@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1><%= title %></h1>
+
+    <div class="roster-toolbar">
+      <div class="roster-nav">
+        <a class="btn-secondary" href="?offset=<%= offset + 1 %>">&larr; Older 12 Weeks</a>
+        <% if (canGoNewer) { %>
+          <a class="btn-secondary" href="?offset=<%= offset - 1 %>">Newer 12 Weeks &rarr;</a>
+        <% } %>
+      </div>
+      <a class="btn-secondary" href="/admin/roster/<%= type %>/<%= day %>/export.csv?offset=<%= offset %>">Export CSV</a>
+    </div>
+
+    <% if (type === 'attendance') { %>
+      <div class="legend">
+        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+      </div>
+    <% } %>
+
+    <div class="roster-scroll">
+      <table class="roster-table">
+        <thead>
+          <tr>
+            <th class="roster-name-col">Name</th>
+            <% dateLabels.forEach(function(label) { %>
+              <th><%= label %></th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (rows.length === 0) { %>
+            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members assigned to this roster yet.</td></tr>
+          <% } %>
+          <% rows.forEach(function(row) { %>
+            <tr>
+              <td class="roster-name-col"><%= row.member.name %></td>
+              <% row.cells.forEach(function(cell) { %>
+                <% if (type === 'attendance') { %>
+                  <td>
+                    <% if (cell === 'P') { %><span class="cell-tag cell-present">P</span>
+                    <% } else if (cell === 'A') { %><span class="cell-tag cell-absent">A</span>
+                    <% } else { %><span class="cell-tag cell-blank">&nbsp;</span>
+                    <% } %>
+                  </td>
+                <% } else { %>
+                  <td><span class="cell-tag <%= cell ? 'cell-number' : 'cell-blank' %>"><%= cell || ' ' %></span></td>
+                <% } %>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

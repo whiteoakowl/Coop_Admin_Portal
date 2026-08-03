@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <main class="form-wrap">
+    <a href="/" class="kiosk-home">&larr; Home</a>
+    <h1>Report an Absence</h1>
+    <p class="subtitle">Let us know you won't be at an upcoming Monday or Wednesday session.</p>
+
+    <% if (result) { %>
+      <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
+    <% } %>
+
+    <form method="POST" action="/absence/submit" class="stack-form">
+      <label for="memberId">Your Name</label>
+      <select id="memberId" name="memberId" required>
+        <option value="">Select your name&hellip;</option>
+        <% members.forEach(function(m) { %>
+          <option value="<%= m.id %>"><%= m.name %></option>
+        <% }); %>
+      </select>
+
+      <label for="sessionDate">Session</label>
+      <select id="sessionDate" name="sessionDate" required>
+        <option value="">Select a session&hellip;</option>
+        <% sessions.forEach(function(s) { %>
+          <option value="<%= s.date %>"><%= s.label %></option>
+        <% }); %>
+      </select>
+
+      <label for="reason">Reason (optional)</label>
+      <textarea id="reason" name="reason" rows="3" placeholder="Optional note"></textarea>
+
+      <button type="submit" class="primary-btn">Submit Absence</button>
+    </form>
+  </main>
+</body>
+</html>

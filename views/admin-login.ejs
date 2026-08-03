@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <main class="form-wrap form-wrap-narrow">
+    <a href="/" class="kiosk-home">&larr; Home</a>
+    <h1>Admin Login</h1>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/admin/login" class="stack-form">
+      <input type="hidden" name="next" value="<%= next %>" />
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <button type="submit" class="primary-btn">Log In</button>
+    </form>
+  </main>
+</body>
+</html>

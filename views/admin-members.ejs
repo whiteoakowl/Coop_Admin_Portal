@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Members</h1>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <details class="add-member-details">
+      <summary class="btn-primary-summary">+ Add Member</summary>
+      <form method="POST" action="/admin/members" class="inline-form">
+        <div class="inline-form-row">
+          <label>
+            Name
+            <input type="text" name="name" required />
+          </label>
+          <label>
+            Roster Day(s)
+            <select name="days">
+              <option value="both">Monday &amp; Wednesday</option>
+              <option value="monday">Monday only</option>
+              <option value="wednesday">Wednesday only</option>
+            </select>
+          </label>
+          <label>
+            Barcode <span class="hint">(leave blank to auto-generate)</span>
+            <input type="text" name="barcode" placeholder="auto-generated" />
+          </label>
+        </div>
+        <button type="submit" class="primary-btn">Add Member</button>
+      </form>
+    </details>
+
+    <div class="roster-scroll">
+      <table class="roster-table members-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Barcode</th>
+            <th>Roster Day(s)</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% members.forEach(function(m) { %>
+            <tr class="<%= m.active ? '' : 'row-inactive' %>">
+              <td>
+                <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-name-form">
+                  <input type="text" name="name" value="<%= m.name %>" />
+                  <button type="submit" class="link-btn">Save</button>
+                </form>
+              </td>
+              <td class="mono"><%= m.barcode %></td>
+              <td>
+                <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-days-form">
+                  <input type="hidden" name="name" value="<%= m.name %>" />
+                  <select name="days" onchange="this.form.submit()">
+                    <option value="both" <%= m.days === 'both' ? 'selected' : '' %>>Mon &amp; Wed</option>
+                    <option value="monday" <%= m.days === 'monday' ? 'selected' : '' %>>Monday only</option>
+                    <option value="wednesday" <%= m.days === 'wednesday' ? 'selected' : '' %>>Wednesday only</option>
+                  </select>
+                </form>
+              </td>
+              <td><%= m.active ? 'Active' : 'Inactive' %></td>
+              <td class="actions-cell">
+                <a class="link-btn" href="/admin/members/<%= m.id %>/badge" target="_blank">Print Badge</a>
+                <form method="POST" action="/admin/members/<%= m.id %>/toggle-active" class="inline-block-form">
+                  <button type="submit" class="link-btn"><%= m.active ? 'Deactivate' : 'Reactivate' %></button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

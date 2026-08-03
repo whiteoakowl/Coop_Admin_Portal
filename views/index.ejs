@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="landing">
+  <main class="landing-wrap">
+    <h1>SH Check-In / Check-Out</h1>
+    <p class="subtitle">Monday &amp; Wednesday attendance system</p>
+
+    <div class="landing-grid">
+      <a class="landing-card" href="/kiosk/checkin">
+        <span class="landing-icon">✅</span>
+        <span class="landing-label">Check In</span>
+        <span class="landing-desc">Scan your barcode to check in</span>
+      </a>
+      <a class="landing-card" href="/kiosk/checkout">
+        <span class="landing-icon">🚪</span>
+        <span class="landing-label">Check Out</span>
+        <span class="landing-desc">Scan your barcode &amp; pick your number</span>
+      </a>
+      <a class="landing-card" href="/absence">
+        <span class="landing-icon">📝</span>
+        <span class="landing-label">Report Absence</span>
+        <span class="landing-desc">Can't make it? Let us know</span>
+      </a>
+      <a class="landing-card landing-card-admin" href="/admin">
+        <span class="landing-icon">🔐</span>
+        <span class="landing-label">Admin</span>
+        <span class="landing-desc">Rosters &amp; member management</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
