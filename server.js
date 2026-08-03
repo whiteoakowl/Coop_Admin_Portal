@@ -62,11 +62,21 @@ function lanAddresses() {
   return addresses;
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
   const addresses = lanAddresses();
   if (addresses.length > 0) {
     console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
     for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
   }
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\nSomething else on this computer is already using port ${PORT}, so the server can't start.`);
+    console.error(`Close that other program, or open the .env file and change PORT to a different number (e.g. 3001), then try again.\n`);
+  } else {
+    console.error('\nThe server failed to start:', err.message, '\n');
+  }
+  process.exitCode = 1;
 });

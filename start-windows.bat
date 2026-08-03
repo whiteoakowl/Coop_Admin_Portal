@@ -25,6 +25,11 @@ if not exist .env (
   echo You can open it in a text editor later to set a real admin password.
 )
 
+set "PORT_TO_OPEN=3000"
+for /f "usebackq tokens=1,2 delims==" %%A in (".env") do (
+  if /i "%%A"=="PORT" set "PORT_TO_OPEN=%%B"
+)
+
 echo.
 echo Starting the Check-In/Out system...
 echo Your browser will open automatically in a couple of seconds.
@@ -33,6 +38,14 @@ echo IMPORTANT: keep this window open while you're using the system.
 echo Closing it stops the server.
 echo.
 
-start "" cmd /c "timeout /t 2 >nul && start http://localhost:3000"
+start "" cmd /c "timeout /t 2 >nul && start http://localhost:%PORT_TO_OPEN%"
 
 call npm start
+
+echo.
+if errorlevel 1 (
+  echo The server stopped because of an error - see the messages above for what went wrong.
+) else (
+  echo The server has stopped.
+)
+pause
