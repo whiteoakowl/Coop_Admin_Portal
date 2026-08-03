@@ -1,4 +1,4 @@
-# SH Check-In / Check-Out
+# Sanford Homeschoolers Check-In / Check-Out
 
 Kiosk-style barcode attendance system for Monday and Wednesday sessions, built around admin-defined **rosters**.
 

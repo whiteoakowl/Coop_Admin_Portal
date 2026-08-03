@@ -1,17 +1,22 @@
 :root {
-  --bg: #f4f6f8;
+  /* Sanford Homeschoolers brand palette */
+  --bg: #f2f7fc;
   --surface: #ffffff;
   --ink: #1c2530;
   --muted: #64748b;
-  --brand: #2563eb;
-  --brand-dark: #1d4ed8;
+  --brand: #79baec;       /* logo blue - fills, borders, badges (pair with --ink or white) */
+  --brand-dark: #2e6da4;  /* accessible mid blue - links, button fills w/ white text */
+  --brand-darker: #1f4e7a; /* hover state for brand-dark */
+  --brand-soft: #eaf4fd;  /* tinted section backgrounds */
+  --accent: #e49b0f;      /* logo gold - highlights, focus, secondary accents */
+  --accent-dark: #b97a0a; /* hover state for accent */
   --green: #16a34a;
   --green-bg: #dcfce7;
   --red: #dc2626;
   --red-bg: #fee2e2;
   --yellow: #a16207;
   --yellow-bg: #fef9c3;
-  --border: #e2e8f0;
+  --border: #dbe8f5;
   --radius: 14px;
 }
 
@@ -25,7 +30,7 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-a { color: var(--brand); text-decoration: none; }
+a { color: var(--brand-dark); text-decoration: none; }
 
 h1 { margin: 0 0 0.25rem; font-size: 2rem; }
 h2 { margin: 2rem 0 0.75rem; font-size: 1.25rem; }
@@ -44,6 +49,8 @@ button { font-family: inherit; cursor: pointer; }
 
 .landing-wrap { text-align: center; max-width: 780px; }
 
+.landing-logo { height: 140px; width: 140px; margin-bottom: 1rem; }
+
 .landing .subtitle { color: var(--muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
 
 .landing-grid {
@@ -55,6 +62,7 @@ button { font-family: inherit; cursor: pointer; }
 .landing-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--brand);
   border-radius: var(--radius);
   padding: 2rem 1rem;
   display: flex;
@@ -62,10 +70,10 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   gap: 0.4rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.landing-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+.landing-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-top-color: var(--accent); }
 
 .landing-icon { font-size: 2.5rem; }
 .landing-label { font-size: 1.15rem; font-weight: 600; color: var(--ink); }
@@ -82,7 +90,7 @@ button { font-family: inherit; cursor: pointer; }
   justify-content: flex-start;
   padding: 2.5rem 1.5rem;
   text-align: center;
-  background: linear-gradient(180deg, #eef2f9 0%, #f4f6f8 100%);
+  background: linear-gradient(180deg, var(--brand-soft) 0%, var(--bg) 100%);
   user-select: none;
 }
 
@@ -93,6 +101,7 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--muted);
 }
 
+.kiosk-logo { height: 84px; width: 84px; margin-bottom: 0.5rem; }
 .kiosk h1 { font-size: 2.4rem; }
 .kiosk-date { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
 
@@ -128,9 +137,9 @@ button { font-family: inherit; cursor: pointer; }
   background: #eef1f5;
 }
 
-.kiosk-status-loading { background: #e0e7ff; transform: scale(1.05); }
+.kiosk-status-loading { background: var(--brand-soft); transform: scale(1.05); }
 .kiosk-status-success { background: var(--green-bg); transform: scale(1.08); }
-.kiosk-status-info { background: #dbeafe; }
+.kiosk-status-info { background: var(--brand-soft); }
 .kiosk-status-error { background: var(--red-bg); transform: scale(1.08); }
 
 #barcode-input {
@@ -160,8 +169,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
 }
 
-.numpad-btn:active { background: var(--brand); color: #fff; }
-.numpad-btn-selected { background: var(--brand); color: #fff; border-color: var(--brand); }
+.numpad-btn:active { background: var(--brand-dark); color: #fff; }
+.numpad-btn-selected { background: var(--brand-dark); color: #fff; border-color: var(--brand-dark); }
 
 .kiosk-cancel-btn {
   margin-top: 0.5rem;
@@ -183,6 +192,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .form-wrap { max-width: 560px; margin: 0 auto; }
 .form-wrap-narrow { max-width: 400px; }
+.form-logo { height: 72px; width: 72px; margin-bottom: 0.75rem; }
 
 .form-wrap .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
 
@@ -204,7 +214,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .primary-btn {
   margin-top: 1.5rem;
-  background: var(--brand);
+  background: var(--brand-dark);
   color: #fff;
   border: none;
   padding: 0.85rem 1.5rem;
@@ -215,7 +225,7 @@ button { font-family: inherit; cursor: pointer; }
   text-align: center;
 }
 
-.primary-btn:hover { background: var(--brand-dark); }
+.primary-btn:hover { background: var(--brand-darker); }
 
 .alert {
   padding: 0.85rem 1rem;
@@ -232,7 +242,16 @@ button { font-family: inherit; cursor: pointer; }
 .admin-nav {
   background: var(--ink);
   color: #fff;
+  border-bottom: 3px solid var(--accent);
 }
+
+.admin-nav .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-nav .brand img { height: 28px; width: 28px; }
 
 .admin-nav-inner {
   max-width: 1200px;
@@ -294,7 +313,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .badge-pill {
   display: inline-block;
-  background: #e0e7ff;
+  background: var(--brand-soft);
   color: var(--brand-dark);
   font-size: 0.75rem;
   font-weight: 600;
@@ -375,7 +394,6 @@ button { font-family: inherit; cursor: pointer; }
 .cell-late { background: var(--yellow-bg); color: var(--yellow); }
 .cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: transparent; color: var(--border); }
-.cell-number { background: #e0e7ff; color: var(--brand-dark); }
 
 .roster-table-detailed td { white-space: nowrap; }
 .cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
@@ -394,7 +412,7 @@ button { font-family: inherit; cursor: pointer; }
 .btn-primary-summary {
   cursor: pointer;
   display: inline-block;
-  background: var(--brand);
+  background: var(--brand-dark);
   color: #fff;
   padding: 0.6rem 1.1rem;
   border-radius: 8px;
@@ -414,7 +432,7 @@ button { font-family: inherit; cursor: pointer; }
 .edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }
 .edit-name-form input:focus { border-color: var(--border); background: #f8fafc; }
 
-.link-btn { background: none; border: none; color: var(--brand); font-size: 0.85rem; padding: 0; }
+.link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
 .inline-block-form { display: inline; }
 .actions-cell { display: flex; gap: 0.75rem; align-items: center; }
@@ -425,13 +443,15 @@ button { font-family: inherit; cursor: pointer; }
 
 .badge-card {
   width: 340px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--brand);
+  border-top: 6px solid var(--accent);
   border-radius: 16px;
   padding: 2rem 1.5rem;
   text-align: center;
   background: #fff;
 }
 
+.badge-logo { height: 56px; width: 56px; margin-bottom: 0.75rem; }
 .badge-name { font-size: 1.6rem; font-weight: 700; margin-bottom: 1rem; }
 .badge-code { margin-top: 0.5rem; font-family: monospace; letter-spacing: 2px; color: var(--muted); }
 

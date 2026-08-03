@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <title>Badge - <%= member.name %></title>
+  <link rel="icon" type="image/png" href="/img/logo.png" />
   <link rel="stylesheet" href="/css/styles.css" />
   <script src="/vendor/jsbarcode.min.js"></script>
 </head>
 <body class="badge-page">
   <div class="badge-card">
+    <img class="badge-logo" src="/img/logo.png" alt="" />
     <div class="badge-name"><%= member.name %></div>
     <svg id="barcode"></svg>
     <div class="badge-code"><%= member.barcode %></div>

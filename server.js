@@ -51,5 +51,5 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`SH Check-In/Out running at http://localhost:${PORT}`);
+  console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
 });
