@@ -8,15 +8,22 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- A roster is an admin-defined group of members that meets on a given
--- weekday (sessions run Monday and Wednesday). Admins can create as many
--- rosters as they need (e.g. "Monday Adults", "Wednesday Youth").
+-- A roster is an admin-defined group of members with its own explicit list
+-- of session dates (see roster_dates) and an optional category label.
+-- Admins can create as many rosters as they need.
 CREATE TABLE IF NOT EXISTS rosters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  category TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- The specific calendar dates that make up a roster's columns.
+CREATE TABLE IF NOT EXISTS roster_dates (
+  roster_id INTEGER NOT NULL REFERENCES rosters(id) ON DELETE CASCADE,
+  session_date TEXT NOT NULL,
+  PRIMARY KEY (roster_id, session_date)
 );
 
 -- Members can belong to more than one roster.
@@ -62,3 +69,4 @@ CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, sessi
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
 CREATE INDEX IF NOT EXISTS idx_roster_members_member ON roster_members(member_id);
+CREATE INDEX IF NOT EXISTS idx_roster_dates_date ON roster_dates(session_date);

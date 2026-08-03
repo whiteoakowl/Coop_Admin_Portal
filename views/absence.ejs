@@ -8,13 +8,13 @@
     <a href="/" class="kiosk-home">&larr; Home</a>
     <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
     <h1>Absence/Late Form</h1>
-    <p class="subtitle">Let us know if you'll be absent or arriving late to an upcoming Monday or Wednesday session.</p>
+    <p class="subtitle">Let us know if you'll be absent or arriving late to an upcoming session.</p>
 
     <% if (result) { %>
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
     <% } %>
 
-    <form method="POST" action="/absence/submit" class="stack-form" id="absence-form">
+    <form method="POST" action="/absence/submit" class="stack-form" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
       <label for="type">Absence or Late</label>
       <select id="type" name="type" required>
         <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; I won't be there</option>
@@ -29,8 +29,10 @@
         <% }); %>
       </select>
 
-      <label for="sessionDate">Date</label>
-      <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />
+      <label for="sessionDate">Session Date</label>
+      <select id="sessionDate" name="sessionDate" required disabled data-preselect="<%= formValues.sessionDate %>">
+        <option value="">Select your name first&hellip;</option>
+      </select>
       <span id="date-warning" class="field-warning"></span>
 
       <label for="reasonCategory">Reason</label>

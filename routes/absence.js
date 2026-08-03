@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { sessionDayForDate, formatDateLabel } = require('../utils/dates');
-const { getMemberRostersForDay } = require('../utils/rosters');
+const { todayISO, isValidISODate, formatDateLabel } = require('../utils/dates');
+const { getMemberRostersForDate, getMemberUpcomingDates } = require('../utils/rosters');
 
 function loadMembers() {
   return db.prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
@@ -15,6 +15,14 @@ router.get('/absence', (req, res) => {
     result: null,
     formValues: { type: 'absence', memberId: '', sessionDate: '', reasonCategory: '', reason: '' },
   });
+});
+
+// Used by the form's JS to populate the date dropdown once a name is picked.
+router.get('/absence/dates', (req, res) => {
+  const memberId = parseInt(req.query.memberId, 10);
+  if (!memberId) return res.json({ dates: [] });
+  const dates = getMemberUpcomingDates(memberId, todayISO());
+  res.json({ dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })) });
 });
 
 router.post('/absence/submit', (req, res) => {
@@ -33,7 +41,6 @@ router.post('/absence/submit', (req, res) => {
   };
 
   const members = loadMembers();
-  const sessionDay = sessionDayForDate(sessionDate);
   const member = memberId ? db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId) : null;
 
   if (!member) {
@@ -44,12 +51,12 @@ router.post('/absence/submit', (req, res) => {
       result: { ok: false, message: 'Please select your name.' },
     });
   }
-  if (!sessionDay) {
+  if (!isValidISODate(sessionDate)) {
     return res.render('absence', {
       title: 'Absence/Late Form',
       members,
       formValues,
-      result: { ok: false, message: 'Please choose a Monday or Wednesday date.' },
+      result: { ok: false, message: 'Please choose a session date.' },
     });
   }
   if (!reasonCategory) {
@@ -61,13 +68,13 @@ router.post('/absence/submit', (req, res) => {
     });
   }
 
-  const rosters = getMemberRostersForDay(member.id, sessionDay);
+  const rosters = getMemberRostersForDate(member.id, sessionDate);
   if (rosters.length === 0) {
     return res.render('absence', {
       title: 'Absence/Late Form',
       members,
       formValues,
-      result: { ok: false, message: `${member.name} is not on a roster for ${formatDateLabel(sessionDate)}.` },
+      result: { ok: false, message: `${member.name} isn't on a roster meeting on ${formatDateLabel(sessionDate)}.` },
     });
   }
 
@@ -108,7 +115,7 @@ router.post('/absence/submit', (req, res) => {
     title: 'Absence/Late Form',
     members,
     formValues: { type: 'absence', memberId: '', sessionDate: '', reasonCategory: '', reason: '' },
-    result: { ok: true, message },
+    result: { ok: true, message, redirectHome: true },
   });
 });
 

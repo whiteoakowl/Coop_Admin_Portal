@@ -3,11 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { todayISO, addDays, getOccurrences, getUpcomingOccurrences, formatDateLabel, formatTime } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime } = require('../utils/dates');
+const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
-
-const WEEKS_PER_PAGE = 12;
 
 function rosterMembers(rosterId) {
   return db
@@ -20,16 +19,41 @@ function rosterMembers(rosterId) {
     .all(rosterId);
 }
 
-function buildRosterGridData(roster, offset) {
-  const today = todayISO();
-  const [upcoming] = getUpcomingOccurrences(roster.day, 1, today);
-  const anchor = addDays(upcoming, -7 * WEEKS_PER_PAGE * offset);
-  const dates = getOccurrences(roster.day, WEEKS_PER_PAGE, anchor);
-  const placeholders = dates.map(() => '?').join(',');
+function rosterDates(rosterId) {
+  return db
+    .prepare('SELECT session_date FROM roster_dates WHERE roster_id = ? ORDER BY session_date ASC')
+    .all(rosterId)
+    .map((r) => r.session_date);
+}
 
+function distinctCategories() {
+  return db
+    .prepare(`SELECT DISTINCT category FROM rosters WHERE category IS NOT NULL AND category != '' ORDER BY category COLLATE NOCASE`)
+    .all()
+    .map((r) => r.category);
+}
+
+function importNamesIntoRoster(rosterId, buffer) {
+  const names = parseNamesFile(buffer);
+  const linkMember = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
+
+  let created = 0;
+  let linked = 0;
+  for (const name of names) {
+    const { member, created: wasCreated } = findOrCreateMemberByName(name);
+    if (wasCreated) created++;
+    const result = linkMember.run(rosterId, member.id);
+    if (result.changes > 0) linked++;
+  }
+  return { total: names.length, created, linked };
+}
+
+function buildRosterGridData(roster) {
+  const dates = rosterDates(roster.id);
+  const placeholders = dates.map(() => '?').join(',');
   const members = rosterMembers(roster.id);
 
-  const attendanceRows = members.length
+  const attendanceRows = members.length && dates.length
     ? db
         .prepare(
           `SELECT member_id, session_date, status, check_in_time FROM attendance
@@ -37,7 +61,7 @@ function buildRosterGridData(roster, offset) {
         )
         .all(roster.id, ...dates)
     : [];
-  const checkoutRows = members.length
+  const checkoutRows = members.length && dates.length
     ? db
         .prepare(
           `SELECT member_id, session_date, number, check_out_time FROM checkouts
@@ -67,35 +91,87 @@ function buildRosterGridData(roster, offset) {
     }),
   }));
 
+  const summary = dates.map((d, i) => {
+    let present = 0, late = 0, absent = 0;
+    for (const row of rows) {
+      const cell = row.cells[i];
+      if (!cell) continue;
+      if (cell.tag === 'P') present++;
+      else if (cell.tag === 'L') late++;
+      else if (cell.tag === 'A') absent++;
+    }
+    return { present, late, absent };
+  });
+
   return {
     dates,
     dateLabels: dates.map(formatDateLabel),
     rows,
-    offset,
-    canGoNewer: offset > 0,
+    summary,
   };
 }
 
 // --- Roster list & creation ---
 
 router.get('/rosters', requireAdmin, (req, res) => {
-  const rosters = db
-    .prepare(
-      `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount
-       FROM rosters r ORDER BY r.active DESC, r.day, r.name COLLATE NOCASE`
-    )
-    .all();
-  res.render('admin-rosters', { title: 'Rosters', rosters, error: req.query.error || null, notice: req.query.notice || null });
+  const category = (req.query.category || '').trim();
+  let sql = `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount,
+             (SELECT COUNT(*) FROM roster_dates rd WHERE rd.roster_id = r.id) AS dateCount
+             FROM rosters r`;
+  const params = [];
+  if (category) {
+    sql += ' WHERE r.category = ?';
+    params.push(category);
+  }
+  sql += ' ORDER BY r.active DESC, r.name COLLATE NOCASE';
+  const rosters = db.prepare(sql).all(...params);
+
+  res.render('admin-rosters', {
+    title: 'Rosters',
+    rosters,
+    categories: distinctCategories(),
+    selectedCategory: category,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 });
 
-router.post('/rosters', requireAdmin, (req, res) => {
+router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
   const name = (req.body.name || '').trim();
-  const day = ['monday', 'wednesday'].includes(req.body.day) ? req.body.day : null;
-  if (!name || !day) {
-    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Name and day are required.'));
+  const category = (req.body.category || '').trim() || null;
+  const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))].sort();
+
+  if (!name) {
+    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Roster title is required.'));
   }
-  const info = db.prepare('INSERT INTO rosters (name, day) VALUES (?, ?)').run(name, day);
-  res.redirect(`/admin/rosters/${info.lastInsertRowid}/manage`);
+  if (dates.length === 0) {
+    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Pick at least one date for the roster.'));
+  }
+
+  const info = db.prepare('INSERT INTO rosters (name, category) VALUES (?, ?)').run(name, category);
+  const rosterId = info.lastInsertRowid;
+
+  const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
+  for (const d of dates) insertDate.run(rosterId, d);
+
+  let notice = `Roster "${name}" created with ${dates.length} date${dates.length === 1 ? '' : 's'}.`;
+  if (req.file) {
+    const result = importNamesIntoRoster(rosterId, req.file.buffer);
+    notice += ` Imported ${result.total} name(s): ${result.created} new member(s), ${result.linked} added to the roster.`;
+  }
+
+  res.redirect(`/admin/rosters/${rosterId}/manage?notice=` + encodeURIComponent(notice));
+});
+
+router.post('/rosters/:id/rename', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body.name || '').trim();
+  const category = (req.body.category || '').trim() || null;
+  if (!name) {
+    return res.redirect(`/admin/rosters/${id}/manage?error=` + encodeURIComponent('Roster title is required.'));
+  }
+  db.prepare('UPDATE rosters SET name = ?, category = ? WHERE id = ?').run(name, category, id);
+  res.redirect(`/admin/rosters/${id}/manage`);
 });
 
 router.post('/rosters/:id/toggle-active', requireAdmin, (req, res) => {
@@ -105,15 +181,32 @@ router.post('/rosters/:id/toggle-active', requireAdmin, (req, res) => {
   res.redirect('/admin/rosters');
 });
 
-router.post('/rosters/:id/rename', requireAdmin, (req, res) => {
+router.post('/rosters/:id/delete', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const name = (req.body.name || '').trim();
-  const day = ['monday', 'wednesday'].includes(req.body.day) ? req.body.day : null;
-  if (!name || !day) {
-    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Name and day are required.'));
-  }
-  db.prepare('UPDATE rosters SET name = ?, day = ? WHERE id = ?').run(name, day, id);
-  res.redirect('/admin/rosters');
+  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
+  db.prepare('DELETE FROM rosters WHERE id = ?').run(id);
+  res.redirect(
+    '/admin/rosters?notice=' + encodeURIComponent(roster ? `Deleted "${roster.name}" and its attendance history.` : 'Roster deleted.')
+  );
+});
+
+// --- Roster dates management ---
+
+router.post('/rosters/:id/dates/add', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
+  const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
+  for (const d of dates) insertDate.run(id, d);
+  res.redirect(`/admin/rosters/${id}/manage?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
+});
+
+router.post('/rosters/:id/dates/:date/remove', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const date = req.params.date;
+  db.prepare('DELETE FROM roster_dates WHERE roster_id = ? AND session_date = ?').run(id, date);
+  db.prepare('DELETE FROM attendance WHERE roster_id = ? AND session_date = ?').run(id, date);
+  db.prepare('DELETE FROM checkouts WHERE roster_id = ? AND session_date = ?').run(id, date);
+  res.redirect(`/admin/rosters/${id}/manage?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
 });
 
 // --- Roster membership management ---
@@ -130,11 +223,15 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
     .all()
     .filter((m) => !memberIds.includes(m.id));
 
+  const dates = rosterDates(id);
+
   res.render('admin-roster-manage', {
     title: `Manage ${roster.name}`,
     roster,
     members,
     availableMembers,
+    dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    categories: distinctCategories(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -156,7 +253,7 @@ router.post('/rosters/:id/remove-member/:memberId', requireAdmin, (req, res) => 
   res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 
-// --- Bulk import (names-only file, one name per line) ---
+// --- Bulk import (names-only file, one name per line) into an existing roster ---
 
 router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, res) => {
   const rosterId = parseInt(req.params.id, 10);
@@ -167,37 +264,10 @@ router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, re
     return res.redirect(`/admin/rosters/${rosterId}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
   }
 
-  const text = req.file.buffer.toString('utf8');
-  const names = text
-    .split(/\r?\n/)
-    .map((line) => line.split(',')[0].trim().replace(/^"|"$/g, ''))
-    .filter((name) => name && name.toLowerCase() !== 'name');
-
-  let created = 0;
-  let linked = 0;
-
-  const findMember = db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE');
-  const insertMember = db.prepare(`INSERT INTO members (name, barcode) VALUES (?, ?)`);
-  const updateBarcode = db.prepare('UPDATE members SET barcode = ? WHERE id = ?');
-  const linkMember = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
-
-  for (const name of names) {
-    let member = findMember.get(name);
-    if (!member) {
-      const tempBarcode = `TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const info = insertMember.run(name, tempBarcode);
-      const barcode = `SH${String(info.lastInsertRowid).padStart(6, '0')}`;
-      updateBarcode.run(barcode, info.lastInsertRowid);
-      member = { id: info.lastInsertRowid };
-      created++;
-    }
-    const result = linkMember.run(rosterId, member.id);
-    if (result.changes > 0) linked++;
-  }
-
+  const result = importNamesIntoRoster(rosterId, req.file.buffer);
   res.redirect(
     `/admin/rosters/${rosterId}/manage?notice=` +
-      encodeURIComponent(`Imported ${names.length} name(s): ${created} new member(s) created, ${linked} added to this roster.`)
+      encodeURIComponent(`Imported ${result.total} name(s): ${result.created} new member(s) created, ${result.linked} added to this roster.`)
   );
 });
 
@@ -208,8 +278,7 @@ router.get('/roster/:id', requireAdmin, (req, res) => {
   const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
   if (!roster) return res.status(404).send('Not found');
 
-  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
-  const data = buildRosterGridData(roster, offset);
+  const data = buildRosterGridData(roster);
 
   res.render('admin-roster', {
     title: `${roster.name} Roster`,
@@ -223,8 +292,7 @@ router.get('/roster/:id/export.csv', requireAdmin, (req, res) => {
   const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
   if (!roster) return res.status(404).send('Not found');
 
-  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
-  const data = buildRosterGridData(roster, offset);
+  const data = buildRosterGridData(roster);
 
   const header = ['Name'];
   for (const d of data.dates) {
@@ -239,7 +307,16 @@ router.get('/roster/:id/export.csv', requireAdmin, (req, res) => {
     return row.join(',');
   });
 
-  const csv = [header.join(','), ...lines].join('\n');
+  const summaryRows = ['Present', 'Late', 'Absent'].map((label, idx) => {
+    const key = label.toLowerCase();
+    const row = [label];
+    for (const s of data.summary) {
+      row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
+    }
+    return row.join(',');
+  });
+
+  const csv = [header.join(','), ...lines, ...summaryRows].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="${roster.name.replace(/[^a-z0-9]+/gi, '-')}-roster.csv"`);
   res.send(csv);

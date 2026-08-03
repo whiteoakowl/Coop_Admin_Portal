@@ -240,9 +240,9 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------- Admin ---------- */
 
 .admin-nav {
-  background: var(--ink);
-  color: #fff;
-  border-bottom: 3px solid var(--accent);
+  background: var(--accent);
+  color: var(--ink);
+  border-bottom: 3px solid var(--ink);
 }
 
 .admin-nav .brand {
@@ -263,15 +263,15 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 
-.admin-nav .brand { color: #fff; font-weight: 700; margin-right: 0.5rem; }
+.admin-nav .brand { color: var(--ink); font-weight: 700; margin-right: 0.5rem; }
 
 .admin-nav nav { display: flex; gap: 1rem; flex-wrap: wrap; flex: 1; }
-.admin-nav nav a { color: #cbd5e1; font-size: 0.9rem; }
-.admin-nav nav a:hover { color: #fff; }
+.admin-nav nav a { color: var(--ink); font-size: 0.9rem; font-weight: 600; }
+.admin-nav nav a:hover { color: var(--brand-darker); }
 
 .logout-form { margin: 0; }
-.admin-nav .link-btn { color: #cbd5e1; background: none; border: none; font-size: 0.9rem; }
-.admin-nav .link-btn:hover { color: #fff; }
+.admin-nav .link-btn { color: var(--ink); background: none; border: none; font-size: 0.9rem; font-weight: 600; }
+.admin-nav .link-btn:hover { color: var(--brand-darker); }
 
 .admin-main { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
 
@@ -346,7 +346,35 @@ button { font-family: inherit; cursor: pointer; }
   margin: 1.25rem 0;
 }
 
-.roster-nav { display: flex; gap: 0.5rem; }
+.date-list-wrap { margin: 0.5rem 0 1rem; }
+.date-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
+.date-list-row { display: flex; align-items: center; gap: 0.5rem; }
+.date-list-row input[type="date"] {
+  padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-family: inherit;
+}
+.date-list-remove {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  width: 2rem; height: 2rem; font-size: 1.1rem; color: var(--muted); line-height: 1;
+}
+.date-list-remove:hover { border-color: var(--red); color: var(--red); }
+
+.category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+.category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
+.category-filter select {
+  padding: 0.45rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; background: var(--surface);
+}
+
+.roster-summary-row td {
+  font-weight: 700;
+  background: #f8fafc;
+  border-top: 2px solid var(--border);
+}
+.roster-summary-label { text-align: left !important; color: var(--muted); font-weight: 600 !important; }
+.summary-present { color: var(--green); }
+.summary-late { color: var(--yellow); }
+.summary-absent { color: var(--red); }
+
+.link-btn-danger { color: var(--red); }
 
 .btn-secondary {
   background: var(--surface);
@@ -456,6 +484,16 @@ button { font-family: inherit; cursor: pointer; }
 .badge-code { margin-top: 0.5rem; font-family: monospace; letter-spacing: 2px; color: var(--muted); }
 
 @media print {
-  .no-print { display: none; }
+  .no-print { display: none !important; }
   .admin-nav, .kiosk-home { display: none; }
+  body { background: #fff; }
+  .admin-main { max-width: none; padding: 0; }
+  .roster-scroll { overflow: visible; border: none; }
+  .roster-table { font-size: 11px; }
+  .roster-name-col { position: static; }
+}
+
+@page {
+  size: landscape;
+  margin: 1cm;
 }

@@ -32,17 +32,27 @@ router.post('/logout', (req, res) => {
 
 router.get('/', requireAdmin, (req, res) => {
   const today = todayISO();
+  const category = (req.query.category || '').trim();
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
   const todayPresent = db
     .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'present'`)
     .get(today).c;
   const todayCheckouts = db.prepare(`SELECT COUNT(*) AS c FROM checkouts WHERE session_date = ?`).get(today).c;
-  const rosters = db
-    .prepare(
-      `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount
-       FROM rosters r WHERE r.active = 1 ORDER BY r.day, r.name COLLATE NOCASE`
-    )
-    .all();
+
+  let sql = `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount
+             FROM rosters r WHERE r.active = 1`;
+  const params = [];
+  if (category) {
+    sql += ' AND r.category = ?';
+    params.push(category);
+  }
+  sql += ' ORDER BY r.name COLLATE NOCASE';
+  const rosters = db.prepare(sql).all(...params);
+
+  const categories = db
+    .prepare(`SELECT DISTINCT category FROM rosters WHERE category IS NOT NULL AND category != '' ORDER BY category COLLATE NOCASE`)
+    .all()
+    .map((r) => r.category);
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
@@ -52,6 +62,8 @@ router.get('/', requireAdmin, (req, res) => {
     todayCheckouts,
     today,
     rosters,
+    categories,
+    selectedCategory: category,
   });
 });
 

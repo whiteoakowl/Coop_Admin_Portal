@@ -8,13 +8,71 @@
   <main class="admin-main">
     <p class="subtitle"><a href="/admin/rosters">&larr; All Rosters</a></p>
     <h1>Manage <%= roster.name %></h1>
-    <p class="subtitle"><%= roster.day[0].toUpperCase() + roster.day.slice(1) %> roster</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
+    <h2>Roster Details</h2>
+    <form method="POST" action="/admin/rosters/<%= roster.id %>/rename" class="inline-form inline-form-row">
+      <label>
+        Title
+        <input type="text" name="name" value="<%= roster.name %>" required />
+      </label>
+      <label>
+        Category
+        <input type="text" name="category" value="<%= roster.category || '' %>" list="category-options" placeholder="e.g. Youth, Adults" />
+        <datalist id="category-options">
+          <% categories.forEach(function(c) { %><option value="<%= c %>"></option><% }); %>
+        </datalist>
+      </label>
+      <button type="submit" class="primary-btn">Save</button>
+    </form>
+    <div class="roster-card-actions" style="margin-top: 0.75rem;">
+      <form method="POST" action="/admin/rosters/<%= roster.id %>/toggle-active" class="inline-block-form">
+        <button type="submit" class="link-btn"><%= roster.active ? 'Archive Roster' : 'Unarchive Roster' %></button>
+      </form>
+      <form method="POST" action="/admin/rosters/<%= roster.id %>/delete" class="inline-block-form" onsubmit="return confirm('Permanently delete &quot;<%= roster.name %>&quot; and all its attendance history? This cannot be undone.');">
+        <button type="submit" class="link-btn link-btn-danger">Delete Roster</button>
+      </form>
+    </div>
+
+    <h2>Session Dates (<%= dates.length %>)</h2>
+    <div class="roster-scroll">
+      <table class="roster-table members-table">
+        <thead><tr><th>Date</th><th>Actions</th></tr></thead>
+        <tbody>
+          <% if (dates.length === 0) { %>
+            <tr><td colspan="2" class="roster-empty">No dates yet.</td></tr>
+          <% } %>
+          <% dates.forEach(function(d) { %>
+            <tr>
+              <td><%= d.label %></td>
+              <td>
+                <form method="POST" action="/admin/rosters/<%= roster.id %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any attendance recorded for this date on this roster will be deleted too.');">
+                  <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <form method="POST" action="/admin/rosters/<%= roster.id %>/dates/add" class="inline-form">
+      <label class="roster-checkbox-label">Add More Dates</label>
+      <div class="date-list-wrap">
+        <div class="date-list">
+          <div class="date-list-row">
+            <input type="date" name="dates" />
+            <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
+          </div>
+        </div>
+        <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+      </div>
+      <button type="submit" class="primary-btn">Add Dates</button>
+    </form>
+
     <h2>Import Members from File</h2>
-    <p class="subtitle">Upload a .csv or .txt file with one member name per line (or name in the first column). New names automatically get a member record and a barcode; existing names are matched and added to this roster.</p>
+    <p class="subtitle">Upload a .csv or .txt file with one member name per line (or name in the first column). New names automatically get a member record (barcode = their name); existing names are matched and added to this roster.</p>
     <form method="POST" action="/admin/rosters/<%= roster.id %>/import" enctype="multipart/form-data" class="inline-form">
       <input type="file" name="file" accept=".csv,.txt" required />
       <button type="submit" class="primary-btn">Import</button>
@@ -57,5 +115,6 @@
       </table>
     </div>
   </main>
+  <script src="/js/date-list.js"></script>
 </body>
 </html>

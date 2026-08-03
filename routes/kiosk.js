@@ -1,29 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { todayISO, sessionDayForDate, formatDateLong } = require('../utils/dates');
-const { getMemberRostersForDay } = require('../utils/rosters');
+const { todayISO, formatDateLong } = require('../utils/dates');
+const { getMemberRostersForDate } = require('../utils/rosters');
 
 // --- Check-in kiosk ---
 
 router.get('/checkin', (req, res) => {
-  const today = todayISO();
-  const sessionDay = sessionDayForDate(today);
   res.render('kiosk-checkin', {
     title: 'Check In',
-    sessionDay,
-    dateLabel: formatDateLong(today),
+    dateLabel: formatDateLong(todayISO()),
   });
 });
 
 router.post('/checkin/scan', (req, res) => {
   const barcode = (req.body.barcode || '').trim();
   const today = todayISO();
-  const sessionDay = sessionDayForDate(today);
 
-  if (!sessionDay) {
-    return res.json({ ok: false, message: 'There is no session today. Sessions run Monday and Wednesday.' });
-  }
   if (!barcode) {
     return res.json({ ok: false, message: 'No barcode scanned.' });
   }
@@ -33,9 +26,9 @@ router.post('/checkin/scan', (req, res) => {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
-  const rosters = getMemberRostersForDay(member.id, sessionDay);
+  const rosters = getMemberRostersForDate(member.id, today);
   if (rosters.length === 0) {
-    return res.json({ ok: false, message: `${member.name} is not on a roster for today.` });
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
 
   const now = Date.now();

@@ -7,9 +7,13 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <h1>Members</h1>
+    <p class="subtitle">The full member list. Every member here is available on the Absence/Late form, and can be added to any roster.</p>
 
     <% if (error) { %>
       <div class="alert alert-error"><%= error %></div>
+    <% } %>
+    <% if (notice) { %>
+      <div class="alert alert-success"><%= notice %></div>
     <% } %>
 
     <details class="add-member-details">
@@ -21,8 +25,8 @@
             <input type="text" name="name" required />
           </label>
           <label>
-            Barcode <span class="hint">(leave blank to auto-generate)</span>
-            <input type="text" name="barcode" placeholder="auto-generated" />
+            Barcode <span class="hint">(leave blank to use their name &mdash; barcodes read as names)</span>
+            <input type="text" name="barcode" placeholder="defaults to name" />
           </label>
         </div>
         <label class="roster-checkbox-label">Add to Roster(s)</label>
@@ -30,7 +34,7 @@
           <% allRosters.forEach(function(r) { %>
             <label class="checkbox-pill">
               <input type="checkbox" name="rosterIds" value="<%= r.id %>" />
-              <%= r.name %> (<%= r.day[0].toUpperCase() + r.day.slice(1) %>)
+              <%= r.name %>
             </label>
           <% }); %>
           <% if (allRosters.length === 0) { %>
@@ -38,6 +42,15 @@
           <% } %>
         </div>
         <button type="submit" class="primary-btn">Add Member</button>
+      </form>
+    </details>
+
+    <details class="add-member-details">
+      <summary class="btn-primary-summary">+ Import Names from File</summary>
+      <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form">
+        <p class="subtitle">Upload a .csv or .txt file with one name per line. This adds people to the member list (and the Absence/Late form) without assigning them to a roster &mdash; do that afterward from a roster's Manage page.</p>
+        <input type="file" name="file" accept=".csv,.txt" required />
+        <button type="submit" class="primary-btn">Import</button>
       </form>
     </details>
 

@@ -96,7 +96,7 @@
       const data = await res.json();
       numberMessage.textContent = data.message;
       if (data.ok) {
-        setTimeout(resetToScan, 1800);
+        setTimeout(() => { window.location.href = '/'; }, 1800);
       }
     } catch (err) {
       numberMessage.textContent = 'Connection error. Please try again.';

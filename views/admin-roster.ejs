@@ -7,16 +7,17 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <h1><%= roster.name %></h1>
-    <p class="subtitle"><%= roster.day[0].toUpperCase() + roster.day.slice(1) %> roster &middot; <a href="/admin/rosters/<%= roster.id %>/manage">Manage members</a></p>
+    <p class="subtitle">
+      <% if (roster.category) { %><span class="badge-pill"><%= roster.category %></span><% } %>
+      <a href="/admin/rosters/<%= roster.id %>/manage">Manage roster</a>
+    </p>
 
     <div class="roster-toolbar">
-      <div class="roster-nav">
-        <a class="btn-secondary" href="?offset=<%= offset + 1 %>">&larr; Older 12 Weeks</a>
-        <% if (canGoNewer) { %>
-          <a class="btn-secondary" href="?offset=<%= offset - 1 %>">Newer 12 Weeks &rarr;</a>
-        <% } %>
+      <div></div>
+      <div class="roster-card-actions">
+        <a class="btn-secondary" href="/admin/roster/<%= roster.id %>/export.csv">Export CSV</a>
+        <button type="button" class="btn-secondary no-print" onclick="window.print()">Print</button>
       </div>
-      <a class="btn-secondary" href="/admin/roster/<%= roster.id %>/export.csv?offset=<%= offset %>">Export CSV</a>
     </div>
 
     <div class="legend">
@@ -58,6 +59,22 @@
             </tr>
           <% }); %>
         </tbody>
+        <% if (rows.length > 0) { %>
+          <tfoot>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Present</td>
+              <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Late</td>
+              <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Absent</td>
+              <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
+            </tr>
+          </tfoot>
+        <% } %>
       </table>
     </div>
   </main>

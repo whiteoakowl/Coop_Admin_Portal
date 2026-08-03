@@ -56,13 +56,20 @@ Go to `/admin` (click **Admin** on the home page). Log in with:
 
 Then open **Settings** and change the password to something only you know. This matters most if this computer is ever reachable from outside your own wifi network.
 
-## Step 5 — Create your rosters
+## Step 5 — Create your first roster
 
-Click **Rosters**. Two starter rosters already exist, "Monday" and "Wednesday" — rename them to whatever you call your groups, or leave them, and add as many more as you need. Each roster is tied to Monday or Wednesday. A student in two different groups just gets added to both rosters.
+Click **Rosters** → **+ New Roster**. Fill in:
+
+- **Title** — whatever you call the group (e.g. "Wednesday Youth", "Monday Adults").
+- **Category** — optional, lets you filter rosters later (e.g. "Youth", "Adults", "Sports").
+- **Session Dates** — click a date field and pick a date, then **+ Add another date** for each additional session. Pick as many or as few as you want up front; you can always add more later from the roster's Manage page.
+- **Import Member Names** — optional; upload a list right here to seed the roster's member list in the same step (see the file format below).
+
+A student in two different groups just gets added to both rosters — create each roster separately and add that member to both.
 
 ## Step 6 — Add your members
 
-Open a roster and click **Manage Members**. Two ways to add people:
+If you didn't upload a list when creating the roster, open it and click **Manage**. Two ways to add people:
 
 **Import a list** (fastest for a whole group) — a plain text or spreadsheet-exported `.csv`/`.txt` file with one name per line:
 
@@ -73,9 +80,11 @@ Grace Kim
 Ella Martinez
 ```
 
-Upload it and the system creates a member record and a unique barcode for each new name automatically. A name that already exists elsewhere in the system just gets added to this roster too.
+Upload it and the system creates a member record for each new name automatically — barcode readers here read a person's name directly, so each new member's barcode is just their name. A name that already exists elsewhere in the system just gets added to this roster too.
 
 **Add one at a time** — pick an existing member from the dropdown (handy when adding someone to a second roster).
+
+**Adding names without a roster yet?** Go to **Members → + Import Names from File** to add people to the system (and the Absence/Late form's dropdown) before you've decided which roster they belong to.
 
 ## Step 7 — Print name tags
 
@@ -96,11 +105,11 @@ If the second kiosk is a **different device** (a tablet or second laptop) on the
 
 For a clean walk-up screen with no browser bars, use full-screen mode: **F11** on Windows/Chromebook, or on an iPad, **Share → Add to Home Screen** so it opens like an app.
 
-Both kiosks automatically know whether today is a Monday or Wednesday session — on any other day they'll just say so.
+A scan only works if today's date is one of that member's roster's session dates — if not, the kiosk says so and stays ready for the next person. After a successful check-in or check-out, the kiosk shows a quick confirmation and then returns to the home page automatically.
 
 ## Step 9 — Share the Absence/Late Form
 
-Send families the link to `/absence` (no login needed). It lets them report an absence or a late arrival in advance, and it writes straight into the same roster you see in the admin dashboard — a red **A** for absent, a yellow **L** for late.
+Send families the link to `/absence` (no login needed). It lets them report an absence or a late arrival in advance — the date dropdown only shows dates from rosters that person is actually on — and it writes straight into the same roster you see in the admin dashboard: a red **A** for absent, a yellow **L** for late.
 
 ---
 
@@ -127,7 +136,7 @@ Everything — every member, roster, check-in, and absence — lives in one file
 | Problem | Try this |
 |---|---|
 | "Barcode not recognized" at the kiosk | Check that the member is listed under **Members** and marked Active, and that their badge's barcode matches what's shown there. |
-| Kiosk says "no session today" | Expected on any day that isn't Monday or Wednesday. |
+| "Not scheduled for a roster today" at the kiosk | That member's roster(s) don't include today's date. Add today as a session date from the roster's Manage page if that's unexpected. |
 | Second kiosk can't reach the system | Make sure both devices are on the same wifi, and use the `http://192.168.x.x:3000` address printed in the terminal window, not `localhost`. |
 | Forgot the admin password | Close the server, delete the `data` folder (this erases all data — restore from a backup afterward), then start it again to get a fresh admin account from your `.env` file. |
 | Double-clicking the start file does nothing | On Mac, right-click it and choose **Open** the first time (see Step 3). On Windows, make sure the file ends in `.bat`, not `.txt`. |
