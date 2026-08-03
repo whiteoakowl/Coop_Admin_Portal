@@ -9,6 +9,8 @@
   --green-bg: #dcfce7;
   --red: #dc2626;
   --red-bg: #fee2e2;
+  --yellow: #a16207;
+  --yellow-bg: #fef9c3;
   --border: #e2e8f0;
   --radius: 14px;
 }
@@ -282,6 +284,39 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .admin-card:hover { border-color: var(--brand); }
+.admin-card-sub { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+.admin-card-muted { color: var(--muted); display: flex; align-items: center; justify-content: center; text-align: center; }
+
+.roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
+.roster-card-top { display: flex; justify-content: space-between; align-items: center; }
+.roster-card-meta { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.roster-card-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem; }
+
+.badge-pill {
+  display: inline-block;
+  background: #e0e7ff;
+  color: var(--brand-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  margin: 0.1rem 0.25rem 0.1rem 0;
+}
+
+.checkbox-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1rem; }
+.roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; display: block; }
+
+.checkbox-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  background: #f8fafc;
+}
 
 .roster-toolbar {
   display: flex;
@@ -337,9 +372,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .cell-present { background: var(--green-bg); color: var(--green); }
+.cell-late { background: var(--yellow-bg); color: var(--yellow); }
 .cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: transparent; color: var(--border); }
 .cell-number { background: #e0e7ff; color: var(--brand-dark); }
+
+.roster-table-detailed td { white-space: nowrap; }
+.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+.cell-time { font-size: 0.7rem; color: var(--muted); }
+
+.field-warning { color: var(--red); font-size: 0.8rem; min-height: 1em; display: block; }
 
 .members-table td { text-align: left; }
 .members-table th { text-align: left; }
@@ -368,10 +410,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hint { font-weight: 400; }
 
-.edit-name-form, .edit-days-form { display: flex; gap: 0.4rem; align-items: center; }
+.edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
 .edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }
 .edit-name-form input:focus { border-color: var(--border); background: #f8fafc; }
-.edit-days-form select { border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem; font: inherit; }
 
 .link-btn { background: none; border: none; color: var(--brand); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }

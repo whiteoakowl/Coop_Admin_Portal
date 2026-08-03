@@ -6,7 +6,8 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <h1><%= title %></h1>
+    <h1><%= roster.name %></h1>
+    <p class="subtitle"><%= roster.day[0].toUpperCase() + roster.day.slice(1) %> roster &middot; <a href="/admin/rosters/<%= roster.id %>/manage">Manage members</a></p>
 
     <div class="roster-toolbar">
       <div class="roster-nav">
@@ -15,18 +16,17 @@
           <a class="btn-secondary" href="?offset=<%= offset - 1 %>">Newer 12 Weeks &rarr;</a>
         <% } %>
       </div>
-      <a class="btn-secondary" href="/admin/roster/<%= type %>/<%= day %>/export.csv?offset=<%= offset %>">Export CSV</a>
+      <a class="btn-secondary" href="/admin/roster/<%= roster.id %>/export.csv?offset=<%= offset %>">Export CSV</a>
     </div>
 
-    <% if (type === 'attendance') { %>
-      <div class="legend">
-        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
-        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
-      </div>
-    <% } %>
+    <div class="legend">
+      <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+      <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+      <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+    </div>
 
     <div class="roster-scroll">
-      <table class="roster-table">
+      <table class="roster-table roster-table-detailed">
         <thead>
           <tr>
             <th class="roster-name-col">Name</th>
@@ -37,22 +37,23 @@
         </thead>
         <tbody>
           <% if (rows.length === 0) { %>
-            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members assigned to this roster yet.</td></tr>
+            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
           <% } %>
           <% rows.forEach(function(row) { %>
             <tr>
               <td class="roster-name-col"><%= row.member.name %></td>
               <% row.cells.forEach(function(cell) { %>
-                <% if (type === 'attendance') { %>
-                  <td>
-                    <% if (cell === 'P') { %><span class="cell-tag cell-present">P</span>
-                    <% } else if (cell === 'A') { %><span class="cell-tag cell-absent">A</span>
-                    <% } else { %><span class="cell-tag cell-blank">&nbsp;</span>
-                    <% } %>
-                  </td>
-                <% } else { %>
-                  <td><span class="cell-tag <%= cell ? 'cell-number' : 'cell-blank' %>"><%= cell || ' ' %></span></td>
-                <% } %>
+                <td>
+                  <% if (!cell) { %>
+                    <span class="cell-tag cell-blank">&nbsp;</span>
+                  <% } else { %>
+                    <div class="cell-detailed">
+                      <span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : 'absent' %>"><%= cell.tag %></span>
+                      <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                      <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                    </div>
+                  <% } %>
+                </td>
               <% }); %>
             </tr>
           <% }); %>

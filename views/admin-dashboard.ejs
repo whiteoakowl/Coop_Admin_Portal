@@ -26,17 +26,20 @@
 
     <h2>Rosters</h2>
     <div class="admin-card-grid">
-      <a class="admin-card" href="/admin/roster/attendance/monday">Monday Attendance Roster</a>
-      <a class="admin-card" href="/admin/roster/attendance/wednesday">Wednesday Attendance Roster</a>
-      <a class="admin-card" href="/admin/roster/checkout/monday">Monday Checkout Roster</a>
-      <a class="admin-card" href="/admin/roster/checkout/wednesday">Wednesday Checkout Roster</a>
+      <% rosters.forEach(function(r) { %>
+        <a class="admin-card" href="/admin/roster/<%= r.id %>">
+          <%= r.name %>
+          <span class="admin-card-sub"><%= r.day[0].toUpperCase() + r.day.slice(1) %> &middot; <%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %></span>
+        </a>
+      <% }); %>
+      <a class="admin-card admin-card-muted" href="/admin/rosters">+ Manage / Create Rosters</a>
     </div>
 
     <h2>Kiosk Links</h2>
     <div class="admin-card-grid">
       <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
       <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
-      <a class="admin-card" href="/absence" target="_blank">Absence Form (public link)</a>
+      <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
     </div>
   </main>
 </body>

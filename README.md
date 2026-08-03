@@ -1,23 +1,24 @@
 # SH Check-In / Check-Out
 
-Kiosk-style barcode attendance system for Monday and Wednesday sessions.
+Kiosk-style barcode attendance system for Monday and Wednesday sessions, built around admin-defined **rosters**.
 
 ## What it does
 
-- **Check-In kiosk** — members scan the barcode on their name tag to check in. Marked as a green **P** (Present) on the roster.
-- **Check-Out kiosk** — members scan their barcode, then pick a number 1-80 (e.g. a pickup/locker number). Recorded on a separate checkout roster.
-- **Absence form** — a public web page members can fill out in advance to report they'll miss a session. Marked as a red **A** (Absent) on the roster. (If the member already checked in that day, the absence submission is ignored so it doesn't overwrite a real check-in.)
-- **Admin dashboard** — password-protected. View/export rosters, manage members, print barcode name tags.
-- Everything is tracked **separately for Monday and Wednesday**, and the check-in/absence roster is separate from the checkout roster.
+- **Rosters** — admins create as many rosters as needed (e.g. "Monday Adults", "Wednesday Youth"), each tied to Monday or Wednesday. A member can belong to multiple rosters. Rosters can be populated by importing a names-only file or by adding existing members individually.
+- **Check-In kiosk** — members scan the barcode on their name tag to check in. Marked as a green **P** (Present), with the check-in time recorded.
+- **Check-Out kiosk** — members scan their barcode, then pick a number 1-80 (e.g. a pickup/locker number). The check-out time and number are recorded.
+- **Absence/Late Form** — a public web page members fill out in advance, choosing **Absence** or **Late**, their name, the session date (a real calendar date, validated to be a Monday or Wednesday), a reason category (Personal/Medical), and a description. Absence marks a red **A**; Late marks a yellow **L**. (If the member already checked in for that date, the submission is ignored so it doesn't overwrite a real check-in.)
+- **Admin dashboard** — password-protected. One combined roster grid per roster, member management, printable barcode name tags.
 
-## Roster views
+## The roster grid
 
-Each roster is a grid: member names down the side, the most recent 12 session dates across the top.
+Each roster has one grid: member names down the side, the most recent 12 session dates for that roster's day across the top. Each cell shows everything for that member on that date:
 
-- `Attendance` rosters (Monday & Wednesday): green `P` / red `A` per date.
-- `Checkout` rosters (Monday & Wednesday): the picked number (1-80) per date.
+- **P** (green) / **L** (yellow) / **A** (red) status
+- Check-in time (if they scanned in)
+- Check-out time and pickup number (if they checked out)
 
-Use the "Older 12 Weeks" / "Newer 12 Weeks" links to page through history, and "Export CSV" to download the currently displayed grid.
+All three sources — the check-in kiosk, the check-out kiosk, and the Absence/Late form — feed the same grid. Use "Older 12 Weeks" / "Newer 12 Weeks" to page through history, and "Export CSV" to download the currently displayed grid (with separate columns per date for status, check-in, check-out, and number).
 
 ## Setup
 
@@ -29,7 +30,7 @@ npm start
 
 The app runs on `http://localhost:3000` by default (set `PORT` in `.env` to change it).
 
-A SQLite database is created automatically at `data/attendance.db` on first run, along with a default admin account (from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`, or `admin` / `changeme123` if unset). **Log in and change the password immediately** via Admin → Settings.
+A SQLite database is created automatically at `data/attendance.db` on first run, along with a default admin account (from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`, or `admin` / `changeme123` if unset) and two starter rosters, "Monday" and "Wednesday". **Log in and change the password immediately** via Admin → Settings.
 
 ## Pages
 
@@ -38,20 +39,23 @@ A SQLite database is created automatically at `data/attendance.db` on first run,
 | Home | `/` |
 | Check-In kiosk | `/kiosk/checkin` |
 | Check-Out kiosk | `/kiosk/checkout` |
-| Absence form (share this link publicly) | `/absence` |
+| Absence/Late Form (share this link publicly) | `/absence` |
 | Admin login | `/admin/login` |
 
-## Setting up members & barcodes
+## Setting up rosters, members & barcodes
 
-1. Log into `/admin`, go to **Members**, and add each person with a name and which day(s) roster they belong to (Monday, Wednesday, or both).
-2. Leave the barcode field blank to auto-generate a unique code, or type in an existing barcode number if members already have ID cards.
-3. Click **Print Badge** next to a member to open a printable name tag with a scannable Code128 barcode. Print it (or a batch, one at a time) and attach to name tags/lanyards.
+1. Log into `/admin` → **Rosters**. Rename/reuse the starter "Monday"/"Wednesday" rosters or create new ones (name + day).
+2. On a roster's **Manage Members** page, either:
+   - **Import a file** — a `.csv` or `.txt` file with one member name per line (or name in the first column). New names get a member record and an auto-generated barcode; existing names (matched by exact name) are just added to the roster.
+   - **Add an existing member** — pick from members already in the system.
+3. From **Members**, click **Print Badge** next to a member to open a printable name tag with a scannable Code128 barcode. Print it and attach to a name tag/lanyard.
+4. A member can be added to more than one roster (e.g. if they attend both Monday and Wednesday groups).
 
 ## Running the kiosks
 
 - Any standard USB or Bluetooth barcode scanner works — they act like a keyboard, "typing" the barcode followed by Enter, which is exactly what the kiosk pages listen for. No special drivers needed.
 - Load `/kiosk/checkin` on the check-in tablet/kiosk and `/kiosk/checkout` on the check-out kiosk. Consider using your browser's full-screen/kiosk mode so members can't navigate away.
-- The kiosk automatically detects whether today is a Monday or Wednesday session; on any other day it shows a "no session today" message.
+- The kiosk automatically detects whether today is a Monday or Wednesday session; on any other day it shows a "no session today" message. Scanning a barcode checks the member into every roster they belong to for that day.
 
 ## Deployment notes
 

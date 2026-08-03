@@ -17,6 +17,7 @@
   keepInputFocused(input);
 
   let currentMemberId = null;
+  let currentRosterId = null;
 
   // Build the 1-80 number grid once.
   for (let n = 1; n <= 80; n++) {
@@ -37,6 +38,7 @@
 
   function resetToScan() {
     currentMemberId = null;
+    currentRosterId = null;
     stepNumber.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
     setScanState('idle', 'Scan your name tag barcode', '📷');
@@ -62,6 +64,7 @@
       const data = await res.json();
       if (data.ok) {
         currentMemberId = data.memberId;
+        currentRosterId = data.rosterId;
         memberNameEl.textContent = data.name;
         numpad.querySelectorAll('.numpad-btn').forEach((b) => {
           b.classList.toggle('numpad-btn-selected', data.existingNumber && Number(b.dataset.number) === data.existingNumber);
@@ -85,7 +88,10 @@
       const res = await fetch('/kiosk/checkout/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'memberId=' + encodeURIComponent(currentMemberId) + '&number=' + encodeURIComponent(n),
+        body:
+          'memberId=' + encodeURIComponent(currentMemberId) +
+          '&rosterId=' + encodeURIComponent(currentRosterId) +
+          '&number=' + encodeURIComponent(n),
       });
       const data = await res.json();
       numberMessage.textContent = data.message;

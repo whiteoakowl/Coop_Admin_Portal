@@ -78,6 +78,11 @@ function formatDateLong(iso) {
   return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+function formatTime(epochMs) {
+  if (!epochMs) return null;
+  return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 module.exports = {
   todayISO,
   addDays,
@@ -87,4 +92,5 @@ module.exports = {
   getUpcomingOccurrences,
   formatDateLabel,
   formatDateLong,
+  formatTime,
 };

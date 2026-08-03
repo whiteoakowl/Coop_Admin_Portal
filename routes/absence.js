@@ -1,85 +1,114 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { todayISO, getUpcomingOccurrences, sessionDayForDate, formatDateLabel } = require('../utils/dates');
+const { sessionDayForDate, formatDateLabel } = require('../utils/dates');
+const { getMemberRostersForDay } = require('../utils/rosters');
 
-function buildUpcomingSessions() {
-  const today = todayISO();
-  const mondays = getUpcomingOccurrences('monday', 6, today);
-  const wednesdays = getUpcomingOccurrences('wednesday', 6, today);
-  const all = [...mondays, ...wednesdays].sort();
-  return all.map((date) => ({ date, label: formatDateLabel(date) }));
+function loadMembers() {
+  return db.prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
 }
 
 router.get('/absence', (req, res) => {
-  const members = db
-    .prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all();
   res.render('absence', {
-    title: 'Report an Absence',
-    members,
-    sessions: buildUpcomingSessions(),
+    title: 'Absence/Late Form',
+    members: loadMembers(),
     result: null,
+    formValues: { type: 'absence', memberId: '', sessionDate: '', reasonCategory: '', reason: '' },
   });
 });
 
 router.post('/absence/submit', (req, res) => {
+  const type = req.body.type === 'late' ? 'late' : 'absence';
   const memberId = parseInt(req.body.memberId, 10);
   const sessionDate = (req.body.sessionDate || '').trim();
+  const reasonCategory = ['personal', 'medical'].includes(req.body.reasonCategory) ? req.body.reasonCategory : null;
   const reason = (req.body.reason || '').trim() || null;
 
-  const members = db
-    .prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all();
-  const sessions = buildUpcomingSessions();
+  const formValues = {
+    type,
+    memberId: req.body.memberId || '',
+    sessionDate,
+    reasonCategory: req.body.reasonCategory || '',
+    reason: req.body.reason || '',
+  };
 
+  const members = loadMembers();
   const sessionDay = sessionDayForDate(sessionDate);
   const member = memberId ? db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId) : null;
 
-  if (!member || !sessionDay) {
+  if (!member) {
     return res.render('absence', {
-      title: 'Report an Absence',
+      title: 'Absence/Late Form',
       members,
-      sessions,
-      result: { ok: false, message: 'Please select your name and a valid Monday/Wednesday session.' },
+      formValues,
+      result: { ok: false, message: 'Please select your name.' },
+    });
+  }
+  if (!sessionDay) {
+    return res.render('absence', {
+      title: 'Absence/Late Form',
+      members,
+      formValues,
+      result: { ok: false, message: 'Please choose a Monday or Wednesday date.' },
+    });
+  }
+  if (!reasonCategory) {
+    return res.render('absence', {
+      title: 'Absence/Late Form',
+      members,
+      formValues,
+      result: { ok: false, message: 'Please select Personal or Medical.' },
     });
   }
 
-  const existing = db
-    .prepare('SELECT * FROM attendance WHERE member_id = ? AND session_date = ?')
-    .get(member.id, sessionDate);
-
-  if (existing && existing.status === 'present') {
+  const rosters = getMemberRostersForDay(member.id, sessionDay);
+  if (rosters.length === 0) {
     return res.render('absence', {
-      title: 'Report an Absence',
+      title: 'Absence/Late Form',
       members,
-      sessions,
-      result: {
-        ok: true,
-        message: `${member.name} is already checked in as present for ${formatDateLabel(sessionDate)}, so no change was made.`,
-      },
+      formValues,
+      result: { ok: false, message: `${member.name} is not on a roster for ${formatDateLabel(sessionDate)}.` },
     });
   }
 
-  if (existing) {
-    db.prepare(
-      `UPDATE attendance SET status = 'absent', source = 'absence_form', reason = ?, recorded_at = datetime('now') WHERE id = ?`
-    ).run(reason, existing.id);
-  } else {
-    db.prepare(
-      `INSERT INTO attendance (member_id, session_day, session_date, status, source, reason)
-       VALUES (?, ?, ?, 'absent', 'absence_form', ?)`
-    ).run(member.id, sessionDay, sessionDate, reason);
+  const status = type === 'late' ? 'late' : 'absent';
+  let skippedAsPresent = 0;
+
+  for (const roster of rosters) {
+    const existing = db
+      .prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+      .get(member.id, roster.id, sessionDate);
+
+    if (existing && existing.status === 'present') {
+      skippedAsPresent++;
+      continue;
+    }
+
+    if (existing) {
+      db.prepare(
+        `UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = datetime('now') WHERE id = ?`
+      ).run(status, reasonCategory, reason, existing.id);
+    } else {
+      db.prepare(
+        `INSERT INTO attendance (member_id, roster_id, session_date, status, source, reason_category, reason_text)
+         VALUES (?, ?, ?, ?, 'absence_form', ?, ?)`
+      ).run(member.id, roster.id, sessionDate, status, reasonCategory, reason);
+    }
+  }
+
+  const label = type === 'late' ? 'Late notice' : 'Absence';
+  let message = `${label} recorded for ${member.name} on ${formatDateLabel(sessionDate)}.`;
+  if (skippedAsPresent === rosters.length) {
+    message = `${member.name} is already checked in as present for ${formatDateLabel(sessionDate)}, so no change was made.`;
+  } else if (skippedAsPresent > 0) {
+    message += ' (Already checked in as present on one roster, so that one was left unchanged.)';
   }
 
   res.render('absence', {
-    title: 'Report an Absence',
+    title: 'Absence/Late Form',
     members,
-    sessions,
-    result: {
-      ok: true,
-      message: `Absence recorded for ${member.name} on ${formatDateLabel(sessionDate)}.`,
-    },
+    formValues: { type: 'absence', memberId: '', sessionDate: '', reasonCategory: '', reason: '' },
+    result: { ok: true, message },
   });
 });
 

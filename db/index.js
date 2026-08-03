@@ -24,4 +24,13 @@ if (adminCount === 0) {
   console.log(`Seeded default admin account "${username}". Change the password after first login.`);
 }
 
+// Seed a starter Monday and Wednesday roster so the system isn't empty on
+// first run. Admins can rename these or create additional rosters freely.
+const rosterCount = db.prepare('SELECT COUNT(*) AS c FROM rosters').get().c;
+if (rosterCount === 0) {
+  const insertRoster = db.prepare('INSERT INTO rosters (name, day) VALUES (?, ?)');
+  insertRoster.run('Monday', 'monday');
+  insertRoster.run('Wednesday', 'wednesday');
+}
+
 module.exports = db;

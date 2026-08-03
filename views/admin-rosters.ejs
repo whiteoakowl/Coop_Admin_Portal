@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Rosters</h1>
+    <p class="subtitle">Create as many rosters as you need. Each roster meets on Monday or Wednesday and has its own member list.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <details class="add-member-details">
+      <summary class="btn-primary-summary">+ New Roster</summary>
+      <form method="POST" action="/admin/rosters" class="inline-form">
+        <div class="inline-form-row">
+          <label>
+            Roster Name
+            <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
+          </label>
+          <label>
+            Day
+            <select name="day">
+              <option value="monday">Monday</option>
+              <option value="wednesday">Wednesday</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="primary-btn">Create Roster</button>
+      </form>
+    </details>
+
+    <div class="admin-card-grid">
+      <% rosters.forEach(function(r) { %>
+        <div class="admin-card roster-card <%= r.active ? '' : 'row-inactive' %>">
+          <div class="roster-card-top">
+            <strong><%= r.name %></strong>
+            <span class="badge-pill"><%= r.day[0].toUpperCase() + r.day.slice(1) %></span>
+          </div>
+          <div class="roster-card-meta"><%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %><%= r.active ? '' : ' &middot; inactive' %></div>
+          <div class="roster-card-actions">
+            <a class="link-btn" href="/admin/roster/<%= r.id %>">View Roster</a>
+            <a class="link-btn" href="/admin/rosters/<%= r.id %>/manage">Manage Members</a>
+            <form method="POST" action="/admin/rosters/<%= r.id %>/toggle-active" class="inline-block-form">
+              <button type="submit" class="link-btn"><%= r.active ? 'Deactivate' : 'Reactivate' %></button>
+            </form>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

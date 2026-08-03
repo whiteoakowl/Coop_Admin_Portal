@@ -21,17 +21,21 @@
             <input type="text" name="name" required />
           </label>
           <label>
-            Roster Day(s)
-            <select name="days">
-              <option value="both">Monday &amp; Wednesday</option>
-              <option value="monday">Monday only</option>
-              <option value="wednesday">Wednesday only</option>
-            </select>
-          </label>
-          <label>
             Barcode <span class="hint">(leave blank to auto-generate)</span>
             <input type="text" name="barcode" placeholder="auto-generated" />
           </label>
+        </div>
+        <label class="roster-checkbox-label">Add to Roster(s)</label>
+        <div class="checkbox-row">
+          <% allRosters.forEach(function(r) { %>
+            <label class="checkbox-pill">
+              <input type="checkbox" name="rosterIds" value="<%= r.id %>" />
+              <%= r.name %> (<%= r.day[0].toUpperCase() + r.day.slice(1) %>)
+            </label>
+          <% }); %>
+          <% if (allRosters.length === 0) { %>
+            <span class="hint">No rosters yet &mdash; <a href="/admin/rosters">create one first</a>.</span>
+          <% } %>
         </div>
         <button type="submit" class="primary-btn">Add Member</button>
       </form>
@@ -43,7 +47,7 @@
           <tr>
             <th>Name</th>
             <th>Barcode</th>
-            <th>Roster Day(s)</th>
+            <th>Rosters</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -59,14 +63,14 @@
               </td>
               <td class="mono"><%= m.barcode %></td>
               <td>
-                <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-days-form">
-                  <input type="hidden" name="name" value="<%= m.name %>" />
-                  <select name="days" onchange="this.form.submit()">
-                    <option value="both" <%= m.days === 'both' ? 'selected' : '' %>>Mon &amp; Wed</option>
-                    <option value="monday" <%= m.days === 'monday' ? 'selected' : '' %>>Monday only</option>
-                    <option value="wednesday" <%= m.days === 'wednesday' ? 'selected' : '' %>>Wednesday only</option>
-                  </select>
-                </form>
+                <% if (m.rosters.length === 0) { %>
+                  <span class="hint">none</span>
+                <% } else { %>
+                  <% m.rosters.forEach(function(r) { %>
+                    <span class="badge-pill"><%= r.name %></span>
+                  <% }); %>
+                <% } %>
+                <a class="link-btn" href="/admin/rosters">manage</a>
               </td>
               <td><%= m.active ? 'Active' : 'Inactive' %></td>
               <td class="actions-cell">

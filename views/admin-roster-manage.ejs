@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle"><a href="/admin/rosters">&larr; All Rosters</a></p>
+    <h1>Manage <%= roster.name %></h1>
+    <p class="subtitle"><%= roster.day[0].toUpperCase() + roster.day.slice(1) %> roster</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <h2>Import Members from File</h2>
+    <p class="subtitle">Upload a .csv or .txt file with one member name per line (or name in the first column). New names automatically get a member record and a barcode; existing names are matched and added to this roster.</p>
+    <form method="POST" action="/admin/rosters/<%= roster.id %>/import" enctype="multipart/form-data" class="inline-form">
+      <input type="file" name="file" accept=".csv,.txt" required />
+      <button type="submit" class="primary-btn">Import</button>
+    </form>
+
+    <h2>Add an Existing Member</h2>
+    <form method="POST" action="/admin/rosters/<%= roster.id %>/add-member" class="inline-form inline-form-row">
+      <select name="memberId" required>
+        <option value="">Select a member&hellip;</option>
+        <% availableMembers.forEach(function(m) { %>
+          <option value="<%= m.id %>"><%= m.name %></option>
+        <% }); %>
+      </select>
+      <button type="submit" class="primary-btn">Add to Roster</button>
+    </form>
+
+    <h2>Current Members (<%= members.length %>)</h2>
+    <div class="roster-scroll">
+      <table class="roster-table members-table">
+        <thead>
+          <tr><th>Name</th><th>Barcode</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          <% if (members.length === 0) { %>
+            <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+          <% } %>
+          <% members.forEach(function(m) { %>
+            <tr>
+              <td><%= m.name %></td>
+              <td class="mono"><%= m.barcode %></td>
+              <td class="actions-cell">
+                <a class="link-btn" href="/admin/members/<%= m.id %>/badge" target="_blank">Print Badge</a>
+                <form method="POST" action="/admin/rosters/<%= roster.id %>/remove-member/<%= m.id %>" class="inline-block-form">
+                  <button type="submit" class="link-btn">Remove</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
