@@ -14,9 +14,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist node_modules (
-  echo Setting up for the first time, this can take a minute...
-  call npm install
+echo Checking everything is installed (fast if it already is, longer the first time)...
+call npm install
+if errorlevel 1 (
+  echo.
+  echo Something went wrong installing the required files. Check your internet connection and try again.
+  echo.
+  pause
+  exit /b 1
 )
 
 if not exist .env (

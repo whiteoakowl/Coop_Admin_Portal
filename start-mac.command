@@ -13,9 +13,13 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d node_modules ]; then
-  echo "Setting up for the first time (this can take a minute)..."
-  npm install
+echo "Checking everything is installed (fast if it already is, longer the first time)..."
+if ! npm install; then
+  echo ""
+  echo "Something went wrong installing the required files. Check your internet connection and try again."
+  echo ""
+  read -p "Press Enter to close this window..."
+  exit 1
 fi
 
 if [ ! -f .env ]; then
