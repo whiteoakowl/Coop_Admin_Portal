@@ -2,6 +2,8 @@
 
 Kiosk-style barcode attendance system for Monday and Wednesday sessions, built around admin-defined **rosters**.
 
+> **New here, or not a developer?** Use **[SETUP.md](SETUP.md)** instead — a plain-language, no-terminal-required walkthrough with double-click start scripts. This README is the technical reference.
+
 ## What it does
 
 - **Rosters** — admins create as many rosters as needed (e.g. "Monday Adults", "Wednesday Youth"), each tied to Monday or Wednesday. A member can belong to multiple rosters. Rosters can be populated by importing a names-only file or by adding existing members individually.
@@ -22,13 +24,17 @@ All three sources — the check-in kiosk, the check-out kiosk, and the Absence/L
 
 ## Setup
 
+Double-click `start-mac.command` (Mac) or `start-windows.bat` (Windows) — it installs dependencies, creates `.env` from the example file, starts the server, and opens your browser automatically. See [SETUP.md](SETUP.md) for the full non-technical walkthrough.
+
+Or, from a terminal:
+
 ```bash
 npm install
 cp .env.example .env   # then edit SESSION_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD
 npm start
 ```
 
-The app runs on `http://localhost:3000` by default (set `PORT` in `.env` to change it).
+The app runs on `http://localhost:3000` by default (set `PORT` in `.env` to change it). On startup it also prints the address other devices on the same wifi can use to reach it (e.g. `http://192.168.1.42:3000`) — useful for pointing a second kiosk device at the server without hunting down its IP manually.
 
 A SQLite database is created automatically at `data/attendance.db` on first run, along with a default admin account (from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`, or `admin` / `changeme123` if unset) and two starter rosters, "Monday" and "Wednesday". **Log in and change the password immediately** via Admin → Settings.
 

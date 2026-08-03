@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const os = require('os');
 const express = require('express');
 const session = require('express-session');
 
@@ -50,6 +51,22 @@ app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });
 });
 
+function lanAddresses() {
+  const nets = os.networkInterfaces();
+  const addresses = [];
+  for (const iface of Object.values(nets)) {
+    for (const net of iface || []) {
+      if (net.family === 'IPv4' && !net.internal) addresses.push(net.address);
+    }
+  }
+  return addresses;
+}
+
 app.listen(PORT, () => {
   console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
+  const addresses = lanAddresses();
+  if (addresses.length > 0) {
+    console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
+    for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
+  }
 });
