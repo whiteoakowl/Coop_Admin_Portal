@@ -1,15 +1,17 @@
 :root {
   /* Sanford Homeschoolers brand palette */
-  --bg: #cfe7fb;
+  --bg: #659EC7;
   --surface: #ffffff;
   --ink: #1c2530;
   --muted: #64748b;
   --brand: #79baec;       /* logo blue - fills, borders, badges (pair with --ink or white) */
-  --brand-dark: #2e6da4;  /* accessible mid blue - links, button fills w/ white text */
+  --brand-dark: #2e6da4;  /* accessible mid blue - links, text (not button fills) */
   --brand-darker: #1f4e7a; /* hover state for brand-dark */
   --brand-soft: #eaf4fd;  /* tinted section backgrounds */
   --accent: #e49b0f;      /* logo gold - highlights, focus, secondary accents */
   --accent-dark: #b97a0a; /* hover state for accent */
+  --btn-bg: #EE9A4D;      /* filled button background, every page */
+  --btn-bg-hover: #d9822f; /* hover state for --btn-bg */
   --green: #16a34a;
   --green-bg: #dcfce7;
   --red: #dc2626;
@@ -197,8 +199,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
 }
 
-.numpad-btn:active { background: var(--brand-dark); color: #fff; }
-.numpad-btn-selected { background: var(--brand-dark); color: #fff; border-color: var(--brand-dark); }
+.numpad-btn:active { background: var(--btn-bg); color: #fff; }
+.numpad-btn-selected { background: var(--btn-bg); color: #fff; border-color: var(--btn-bg); }
 
 .kiosk-cancel-btn {
   margin-top: 0.5rem;
@@ -234,6 +236,8 @@ button { font-family: inherit; cursor: pointer; }
 
 .stack-form label { font-weight: 600; margin-top: 0.75rem; font-size: 0.9rem; }
 
+.stack-form input[type="date"] { width: 192px; }
+
 .stack-form input,
 .stack-form select,
 .stack-form textarea {
@@ -247,7 +251,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .primary-btn {
   margin-top: 1.5rem;
-  background: var(--brand-dark);
+  background: var(--btn-bg);
   color: #fff;
   border: none;
   padding: 0.85rem 1.5rem;
@@ -258,7 +262,7 @@ button { font-family: inherit; cursor: pointer; }
   text-align: center;
 }
 
-.primary-btn:hover { background: var(--brand-darker); }
+.primary-btn:hover { background: var(--btn-bg-hover); }
 
 .alert {
   padding: 0.85rem 1rem;
@@ -276,6 +280,9 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--accent);
   color: var(--ink);
   border-bottom: 3px solid var(--ink);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .admin-nav .brand {
@@ -407,7 +414,7 @@ button { font-family: inherit; cursor: pointer; }
 .date-list-wrap { margin: 0.4rem 0 0.75rem; }
 .date-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.4rem; }
 .date-list-row { display: flex; align-items: center; gap: 0.5rem; }
-.date-list-row input[type="date"] { width: 170px; flex: none; }
+.date-list-row input[type="date"] { width: 192px; flex: none; }
 .date-list-remove {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   width: 2.15rem; height: 2.15rem; font-size: 1.1rem; color: var(--muted); line-height: 1; flex-shrink: 0;
@@ -513,7 +520,7 @@ button { font-family: inherit; cursor: pointer; }
 .btn-primary-summary {
   cursor: pointer;
   display: inline-block;
-  background: var(--brand-dark);
+  background: var(--btn-bg);
   color: #fff;
   padding: 0.6rem 1.1rem;
   border-radius: 8px;
@@ -541,14 +548,14 @@ button { font-family: inherit; cursor: pointer; }
 .inline-form-flat input[type="text"] { flex: 1; min-width: 180px; }
 .inline-form-flat button {
   border-radius: 0 8px 8px 0;
-  background: var(--brand-dark);
+  background: var(--btn-bg);
   color: #fff;
-  border: 1px solid var(--brand-dark);
+  border: 1px solid var(--btn-bg);
   padding: 0.55rem 1rem;
   font-weight: 600;
   white-space: nowrap;
 }
-.inline-form-flat button:hover { background: var(--brand-darker); border-color: var(--brand-darker); }
+.inline-form-flat button:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
 .edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }
@@ -699,9 +706,9 @@ button { font-family: inherit; cursor: pointer; }
 .volunteer-card-link-form button,
 .volunteer-sections-form button {
   border-radius: 0 8px 8px 0;
-  background: var(--brand-dark);
+  background: var(--btn-bg);
   color: #fff;
-  border-color: var(--brand-dark);
+  border-color: var(--btn-bg);
   font-weight: 600;
   white-space: nowrap;
   position: relative;
@@ -709,12 +716,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 .volunteer-card-link-form button:hover,
 .volunteer-sections-form button:hover {
-  background: var(--brand-darker);
-  border-color: var(--brand-darker);
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
 }
 
 .volunteer-date-add-form { margin-top: 0.5rem; }
-.volunteer-date-add-form input[type="date"] { width: 170px; }
+.volunteer-date-add-form input[type="date"] { width: 192px; }
 
 .volunteer-section-row td {
   text-align: left !important;
