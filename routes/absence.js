@@ -5,7 +5,23 @@ const { todayISO, isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate, getMemberUpcomingDates } = require('../utils/rosters');
 
 function loadMembers() {
-  return db.prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
+  return db
+    .prepare(
+      `SELECT m.id, m.name FROM members m
+       JOIN absence_list_members alm ON alm.member_id = m.id
+       WHERE m.active = 1 ORDER BY m.name COLLATE NOCASE`
+    )
+    .all();
+}
+
+function loadAbsenceListMember(memberId) {
+  return db
+    .prepare(
+      `SELECT m.* FROM members m
+       JOIN absence_list_members alm ON alm.member_id = m.id
+       WHERE m.id = ? AND m.active = 1`
+    )
+    .get(memberId);
 }
 
 router.get('/absence', (req, res) => {
@@ -20,7 +36,7 @@ router.get('/absence', (req, res) => {
 // Used by the form's JS to populate the date dropdown once a name is picked.
 router.get('/absence/dates', (req, res) => {
   const memberId = parseInt(req.query.memberId, 10);
-  if (!memberId) return res.json({ dates: [] });
+  if (!memberId || !loadAbsenceListMember(memberId)) return res.json({ dates: [] });
   const dates = getMemberUpcomingDates(memberId, todayISO());
   res.json({ dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })) });
 });
@@ -41,7 +57,7 @@ router.post('/absence/submit', (req, res) => {
   };
 
   const members = loadMembers();
-  const member = memberId ? db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId) : null;
+  const member = memberId ? loadAbsenceListMember(memberId) : null;
 
   if (!member) {
     return res.render('absence', {
