@@ -6,35 +6,48 @@
 <body class="public-page">
   <main class="form-wrap">
     <a href="/" class="kiosk-home">&larr; Home</a>
-    <h1>Report an Absence</h1>
-    <p class="subtitle">Let us know you won't be at an upcoming Monday or Wednesday session.</p>
+    <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <h1>Absence/Late Form</h1>
+    <p class="subtitle">Let us know if you'll be absent or arriving late to an upcoming session.</p>
 
     <% if (result) { %>
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
     <% } %>
 
-    <form method="POST" action="/absence/submit" class="stack-form">
+    <form method="POST" action="/absence/submit" class="stack-form" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+      <label for="type">Absence or Late</label>
+      <select id="type" name="type" required>
+        <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; I won't be there</option>
+        <option value="late" <%= formValues.type === 'late' ? 'selected' : '' %>>Late &ndash; I'll arrive late</option>
+      </select>
+
       <label for="memberId">Your Name</label>
       <select id="memberId" name="memberId" required>
         <option value="">Select your name&hellip;</option>
         <% members.forEach(function(m) { %>
-          <option value="<%= m.id %>"><%= m.name %></option>
+          <option value="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %></option>
         <% }); %>
       </select>
 
-      <label for="sessionDate">Session</label>
-      <select id="sessionDate" name="sessionDate" required>
-        <option value="">Select a session&hellip;</option>
-        <% sessions.forEach(function(s) { %>
-          <option value="<%= s.date %>"><%= s.label %></option>
-        <% }); %>
+      <label for="sessionDate">Class Date</label>
+      <select id="sessionDate" name="sessionDate" required disabled data-preselect="<%= formValues.sessionDate %>">
+        <option value="">Select your name first&hellip;</option>
+      </select>
+      <span id="date-warning" class="field-warning"></span>
+
+      <label for="reasonCategory">Reason</label>
+      <select id="reasonCategory" name="reasonCategory" required>
+        <option value="">Select a reason&hellip;</option>
+        <option value="personal" <%= formValues.reasonCategory === 'personal' ? 'selected' : '' %>>Personal</option>
+        <option value="medical" <%= formValues.reasonCategory === 'medical' ? 'selected' : '' %>>Medical</option>
       </select>
 
-      <label for="reason">Reason (optional)</label>
-      <textarea id="reason" name="reason" rows="3" placeholder="Optional note"></textarea>
+      <label for="reason">Description</label>
+      <textarea id="reason" name="reason" rows="3" placeholder="Briefly explain the reason" required><%= formValues.reason %></textarea>
 
-      <button type="submit" class="primary-btn">Submit Absence</button>
+      <button type="submit" class="primary-btn">Submit</button>
     </form>
   </main>
+  <script src="/js/absence.js"></script>
 </body>
 </html>

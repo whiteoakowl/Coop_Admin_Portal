@@ -6,41 +6,33 @@
 <body class="kiosk kiosk-checkout">
   <main class="kiosk-wrap">
     <a href="/" class="kiosk-home">&larr; Home</a>
-    <h1>Check Out</h1>
+    <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
     <p class="kiosk-date"><%= dateLabel %></p>
 
-    <% if (!sessionDay) { %>
-      <div class="kiosk-panel kiosk-panel-muted">
-        <p class="kiosk-big-icon">📅</p>
-        <p class="kiosk-message">There is no session today.</p>
-        <p class="kiosk-submessage">Sessions run every Monday and Wednesday.</p>
+    <div id="step-scan" class="kiosk-panel">
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
+      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+        <span class="kiosk-status-icon">📷</span>
       </div>
-    <% } else { %>
-      <div id="step-scan" class="kiosk-panel">
-        <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
-        <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-          <span class="kiosk-status-icon">📷</span>
-        </div>
-        <form id="scan-form" autocomplete="off">
-          <input
-            id="barcode-input"
-            name="barcode"
-            type="text"
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-            inputmode="none"
-          />
-        </form>
-      </div>
+      <form id="scan-form" autocomplete="off">
+        <input
+          id="barcode-input"
+          name="barcode"
+          type="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="none"
+        />
+      </form>
+    </div>
 
-      <div id="step-number" class="kiosk-panel kiosk-hidden">
-        <p class="kiosk-instructions">Hi <span id="member-name">-</span>, select your number</p>
-        <p id="number-message" class="kiosk-submessage"></p>
-        <div id="numpad" class="numpad"></div>
-        <button id="cancel-btn" type="button" class="kiosk-cancel-btn">Cancel</button>
-      </div>
-    <% } %>
+    <div id="step-number" class="kiosk-panel kiosk-hidden">
+      <p class="kiosk-instructions">Hi <span id="member-name">-</span>, select your number</p>
+      <p id="number-message" class="kiosk-submessage"></p>
+      <div id="numpad" class="numpad"></div>
+      <button id="cancel-btn" type="button" class="kiosk-cancel-btn">Cancel</button>
+    </div>
   </main>
   <script src="/js/kiosk-common.js"></script>
   <script src="/js/kiosk-checkout.js"></script>

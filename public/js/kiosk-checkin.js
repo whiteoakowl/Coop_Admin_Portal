@@ -41,9 +41,10 @@
       const data = await res.json();
       if (data.ok) {
         setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'ℹ️' : '✅');
-      } else {
-        setState('error', data.message, '❌');
+        setTimeout(() => { window.location.href = '/'; }, 1800);
+        return;
       }
+      setState('error', data.message, '❌');
     } catch (err) {
       setState('error', 'Connection error. Please try again.', '❌');
     }

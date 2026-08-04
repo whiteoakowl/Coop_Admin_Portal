@@ -19,24 +19,20 @@
         <span class="stat-label">Checked In Today</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value"><%= todayCheckouts %></span>
-        <span class="stat-label">Checked Out Today</span>
+        <span class="stat-value"><%= todayLate %></span>
+        <span class="stat-label">Late Today</span>
       </div>
-    </div>
-
-    <h2>Rosters</h2>
-    <div class="admin-card-grid">
-      <a class="admin-card" href="/admin/roster/attendance/monday">Monday Attendance Roster</a>
-      <a class="admin-card" href="/admin/roster/attendance/wednesday">Wednesday Attendance Roster</a>
-      <a class="admin-card" href="/admin/roster/checkout/monday">Monday Checkout Roster</a>
-      <a class="admin-card" href="/admin/roster/checkout/wednesday">Wednesday Checkout Roster</a>
+      <div class="stat-card">
+        <span class="stat-value"><%= todayAbsent %></span>
+        <span class="stat-label">Absent Today</span>
+      </div>
     </div>
 
     <h2>Kiosk Links</h2>
     <div class="admin-card-grid">
       <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
       <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
-      <a class="admin-card" href="/absence" target="_blank">Absence Form (public link)</a>
+      <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
     </div>
   </main>
 </body>

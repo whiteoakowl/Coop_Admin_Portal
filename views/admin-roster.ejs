@@ -6,27 +6,28 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <h1><%= title %></h1>
+    <h1><%= roster.name %></h1>
+    <p class="subtitle">
+      <% if (roster.category) { %><span class="badge-pill"><%= roster.category %></span><% } %>
+      <a href="/admin/rosters/<%= roster.id %>/manage">Manage roster</a>
+    </p>
 
     <div class="roster-toolbar">
-      <div class="roster-nav">
-        <a class="btn-secondary" href="?offset=<%= offset + 1 %>">&larr; Older 12 Weeks</a>
-        <% if (canGoNewer) { %>
-          <a class="btn-secondary" href="?offset=<%= offset - 1 %>">Newer 12 Weeks &rarr;</a>
-        <% } %>
+      <div></div>
+      <div class="roster-btn-row no-print">
+        <a class="roster-action-btn" href="/admin/roster/<%= roster.id %>/export.csv">Export CSV</a>
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
       </div>
-      <a class="btn-secondary" href="/admin/roster/<%= type %>/<%= day %>/export.csv?offset=<%= offset %>">Export CSV</a>
     </div>
 
-    <% if (type === 'attendance') { %>
-      <div class="legend">
-        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
-        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
-      </div>
-    <% } %>
+    <div class="legend">
+      <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+      <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+      <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+    </div>
 
     <div class="roster-scroll">
-      <table class="roster-table">
+      <table class="roster-table roster-table-detailed">
         <thead>
           <tr>
             <th class="roster-name-col">Name</th>
@@ -37,23 +38,72 @@
         </thead>
         <tbody>
           <% if (rows.length === 0) { %>
-            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members assigned to this roster yet.</td></tr>
+            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
           <% } %>
           <% rows.forEach(function(row) { %>
             <tr>
               <td class="roster-name-col"><%= row.member.name %></td>
               <% row.cells.forEach(function(cell) { %>
-                <% if (type === 'attendance') { %>
-                  <td>
-                    <% if (cell === 'P') { %><span class="cell-tag cell-present">P</span>
-                    <% } else if (cell === 'A') { %><span class="cell-tag cell-absent">A</span>
-                    <% } else { %><span class="cell-tag cell-blank">&nbsp;</span>
-                    <% } %>
-                  </td>
-                <% } else { %>
-                  <td><span class="cell-tag <%= cell ? 'cell-number' : 'cell-blank' %>"><%= cell || ' ' %></span></td>
-                <% } %>
+                <td>
+                  <% if (!cell) { %>
+                    <span class="cell-tag cell-blank">&nbsp;</span>
+                  <% } else { %>
+                    <div class="cell-detailed">
+                      <span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : 'absent' %>"><%= cell.tag %></span>
+                      <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                      <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                    </div>
+                  <% } %>
+                </td>
               <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+        <% if (rows.length > 0) { %>
+          <tfoot>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Present</td>
+              <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Late</td>
+              <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Absent</td>
+              <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
+    </div>
+
+    <h2>Absence/Late Submissions</h2>
+    <div class="category-filter no-print">
+      <label for="absence-date-select">Date</label>
+      <select id="absence-date-select" onchange="window.location = '/admin/roster/<%= roster.id %>' + (this.value ? '?absenceDate=' + encodeURIComponent(this.value) : '')">
+        <option value="">All dates</option>
+        <% dates.forEach(function(d, i) { %>
+          <option value="<%= d %>" <%= absenceDateFilter === d ? 'selected' : '' %>><%= dateLabels[i] %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Name</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <% if (absenceSubmissions.length === 0) { %>
+            <tr><td colspan="5" class="roster-empty">No absence or late submissions<%= absenceDateFilter ? ' for this date' : '' %>.</td></tr>
+          <% } %>
+          <% absenceSubmissions.forEach(function(s) { %>
+            <tr>
+              <td><%= s.memberName %></td>
+              <td><%= s.dateLabel %></td>
+              <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+              <td><%= s.reasonLabel %></td>
+              <td><%= s.description %></td>
             </tr>
           <% }); %>
         </tbody>

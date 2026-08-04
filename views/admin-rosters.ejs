@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1><%= archived ? 'Archived Rosters' : 'Attendance' %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (!archived) { %>
+      <div class="page-actions">
+        <details class="add-member-details">
+          <summary class="btn-primary-summary">+ New Roster</summary>
+          <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
+            <div class="inline-form-row">
+              <label>
+                Roster Title
+                <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
+              </label>
+              <label>
+                Category
+                <select name="category">
+                  <option value="">No category</option>
+                  <% categories.forEach(function(c) { %><option value="<%= c %>"><%= c %></option><% }); %>
+                </select>
+              </label>
+            </div>
+
+            <label class="roster-checkbox-label">Session Dates</label>
+            <div class="date-list-wrap">
+              <div class="date-list">
+                <div class="date-list-row">
+                  <input type="date" name="dates" />
+                  <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
+                </div>
+              </div>
+              <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+            </div>
+
+            <label class="roster-checkbox-label">Import Member Names <span class="hint">(optional &mdash; one name per line)</span></label>
+            <input type="file" name="file" accept=".csv,.txt" />
+
+            <button type="submit" class="primary-btn">Create Roster</button>
+          </form>
+        </details>
+        <a class="btn-secondary" href="/admin/rosters?archived=1">View Archived Rosters</a>
+      </div>
+    <% } else { %>
+      <div class="page-actions">
+        <a class="btn-secondary" href="/admin/rosters">&larr; Back to Active Rosters</a>
+      </div>
+    <% } %>
+
+    <details class="add-member-details">
+      <summary class="btn-primary-summary">+ Add Category</summary>
+      <form method="POST" action="/admin/rosters/categories" class="inline-form-flat">
+        <input type="text" name="name" placeholder="e.g. Youth, Adults, Sports" required />
+        <button type="submit" class="btn-secondary">Add Category</button>
+      </form>
+    </details>
+
+    <div class="category-filter">
+      <label for="category-select">Filter by category</label>
+      <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
+        <option value="">All categories</option>
+        <% categories.forEach(function(c) { %>
+          <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
+        <% }); %>
+      </select>
+    </div>
+
+    <div class="admin-card-grid">
+      <% rosters.forEach(function(r) { %>
+        <div class="admin-card roster-card">
+          <div class="roster-card-top">
+            <strong><%= r.name %></strong>
+            <% if (r.category) { %><span class="badge-pill"><%= r.category %></span><% } %>
+          </div>
+          <div class="roster-card-meta">
+            <%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %> &middot;
+            <%= r.dateCount %> date<%= r.dateCount === 1 ? '' : 's' %>
+          </div>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn" href="/admin/roster/<%= r.id %>">View Roster</a>
+            <a class="roster-action-btn" href="/admin/rosters/<%= r.id %>/manage">Manage</a>
+            <form method="POST" action="/admin/rosters/<%= r.id %>/toggle-active" class="inline-block-form roster-btn-form">
+              <button type="submit" class="roster-action-btn"><%= r.active ? 'Archive' : 'Unarchive' %></button>
+            </form>
+            <form method="POST" action="/admin/rosters/<%= r.id %>/delete" class="inline-block-form roster-btn-form" onsubmit="return confirm('Permanently delete &quot;<%= r.name %>&quot; and all its attendance history? This cannot be undone.');">
+              <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+            </form>
+          </div>
+        </div>
+      <% }); %>
+      <% if (rosters.length === 0) { %>
+        <p class="hint"><%= archived ? 'No archived rosters.' : ('No rosters yet' + (selectedCategory ? ' in this category' : '') + '.') %></p>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/date-list.js"></script>
+</body>
+</html>

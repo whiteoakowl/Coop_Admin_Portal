@@ -1,28 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { todayISO, sessionDayForDate, formatDateLong } = require('../utils/dates');
+const { todayISO, formatDateLong } = require('../utils/dates');
+const { getMemberRostersForDate } = require('../utils/rosters');
 
 // --- Check-in kiosk ---
 
 router.get('/checkin', (req, res) => {
-  const today = todayISO();
-  const sessionDay = sessionDayForDate(today);
   res.render('kiosk-checkin', {
     title: 'Check In',
-    sessionDay,
-    dateLabel: formatDateLong(today),
+    dateLabel: formatDateLong(todayISO()),
   });
 });
 
 router.post('/checkin/scan', (req, res) => {
   const barcode = (req.body.barcode || '').trim();
   const today = todayISO();
-  const sessionDay = sessionDayForDate(today);
 
-  if (!sessionDay) {
-    return res.json({ ok: false, message: 'There is no session today. Sessions run Monday and Wednesday.' });
-  }
   if (!barcode) {
     return res.json({ ok: false, message: 'No barcode scanned.' });
   }
@@ -32,11 +26,20 @@ router.post('/checkin/scan', (req, res) => {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
-  const existing = db
-    .prepare('SELECT * FROM attendance WHERE member_id = ? AND session_date = ?')
-    .get(member.id, today);
+  const rosters = getMemberRostersForDate(member.id, today);
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
 
-  if (existing && existing.status === 'present') {
+  const now = Date.now();
+  const alreadyPresent = rosters.every((r) => {
+    const existing = db
+      .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+      .get(member.id, r.id, today);
+    return existing && existing.status === 'present';
+  });
+
+  if (alreadyPresent) {
     return res.json({
       ok: true,
       alreadyChecked: true,
@@ -45,12 +48,15 @@ router.post('/checkin/scan', (req, res) => {
     });
   }
 
-  db.prepare(
-    `INSERT INTO attendance (member_id, session_day, session_date, status, source)
-     VALUES (?, ?, ?, 'present', 'kiosk')
-     ON CONFLICT(member_id, session_date)
-     DO UPDATE SET status = 'present', source = 'kiosk', recorded_at = datetime('now')`
-  ).run(member.id, sessionDay, today);
+  const upsert = db.prepare(
+    `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
+     VALUES (?, ?, ?, 'present', ?, 'kiosk')
+     ON CONFLICT(member_id, roster_id, session_date)
+     DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = datetime('now')`
+  );
+  for (const r of rosters) {
+    upsert.run(member.id, r.id, today, now);
+  }
 
   res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
 });
