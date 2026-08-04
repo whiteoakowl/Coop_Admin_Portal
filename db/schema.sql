@@ -2,16 +2,17 @@
 
 -- member_type distinguishes a Student (attends co-op, can be checked in/out
 -- and marked absent/late) from a Parent (submits forms and volunteers, but
--- is never checked in). A student can optionally link to a parent profile
--- via parent_id, used to group students under their parent on the public
--- Absence/Late form.
+-- is never checked in) from an Admin (co-op staff/leaders who mainly just
+-- need a printable badge). A student can optionally link to a parent
+-- profile via parent_id, used to group students under their parent on the
+-- public Absence/Late form.
 CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   barcode TEXT NOT NULL UNIQUE,
   active INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
-  member_type TEXT NOT NULL DEFAULT 'student' CHECK(member_type IN ('student','parent')),
+  member_type TEXT NOT NULL DEFAULT 'student' CHECK(member_type IN ('student','parent','admin')),
   address TEXT,
   city TEXT,
   state TEXT,
@@ -173,11 +174,11 @@ CREATE TABLE IF NOT EXISTS name_tag_requests (
 );
 
 -- The printable badge design an admin lays out - one per member type,
--- since Students and Parents show different fields. layout_json is an
--- array of positioned elements (text field / shape / image / barcode);
--- see utils/nameTagBadge.js for the shape.
+-- since Students, Parents, and Admins each show different fields.
+-- layout_json is an array of positioned elements (text field / shape /
+-- image / barcode); see utils/nameTagBadge.js for the shape.
 CREATE TABLE IF NOT EXISTS name_tag_templates (
-  member_type TEXT PRIMARY KEY CHECK(member_type IN ('student','parent')),
+  member_type TEXT PRIMARY KEY CHECK(member_type IN ('student','parent','admin')),
   layout_json TEXT NOT NULL DEFAULT '[]',
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

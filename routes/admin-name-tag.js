@@ -67,7 +67,7 @@ router.get('/name-tag', requireAdmin, (req, res) => {
     dates,
     dateFilter,
     members,
-    templates: { student: getTemplate('student'), parent: getTemplate('parent') },
+    templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
     defaultLayouts: DEFAULT_LAYOUTS,
     fieldsByType: FIELDS_BY_TYPE,
     badgeWidth: BADGE_WIDTH,
@@ -75,9 +75,11 @@ router.get('/name-tag', requireAdmin, (req, res) => {
   });
 });
 
+const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
+
 router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
   const type = req.params.type;
-  if (type !== 'student' && type !== 'parent') return res.status(404).json({ ok: false });
+  if (!NAME_TAG_TYPES.includes(type)) return res.status(404).json({ ok: false });
 
   let layout;
   try {
@@ -108,7 +110,7 @@ router.post('/name-tag/print', requireAdmin, (req, res) => {
   const placeholders = memberIds.map(() => '?').join(',');
   const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
 
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
   const badges = members.map((m) => ({
     layout: templates[m.member_type] || templates.student,
     data: badgeDataForMember(m),

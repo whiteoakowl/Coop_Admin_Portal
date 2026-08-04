@@ -99,7 +99,7 @@ router.get('/members', requireAdmin, (req, res) => {
   const members = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
   const parentNames = {};
   for (const m of members) parentNames[m.id] = m.name;
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
   const withRosters = members.map((m) => ({
     ...m,
     rosters: rostersForMember(m.id),
@@ -117,8 +117,10 @@ router.get('/members', requireAdmin, (req, res) => {
   });
 });
 
+const MEMBER_TYPES = ['student', 'parent', 'admin'];
+
 function memberFormFields(req) {
-  const memberType = req.body.memberType === 'parent' ? 'parent' : 'student';
+  const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
   return {
     name: (req.body.name || '').trim(),
     barcode: (req.body.barcode || '').trim(),
@@ -133,7 +135,29 @@ function memberFormFields(req) {
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     medicalNotes: memberType === 'student' ? (req.body.medicalNotes || '').trim() || null : null,
     parentId: memberType === 'student' && req.body.parentId ? parseInt(req.body.parentId, 10) || null : null,
+    cleanupTeamIds:
+      memberType === 'parent'
+        ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
+        : null,
   };
+}
+
+// Keeps setup_team_members in sync with the Cleanup Team checkboxes on a
+// parent's profile, so editing it there is reflected on the actual
+// Setup/Cleanup team charts (and vice versa - both read/write the same table).
+function syncCleanupTeams(memberId, teamIds) {
+  if (teamIds === null) return;
+  db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
+  const link = db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)');
+  for (const teamId of teamIds) link.run(teamId, memberId);
+}
+
+function allSetupTeams() {
+  return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, title COLLATE NOCASE').all();
+}
+
+function cleanupTeamIdsForMember(memberId) {
+  return db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId).map((r) => r.team_id);
 }
 
 router.get('/members/new', requireAdmin, (req, res) => {
@@ -157,6 +181,8 @@ router.get('/members/new', requireAdmin, (req, res) => {
       parent_id: null,
     },
     parents: activeParents(),
+    setupTeams: allSetupTeams(),
+    memberCleanupTeamIds: [],
     error: req.query.error || null,
   });
 });
@@ -176,26 +202,29 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
 
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : null;
 
-  db.prepare(
-    `INSERT INTO members
-       (name, barcode, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes, parent_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    f.name,
-    barcode,
-    f.memberType,
-    f.address,
-    f.city,
-    f.state,
-    f.zip,
-    f.phone,
-    f.email,
-    photoPath,
-    f.birthday,
-    f.gradeLevel,
-    f.medicalNotes,
-    f.parentId
-  );
+  const info = db
+    .prepare(
+      `INSERT INTO members
+         (name, barcode, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes, parent_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      f.name,
+      barcode,
+      f.memberType,
+      f.address,
+      f.city,
+      f.state,
+      f.zip,
+      f.phone,
+      f.email,
+      photoPath,
+      f.birthday,
+      f.gradeLevel,
+      f.medicalNotes,
+      f.parentId
+    );
+  syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
@@ -210,6 +239,8 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
     mode: 'edit',
     member,
     parents: activeParents(id),
+    setupTeams: allSetupTeams(),
+    memberCleanupTeamIds: cleanupTeamIdsForMember(id),
     error: req.query.error || null,
   });
 });
@@ -255,6 +286,7 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
     parentId,
     id
   );
+  syncCleanupTeams(id, f.cleanupTeamIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });
@@ -328,7 +360,8 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
       skipped++;
       continue;
     }
-    const memberType = (r.type || '').toLowerCase() === 'parent' ? 'parent' : 'student';
+    const typeLower = (r.type || '').toLowerCase();
+    const memberType = MEMBER_TYPES.includes(typeLower) ? typeLower : 'student';
     let barcode = r.name;
     if (db.prepare('SELECT id FROM members WHERE barcode = ?').get(barcode)) {
       barcode = `${r.name} (${Date.now().toString(36)})`;

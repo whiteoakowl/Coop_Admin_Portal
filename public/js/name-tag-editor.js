@@ -7,16 +7,21 @@
   const BADGE_HEIGHT = seed.badgeHeight;
   const FIELDS_BY_TYPE = seed.fieldsByType;
   const DEFAULT_LAYOUTS = seed.defaultLayouts;
-  // Working copy - edits happen here until "Save Template" persists them.
-  const layouts = { student: cloneLayout(seed.templates.student), parent: cloneLayout(seed.templates.parent) };
-
   function cloneLayout(layout) {
     return JSON.parse(JSON.stringify(layout || []));
   }
 
+  // Working copy - edits happen here until "Save Template" persists them.
+  const layouts = {
+    student: cloneLayout(seed.templates.student),
+    parent: cloneLayout(seed.templates.parent),
+    admin: cloneLayout(seed.templates.admin),
+  };
+
   const PLACEHOLDER_DATA = {
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', barcodeValue: '0123456789' },
     parent: { name: 'Jordan Parent', cleanupTeam: 'Chairs & Tables', barcodeValue: '0123456789' },
+    admin: { name: 'Sam Admin', barcodeValue: '0123456789' },
   };
 
   let currentType = 'student';

@@ -22,12 +22,16 @@
         <h2>Member Type</h2>
         <div class="radio-group">
           <label class="radio-option">
-            <input type="radio" name="memberType" value="student" <%= member.member_type !== 'parent' ? 'checked' : '' %> />
+            <input type="radio" name="memberType" value="student" <%= member.member_type !== 'parent' && member.member_type !== 'admin' ? 'checked' : '' %> />
             Student
           </label>
           <label class="radio-option">
             <input type="radio" name="memberType" value="parent" <%= member.member_type === 'parent' ? 'checked' : '' %> />
             Parent
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="memberType" value="admin" <%= member.member_type === 'admin' ? 'checked' : '' %> />
+            Admin
           </label>
         </div>
       </div>
@@ -91,6 +95,23 @@
             <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
           </label>
         </div>
+      </div>
+
+      <div class="manage-section" id="parent-only-fields">
+        <h2>Cleanup Team</h2>
+        <p class="hint">Check the Setup/Cleanup team(s) this parent is on - this stays in sync with the actual team charts either way.</p>
+        <% if (setupTeams.length === 0) { %>
+          <p class="hint">No Setup/Cleanup teams exist yet.</p>
+        <% } else { %>
+          <div class="checkbox-group">
+            <% setupTeams.forEach(function(t) { %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
+                <%= t.day.charAt(0).toUpperCase() + t.day.slice(1) %> &mdash; <%= t.title %>
+              </label>
+            <% }); %>
+          </div>
+        <% } %>
       </div>
 
       <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Changes' %></button>

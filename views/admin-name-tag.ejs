@@ -19,6 +19,7 @@
       <div class="name-tag-type-tabs" id="name-tag-type-tabs">
         <button type="button" class="name-tag-type-tab" data-type="student">Student</button>
         <button type="button" class="name-tag-type-tab" data-type="parent">Parent</button>
+        <button type="button" class="name-tag-type-tab" data-type="admin">Admin</button>
       </div>
 
       <div class="name-tag-editor" id="name-tag-editor">
@@ -52,12 +53,13 @@
 
     <div class="manage-section">
       <h2>Bulk Print</h2>
-      <p class="hint">Pick members and print their name tags together, 8 to a sheet.</p>
+      <p class="hint">Pick members and print their name tags together, 6 to a sheet.</p>
       <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
         <div class="name-tag-bulk-filter">
           <button type="button" class="btn-secondary" data-filter="all">All</button>
           <button type="button" class="btn-secondary" data-filter="student">Students Only</button>
           <button type="button" class="btn-secondary" data-filter="parent">Parents Only</button>
+          <button type="button" class="btn-secondary" data-filter="admin">Admins Only</button>
           <button type="button" class="btn-secondary" id="bulk-select-all-btn">Select All Shown</button>
           <button type="button" class="btn-secondary" id="bulk-select-none-btn">Select None</button>
         </div>
@@ -69,7 +71,7 @@
             <label class="member-picker-row" data-type="<%= m.member_type %>">
               <input type="checkbox" name="memberIds" value="<%= m.id %>" />
               <span><%= m.name %></span>
-              <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+              <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
             </label>
           <% }); %>
         </div>

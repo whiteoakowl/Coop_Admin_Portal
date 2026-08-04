@@ -56,7 +56,7 @@
                 <% } %>
               </td>
               <td><a href="/admin/members/<%= m.id %>/edit"><%= m.name %></a></td>
-              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="mono"><%= m.barcode %></td>
               <td><%= m.parentName || '—' %></td>
               <td>

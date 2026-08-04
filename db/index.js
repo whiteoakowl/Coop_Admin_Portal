@@ -73,7 +73,7 @@ for (const day of ['monday', 'wednesday']) {
 
 // Seed a starter badge design for each member type so the design editor
 // and badge printing always have something to render.
-for (const memberType of ['student', 'parent']) {
+for (const memberType of ['student', 'parent', 'admin']) {
   const existing = db.prepare('SELECT member_type FROM name_tag_templates WHERE member_type = ?').get(memberType);
   if (existing) continue;
   db.prepare('INSERT INTO name_tag_templates (member_type, layout_json) VALUES (?, ?)').run(
