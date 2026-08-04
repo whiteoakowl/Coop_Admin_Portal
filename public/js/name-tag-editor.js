@@ -30,15 +30,20 @@
 
   const canvas = document.getElementById('name-tag-canvas');
   const propsPanel = document.getElementById('name-tag-properties');
-  const tabs = document.querySelectorAll('.name-tag-type-tab');
+  const typeSelect = document.getElementById('name-tag-type-select');
   const addFieldSelect = document.getElementById('add-field-select');
   const saveStatus = document.getElementById('save-status');
+  const bgInput = document.getElementById('name-tag-bg-input');
 
   canvas.style.width = BADGE_WIDTH + 'px';
   canvas.style.height = BADGE_HEIGHT + 'px';
 
-  function currentLayout() {
+  function currentTemplate() {
     return layouts[currentType];
+  }
+
+  function currentLayout() {
+    return layouts[currentType].elements;
   }
 
   function findEl(id) {
@@ -55,6 +60,7 @@
 
   function renderCanvas() {
     canvas.innerHTML = '';
+    canvas.style.background = currentTemplate().background || '#ffffff';
     currentLayout().forEach((el) => {
       const node =
         el.type === 'image'
@@ -346,14 +352,21 @@
   function switchType(type) {
     currentType = type;
     selectedId = null;
-    tabs.forEach((t) => t.classList.toggle('active', t.dataset.type === type));
+    typeSelect.value = type;
+    bgInput.value = currentTemplate().background || '#ffffff';
     populateFieldSelect();
     renderCanvas();
     renderProperties();
     saveStatus.textContent = '';
   }
 
-  tabs.forEach((t) => t.addEventListener('click', () => switchType(t.dataset.type)));
+  typeSelect.addEventListener('change', () => switchType(typeSelect.value));
+
+  bgInput.addEventListener('input', () => {
+    currentTemplate().background = bgInput.value;
+    canvas.style.background = bgInput.value;
+    markUnsaved();
+  });
 
   document.getElementById('add-field-btn').addEventListener('click', () => {
     const field = addFieldSelect.value;
@@ -434,7 +447,7 @@
       const res = await fetch('/admin/name-tag/template/' + currentType, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ layout: currentLayout() }),
+        body: JSON.stringify({ layout: currentTemplate() }),
       });
       const data = await res.json();
       saveStatus.textContent = data.ok ? 'Saved!' : 'Could not save.';

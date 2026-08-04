@@ -39,7 +39,11 @@ function getTemplate(memberType) {
   const row = db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
   if (!row) return DEFAULT_LAYOUTS[memberType];
   try {
-    return JSON.parse(row.layout_json);
+    const parsed = JSON.parse(row.layout_json);
+    // Older saved templates stored a bare elements array with no badge
+    // background color - wrap those so every caller can rely on the
+    // { background, elements } shape.
+    return Array.isArray(parsed) ? { background: '#ffffff', elements: parsed } : parsed;
   } catch (err) {
     return DEFAULT_LAYOUTS[memberType];
   }

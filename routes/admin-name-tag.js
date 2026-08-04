@@ -99,8 +99,11 @@ router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
 
   let layout;
   try {
-    layout = Array.isArray(req.body.layout) ? req.body.layout : JSON.parse(req.body.layout);
+    layout = typeof req.body.layout === 'string' ? JSON.parse(req.body.layout) : req.body.layout;
   } catch (err) {
+    return res.status(400).json({ ok: false, message: 'Invalid layout.' });
+  }
+  if (!layout || !Array.isArray(layout.elements)) {
     return res.status(400).json({ ok: false, message: 'Invalid layout.' });
   }
 

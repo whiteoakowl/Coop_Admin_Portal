@@ -65,15 +65,10 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-function loadCategories() {
-  return db.prepare('SELECT name FROM categories ORDER BY name COLLATE NOCASE').all().map((r) => r.name);
-}
-
 function renderSettings(req, res, error, success) {
   res.render('admin-settings', {
     title: 'Settings',
     username: req.session.username,
-    categories: loadCategories(),
     error,
     success,
   });

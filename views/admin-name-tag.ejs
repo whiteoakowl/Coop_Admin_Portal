@@ -14,13 +14,12 @@
 
     <div class="manage-section">
       <h2>Name Tag Design</h2>
-      <p class="hint">Lay out what shows on each type of name tag. Text fields, shapes, and the barcode can be dragged and resized; drop an image in for a logo or background art.</p>
 
-      <div class="name-tag-type-tabs" id="name-tag-type-tabs">
-        <button type="button" class="name-tag-type-tab" data-type="student">Student</button>
-        <button type="button" class="name-tag-type-tab" data-type="parent">Parent</button>
-        <button type="button" class="name-tag-type-tab" data-type="admin">Admin</button>
-      </div>
+      <select class="name-tag-type-select" id="name-tag-type-select">
+        <option value="student">Student</option>
+        <option value="parent">Parent</option>
+        <option value="admin">Admin</option>
+      </select>
 
       <div class="name-tag-editor" id="name-tag-editor">
         <div class="name-tag-editor-toolbar">
@@ -34,6 +33,10 @@
             <input type="file" id="add-image-input" accept="image/*" hidden />
           </label>
           <button type="button" class="btn-secondary" id="add-barcode-btn">+ Add Barcode</button>
+          <label class="name-tag-bg-label">
+            Background
+            <input type="color" id="name-tag-bg-input" />
+          </label>
         </div>
 
         <div class="name-tag-editor-body">

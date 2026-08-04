@@ -13,12 +13,17 @@
         <p class="print-header-sub"><%= dayLabel %> Floater Assignments</p>
       </div>
     </div>
+    <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
+    <% var showAssignmentsForm = dates.length > 0 && anyMembers; %>
     <div class="roster-toolbar">
       <div>
         <p class="subtitle no-print"><a href="/admin/volunteers">&larr; Volunteers</a></p>
         <h1><%= dayLabel %> Floater Assignments</h1>
       </div>
       <div class="roster-btn-row no-print">
+        <% if (showAssignmentsForm) { %>
+          <button type="submit" form="assignments-form" class="roster-action-btn">Save All</button>
+        <% } %>
         <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
@@ -111,7 +116,6 @@
             <tr><th>Name</th><th>Section</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
             <% if (!anyMembers) { %>
               <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
             <% } %>
@@ -148,7 +152,7 @@
       <% } else if (!anyMembers) { %>
         <p class="roster-empty">Add members above first.</p>
       <% } else { %>
-        <form method="POST" action="/admin/volunteers/<%= day %>/assignments">
+        <form method="POST" action="/admin/volunteers/<%= day %>/assignments" id="assignments-form">
           <input type="hidden" name="redirectTo" value="/admin/volunteers/<%= day %>/manage" />
           <div class="roster-scroll">
             <table class="roster-table roster-table-detailed volunteer-grid">
@@ -185,7 +189,6 @@
               </tbody>
             </table>
           </div>
-          <button type="submit" class="primary-btn no-print">Save All</button>
         </form>
       <% } %>
     </div>

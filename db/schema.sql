@@ -65,12 +65,6 @@ CREATE TABLE IF NOT EXISTS roster_members (
   PRIMARY KEY (roster_id, member_id)
 );
 
--- Who can be selected on the public Absence/Late form - an explicit opt-in
--- list managed the same way roster membership is, not "every member."
-CREATE TABLE IF NOT EXISTS absence_list_members (
-  member_id INTEGER PRIMARY KEY REFERENCES members(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS attendance (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,

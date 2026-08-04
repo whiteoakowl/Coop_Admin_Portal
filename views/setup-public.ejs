@@ -15,17 +15,19 @@
       </div>
     </div>
   <% } else { %>
-    <div class="volunteer-public-list">
+    <div class="setup-public-grid">
       <% teams.forEach(function(t) { %>
-        <h2 class="volunteer-public-section"><%= t.title %></h2>
-        <% if (t.description) { %><p class="setup-public-desc"><%= t.description %></p><% } %>
-        <% if (t.members.length === 0) { %>
-          <p class="setup-public-desc">No members on this team yet.</p>
-        <% } else { %>
-          <ul class="setup-public-member-list">
-            <% t.members.forEach(function(m) { %><li><%= m.name %></li><% }); %>
-          </ul>
-        <% } %>
+        <div class="setup-public-card">
+          <h2><%= t.title %></h2>
+          <% if (t.description) { %><p class="setup-public-desc"><%= t.description %></p><% } %>
+          <% if (t.members.length === 0) { %>
+            <p class="setup-public-desc">No members on this team yet.</p>
+          <% } else { %>
+            <ul class="setup-public-member-list">
+              <% t.members.forEach(function(m) { %><li><%= m.name %></li><% }); %>
+            </ul>
+          <% } %>
+        </div>
       <% }); %>
     </div>
   <% } %>

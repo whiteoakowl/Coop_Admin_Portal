@@ -25,22 +25,34 @@ const FIELDS_BY_TYPE = {
   admin: [{ field: 'name', label: 'Name' }],
 };
 
+// Each template is { background: '#hex', elements: [...] } - background is
+// the badge's page color, elements is the same positioned-element list as
+// before (text field / shape / image / barcode).
 const DEFAULT_LAYOUTS = {
-  student: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 10, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 42, width: 320, height: 22, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
-    { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 66, width: 320, height: 42, fontSize: 12, color: '#dc2626', bold: true, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
-  ],
-  parent: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 16, width: 320, height: 34, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 54, width: 320, height: 40, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
-  ],
-  admin: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 38, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
-  ],
+  student: {
+    background: '#ffffff',
+    elements: [
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 10, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center' },
+      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 42, width: 320, height: 22, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
+      { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 66, width: 320, height: 42, fontSize: 12, color: '#dc2626', bold: true, align: 'center' },
+      { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
+    ],
+  },
+  parent: {
+    background: '#ffffff',
+    elements: [
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 16, width: 320, height: 34, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
+      { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 54, width: 320, height: 40, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
+      { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
+    ],
+  },
+  admin: {
+    background: '#ffffff',
+    elements: [
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 38, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
+      { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
+    ],
+  },
 };
 
 module.exports = { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, DEFAULT_LAYOUTS };

@@ -10,17 +10,16 @@ function loadParents() {
     .all();
 }
 
-// Students eligible to be marked absent/late: linked to a parent (parent_id)
-// and on the admin-curated Absence/Late opt-in list, same as before - the
-// parent-picker just makes it faster to find your family's names.
+// Every member is selectable - no separate opt-in list to manage. The
+// parent-picker just groups the full member list by family: the parent
+// themselves, plus every student linked to them via parent_id.
 function loadChildrenByParent() {
   const rows = db
     .prepare(
-      `SELECT m.id, m.name, m.parent_id AS parentId
-       FROM members m
-       JOIN absence_list_members alm ON alm.member_id = m.id
-       WHERE m.active = 1 AND m.member_type = 'student' AND m.parent_id IS NOT NULL
-       ORDER BY m.name COLLATE NOCASE`
+      `SELECT id, name, parent_id AS parentId
+       FROM members
+       WHERE active = 1 AND member_type = 'student' AND parent_id IS NOT NULL
+       ORDER BY name COLLATE NOCASE`
     )
     .all();
   const byParent = {};
@@ -32,12 +31,11 @@ function loadChildrenByParent() {
 }
 
 function loadEligibleStudent(studentId, parentId) {
+  if (studentId === parentId) {
+    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
+  }
   return db
-    .prepare(
-      `SELECT m.* FROM members m
-       JOIN absence_list_members alm ON alm.member_id = m.id
-       WHERE m.id = ? AND m.parent_id = ? AND m.active = 1 AND m.member_type = 'student'`
-    )
+    .prepare("SELECT * FROM members WHERE id = ? AND parent_id = ? AND active = 1 AND member_type = 'student'")
     .get(studentId, parentId);
 }
 
@@ -78,7 +76,7 @@ router.post('/absence/submit', (req, res) => {
   if (!parent) return fail('Please select your name.');
 
   const students = studentIds.map((id) => loadEligibleStudent(id, parentId)).filter(Boolean);
-  if (students.length === 0) return fail('Please select at least one student.');
+  if (students.length === 0) return fail('Please select at least one name.');
 
   if (!isValidISODate(sessionDate)) return fail('Please choose a class date.');
   if (!reasonCategory) return fail('Please select Personal or Medical.');

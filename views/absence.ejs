@@ -28,27 +28,27 @@
         <% }); %>
       </select>
 
-      <label>Student(s)</label>
+      <label>Who is this for?</label>
       <div id="absence-children-groups">
         <% parents.forEach(function(p) { %>
           <% var kids = childrenByParent[p.id] || []; %>
           <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
-            <% if (kids.length === 0) { %>
-              <p class="hint">No students linked to this parent yet.</p>
-            <% } else { %>
-              <div class="checkbox-group">
-                <% kids.forEach(function(k) { %>
-                  <label class="checkbox-option">
-                    <input type="checkbox" name="studentIds" value="<%= k.id %>" <%= formValues.studentIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
-                    <%= k.name %>
-                  </label>
-                <% }); %>
-              </div>
-            <% } %>
+            <div class="checkbox-group">
+              <label class="checkbox-option">
+                <input type="checkbox" name="studentIds" value="<%= p.id %>" <%= formValues.studentIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
+                <%= p.name %> (Parent)
+              </label>
+              <% kids.forEach(function(k) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="studentIds" value="<%= k.id %>" <%= formValues.studentIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
+                  <%= k.name %>
+                </label>
+              <% }); %>
+            </div>
           </div>
         <% }); %>
       </div>
-      <p id="student-required-msg" class="hint absence-required-msg" hidden>Please select at least one student.</p>
+      <p id="student-required-msg" class="hint absence-required-msg" hidden>Please select at least one name.</p>
 
       <label for="sessionDate">Class Date</label>
       <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />

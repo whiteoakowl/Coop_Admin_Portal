@@ -1,9 +1,9 @@
 <%
-// locals: layout (array), data (object), badgeWidth, badgeHeight
+// locals: layout ({ background, elements }), data (object), badgeWidth, badgeHeight
 var ALIGN_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
 %>
-<div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px;">
-  <% layout.forEach(function(el) { %>
+<div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; background:<%= layout.background || '#ffffff' %>;">
+  <% layout.elements.forEach(function(el) { %>
     <% if (el.type === 'text') { %>
       <div
         class="badge-el badge-el-text"

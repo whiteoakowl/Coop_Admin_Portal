@@ -14,13 +14,35 @@
     <% } %>
 
     <form method="POST" action="/name-tag/submit" class="stack-form" id="name-tag-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
-      <label for="memberId">Your Name</label>
-      <select id="memberId" name="memberId" required>
+      <label for="parentId">Parent Name</label>
+      <select id="parentId" name="parentId" required>
         <option value="">Select your name&hellip;</option>
-        <% members.forEach(function(m) { %>
-          <option value="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %></option>
+        <% parents.forEach(function(p) { %>
+          <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
         <% }); %>
       </select>
+
+      <label>Who is this for?</label>
+      <div id="name-tag-member-groups">
+        <% parents.forEach(function(p) { %>
+          <% var kids = childrenByParent[p.id] || []; %>
+          <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
+            <div class="checkbox-group">
+              <label class="checkbox-option">
+                <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= formValues.memberIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
+                <%= p.name %> (Parent)
+              </label>
+              <% kids.forEach(function(k) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="memberIds" value="<%= k.id %>" <%= formValues.memberIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
+                  <%= k.name %>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+      <p id="member-required-msg" class="hint absence-required-msg" hidden>Please select at least one name.</p>
 
       <label>What do you need?</label>
       <div class="radio-group">

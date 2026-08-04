@@ -47,9 +47,26 @@
             <button type="submit" class="primary-btn">Create Roster</button>
           </form>
         </details>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
         <a class="btn-secondary" href="/admin/rosters?archived=1">View Archived Rosters</a>
         <a class="btn-secondary" href="/admin/checkinout-log">Check In/Out Log</a>
       </div>
+
+      <dialog id="add-category-dialog" class="member-picker-dialog">
+        <form method="POST" action="/admin/rosters/categories">
+          <h3>Add Category</h3>
+          <p class="hint">Used to organize rosters &mdash; pick it from the dropdown when creating or editing a roster.</p>
+          <input type="text" name="name" placeholder="e.g. Youth, Adults, Sports" required />
+          <div class="checkbox-row">
+            <% if (categories.length === 0) { %><span class="hint">No categories yet.</span><% } %>
+            <% categories.forEach(function(c) { %><span class="badge-pill"><%= c %></span><% }); %>
+          </div>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Add</button>
+          </div>
+        </form>
+      </dialog>
     <% } else { %>
       <div class="page-actions">
         <a class="btn-secondary" href="/admin/rosters">&larr; Back to Active Rosters</a>
