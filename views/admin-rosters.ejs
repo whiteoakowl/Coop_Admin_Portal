@@ -6,116 +6,200 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : 'Attendance' %></p>
+      </div>
+    </div>
     <h1>Attendance</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="view-tabs">
-      <a class="view-tab<%= !archived ? ' active' : '' %>" href="/admin/rosters">Active</a>
-      <a class="view-tab<%= archived ? ' active' : '' %>" href="/admin/rosters?archived=1">Archived</a>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'active' ? ' active' : '' %>" href="/admin/rosters">Active Rosters</a>
+      <a class="view-tab<%= tab === 'archived' ? ' active' : '' %>" href="/admin/rosters?archived=1">Archived Rosters</a>
+      <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/absence-list">Absence/Late Log</a>
+      <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/checkinout-log">Check In/Out Log</a>
     </div>
     <div class="view-tab-panel">
-      <% if (!archived) { %>
-        <div class="page-actions">
-          <details class="add-member-details">
-            <summary class="btn-primary-summary">+ New Roster</summary>
-            <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
-              <div class="inline-form-row">
-                <label>
-                  Roster Title
-                  <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
-                </label>
-                <label>
-                  Category
-                  <select name="category">
-                    <option value="">No category</option>
-                    <% categories.forEach(function(c) { %><option value="<%= c %>"><%= c %></option><% }); %>
-                  </select>
-                </label>
-              </div>
-
-              <label class="roster-checkbox-label">Session Dates</label>
-              <div class="date-list-wrap">
-                <div class="date-list">
-                  <div class="date-list-row">
-                    <input type="date" name="dates" />
-                    <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
-                  </div>
+      <% if (tab === 'active' || tab === 'archived') { %>
+        <% if (tab === 'active') { %>
+          <div class="page-actions no-print">
+            <details class="add-member-details">
+              <summary class="btn-primary-summary">+ New Roster</summary>
+              <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
+                <div class="inline-form-row">
+                  <label>
+                    Roster Title
+                    <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
+                  </label>
+                  <label>
+                    Category
+                    <select name="category">
+                      <option value="">No category</option>
+                      <% categories.forEach(function(c) { %><option value="<%= c %>"><%= c %></option><% }); %>
+                    </select>
+                  </label>
                 </div>
-                <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+
+                <label class="roster-checkbox-label">Session Dates</label>
+                <div class="date-list-wrap">
+                  <div class="date-list">
+                    <div class="date-list-row">
+                      <input type="date" name="dates" />
+                      <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+                </div>
+
+                <label class="roster-checkbox-label">Import Member Names <span class="hint">(optional &mdash; one name per line)</span></label>
+                <input type="file" name="file" accept=".csv,.txt" />
+
+                <button type="submit" class="primary-btn">Create Roster</button>
+              </form>
+            </details>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+          </div>
+
+          <dialog id="add-category-dialog" class="member-picker-dialog">
+            <form method="POST" action="/admin/rosters/categories">
+              <h3>Add Category</h3>
+              <p class="hint">Used to organize rosters &mdash; pick it from the dropdown when creating or editing a roster.</p>
+              <input type="text" name="name" placeholder="e.g. Youth, Adults, Sports" required />
+              <div class="checkbox-row">
+                <% if (categories.length === 0) { %><span class="hint">No categories yet.</span><% } %>
+                <% categories.forEach(function(c) { %><span class="badge-pill"><%= c %></span><% }); %>
               </div>
-
-              <label class="roster-checkbox-label">Import Member Names <span class="hint">(optional &mdash; one name per line)</span></label>
-              <input type="file" name="file" accept=".csv,.txt" />
-
-              <button type="submit" class="primary-btn">Create Roster</button>
+              <div class="notes-dialog-actions">
+                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                <button type="submit" class="primary-btn">Add</button>
+              </div>
             </form>
-          </details>
-          <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
-          <a class="btn-secondary" href="/admin/absence-list">Absence/Late</a>
-          <a class="btn-secondary" href="/admin/checkinout-log">Check In/Out Log</a>
+          </dialog>
+        <% } %>
+
+        <div class="category-filter no-print">
+          <label for="category-select">Filter by category</label>
+          <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
+            <option value="">All categories</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
+            <% }); %>
+          </select>
         </div>
 
-        <dialog id="add-category-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/rosters/categories">
-            <h3>Add Category</h3>
-            <p class="hint">Used to organize rosters &mdash; pick it from the dropdown when creating or editing a roster.</p>
-            <input type="text" name="name" placeholder="e.g. Youth, Adults, Sports" required />
-            <div class="checkbox-row">
-              <% if (categories.length === 0) { %><span class="hint">No categories yet.</span><% } %>
-              <% categories.forEach(function(c) { %><span class="badge-pill"><%= c %></span><% }); %>
+        <div class="admin-card-grid">
+          <% rosters.forEach(function(r) { %>
+            <div class="admin-card roster-card">
+              <div class="roster-card-top">
+                <strong><%= r.name %></strong>
+                <% if (r.category) { %><span class="badge-pill"><%= r.category %></span><% } %>
+              </div>
+              <div class="roster-card-meta">
+                <%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %> &middot;
+                <%= r.dateCount %> date<%= r.dateCount === 1 ? '' : 's' %>
+              </div>
+              <div class="roster-btn-row">
+                <a class="roster-action-btn" href="/admin/roster/<%= r.id %>">View Roster</a>
+                <a class="roster-action-btn" href="/admin/rosters/<%= r.id %>/manage">Manage</a>
+                <form method="POST" action="/admin/rosters/<%= r.id %>/toggle-active" class="roster-btn-form">
+                  <button type="submit" class="roster-action-btn"><%= r.active ? 'Archive' : 'Unarchive' %></button>
+                </form>
+                <form method="POST" action="/admin/rosters/<%= r.id %>/delete" class="roster-btn-form" onsubmit="return confirm('Permanently delete &quot;<%= r.name %>&quot; and all its attendance history? This cannot be undone.');">
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                </form>
+              </div>
             </div>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Add</button>
-            </div>
-          </form>
-        </dialog>
-      <% } else { %>
-        <div class="page-actions">
-          <a class="btn-secondary" href="/admin/absence-list">Absence/Late</a>
-          <a class="btn-secondary" href="/admin/checkinout-log">Check In/Out Log</a>
+          <% }); %>
+          <% if (rosters.length === 0) { %>
+            <p class="hint"><%= archived ? 'No archived rosters.' : ('No rosters yet' + (selectedCategory ? ' in this category' : '') + '.') %></p>
+          <% } %>
+        </div>
+      <% } else if (tab === 'absence') { %>
+        <div class="roster-toolbar no-print">
+          <div></div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+            <a class="roster-action-btn" href="/admin/absence-list/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+          </div>
+        </div>
+
+        <div class="category-filter no-print">
+          <label for="date-select">Date</label>
+          <select id="date-select" onchange="window.location = '/admin/absence-list' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+            <option value="">All dates</option>
+            <% submissionDates.forEach(function(d) { %>
+              <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <% if (submissions.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+              <% } %>
+              <% submissions.forEach(function(s) { %>
+                <tr>
+                  <td><%= s.memberName %></td>
+                  <td><%= s.rosterName %></td>
+                  <td><%= s.dateLabel %></td>
+                  <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+                  <td><%= s.reasonLabel %></td>
+                  <td><%= s.description %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (tab === 'checkinout') { %>
+        <div class="roster-toolbar no-print">
+          <div></div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+            <a class="roster-action-btn" href="/admin/checkinout-log/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+          </div>
+        </div>
+
+        <div class="category-filter no-print">
+          <label for="date-select">Date</label>
+          <select id="date-select" onchange="window.location = '/admin/checkinout-log' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+            <option value="">All dates</option>
+            <% dates.forEach(function(d) { %>
+              <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Name</th><th>Roster</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Number</th></tr>
+            </thead>
+            <tbody>
+              <% if (rows.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No check-ins recorded yet.</td></tr>
+              <% } %>
+              <% rows.forEach(function(r) { %>
+                <tr>
+                  <td><%= r.memberName %></td>
+                  <td><%= r.rosterName %></td>
+                  <td><%= r.dateLabel %></td>
+                  <td><%= r.checkInTime %></td>
+                  <td><%= r.checkOutTime %></td>
+                  <td><%= r.number %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         </div>
       <% } %>
-
-      <div class="category-filter">
-        <label for="category-select">Filter by category</label>
-        <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
-          <option value="">All categories</option>
-          <% categories.forEach(function(c) { %>
-            <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
-          <% }); %>
-        </select>
-      </div>
-
-      <div class="admin-card-grid">
-        <% rosters.forEach(function(r) { %>
-          <div class="admin-card roster-card">
-            <div class="roster-card-top">
-              <strong><%= r.name %></strong>
-              <% if (r.category) { %><span class="badge-pill"><%= r.category %></span><% } %>
-            </div>
-            <div class="roster-card-meta">
-              <%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %> &middot;
-              <%= r.dateCount %> date<%= r.dateCount === 1 ? '' : 's' %>
-            </div>
-            <div class="roster-btn-row">
-              <a class="roster-action-btn" href="/admin/roster/<%= r.id %>">View Roster</a>
-              <a class="roster-action-btn" href="/admin/rosters/<%= r.id %>/manage">Manage</a>
-              <form method="POST" action="/admin/rosters/<%= r.id %>/toggle-active" class="inline-block-form roster-btn-form">
-                <button type="submit" class="roster-action-btn"><%= r.active ? 'Archive' : 'Unarchive' %></button>
-              </form>
-              <form method="POST" action="/admin/rosters/<%= r.id %>/delete" class="inline-block-form roster-btn-form" onsubmit="return confirm('Permanently delete &quot;<%= r.name %>&quot; and all its attendance history? This cannot be undone.');">
-                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-              </form>
-            </div>
-          </div>
-        <% }); %>
-        <% if (rosters.length === 0) { %>
-          <p class="hint"><%= archived ? 'No archived rosters.' : ('No rosters yet' + (selectedCategory ? ' in this category' : '') + '.') %></p>
-        <% } %>
-      </div>
     </div>
   </main>
   <script src="/js/date-list.js"></script>

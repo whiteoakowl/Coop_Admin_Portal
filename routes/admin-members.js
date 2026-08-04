@@ -437,14 +437,37 @@ router.post('/members/:id/delete', requireAdmin, (req, res) => {
 router.get('/absence-list', requireAdmin, (req, res) => {
   const dateFilter = req.query.date || '';
 
-  res.render('admin-absence-list', {
-    title: 'Absence/Late Form',
+  res.render('admin-rosters', {
+    title: 'Absence/Late Log',
+    tab: 'absence',
     submissions: allAbsenceSubmissions(dateFilter),
     submissionDates: absenceSubmissionDates(),
     dateFilter,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.get('/absence-list/export.csv', requireAdmin, (req, res) => {
+  const dateFilter = req.query.date || '';
+  const submissions = allAbsenceSubmissions(dateFilter);
+
+  const header = ['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description'];
+  const lines = submissions.map((s) =>
+    [
+      `"${s.memberName.replace(/"/g, '""')}"`,
+      `"${s.rosterName.replace(/"/g, '""')}"`,
+      s.dateLabel,
+      s.statusLabel,
+      s.reasonLabel,
+      `"${(s.description || '').replace(/"/g, '""')}"`,
+    ].join(',')
+  );
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="absence-late-log.csv"');
+  res.send(csv);
 });
 
 module.exports = router;

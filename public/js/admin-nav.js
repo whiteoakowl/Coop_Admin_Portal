@@ -1,17 +1,37 @@
 (function () {
+  const path = window.location.pathname;
+
+  function bestMatch(candidates, getPrefixes) {
+    let best = null;
+    let bestLen = -1;
+    candidates.forEach((item) => {
+      getPrefixes(item).forEach((prefix) => {
+        if (!prefix) return;
+        const matches = path === prefix || path.indexOf(prefix + '/') === 0;
+        if (matches && prefix.length > bestLen) {
+          best = item;
+          bestLen = prefix.length;
+        }
+      });
+    });
+    return best;
+  }
+
+  // Desktop sidebar: highlight whichever section link best matches the
+  // current page (longest prefix match wins). A link can also claim extra
+  // paths via data-match (e.g. Volunteers also covers /admin/setup/*).
+  const navLinks = Array.prototype.slice.call(document.querySelectorAll('#admin-nav-links a'));
+  const activeLink = bestMatch(navLinks, (a) => [a.getAttribute('href'), a.dataset.match]);
+  if (activeLink) activeLink.classList.add('active');
+
+  // Mobile dropdown: pre-select whichever option best matches the current
+  // page, so it always shows where you are.
   const select = document.getElementById('admin-nav-select');
   if (!select) return;
 
-  // Pre-select whichever option best matches the current page, so the
-  // mobile dropdown always shows where you are (longest prefix match wins,
-  // since every page path starts with "/admin").
-  const path = window.location.pathname;
-  let best = null;
-  Array.prototype.forEach.call(select.options, (opt) => {
-    const matches = path === opt.value || path.indexOf(opt.value + '/') === 0;
-    if (matches && (!best || opt.value.length > best.length)) best = opt.value;
-  });
-  if (best) select.value = best;
+  const options = Array.prototype.slice.call(select.options);
+  const activeOption = bestMatch(options, (opt) => [opt.value]);
+  if (activeOption) select.value = activeOption.value;
 
   select.addEventListener('change', () => {
     if (select.value) window.location = select.value;

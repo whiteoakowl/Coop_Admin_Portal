@@ -1,6 +1,6 @@
 const db = require('../db');
 const { formatDateLabel } = require('./dates');
-const { DAYS, DAY_LABELS, isValidDay } = require('./days');
+const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 
 function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
@@ -74,6 +74,7 @@ module.exports = {
   DAYS,
   DAY_LABELS,
   isValidDay,
+  defaultDay,
   getListByDay,
   getListsByRosterId,
   sectionsForList,

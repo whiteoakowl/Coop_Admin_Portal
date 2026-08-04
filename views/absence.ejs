@@ -25,7 +25,6 @@
       </div>
 
       <div class="form-section">
-        <h2>Who Is This For?</h2>
         <div class="stack-form">
           <label for="parentId">Parent Name</label>
           <select id="parentId" name="parentId" required>
@@ -73,8 +72,12 @@
             <option value="personal" <%= formValues.reasonCategory === 'personal' ? 'selected' : '' %>>Personal</option>
             <option value="medical" <%= formValues.reasonCategory === 'medical' ? 'selected' : '' %>>Medical</option>
           </select>
+        </div>
+      </div>
 
-          <label for="reason">Description</label>
+      <div class="form-section">
+        <h2>Description</h2>
+        <div class="stack-form">
           <textarea id="reason" name="reason" rows="3" placeholder="Briefly explain the reason" required><%= formValues.reason %></textarea>
         </div>
       </div>

@@ -6,16 +6,15 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const {
-  DAYS,
   DAY_LABELS,
   isValidDay,
+  defaultDay,
   getListByDay,
   sectionsForList,
   datesForList,
   membersForList,
   buildListGrid,
 } = require('../utils/volunteers');
-const { teamsForDay } = require('../utils/setup');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -24,26 +23,9 @@ function requireDay(req, res, next) {
   next();
 }
 
-// --- Landing page: Floater Assignments cards, then Setup/Cleanup Teams
-// cards below - one combined page under the Volunteers nav tab. ---
-
-router.get('/volunteers', requireAdmin, (req, res) => {
-  const rosters = db.prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
-  const cards = DAYS.map((day) => {
-    const list = getListByDay(day);
-    const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
-    return { day, label: DAY_LABELS[day], rosterId: list.roster_id, rosterName: roster ? roster.name : null };
-  });
-  const setupCards = DAYS.map((day) => ({ day, label: DAY_LABELS[day], teamCount: teamsForDay(day).length }));
-  res.render('admin-volunteers', {
-    title: 'Floater Assignments',
-    cards,
-    setupCards,
-    rosters,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
+// The landing page now lives on the combined Volunteers page, tabbed
+// between Floater Assignments and Setup/Cleanup Teams.
+router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volunteers/${defaultDay()}/manage`));
 
 router.post('/volunteers/:day/link', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
@@ -72,12 +54,15 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     .filter((m) => !memberIds.includes(m.id));
   const dates = datesForList(list.id);
   const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
+  const rosters = db.prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
 
-  res.render('admin-volunteer-manage', {
+  res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
+    tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
     roster,
+    rosters,
     sections,
     availableMembers,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
@@ -212,6 +197,29 @@ router.post('/volunteers/:day/assignments', requireAdmin, requireDay, (req, res)
   const redirectTo = requested.startsWith('/admin/') ? requested : `/admin/volunteers/${day}/manage`;
   const sep = redirectTo.includes('?') ? '&' : '?';
   res.redirect(redirectTo + sep + 'notice=' + encodeURIComponent('Volunteer assignments saved.'));
+});
+
+router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const list = getListByDay(day);
+  const grid = buildListGrid(list.id, null);
+
+  const header = ['Name', 'Section'];
+  for (const label of grid.dateLabels) header.push(`${label} Position`, `${label} Room`);
+
+  const lines = [];
+  for (const section of grid.sections) {
+    for (const row of section.members) {
+      const line = [`"${row.member.name.replace(/"/g, '""')}"`, `"${section.label.replace(/"/g, '""')}"`];
+      for (const cell of row.cells) line.push(cell.position || '', cell.room || '');
+      lines.push(line.join(','));
+    }
+  }
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${day}-floater-assignments.csv"`);
+  res.send(csv);
 });
 
 module.exports = router;

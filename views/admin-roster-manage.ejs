@@ -10,8 +10,14 @@
 
     <div class="manage-header-row">
       <form method="POST" action="/admin/rosters/<%= roster.id %>/rename" class="edit-name-form manage-title-form">
-        <input type="text" name="name" value="<%= roster.name %>" class="manage-title-input" required />
-        <button type="submit" class="link-btn">Save</button>
+        <input
+          type="text"
+          name="name"
+          value="<%= roster.name %>"
+          class="manage-title-input"
+          required
+          onblur="if (this.value.trim() && this.value !== this.defaultValue) this.form.submit();"
+        />
       </form>
       <form method="POST" action="/admin/rosters/<%= roster.id %>/category" class="inline-block-form">
         <select name="category" onchange="this.form.submit()">

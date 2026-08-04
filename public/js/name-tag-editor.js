@@ -31,9 +31,9 @@
   const canvas = document.getElementById('name-tag-canvas');
   const propsPanel = document.getElementById('name-tag-properties');
   const typeSelect = document.getElementById('name-tag-type-select');
-  const addFieldSelect = document.getElementById('add-field-select');
+  const toolSelect = document.getElementById('name-tag-tool-select');
+  const toolPanel = document.getElementById('name-tag-tool-panel');
   const saveStatus = document.getElementById('save-status');
-  const bgInput = document.getElementById('name-tag-bg-input');
 
   canvas.style.width = BADGE_WIDTH + 'px';
   canvas.style.height = BADGE_HEIGHT + 'px';
@@ -191,13 +191,7 @@
   function renderProperties() {
     propsPanel.innerHTML = '';
     const el = findEl(selectedId);
-    if (!el) {
-      const p = document.createElement('p');
-      p.className = 'hint';
-      p.textContent = 'Click an element on the badge to edit it.';
-      propsPanel.appendChild(p);
-      return;
-    }
+    if (!el) return;
 
     const title = document.createElement('h3');
     title.textContent =
@@ -339,38 +333,7 @@
     return found ? found.label : null;
   }
 
-  function populateFieldSelect() {
-    addFieldSelect.innerHTML = '';
-    (FIELDS_BY_TYPE[currentType] || []).forEach((f) => {
-      const opt = document.createElement('option');
-      opt.value = f.field;
-      opt.textContent = f.label;
-      addFieldSelect.appendChild(opt);
-    });
-  }
-
-  function switchType(type) {
-    currentType = type;
-    selectedId = null;
-    typeSelect.value = type;
-    bgInput.value = currentTemplate().background || '#ffffff';
-    populateFieldSelect();
-    renderCanvas();
-    renderProperties();
-    saveStatus.textContent = '';
-  }
-
-  typeSelect.addEventListener('change', () => switchType(typeSelect.value));
-
-  bgInput.addEventListener('input', () => {
-    currentTemplate().background = bgInput.value;
-    canvas.style.background = bgInput.value;
-    markUnsaved();
-  });
-
-  document.getElementById('add-field-btn').addEventListener('click', () => {
-    const field = addFieldSelect.value;
-    if (!field) return;
+  function addField(field) {
     currentLayout().push({
       id: newId('text'),
       type: 'text',
@@ -386,9 +349,9 @@
     });
     renderCanvas();
     markUnsaved();
-  });
+  }
 
-  document.getElementById('add-shape-btn').addEventListener('click', () => {
+  function addShape() {
     currentLayout().push({
       id: newId('shape'),
       type: 'shape',
@@ -403,18 +366,15 @@
     });
     renderCanvas();
     markUnsaved();
-  });
+  }
 
-  document.getElementById('add-barcode-btn').addEventListener('click', () => {
+  function addBarcode() {
     currentLayout().push({ id: newId('barcode'), type: 'barcode', x: 43, y: 150, width: 250, height: 55 });
     renderCanvas();
     markUnsaved();
-  });
+  }
 
-  document.getElementById('add-image-input').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
+  async function uploadImage(file) {
     const formData = new FormData();
     formData.append('image', file);
     try {
@@ -430,7 +390,92 @@
     } catch (err) {
       alert('Connection error uploading image.');
     }
-  });
+  }
+
+  // The toolbar is a single "Choose a tool..." dropdown - picking an option
+  // reveals just that tool's controls in the small panel below it, instead
+  // of a permanent row of five buttons.
+  function renderToolPanel() {
+    const tool = toolSelect.value;
+    toolPanel.innerHTML = '';
+
+    if (tool === 'add-field') {
+      const row = document.createElement('div');
+      row.className = 'name-tag-add-field';
+      const select = document.createElement('select');
+      (FIELDS_BY_TYPE[currentType] || []).forEach((f) => {
+        const opt = document.createElement('option');
+        opt.value = f.field;
+        opt.textContent = f.label;
+        select.appendChild(opt);
+      });
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.textContent = '+ Add to Badge';
+      btn.addEventListener('click', () => addField(select.value));
+      row.appendChild(select);
+      row.appendChild(btn);
+      toolPanel.appendChild(row);
+    } else if (tool === 'add-shape') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.textContent = '+ Add Shape to Badge';
+      btn.addEventListener('click', addShape);
+      toolPanel.appendChild(btn);
+    } else if (tool === 'add-image') {
+      const label = document.createElement('label');
+      label.className = 'btn-secondary name-tag-upload-label';
+      label.textContent = '+ Choose Image File';
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.hidden = true;
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (file) uploadImage(file);
+      });
+      label.appendChild(input);
+      toolPanel.appendChild(label);
+    } else if (tool === 'add-barcode') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.textContent = '+ Add Barcode to Badge';
+      btn.addEventListener('click', addBarcode);
+      toolPanel.appendChild(btn);
+    } else if (tool === 'background') {
+      const label = document.createElement('label');
+      label.className = 'name-tag-bg-label';
+      label.textContent = 'Background Color';
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = currentTemplate().background || '#ffffff';
+      input.addEventListener('input', () => {
+        currentTemplate().background = input.value;
+        canvas.style.background = input.value;
+        markUnsaved();
+      });
+      label.appendChild(input);
+      toolPanel.appendChild(label);
+    }
+  }
+
+  function switchType(type) {
+    currentType = type;
+    selectedId = null;
+    typeSelect.value = type;
+    toolSelect.value = '';
+    renderToolPanel();
+    renderCanvas();
+    renderProperties();
+    saveStatus.textContent = '';
+  }
+
+  typeSelect.addEventListener('change', () => switchType(typeSelect.value));
+  toolSelect.addEventListener('change', renderToolPanel);
 
   document.getElementById('reset-template-btn').addEventListener('click', () => {
     if (!confirm('Reset the ' + currentType + ' badge design to the default layout? This discards unsaved changes.')) return;

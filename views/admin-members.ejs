@@ -6,6 +6,13 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Members</p>
+      </div>
+    </div>
     <h1>Members</h1>
 
     <% if (error) { %>
@@ -15,9 +22,10 @@
       <div class="alert alert-success"><%= notice %></div>
     <% } %>
 
-    <div class="quick-add-row">
+    <div class="quick-add-row no-print">
       <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
       <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
+      <button type="button" class="btn-secondary" onclick="window.print()">Print</button>
     </div>
 
     <dialog id="import-dialog" class="member-picker-dialog">
@@ -36,18 +44,18 @@
       <table class="roster-table members-table">
         <thead>
           <tr>
-            <th></th>
+            <th class="members-col-photo"></th>
             <th>Name</th>
             <th>Type</th>
-            <th>Parent</th>
-            <th>Rosters</th>
+            <th class="members-col-parent">Parent</th>
+            <th class="members-col-rosters">Rosters</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <% members.forEach(function(m) { %>
             <tr>
-              <td>
+              <td class="members-col-photo">
                 <% if (m.photo_path) { %>
                   <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
                 <% } else { %>
@@ -56,8 +64,8 @@
               </td>
               <td><a href="/admin/members/<%= m.id %>/edit"><%= m.name %></a></td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-              <td><%= m.parentName || '—' %></td>
-              <td>
+              <td class="members-col-parent"><%= m.parentName || '—' %></td>
+              <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>
                 <% } else { %>

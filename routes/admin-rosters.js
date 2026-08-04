@@ -165,6 +165,7 @@ router.get('/rosters', requireAdmin, (req, res) => {
 
   res.render('admin-rosters', {
     title: archived ? 'Archived Rosters' : 'Attendance',
+    tab: archived ? 'archived' : 'active',
     rosters,
     categories: allCategories(),
     selectedCategory: category,
@@ -174,11 +175,7 @@ router.get('/rosters', requireAdmin, (req, res) => {
   });
 });
 
-// A single spreadsheet-style log of every actual kiosk check-in/out across
-// all rosters and dates - distinct from the per-roster attendance grid.
-router.get('/checkinout-log', requireAdmin, (req, res) => {
-  const dateFilter = req.query.date || '';
-
+function checkinoutLogRows(dateFilter) {
   let sql = `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date,
              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
              FROM attendance a
@@ -193,24 +190,62 @@ router.get('/checkinout-log', requireAdmin, (req, res) => {
   }
   sql += ' ORDER BY a.check_in_time DESC';
 
-  const rows = db
-    .prepare(sql)
-    .all(...params)
-    .map((r) => ({
-      memberName: r.memberName,
-      rosterName: r.rosterName,
-      dateLabel: formatDateLabel(r.date),
-      checkInTime: formatTime(r.checkInTime) || '—',
-      checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
-      number: r.number ?? '—',
-    }));
+  return db.prepare(sql).all(...params);
+}
 
-  const dates = db
+function checkinoutLogDates() {
+  return db
     .prepare(`SELECT DISTINCT session_date FROM attendance WHERE check_in_time IS NOT NULL ORDER BY session_date DESC`)
     .all()
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
+}
 
-  res.render('admin-checkinout-log', { title: 'Check In/Out Log', rows, dates, dateFilter });
+// A single spreadsheet-style log of every actual kiosk check-in/out across
+// all rosters and dates - distinct from the per-roster attendance grid.
+// Rendered as a tab on the shared Attendance page.
+router.get('/checkinout-log', requireAdmin, (req, res) => {
+  const dateFilter = req.query.date || '';
+
+  const rows = checkinoutLogRows(dateFilter).map((r) => ({
+    memberName: r.memberName,
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    checkInTime: formatTime(r.checkInTime) || '—',
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+    number: r.number ?? '—',
+  }));
+
+  res.render('admin-rosters', {
+    title: 'Check In/Out Log',
+    tab: 'checkinout',
+    rows,
+    dates: checkinoutLogDates(),
+    dateFilter,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.get('/checkinout-log/export.csv', requireAdmin, (req, res) => {
+  const dateFilter = req.query.date || '';
+  const rows = checkinoutLogRows(dateFilter);
+
+  const header = ['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number'];
+  const lines = rows.map((r) =>
+    [
+      `"${r.memberName.replace(/"/g, '""')}"`,
+      `"${r.rosterName.replace(/"/g, '""')}"`,
+      formatDateLabel(r.date),
+      formatTime(r.checkInTime) || '',
+      r.checkOutTime ? formatTime(r.checkOutTime) : '',
+      r.number ?? '',
+    ].join(',')
+  );
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="check-in-out-log.csv"');
+  res.send(csv);
 });
 
 router.post('/rosters/categories', requireAdmin, (req, res) => {

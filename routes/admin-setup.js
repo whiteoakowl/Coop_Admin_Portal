@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, isValidDay } = require('../utils/days');
+const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { teamsForDay, membersForTeam } = require('../utils/setup');
 
 function requireDay(req, res, next) {
@@ -10,19 +10,19 @@ function requireDay(req, res, next) {
   next();
 }
 
-// The landing page now lives on the combined Volunteers page.
-router.get('/setup', requireAdmin, (req, res) => res.redirect('/admin/volunteers'));
+// The landing page now lives on the combined Volunteers page, tabbed
+// between Floater Assignments and Setup/Cleanup Teams.
+router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${defaultDay()}/manage`));
 
 // --- Manage page: create/edit/delete teams, add/remove members per team ---
 
-router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
-  const day = req.params.day;
+function teamsWithMembers(day) {
   // Setup/Cleanup teams are staffed by parent volunteers, not students.
   const allActiveMembers = db
     .prepare("SELECT * FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE")
     .all();
 
-  const teams = teamsForDay(day).map((t) => {
+  return teamsForDay(day).map((t) => {
     const members = membersForTeam(t.id);
     const memberIds = members.map((m) => m.id);
     return {
@@ -31,12 +31,17 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
       availableMembers: allActiveMembers.filter((m) => !memberIds.includes(m.id)),
     };
   });
+}
 
-  res.render('admin-setup-manage', {
+router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+
+  res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
+    tab: 'setup',
     day,
     dayLabel: DAY_LABELS[day],
-    teams,
+    teams: teamsWithMembers(day),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -87,6 +92,30 @@ router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, r
   const memberId = parseInt(req.params.memberId, 10);
   db.prepare('DELETE FROM setup_team_members WHERE team_id = ? AND member_id = ?').run(teamId, memberId);
   res.redirect(`/admin/setup/${day}/manage`);
+});
+
+router.get('/setup/:day/export.csv', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const teams = teamsWithMembers(day);
+
+  const header = ['Team', 'Description', 'Member'];
+  const lines = [];
+  for (const t of teams) {
+    const title = `"${t.title.replace(/"/g, '""')}"`;
+    const description = `"${(t.description || '').replace(/"/g, '""')}"`;
+    if (t.members.length === 0) {
+      lines.push([title, description, ''].join(','));
+    } else {
+      for (const m of t.members) {
+        lines.push([title, description, `"${m.name.replace(/"/g, '""')}"`].join(','));
+      }
+    }
+  }
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="${day}-setup-cleanup-teams.csv"`);
+  res.send(csv);
 });
 
 module.exports = router;

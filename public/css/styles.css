@@ -95,9 +95,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-.landing-card:focus-visible,
-.volunteer-card-link:focus-visible,
-.setup-card:focus-visible {
+.landing-card:focus-visible {
   outline: 2px solid var(--btn-bg);
   outline-offset: 2px;
 }
@@ -170,6 +168,10 @@ textarea:focus-visible,
 }
 .landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); }
 
+/* Check In is the single most-used button on the kiosk homepage, so it
+   reads as a big checkmark instead of an icon + label like its siblings. */
+.landing-icon-lg { width: 5rem; height: 5rem; font-size: 2.75rem; }
+
 /* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
 .landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
 .landing-card-orange:hover { border-color: var(--btn-bg-hover); }
@@ -225,11 +227,22 @@ textarea:focus-visible,
 }
 
 .kiosk-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   align-self: flex-start;
   margin-bottom: 1rem;
-  font-size: 0.95rem;
-  color: var(--muted);
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+.kiosk-home:hover { border-color: var(--brand); background: var(--brand-soft); }
 
 .kiosk-logo { height: 84px; width: 84px; margin-bottom: 0.5rem; border-radius: 50%; }
 .kiosk h1 { font-size: 2.4rem; }
@@ -356,7 +369,6 @@ textarea:focus-visible,
 .member-form-grid input,
 .member-form-grid select,
 .member-form-grid textarea,
-.new-team-form input,
 .notes-dialog textarea,
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"] {
@@ -429,7 +441,12 @@ textarea:focus-visible,
   z-index: 40;
 }
 
-.admin-sidebar .brand,
+.admin-sidebar .brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0 1rem;
+}
 .admin-mobile-topbar .brand {
   display: flex;
   align-items: center;
@@ -437,7 +454,7 @@ textarea:focus-visible,
   color: var(--ink);
   font-weight: 700;
 }
-.admin-sidebar .brand img,
+.admin-sidebar .brand img { height: 64px; width: 64px; border-radius: 50%; flex-shrink: 0; }
 .admin-mobile-topbar .brand img { height: 28px; width: 28px; border-radius: 50%; flex-shrink: 0; }
 
 .admin-sidebar nav { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -454,12 +471,47 @@ textarea:focus-visible,
 }
 .admin-sidebar nav a .icon { opacity: 0.75; }
 .admin-sidebar nav a:hover { background: rgba(255,255,255,0.4); }
+.admin-sidebar nav a.active {
+  background: var(--surface);
+  color: var(--brand-darker);
+  box-shadow: var(--shadow-sm);
+}
+.admin-sidebar nav a.active .icon { opacity: 1; }
 
 .logout-form { margin: 0; }
 
-/* Settings + Log out stay pinned to the top-right corner of the screen,
-   independent of the sidebar - fixed on desktop, folded into the mobile
-   topbar's right side on small screens. */
+/* Settings + Log out live at the bottom of the sidebar on desktop, pinned
+   there via margin-top:auto; folded into the mobile topbar's right side
+   (a separate compact box) on small screens where there's no sidebar. */
+.admin-sidebar-bottom {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(28, 37, 48, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.admin-sidebar-bottom a,
+.admin-sidebar-bottom button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  color: var(--ink);
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.admin-sidebar-bottom a:hover,
+.admin-sidebar-bottom button:hover { background: rgba(255,255,255,0.4); }
+
 .admin-nav-right { display: flex; align-items: center; gap: 0.3rem; }
 .admin-nav-right-link {
   display: inline-flex;
@@ -476,19 +528,6 @@ textarea:focus-visible,
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-
-.admin-nav-right-desktop {
-  position: fixed;
-  top: 1rem;
-  right: 1.5rem;
-  z-index: 60;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.3rem;
-  box-shadow: var(--shadow-md);
-}
-.admin-nav-right-desktop .admin-nav-right-link:hover { background: var(--brand-soft); color: var(--brand-darker); }
 
 .admin-mobile-topbar { display: none; }
 
@@ -516,7 +555,6 @@ textarea:focus-visible,
    instead of 5+ links wrapping into a messy multi-row header. */
 @media (max-width: 860px) {
   .admin-sidebar { display: none; }
-  .admin-nav-right-desktop { display: none; }
 
   .admin-mobile-topbar {
     display: flex;
@@ -538,6 +576,15 @@ textarea:focus-visible,
 }
 
 .admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; }
+
+/* Every admin page's h1 is its page title - give it clean, consistent air
+   below it (a rule line) so it always stands apart from the h2 section
+   titles underneath, no matter how the rest of the page is laid out. */
+.admin-main h1 {
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+}
 
 @media (max-width: 860px) {
   .admin-main { margin-left: 0; padding: 1.5rem; }
@@ -829,7 +876,6 @@ textarea:focus-visible,
 .inline-form-flat select,
 .manage-header-row select,
 .quick-add-row select,
-.volunteer-card-link-form select,
 .volunteer-sections-form input,
 .volunteer-date-add-form input[type="date"],
 .name-tag-bulk-filter-select,
@@ -897,6 +943,13 @@ textarea:focus-visible,
 .members-table th { text-align: left; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
+/* Mobile member list: keep it to Name, Type, and the action icons - Photo,
+   Parent, and Rosters are useful on a wide screen but just add scroll on
+   a phone. */
+@media (max-width: 640px) {
+  .members-col-photo, .members-col-parent, .members-col-rosters { display: none; }
+}
+
 .row-inactive { opacity: 0.5; }
 
 .add-member-details { margin-bottom: 1.5rem; }
@@ -950,7 +1003,7 @@ textarea:focus-visible,
 
 .page-actions { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 
-.roster-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
 .roster-action-btn {
@@ -985,19 +1038,6 @@ textarea:focus-visible,
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 
 /* ---------- Settings ---------- */
-
-.settings-box-row { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 1rem; }
-.settings-box {
-  flex: 1;
-  min-width: 260px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-}
-.settings-box h2 { margin-top: 0; }
-.settings-box .stack-form-narrow { max-width: none; }
 
 .link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
@@ -1047,14 +1087,28 @@ textarea:focus-visible,
   margin: 0.75rem 0;
 }
 
-/* The badge canvas ("the name tag image") sits alone on the left; every
-   editing control - add-field/shape/image/barcode, background color,
-   the properties panel, and Reset/Save - lives in a column to its right. */
-.name-tag-editor-body { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+/* The badge canvas ("the name tag image") and the editing controls sit
+   side by side in two equal-width grid columns; the canvas is centered
+   within its column since it's a fixed print size, smaller than the
+   column itself. */
+.name-tag-editor-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 
-.name-tag-editor-controls { display: flex; flex-direction: column; gap: 1.1rem; width: 300px; flex-shrink: 0; }
+.name-tag-canvas-col { display: flex; justify-content: center; }
 
-.name-tag-editor-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.name-tag-editor-controls { display: flex; flex-direction: column; gap: 1.1rem; }
+
+.name-tag-tool-select { width: 100%; }
+
+/* One tool's controls at a time, revealed below the dropdown once a tool
+   is chosen - a small bordered box instead of a permanent button row. */
+.name-tag-tool-panel:empty { display: none; }
+.name-tag-tool-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
 .name-tag-add-field { display: flex; gap: 0.4rem; }
 .name-tag-upload-label { cursor: pointer; }
 .name-tag-bg-label {
@@ -1099,6 +1153,7 @@ textarea:focus-visible,
 }
 .badge-el-selected .badge-el-resize-handle { display: block; }
 
+.name-tag-properties:empty { display: none; }
 .name-tag-properties {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1122,93 +1177,27 @@ textarea:focus-visible,
 .name-tag-bulk-submit { margin-top: 1rem; }
 
 @media (max-width: 720px) {
-  .name-tag-editor-body { flex-direction: column; }
-  .name-tag-editor-controls { width: 100%; }
+  .name-tag-editor-body { grid-template-columns: 1fr; }
 }
 
 /* ---------- Volunteers ---------- */
 
-.volunteer-page-title { text-align: center; font-size: 1.5rem; margin: 1.5rem 0 0.5rem; }
-
-.volunteer-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 260px);
-  gap: 1.25rem;
-  margin: 1rem auto 0;
-  width: max-content;
-}
-
-@media (max-width: 560px) {
-  .volunteer-card-grid { grid-template-columns: 1fr; width: 100%; max-width: 260px; }
-}
-
-.volunteer-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease;
-}
-.volunteer-card:hover { box-shadow: var(--shadow-md); border-color: var(--brand); }
-
-.volunteer-card-link {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 2rem 1rem;
-  text-align: center;
-  transition: background 0.15s ease;
-}
-.volunteer-card-link:hover { background: var(--brand-soft); }
-
-.volunteer-card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  font-size: 1.4rem;
-}
-.volunteer-card-label { font-size: 1rem; font-weight: 700; color: var(--ink); }
-.volunteer-card-sub { font-size: 0.75rem; color: var(--muted); }
-
-.volunteer-card-link-form {
-  display: flex;
-  align-items: stretch;
-  padding: 0.6rem;
-  border-top: 1px solid var(--border);
-  background: #f8fafc;
-}
-.volunteer-card-link-form select { flex: 1; min-width: 0; }
-
 .volunteer-sections-form { display: flex; flex-wrap: wrap; align-items: stretch; margin: 0.5rem 0 1rem; }
 .volunteer-sections-form input[type="text"] { flex: 1; min-width: 150px; }
 
-/* Joins a run of text-bar/select fields + a trailing button into one
-   seamless control, no gaps, connected corners - same look as the Members
-   page quick-add bar, extended to multi-field forms. Uses explicit
-   input/select selectors (not :first-child alone) so specificity reliably
-   beats the shared control-sizing rule regardless of field order. */
-.volunteer-card-link-form input,
-.volunteer-card-link-form select,
-.volunteer-sections-form input,
-.volunteer-sections-form select {
+/* Joins a run of text-bar fields + a trailing button into one seamless
+   control, no gaps, connected corners - same look as the Members page
+   quick-add bar, extended to multi-field forms. Uses explicit input
+   selectors (not :first-child alone) so specificity reliably beats the
+   shared control-sizing rule regardless of field order. */
+.volunteer-sections-form input {
   border-radius: 0;
   margin-left: -1px;
 }
-.volunteer-card-link-form > *:first-child,
 .volunteer-sections-form > *:first-child {
   border-radius: 8px 0 0 8px;
   margin-left: 0;
 }
-.volunteer-card-link-form button,
 .volunteer-sections-form button {
   border-radius: 0 8px 8px 0;
   background: var(--btn-bg);
@@ -1220,7 +1209,6 @@ textarea:focus-visible,
   z-index: 1;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.volunteer-card-link-form button:hover,
 .volunteer-sections-form button:hover {
   background: var(--btn-bg-hover);
   border-color: var(--btn-bg-hover);
@@ -1238,15 +1226,41 @@ textarea:focus-visible,
 }
 
 .volunteer-cell-input {
-  width: 2.25rem;
-  padding: 0.3rem 0.35rem;
+  width: 4.5rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--control-radius);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-family: inherit;
   background: var(--surface);
 }
 .volunteer-cell-input:focus { border-color: var(--brand); outline: none; }
+
+/* Hour Sections / Session Dates / Members sit as three equal cards in a
+   row on the Floater Assignments manage tab, instead of one long stacked
+   column of sections. */
+.volunteer-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .volunteer-manage-grid { grid-template-columns: 1fr; }
+}
+.volunteer-manage-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-sm);
+}
+.volunteer-manage-card h2 { margin-top: 0; }
+
+.volunteer-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.volunteer-chart-header h2 { margin: 0; }
+.volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
 
 /* Darker divider before each date's Position/Room column pair in the
    Volunteer Chart, so one session's data is visually separated from the next. */
@@ -1313,31 +1327,6 @@ textarea:focus-visible,
 .volunteer-bubble-room { background: var(--brand-darker); }
 
 /* ---------- Setup/Cleanup ---------- */
-
-.setup-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 2rem 1rem;
-  text-align: center;
-  transition: background 0.15s ease;
-}
-.setup-card:hover { background: var(--brand-soft); }
-
-.new-team-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-  max-width: 360px;
-  margin-bottom: 1.25rem;
-}
-.new-team-card h2 { margin-top: 0; }
-.new-team-form { display: flex; flex-direction: column; gap: 0.6rem; }
-.new-team-form .primary-btn { margin-top: 0.15rem; }
 
 .setup-team-grid {
   display: grid;
@@ -1486,8 +1475,7 @@ textarea:focus-visible,
      file picker or several fields are involved - stack them full-width
      instead of overflowing the screen. */
   .inline-form-flat,
-  .volunteer-sections-form,
-  .volunteer-card-link-form {
+  .volunteer-sections-form {
     flex-direction: column;
     gap: 0.5rem;
   }
@@ -1495,9 +1483,7 @@ textarea:focus-visible,
   .inline-form-flat select,
   .inline-form-flat button,
   .volunteer-sections-form input,
-  .volunteer-sections-form button,
-  .volunteer-card-link-form select,
-  .volunteer-card-link-form button {
+  .volunteer-sections-form button {
     width: 100%;
     max-width: 100%;
     border-radius: 8px !important;
@@ -1505,8 +1491,7 @@ textarea:focus-visible,
     margin-left: 0 !important;
   }
   .inline-form-flat button,
-  .volunteer-sections-form button,
-  .volunteer-card-link-form button {
+  .volunteer-sections-form button {
     border-color: var(--btn-bg) !important;
   }
 
@@ -1523,7 +1508,7 @@ textarea:focus-visible,
 
 @media print {
   .no-print { display: none !important; }
-  .admin-sidebar, .admin-nav-right-desktop, .admin-mobile-topbar, .kiosk-home { display: none; }
+  .admin-sidebar, .admin-mobile-topbar, .kiosk-home { display: none; }
   html, body { background: #fff; }
   .admin-main { max-width: none; margin-left: 0; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }
@@ -1533,6 +1518,10 @@ textarea:focus-visible,
   /* Roster (Attendance) page: printing "Attendance Spreadsheet" should
      show just the grid, not the embedded Floater Assignments box. */
   .volunteer-box { display: none !important; }
+
+  /* Members page: printed roster is a name/type/parent/rosters list, not
+     an interactive table - hide the action icon buttons column. */
+  .members-table .actions-cell { display: none; }
 
   .print-header {
     display: flex;
