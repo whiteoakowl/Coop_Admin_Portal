@@ -1,31 +1,47 @@
 <%- include('icon-sprite') %>
-<header class="admin-nav">
-  <div class="admin-nav-inner" id="admin-nav-inner">
+
+<div class="admin-nav-right admin-nav-right-desktop">
+  <a class="admin-nav-right-link" href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
+  <form method="POST" action="/admin/logout" class="logout-form">
+    <button type="submit" class="admin-nav-right-link"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
+  </form>
+</div>
+
+<aside class="admin-sidebar">
+  <a class="brand" href="/admin">
+    <img src="/img/logo.png" alt="" />
+    Sanford Homeschoolers
+  </a>
+  <nav id="admin-nav-links">
+    <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
+    <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
+    <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
+    <a href="/admin/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tags</a>
+    <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
+  </nav>
+</aside>
+
+<div class="admin-mobile-topbar">
+  <div class="admin-mobile-topbar-row">
     <a class="brand" href="/admin">
       <img src="/img/logo.png" alt="" />
       Sanford Homeschoolers
     </a>
-    <nav id="admin-nav-links">
-      <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
-      <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
-      <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
-      <a href="/admin/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tags</a>
-      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
-    </nav>
-    <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
-      <option value="/admin">Home</option>
-      <option value="/admin/rosters">Attendance</option>
-      <option value="/admin/volunteers">Volunteers</option>
-      <option value="/admin/name-tag">Name Tags</option>
-      <option value="/admin/members">Members</option>
-      <option value="/admin/settings">Settings</option>
-    </select>
-    <div class="admin-nav-right">
-      <a class="admin-nav-right-link" href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
+    <div class="admin-nav-right admin-nav-right-mobile">
+      <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-sliders"/></svg></a>
       <form method="POST" action="/admin/logout" class="logout-form">
-        <button type="submit" class="admin-nav-right-link"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
+        <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
       </form>
     </div>
   </div>
-</header>
+  <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
+    <option value="/admin">Home</option>
+    <option value="/admin/rosters">Attendance</option>
+    <option value="/admin/volunteers">Volunteers</option>
+    <option value="/admin/name-tag">Name Tags</option>
+    <option value="/admin/members">Members</option>
+    <option value="/admin/settings">Settings</option>
+  </select>
+</div>
+
 <script src="/js/admin-nav.js"></script>

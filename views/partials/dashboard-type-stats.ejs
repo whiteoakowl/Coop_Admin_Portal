@@ -1,8 +1,10 @@
 <%
 // locals: label (string), stats ({ total, checkedIn, checkedOut, late, absent })
 %>
-<div class="analytics-type-section">
-  <h3><%= label %></h3>
+<div class="dashboard-analytics-card">
+  <div class="dashboard-analytics-header">
+    <h2><%= label %></h2>
+  </div>
   <div class="analytics-stat-row">
     <div class="analytics-stat analytics-stat-checkedin">
       <span class="analytics-stat-label">Checked In</span>

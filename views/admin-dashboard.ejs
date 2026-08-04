@@ -15,10 +15,8 @@
       </div>
     </div>
 
-    <div class="dashboard-analytics-card">
-      <div class="dashboard-analytics-header">
-        <h2>Today's Attendance</h2>
-      </div>
+    <h2 class="dashboard-section-title">Today's Attendance</h2>
+    <div class="dashboard-analytics-grid">
       <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
       <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
     </div>
