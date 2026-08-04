@@ -1324,18 +1324,20 @@ textarea:focus-visible,
 .volunteer-box-header h2 { margin: 0; }
 .volunteer-box .btn-secondary { margin-top: 0.75rem; }
 
+/* Flexbox (not grid) so cards keep a fixed natural width and wrap onto
+   centered rows - a lone card, or a partial last row, stays centered
+   instead of stretching to fill the leftover space. */
 .volunteer-public-grid {
-  display: grid;
-  /* auto-fill (not auto-fit) keeps empty tracks around instead of
-     collapsing them, so a lone card stays a normal card width instead of
-     stretching to fill the whole row. */
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1.25rem;
   width: 100%;
   max-width: 1100px;
   text-align: left;
 }
 .volunteer-public-card {
+  flex: 0 1 340px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1372,7 +1374,7 @@ textarea:focus-visible,
 .volunteer-public-table th:first-child,
 .volunteer-public-table td:first-child { width: 55%; }
 .volunteer-public-table th:not(:first-child),
-.volunteer-public-table td:not(:first-child) { width: 22.5%; }
+.volunteer-public-table td:not(:first-child) { width: 22.5%; text-align: center; }
 
 .volunteer-bubble {
   display: inline-block;
