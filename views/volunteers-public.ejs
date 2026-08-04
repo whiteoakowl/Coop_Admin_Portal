@@ -6,12 +6,12 @@
 <body class="kiosk" data-idle-redirect="20000">
   <a class="kiosk-home" href="/">&larr; Home</a>
   <img class="kiosk-logo" src="/img/logo.png" alt="" />
-  <h1><%= dayLabel %> Volunteers</h1>
+  <h1><%= dayLabel %> Floater Assignments</h1>
 
   <% if (!scheduledToday) { %>
     <div class="kiosk-wrap">
       <div class="kiosk-panel kiosk-panel-muted">
-        <p class="kiosk-message">No volunteer schedule for today.</p>
+        <p class="kiosk-message">No floater assignments for today.</p>
       </div>
     </div>
   <% } else { %>

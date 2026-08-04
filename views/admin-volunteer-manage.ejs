@@ -6,13 +6,27 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <p class="subtitle"><a href="/admin/volunteers">&larr; Volunteers</a></p>
-    <h1><%= dayLabel %> Volunteers</h1>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Floater Assignments</p>
+      </div>
+    </div>
+    <div class="roster-toolbar">
+      <div>
+        <p class="subtitle no-print"><a href="/admin/volunteers">&larr; Volunteers</a></p>
+        <h1><%= dayLabel %> Floater Assignments</h1>
+      </div>
+      <div class="roster-btn-row no-print">
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="manage-section">
+    <div class="manage-section no-print">
       <h2>Hour Sections</h2>
       <form method="POST" action="/admin/volunteers/<%= day %>/sections" class="volunteer-sections-form">
         <% sections.forEach(function(s) { %>
@@ -22,7 +36,7 @@
       </form>
     </div>
 
-    <div class="manage-section">
+    <div class="manage-section no-print">
       <h2>Session Dates (<%= dates.length %>)</h2>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
@@ -48,7 +62,7 @@
       </form>
     </div>
 
-    <div class="manage-section">
+    <div class="manage-section no-print">
       <h2>Members</h2>
       <div class="quick-add-row">
         <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data" class="inline-form-flat">
@@ -103,7 +117,7 @@
     </div>
 
     <div class="manage-section">
-      <h2><%= dayLabel %> Volunteer Chart</h2>
+      <h2><%= dayLabel %> Floater Assignments Chart</h2>
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!anyMembers) { %>

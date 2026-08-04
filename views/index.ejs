@@ -7,37 +7,49 @@
   <%- include('partials/icon-sprite') %>
   <a class="admin-corner-link" href="/admin">Admin</a>
   <main class="landing-wrap">
-    <img class="landing-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <div class="landing-banner">
+      <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <div class="landing-welcome">Welcome to Co-op!</div>
+    </div>
 
     <div class="landing-columns">
       <div class="landing-column">
+        <h2 class="landing-column-heading">Monday</h2>
+        <a class="landing-card" href="/volunteers/monday">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+          <span class="landing-label">Floater Assignments</span>
+        </a>
+        <a class="landing-card" href="/setup/monday">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-wrench"/></svg></span>
+          <span class="landing-label">Setup/Cleanup</span>
+        </a>
+      </div>
+
+      <div class="landing-divider" aria-hidden="true"></div>
+
+      <div class="landing-column">
+        <h2 class="landing-column-heading landing-column-heading-hidden" aria-hidden="true">&nbsp;</h2>
         <a class="landing-card" href="/kiosk/checkin">
           <span class="landing-icon"><svg class="icon"><use href="#icon-check-circle"/></svg></span>
-          <span class="landing-label">Check in</span>
+          <span class="landing-label">Check In</span>
         </a>
         <a class="landing-card" href="/kiosk/checkout">
           <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
-          <span class="landing-label">Check out</span>
+          <span class="landing-label">Check Out</span>
         </a>
       </div>
+
+      <div class="landing-divider" aria-hidden="true"></div>
+
       <div class="landing-column">
-        <a class="landing-card" href="/volunteers/monday">
-          <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-          <span class="landing-label">Monday Volunteers</span>
-        </a>
+        <h2 class="landing-column-heading">Wednesday</h2>
         <a class="landing-card" href="/volunteers/wednesday">
           <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-          <span class="landing-label">Wednesday Volunteers</span>
-        </a>
-      </div>
-      <div class="landing-column">
-        <a class="landing-card" href="/setup/monday">
-          <span class="landing-icon"><svg class="icon"><use href="#icon-wrench"/></svg></span>
-          <span class="landing-label">Monday Setup/Cleanup Teams</span>
+          <span class="landing-label">Floater Assignments</span>
         </a>
         <a class="landing-card" href="/setup/wednesday">
           <span class="landing-icon"><svg class="icon"><use href="#icon-wrench"/></svg></span>
-          <span class="landing-label">Wednesday Setup/Cleanup Teams</span>
+          <span class="landing-label">Setup/Cleanup</span>
         </a>
       </div>
     </div>

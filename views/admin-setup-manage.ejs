@@ -6,13 +6,27 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <p class="subtitle"><a href="/admin/setup">&larr; Setup/Cleanup</a></p>
-    <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Teams</p>
+      </div>
+    </div>
+    <div class="roster-toolbar">
+      <div>
+        <p class="subtitle no-print"><a href="/admin/volunteers">&larr; Volunteers</a></p>
+        <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+      </div>
+      <div class="roster-btn-row no-print">
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="manage-section">
+    <div class="manage-section no-print">
       <h2>New Team</h2>
       <form method="POST" action="/admin/setup/<%= day %>/teams" class="volunteer-sections-form">
         <input type="text" name="title" placeholder="Team title (e.g. Chairs &amp; Tables)" required />
@@ -45,7 +59,7 @@
               onblur="if (this.value !== this.defaultValue) this.form.submit();"
             />
           </form>
-          <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
+          <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
             <button type="submit" class="link-btn link-btn-danger">Delete Team</button>
           </form>
         </div>
@@ -55,13 +69,13 @@
           <% t.members.forEach(function(m) { %>
             <span class="badge-pill">
               <%= m.name %>
-              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form">
+              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form no-print">
                 <button type="submit" class="badge-pill-x" aria-label="Remove <%= m.name %>">&times;</button>
               </form>
             </span>
           <% }); %>
         </div>
-        <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/add-member" class="inline-form-flat">
+        <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/add-member" class="inline-form-flat no-print">
           <select name="memberId" required>
             <option value="">Add member&hellip;</option>
             <% t.availableMembers.forEach(function(m) { %>

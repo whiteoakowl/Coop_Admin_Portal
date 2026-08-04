@@ -85,14 +85,34 @@ textarea:focus-visible,
 
 .landing-wrap { text-align: center; max-width: 900px; }
 
-.landing-logo { height: 140px; width: 140px; margin-bottom: 1rem; }
+.landing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.landing-logo-sm { height: 96px; width: 96px; flex-shrink: 0; }
+
+.landing-welcome {
+  background: #f2e9db;
+  color: var(--ink);
+  font-size: 2rem;
+  font-weight: 800;
+  padding: 1rem 2.25rem;
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+}
 
 .landing .subtitle { color: var(--muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
 
 .landing-columns {
   display: flex;
   justify-content: center;
-  gap: 1.25rem;
+  align-items: stretch;
+  gap: 1.5rem;
   flex-wrap: wrap;
 }
 
@@ -101,6 +121,16 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 1.25rem;
   width: 220px;
+}
+
+.landing-column-heading { font-size: 1.4rem; font-weight: 800; color: var(--ink); margin: 0; }
+.landing-column-heading-hidden { visibility: hidden; }
+
+.landing-divider {
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.25;
+  align-self: stretch;
 }
 
 .landing-card {
@@ -151,6 +181,8 @@ textarea:focus-visible,
 @media (max-width: 720px) {
   .landing-columns { flex-direction: column; align-items: center; }
   .landing-column { width: 260px; }
+  .landing-divider { display: none; }
+  .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
 }
 
 /* ---------- Kiosk ---------- */
@@ -953,14 +985,46 @@ textarea:focus-visible,
 }
 .notes-dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
 
+/* Hidden on screen, shown only when printing - a consistent branded
+   header (logo + co-op name + page title) at the top of every printout. */
+.print-header { display: none; }
+
 @media print {
   .no-print { display: none !important; }
   .admin-nav, .kiosk-home { display: none; }
-  body { background: #fff; }
+  html, body { background: #fff; }
   .admin-main { max-width: none; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
   .roster-name-col { position: static; }
+
+  /* Roster (Attendance) page: printing "Attendance Spreadsheet" should
+     show just the grid, not the embedded Floater Assignments box. */
+  .volunteer-box { display: none !important; }
+
+  .print-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid #000;
+  }
+  .print-header img { height: 48px; width: 48px; }
+  .print-header-title { font-size: 1.25rem; font-weight: 800; margin: 0; color: #000; }
+  .print-header-sub { font-size: 0.95rem; margin: 0.1rem 0 0; color: #333; }
+
+  /* Data-bearing text inputs read as plain values, not editable boxes. */
+  .volunteer-cell-input,
+  .setup-team-title-input,
+  .setup-team-desc-input {
+    border: none !important;
+    background: none !important;
+    padding: 0.15rem 0.2rem !important;
+    color: #000 !important;
+  }
+  .setup-team-title-input { font-weight: 700; }
+  .setup-team-card { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
 }
 
 @page {

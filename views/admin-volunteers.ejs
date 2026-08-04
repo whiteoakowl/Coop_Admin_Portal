@@ -6,7 +6,7 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <h1>Volunteers</h1>
+    <h1>Floater Assignments</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -16,7 +16,7 @@
         <div class="volunteer-card">
           <a class="volunteer-card-link" href="/admin/volunteers/<%= c.day %>/manage">
             <span class="volunteer-card-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <span class="volunteer-card-label"><%= c.label %> Volunteers</span>
+            <span class="volunteer-card-label"><%= c.label %> Floater Assignments</span>
             <span class="volunteer-card-sub"><%= c.rosterName ? 'Linked to "' + c.rosterName + '"' : 'Not linked to a roster' %></span>
           </a>
           <form method="POST" action="/admin/volunteers/<%= c.day %>/link" class="volunteer-card-link-form">
@@ -29,6 +29,17 @@
             <button type="submit" class="btn-secondary">Save</button>
           </form>
         </div>
+      <% }); %>
+    </div>
+
+    <h2>Setup/Cleanup Teams</h2>
+    <div class="volunteer-card-grid">
+      <% setupCards.forEach(function(c) { %>
+        <a class="volunteer-card setup-card" href="/admin/setup/<%= c.day %>/manage">
+          <span class="volunteer-card-icon"><svg class="icon"><use href="#icon-wrench"/></svg></span>
+          <span class="volunteer-card-label"><%= c.label %> Setup/Cleanup Teams</span>
+          <span class="volunteer-card-sub"><%= c.teamCount %> team<%= c.teamCount === 1 ? '' : 's' %></span>
+        </a>
       <% }); %>
     </div>
   </main>

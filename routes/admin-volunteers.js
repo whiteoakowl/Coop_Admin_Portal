@@ -15,6 +15,7 @@ const {
   membersForList,
   buildListGrid,
 } = require('../utils/volunteers');
+const { teamsForDay } = require('../utils/setup');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -23,7 +24,8 @@ function requireDay(req, res, next) {
   next();
 }
 
-// --- Landing page: two square cards, one per volunteer day ---
+// --- Landing page: Floater Assignments cards, then Setup/Cleanup Teams
+// cards below - one combined page under the Volunteers nav tab. ---
 
 router.get('/volunteers', requireAdmin, (req, res) => {
   const rosters = db.prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
@@ -32,9 +34,11 @@ router.get('/volunteers', requireAdmin, (req, res) => {
     const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
     return { day, label: DAY_LABELS[day], rosterId: list.roster_id, rosterName: roster ? roster.name : null };
   });
+  const setupCards = DAYS.map((day) => ({ day, label: DAY_LABELS[day], teamCount: teamsForDay(day).length }));
   res.render('admin-volunteers', {
-    title: 'Volunteers',
+    title: 'Floater Assignments',
     cards,
+    setupCards,
     rosters,
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -48,8 +52,8 @@ router.post('/volunteers/:day/link', requireAdmin, requireDay, (req, res) => {
   db.prepare('UPDATE volunteer_lists SET roster_id = ? WHERE id = ?').run(rosterId, list.id);
   const roster = rosterId ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId) : null;
   const notice = roster
-    ? `${DAY_LABELS[day]} volunteers linked to "${roster.name}".`
-    : `${DAY_LABELS[day]} volunteers unlinked from any roster.`;
+    ? `${DAY_LABELS[day]} Floater Assignments linked to "${roster.name}".`
+    : `${DAY_LABELS[day]} Floater Assignments unlinked from any roster.`;
   res.redirect('/admin/volunteers?notice=' + encodeURIComponent(notice));
 });
 
@@ -69,7 +73,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
 
   res.render('admin-volunteer-manage', {
-    title: `${DAY_LABELS[day]} Volunteers`,
+    title: `${DAY_LABELS[day]} Floater Assignments`,
     day,
     dayLabel: DAY_LABELS[day],
     roster,

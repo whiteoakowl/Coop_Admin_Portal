@@ -15,7 +15,7 @@ router.get('/volunteers/:day', (req, res) => {
   const grid = scheduledToday ? buildListGrid(list.id, today) : null;
 
   res.render('volunteers-public', {
-    title: `${DAY_LABELS[day]} Volunteers`,
+    title: `${DAY_LABELS[day]} Floater Assignments`,
     dayLabel: DAY_LABELS[day],
     scheduledToday,
     grid,

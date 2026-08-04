@@ -6,8 +6,15 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= roster.name %> &mdash; Attendance Spreadsheet</p>
+      </div>
+    </div>
     <h1><%= roster.name %></h1>
-    <p class="subtitle">
+    <p class="subtitle no-print">
       <a href="/admin/rosters/<%= roster.id %>/manage">Manage roster</a>
     </p>
 
@@ -81,7 +88,7 @@
       <% volunteerLists.forEach(function(vl) { %>
         <div class="volunteer-box">
           <div class="volunteer-box-header">
-            <h2><%= vl.dayLabel %> Volunteers</h2>
+            <h2><%= vl.dayLabel %> Floater Assignments</h2>
             <% if (vl.dates.length > 0) { %>
               <select class="no-print" onchange="window.location = '/admin/roster/<%= roster.id %>?volDate=' + encodeURIComponent(this.value)<% if (absenceDateFilter) { %> + '&absenceDate=<%= absenceDateFilter %>'<% } %>;">
                 <% vl.dates.forEach(function(d, i) { %>
@@ -91,7 +98,7 @@
             <% } %>
           </div>
           <% if (vl.dates.length === 0) { %>
-            <p class="roster-empty">No session dates set for this volunteer list yet. <a href="/admin/volunteers/<%= vl.day %>/manage">Manage it</a>.</p>
+            <p class="roster-empty">No session dates set for this floater assignments list yet. <a href="/admin/volunteers/<%= vl.day %>/manage">Manage it</a>.</p>
           <% } else { %>
             <% var anyVolMembers = vl.grid.sections.some(function(s) { return s.members.length > 0; }); %>
             <form method="POST" action="/admin/volunteers/<%= vl.day %>/assignments">
@@ -101,7 +108,7 @@
                   <thead><tr><th>Name</th><th>Position</th><th>Room</th></tr></thead>
                   <tbody>
                     <% if (!anyVolMembers) { %>
-                      <tr><td colspan="3" class="roster-empty">No volunteers yet.</td></tr>
+                      <tr><td colspan="3" class="roster-empty">No floater assignments yet.</td></tr>
                     <% } %>
                     <% vl.grid.sections.forEach(function(section) { %>
                       <% if (section.members.length > 0) { %>
@@ -125,36 +132,38 @@
       <% }); %>
     </div>
 
-    <h2>Absence/Late Submissions</h2>
-    <div class="category-filter no-print">
-      <label for="absence-date-select">Date</label>
-      <select id="absence-date-select" onchange="window.location = '/admin/roster/<%= roster.id %>' + (this.value ? '?absenceDate=' + encodeURIComponent(this.value) : '')">
-        <option value="">All dates</option>
-        <% dates.forEach(function(d, i) { %>
-          <option value="<%= d %>" <%= absenceDateFilter === d ? 'selected' : '' %>><%= dateLabels[i] %></option>
-        <% }); %>
-      </select>
-    </div>
-    <div class="roster-scroll">
-      <table class="roster-table members-table condensed-table">
-        <thead>
-          <tr><th>Name</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <% if (absenceSubmissions.length === 0) { %>
-            <tr><td colspan="5" class="roster-empty">No absence or late submissions<%= absenceDateFilter ? ' for this date' : '' %>.</td></tr>
-          <% } %>
-          <% absenceSubmissions.forEach(function(s) { %>
-            <tr>
-              <td><%= s.memberName %></td>
-              <td><%= s.dateLabel %></td>
-              <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
-              <td><%= s.reasonLabel %></td>
-              <td><%= s.description %></td>
-            </tr>
+    <div class="no-print">
+      <h2>Absence/Late Submissions</h2>
+      <div class="category-filter">
+        <label for="absence-date-select">Date</label>
+        <select id="absence-date-select" onchange="window.location = '/admin/roster/<%= roster.id %>' + (this.value ? '?absenceDate=' + encodeURIComponent(this.value) : '')">
+          <option value="">All dates</option>
+          <% dates.forEach(function(d, i) { %>
+            <option value="<%= d %>" <%= absenceDateFilter === d ? 'selected' : '' %>><%= dateLabels[i] %></option>
           <% }); %>
-        </tbody>
-      </table>
+        </select>
+      </div>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th>Name</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <% if (absenceSubmissions.length === 0) { %>
+              <tr><td colspan="5" class="roster-empty">No absence or late submissions<%= absenceDateFilter ? ' for this date' : '' %>.</td></tr>
+            <% } %>
+            <% absenceSubmissions.forEach(function(s) { %>
+              <tr>
+                <td><%= s.memberName %></td>
+                <td><%= s.dateLabel %></td>
+                <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+                <td><%= s.reasonLabel %></td>
+                <td><%= s.description %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 </body>

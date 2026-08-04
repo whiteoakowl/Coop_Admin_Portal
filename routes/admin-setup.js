@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAYS, DAY_LABELS, isValidDay } = require('../utils/days');
+const { DAY_LABELS, isValidDay } = require('../utils/days');
 const { teamsForDay, membersForTeam } = require('../utils/setup');
 
 function requireDay(req, res, next) {
@@ -10,17 +10,8 @@ function requireDay(req, res, next) {
   next();
 }
 
-// --- Landing page: two cards, one per day. No linking step - teams just
-// belong to a day and show up on that day's page automatically. ---
-
-router.get('/setup', requireAdmin, (req, res) => {
-  const cards = DAYS.map((day) => ({
-    day,
-    label: DAY_LABELS[day],
-    teamCount: teamsForDay(day).length,
-  }));
-  res.render('admin-setup', { title: 'Setup/Cleanup', cards });
-});
+// The landing page now lives on the combined Volunteers page.
+router.get('/setup', requireAdmin, (req, res) => res.redirect('/admin/volunteers'));
 
 // --- Manage page: create/edit/delete teams, add/remove members per team ---
 
