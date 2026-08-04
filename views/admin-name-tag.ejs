@@ -53,7 +53,7 @@
 
     <div class="manage-section">
       <h2>Bulk Print</h2>
-      <p class="hint">Pick members and print their name tags together, 6 to a sheet.</p>
+      <p class="hint">Pick members and print their name tags together, 8 to a sheet.</p>
       <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
         <div class="name-tag-bulk-filter">
           <button type="button" class="btn-secondary" data-filter="all">All</button>
@@ -79,10 +79,15 @@
       </form>
     </div>
 
-    <h2>Submissions</h2>
+    <div class="actions-btn-row" style="justify-content: space-between; margin-bottom: 0.5rem;">
+      <h2 style="margin: 0;">Name Tag/Schedule Requests<%= showArchived ? ' (Archived)' : '' %></h2>
+      <a class="btn-secondary" href="/admin/name-tag<%= showArchived ? '' : '?archived=1' %>">
+        <%= showArchived ? 'View Active' : 'View Archived' %>
+      </a>
+    </div>
     <div class="category-filter">
       <label for="date-select">Date</label>
-      <select id="date-select" onchange="window.location = '/admin/name-tag' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+      <select id="date-select" onchange="window.location = '/admin/name-tag?' + (this.value ? 'date=' + encodeURIComponent(this.value) + '&' : '') + 'archived=<%= showArchived ? 1 : 0 %>'">
         <option value="">All dates</option>
         <% dates.forEach(function(d) { %>
           <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -93,11 +98,11 @@
     <div class="roster-scroll">
       <table class="roster-table members-table condensed-table">
         <thead>
-          <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th></tr>
+          <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th></th></tr>
         </thead>
         <tbody>
           <% if (submissions.length === 0) { %>
-            <tr><td colspan="5" class="roster-empty">No name tag requests yet.</td></tr>
+            <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
           <% } %>
           <% submissions.forEach(function(s) { %>
             <tr>
@@ -106,6 +111,11 @@
               <td><%= s.requestTypeLabel %></td>
               <td><%= s.dayLabel %></td>
               <td><%= s.description %></td>
+              <td>
+                <form method="POST" action="/admin/name-tag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
+                  <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
+                </form>
+              </td>
             </tr>
           <% }); %>
         </tbody>

@@ -5,9 +5,6 @@
       <img src="/img/logo.png" alt="" />
       Sanford Homeschoolers
     </a>
-    <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="admin-nav-links">
-      <svg class="icon"><use href="#icon-menu"/></svg>
-    </button>
     <nav id="admin-nav-links">
       <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
       <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
@@ -17,6 +14,15 @@
       <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
       <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     </nav>
+    <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
+      <option value="/admin">Home</option>
+      <option value="/admin/rosters">Attendance</option>
+      <option value="/admin/volunteers">Volunteers</option>
+      <option value="/admin/absence-list">Absence/Late</option>
+      <option value="/admin/name-tag">Name Tags</option>
+      <option value="/admin/members">Members</option>
+      <option value="/admin/settings">Settings</option>
+    </select>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit" class="link-btn">Log out</button>
     </form>

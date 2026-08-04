@@ -19,10 +19,10 @@
     <% } %>
 
     <%
-      // Portrait 2.25x3.5in badges fit 3 across x 2 down on a US Letter
-      // sheet with room for margins - 6 per page.
+      // Landscape 3.5x2.25in badges fit 2 across x 4 down on a US Letter
+      // sheet with room for margins - 8 per page.
       var pages = [];
-      for (var i = 0; i < badges.length; i += 6) pages.push(badges.slice(i, i + 6));
+      for (var i = 0; i < badges.length; i += 8) pages.push(badges.slice(i, i + 8));
     %>
     <% pages.forEach(function(pageBadges) { %>
       <div class="badge-sheet-page badge-sheet">

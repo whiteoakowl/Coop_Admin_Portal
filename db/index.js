@@ -50,6 +50,11 @@ if (!rosterMemberColumns.includes('scheduled_departure')) {
   db.exec('ALTER TABLE roster_members ADD COLUMN scheduled_departure TEXT');
 }
 
+const nameTagRequestColumns = db.prepare('PRAGMA table_info(name_tag_requests)').all().map((c) => c.name);
+if (!nameTagRequestColumns.includes('archived')) {
+  db.exec('ALTER TABLE name_tag_requests ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

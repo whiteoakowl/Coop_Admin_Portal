@@ -5,10 +5,11 @@
 // in ../db here would create a require cycle. DB-backed lookups (the
 // current saved template, per-member badge data) live in nameTagData.js.
 
-// 2.25in x 3.5in at 96dpi - CSS px are defined as 1/96in, so these numbers
-// double as both on-screen editor pixels and true print dimensions.
-const BADGE_WIDTH = 216;
-const BADGE_HEIGHT = 336;
+// 3.5in x 2.25in (landscape) at 96dpi - CSS px are defined as 1/96in, so
+// these numbers double as both on-screen editor pixels and true print
+// dimensions.
+const BADGE_WIDTH = 336;
+const BADGE_HEIGHT = 216;
 
 // Fields available to place on each badge type's canvas.
 const FIELDS_BY_TYPE = {
@@ -26,19 +27,19 @@ const FIELDS_BY_TYPE = {
 
 const DEFAULT_LAYOUTS = {
   student: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 16, width: 200, height: 34, fontSize: 20, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 54, width: 200, height: 26, fontSize: 14, color: '#1c2530', bold: false, align: 'center' },
-    { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 84, width: 200, height: 70, fontSize: 12, color: '#dc2626', bold: true, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 13, y: 265, width: 190, height: 55 },
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 10, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center' },
+    { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 42, width: 320, height: 22, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
+    { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 66, width: 320, height: 42, fontSize: 12, color: '#dc2626', bold: true, align: 'center' },
+    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
   ],
   parent: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 24, width: 200, height: 36, fontSize: 22, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 66, width: 200, height: 50, fontSize: 14, color: '#1c2530', bold: false, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 13, y: 265, width: 190, height: 55 },
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 16, width: 320, height: 34, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
+    { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 54, width: 320, height: 40, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
+    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
   ],
   admin: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 140, width: 200, height: 40, fontSize: 22, color: '#1c2530', bold: true, align: 'center' },
-    { id: 'barcode', type: 'barcode', x: 13, y: 265, width: 190, height: 55 },
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 38, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
+    { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
   ],
 };
 

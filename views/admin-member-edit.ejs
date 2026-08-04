@@ -99,18 +99,25 @@
 
       <div class="manage-section" id="parent-only-fields">
         <h2>Cleanup Team</h2>
-        <p class="hint">Check the Setup/Cleanup team(s) this parent is on - this stays in sync with the actual team charts either way.</p>
+        <p class="hint">Choose Monday and/or Wednesday, then check the Setup/Cleanup team(s) this parent is on for that day - this stays in sync with the actual team charts either way.</p>
         <% if (setupTeams.length === 0) { %>
           <p class="hint">No Setup/Cleanup teams exist yet.</p>
         <% } else { %>
-          <div class="checkbox-group">
-            <% setupTeams.forEach(function(t) { %>
-              <label class="checkbox-option">
-                <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
-                <%= t.day.charAt(0).toUpperCase() + t.day.slice(1) %> &mdash; <%= t.title %>
-              </label>
-            <% }); %>
-          </div>
+          <% ['monday', 'wednesday'].forEach(function(day) { %>
+            <% var dayTeams = setupTeams.filter(function(t) { return t.day === day; }); %>
+            <% if (dayTeams.length === 0) return; %>
+            <div class="cleanup-team-day-group">
+              <h3 class="cleanup-team-day-heading"><%= day.charAt(0).toUpperCase() + day.slice(1) %></h3>
+              <div class="checkbox-group">
+                <% dayTeams.forEach(function(t) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
+                    <%= t.title %>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
         <% } %>
       </div>
 

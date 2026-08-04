@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS name_tag_requests (
   request_type TEXT NOT NULL CHECK(request_type IN ('lost_tag','schedule_change')),
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday','both')),
   description TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

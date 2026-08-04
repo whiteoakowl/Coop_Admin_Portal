@@ -1,18 +1,19 @@
 (function () {
-  const toggle = document.getElementById('nav-toggle');
-  const inner = document.getElementById('admin-nav-inner');
-  if (!toggle || !inner) return;
+  const select = document.getElementById('admin-nav-select');
+  if (!select) return;
 
-  toggle.addEventListener('click', () => {
-    const open = inner.classList.toggle('nav-open');
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // Pre-select whichever option best matches the current page, so the
+  // mobile dropdown always shows where you are (longest prefix match wins,
+  // since every page path starts with "/admin").
+  const path = window.location.pathname;
+  let best = null;
+  Array.prototype.forEach.call(select.options, (opt) => {
+    const matches = path === opt.value || path.indexOf(opt.value + '/') === 0;
+    if (matches && (!best || opt.value.length > best.length)) best = opt.value;
   });
+  if (best) select.value = best;
 
-  // Close the menu once a link is chosen, so navigating doesn't leave it stuck open.
-  inner.querySelectorAll('nav a').forEach((a) => {
-    a.addEventListener('click', () => {
-      inner.classList.remove('nav-open');
-      toggle.setAttribute('aria-expanded', 'false');
-    });
+  select.addEventListener('change', () => {
+    if (select.value) window.location = select.value;
   });
 })();

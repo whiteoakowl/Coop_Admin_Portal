@@ -335,6 +335,10 @@ textarea:focus-visible,
 .radio-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+
+.cleanup-team-day-group { margin-top: 0.85rem; }
+.cleanup-team-day-group:first-child { margin-top: 0.5rem; }
+.cleanup-team-day-heading { margin: 0 0 0.15rem; font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
 .checkbox-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
 .checkbox-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 .absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
@@ -416,55 +420,33 @@ textarea:focus-visible,
 .admin-nav .link-btn { color: var(--ink); background: none; border: none; font-size: 0.9rem; font-weight: 600; transition: color 0.15s ease; }
 .admin-nav .link-btn:hover { color: var(--brand-darker); }
 
-.nav-toggle {
+.admin-nav-select {
   display: none;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-left: auto;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  width: 100%;
+  order: 3;
+  padding: 0.65rem 2.25rem 0.65rem 0.9rem;
+  border: 1px solid rgba(28, 37, 48, 0.18);
+  border-radius: 10px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%231c2530'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.1em;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--ink);
-  flex-shrink: 0;
 }
-.nav-toggle:hover { background: rgba(28, 37, 48, 0.08); }
-.nav-toggle .icon { width: 1.4em; height: 1.4em; }
 
-/* Modern collapsible mobile nav: hide the links + logout behind a hamburger
-   toggle instead of letting 7 links wrap into a messy multi-row header. */
+/* Modern mobile nav: a single native dropdown instead of 7 links wrapping
+   into a messy multi-row header - tap it, pick a page, it navigates. */
 @media (max-width: 860px) {
-  .admin-nav-inner { padding: 0.7rem 1.25rem; gap: 0.75rem; }
-  .nav-toggle { display: flex; }
-  .logout-form { display: none; margin-left: 0; order: 4; width: 100%; }
-
-  .admin-nav-inner nav {
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    width: 100%;
-    order: 3;
-    flex: none;
-  }
-  .admin-nav-inner nav a {
-    padding: 0.85rem 0.25rem;
-    border-top: 1px solid rgba(28, 37, 48, 0.12);
-  }
-
-  .admin-nav-inner.nav-open nav { display: flex; }
-  .admin-nav-inner.nav-open .logout-form {
-    display: block;
-    border-top: 1px solid rgba(28, 37, 48, 0.12);
-    padding-top: 0.6rem;
-    margin-top: 0.1rem;
-  }
-  .admin-nav-inner.nav-open .logout-form .link-btn {
-    display: block;
-    width: 100%;
-    padding: 0.35rem 0.25rem;
-  }
+  .admin-nav-inner { padding: 0.7rem 1.25rem; gap: 0.6rem; }
+  .admin-nav-inner nav { display: none; }
+  .admin-nav-select { display: block; }
+  .logout-form { margin-left: auto; }
 }
 
 .admin-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.5rem 2rem; }
@@ -871,6 +853,8 @@ textarea:focus-visible,
 
 .actions-btn-row { display: flex; gap: 0.5rem; align-items: center; }
 
+.condensed-btn { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
 .badge-preview-dialog {
   width: min(420px, 92vw);
   border: none;
@@ -887,8 +871,8 @@ textarea:focus-visible,
 
 .badge-sheet {
   display: grid;
-  grid-template-columns: repeat(3, auto);
-  gap: 0.3in;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.35in;
   justify-content: center;
 }
 .badge-sheet-page { page-break-after: always; margin-bottom: 0.5in; }
@@ -956,7 +940,7 @@ textarea:focus-visible,
 .name-tag-editor-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
-.name-tag-bulk-list { max-height: 260px; overflow-y: auto; }
+.name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }
 .name-tag-bulk-list .member-picker-row { justify-content: space-between; }
 .name-tag-bulk-submit { margin-top: 1rem; }
 
