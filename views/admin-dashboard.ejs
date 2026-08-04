@@ -19,21 +19,8 @@
       <div class="dashboard-analytics-header">
         <h2>Today's Attendance</h2>
       </div>
-      <% var total = todayPresent + todayLate + todayAbsent; %>
-      <div class="stacked-bar">
-        <% if (total === 0) { %>
-          <div class="stacked-bar-seg stacked-bar-empty" style="width: 100%"></div>
-        <% } else { %>
-          <% if (todayPresent > 0) { %><div class="stacked-bar-seg stacked-bar-present" style="width: <%= (todayPresent / total * 100).toFixed(1) %>%"></div><% } %>
-          <% if (todayLate > 0) { %><div class="stacked-bar-seg stacked-bar-late" style="width: <%= (todayLate / total * 100).toFixed(1) %>%"></div><% } %>
-          <% if (todayAbsent > 0) { %><div class="stacked-bar-seg stacked-bar-absent" style="width: <%= (todayAbsent / total * 100).toFixed(1) %>%"></div><% } %>
-        <% } %>
-      </div>
-      <div class="stacked-bar-legend">
-        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-present"></span>Checked In <strong><%= todayPresent %></strong></span>
-        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-late"></span>Late <strong><%= todayLate %></strong></span>
-        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-absent"></span>Absent <strong><%= todayAbsent %></strong></span>
-      </div>
+      <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
+      <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
     </div>
   </main>
 </body>

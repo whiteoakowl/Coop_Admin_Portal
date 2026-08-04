@@ -31,25 +31,54 @@ router.post('/logout', (req, res) => {
 
 // --- Dashboard ---
 
+// Today's checked-in/out/late/absent counts for one member type, each as
+// "X of Y" against every active member of that type (not just those on a
+// roster today, so the denominator reads as a stable roster size).
+function todayStatsForType(memberType, today) {
+  const total = db
+    .prepare(`SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?`)
+    .get(memberType).c;
+  const checkedIn = db
+    .prepare(
+      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ?`
+    )
+    .get(today, memberType).c;
+  const checkedOut = db
+    .prepare(
+      `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
+       JOIN members m ON m.id = c.member_id
+       WHERE c.session_date = ? AND m.member_type = ?`
+    )
+    .get(today, memberType).c;
+  const late = db
+    .prepare(
+      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ?`
+    )
+    .get(today, memberType).c;
+  const absent = db
+    .prepare(
+      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ?`
+    )
+    .get(today, memberType).c;
+
+  return { total, checkedIn, checkedOut, late, absent };
+}
+
 router.get('/', requireAdmin, (req, res) => {
   const today = todayISO();
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
-  const todayPresent = db
-    .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'present'`)
-    .get(today).c;
-  const todayLate = db
-    .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'late'`)
-    .get(today).c;
-  const todayAbsent = db
-    .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'absent'`)
-    .get(today).c;
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     memberCount,
-    todayPresent,
-    todayLate,
-    todayAbsent,
+    studentStats: todayStatsForType('student', today),
+    parentStats: todayStatsForType('parent', today),
   });
 });
 

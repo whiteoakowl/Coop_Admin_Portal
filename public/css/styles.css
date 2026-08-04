@@ -506,28 +506,29 @@ textarea:focus-visible,
 .dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .dashboard-analytics-header h2 { margin: 0; }
 
-.stacked-bar {
-  display: flex;
-  width: 100%;
-  height: 1.5rem;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #eef1f5;
-  margin-bottom: 1.1rem;
-}
-.stacked-bar-seg { height: 100%; transition: width 0.3s ease; }
-.stacked-bar-present { background: var(--green); }
-.stacked-bar-late { background: var(--yellow-solid); }
-.stacked-bar-absent { background: var(--red); }
-.stacked-bar-empty { background: #eef1f5; }
+.analytics-type-section { margin-top: 1.25rem; }
+.analytics-type-section:first-of-type { margin-top: 0; }
+.analytics-type-section h3 { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--brand-dark); }
 
-.stacked-bar-legend { display: flex; gap: 1.75rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--ink); }
-.stacked-bar-legend-item { display: flex; align-items: center; gap: 0.45rem; }
-.stacked-bar-legend-item strong { font-size: 1rem; }
-.stacked-bar-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; flex-shrink: 0; }
-.stacked-bar-dot-present { background: var(--green); }
-.stacked-bar-dot-late { background: var(--yellow-solid); }
-.stacked-bar-dot-absent { background: var(--red); }
+.analytics-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.analytics-stat {
+  background: #f8fafc;
+  border-radius: 10px;
+  border-left: 4px solid var(--border);
+  padding: 0.7rem 0.9rem;
+}
+.analytics-stat-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.analytics-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--ink); }
+.analytics-stat-of { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+
+.analytics-stat-checkedin { border-left-color: var(--green); }
+.analytics-stat-checkedout { border-left-color: var(--brand-dark); }
+.analytics-stat-late { border-left-color: var(--yellow-solid); }
+.analytics-stat-absent { border-left-color: var(--red); }
 
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
