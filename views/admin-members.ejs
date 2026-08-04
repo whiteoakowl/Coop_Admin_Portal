@@ -61,7 +61,7 @@
                   onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()"
                   aria-label="Notes for <%= m.name %>"
                   title="Notes"
-                >📝</button>
+                ><svg class="icon"><use href="#icon-edit"/></svg></button>
                 <dialog id="notes-dialog-<%= m.id %>" class="notes-dialog">
                   <form method="POST" action="/admin/members/<%= m.id %>/notes">
                     <h3>Notes &mdash; <%= m.name %></h3>

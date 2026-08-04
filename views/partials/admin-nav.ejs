@@ -1,3 +1,4 @@
+<%- include('icon-sprite') %>
 <header class="admin-nav">
   <div class="admin-nav-inner">
     <a class="brand" href="/admin">
@@ -5,13 +6,13 @@
       Sanford Homeschoolers
     </a>
     <nav>
-      <a href="/admin">Home</a>
-      <a href="/admin/rosters">Attendance</a>
-      <a href="/admin/volunteers">Volunteers</a>
-      <a href="/admin/setup">Setup/Cleanup</a>
-      <a href="/admin/members">Members</a>
-      <a href="/admin/absence-list">Absence/Late</a>
-      <a href="/admin/settings">Settings</a>
+      <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
+      <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
+      <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
+      <a href="/admin/setup"><svg class="icon"><use href="#icon-wrench"/></svg> Setup/Cleanup</a>
+      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
+      <a href="/admin/absence-list"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late</a>
+      <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     </nav>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit" class="link-btn">Log out</button>

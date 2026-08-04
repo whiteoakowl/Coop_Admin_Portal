@@ -15,7 +15,7 @@
       <% cards.forEach(function(c) { %>
         <div class="volunteer-card">
           <a class="volunteer-card-link" href="/admin/volunteers/<%= c.day %>/manage">
-            <span class="volunteer-card-icon">🙋</span>
+            <span class="volunteer-card-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
             <span class="volunteer-card-label"><%= c.label %> Volunteers</span>
             <span class="volunteer-card-sub"><%= c.rosterName ? 'Linked to "' + c.rosterName + '"' : 'Not linked to a roster' %></span>
           </a>

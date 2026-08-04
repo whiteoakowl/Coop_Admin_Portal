@@ -4,6 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body class="kiosk kiosk-checkout">
+  <%- include('partials/icon-sprite') %>
   <main class="kiosk-wrap">
     <a href="/" class="kiosk-home">&larr; Home</a>
     <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
@@ -12,7 +13,7 @@
     <div id="step-scan" class="kiosk-panel">
       <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
       <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-        <span class="kiosk-status-icon">📷</span>
+        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
       </div>
       <form id="scan-form" autocomplete="off">
         <input

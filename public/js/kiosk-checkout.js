@@ -30,9 +30,9 @@
     numpad.appendChild(btn);
   }
 
-  function setScanState(state, message, icon_) {
+  function setScanState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
-    icon.textContent = icon_;
+    icon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
     instructions.textContent = message;
   }
 
@@ -41,7 +41,7 @@
     currentRosterId = null;
     stepNumber.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
-    setScanState('idle', 'Scan your name tag barcode', '📷');
+    setScanState('idle', 'Scan your name tag barcode', 'camera');
     numberMessage.textContent = '';
     numpad.querySelectorAll('.numpad-btn').forEach((b) => b.classList.remove('numpad-btn-selected'));
     setTimeout(() => input.focus(), 50);
@@ -53,7 +53,7 @@
     input.value = '';
     if (!barcode) return;
 
-    setScanState('loading', 'Checking…', '⏳');
+    setScanState('loading', 'Checking…', 'loader');
 
     try {
       const res = await fetch('/kiosk/checkout/scan', {
@@ -71,14 +71,14 @@
         });
         stepScan.classList.add('kiosk-hidden');
         stepNumber.classList.remove('kiosk-hidden');
-        setScanState('idle', 'Scan your name tag barcode', '📷');
+        setScanState('idle', 'Scan your name tag barcode', 'camera');
       } else {
-        setScanState('error', data.message, '❌');
-        setTimeout(() => setScanState('idle', 'Scan your name tag barcode', '📷'), 2500);
+        setScanState('error', data.message, 'x-circle');
+        setTimeout(() => setScanState('idle', 'Scan your name tag barcode', 'camera'), 2500);
       }
     } catch (err) {
-      setScanState('error', 'Connection error. Please try again.', '❌');
-      setTimeout(() => setScanState('idle', 'Scan your name tag barcode', '📷'), 2500);
+      setScanState('error', 'Connection error. Please try again.', 'x-circle');
+      setTimeout(() => setScanState('idle', 'Scan your name tag barcode', 'camera'), 2500);
     }
   });
 
