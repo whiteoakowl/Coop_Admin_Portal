@@ -33,7 +33,7 @@
       if (!data.dates || data.dates.length === 0) {
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = 'No upcoming sessions found';
+        opt.textContent = 'No upcoming class dates found';
         dateSelect.appendChild(opt);
         dateSelect.disabled = true;
         warning.textContent = "This person isn't on any roster with upcoming dates.";

@@ -19,31 +19,13 @@
         <span class="stat-label">Checked In Today</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value"><%= todayCheckouts %></span>
-        <span class="stat-label">Checked Out Today</span>
+        <span class="stat-value"><%= todayLate %></span>
+        <span class="stat-label">Late Today</span>
       </div>
-    </div>
-
-    <h2>Rosters</h2>
-    <% if (categories.length > 0) { %>
-      <div class="category-filter">
-        <label for="category-select">Category</label>
-        <select id="category-select" onchange="window.location = this.value ? '/admin?category=' + encodeURIComponent(this.value) : '/admin'">
-          <option value="">All categories</option>
-          <% categories.forEach(function(c) { %>
-            <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
-          <% }); %>
-        </select>
+      <div class="stat-card">
+        <span class="stat-value"><%= todayAbsent %></span>
+        <span class="stat-label">Absent Today</span>
       </div>
-    <% } %>
-    <div class="admin-card-grid">
-      <% rosters.forEach(function(r) { %>
-        <a class="admin-card" href="/admin/roster/<%= r.id %>">
-          <%= r.name %>
-          <span class="admin-card-sub"><%= r.category ? r.category + ' &middot; ' : '' %><%= r.memberCount %> member<%= r.memberCount === 1 ? '' : 's' %></span>
-        </a>
-      <% }); %>
-      <a class="admin-card admin-card-muted" href="/admin/rosters">+ Manage / Create Rosters</a>
     </div>
 
     <h2>Kiosk Links</h2>

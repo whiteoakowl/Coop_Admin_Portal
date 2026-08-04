@@ -7,24 +7,37 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <h1>Settings</h1>
-    <p class="subtitle">Signed in as <%= username %></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <h2>Change Password</h2>
-    <form method="POST" action="/admin/settings/password" class="stack-form stack-form-narrow">
-      <label for="currentPassword">Current Password</label>
-      <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+    <div class="settings-box-row">
+      <div class="settings-box">
+        <h2>Username</h2>
+        <form method="POST" action="/admin/settings/username" class="stack-form stack-form-narrow">
+          <label>Current Username</label>
+          <input type="text" value="<%= username %>" disabled />
 
-      <label for="newPassword">New Password</label>
-      <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" required minlength="8" />
+          <label for="newUsername">New Username</label>
+          <input id="newUsername" name="newUsername" type="text" required />
 
-      <label for="confirmPassword">Confirm New Password</label>
-      <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
+          <button type="submit" class="primary-btn">Update</button>
+        </form>
+      </div>
 
-      <button type="submit" class="primary-btn">Update Password</button>
-    </form>
+      <div class="settings-box">
+        <h2>Password</h2>
+        <form method="POST" action="/admin/settings/password" class="stack-form stack-form-narrow">
+          <label for="currentPassword">Current Password</label>
+          <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+
+          <label for="newPassword">New Password</label>
+          <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" required minlength="8" />
+
+          <button type="submit" class="primary-btn">Update</button>
+        </form>
+      </div>
+    </div>
   </main>
 </body>
 </html>

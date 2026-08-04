@@ -14,9 +14,9 @@
 
     <div class="roster-toolbar">
       <div></div>
-      <div class="roster-card-actions">
-        <a class="btn-secondary" href="/admin/roster/<%= roster.id %>/export.csv">Export CSV</a>
-        <button type="button" class="btn-secondary no-print" onclick="window.print()">Print</button>
+      <div class="roster-btn-row no-print">
+        <a class="roster-action-btn" href="/admin/roster/<%= roster.id %>/export.csv">Export CSV</a>
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
 

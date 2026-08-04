@@ -32,38 +32,25 @@ router.post('/logout', (req, res) => {
 
 router.get('/', requireAdmin, (req, res) => {
   const today = todayISO();
-  const category = (req.query.category || '').trim();
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
   const todayPresent = db
     .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'present'`)
     .get(today).c;
-  const todayCheckouts = db.prepare(`SELECT COUNT(*) AS c FROM checkouts WHERE session_date = ?`).get(today).c;
-
-  let sql = `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount
-             FROM rosters r WHERE r.active = 1`;
-  const params = [];
-  if (category) {
-    sql += ' AND r.category = ?';
-    params.push(category);
-  }
-  sql += ' ORDER BY r.name COLLATE NOCASE';
-  const rosters = db.prepare(sql).all(...params);
-
-  const categories = db
-    .prepare(`SELECT DISTINCT category FROM rosters WHERE category IS NOT NULL AND category != '' ORDER BY category COLLATE NOCASE`)
-    .all()
-    .map((r) => r.category);
+  const todayLate = db
+    .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'late'`)
+    .get(today).c;
+  const todayAbsent = db
+    .prepare(`SELECT COUNT(*) AS c FROM attendance WHERE session_date = ? AND status = 'absent'`)
+    .get(today).c;
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     username: req.session.username,
     memberCount,
     todayPresent,
-    todayCheckouts,
+    todayLate,
+    todayAbsent,
     today,
-    rosters,
-    categories,
-    selectedCategory: category,
   });
 });
 
@@ -73,8 +60,23 @@ router.get('/settings', requireAdmin, (req, res) => {
   res.render('admin-settings', { title: 'Settings', username: req.session.username, error: null, success: null });
 });
 
+router.post('/settings/username', requireAdmin, (req, res) => {
+  const newUsername = (req.body.newUsername || '').trim();
+  const render = (error, success) =>
+    res.render('admin-settings', { title: 'Settings', username: req.session.username, error, success });
+
+  if (!newUsername) return render('New username is required.', null);
+
+  const taken = db.prepare('SELECT id FROM admins WHERE username = ? AND id != ?').get(newUsername, req.session.adminId);
+  if (taken) return render('That username is already in use.', null);
+
+  db.prepare('UPDATE admins SET username = ? WHERE id = ?').run(newUsername, req.session.adminId);
+  req.session.username = newUsername;
+  render(null, 'Username updated.');
+});
+
 router.post('/settings/password', requireAdmin, (req, res) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body;
+  const { currentPassword, newPassword } = req.body;
   const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.session.adminId);
 
   if (!admin || !bcrypt.compareSync(currentPassword || '', admin.password_hash)) {
@@ -82,9 +84,6 @@ router.post('/settings/password', requireAdmin, (req, res) => {
   }
   if (!newPassword || newPassword.length < 8) {
     return res.render('admin-settings', { title: 'Settings', username: req.session.username, error: 'New password must be at least 8 characters.', success: null });
-  }
-  if (newPassword !== confirmPassword) {
-    return res.render('admin-settings', { title: 'Settings', username: req.session.username, error: 'New passwords do not match.', success: null });
   }
 
   const hash = bcrypt.hashSync(newPassword, 10);

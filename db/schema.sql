@@ -8,6 +8,14 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Categories are managed separately (Attendance page) so the roster
+-- creation form can offer a plain dropdown instead of free text.
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- A roster is an admin-defined group of members with its own explicit list
 -- of session dates (see roster_dates) and an optional category label.
 -- Admins can create as many rosters as they need.

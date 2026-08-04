@@ -26,11 +26,13 @@ function rosterDates(rosterId) {
     .map((r) => r.session_date);
 }
 
-function distinctCategories() {
-  return db
-    .prepare(`SELECT DISTINCT category FROM rosters WHERE category IS NOT NULL AND category != '' ORDER BY category COLLATE NOCASE`)
-    .all()
-    .map((r) => r.category);
+function allCategories() {
+  return db.prepare('SELECT name FROM categories ORDER BY name COLLATE NOCASE').all().map((r) => r.name);
+}
+
+function isKnownCategory(name) {
+  if (!name) return false;
+  return !!db.prepare('SELECT 1 FROM categories WHERE name = ?').get(name);
 }
 
 function importNamesIntoRoster(rosterId, buffer) {
@@ -115,30 +117,41 @@ function buildRosterGridData(roster) {
 
 router.get('/rosters', requireAdmin, (req, res) => {
   const category = (req.query.category || '').trim();
+  const archived = req.query.archived === '1';
   let sql = `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount,
              (SELECT COUNT(*) FROM roster_dates rd WHERE rd.roster_id = r.id) AS dateCount
-             FROM rosters r`;
-  const params = [];
+             FROM rosters r WHERE r.active = ?`;
+  const params = [archived ? 0 : 1];
   if (category) {
-    sql += ' WHERE r.category = ?';
+    sql += ' AND r.category = ?';
     params.push(category);
   }
-  sql += ' ORDER BY r.active DESC, r.name COLLATE NOCASE';
+  sql += ' ORDER BY r.name COLLATE NOCASE';
   const rosters = db.prepare(sql).all(...params);
 
   res.render('admin-rosters', {
-    title: 'Rosters',
+    title: archived ? 'Archived Rosters' : 'Attendance',
     rosters,
-    categories: distinctCategories(),
+    categories: allCategories(),
     selectedCategory: category,
+    archived,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
+router.post('/rosters/categories', requireAdmin, (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (name) {
+    db.prepare('INSERT OR IGNORE INTO categories (name) VALUES (?)').run(name);
+  }
+  res.redirect('/admin/rosters?notice=' + encodeURIComponent(name ? `Category "${name}" added.` : 'Category name is required.'));
+});
+
 router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
   const name = (req.body.name || '').trim();
-  const category = (req.body.category || '').trim() || null;
+  const rawCategory = (req.body.category || '').trim();
+  const category = isKnownCategory(rawCategory) ? rawCategory : null;
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))].sort();
 
   if (!name) {
@@ -166,11 +179,18 @@ router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
 router.post('/rosters/:id/rename', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const name = (req.body.name || '').trim();
-  const category = (req.body.category || '').trim() || null;
   if (!name) {
     return res.redirect(`/admin/rosters/${id}/manage?error=` + encodeURIComponent('Roster title is required.'));
   }
-  db.prepare('UPDATE rosters SET name = ?, category = ? WHERE id = ?').run(name, category, id);
+  db.prepare('UPDATE rosters SET name = ? WHERE id = ?').run(name, id);
+  res.redirect(`/admin/rosters/${id}/manage`);
+});
+
+router.post('/rosters/:id/category', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const rawCategory = (req.body.category || '').trim();
+  const category = isKnownCategory(rawCategory) ? rawCategory : null;
+  db.prepare('UPDATE rosters SET category = ? WHERE id = ?').run(category, id);
   res.redirect(`/admin/rosters/${id}/manage`);
 });
 
@@ -231,7 +251,7 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
     members,
     availableMembers,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
-    categories: distinctCategories(),
+    categories: allCategories(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

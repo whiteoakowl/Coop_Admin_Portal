@@ -16,43 +16,16 @@
       <div class="alert alert-success"><%= notice %></div>
     <% } %>
 
-    <details class="add-member-details">
-      <summary class="btn-primary-summary">+ Add Member</summary>
-      <form method="POST" action="/admin/members" class="inline-form">
-        <div class="inline-form-row">
-          <label>
-            Name
-            <input type="text" name="name" required />
-          </label>
-          <label>
-            Barcode <span class="hint">(leave blank to use their name &mdash; barcodes read as names)</span>
-            <input type="text" name="barcode" placeholder="defaults to name" />
-          </label>
-        </div>
-        <label class="roster-checkbox-label">Add to Roster(s)</label>
-        <div class="checkbox-row">
-          <% allRosters.forEach(function(r) { %>
-            <label class="checkbox-pill">
-              <input type="checkbox" name="rosterIds" value="<%= r.id %>" />
-              <%= r.name %>
-            </label>
-          <% }); %>
-          <% if (allRosters.length === 0) { %>
-            <span class="hint">No rosters yet &mdash; <a href="/admin/rosters">create one first</a>.</span>
-          <% } %>
-        </div>
-        <button type="submit" class="primary-btn">Add Member</button>
+    <div class="quick-add-row">
+      <form method="POST" action="/admin/members" class="inline-form-flat">
+        <input type="text" name="name" placeholder="Member's name" required />
+        <button type="submit" class="btn-secondary">+ Add Member</button>
       </form>
-    </details>
-
-    <details class="add-member-details">
-      <summary class="btn-primary-summary">+ Import Names from File</summary>
-      <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form">
-        <p class="subtitle">Upload a .csv or .txt file with one name per line. This adds people to the member list (and the Absence/Late form) without assigning them to a roster &mdash; do that afterward from a roster's Manage page.</p>
+      <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form-flat">
         <input type="file" name="file" accept=".csv,.txt" required />
-        <button type="submit" class="primary-btn">Import</button>
+        <button type="submit" class="btn-secondary">Import from File</button>
       </form>
-    </details>
+    </div>
 
     <div class="roster-scroll">
       <table class="roster-table members-table">
