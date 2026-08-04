@@ -22,34 +22,37 @@
       </select>
 
       <div class="name-tag-editor" id="name-tag-editor">
-        <div class="name-tag-editor-toolbar">
-          <div class="name-tag-add-field">
-            <select id="add-field-select"></select>
-            <button type="button" class="btn-secondary" id="add-field-btn">+ Add Field</button>
-          </div>
-          <button type="button" class="btn-secondary" id="add-shape-btn">+ Add Shape</button>
-          <label class="btn-secondary name-tag-upload-label">
-            + Add Image
-            <input type="file" id="add-image-input" accept="image/*" hidden />
-          </label>
-          <button type="button" class="btn-secondary" id="add-barcode-btn">+ Add Barcode</button>
-          <label class="name-tag-bg-label">
-            Background
-            <input type="color" id="name-tag-bg-input" />
-          </label>
-        </div>
-
         <div class="name-tag-editor-body">
           <div class="badge-canvas name-tag-canvas" id="name-tag-canvas"></div>
-          <div class="name-tag-properties" id="name-tag-properties">
-            <p class="hint">Click an element on the badge to edit it.</p>
-          </div>
-        </div>
 
-        <div class="name-tag-editor-actions">
-          <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
-          <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
-          <span id="save-status" class="hint"></span>
+          <div class="name-tag-editor-controls">
+            <div class="name-tag-editor-toolbar">
+              <div class="name-tag-add-field">
+                <select id="add-field-select"></select>
+                <button type="button" class="btn-secondary" id="add-field-btn">+ Add Field</button>
+              </div>
+              <button type="button" class="btn-secondary" id="add-shape-btn">+ Add Shape</button>
+              <label class="btn-secondary name-tag-upload-label">
+                + Add Image
+                <input type="file" id="add-image-input" accept="image/*" hidden />
+              </label>
+              <button type="button" class="btn-secondary" id="add-barcode-btn">+ Add Barcode</button>
+              <label class="name-tag-bg-label">
+                Background
+                <input type="color" id="name-tag-bg-input" />
+              </label>
+            </div>
+
+            <div class="name-tag-properties" id="name-tag-properties">
+              <p class="hint">Click an element on the badge to edit it.</p>
+            </div>
+
+            <div class="name-tag-editor-actions">
+              <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
+              <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
+              <span id="save-status" class="hint"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -59,10 +62,12 @@
       <p class="hint">Pick members and print their name tags together, 8 to a sheet.</p>
       <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
         <div class="name-tag-bulk-filter">
-          <button type="button" class="btn-secondary" data-filter="all">All</button>
-          <button type="button" class="btn-secondary" data-filter="student">Students Only</button>
-          <button type="button" class="btn-secondary" data-filter="parent">Parents Only</button>
-          <button type="button" class="btn-secondary" data-filter="admin">Admins Only</button>
+          <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
+            <option value="all">All</option>
+            <option value="student">Students Only</option>
+            <option value="parent">Parents Only</option>
+            <option value="admin">Admins Only</option>
+          </select>
           <button type="button" class="btn-secondary" id="bulk-select-all-btn">Select All Shown</button>
           <button type="button" class="btn-secondary" id="bulk-select-none-btn">Select None</button>
         </div>

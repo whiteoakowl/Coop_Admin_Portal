@@ -314,6 +314,18 @@ textarea:focus-visible,
 
 .form-wrap .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
 
+/* Polished card per logical section of a public form (Absence/Late,
+   Name Tag), instead of one long undivided column of fields. */
+.form-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.form-section h2 { margin: 0 0 0.85rem; font-size: 1.05rem; }
+
 .stack-form { display: flex; flex-direction: column; gap: 0.35rem; }
 .stack-form-narrow { max-width: 360px; }
 
@@ -528,8 +540,11 @@ textarea:focus-visible,
 
 .dashboard-analytics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
+}
+@media (max-width: 720px) {
+  .dashboard-analytics-grid { grid-template-columns: 1fr; }
 }
 
 .dashboard-analytics-card {
@@ -542,9 +557,10 @@ textarea:focus-visible,
 .dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .dashboard-analytics-header h2 { margin: 0; }
 
-.analytics-stat-row {
+/* Checked In/Checked Out on the top row, Absent/Late on the bottom row. */
+.analytics-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
 }
 .analytics-stat {
@@ -798,6 +814,7 @@ textarea:focus-visible,
 .volunteer-card-link-form select,
 .volunteer-sections-form input,
 .volunteer-date-add-form input[type="date"],
+.name-tag-bulk-filter-select,
 .btn-secondary {
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--border);
@@ -1011,7 +1028,14 @@ textarea:focus-visible,
   margin: 0.75rem 0;
 }
 
-.name-tag-editor-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 1rem; }
+/* The badge canvas ("the name tag image") sits alone on the left; every
+   editing control - add-field/shape/image/barcode, background color,
+   the properties panel, and Reset/Save - lives in a column to its right. */
+.name-tag-editor-body { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+
+.name-tag-editor-controls { display: flex; flex-direction: column; gap: 1.1rem; width: 300px; flex-shrink: 0; }
+
+.name-tag-editor-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
 .name-tag-add-field { display: flex; gap: 0.4rem; }
 .name-tag-add-field select { padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
 .name-tag-upload-label { cursor: pointer; }
@@ -1022,7 +1046,6 @@ textarea:focus-visible,
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--ink);
-  margin-left: auto;
 }
 .name-tag-bg-label input[type="color"] {
   width: 2.25rem;
@@ -1034,7 +1057,6 @@ textarea:focus-visible,
   cursor: pointer;
 }
 
-.name-tag-editor-body { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
 .name-tag-canvas {
   background-image:
     linear-gradient(45deg, #f4f7fb 25%, transparent 25%), linear-gradient(-45deg, #f4f7fb 25%, transparent 25%),
@@ -1060,8 +1082,6 @@ textarea:focus-visible,
 .badge-el-selected .badge-el-resize-handle { display: block; }
 
 .name-tag-properties {
-  width: 240px;
-  flex-shrink: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1074,9 +1094,9 @@ textarea:focus-visible,
 .name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
 .name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
 
-.name-tag-editor-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; margin-top: 1rem; }
+.name-tag-editor-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; }
 .name-tag-editor-actions .btn-secondary,
-.name-tag-editor-actions .primary-btn { width: 100%; max-width: 220px; text-align: center; margin-top: 0; }
+.name-tag-editor-actions .primary-btn { width: 100%; text-align: center; margin-top: 0; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
 .name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }
@@ -1085,7 +1105,7 @@ textarea:focus-visible,
 
 @media (max-width: 720px) {
   .name-tag-editor-body { flex-direction: column; }
-  .name-tag-properties { width: 100%; }
+  .name-tag-editor-controls { width: 100%; }
 }
 
 /* ---------- Volunteers ---------- */

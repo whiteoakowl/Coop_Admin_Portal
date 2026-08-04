@@ -13,55 +13,71 @@
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
     <% } %>
 
-    <form method="POST" action="/absence/submit" class="stack-form" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
-      <label for="type">Absence or Late</label>
-      <select id="type" name="type" required>
-        <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; won't be there</option>
-        <option value="late" <%= formValues.type === 'late' ? 'selected' : '' %>>Late &ndash; will arrive late</option>
-      </select>
-
-      <label for="parentId">Parent Name</label>
-      <select id="parentId" name="parentId" required>
-        <option value="">Select your name&hellip;</option>
-        <% parents.forEach(function(p) { %>
-          <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
-        <% }); %>
-      </select>
-
-      <label>Who is this for?</label>
-      <div id="absence-children-groups">
-        <% parents.forEach(function(p) { %>
-          <% var kids = childrenByParent[p.id] || []; %>
-          <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
-            <div class="checkbox-group">
-              <label class="checkbox-option">
-                <input type="checkbox" name="studentIds" value="<%= p.id %>" <%= formValues.studentIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
-                <%= p.name %> (Parent)
-              </label>
-              <% kids.forEach(function(k) { %>
-                <label class="checkbox-option">
-                  <input type="checkbox" name="studentIds" value="<%= k.id %>" <%= formValues.studentIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
-                  <%= k.name %>
-                </label>
-              <% }); %>
-            </div>
-          </div>
-        <% }); %>
+    <form method="POST" action="/absence/submit" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+      <div class="form-section">
+        <h2>Absence or Late</h2>
+        <div class="stack-form">
+          <select id="type" name="type" required>
+            <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; won't be there</option>
+            <option value="late" <%= formValues.type === 'late' ? 'selected' : '' %>>Late &ndash; will arrive late</option>
+          </select>
+        </div>
       </div>
-      <p id="student-required-msg" class="hint absence-required-msg" hidden>Please select at least one name.</p>
 
-      <label for="sessionDate">Class Date</label>
-      <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />
+      <div class="form-section">
+        <h2>Who Is This For?</h2>
+        <div class="stack-form">
+          <label for="parentId">Parent Name</label>
+          <select id="parentId" name="parentId" required>
+            <option value="">Select your name&hellip;</option>
+            <% parents.forEach(function(p) { %>
+              <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
+            <% }); %>
+          </select>
+        </div>
 
-      <label for="reasonCategory">Reason</label>
-      <select id="reasonCategory" name="reasonCategory" required>
-        <option value="">Select a reason&hellip;</option>
-        <option value="personal" <%= formValues.reasonCategory === 'personal' ? 'selected' : '' %>>Personal</option>
-        <option value="medical" <%= formValues.reasonCategory === 'medical' ? 'selected' : '' %>>Medical</option>
-      </select>
+        <div id="absence-children-groups">
+          <% parents.forEach(function(p) { %>
+            <% var kids = childrenByParent[p.id] || []; %>
+            <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
+              <div class="checkbox-group">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="studentIds" value="<%= p.id %>" <%= formValues.studentIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
+                  <%= p.name %> (Parent)
+                </label>
+                <% kids.forEach(function(k) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="studentIds" value="<%= k.id %>" <%= formValues.studentIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
+                    <%= k.name %>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <p id="student-required-msg" class="hint absence-required-msg" hidden>Please select at least one name.</p>
+      </div>
 
-      <label for="reason">Description</label>
-      <textarea id="reason" name="reason" rows="3" placeholder="Briefly explain the reason" required><%= formValues.reason %></textarea>
+      <div class="form-section">
+        <h2>Class Date</h2>
+        <div class="stack-form">
+          <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2>Reason</h2>
+        <div class="stack-form">
+          <select id="reasonCategory" name="reasonCategory" required>
+            <option value="">Select a reason&hellip;</option>
+            <option value="personal" <%= formValues.reasonCategory === 'personal' ? 'selected' : '' %>>Personal</option>
+            <option value="medical" <%= formValues.reasonCategory === 'medical' ? 'selected' : '' %>>Medical</option>
+          </select>
+
+          <label for="reason">Description</label>
+          <textarea id="reason" name="reason" rows="3" placeholder="Briefly explain the reason" required><%= formValues.reason %></textarea>
+        </div>
+      </div>
 
       <button type="submit" class="primary-btn">Submit</button>
     </form>

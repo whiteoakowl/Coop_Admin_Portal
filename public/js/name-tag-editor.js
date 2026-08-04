@@ -461,14 +461,15 @@
   // --- Bulk print list filtering ---
   const bulkList = document.getElementById('name-tag-bulk-list');
   if (bulkList) {
-    document.querySelectorAll('.name-tag-bulk-filter [data-filter]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const filter = btn.dataset.filter;
+    const filterSelect = document.getElementById('name-tag-bulk-filter-select');
+    if (filterSelect) {
+      filterSelect.addEventListener('change', () => {
+        const filter = filterSelect.value;
         bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
           row.style.display = filter === 'all' || row.dataset.type === filter ? '' : 'none';
         });
       });
-    });
+    }
 
     const selectAllBtn = document.getElementById('bulk-select-all-btn');
     if (selectAllBtn) {
