@@ -113,6 +113,35 @@ function buildRosterGridData(roster) {
   };
 }
 
+const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
+
+// Absence/Late form submissions recorded against this roster, optionally
+// narrowed to a single session date.
+function absenceSubmissionsForRoster(rosterId, dateFilter) {
+  let sql = `SELECT m.name AS memberName, a.session_date AS date, a.status,
+             a.reason_category AS reasonCategory, a.reason_text AS reasonText
+             FROM attendance a
+             JOIN members m ON m.id = a.member_id
+             WHERE a.roster_id = ? AND a.source = 'absence_form'`;
+  const params = [rosterId];
+  if (dateFilter) {
+    sql += ' AND a.session_date = ?';
+    params.push(dateFilter);
+  }
+  sql += ' ORDER BY a.session_date DESC, m.name COLLATE NOCASE';
+
+  return db
+    .prepare(sql)
+    .all(...params)
+    .map((r) => ({
+      memberName: r.memberName,
+      dateLabel: formatDateLabel(r.date),
+      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
+      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+      description: r.reasonText || '—',
+    }));
+}
+
 // --- Roster list & creation ---
 
 router.get('/rosters', requireAdmin, (req, res) => {
@@ -299,11 +328,14 @@ router.get('/roster/:id', requireAdmin, (req, res) => {
   if (!roster) return res.status(404).send('Not found');
 
   const data = buildRosterGridData(roster);
+  const absenceDateFilter = data.dates.includes(req.query.absenceDate) ? req.query.absenceDate : '';
 
   res.render('admin-roster', {
     title: `${roster.name} Roster`,
     roster,
     ...data,
+    absenceDateFilter,
+    absenceSubmissions: absenceSubmissionsForRoster(id, absenceDateFilter),
   });
 });
 

@@ -77,6 +77,38 @@
         <% } %>
       </table>
     </div>
+
+    <h2>Absence/Late Submissions</h2>
+    <div class="category-filter no-print">
+      <label for="absence-date-select">Date</label>
+      <select id="absence-date-select" onchange="window.location = '/admin/roster/<%= roster.id %>' + (this.value ? '?absenceDate=' + encodeURIComponent(this.value) : '')">
+        <option value="">All dates</option>
+        <% dates.forEach(function(d, i) { %>
+          <option value="<%= d %>" <%= absenceDateFilter === d ? 'selected' : '' %>><%= dateLabels[i] %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Name</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <% if (absenceSubmissions.length === 0) { %>
+            <tr><td colspan="5" class="roster-empty">No absence or late submissions<%= absenceDateFilter ? ' for this date' : '' %>.</td></tr>
+          <% } %>
+          <% absenceSubmissions.forEach(function(s) { %>
+            <tr>
+              <td><%= s.memberName %></td>
+              <td><%= s.dateLabel %></td>
+              <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+              <td><%= s.reasonLabel %></td>
+              <td><%= s.description %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
   </main>
 </body>
 </html>
