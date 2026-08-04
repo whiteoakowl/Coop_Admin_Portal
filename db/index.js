@@ -21,6 +21,25 @@ const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => 
 if (!memberColumns.includes('notes')) {
   db.exec('ALTER TABLE members ADD COLUMN notes TEXT');
 }
+const newMemberColumns = {
+  member_type: "TEXT NOT NULL DEFAULT 'student'",
+  address: 'TEXT',
+  city: 'TEXT',
+  state: 'TEXT',
+  zip: 'TEXT',
+  phone: 'TEXT',
+  email: 'TEXT',
+  photo_path: 'TEXT',
+  birthday: 'TEXT',
+  grade_level: 'TEXT',
+  medical_notes: 'TEXT',
+  parent_id: 'INTEGER REFERENCES members(id) ON DELETE SET NULL',
+};
+for (const [column, definition] of Object.entries(newMemberColumns)) {
+  if (!memberColumns.includes(column)) {
+    db.exec(`ALTER TABLE members ADD COLUMN ${column} ${definition}`);
+  }
+}
 
 const rosterMemberColumns = db.prepare('PRAGMA table_info(roster_members)').all().map((c) => c.name);
 if (!rosterMemberColumns.includes('scheduled_arrival')) {

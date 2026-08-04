@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatTime, formatTimeOfDay, todayISO } = require('../utils/dates');
-const { parseNamesFile, findMemberByName } = require('../utils/members');
+const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -37,8 +37,8 @@ function isKnownCategory(name) {
   return !!db.prepare('SELECT 1 FROM categories WHERE name = ?').get(name);
 }
 
-function importNamesIntoRoster(rosterId, buffer) {
-  const names = parseNamesFile(buffer);
+function importNamesIntoRoster(rosterId, buffer, filename) {
+  const names = parseNamesFromUpload(buffer, filename);
   const linkMember = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
 
   let linked = 0;
@@ -81,6 +81,7 @@ function buildRosterGridData(roster) {
 
   const rows = members.map((m) => ({
     member: m,
+    parentName: m.parent_id ? (db.prepare('SELECT name FROM members WHERE id = ?').get(m.parent_id) || {}).name : null,
     arrivalLabel: formatTimeOfDay(m.scheduledArrival),
     departureLabel: formatTimeOfDay(m.scheduledDeparture),
     cells: dates.map((d) => {
@@ -176,18 +177,25 @@ router.get('/rosters', requireAdmin, (req, res) => {
 // A single spreadsheet-style log of every actual kiosk check-in/out across
 // all rosters and dates - distinct from the per-roster attendance grid.
 router.get('/checkinout-log', requireAdmin, (req, res) => {
+  const dateFilter = req.query.date || '';
+
+  let sql = `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date,
+             a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+             FROM attendance a
+             JOIN members m ON m.id = a.member_id
+             JOIN rosters r ON r.id = a.roster_id
+             LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+             WHERE a.check_in_time IS NOT NULL`;
+  const params = [];
+  if (dateFilter) {
+    sql += ' AND a.session_date = ?';
+    params.push(dateFilter);
+  }
+  sql += ' ORDER BY a.check_in_time DESC';
+
   const rows = db
-    .prepare(
-      `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date,
-              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
-       FROM attendance a
-       JOIN members m ON m.id = a.member_id
-       JOIN rosters r ON r.id = a.roster_id
-       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
-       WHERE a.check_in_time IS NOT NULL
-       ORDER BY a.check_in_time DESC`
-    )
-    .all()
+    .prepare(sql)
+    .all(...params)
     .map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
@@ -197,7 +205,12 @@ router.get('/checkinout-log', requireAdmin, (req, res) => {
       number: r.number ?? '—',
     }));
 
-  res.render('admin-checkinout-log', { title: 'Check In/Out Log', rows });
+  const dates = db
+    .prepare(`SELECT DISTINCT session_date FROM attendance WHERE check_in_time IS NOT NULL ORDER BY session_date DESC`)
+    .all()
+    .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
+
+  res.render('admin-checkinout-log', { title: 'Check In/Out Log', rows, dates, dateFilter });
 });
 
 router.post('/rosters/categories', requireAdmin, (req, res) => {
@@ -231,7 +244,7 @@ router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
 
   let notice = `Roster "${name}" created with ${dates.length} date${dates.length === 1 ? '' : 's'}.`;
   if (req.file) {
-    const result = importNamesIntoRoster(rosterId, req.file.buffer);
+    const result = importNamesIntoRoster(rosterId, req.file.buffer, req.file.originalname);
     notice += ` Imported ${result.linked} member(s) added to the roster` + (result.notFound ? `, ${result.notFound} name(s) not found in Members.` : '.');
   }
 
@@ -359,7 +372,7 @@ router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, re
     return res.redirect(`/admin/rosters/${rosterId}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
   }
 
-  const result = importNamesIntoRoster(rosterId, req.file.buffer);
+  const result = importNamesIntoRoster(rosterId, req.file.buffer, req.file.originalname);
   res.redirect(
     `/admin/rosters/${rosterId}/manage?notice=` +
       encodeURIComponent(`Imported ${result.linked} member(s) added to this roster` + (result.notFound ? `, ${result.notFound} name(s) not found in Members.` : '.'))

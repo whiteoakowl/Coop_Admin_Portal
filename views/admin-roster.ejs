@@ -51,7 +51,9 @@
             <% } %>
             <% rows.forEach(function(row) { %>
               <tr>
-                <td class="roster-name-col"><%= row.member.name %></td>
+                <td class="roster-name-col">
+                  <button type="button" class="link-btn" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button>
+                </td>
                 <td><%= row.arrivalLabel || '—' %></td>
                 <td><%= row.departureLabel || '—' %></td>
                 <% row.cells.forEach(function(cell) { %>
@@ -68,6 +70,35 @@
                   </td>
                 <% }); %>
               </tr>
+              <dialog id="profile-dialog-<%= row.member.id %>" class="member-profile-dialog">
+                <div class="member-profile-header">
+                  <% if (row.member.photo_path) { %>
+                    <img class="member-photo-preview" src="<%= row.member.photo_path %>" alt="" />
+                  <% } %>
+                  <div>
+                    <h3><%= row.member.name %></h3>
+                    <span class="badge-pill"><%= row.member.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+                  </div>
+                </div>
+                <dl class="member-profile-list">
+                  <% if (row.member.address || row.member.city || row.member.state || row.member.zip) { %>
+                    <dt>Address</dt>
+                    <dd><%= [row.member.address, row.member.city, [row.member.state, row.member.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') %></dd>
+                  <% } %>
+                  <% if (row.member.phone) { %><dt>Phone</dt><dd><%= row.member.phone %></dd><% } %>
+                  <% if (row.member.email) { %><dt>Email</dt><dd><%= row.member.email %></dd><% } %>
+                  <% if (row.member.member_type !== 'parent') { %>
+                    <% if (row.member.birthday) { %><dt>Birthday</dt><dd><%= row.member.birthday %></dd><% } %>
+                    <% if (row.member.grade_level) { %><dt>Grade Level</dt><dd><%= row.member.grade_level %></dd><% } %>
+                    <% if (row.parentName) { %><dt>Parent</dt><dd><%= row.parentName %></dd><% } %>
+                    <% if (row.member.medical_notes) { %><dt>Medical/Allergy Notes</dt><dd><%= row.member.medical_notes %></dd><% } %>
+                  <% } %>
+                </dl>
+                <p class="hint">To make changes, edit this profile on the <a href="/admin/members/<%= row.member.id %>/edit">Members page</a>.</p>
+                <div class="notes-dialog-actions">
+                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                </div>
+              </dialog>
             <% }); %>
           </tbody>
           <% if (rows.length > 0) { %>

@@ -43,8 +43,8 @@
     <dialog id="import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/absence-list/import" enctype="multipart/form-data">
         <h3>Import from File</h3>
-        <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
-        <input type="file" name="file" accept=".csv,.txt" required />
+        <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first. <a href="/admin/import-template/names.xlsx">Download an example spreadsheet</a>.</p>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Import</button>
@@ -76,6 +76,15 @@
     </div>
 
     <h2>Submissions</h2>
+    <div class="category-filter">
+      <label for="date-select">Date</label>
+      <select id="date-select" onchange="window.location = '/admin/absence-list' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+        <option value="">All dates</option>
+        <% submissionDates.forEach(function(d) { %>
+          <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+        <% }); %>
+      </select>
+    </div>
     <div class="roster-scroll">
       <table class="roster-table members-table condensed-table">
         <thead>
@@ -83,7 +92,7 @@
         </thead>
         <tbody>
           <% if (submissions.length === 0) { %>
-            <tr><td colspan="6" class="roster-empty">No absence or late submissions yet.</td></tr>
+            <tr><td colspan="6" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
           <% } %>
           <% submissions.forEach(function(s) { %>
             <tr>

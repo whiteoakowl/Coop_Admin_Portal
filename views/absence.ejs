@@ -16,17 +16,39 @@
     <form method="POST" action="/absence/submit" class="stack-form" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
       <label for="type">Absence or Late</label>
       <select id="type" name="type" required>
-        <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; I won't be there</option>
-        <option value="late" <%= formValues.type === 'late' ? 'selected' : '' %>>Late &ndash; I'll arrive late</option>
+        <option value="absence" <%= formValues.type === 'absence' ? 'selected' : '' %>>Absence &ndash; won't be there</option>
+        <option value="late" <%= formValues.type === 'late' ? 'selected' : '' %>>Late &ndash; will arrive late</option>
       </select>
 
-      <label for="memberId">Your Name</label>
-      <select id="memberId" name="memberId" required>
+      <label for="parentId">Parent Name</label>
+      <select id="parentId" name="parentId" required>
         <option value="">Select your name&hellip;</option>
-        <% members.forEach(function(m) { %>
-          <option value="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %></option>
+        <% parents.forEach(function(p) { %>
+          <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
         <% }); %>
       </select>
+
+      <label>Student(s)</label>
+      <div id="absence-children-groups">
+        <% parents.forEach(function(p) { %>
+          <% var kids = childrenByParent[p.id] || []; %>
+          <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
+            <% if (kids.length === 0) { %>
+              <p class="hint">No students linked to this parent yet.</p>
+            <% } else { %>
+              <div class="checkbox-group">
+                <% kids.forEach(function(k) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="studentIds" value="<%= k.id %>" <%= formValues.studentIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
+                    <%= k.name %>
+                  </label>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+      <p id="student-required-msg" class="hint absence-required-msg" hidden>Please select at least one student.</p>
 
       <label for="sessionDate">Class Date</label>
       <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />

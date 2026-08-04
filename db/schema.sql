@@ -1,11 +1,28 @@
 -- SH Check-in/out schema
 
+-- member_type distinguishes a Student (attends co-op, can be checked in/out
+-- and marked absent/late) from a Parent (submits forms and volunteers, but
+-- is never checked in). A student can optionally link to a parent profile
+-- via parent_id, used to group students under their parent on the public
+-- Absence/Late form.
 CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   barcode TEXT NOT NULL UNIQUE,
   active INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
+  member_type TEXT NOT NULL DEFAULT 'student' CHECK(member_type IN ('student','parent')),
+  address TEXT,
+  city TEXT,
+  state TEXT,
+  zip TEXT,
+  phone TEXT,
+  email TEXT,
+  photo_path TEXT,
+  birthday TEXT,
+  grade_level TEXT,
+  medical_notes TEXT,
+  parent_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

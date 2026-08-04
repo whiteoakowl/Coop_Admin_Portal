@@ -17,7 +17,10 @@ router.get('/setup', requireAdmin, (req, res) => res.redirect('/admin/volunteers
 
 router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
-  const allActiveMembers = db.prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
+  // Setup/Cleanup teams are staffed by parent volunteers, not students.
+  const allActiveMembers = db
+    .prepare("SELECT * FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE")
+    .all();
 
   const teams = teamsForDay(day).map((t) => {
     const members = membersForTeam(t.id);

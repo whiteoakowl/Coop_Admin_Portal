@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
-const { parseNamesFile, findMemberByName } = require('../utils/members');
+const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const {
   DAYS,
   DAY_LABELS,
@@ -65,8 +65,9 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const sections = sectionsForList(list.id);
   const members = membersForList(list.id);
   const memberIds = members.map((m) => m.id);
+  // Floater Assignments are staffed by parent volunteers, not students.
   const availableMembers = db
-    .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
+    .prepare("SELECT * FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE")
     .all()
     .filter((m) => !memberIds.includes(m.id));
   const dates = datesForList(list.id);
@@ -143,12 +144,12 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   if (!req.file) {
     return res.redirect(`/admin/volunteers/${day}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
   }
-  const names = parseNamesFile(req.file.buffer);
+  const names = parseNamesFromUpload(req.file.buffer, req.file.originalname);
   const linkMember = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
   let added = 0;
   let notFound = 0;
   for (const name of names) {
-    const member = findMemberByName(name);
+    const member = findMemberByName(name, 'parent');
     if (!member) { notFound++; continue; }
     const result = linkMember.run(list.id, member.id, sectionId);
     if (result.changes > 0) added++;

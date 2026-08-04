@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle"><a href="/admin/members">&larr; Members</a></p>
+    <h1><%= mode === 'create' ? 'Add Member' : 'Edit ' + member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form
+      method="POST"
+      action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
+      enctype="multipart/form-data"
+      id="member-form"
+      class="member-edit-form"
+    >
+      <div class="manage-section">
+        <h2>Member Type</h2>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="memberType" value="student" <%= member.member_type !== 'parent' ? 'checked' : '' %> />
+            Student
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="memberType" value="parent" <%= member.member_type === 'parent' ? 'checked' : '' %> />
+            Parent
+          </label>
+        </div>
+      </div>
+
+      <div class="manage-section">
+        <h2>Basic Info</h2>
+        <div class="member-form-grid">
+          <label>Name
+            <input type="text" name="name" value="<%= member.name %>" required />
+          </label>
+          <label>Barcode <span class="hint">(defaults to name)</span>
+            <input type="text" name="barcode" value="<%= member.barcode %>" placeholder="<%= member.name || 'Defaults to name' %>" />
+          </label>
+          <label>Phone
+            <input type="tel" name="phone" value="<%= member.phone || '' %>" />
+          </label>
+          <label>Email
+            <input type="email" name="email" value="<%= member.email || '' %>" />
+          </label>
+          <label class="member-form-full">Address
+            <input type="text" name="address" value="<%= member.address || '' %>" />
+          </label>
+          <label>City
+            <input type="text" name="city" value="<%= member.city || '' %>" />
+          </label>
+          <label>State
+            <input type="text" name="state" value="<%= member.state || '' %>" />
+          </label>
+          <label>Zip Code
+            <input type="text" name="zip" value="<%= member.zip || '' %>" />
+          </label>
+        </div>
+      </div>
+
+      <div class="manage-section">
+        <h2>Photo</h2>
+        <% if (member.photo_path) { %>
+          <img class="member-photo-preview" src="<%= member.photo_path %>" alt="<%= member.name %>" />
+        <% } %>
+        <input type="file" name="photo" accept="image/*" />
+      </div>
+
+      <div class="manage-section" id="student-only-fields">
+        <h2>Student Info</h2>
+        <div class="member-form-grid">
+          <label>Birthday
+            <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
+          </label>
+          <label>Grade Level
+            <input type="text" name="gradeLevel" value="<%= member.grade_level || '' %>" placeholder="e.g. 5th Grade" />
+          </label>
+          <label>Parent
+            <select name="parentId">
+              <option value="">No parent linked</option>
+              <% parents.forEach(function(p) { %>
+                <option value="<%= p.id %>" <%= member.parent_id === p.id ? 'selected' : '' %>><%= p.name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label class="member-form-full">Medical/Allergy Notes
+            <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Changes' %></button>
+    </form>
+  </main>
+  <script src="/js/member-form.js"></script>
+</body>
+</html>

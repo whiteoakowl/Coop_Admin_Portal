@@ -16,22 +16,31 @@
     <% } %>
 
     <div class="quick-add-row">
-      <form method="POST" action="/admin/members" class="inline-form-flat">
-        <input type="text" name="name" placeholder="Member's name" required />
-        <button type="submit">+ Add Member</button>
-      </form>
-      <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form-flat">
-        <input type="file" name="file" accept=".csv,.txt" required />
-        <button type="submit">Import from File</button>
-      </form>
+      <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
+      <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
     </div>
+
+    <dialog id="import-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
+        <h3>Import from File</h3>
+        <p class="hint">Upload a .csv, .txt, or .xlsx file. Not sure of the format? <a href="/admin/members/import-template.xlsx">Download an example spreadsheet</a>.</p>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="roster-scroll">
       <table class="roster-table members-table">
         <thead>
           <tr>
+            <th></th>
             <th>Name</th>
+            <th>Type</th>
             <th>Barcode</th>
+            <th>Parent</th>
             <th>Rosters</th>
             <th>Actions</th>
           </tr>
@@ -40,11 +49,16 @@
           <% members.forEach(function(m) { %>
             <tr>
               <td>
-                <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-name-form">
-                  <input type="text" name="name" value="<%= m.name %>" onblur="if (this.value.trim() && this.value !== this.defaultValue) this.form.submit();" />
-                </form>
+                <% if (m.photo_path) { %>
+                  <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
+                <% } else { %>
+                  <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
+                <% } %>
               </td>
+              <td><a href="/admin/members/<%= m.id %>/edit"><%= m.name %></a></td>
+              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
               <td class="mono"><%= m.barcode %></td>
+              <td><%= m.parentName || '—' %></td>
               <td>
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>
@@ -75,6 +89,7 @@
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
                 <select class="member-action-select" onchange="
                     if (this.value === 'manage') { location.href = '/admin/members/<%= m.id %>/manage'; }
+                    else if (this.value === 'edit') { location.href = '/admin/members/<%= m.id %>/edit'; }
                     else if (this.value === 'delete') {
                       if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, the absence list, and all attendance history. This cannot be undone.')) {
                         document.getElementById('delete-form-<%= m.id %>').submit();
@@ -84,6 +99,7 @@
                   ">
                   <option value="" selected disabled>Actions&hellip;</option>
                   <option value="manage">Manage</option>
+                  <option value="edit">Edit</option>
                   <option value="delete">Delete</option>
                 </select>
               </td>

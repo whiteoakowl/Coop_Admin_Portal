@@ -8,6 +8,16 @@
   <main class="admin-main">
     <h1>Name Tag Requests</h1>
 
+    <div class="category-filter">
+      <label for="date-select">Date</label>
+      <select id="date-select" onchange="window.location = '/admin/name-tag' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+        <option value="">All dates</option>
+        <% dates.forEach(function(d) { %>
+          <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+        <% }); %>
+      </select>
+    </div>
+
     <div class="roster-scroll">
       <table class="roster-table members-table condensed-table">
         <thead>

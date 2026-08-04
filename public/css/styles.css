@@ -149,7 +149,7 @@ textarea:focus-visible,
   color: var(--brand-dark);
   font-size: 1.5rem;
 }
-.landing-label { font-size: 1.3rem; font-weight: 700; color: var(--ink); }
+.landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); }
 
 /* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
 .landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
@@ -324,6 +324,11 @@ textarea:focus-visible,
 .radio-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
 .radio-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+.checkbox-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+.checkbox-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+.absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
+
 .primary-btn {
   margin-top: 1.5rem;
   background: var(--btn-bg);
@@ -491,6 +496,62 @@ textarea:focus-visible,
   font-size: 0.85rem;
   font-weight: 400;
   background: #f8fafc;
+}
+
+.member-edit-form { max-width: 720px; }
+.member-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 1.5rem;
+}
+.member-form-full { grid-column: 1 / -1; }
+.member-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.member-form-grid input,
+.member-form-grid select,
+.member-form-grid textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--ink);
+  font-weight: 400;
+  background: var(--surface);
+}
+.member-photo-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+}
+.member-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+.member-thumb-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .schedule-time-form input[type="time"] {
@@ -1032,6 +1093,21 @@ textarea:focus-visible,
 .member-picker-row:hover { background: var(--brand-soft); }
 .member-picker-row input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 
+.member-profile-dialog {
+  width: min(440px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.member-profile-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.member-profile-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.member-profile-header h3 { margin: 0 0 0.35rem; }
+.member-profile-header .member-photo-preview { width: 64px; height: 64px; margin: 0; }
+.member-profile-list { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; margin: 0 0 0.75rem; }
+.member-profile-list dt { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+.member-profile-list dd { margin: 0; }
+
 /* ---------- Responsive: narrow phones ---------- */
 
 @media (max-width: 480px) {
@@ -1065,7 +1141,9 @@ textarea:focus-visible,
 
   .admin-main { padding: 1rem; }
   .notes-dialog,
-  .member-picker-dialog { width: 92vw; padding: 1rem; }
+  .member-picker-dialog,
+  .member-profile-dialog { width: 92vw; padding: 1rem; }
+  .member-form-grid { grid-template-columns: 1fr; }
 }
 
 /* Hidden on screen, shown only when printing - a consistent branded
