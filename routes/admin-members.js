@@ -83,20 +83,13 @@ router.post('/members/:id/edit', requireAdmin, (req, res) => {
   res.redirect('/admin/members');
 });
 
-router.post('/members/:id/toggle-active', requireAdmin, (req, res) => {
+router.post('/members/:id/delete', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (member) {
-    db.prepare('UPDATE members SET active = ? WHERE id = ?').run(member.active ? 0 : 1, id);
-  }
-  res.redirect('/admin/members');
-});
-
-router.get('/members/:id/badge', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (!member) return res.status(404).send('Not found');
-  res.render('admin-badge', { title: `Badge - ${member.name}`, member, layout: false });
+  db.prepare('DELETE FROM members WHERE id = ?').run(id);
+  res.redirect(
+    '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
+  );
 });
 
 // --- Absence/Late list (who CAN be picked on the public absence form) ---

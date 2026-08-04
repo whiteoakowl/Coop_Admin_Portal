@@ -93,7 +93,6 @@
                 <td><%= m.name %></td>
                 <td class="mono"><%= m.barcode %></td>
                 <td class="actions-cell">
-                  <a class="link-btn" href="/admin/members/<%= m.id %>/badge" target="_blank">Print Badge</a>
                   <form method="POST" action="/admin/rosters/<%= roster.id %>/remove-member/<%= m.id %>" class="inline-block-form">
                     <button type="submit" class="link-btn">Remove</button>
                   </form>

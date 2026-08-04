@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { todayISO, isValidISODate, formatDateLabel } = require('../utils/dates');
-const { getMemberRostersForDate, getMemberUpcomingDates } = require('../utils/rosters');
+const { isValidISODate, formatDateLabel } = require('../utils/dates');
+const { getMemberRostersForDate } = require('../utils/rosters');
 
 function loadMembers() {
   return db
@@ -31,14 +31,6 @@ router.get('/absence', (req, res) => {
     result: null,
     formValues: { type: 'absence', memberId: '', sessionDate: '', reasonCategory: '', reason: '' },
   });
-});
-
-// Used by the form's JS to populate the date dropdown once a name is picked.
-router.get('/absence/dates', (req, res) => {
-  const memberId = parseInt(req.query.memberId, 10);
-  if (!memberId || !loadAbsenceListMember(memberId)) return res.json({ dates: [] });
-  const dates = getMemberUpcomingDates(memberId, todayISO());
-  res.json({ dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })) });
 });
 
 router.post('/absence/submit', (req, res) => {

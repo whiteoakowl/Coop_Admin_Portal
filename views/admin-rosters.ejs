@@ -55,14 +55,6 @@
       </div>
     <% } %>
 
-    <details class="add-member-details">
-      <summary class="btn-primary-summary">+ Add Category</summary>
-      <form method="POST" action="/admin/rosters/categories" class="inline-form-flat">
-        <input type="text" name="name" placeholder="e.g. Youth, Adults, Sports" required />
-        <button type="submit" class="btn-secondary">Add Category</button>
-      </form>
-    </details>
-
     <div class="category-filter">
       <label for="category-select">Filter by category</label>
       <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">

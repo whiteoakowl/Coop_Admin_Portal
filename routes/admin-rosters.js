@@ -174,7 +174,9 @@ router.post('/rosters/categories', requireAdmin, (req, res) => {
   if (name) {
     db.prepare('INSERT OR IGNORE INTO categories (name) VALUES (?)').run(name);
   }
-  res.redirect('/admin/rosters?notice=' + encodeURIComponent(name ? `Category "${name}" added.` : 'Category name is required.'));
+  const param = name ? 'notice' : 'error';
+  const message = name ? `Category "${name}" added.` : 'Category name is required.';
+  res.redirect(`/admin/settings?${param}=` + encodeURIComponent(message));
 });
 
 router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {

@@ -78,7 +78,21 @@ button { font-family: inherit; cursor: pointer; }
 
 .landing-icon { font-size: 2.5rem; }
 .landing-label { font-size: 1.15rem; font-weight: 600; color: var(--ink); }
-.landing-card-admin { opacity: 0.75; }
+
+.admin-corner-link {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
 
 @media (max-width: 480px) {
   .landing-grid { grid-template-columns: 1fr; }
@@ -438,10 +452,11 @@ button { font-family: inherit; cursor: pointer; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 6px;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 5px;
   font-weight: 700;
+  font-size: 0.8rem;
 }
 
 .cell-present { background: var(--green-bg); color: var(--green); }
@@ -449,10 +464,11 @@ button { font-family: inherit; cursor: pointer; }
 .cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: transparent; color: var(--border); }
 
-.roster-table-detailed th, .roster-table-detailed td { padding: 0.4rem 0.4rem; }
+.roster-table-detailed { width: auto; font-size: 0.8rem; }
+.roster-table-detailed th, .roster-table-detailed td { padding: 0.25rem 0.3rem; }
 .roster-table-detailed td { white-space: nowrap; }
-.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
-.cell-time { font-size: 0.65rem; color: var(--muted); }
+.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; }
+.cell-time { font-size: 0.6rem; color: var(--muted); }
 
 .field-warning { color: var(--red); font-size: 0.8rem; min-height: 1em; display: block; }
 
@@ -480,11 +496,29 @@ button { font-family: inherit; cursor: pointer; }
 .inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--muted); flex: 1; min-width: 180px; }
 .hint { font-weight: 400; }
 
-/* A simple, borderless row: input/select + button, no card wrapper. Used
-   for quick-add bars (Members, Absence/Late list, category filter). */
-.inline-form-flat, .quick-add-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.quick-add-row { margin: 0.75rem 0 1rem; }
+/* A seamless text-bar-and-button unit: input/select + button joined into
+   one control, no gap, connected corners. Used for quick-add bars
+   (Members, Absence/Late list, roster manage, Categories). */
+.quick-add-row { display: flex; align-items: stretch; gap: 0.75rem; flex-wrap: wrap; margin: 0.75rem 0 1rem; }
+
+.inline-form-flat { display: flex; align-items: stretch; gap: 0; }
+.inline-form-flat input[type="text"],
+.inline-form-flat input[type="file"],
+.inline-form-flat select {
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
 .inline-form-flat input[type="text"] { flex: 1; min-width: 180px; }
+.inline-form-flat button {
+  border-radius: 0 8px 8px 0;
+  background: var(--brand-dark);
+  color: #fff;
+  border: 1px solid var(--brand-dark);
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.inline-form-flat button:hover { background: var(--brand-darker); border-color: var(--brand-darker); }
 
 .edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
 .edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }

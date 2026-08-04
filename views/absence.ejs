@@ -30,10 +30,7 @@
       </select>
 
       <label for="sessionDate">Class Date</label>
-      <select id="sessionDate" name="sessionDate" required disabled data-preselect="<%= formValues.sessionDate %>">
-        <option value="">Select your name first&hellip;</option>
-      </select>
-      <span id="date-warning" class="field-warning"></span>
+      <input id="sessionDate" name="sessionDate" type="date" required value="<%= formValues.sessionDate %>" />
 
       <label for="reasonCategory">Reason</label>
       <select id="reasonCategory" name="reasonCategory" required>

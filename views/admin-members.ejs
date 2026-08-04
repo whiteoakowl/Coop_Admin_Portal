@@ -19,11 +19,11 @@
     <div class="quick-add-row">
       <form method="POST" action="/admin/members" class="inline-form-flat">
         <input type="text" name="name" placeholder="Member's name" required />
-        <button type="submit" class="btn-secondary">+ Add Member</button>
+        <button type="submit">+ Add Member</button>
       </form>
       <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form-flat">
         <input type="file" name="file" accept=".csv,.txt" required />
-        <button type="submit" class="btn-secondary">Import from File</button>
+        <button type="submit">Import from File</button>
       </form>
     </div>
 
@@ -34,13 +34,12 @@
             <th>Name</th>
             <th>Barcode</th>
             <th>Rosters</th>
-            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <% members.forEach(function(m) { %>
-            <tr class="<%= m.active ? '' : 'row-inactive' %>">
+            <tr>
               <td>
                 <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-name-form">
                   <input type="text" name="name" value="<%= m.name %>" />
@@ -58,11 +57,9 @@
                 <% } %>
                 <a class="link-btn" href="/admin/rosters">manage</a>
               </td>
-              <td><%= m.active ? 'Active' : 'Inactive' %></td>
               <td class="actions-cell">
-                <a class="link-btn" href="/admin/members/<%= m.id %>/badge" target="_blank">Print Badge</a>
-                <form method="POST" action="/admin/members/<%= m.id %>/toggle-active" class="inline-block-form">
-                  <button type="submit" class="link-btn"><%= m.active ? 'Deactivate' : 'Reactivate' %></button>
+                <form method="POST" action="/admin/members/<%= m.id %>/delete" class="inline-block-form" onsubmit="return confirm('Permanently delete &quot;<%= m.name %>&quot;? This removes them from all rosters, the absence list, and all attendance history. This cannot be undone.');">
+                  <button type="submit" class="link-btn link-btn-danger">Delete</button>
                 </form>
               </td>
             </tr>
