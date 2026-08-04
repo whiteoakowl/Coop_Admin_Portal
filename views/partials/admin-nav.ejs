@@ -32,14 +32,13 @@
       </form>
     </div>
   </div>
-  <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
-    <option value="/admin">Home</option>
-    <option value="/admin/rosters" data-match="/admin/absence-list,/admin/checkinout-log">Attendance</option>
-    <option value="/admin/volunteers" data-match="/admin/setup">Volunteers</option>
-    <option value="/admin/name-tag">Name Tags</option>
-    <option value="/admin/members">Members</option>
-    <option value="/admin/settings">Settings</option>
-  </select>
+  <nav class="admin-mobile-tabs" id="admin-mobile-tabs">
+    <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg><span>Home</span></a>
+    <a href="/admin/rosters" data-match="/admin/absence-list,/admin/checkinout-log"><svg class="icon"><use href="#icon-calendar-check"/></svg><span>Attendance</span></a>
+    <a href="/admin/volunteers" data-match="/admin/setup"><svg class="icon"><use href="#icon-users"/></svg><span>Volunteers</span></a>
+    <a href="/admin/name-tag"><svg class="icon"><use href="#icon-badge"/></svg><span>Name Tags</span></a>
+    <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg><span>Members</span></a>
+  </nav>
 </div>
 
 <script src="/js/admin-nav.js"></script>

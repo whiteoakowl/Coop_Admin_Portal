@@ -550,27 +550,10 @@ textarea:focus-visible,
 
 .admin-mobile-topbar { display: none; }
 
-.admin-nav-select {
-  display: none;
-  width: 100%;
-  padding: 0.65rem 2.25rem 0.65rem 0.9rem;
-  border: 1px solid rgba(28, 37, 48, 0.18);
-  border-radius: 10px;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%231c2530'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.7rem center;
-  background-size: 1.1em;
-  appearance: none;
-  -webkit-appearance: none;
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--ink);
-}
+.admin-mobile-tabs { display: none; }
 
 /* Modern mobile nav: the sidebar collapses into a sticky top bar with a
-   brand row (+ compact Settings/Log out) and a single dropdown below it
+   brand row (+ compact Settings/Log out) and a row of icon tabs below it
    instead of 5+ links wrapping into a messy multi-row header. */
 @media (max-width: 860px) {
   .admin-sidebar { display: none; }
@@ -591,7 +574,31 @@ textarea:focus-visible,
   .admin-nav-right-mobile .admin-nav-right-link { padding: 0.4rem; }
   .admin-nav-right-mobile .admin-nav-right-link:hover { background: rgba(255,255,255,0.6); color: var(--brand-darker); }
 
-  .admin-nav-select { display: block; }
+  .admin-mobile-tabs { display: flex; gap: 0.2rem; }
+  .admin-mobile-tabs a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.15rem;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    transition: background-color 0.15s ease;
+  }
+  .admin-mobile-tabs a .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
+  .admin-mobile-tabs a:hover { background: rgba(255,255,255,0.4); }
+  .admin-mobile-tabs a.active {
+    background: var(--surface);
+    color: var(--brand-darker);
+    box-shadow: var(--shadow-sm);
+  }
+  .admin-mobile-tabs a.active .icon { opacity: 1; }
 }
 
 .admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; }
