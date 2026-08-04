@@ -27,11 +27,18 @@
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'design') { %>
-        <select class="name-tag-type-select" id="name-tag-type-select">
-          <option value="student">Student</option>
-          <option value="parent">Parent</option>
-          <option value="admin">Admin</option>
-        </select>
+        <div class="name-tag-design-toolbar">
+          <select class="name-tag-type-select" id="name-tag-type-select">
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+            <option value="admin">Admin</option>
+          </select>
+          <div class="name-tag-editor-actions">
+            <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
+            <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
+            <span id="save-status" class="hint"></span>
+          </div>
+        </div>
 
         <div class="name-tag-editor" id="name-tag-editor">
           <div class="name-tag-editor-body">
@@ -42,7 +49,7 @@
             <div class="name-tag-editor-controls">
               <div class="name-tag-tool-icons" id="name-tag-tool-icons">
                 <button type="button" class="name-tag-tool-icon-btn" data-tool="add-field" aria-label="Add Field" title="Add Field"><svg class="icon"><use href="#icon-type"/></svg></button>
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-shape" aria-label="Add Shape" title="Add Shape"><svg class="icon"><use href="#icon-square"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-shape" aria-label="Add Element" title="Add Element"><svg class="icon"><use href="#icon-square"/></svg></button>
                 <button type="button" class="name-tag-tool-icon-btn" data-tool="add-image" aria-label="Add Image" title="Add Image"><svg class="icon"><use href="#icon-image"/></svg></button>
                 <button type="button" class="name-tag-tool-icon-btn" data-tool="add-barcode" aria-label="Add Barcode" title="Add Barcode"><svg class="icon"><use href="#icon-barcode"/></svg></button>
                 <button type="button" class="name-tag-tool-icon-btn" data-tool="background" aria-label="Change Background" title="Change Background"><svg class="icon"><use href="#icon-palette"/></svg></button>
@@ -50,12 +57,6 @@
               <div class="name-tag-tool-panel" id="name-tag-tool-panel"></div>
 
               <div class="name-tag-properties" id="name-tag-properties"></div>
-
-              <div class="name-tag-editor-actions">
-                <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
-                <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
-                <span id="save-status" class="hint"></span>
-              </div>
             </div>
           </div>
         </div>
@@ -103,8 +104,8 @@
             </select>
           </div>
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
-            <a class="roster-action-btn" href="/admin/name-tag/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/name-tag/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 

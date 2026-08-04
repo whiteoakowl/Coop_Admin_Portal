@@ -5,7 +5,13 @@
 </head>
 <body class="landing">
   <%- include('partials/icon-sprite') %>
-  <a class="admin-corner-link" href="/admin">Admin</a>
+  <div class="landing-corner-actions">
+    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
+    <a class="admin-corner-link" href="/admin">Admin</a>
+  </div>
   <main class="landing-wrap">
     <div class="landing-banner">
       <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
@@ -39,5 +45,6 @@
       </a>
     </div>
   </main>
+  <script src="/js/fullscreen-toggle.js"></script>
 </body>
 </html>

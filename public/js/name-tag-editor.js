@@ -349,19 +349,39 @@
     markUnsaved();
   }
 
-  function addShape() {
-    currentLayout().push({
+  // "Add Element" offers a few basic shapes (rectangle, circle, line) at a
+  // few basic sizes - all still just shape elements underneath, so the
+  // existing drag/resize handles and the Properties panel's fill/border
+  // controls keep working unchanged once one is placed.
+  const ELEMENT_SIZES = {
+    small: { width: 60, height: 30 },
+    medium: { width: 120, height: 60 },
+    large: { width: 200, height: 100 },
+  };
+
+  function addElement(shapeType, size) {
+    const dims = ELEMENT_SIZES[size] || ELEMENT_SIZES.medium;
+    const el = {
       id: newId('shape'),
       type: 'shape',
       x: 20,
       y: 20,
-      width: 120,
-      height: 60,
+      width: dims.width,
+      height: dims.height,
       fill: 'transparent',
       borderColor: '#1c2530',
       borderWidth: 2,
       borderRadius: 0,
-    });
+    };
+    if (shapeType === 'circle') {
+      el.height = el.width;
+      el.borderRadius = 999;
+    } else if (shapeType === 'line') {
+      el.height = 4;
+      el.fill = '#1c2530';
+      el.borderWidth = 0;
+    }
+    currentLayout().push(el);
     renderCanvas();
     markUnsaved();
   }
@@ -416,12 +436,55 @@
       row.appendChild(btn);
       toolPanel.appendChild(row);
     } else if (tool === 'add-shape') {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn-secondary';
-      btn.textContent = '+ Add Shape to Badge';
-      btn.addEventListener('click', addShape);
-      toolPanel.appendChild(btn);
+      const wrap = document.createElement('div');
+      wrap.className = 'name-tag-add-element';
+
+      const shapePicker = document.createElement('div');
+      shapePicker.className = 'name-tag-shape-picker';
+      let selectedShape = 'rectangle';
+      const shapeButtons = [
+        ['rectangle', '#icon-square', 'Rectangle'],
+        ['circle', '#icon-circle', 'Circle'],
+        ['line', '#icon-line', 'Line'],
+      ].map(([key, iconHref, shapeLabel]) => {
+        const shapeBtn = document.createElement('button');
+        shapeBtn.type = 'button';
+        shapeBtn.className = 'name-tag-shape-btn' + (key === selectedShape ? ' active' : '');
+        shapeBtn.setAttribute('aria-label', shapeLabel);
+        shapeBtn.title = shapeLabel;
+        shapeBtn.innerHTML = '<svg class="icon"><use href="' + iconHref + '"/></svg>';
+        shapeBtn.addEventListener('click', () => {
+          selectedShape = key;
+          shapeButtons.forEach((b) => b.classList.remove('active'));
+          shapeBtn.classList.add('active');
+        });
+        shapePicker.appendChild(shapeBtn);
+        return shapeBtn;
+      });
+      wrap.appendChild(shapePicker);
+
+      const sizeSelect = document.createElement('select');
+      [
+        ['small', 'Small'],
+        ['medium', 'Medium'],
+        ['large', 'Large'],
+      ].forEach(([val, sizeLabel]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = sizeLabel;
+        if (val === 'medium') opt.selected = true;
+        sizeSelect.appendChild(opt);
+      });
+      wrap.appendChild(sizeSelect);
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn-secondary';
+      addBtn.textContent = '+ Add to Badge';
+      addBtn.addEventListener('click', () => addElement(selectedShape, sizeSelect.value));
+      wrap.appendChild(addBtn);
+
+      toolPanel.appendChild(wrap);
     } else if (tool === 'add-image') {
       const label = document.createElement('label');
       label.className = 'btn-secondary name-tag-upload-label';

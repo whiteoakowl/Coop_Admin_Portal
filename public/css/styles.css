@@ -184,10 +184,12 @@ textarea:focus-visible,
 .landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
 .landing-card-purple .landing-label { color: #000; }
 
+.landing-corner-actions { position: fixed; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
+
 .admin-corner-link {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -243,6 +245,23 @@ textarea:focus-visible,
 .kiosk-logo { height: 84px; width: 84px; margin-bottom: 0.5rem; border-radius: 50%; }
 .kiosk h1 { font-size: 2.4rem; }
 .kiosk-date { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
+
+/* Logo + page title sit side by side and centered as one header block,
+   set off from the rest of the page the same way admin pages separate
+   their H1 from the content below (a rule line). */
+.kiosk-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+.kiosk-header .kiosk-logo,
+.kiosk-header .form-logo { margin-bottom: 0; flex-shrink: 0; }
+.kiosk-header h1 { margin: 0; }
 
 .kiosk-wrap { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; }
 
@@ -350,7 +369,7 @@ textarea:focus-visible,
   padding: var(--card-padding);
   margin-bottom: 1.25rem;
 }
-.form-section h2 { margin: 0 0 0.85rem; font-size: 1.05rem; }
+.form-section h2 { margin: 0 0 0.85rem; }
 
 .stack-form { display: flex; flex-direction: column; gap: 0.35rem; }
 .stack-form-narrow { max-width: 360px; }
@@ -806,7 +825,16 @@ textarea:focus-visible,
 /* Connected tab strip for switching between views of the same page (e.g.
    Active/Archived) - tabs sit on top of a card, the active tab merges
    seamlessly into the panel below it, like a folder tab. */
-.view-tabs { display: flex; gap: 0.3rem; margin: 1.25rem 0 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.view-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 1.25rem 0 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.view-tabs::-webkit-scrollbar { display: none; }
 .view-tab {
   padding: 0.6rem 1.35rem;
   background: rgba(255,255,255,0.5);
@@ -856,6 +884,11 @@ textarea:focus-visible,
 
 .category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
 .category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--ink); }
+
+/* Two or more filter dropdowns that belong together (e.g. Day + Linked
+   Roster) sit on the same row instead of stacking. */
+.filter-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+.filter-row .category-filter { margin: 0; }
 
 .roster-summary-row td {
   font-weight: 700;
@@ -1031,6 +1064,25 @@ textarea:focus-visible,
 .roster-action-btn-danger { color: var(--red); }
 .roster-action-btn-danger:hover { border-color: var(--red); color: var(--red); }
 
+/* Import CSV / Export CSV / Print are the same "work with a file" action
+   everywhere in the app, so they always get the same green treatment
+   regardless of which button component (.btn-secondary or
+   .roster-action-btn) they're built from. */
+.file-action-btn,
+.file-action-btn.btn-secondary,
+.file-action-btn.roster-action-btn {
+  background: #85BB65;
+  border-color: #85BB65;
+  color: #fff;
+}
+.file-action-btn:hover,
+.file-action-btn.btn-secondary:hover,
+.file-action-btn.roster-action-btn:hover {
+  background: #6fa350;
+  border-color: #6fa350;
+  color: #fff;
+}
+
 /* ---------- Manage roster page ---------- */
 
 .manage-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
@@ -1091,6 +1143,13 @@ textarea:focus-visible,
 .badge-sheet-page:last-child { page-break-after: auto; }
 
 /* ---------- Name tag design editor ---------- */
+
+/* Type dropdown + Reset/Save sit together in one toolbar row above the
+   canvas, instead of the actions being stacked at the bottom of the
+   controls column. */
+.name-tag-design-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 0.75rem 0 1.1rem; }
+.name-tag-design-toolbar .name-tag-type-select { margin: 0; }
+.name-tag-design-toolbar .name-tag-editor-actions { margin-left: auto; }
 
 .name-tag-type-select {
   padding: var(--control-padding-compact);
@@ -1203,9 +1262,30 @@ textarea:focus-visible,
 .name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
 .name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
 
-.name-tag-editor-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; }
+.name-tag-add-element { display: flex; flex-direction: column; gap: 0.6rem; }
+.name-tag-shape-picker { display: flex; gap: 0.4rem; }
+.name-tag-shape-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-shape-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-shape-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+
+/* Toolbar placement (next to the type dropdown) needs Reset/Save as a
+   compact inline row instead of the full-width stacked buttons this class
+   used when it lived at the bottom of the controls column. */
+.name-tag-editor-actions { display: flex; align-items: center; gap: 0.6rem; }
 .name-tag-editor-actions .btn-secondary,
-.name-tag-editor-actions .primary-btn { width: 100%; text-align: center; margin-top: 0; }
+.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
 .name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }

@@ -27,44 +27,6 @@
     <div class="view-tab-panel">
       <% if (tab === 'active' || tab === 'archived') { %>
         <% if (tab === 'active') { %>
-          <div class="page-actions no-print">
-            <details class="add-member-details">
-              <summary class="btn-primary-summary">+ New Roster</summary>
-              <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
-                <div class="inline-form-row">
-                  <label>
-                    Roster Title
-                    <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
-                  </label>
-                  <label>
-                    Category
-                    <select name="category">
-                      <option value="">No category</option>
-                      <% categories.forEach(function(c) { %><option value="<%= c %>"><%= c %></option><% }); %>
-                    </select>
-                  </label>
-                </div>
-
-                <label class="roster-checkbox-label">Session Dates</label>
-                <div class="date-list-wrap">
-                  <div class="date-list">
-                    <div class="date-list-row">
-                      <input type="date" name="dates" />
-                      <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
-                    </div>
-                  </div>
-                  <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
-                </div>
-
-                <label class="roster-checkbox-label">Import Member Names <span class="hint">(optional &mdash; one name per line)</span></label>
-                <input type="file" name="file" accept=".csv,.txt" />
-
-                <button type="submit" class="primary-btn">Create Roster</button>
-              </form>
-            </details>
-            <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
-          </div>
-
           <dialog id="add-category-dialog" class="member-picker-dialog">
             <form method="POST" action="/admin/rosters/categories">
               <h3>Add Category</h3>
@@ -82,14 +44,56 @@
           </dialog>
         <% } %>
 
-        <div class="category-filter no-print">
-          <label for="category-select">Filter by category</label>
-          <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
-            <option value="">All categories</option>
-            <% categories.forEach(function(c) { %>
-              <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
-            <% }); %>
-          </select>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="category-select">Filter by category</label>
+            <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
+              <option value="">All categories</option>
+              <% categories.forEach(function(c) { %>
+                <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
+              <% }); %>
+            </select>
+          </div>
+
+          <% if (tab === 'active') { %>
+            <div class="page-actions" style="margin: 0;">
+              <details class="add-member-details">
+                <summary class="btn-primary-summary">+ New Roster</summary>
+                <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
+                  <div class="inline-form-row">
+                    <label>
+                      Roster Title
+                      <input type="text" name="name" placeholder="e.g. Wednesday Youth" required />
+                    </label>
+                    <label>
+                      Category
+                      <select name="category">
+                        <option value="">No category</option>
+                        <% categories.forEach(function(c) { %><option value="<%= c %>"><%= c %></option><% }); %>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label class="roster-checkbox-label">Session Dates</label>
+                  <div class="date-list-wrap">
+                    <div class="date-list">
+                      <div class="date-list-row">
+                        <input type="date" name="dates" />
+                        <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
+                      </div>
+                    </div>
+                    <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+                  </div>
+
+                  <label class="roster-checkbox-label">Import Member Names <span class="hint">(optional &mdash; one name per line)</span></label>
+                  <input type="file" name="file" accept=".csv,.txt" />
+
+                  <button type="submit" class="primary-btn">Create Roster</button>
+                </form>
+              </details>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+            </div>
+          <% } %>
         </div>
 
         <div class="admin-card-grid">
@@ -120,22 +124,21 @@
         </div>
       <% } else if (tab === 'absence') { %>
         <div class="roster-toolbar no-print">
-          <div></div>
+          <div class="category-filter" style="margin: 0;">
+            <label for="date-select">Date</label>
+            <select id="date-select" onchange="window.location = '/admin/absence-list' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+              <option value="">All dates</option>
+              <% submissionDates.forEach(function(d) { %>
+                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+              <% }); %>
+            </select>
+          </div>
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
-            <a class="roster-action-btn" href="/admin/absence-list/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/absence-list/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 
-        <div class="category-filter no-print">
-          <label for="date-select">Date</label>
-          <select id="date-select" onchange="window.location = '/admin/absence-list' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
-            <option value="">All dates</option>
-            <% submissionDates.forEach(function(d) { %>
-              <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
-            <% }); %>
-          </select>
-        </div>
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table">
             <thead>
@@ -160,22 +163,21 @@
         </div>
       <% } else if (tab === 'checkinout') { %>
         <div class="roster-toolbar no-print">
-          <div></div>
+          <div class="category-filter" style="margin: 0;">
+            <label for="date-select">Date</label>
+            <select id="date-select" onchange="window.location = '/admin/checkinout-log' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
+              <option value="">All dates</option>
+              <% dates.forEach(function(d) { %>
+                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+              <% }); %>
+            </select>
+          </div>
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
-            <a class="roster-action-btn" href="/admin/checkinout-log/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/checkinout-log/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export CSV</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 
-        <div class="category-filter no-print">
-          <label for="date-select">Date</label>
-          <select id="date-select" onchange="window.location = '/admin/checkinout-log' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
-            <option value="">All dates</option>
-            <% dates.forEach(function(d) { %>
-              <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
-            <% }); %>
-          </select>
-        </div>
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table">
             <thead>

@@ -6,7 +6,7 @@
   </a>
   <nav id="admin-nav-links">
     <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
-    <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
+    <a href="/admin/rosters" data-match="/admin/absence-list,/admin/checkinout-log"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
     <a href="/admin/volunteers" data-match="/admin/setup"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
     <a href="/admin/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tags</a>
     <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
@@ -34,8 +34,8 @@
   </div>
   <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
     <option value="/admin">Home</option>
-    <option value="/admin/rosters">Attendance</option>
-    <option value="/admin/volunteers">Volunteers</option>
+    <option value="/admin/rosters" data-match="/admin/absence-list,/admin/checkinout-log">Attendance</option>
+    <option value="/admin/volunteers" data-match="/admin/setup">Volunteers</option>
     <option value="/admin/name-tag">Name Tags</option>
     <option value="/admin/members">Members</option>
     <option value="/admin/settings">Settings</option>

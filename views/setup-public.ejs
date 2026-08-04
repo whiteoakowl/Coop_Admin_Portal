@@ -4,9 +4,12 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body class="kiosk" data-idle-redirect="20000">
-  <a class="kiosk-home" href="/">&larr; Home</a>
-  <img class="kiosk-logo" src="/img/logo.png" alt="" />
-  <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+  <%- include('partials/icon-sprite') %>
+  <a class="kiosk-home" href="/"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+  <div class="kiosk-header">
+    <img class="kiosk-logo" src="/img/logo.png" alt="" />
+    <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+  </div>
 
   <% if (teams.length === 0) { %>
     <div class="kiosk-wrap">

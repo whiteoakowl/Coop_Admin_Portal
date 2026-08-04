@@ -25,26 +25,28 @@
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'floater') { %>
-        <div class="category-filter no-print">
-          <label for="day-select">Day</label>
-          <select
-            id="day-select"
-            onchange="window.location = '/admin/volunteers/' + this.value + '/manage'"
-          >
-            <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-            <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-          </select>
-        </div>
+        <div class="filter-row no-print">
+          <div class="category-filter">
+            <label for="day-select">Day</label>
+            <select
+              id="day-select"
+              onchange="window.location = '/admin/volunteers/' + this.value + '/manage'"
+            >
+              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
 
-        <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter no-print">
-          <label for="rosterId-select">Linked Roster</label>
-          <select id="rosterId-select" name="rosterId" onchange="this.form.submit()">
-            <option value="">No roster</option>
-            <% rosters.forEach(function(r) { %>
-              <option value="<%= r.id %>" <%= roster && roster.id === r.id ? 'selected' : '' %>><%= r.name %></option>
-            <% }); %>
-          </select>
-        </form>
+          <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter">
+            <label for="rosterId-select">Linked Roster</label>
+            <select id="rosterId-select" name="rosterId" onchange="this.form.submit()">
+              <option value="">No roster</option>
+              <% rosters.forEach(function(r) { %>
+                <option value="<%= r.id %>" <%= roster && roster.id === r.id ? 'selected' : '' %>><%= r.name %></option>
+              <% }); %>
+            </select>
+          </form>
+        </div>
 
         <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
 
@@ -89,7 +91,7 @@
             <h2>Members</h2>
             <div class="quick-add-row">
               <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-              <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
+              <button type="button" class="btn-secondary file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
             </div>
 
             <dialog id="add-member-dialog" class="member-picker-dialog">
@@ -170,8 +172,8 @@
             <h2><%= dayLabel %> Floater Assignments Chart</h2>
             <div class="roster-btn-row no-print">
               <span id="volunteer-save-status" class="volunteer-save-status"></span>
-              <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
-              <a class="roster-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export CSV</a>
+              <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export CSV</a>
+              <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
             </div>
           </div>
           <% if (dates.length === 0) { %>
@@ -218,23 +220,21 @@
         </div>
       <% } else { %>
         <div class="roster-toolbar no-print">
-          <div></div>
+          <div class="category-filter" style="margin: 0;">
+            <label for="day-select">Day</label>
+            <select
+              id="day-select"
+              onchange="window.location = '/admin/setup/' + this.value + '/manage'"
+            >
+              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
-            <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
-            <a class="roster-action-btn" href="/admin/setup/<%= day %>/export.csv">Export CSV</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export CSV</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
-        </div>
-
-        <div class="category-filter no-print">
-          <label for="day-select">Day</label>
-          <select
-            id="day-select"
-            onchange="window.location = '/admin/setup/' + this.value + '/manage'"
-          >
-            <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-            <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-          </select>
         </div>
 
         <dialog id="new-team-dialog" class="member-picker-dialog">

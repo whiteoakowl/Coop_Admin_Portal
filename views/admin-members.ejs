@@ -22,21 +22,22 @@
       <div class="alert alert-success"><%= notice %></div>
     <% } %>
 
-    <div class="quick-add-row no-print">
-      <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
-      <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
-      <button type="button" class="btn-secondary" onclick="window.print()">Print</button>
-      <a class="btn-secondary" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export CSV</a>
-    </div>
-
-    <div class="category-filter no-print">
-      <label for="type-select">Filter by type</label>
-      <select id="type-select" onchange="window.location = '/admin/members' + (this.value ? '?type=' + this.value : '')">
-        <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
-        <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-        <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-        <option value="admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
-      </select>
+    <div class="roster-toolbar no-print">
+      <div class="category-filter" style="margin: 0;">
+        <label for="type-select">Filter by type</label>
+        <select id="type-select" onchange="window.location = '/admin/members' + (this.value ? '?type=' + this.value : '')">
+          <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
+          <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+        </select>
+      </div>
+      <div class="quick-add-row" style="margin: 0;">
+        <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
+        <button type="button" class="btn-secondary file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
+        <a class="btn-secondary file-action-btn" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export CSV</a>
+        <button type="button" class="btn-secondary file-action-btn" onclick="window.print()">Print</button>
+      </div>
     </div>
 
     <dialog id="import-dialog" class="member-picker-dialog">

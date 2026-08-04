@@ -4,10 +4,13 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body class="public-page">
+  <%- include('partials/icon-sprite') %>
   <main class="form-wrap">
-    <a href="/" class="kiosk-home">&larr; Home</a>
-    <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
-    <h1>Absence/Late Form</h1>
+    <a href="/" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+    <div class="kiosk-header">
+      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1>Absence/Late Form</h1>
+    </div>
 
     <% if (result) { %>
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
