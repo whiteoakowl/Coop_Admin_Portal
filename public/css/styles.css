@@ -1275,6 +1275,8 @@ textarea:focus-visible,
   background: var(--surface);
 }
 .volunteer-cell-input:focus { border-color: var(--brand); outline: none; }
+.volunteer-cell-input[data-field="position"] { width: 30ch; }
+.volunteer-cell-input[data-field="room"] { width: 15ch; }
 
 /* Hour Sections / Session Dates / Members sit as three equal cards in a
    row on the Floater Assignments manage tab, instead of one long stacked
@@ -1324,7 +1326,10 @@ textarea:focus-visible,
 
 .volunteer-public-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* auto-fill (not auto-fit) keeps empty tracks around instead of
+     collapsing them, so a lone card stays a normal card width instead of
+     stretching to fill the whole row. */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.25rem;
   width: 100%;
   max-width: 1100px;
