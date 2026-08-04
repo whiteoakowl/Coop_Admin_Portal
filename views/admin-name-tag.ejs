@@ -40,14 +40,13 @@
             </div>
 
             <div class="name-tag-editor-controls">
-              <select class="name-tag-tool-select" id="name-tag-tool-select">
-                <option value="">Choose a tool&hellip;</option>
-                <option value="add-field">Add Field</option>
-                <option value="add-shape">Add Shape</option>
-                <option value="add-image">Add Image</option>
-                <option value="add-barcode">Add Barcode</option>
-                <option value="background">Change Background</option>
-              </select>
+              <div class="name-tag-tool-icons" id="name-tag-tool-icons">
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-field" aria-label="Add Field" title="Add Field"><svg class="icon"><use href="#icon-type"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-shape" aria-label="Add Shape" title="Add Shape"><svg class="icon"><use href="#icon-square"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-image" aria-label="Add Image" title="Add Image"><svg class="icon"><use href="#icon-image"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-barcode" aria-label="Add Barcode" title="Add Barcode"><svg class="icon"><use href="#icon-barcode"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="background" aria-label="Change Background" title="Change Background"><svg class="icon"><use href="#icon-palette"/></svg></button>
+              </div>
               <div class="name-tag-tool-panel" id="name-tag-tool-panel"></div>
 
               <div class="name-tag-properties" id="name-tag-properties"></div>
@@ -72,6 +71,10 @@
             <label class="checkbox-option name-tag-select-all">
               <input type="checkbox" id="name-tag-select-all-checkbox" />
               Select All Shown
+            </label>
+            <label class="checkbox-option name-tag-select-none">
+              <input type="checkbox" id="name-tag-select-none-checkbox" />
+              Select None Shown
             </label>
           </div>
           <div class="member-picker-list name-tag-bulk-list" id="name-tag-bulk-list">

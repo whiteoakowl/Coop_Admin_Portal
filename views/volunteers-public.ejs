@@ -15,24 +15,26 @@
       </div>
     </div>
   <% } else { %>
-    <div class="volunteer-public-list">
+    <div class="volunteer-public-grid">
       <% grid.sections.forEach(function(section) { %>
         <% if (section.members.length > 0) { %>
-          <h2 class="volunteer-public-section"><%= section.label %></h2>
-          <table class="volunteer-public-table">
-            <thead>
-              <tr><th>Name</th><th>Volunteer Position</th><th>Location</th></tr>
-            </thead>
-            <tbody>
-              <% section.members.forEach(function(row) { %>
-                <tr>
-                  <td><%= row.member.name %></td>
-                  <td><% if (row.cells[0].position) { %><span class="volunteer-bubble volunteer-bubble-position"><%= row.cells[0].position %></span><% } %></td>
-                  <td><% if (row.cells[0].room) { %><span class="volunteer-bubble volunteer-bubble-room"><%= row.cells[0].room %></span><% } %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+          <div class="volunteer-public-card">
+            <h2 class="volunteer-public-section"><%= section.label %></h2>
+            <table class="volunteer-public-table">
+              <thead>
+                <tr><th>Name</th><th>Volunteer Position</th><th>Location</th></tr>
+              </thead>
+              <tbody>
+                <% section.members.forEach(function(row) { %>
+                  <tr>
+                    <td><%= row.member.name %></td>
+                    <td><% if (row.cells[0].position) { %><span class="volunteer-bubble volunteer-bubble-position"><%= row.cells[0].position %></span><% } %></td>
+                    <td><% if (row.cells[0].room) { %><span class="volunteer-bubble volunteer-bubble-room"><%= row.cells[0].room %></span><% } %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
         <% } %>
       <% }); %>
     </div>

@@ -24,18 +24,18 @@
       <a class="view-tab<%= tab === 'setup' ? ' active' : '' %>" href="/admin/setup/<%= day %>/manage">Setup/Cleanup Teams</a>
     </div>
     <div class="view-tab-panel">
-      <div class="category-filter no-print">
-        <label for="day-select">Day</label>
-        <select
-          id="day-select"
-          onchange="window.location = '<%= tab === 'setup' ? '/admin/setup/' : '/admin/volunteers/' %>' + this.value + '/manage'"
-        >
-          <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-          <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-        </select>
-      </div>
-
       <% if (tab === 'floater') { %>
+        <div class="category-filter no-print">
+          <label for="day-select">Day</label>
+          <select
+            id="day-select"
+            onchange="window.location = '/admin/volunteers/' + this.value + '/manage'"
+          >
+            <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </select>
+        </div>
+
         <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter no-print">
           <label for="rosterId-select">Linked Roster</label>
           <select id="rosterId-select" name="rosterId" onchange="this.form.submit()">
@@ -89,7 +89,7 @@
             <h2>Members</h2>
             <div class="quick-add-row">
               <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-              <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
             </div>
 
             <dialog id="add-member-dialog" class="member-picker-dialog">
@@ -118,7 +118,7 @@
 
             <dialog id="import-dialog" class="member-picker-dialog">
               <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
-                <h3>Import from File</h3>
+                <h3>Import CSV File</h3>
                 <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
                 <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
                 <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
@@ -224,6 +224,17 @@
             <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
             <a class="roster-action-btn" href="/admin/setup/<%= day %>/export.csv">Export CSV</a>
           </div>
+        </div>
+
+        <div class="category-filter no-print">
+          <label for="day-select">Day</label>
+          <select
+            id="day-select"
+            onchange="window.location = '/admin/setup/' + this.value + '/manage'"
+          >
+            <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </select>
         </div>
 
         <dialog id="new-team-dialog" class="member-picker-dialog">

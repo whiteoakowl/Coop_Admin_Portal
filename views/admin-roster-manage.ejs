@@ -71,7 +71,7 @@
       <h2>Members (<%= members.length %>)</h2>
       <div class="quick-add-row">
         <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-        <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
       </div>
 
       <dialog id="add-member-dialog" class="member-picker-dialog">
@@ -100,7 +100,7 @@
 
       <dialog id="import-dialog" class="member-picker-dialog">
         <form method="POST" action="/admin/rosters/<%= roster.id %>/import" enctype="multipart/form-data">
-          <h3>Import from File</h3>
+          <h3>Import CSV File</h3>
           <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
           <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
           <input type="file" name="file" accept=".csv,.txt,.xlsx" required />

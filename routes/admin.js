@@ -73,10 +73,14 @@ function todayStatsForType(memberType, today) {
 router.get('/', requireAdmin, (req, res) => {
   const today = todayISO();
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
+  const studentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get().c;
+  const parentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get().c;
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     memberCount,
+    studentCount,
+    parentCount,
     studentStats: todayStatsForType('student', today),
     parentStats: todayStatsForType('parent', today),
   });

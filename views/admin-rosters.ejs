@@ -96,7 +96,7 @@
           <% rosters.forEach(function(r) { %>
             <div class="admin-card roster-card">
               <div class="roster-card-top">
-                <strong><%= r.name %></strong>
+                <a class="roster-card-title-link" href="/admin/roster/<%= r.id %>"><strong><%= r.name %></strong></a>
                 <% if (r.category) { %><span class="badge-pill"><%= r.category %></span><% } %>
               </div>
               <div class="roster-card-meta">
@@ -104,13 +104,12 @@
                 <%= r.dateCount %> date<%= r.dateCount === 1 ? '' : 's' %>
               </div>
               <div class="roster-btn-row">
-                <a class="roster-action-btn" href="/admin/roster/<%= r.id %>">View Roster</a>
                 <a class="roster-action-btn" href="/admin/rosters/<%= r.id %>/manage">Manage</a>
                 <form method="POST" action="/admin/rosters/<%= r.id %>/toggle-active" class="roster-btn-form">
                   <button type="submit" class="roster-action-btn"><%= r.active ? 'Archive' : 'Unarchive' %></button>
                 </form>
-                <form method="POST" action="/admin/rosters/<%= r.id %>/delete" class="roster-btn-form" onsubmit="return confirm('Permanently delete &quot;<%= r.name %>&quot; and all its attendance history? This cannot be undone.');">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                <form method="POST" action="/admin/rosters/<%= r.id %>/delete" class="roster-btn-form-icon" onsubmit="return confirm('Permanently delete &quot;<%= r.name %>&quot; and all its attendance history? This cannot be undone.');">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= r.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
             </div>

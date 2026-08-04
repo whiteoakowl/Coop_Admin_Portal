@@ -25,13 +25,14 @@
   };
 
   let currentType = 'student';
+  let currentTool = '';
   let selectedId = null;
   let idCounter = 1;
 
   const canvas = document.getElementById('name-tag-canvas');
   const propsPanel = document.getElementById('name-tag-properties');
   const typeSelect = document.getElementById('name-tag-type-select');
-  const toolSelect = document.getElementById('name-tag-tool-select');
+  const toolIcons = document.getElementById('name-tag-tool-icons');
   const toolPanel = document.getElementById('name-tag-tool-panel');
   const saveStatus = document.getElementById('save-status');
 
@@ -389,11 +390,11 @@
     }
   }
 
-  // The toolbar is a single "Choose a tool..." dropdown - picking an option
-  // reveals just that tool's controls in the small panel below it, instead
-  // of a permanent row of five buttons.
+  // The toolbar is a row of icon buttons - clicking one reveals just that
+  // tool's controls in the small panel below it, instead of a dropdown or
+  // a permanent row of five button groups.
   function renderToolPanel() {
-    const tool = toolSelect.value;
+    const tool = currentTool;
     toolPanel.innerHTML = '';
 
     if (tool === 'add-field') {
@@ -464,7 +465,8 @@
     currentType = type;
     selectedId = null;
     typeSelect.value = type;
-    toolSelect.value = '';
+    currentTool = '';
+    if (toolIcons) toolIcons.querySelectorAll('.name-tag-tool-icon-btn').forEach((b) => b.classList.remove('active'));
     renderToolPanel();
     renderCanvas();
     renderProperties();
@@ -478,7 +480,16 @@
     canvas.style.height = BADGE_HEIGHT + 'px';
 
     typeSelect.addEventListener('change', () => switchType(typeSelect.value));
-    toolSelect.addEventListener('change', renderToolPanel);
+
+    if (toolIcons) {
+      toolIcons.querySelectorAll('.name-tag-tool-icon-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          currentTool = btn.dataset.tool;
+          toolIcons.querySelectorAll('.name-tag-tool-icon-btn').forEach((b) => b.classList.toggle('active', b === btn));
+          renderToolPanel();
+        });
+      });
+    }
 
     document.getElementById('reset-template-btn').addEventListener('click', () => {
       if (!confirm('Reset the ' + currentType + ' badge design to the default layout? This discards unsaved changes.')) return;
@@ -520,15 +531,29 @@
       });
     }
 
-    // A single "Select All Shown" checkbox toggles every currently-visible
-    // row's checkbox to match it, instead of separate Select All/Select None
-    // buttons.
+    // "Select All Shown" toggles every currently-visible row's checkbox to
+    // match it. "Select None Shown" is a one-shot action rendered as a
+    // checkbox to match: checking it clears every visible row, then resets
+    // itself back to unchecked.
     const selectAllCheckbox = document.getElementById('name-tag-select-all-checkbox');
     if (selectAllCheckbox) {
       selectAllCheckbox.addEventListener('change', () => {
         bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
           if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = selectAllCheckbox.checked;
         });
+      });
+    }
+
+    const selectNoneCheckbox = document.getElementById('name-tag-select-none-checkbox');
+    if (selectNoneCheckbox) {
+      selectNoneCheckbox.addEventListener('change', () => {
+        if (selectNoneCheckbox.checked) {
+          bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
+            if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = false;
+          });
+          if (selectAllCheckbox) selectAllCheckbox.checked = false;
+          selectNoneCheckbox.checked = false;
+        }
       });
     }
   }

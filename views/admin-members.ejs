@@ -24,7 +24,7 @@
 
     <div class="quick-add-row no-print">
       <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
-      <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
+      <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import CSV File</button>
       <button type="button" class="btn-secondary" onclick="window.print()">Print</button>
       <a class="btn-secondary" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export CSV</a>
     </div>
@@ -41,7 +41,7 @@
 
     <dialog id="import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
-        <h3>Import from File</h3>
+        <h3>Import CSV File</h3>
         <p class="hint">Upload a .csv, .txt, or .xlsx file with the columns below.</p>
         <a class="btn-secondary import-sample-link" href="/admin/members/import-template.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
