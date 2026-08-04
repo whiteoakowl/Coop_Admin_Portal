@@ -43,41 +43,26 @@
           </tbody>
         </table>
       </div>
-      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add" class="date-add-form">
-        <div class="date-list-wrap">
-          <div class="date-list">
-            <div class="date-list-row">
-              <input type="date" name="dates" />
-              <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
-            </div>
-          </div>
-          <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
-        </div>
-        <button type="submit" class="btn-secondary">Add Dates</button>
+      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add" class="volunteer-date-add-form">
+        <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
       </form>
     </div>
 
     <div class="manage-section">
       <h2>Members</h2>
       <div class="quick-add-row">
-        <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data" class="volunteer-add-form">
-          <select name="sectionId" required>
-            <% sections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }); %>
-          </select>
+        <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data" class="inline-form-flat">
           <input type="file" name="file" accept=".csv,.txt" required />
-          <button type="submit" class="btn-secondary">Import from File</button>
+          <button type="submit">Import from File</button>
         </form>
-        <form method="POST" action="/admin/volunteers/<%= day %>/add-member" class="volunteer-add-form">
-          <select name="sectionId" required>
-            <% sections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }); %>
-          </select>
+        <form method="POST" action="/admin/volunteers/<%= day %>/add-member" class="inline-form-flat">
           <select name="memberId" required>
             <option value="">Add existing member&hellip;</option>
             <% availableMembers.forEach(function(m) { %>
               <option value="<%= m.id %>"><%= m.name %></option>
             <% }); %>
           </select>
-          <button type="submit" class="btn-secondary">Add</button>
+          <button type="submit">Add</button>
         </form>
       </div>
 
@@ -132,12 +117,12 @@
                 <tr>
                   <th class="roster-name-col" rowspan="2">Name</th>
                   <% grid.dateLabels.forEach(function(label) { %>
-                    <th colspan="2"><%= label %></th>
+                    <th class="volunteer-chart-divider" colspan="2"><%= label %></th>
                   <% }); %>
                 </tr>
                 <tr>
                   <% grid.dates.forEach(function() { %>
-                    <th>Position</th><th>Room</th>
+                    <th class="volunteer-chart-divider">Position</th><th>Room</th>
                   <% }); %>
                 </tr>
               </thead>
@@ -151,7 +136,7 @@
                       <tr>
                         <td class="roster-name-col"><%= row.member.name %></td>
                         <% row.cells.forEach(function(cell) { %>
-                          <td><input type="text" class="volunteer-cell-input" name="position:<%= row.member.id %>:<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" /></td>
+                          <td class="volunteer-chart-divider"><input type="text" class="volunteer-cell-input" name="position:<%= row.member.id %>:<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" /></td>
                           <td><input type="text" class="volunteer-cell-input" name="room:<%= row.member.id %>:<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" /></td>
                         <% }); %>
                       </tr>
@@ -166,6 +151,5 @@
       <% } %>
     </div>
   </main>
-  <script src="/js/date-list.js"></script>
 </body>
 </html>

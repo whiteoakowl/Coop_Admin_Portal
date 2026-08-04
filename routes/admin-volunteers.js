@@ -112,11 +112,19 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, (re
   res.redirect(`/admin/volunteers/${day}/manage?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
 });
 
+// New additions default into the first hour section; admins reassign from
+// the members table's own section picker, so the quick-add bars don't need
+// their own section dropdown.
+function firstSectionId(listId) {
+  const first = sectionsForList(listId)[0];
+  return first ? first.id : null;
+}
+
 router.post('/volunteers/:day/add-member', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const memberId = parseInt(req.body.memberId, 10);
-  const sectionId = parseInt(req.body.sectionId, 10);
+  const sectionId = firstSectionId(list.id);
   if (memberId && sectionId) {
     db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)').run(
       list.id,
@@ -130,12 +138,9 @@ router.post('/volunteers/:day/add-member', requireAdmin, requireDay, (req, res) 
 router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
-  const sectionId = parseInt(req.body.sectionId, 10);
+  const sectionId = firstSectionId(list.id);
   if (!req.file) {
     return res.redirect(`/admin/volunteers/${day}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
-  }
-  if (!sectionId) {
-    return res.redirect(`/admin/volunteers/${day}/manage?error=` + encodeURIComponent('Pick a section for the imported names.'));
   }
   const names = parseNamesFile(req.file.buffer);
   const linkMember = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
