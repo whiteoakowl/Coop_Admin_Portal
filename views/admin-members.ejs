@@ -26,12 +26,24 @@
       <a class="btn-secondary" href="/admin/members/new">+ Add Member</a>
       <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
       <button type="button" class="btn-secondary" onclick="window.print()">Print</button>
+      <a class="btn-secondary" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export CSV</a>
+    </div>
+
+    <div class="category-filter no-print">
+      <label for="type-select">Filter by type</label>
+      <select id="type-select" onchange="window.location = '/admin/members' + (this.value ? '?type=' + this.value : '')">
+        <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
+        <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+        <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+        <option value="admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+      </select>
     </div>
 
     <dialog id="import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
         <h3>Import from File</h3>
-        <p class="hint">Upload a .csv, .txt, or .xlsx file. Not sure of the format? <a href="/admin/members/import-template.xlsx">Download an example spreadsheet</a>.</p>
+        <p class="hint">Upload a .csv, .txt, or .xlsx file with the columns below.</p>
+        <a class="btn-secondary import-sample-link" href="/admin/members/import-template.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

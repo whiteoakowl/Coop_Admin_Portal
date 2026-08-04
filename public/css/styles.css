@@ -454,7 +454,7 @@ textarea:focus-visible,
   color: var(--ink);
   font-weight: 700;
 }
-.admin-sidebar .brand img { height: 64px; width: 64px; border-radius: 50%; flex-shrink: 0; }
+.admin-sidebar .brand img { height: 112px; width: 112px; border-radius: 50%; flex-shrink: 0; }
 .admin-mobile-topbar .brand img { height: 28px; width: 28px; border-radius: 50%; flex-shrink: 0; }
 
 .admin-sidebar nav { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -498,7 +498,7 @@ textarea:focus-visible,
   gap: 0.65rem;
   width: 100%;
   color: var(--ink);
-  background: none;
+  background: rgba(28, 37, 48, 0.14);
   border: none;
   font-family: inherit;
   font-size: 0.95rem;
@@ -510,7 +510,7 @@ textarea:focus-visible,
   transition: background-color 0.15s ease;
 }
 .admin-sidebar-bottom a:hover,
-.admin-sidebar-bottom button:hover { background: rgba(255,255,255,0.4); }
+.admin-sidebar-bottom button:hover { background: rgba(28, 37, 48, 0.24); }
 
 .admin-nav-right { display: flex; align-items: center; gap: 0.3rem; }
 .admin-nav-right-link {
@@ -652,7 +652,7 @@ textarea:focus-visible,
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
 .admin-card {
-  background: var(--surface);
+  background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
@@ -805,7 +805,7 @@ textarea:focus-visible,
 /* Connected tab strip for switching between views of the same page (e.g.
    Active/Archived) - tabs sit on top of a card, the active tab merges
    seamlessly into the panel below it, like a folder tab. */
-.view-tabs { display: flex; gap: 0.3rem; margin: 1.25rem 0 0; }
+.view-tabs { display: flex; gap: 0.3rem; margin: 1.25rem 0 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .view-tab {
   padding: 0.6rem 1.35rem;
   background: rgba(255,255,255,0.5);
@@ -817,6 +817,7 @@ textarea:focus-visible,
   color: var(--ink);
   position: relative;
   top: 1px;
+  flex-shrink: 0;
   transition: background-color 0.15s ease;
 }
 .view-tab:hover { background: rgba(255,255,255,0.75); }
@@ -1007,9 +1008,13 @@ textarea:focus-visible,
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
 .roster-action-btn {
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 5.5rem;
   text-align: center;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1038,6 +1043,10 @@ textarea:focus-visible,
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 
 /* ---------- Settings ---------- */
+
+.settings-account-grid { display: flex; gap: 2.5rem; flex-wrap: wrap; }
+.settings-account-grid .stack-form-narrow { flex: 1 1 260px; }
+.settings-account-grid h3 { margin-top: 0; }
 
 .link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
@@ -1250,7 +1259,7 @@ textarea:focus-visible,
   .volunteer-manage-grid { grid-template-columns: 1fr; }
 }
 .volunteer-manage-card {
-  background: var(--surface);
+  background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
@@ -1335,7 +1344,7 @@ textarea:focus-visible,
 }
 
 .setup-team-card {
-  background: var(--surface);
+  background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
@@ -1345,9 +1354,9 @@ textarea:focus-visible,
 .setup-team-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .setup-team-edit-form { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 220px; }
 .setup-team-title-input { font-size: 1.1rem; font-weight: 700; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
-.setup-team-title-input:focus { border-color: var(--border); background: #f8fafc; }
+.setup-team-title-input:focus { border-color: var(--border); background: var(--surface); }
 .setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
-.setup-team-desc-input:focus { border-color: var(--border); background: #f8fafc; }
+.setup-team-desc-input:focus { border-color: var(--border); background: var(--surface); }
 
 .setup-public-grid {
   display: grid;
@@ -1429,6 +1438,7 @@ textarea:focus-visible,
 .member-picker-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .member-picker-dialog h3 { margin: 0 0 0.75rem; }
 .member-picker-dialog .hint { margin: 0 0 0.5rem; }
+.import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"] {
   width: 100%;

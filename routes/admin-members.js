@@ -84,26 +84,56 @@ function activeParents(excludeId) {
     .all(excludeId || 0);
 }
 
-router.get('/members', requireAdmin, (req, res) => {
-  const members = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
+function membersWithDetails(typeFilter) {
+  const allMembers = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
   const parentNames = {};
-  for (const m of members) parentNames[m.id] = m.name;
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
-  const withRosters = members.map((m) => ({
+  for (const m of allMembers) parentNames[m.id] = m.name;
+  const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
+  return members.map((m) => ({
     ...m,
     rosters: rostersForMember(m.id),
     parentName: m.parent_id ? parentNames[m.parent_id] || null : null,
+  }));
+}
+
+router.get('/members', requireAdmin, (req, res) => {
+  const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
+  const withRosters = membersWithDetails(typeFilter).map((m) => ({
+    ...m,
     badgeLayout: templates[m.member_type] || templates.student,
     badgeData: badgeDataForMember(m),
   }));
   res.render('admin-members', {
     title: 'Members',
     members: withRosters,
+    typeFilter,
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.get('/members/export.csv', requireAdmin, (req, res) => {
+  const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const members = membersWithDetails(typeFilter);
+
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
+  const header = ['Name', 'Type', 'Parent', 'Rosters'];
+  const lines = members.map((m) =>
+    [
+      `"${m.name.replace(/"/g, '""')}"`,
+      typeLabel(m.member_type),
+      m.parentName ? `"${m.parentName.replace(/"/g, '""')}"` : '',
+      `"${m.rosters.map((r) => r.name).join('; ').replace(/"/g, '""')}"`,
+    ].join(',')
+  );
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="members${typeFilter ? '-' + typeFilter : ''}.csv"`);
+  res.send(csv);
 });
 
 const MEMBER_TYPES = ['student', 'parent', 'admin'];

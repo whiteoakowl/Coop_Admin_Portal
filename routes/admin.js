@@ -94,13 +94,13 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['username', 'password', 'quicklinks'];
+const SETTINGS_TABS = ['account', 'quicklinks'];
 
 function renderSettings(req, res, error, success, activeTab) {
   res.render('admin-settings', {
     title: 'Settings',
     username: req.session.username,
-    activeTab: SETTINGS_TABS.includes(activeTab) ? activeTab : 'username',
+    activeTab: SETTINGS_TABS.includes(activeTab) ? activeTab : 'account',
     error,
     success,
   });
@@ -113,14 +113,14 @@ router.get('/settings', requireAdmin, (req, res) => {
 router.post('/settings/username', requireAdmin, (req, res) => {
   const newUsername = (req.body.newUsername || '').trim();
 
-  if (!newUsername) return renderSettings(req, res, 'New username is required.', null, 'username');
+  if (!newUsername) return renderSettings(req, res, 'New username is required.', null, 'account');
 
   const taken = db.prepare('SELECT id FROM admins WHERE username = ? AND id != ?').get(newUsername, req.session.adminId);
-  if (taken) return renderSettings(req, res, 'That username is already in use.', null, 'username');
+  if (taken) return renderSettings(req, res, 'That username is already in use.', null, 'account');
 
   db.prepare('UPDATE admins SET username = ? WHERE id = ?').run(newUsername, req.session.adminId);
   req.session.username = newUsername;
-  renderSettings(req, res, null, 'Username updated.', 'username');
+  renderSettings(req, res, null, 'Username updated.', 'account');
 });
 
 router.post('/settings/password', requireAdmin, (req, res) => {
@@ -128,15 +128,15 @@ router.post('/settings/password', requireAdmin, (req, res) => {
   const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.session.adminId);
 
   if (!admin || !bcrypt.compareSync(currentPassword || '', admin.password_hash)) {
-    return renderSettings(req, res, 'Current password is incorrect.', null, 'password');
+    return renderSettings(req, res, 'Current password is incorrect.', null, 'account');
   }
   if (!newPassword || newPassword.length < 8) {
-    return renderSettings(req, res, 'New password must be at least 8 characters.', null, 'password');
+    return renderSettings(req, res, 'New password must be at least 8 characters.', null, 'account');
   }
 
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
-  renderSettings(req, res, null, 'Password updated.', 'password');
+  renderSettings(req, res, null, 'Password updated.', 'account');
 });
 
 module.exports = router;

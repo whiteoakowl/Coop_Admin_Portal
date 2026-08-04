@@ -27,10 +27,9 @@ const uploadDesignImage = multer({
   fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
 });
 
-router.get('/name-tag', requireAdmin, (req, res) => {
-  const dateFilter = req.query.date || '';
-  const showArchived = req.query.archived === '1';
+const NAME_TAG_TABS = ['design', 'print', 'requests', 'archived'];
 
+function nameTagSubmissions(showArchived, dateFilter) {
   let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
              n.description AS description, n.created_at AS createdAt
              FROM name_tag_requests n
@@ -43,17 +42,22 @@ router.get('/name-tag', requireAdmin, (req, res) => {
   }
   sql += ' ORDER BY n.created_at DESC';
 
-  const submissions = db
-    .prepare(sql)
-    .all(...params)
-    .map((r) => ({
-      id: r.id,
-      timestamp: formatTimestamp(r.createdAt),
-      memberName: r.memberName,
-      requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
-      dayLabel: DAY_LABELS[r.day] || r.day,
-      description: r.description || '—',
-    }));
+  return db.prepare(sql).all(...params);
+}
+
+router.get('/name-tag', requireAdmin, (req, res) => {
+  const tab = NAME_TAG_TABS.includes(req.query.tab) ? req.query.tab : 'design';
+  const showArchived = tab === 'archived';
+  const dateFilter = req.query.date || '';
+
+  const submissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+    id: r.id,
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
 
   const dates = db
     .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
@@ -66,6 +70,7 @@ router.get('/name-tag', requireAdmin, (req, res) => {
 
   res.render('admin-name-tag', {
     title: 'Name Tags',
+    tab,
     submissions,
     dates,
     dateFilter,
@@ -79,16 +84,38 @@ router.get('/name-tag', requireAdmin, (req, res) => {
   });
 });
 
+router.get('/name-tag/requests/export.csv', requireAdmin, (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const submissions = nameTagSubmissions(showArchived, dateFilter);
+
+  const header = ['Submitted', 'Name', 'Request', 'Day', 'Description'];
+  const lines = submissions.map((r) =>
+    [
+      formatTimestamp(r.createdAt),
+      `"${r.memberName.replace(/"/g, '""')}"`,
+      REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+      DAY_LABELS[r.day] || r.day,
+      `"${(r.description || '').replace(/"/g, '""')}"`,
+    ].join(',')
+  );
+
+  const csv = [header.join(','), ...lines].join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="name-tag-${showArchived ? 'archived' : 'requests'}.csv"`);
+  res.send(csv);
+});
+
 router.post('/name-tag/:id/archive', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
-  res.redirect('/admin/name-tag');
+  res.redirect('/admin/name-tag?tab=requests');
 });
 
 router.post('/name-tag/:id/unarchive', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
-  res.redirect('/admin/name-tag?archived=1');
+  res.redirect('/admin/name-tag?tab=archived');
 });
 
 const NAME_TAG_TYPES = ['student', 'parent', 'admin'];

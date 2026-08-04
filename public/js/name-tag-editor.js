@@ -35,9 +35,6 @@
   const toolPanel = document.getElementById('name-tag-tool-panel');
   const saveStatus = document.getElementById('save-status');
 
-  canvas.style.width = BADGE_WIDTH + 'px';
-  canvas.style.height = BADGE_HEIGHT + 'px';
-
   function currentTemplate() {
     return layouts[currentType];
   }
@@ -474,36 +471,43 @@
     saveStatus.textContent = '';
   }
 
-  typeSelect.addEventListener('change', () => switchType(typeSelect.value));
-  toolSelect.addEventListener('change', renderToolPanel);
+  // The design editor's canvas/tool-select/etc. only exist on the Design
+  // tab - Print/Requests/Archived render a different tab panel entirely.
+  if (canvas) {
+    canvas.style.width = BADGE_WIDTH + 'px';
+    canvas.style.height = BADGE_HEIGHT + 'px';
 
-  document.getElementById('reset-template-btn').addEventListener('click', () => {
-    if (!confirm('Reset the ' + currentType + ' badge design to the default layout? This discards unsaved changes.')) return;
-    layouts[currentType] = cloneLayout(DEFAULT_LAYOUTS[currentType]);
-    selectedId = null;
-    renderCanvas();
-    renderProperties();
-    markUnsaved();
-  });
+    typeSelect.addEventListener('change', () => switchType(typeSelect.value));
+    toolSelect.addEventListener('change', renderToolPanel);
 
-  document.getElementById('save-template-btn').addEventListener('click', async () => {
-    saveStatus.textContent = 'Saving…';
-    try {
-      const res = await fetch('/admin/name-tag/template/' + currentType, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ layout: currentTemplate() }),
-      });
-      const data = await res.json();
-      saveStatus.textContent = data.ok ? 'Saved!' : 'Could not save.';
-    } catch (err) {
-      saveStatus.textContent = 'Connection error.';
-    }
-  });
+    document.getElementById('reset-template-btn').addEventListener('click', () => {
+      if (!confirm('Reset the ' + currentType + ' badge design to the default layout? This discards unsaved changes.')) return;
+      layouts[currentType] = cloneLayout(DEFAULT_LAYOUTS[currentType]);
+      selectedId = null;
+      renderCanvas();
+      renderProperties();
+      markUnsaved();
+    });
 
-  switchType('student');
+    document.getElementById('save-template-btn').addEventListener('click', async () => {
+      saveStatus.textContent = 'Saving…';
+      try {
+        const res = await fetch('/admin/name-tag/template/' + currentType, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ layout: currentTemplate() }),
+        });
+        const data = await res.json();
+        saveStatus.textContent = data.ok ? 'Saved!' : 'Could not save.';
+      } catch (err) {
+        saveStatus.textContent = 'Connection error.';
+      }
+    });
 
-  // --- Bulk print list filtering ---
+    switchType('student');
+  }
+
+  // --- Bulk print list filtering (Print tab) ---
   const bulkList = document.getElementById('name-tag-bulk-list');
   if (bulkList) {
     const filterSelect = document.getElementById('name-tag-bulk-filter-select');
@@ -516,18 +520,15 @@
       });
     }
 
-    const selectAllBtn = document.getElementById('bulk-select-all-btn');
-    if (selectAllBtn) {
-      selectAllBtn.addEventListener('click', () => {
+    // A single "Select All Shown" checkbox toggles every currently-visible
+    // row's checkbox to match it, instead of separate Select All/Select None
+    // buttons.
+    const selectAllCheckbox = document.getElementById('name-tag-select-all-checkbox');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', () => {
         bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
-          if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = true;
+          if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = selectAllCheckbox.checked;
         });
-      });
-    }
-    const selectNoneBtn = document.getElementById('bulk-select-none-btn');
-    if (selectNoneBtn) {
-      selectNoneBtn.addEventListener('click', () => {
-        bulkList.querySelectorAll('input[type="checkbox"]').forEach((cb) => (cb.checked = false));
       });
     }
   }
