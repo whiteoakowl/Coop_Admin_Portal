@@ -9,23 +9,23 @@
       <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
       <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
       <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
-      <a href="/admin/absence-list"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late</a>
       <a href="/admin/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tags</a>
       <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
-      <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     </nav>
     <select class="admin-nav-select" id="admin-nav-select" aria-label="Navigate to">
       <option value="/admin">Home</option>
       <option value="/admin/rosters">Attendance</option>
       <option value="/admin/volunteers">Volunteers</option>
-      <option value="/admin/absence-list">Absence/Late</option>
       <option value="/admin/name-tag">Name Tags</option>
       <option value="/admin/members">Members</option>
       <option value="/admin/settings">Settings</option>
     </select>
-    <form method="POST" action="/admin/logout" class="logout-form">
-      <button type="submit" class="link-btn">Log out</button>
-    </form>
+    <div class="admin-nav-right">
+      <a class="admin-nav-right-link" href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
+      <form method="POST" action="/admin/logout" class="logout-form">
+        <button type="submit" class="admin-nav-right-link"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
+      </form>
+    </div>
   </div>
 </header>
 <script src="/js/admin-nav.js"></script>

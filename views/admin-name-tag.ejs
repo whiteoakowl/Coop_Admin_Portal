@@ -82,47 +82,48 @@
       </form>
     </div>
 
-    <div class="actions-btn-row" style="justify-content: space-between; margin-bottom: 0.5rem;">
-      <h2 style="margin: 0;">Name Tag/Schedule Requests<%= showArchived ? ' (Archived)' : '' %></h2>
-      <a class="btn-secondary" href="/admin/name-tag<%= showArchived ? '' : '?archived=1' %>">
-        <%= showArchived ? 'View Active' : 'View Archived' %>
-      </a>
+    <h2>Name Tag/Schedule Requests</h2>
+    <div class="view-tabs">
+      <a class="view-tab<%= !showArchived ? ' active' : '' %>" href="/admin/name-tag">Active</a>
+      <a class="view-tab<%= showArchived ? ' active' : '' %>" href="/admin/name-tag?archived=1">Archived</a>
     </div>
-    <div class="category-filter">
-      <label for="date-select">Date</label>
-      <select id="date-select" onchange="window.location = '/admin/name-tag?' + (this.value ? 'date=' + encodeURIComponent(this.value) + '&' : '') + 'archived=<%= showArchived ? 1 : 0 %>'">
-        <option value="">All dates</option>
-        <% dates.forEach(function(d) { %>
-          <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
-        <% }); %>
-      </select>
-    </div>
-
-    <div class="roster-scroll">
-      <table class="roster-table members-table condensed-table">
-        <thead>
-          <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th></th></tr>
-        </thead>
-        <tbody>
-          <% if (submissions.length === 0) { %>
-            <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
-          <% } %>
-          <% submissions.forEach(function(s) { %>
-            <tr>
-              <td><%= s.timestamp %></td>
-              <td><%= s.memberName %></td>
-              <td><%= s.requestTypeLabel %></td>
-              <td><%= s.dayLabel %></td>
-              <td><%= s.description %></td>
-              <td>
-                <form method="POST" action="/admin/name-tag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
-                  <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
-                </form>
-              </td>
-            </tr>
+    <div class="view-tab-panel">
+      <div class="category-filter">
+        <label for="date-select">Date</label>
+        <select id="date-select" onchange="window.location = '/admin/name-tag?' + (this.value ? 'date=' + encodeURIComponent(this.value) + '&' : '') + 'archived=<%= showArchived ? 1 : 0 %>'">
+          <option value="">All dates</option>
+          <% dates.forEach(function(d) { %>
+            <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
           <% }); %>
-        </tbody>
-      </table>
+        </select>
+      </div>
+
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% if (submissions.length === 0) { %>
+              <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+            <% } %>
+            <% submissions.forEach(function(s) { %>
+              <tr>
+                <td><%= s.timestamp %></td>
+                <td><%= s.memberName %></td>
+                <td><%= s.requestTypeLabel %></td>
+                <td><%= s.dayLabel %></td>
+                <td><%= s.description %></td>
+                <td>
+                  <form method="POST" action="/admin/name-tag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
+                    <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 

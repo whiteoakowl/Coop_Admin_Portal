@@ -42,9 +42,6 @@
           <label>Name
             <input type="text" name="name" value="<%= member.name %>" required />
           </label>
-          <label>Barcode <span class="hint">(defaults to name)</span>
-            <input type="text" name="barcode" value="<%= member.barcode %>" placeholder="<%= member.name || 'Defaults to name' %>" />
-          </label>
           <label>Phone
             <input type="tel" name="phone" value="<%= member.phone || '' %>" />
           </label>
@@ -99,7 +96,6 @@
 
       <div class="manage-section" id="parent-only-fields">
         <h2>Cleanup Team</h2>
-        <p class="hint">Choose Monday and/or Wednesday, then check the Setup/Cleanup team(s) this parent is on for that day - this stays in sync with the actual team charts either way.</p>
         <% if (setupTeams.length === 0) { %>
           <p class="hint">No Setup/Cleanup teams exist yet.</p>
         <% } else { %>

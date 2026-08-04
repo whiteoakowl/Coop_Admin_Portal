@@ -13,26 +13,27 @@
         <span class="stat-value"><%= memberCount %></span>
         <span class="stat-label">Active Members</span>
       </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayPresent %></span>
-        <span class="stat-label">Checked In Today</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayLate %></span>
-        <span class="stat-label">Late Today</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayAbsent %></span>
-        <span class="stat-label">Absent Today</span>
-      </div>
     </div>
 
-    <h2>Kiosk Links</h2>
-    <div class="admin-card-grid">
-      <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
-      <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
-      <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
-      <a class="admin-card" href="/name-tag" target="_blank">Name Tag Form (public link)</a>
+    <div class="dashboard-analytics-card">
+      <div class="dashboard-analytics-header">
+        <h2>Today's Attendance</h2>
+      </div>
+      <% var total = todayPresent + todayLate + todayAbsent; %>
+      <div class="stacked-bar">
+        <% if (total === 0) { %>
+          <div class="stacked-bar-seg stacked-bar-empty" style="width: 100%"></div>
+        <% } else { %>
+          <% if (todayPresent > 0) { %><div class="stacked-bar-seg stacked-bar-present" style="width: <%= (todayPresent / total * 100).toFixed(1) %>%"></div><% } %>
+          <% if (todayLate > 0) { %><div class="stacked-bar-seg stacked-bar-late" style="width: <%= (todayLate / total * 100).toFixed(1) %>%"></div><% } %>
+          <% if (todayAbsent > 0) { %><div class="stacked-bar-seg stacked-bar-absent" style="width: <%= (todayAbsent / total * 100).toFixed(1) %>%"></div><% } %>
+        <% } %>
+      </div>
+      <div class="stacked-bar-legend">
+        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-present"></span>Checked In <strong><%= todayPresent %></strong></span>
+        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-late"></span>Late <strong><%= todayLate %></strong></span>
+        <span class="stacked-bar-legend-item"><span class="stacked-bar-dot stacked-bar-dot-absent"></span>Absent <strong><%= todayAbsent %></strong></span>
+      </div>
     </div>
   </main>
 </body>

@@ -417,9 +417,35 @@ textarea:focus-visible,
 .admin-nav nav a .icon { opacity: 0.75; }
 .admin-nav nav a:hover { color: var(--brand-darker); }
 
-.logout-form { margin: 0; margin-left: auto; }
-.admin-nav .link-btn { color: var(--ink); background: none; border: none; font-size: 0.9rem; font-weight: 600; transition: color 0.15s ease; }
-.admin-nav .link-btn:hover { color: var(--brand-darker); }
+.logout-form { margin: 0; }
+
+/* Settings + Log out live in their own grey box, set apart from the main
+   nav links and pinned to the far right. */
+.admin-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  background: rgba(28, 37, 48, 0.08);
+  border-radius: 10px;
+  padding: 0.3rem;
+}
+.admin-nav-right-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0.4rem 0.65rem;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.admin-nav-right-link:hover { background: rgba(255,255,255,0.6); color: var(--brand-darker); }
 
 .admin-nav-select {
   display: none;
@@ -447,7 +473,7 @@ textarea:focus-visible,
   .admin-nav-inner { padding: 0.7rem 1.25rem; gap: 0.6rem; }
   .admin-nav-inner nav { display: none; }
   .admin-nav-select { display: block; }
-  .logout-form { margin-left: auto; }
+  .admin-nav-right { margin-left: auto; }
 }
 
 .admin-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.5rem 2rem; }
@@ -468,6 +494,40 @@ textarea:focus-visible,
 
 .stat-value { font-size: 2rem; font-weight: 700; }
 .stat-label { color: var(--muted); font-size: 0.85rem; }
+
+.dashboard-analytics-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-sm);
+  margin-top: 1.25rem;
+}
+.dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+.dashboard-analytics-header h2 { margin: 0; }
+
+.stacked-bar {
+  display: flex;
+  width: 100%;
+  height: 1.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef1f5;
+  margin-bottom: 1.1rem;
+}
+.stacked-bar-seg { height: 100%; transition: width 0.3s ease; }
+.stacked-bar-present { background: var(--green); }
+.stacked-bar-late { background: var(--yellow-solid); }
+.stacked-bar-absent { background: var(--red); }
+.stacked-bar-empty { background: #eef1f5; }
+
+.stacked-bar-legend { display: flex; gap: 1.75rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--ink); }
+.stacked-bar-legend-item { display: flex; align-items: center; gap: 0.45rem; }
+.stacked-bar-legend-item strong { font-size: 1rem; }
+.stacked-bar-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; flex-shrink: 0; }
+.stacked-bar-dot-present { background: var(--green); }
+.stacked-bar-dot-late { background: var(--yellow-solid); }
+.stacked-bar-dot-absent { background: var(--red); }
 
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
@@ -514,9 +574,6 @@ textarea:focus-visible,
 }
 .badge-pill-x:hover { opacity: 1; color: var(--red); }
 
-.member-manage-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; flex-wrap: wrap; }
-.member-manage-row-label { font-weight: 600; min-width: 90px; }
-
 .status-badge {
   display: inline-block;
   font-size: 0.75rem;
@@ -528,7 +585,7 @@ textarea:focus-visible,
 .status-badge-late { background: var(--yellow-bg); color: var(--yellow); }
 
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1rem; }
-.roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; display: block; }
+.roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-top: 0.5rem; display: block; }
 
 .checkbox-pill {
   display: flex;
@@ -555,7 +612,7 @@ textarea:focus-visible,
   gap: 0.3rem;
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--ink);
 }
 .member-form-grid input,
 .member-form-grid select,
@@ -631,6 +688,35 @@ textarea:focus-visible,
   background: var(--surface);
 }
 
+/* Connected tab strip for switching between views of the same page (e.g.
+   Active/Archived) - tabs sit on top of a card, the active tab merges
+   seamlessly into the panel below it, like a folder tab. */
+.view-tabs { display: flex; gap: 0.3rem; margin: 1.25rem 0 0; }
+.view-tab {
+  padding: 0.6rem 1.35rem;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  position: relative;
+  top: 1px;
+  transition: background-color 0.15s ease;
+}
+.view-tab:hover { background: rgba(255,255,255,0.75); }
+.view-tab.active { background: var(--surface); border-bottom: 1px solid var(--surface); }
+.view-tab-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 10px 10px 10px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+.view-tab-panel .admin-card-grid:last-child,
+.view-tab-panel .roster-scroll:last-child { margin-bottom: 0; }
+
 .roster-toolbar {
   display: flex;
   justify-content: space-between;
@@ -653,7 +739,7 @@ textarea:focus-visible,
 .date-add-form .date-list-wrap { margin: 0; flex: none; min-width: 0; }
 
 .category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
-.category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
+.category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--ink); }
 
 .roster-summary-row td {
   font-weight: 700;
@@ -759,7 +845,7 @@ textarea:focus-visible,
 
 .inline-form { margin-top: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
 .inline-form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--muted); flex: 1; min-width: 180px; }
+.inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 180px; }
 .hint { font-weight: 400; }
 
 /* A seamless text-bar-and-button unit: input/select + button joined into
@@ -902,7 +988,7 @@ textarea:focus-visible,
   gap: 0.4rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--ink);
   margin-left: auto;
 }
 .name-tag-bg-label input[type="color"] {
@@ -950,7 +1036,7 @@ textarea:focus-visible,
 }
 .name-tag-properties h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 .name-tag-prop-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
-.name-tag-prop-row label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.name-tag-prop-row label { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
 .name-tag-prop-row input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
 .name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
 .name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
