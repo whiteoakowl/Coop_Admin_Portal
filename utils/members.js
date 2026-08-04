@@ -24,4 +24,11 @@ function findOrCreateMemberByName(name) {
   return { member: { id: info.lastInsertRowid, name, barcode }, created: true };
 }
 
-module.exports = { parseNamesFile, findOrCreateMemberByName };
+// Looks up an existing active member by exact name - never creates one.
+// Used everywhere except the Members page itself, which is the only place
+// new members get added to the system.
+function findMemberByName(name) {
+  return db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name) || null;
+}
+
+module.exports = { parseNamesFile, findOrCreateMemberByName, findMemberByName };

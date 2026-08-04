@@ -65,20 +65,45 @@
     <div class="manage-section no-print">
       <h2>Members</h2>
       <div class="quick-add-row">
-        <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data" class="inline-form-flat">
-          <input type="file" name="file" accept=".csv,.txt" required />
-          <button type="submit">Import from File</button>
-        </form>
-        <form method="POST" action="/admin/volunteers/<%= day %>/add-member" class="inline-form-flat">
-          <select name="memberId" required>
-            <option value="">Add existing member&hellip;</option>
-            <% availableMembers.forEach(function(m) { %>
-              <option value="<%= m.id %>"><%= m.name %></option>
-            <% }); %>
-          </select>
-          <button type="submit">Add</button>
-        </form>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('import-dialog').showModal()">Import from File</button>
       </div>
+
+      <dialog id="add-member-dialog" class="member-picker-dialog">
+        <form method="POST" action="/admin/volunteers/<%= day %>/add-member">
+          <h3>Add Members</h3>
+          <% if (availableMembers.length === 0) { %>
+            <p class="hint">Everyone in Members is already on this list. Add new members on the <a href="/admin/members">Members page</a>.</p>
+          <% } else { %>
+            <div class="member-picker-list">
+              <% availableMembers.forEach(function(m) { %>
+                <label class="member-picker-row">
+                  <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                  <span><%= m.name %></span>
+                </label>
+              <% }); %>
+            </div>
+          <% } %>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <% if (availableMembers.length > 0) { %>
+              <button type="submit" class="primary-btn">Add Selected</button>
+            <% } %>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="import-dialog" class="member-picker-dialog">
+        <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
+          <h3>Import from File</h3>
+          <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
+          <input type="file" name="file" accept=".csv,.txt" required />
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Import</button>
+          </div>
+        </form>
+      </dialog>
 
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">

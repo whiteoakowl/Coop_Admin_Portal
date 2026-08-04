@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
-const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { parseNamesFile, findMemberByName } = require('../utils/members');
 const {
   DAYS,
   DAY_LABELS,
@@ -127,14 +127,11 @@ function firstSectionId(listId) {
 router.post('/volunteers/:day/add-member', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
-  const memberId = parseInt(req.body.memberId, 10);
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const sectionId = firstSectionId(list.id);
-  if (memberId && sectionId) {
-    db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)').run(
-      list.id,
-      memberId,
-      sectionId
-    );
+  if (sectionId) {
+    const link = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
+    for (const memberId of memberIds) link.run(list.id, memberId, sectionId);
   }
   res.redirect(`/admin/volunteers/${day}/manage`);
 });
@@ -148,17 +145,17 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   }
   const names = parseNamesFile(req.file.buffer);
   const linkMember = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
-  let created = 0;
   let added = 0;
+  let notFound = 0;
   for (const name of names) {
-    const { member, created: wasCreated } = findOrCreateMemberByName(name);
-    if (wasCreated) created++;
+    const member = findMemberByName(name);
+    if (!member) { notFound++; continue; }
     const result = linkMember.run(list.id, member.id, sectionId);
     if (result.changes > 0) added++;
   }
   res.redirect(
     `/admin/volunteers/${day}/manage?notice=` +
-      encodeURIComponent(`Imported ${names.length} name(s): ${created} new member(s), ${added} added to the list.`)
+      encodeURIComponent(`Imported ${added} member(s) added to the list` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'))
   );
 });
 

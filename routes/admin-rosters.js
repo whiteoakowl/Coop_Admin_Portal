@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
-const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { parseNamesFile, findMemberByName } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -40,15 +40,15 @@ function importNamesIntoRoster(rosterId, buffer) {
   const names = parseNamesFile(buffer);
   const linkMember = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
 
-  let created = 0;
   let linked = 0;
+  let notFound = 0;
   for (const name of names) {
-    const { member, created: wasCreated } = findOrCreateMemberByName(name);
-    if (wasCreated) created++;
+    const member = findMemberByName(name);
+    if (!member) { notFound++; continue; }
     const result = linkMember.run(rosterId, member.id);
     if (result.changes > 0) linked++;
   }
-  return { total: names.length, created, linked };
+  return { total: names.length, linked, notFound };
 }
 
 function buildRosterGridData(roster) {
@@ -202,7 +202,7 @@ router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
   let notice = `Roster "${name}" created with ${dates.length} date${dates.length === 1 ? '' : 's'}.`;
   if (req.file) {
     const result = importNamesIntoRoster(rosterId, req.file.buffer);
-    notice += ` Imported ${result.total} name(s): ${result.created} new member(s), ${result.linked} added to the roster.`;
+    notice += ` Imported ${result.linked} member(s) added to the roster` + (result.notFound ? `, ${result.notFound} name(s) not found in Members.` : '.');
   }
 
   res.redirect(`/admin/rosters/${rosterId}/manage?notice=` + encodeURIComponent(notice));
@@ -291,10 +291,9 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
 
 router.post('/rosters/:id/add-member', requireAdmin, (req, res) => {
   const rosterId = parseInt(req.params.id, 10);
-  const memberId = parseInt(req.body.memberId, 10);
-  if (memberId) {
-    db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
-  }
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const link = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
+  for (const memberId of memberIds) link.run(rosterId, memberId);
   res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 
@@ -319,7 +318,7 @@ router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, re
   const result = importNamesIntoRoster(rosterId, req.file.buffer);
   res.redirect(
     `/admin/rosters/${rosterId}/manage?notice=` +
-      encodeURIComponent(`Imported ${result.total} name(s): ${result.created} new member(s) created, ${result.linked} added to this roster.`)
+      encodeURIComponent(`Imported ${result.linked} member(s) added to this roster` + (result.notFound ? `, ${result.notFound} name(s) not found in Members.` : '.'))
   );
 });
 

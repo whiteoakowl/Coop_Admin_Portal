@@ -72,10 +72,9 @@ router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, (req, 
 router.post('/setup/:day/teams/:teamId/add-member', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
-  const memberId = parseInt(req.body.memberId, 10);
-  if (memberId) {
-    db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
-  }
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const link = db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)');
+  for (const memberId of memberIds) link.run(teamId, memberId);
   res.redirect(`/admin/setup/${day}/manage`);
 });
 

@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { parseNamesFile, findOrCreateMemberByName, findMemberByName } = require('../utils/members');
 const { formatDateLabel } = require('../utils/dates');
 const { DAYS, DAY_LABELS, isValidDay, getListByDay, sectionsForList } = require('../utils/volunteers');
 
@@ -240,21 +240,10 @@ router.get('/absence-list', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/absence-list/add-person', requireAdmin, (req, res) => {
-  const name = (req.body.name || '').trim();
-  if (!name) {
-    return res.redirect('/admin/absence-list?error=' + encodeURIComponent('Name is required.'));
-  }
-  const { member } = findOrCreateMemberByName(name);
-  db.prepare('INSERT OR IGNORE INTO absence_list_members (member_id) VALUES (?)').run(member.id);
-  res.redirect('/admin/absence-list');
-});
-
 router.post('/absence-list/add-member', requireAdmin, (req, res) => {
-  const memberId = parseInt(req.body.memberId, 10);
-  if (memberId) {
-    db.prepare('INSERT OR IGNORE INTO absence_list_members (member_id) VALUES (?)').run(memberId);
-  }
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const link = db.prepare('INSERT OR IGNORE INTO absence_list_members (member_id) VALUES (?)');
+  for (const memberId of memberIds) link.run(memberId);
   res.redirect('/admin/absence-list');
 });
 
@@ -264,17 +253,17 @@ router.post('/absence-list/import', requireAdmin, upload.single('file'), (req, r
   }
   const names = parseNamesFile(req.file.buffer);
   const linkMember = db.prepare('INSERT OR IGNORE INTO absence_list_members (member_id) VALUES (?)');
-  let created = 0;
   let added = 0;
+  let notFound = 0;
   for (const name of names) {
-    const { member, created: wasCreated } = findOrCreateMemberByName(name);
-    if (wasCreated) created++;
+    const member = findMemberByName(name);
+    if (!member) { notFound++; continue; }
     const result = linkMember.run(member.id);
     if (result.changes > 0) added++;
   }
   res.redirect(
     '/admin/absence-list?notice=' +
-      encodeURIComponent(`Imported ${names.length} name(s): ${created} new member(s), ${added} added to the list.`)
+      encodeURIComponent(`Imported ${added} member(s) added to the list` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'))
   );
 });
 

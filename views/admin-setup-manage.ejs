@@ -75,15 +75,32 @@
             </span>
           <% }); %>
         </div>
-        <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/add-member" class="inline-form-flat no-print">
-          <select name="memberId" required>
-            <option value="">Add member&hellip;</option>
-            <% t.availableMembers.forEach(function(m) { %>
-              <option value="<%= m.id %>"><%= m.name %></option>
-            <% }); %>
-          </select>
-          <button type="submit">Add</button>
-        </form>
+        <div class="no-print">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog-<%= t.id %>').showModal()">+ Add Member</button>
+        </div>
+        <dialog id="add-member-dialog-<%= t.id %>" class="member-picker-dialog">
+          <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/add-member">
+            <h3>Add Members &mdash; <%= t.title %></h3>
+            <% if (t.availableMembers.length === 0) { %>
+              <p class="hint">Everyone in Members is already on this team. Add new members on the <a href="/admin/members">Members page</a>.</p>
+            <% } else { %>
+              <div class="member-picker-list">
+                <% t.availableMembers.forEach(function(m) { %>
+                  <label class="member-picker-row">
+                    <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                    <span><%= m.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            <% } %>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <% if (t.availableMembers.length > 0) { %>
+                <button type="submit" class="primary-btn">Add Selected</button>
+              <% } %>
+            </div>
+          </form>
+        </dialog>
       </div>
     <% }); %>
   </main>
