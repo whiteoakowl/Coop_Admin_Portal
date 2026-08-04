@@ -24,6 +24,22 @@
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
   --shadow-md: 0 10px 22px rgba(15,23,42,0.1);
   --shadow-lg: 0 14px 28px rgba(15,23,42,0.14);
+
+  /* Container padding scale: one value for a page-level card/panel/section,
+     one compact value for denser or smaller supporting cards. */
+  --card-padding: 1.25rem 1.5rem;
+  --card-padding-compact: 1rem 1.1rem;
+
+  /* Control (input/select/textarea/button) sizing scale. "Standard" is for
+     full-size, standalone form fields (public forms, member edit form);
+     "compact" is for inline/toolbar controls (admin action bars, table
+     row actions, dialog buttons). Every interactive control shares one
+     radius so buttons and fields always line up visually. */
+  --control-radius: 8px;
+  --control-padding: 0.65rem 0.85rem;
+  --control-font-size: 0.95rem;
+  --control-padding-compact: 0.55rem 0.8rem;
+  --control-font-size-compact: 0.9rem;
 }
 
 * { box-sizing: border-box; }
@@ -40,6 +56,7 @@ a { color: var(--brand-dark); text-decoration: none; }
 
 h1 { margin: 0 0 0.25rem; font-size: 2rem; }
 h2 { margin: 1rem 0 0.5rem; font-size: 1.15rem; }
+h3 { margin: 0 0 0.6rem; font-size: 1rem; }
 
 h1, h2, h3,
 .landing-welcome,
@@ -321,7 +338,7 @@ textarea:focus-visible,
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   margin-bottom: 1.25rem;
 }
 .form-section h2 { margin: 0 0 0.85rem; font-size: 1.05rem; }
@@ -335,11 +352,18 @@ textarea:focus-visible,
 
 .stack-form input,
 .stack-form select,
-.stack-form textarea {
-  padding: 0.7rem 0.8rem;
+.stack-form textarea,
+.member-form-grid input,
+.member-form-grid select,
+.member-form-grid textarea,
+.new-team-form input,
+.notes-dialog textarea,
+.member-picker-dialog input[type="file"],
+.member-picker-dialog input[type="text"] {
+  padding: var(--control-padding);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 1rem;
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size);
   font-family: inherit;
   background: var(--surface);
 }
@@ -363,7 +387,7 @@ textarea:focus-visible,
   color: #fff;
   border: none;
   padding: 0.85rem 1.5rem;
-  border-radius: 10px;
+  border-radius: var(--control-radius);
   font-size: 1rem;
   font-weight: 600;
   display: inline-block;
@@ -448,7 +472,7 @@ textarea:focus-visible,
   font-weight: 600;
   font-family: inherit;
   padding: 0.4rem 0.65rem;
-  border-radius: 7px;
+  border-radius: var(--control-radius);
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -527,7 +551,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: var(--card-padding-compact);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-sm);
@@ -551,7 +575,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem 1.75rem;
+  padding: var(--card-padding);
   box-shadow: var(--shadow-sm);
 }
 .dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
@@ -584,7 +608,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: var(--card-padding-compact);
   font-weight: 600;
   color: var(--ink);
   box-shadow: var(--shadow-sm);
@@ -666,14 +690,8 @@ textarea:focus-visible,
 .member-form-grid input,
 .member-form-grid select,
 .member-form-grid textarea {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-family: inherit;
   color: var(--ink);
   font-weight: 400;
-  background: var(--surface);
 }
 .member-photo-preview {
   width: 96px;
@@ -746,7 +764,7 @@ textarea:focus-visible,
   background: rgba(255,255,255,0.5);
   border: 1px solid var(--border);
   border-bottom: none;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--radius) var(--radius) 0 0;
   font-weight: 700;
   font-size: 0.9rem;
   color: var(--ink);
@@ -759,8 +777,8 @@ textarea:focus-visible,
 .view-tab-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0 10px 10px 10px;
-  padding: 1.25rem;
+  border-radius: 0 var(--radius) var(--radius) var(--radius);
+  padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
 }
 .view-tab-panel .admin-card-grid:last-child,
@@ -780,7 +798,7 @@ textarea:focus-visible,
 .date-list-row { display: flex; align-items: center; gap: 0.5rem; }
 .date-list-row input[type="date"] { width: 192px; flex: none; }
 .date-list-remove {
-  background: none; border: 1px solid var(--border); border-radius: 6px;
+  background: none; border: 1px solid var(--border); border-radius: var(--control-radius);
   width: 2.15rem; height: 2.15rem; font-size: 1.1rem; color: var(--muted); line-height: 1; flex-shrink: 0;
 }
 .date-list-remove:hover { border-color: var(--red); color: var(--red); }
@@ -815,11 +833,12 @@ textarea:focus-visible,
 .volunteer-sections-form input,
 .volunteer-date-add-form input[type="date"],
 .name-tag-bulk-filter-select,
+.name-tag-add-field select,
 .btn-secondary {
-  padding: 0.55rem 0.8rem;
+  padding: var(--control-padding-compact);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
   font-family: inherit;
   background: var(--surface);
   line-height: 1.3;
@@ -856,7 +875,7 @@ textarea:focus-visible,
   justify-content: center;
   min-width: 2rem;
   height: 1.75rem;
-  border-radius: 6px;
+  border-radius: var(--control-radius);
   font-weight: 800;
   font-size: 0.85rem;
 }
@@ -924,7 +943,7 @@ textarea:focus-visible,
 .inline-form-flat button:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
-.edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }
+.edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); width: 160px; }
 .edit-name-form input:focus { border-color: var(--border); background: #f8fafc; }
 
 /* ---------- Attendance page & roster cards ---------- */
@@ -957,7 +976,7 @@ textarea:focus-visible,
 
 .manage-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .manage-title-form { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 220px; }
-.manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .manage-title-input:focus { border-color: var(--border); background: #f8fafc; }
 
 .manage-section { margin-bottom: 1.25rem; }
@@ -974,7 +993,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   box-shadow: var(--shadow-sm);
 }
 .settings-box h2 { margin-top: 0; }
@@ -995,7 +1014,7 @@ textarea:focus-visible,
   width: min(420px, 92vw);
   border: none;
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .badge-preview-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
@@ -1017,10 +1036,10 @@ textarea:focus-visible,
 /* ---------- Name tag design editor ---------- */
 
 .name-tag-type-select {
-  padding: 0.55rem 0.8rem;
+  padding: var(--control-padding-compact);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
   font-family: inherit;
   font-weight: 600;
   background: var(--surface);
@@ -1037,7 +1056,6 @@ textarea:focus-visible,
 
 .name-tag-editor-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
 .name-tag-add-field { display: flex; gap: 0.4rem; }
-.name-tag-add-field select { padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; }
 .name-tag-upload-label { cursor: pointer; }
 .name-tag-bg-label {
   display: flex;
@@ -1090,8 +1108,8 @@ textarea:focus-visible,
 .name-tag-properties h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 .name-tag-prop-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
 .name-tag-prop-row label { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
-.name-tag-prop-row input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
-.name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
+.name-tag-prop-row input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
+.name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
 .name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
 
 .name-tag-editor-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; }
@@ -1223,7 +1241,7 @@ textarea:focus-visible,
   width: 2.25rem;
   padding: 0.3rem 0.35rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--control-radius);
   font-size: 0.75rem;
   font-family: inherit;
   background: var(--surface);
@@ -1242,7 +1260,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
 }
 .volunteer-box .roster-scroll { margin-top: 0.5rem; border: 1px solid var(--border); }
@@ -1312,21 +1330,13 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem 1.4rem;
+  padding: var(--card-padding);
   box-shadow: var(--shadow-sm);
   max-width: 360px;
   margin-bottom: 1.25rem;
 }
 .new-team-card h2 { margin-top: 0; }
 .new-team-form { display: flex; flex-direction: column; gap: 0.6rem; }
-.new-team-form input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  background: var(--surface);
-}
 .new-team-form .primary-btn { margin-top: 0.15rem; }
 
 .setup-team-grid {
@@ -1339,15 +1349,15 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
 }
 
 .setup-team-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .setup-team-edit-form { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 220px; }
-.setup-team-title-input { font-size: 1.1rem; font-weight: 700; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.setup-team-title-input { font-size: 1.1rem; font-weight: 700; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .setup-team-title-input:focus { border-color: var(--border); background: #f8fafc; }
-.setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .setup-team-desc-input:focus { border-color: var(--border); background: #f8fafc; }
 
 .setup-public-grid {
@@ -1362,7 +1372,7 @@ textarea:focus-visible,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem 1.4rem;
+  padding: var(--card-padding);
   box-shadow: var(--shadow-sm);
 }
 .setup-public-card h2 { margin: 0 0 0.4rem; font-size: 1.15rem; color: var(--brand-dark); }
@@ -1400,18 +1410,13 @@ textarea:focus-visible,
   width: min(420px, 90vw);
   border: none;
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .notes-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .notes-dialog h3 { margin: 0 0 0.75rem; }
 .notes-dialog textarea {
   width: 100%;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-family: inherit;
   resize: vertical;
 }
 .notes-dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
@@ -1429,7 +1434,7 @@ textarea:focus-visible,
   width: min(420px, 90vw);
   border: none;
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .member-picker-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
@@ -1438,11 +1443,6 @@ textarea:focus-visible,
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"] {
   width: 100%;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-family: inherit;
   margin-bottom: 0.5rem;
 }
 .member-picker-list {
@@ -1468,7 +1468,7 @@ textarea:focus-visible,
   width: min(440px, 90vw);
   border: none;
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding);
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .member-profile-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
