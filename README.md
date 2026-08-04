@@ -46,9 +46,10 @@ A SQLite database is created automatically at `data/attendance.db` on first run,
 
 | Page | URL |
 |---|---|
-| Home (Check In / Check Out; Admin is a small link top-right) | `/` |
+| Home (Check In / Check Out / Volunteers; Admin is a small link top-right) | `/` |
 | Check-In kiosk | `/kiosk/checkin` |
 | Check-Out kiosk | `/kiosk/checkout` |
+| Monday / Wednesday Volunteers (today's schedule, no login) | `/volunteers/monday`, `/volunteers/wednesday` |
 | Absence/Late Form (share this link publicly; not linked from the home page) | `/absence` |
 | Admin login | `/admin/login` |
 
@@ -58,9 +59,19 @@ A SQLite database is created automatically at `data/attendance.db` on first run,
 |---|---|
 | Dashboard | Today's stats + kiosk links |
 | Attendance | Create/manage/archive/delete rosters, view each roster's grid |
+| Volunteers | Manage the Monday and Wednesday volunteer schedules |
 | Members | The full member list (add, import, delete) |
 | Absence/Late | Who can be selected on the public Absence/Late form (separate opt-in list) |
 | Settings | Username, password, and Categories (used to organize rosters) |
+
+## Volunteers
+
+There are two fixed volunteer lists, Monday and Wednesday, managed from the **Volunteers** tab. Each list can optionally be linked to a roster so it shows on that roster's view page next to the attendance grid.
+
+- Names are grouped into 4 admin-labeled hour sections (e.g. "9-10am", "Nursery", etc. - whatever your co-op calls its shifts).
+- Session dates are chosen by the admin, just like a roster's dates, and can be added or removed any time.
+- Each volunteer's **position** and **room number** are filled in per session date - they can be different every week - either from the volunteer list's own manage page (all dates at once) or from the linked roster's view page (one date at a time, via a date dropdown above the volunteer box).
+- The public homepage has **Monday Volunteers** / **Wednesday Volunteers** buttons (no login needed) that show that day's schedule for whichever date is today, grouped by section, for a screen members can walk up to and scroll through. That screen returns to the home page automatically after 20 seconds of no interaction.
 
 ## Setting up rosters, members & the absence list
 

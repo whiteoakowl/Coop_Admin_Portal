@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle"><a href="/admin/volunteers">&larr; Volunteers</a></p>
+    <h1><%= dayLabel %> Volunteers</h1>
+    <p class="subtitle"><%= roster ? 'Linked to "' + roster.name + '"' : 'Not linked to a roster' %> &mdash; change this from the <a href="/admin/volunteers">Volunteers</a> page.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <h2>Hour Sections</h2>
+      <p class="subtitle">Labels for the 4 groups volunteer names are sorted into below.</p>
+      <form method="POST" action="/admin/volunteers/<%= day %>/sections" class="volunteer-sections-form">
+        <% sections.forEach(function(s) { %>
+          <input type="text" name="labels" value="<%= s.label %>" />
+        <% }); %>
+        <button type="submit" class="btn-secondary">Save Labels</button>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <h2>Session Dates (<%= dates.length %>)</h2>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <tbody>
+            <% if (dates.length === 0) { %>
+              <tr><td class="roster-empty">No dates yet.</td></tr>
+            <% } %>
+            <% dates.forEach(function(d) { %>
+              <tr>
+                <td><%= d.label %></td>
+                <td class="actions-cell">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room entries for this date will be deleted too.');">
+                    <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add" class="date-add-form">
+        <div class="date-list-wrap">
+          <div class="date-list">
+            <div class="date-list-row">
+              <input type="date" name="dates" />
+              <button type="button" class="date-list-remove" aria-label="Remove date">&times;</button>
+            </div>
+          </div>
+          <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
+        </div>
+        <button type="submit" class="btn-secondary">Add Dates</button>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <h2>Members</h2>
+      <div class="quick-add-row">
+        <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data" class="volunteer-add-form">
+          <select name="sectionId" required>
+            <% sections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }); %>
+          </select>
+          <input type="file" name="file" accept=".csv,.txt" required />
+          <button type="submit" class="btn-secondary">Import from File</button>
+        </form>
+        <form method="POST" action="/admin/volunteers/<%= day %>/add-member" class="volunteer-add-form">
+          <select name="sectionId" required>
+            <% sections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.label %></option><% }); %>
+          </select>
+          <select name="memberId" required>
+            <option value="">Add existing member&hellip;</option>
+            <% availableMembers.forEach(function(m) { %>
+              <option value="<%= m.id %>"><%= m.name %></option>
+            <% }); %>
+          </select>
+          <button type="submit" class="btn-secondary">Add</button>
+        </form>
+      </div>
+
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th>Name</th><th>Section</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
+            <% if (!anyMembers) { %>
+              <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+            <% } %>
+            <% grid.sections.forEach(function(section) { %>
+              <% section.members.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.member.name %></td>
+                  <td>
+                    <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= row.member.id %>/section" class="inline-block-form">
+                      <select name="sectionId" onchange="this.form.submit()">
+                        <% sections.forEach(function(s) { %>
+                          <option value="<%= s.id %>" <%= s.id === section.id ? 'selected' : '' %>><%= s.label %></option>
+                        <% }); %>
+                      </select>
+                    </form>
+                  </td>
+                  <td class="actions-cell">
+                    <form method="POST" action="/admin/volunteers/<%= day %>/remove-member/<%= row.member.id %>" class="inline-block-form">
+                      <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <h2>Positions &amp; Rooms by Date</h2>
+      <p class="subtitle">Fill in where each volunteer is working for each session date. Edit any time and save.</p>
+      <% if (dates.length === 0) { %>
+        <p class="roster-empty">Add session dates above first.</p>
+      <% } else if (!anyMembers) { %>
+        <p class="roster-empty">Add members above first.</p>
+      <% } else { %>
+        <form method="POST" action="/admin/volunteers/<%= day %>/assignments">
+          <input type="hidden" name="redirectTo" value="/admin/volunteers/<%= day %>/manage" />
+          <div class="roster-scroll">
+            <table class="roster-table roster-table-detailed volunteer-grid">
+              <thead>
+                <tr>
+                  <th class="roster-name-col" rowspan="2">Name</th>
+                  <% grid.dateLabels.forEach(function(label) { %>
+                    <th colspan="2"><%= label %></th>
+                  <% }); %>
+                </tr>
+                <tr>
+                  <% grid.dates.forEach(function() { %>
+                    <th>Position</th><th>Room</th>
+                  <% }); %>
+                </tr>
+              </thead>
+              <tbody>
+                <% grid.sections.forEach(function(section) { %>
+                  <% if (section.members.length > 0) { %>
+                    <tr class="volunteer-section-row">
+                      <td colspan="<%= grid.dates.length * 2 + 1 %>"><%= section.label %></td>
+                    </tr>
+                    <% section.members.forEach(function(row) { %>
+                      <tr>
+                        <td class="roster-name-col"><%= row.member.name %></td>
+                        <% row.cells.forEach(function(cell) { %>
+                          <td><input type="text" class="volunteer-cell-input" name="position:<%= row.member.id %>:<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" /></td>
+                          <td><input type="text" class="volunteer-cell-input" name="room:<%= row.member.id %>:<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" /></td>
+                        <% }); %>
+                      </tr>
+                    <% }); %>
+                  <% } %>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <button type="submit" class="primary-btn no-print">Save All</button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/date-list.js"></script>
+</body>
+</html>

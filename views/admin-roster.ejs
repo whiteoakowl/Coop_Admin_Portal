@@ -26,56 +26,104 @@
       <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
     </div>
 
-    <div class="roster-scroll">
-      <table class="roster-table roster-table-detailed">
-        <thead>
-          <tr>
-            <th class="roster-name-col">Name</th>
-            <% dateLabels.forEach(function(label) { %>
-              <th><%= label %></th>
-            <% }); %>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (rows.length === 0) { %>
-            <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
-          <% } %>
-          <% rows.forEach(function(row) { %>
+    <div class="roster-and-volunteers">
+      <div class="roster-scroll roster-grid-col">
+        <table class="roster-table roster-table-detailed">
+          <thead>
             <tr>
-              <td class="roster-name-col"><%= row.member.name %></td>
-              <% row.cells.forEach(function(cell) { %>
-                <td>
-                  <% if (!cell) { %>
-                    <span class="cell-tag cell-blank">&nbsp;</span>
-                  <% } else { %>
-                    <div class="cell-detailed">
-                      <span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : 'absent' %>"><%= cell.tag %></span>
-                      <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
-                      <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
-                    </div>
-                  <% } %>
-                </td>
+              <th class="roster-name-col">Name</th>
+              <% dateLabels.forEach(function(label) { %>
+                <th><%= label %></th>
               <% }); %>
             </tr>
-          <% }); %>
-        </tbody>
-        <% if (rows.length > 0) { %>
-          <tfoot>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Present</td>
-              <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
-            </tr>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Late</td>
-              <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
-            </tr>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Absent</td>
-              <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
-            </tr>
-          </tfoot>
-        <% } %>
-      </table>
+          </thead>
+          <tbody>
+            <% if (rows.length === 0) { %>
+              <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
+            <% } %>
+            <% rows.forEach(function(row) { %>
+              <tr>
+                <td class="roster-name-col"><%= row.member.name %></td>
+                <% row.cells.forEach(function(cell) { %>
+                  <td>
+                    <% if (!cell) { %>
+                      <span class="cell-tag cell-blank">&nbsp;</span>
+                    <% } else { %>
+                      <div class="cell-detailed">
+                        <span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : 'absent' %>"><%= cell.tag %></span>
+                        <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                        <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                      </div>
+                    <% } %>
+                  </td>
+                <% }); %>
+              </tr>
+            <% }); %>
+          </tbody>
+          <% if (rows.length > 0) { %>
+            <tfoot>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Present</td>
+                <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
+              </tr>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Late</td>
+                <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
+              </tr>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Absent</td>
+                <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
+              </tr>
+            </tfoot>
+          <% } %>
+        </table>
+      </div>
+
+      <% volunteerLists.forEach(function(vl) { %>
+        <div class="volunteer-box">
+          <div class="volunteer-box-header">
+            <h2><%= vl.dayLabel %> Volunteers</h2>
+            <% if (vl.dates.length > 0) { %>
+              <select class="no-print" onchange="window.location = '/admin/roster/<%= roster.id %>?volDate=' + encodeURIComponent(this.value)<% if (absenceDateFilter) { %> + '&absenceDate=<%= absenceDateFilter %>'<% } %>;">
+                <% vl.dates.forEach(function(d, i) { %>
+                  <option value="<%= d %>" <%= vl.volDateFilter === d ? 'selected' : '' %>><%= vl.dateLabels[i] %></option>
+                <% }); %>
+              </select>
+            <% } %>
+          </div>
+          <% if (vl.dates.length === 0) { %>
+            <p class="roster-empty">No session dates set for this volunteer list yet. <a href="/admin/volunteers/<%= vl.day %>/manage">Manage it</a>.</p>
+          <% } else { %>
+            <% var anyVolMembers = vl.grid.sections.some(function(s) { return s.members.length > 0; }); %>
+            <form method="POST" action="/admin/volunteers/<%= vl.day %>/assignments">
+              <input type="hidden" name="redirectTo" value="/admin/roster/<%= roster.id %>?volDate=<%= vl.volDateFilter %>" />
+              <div class="roster-scroll">
+                <table class="roster-table members-table condensed-table">
+                  <thead><tr><th>Name</th><th>Position</th><th>Room</th></tr></thead>
+                  <tbody>
+                    <% if (!anyVolMembers) { %>
+                      <tr><td colspan="3" class="roster-empty">No volunteers yet.</td></tr>
+                    <% } %>
+                    <% vl.grid.sections.forEach(function(section) { %>
+                      <% if (section.members.length > 0) { %>
+                        <tr class="volunteer-section-row"><td colspan="3"><%= section.label %></td></tr>
+                        <% section.members.forEach(function(row) { %>
+                          <tr>
+                            <td><%= row.member.name %></td>
+                            <td><input type="text" class="volunteer-cell-input" name="position:<%= row.member.id %>:<%= vl.volDateFilter %>" value="<%= row.cells[0].position %>" placeholder="Position" /></td>
+                            <td><input type="text" class="volunteer-cell-input" name="room:<%= row.member.id %>:<%= vl.volDateFilter %>" value="<%= row.cells[0].room %>" placeholder="Room" /></td>
+                          </tr>
+                        <% }); %>
+                      <% } %>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+              <% if (anyVolMembers) { %><button type="submit" class="btn-secondary no-print">Save</button><% } %>
+            </form>
+          <% } %>
+        </div>
+      <% }); %>
     </div>
 
     <h2>Absence/Late Submissions</h2>

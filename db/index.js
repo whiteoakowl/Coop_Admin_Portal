@@ -24,4 +24,15 @@ if (adminCount === 0) {
   console.log(`Seeded default admin account "${username}". Change the password after first login.`);
 }
 
+// Seed the two fixed volunteer lists (Monday/Wednesday) with 4 default
+// hour sections each, so the Volunteers admin page always has both to show.
+for (const day of ['monday', 'wednesday']) {
+  const existing = db.prepare('SELECT id FROM volunteer_lists WHERE day = ?').get(day);
+  if (existing) continue;
+  const info = db.prepare('INSERT INTO volunteer_lists (day) VALUES (?)').run(day);
+  const listId = info.lastInsertRowid;
+  const insertSection = db.prepare('INSERT INTO volunteer_sections (volunteer_list_id, position, label) VALUES (?, ?, ?)');
+  for (let i = 1; i <= 4; i++) insertSection.run(listId, i, `Hour ${i}`);
+}
+
 module.exports = db;

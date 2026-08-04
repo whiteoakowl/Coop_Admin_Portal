@@ -3,8 +3,9 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
 const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -332,12 +333,27 @@ router.get('/roster/:id', requireAdmin, (req, res) => {
   const data = buildRosterGridData(roster);
   const absenceDateFilter = data.dates.includes(req.query.absenceDate) ? req.query.absenceDate : '';
 
+  const today = todayISO();
+  const volunteerLists = getListsByRosterId(id).map((list) => {
+    const dates = datesForList(list.id);
+    const volDateFilter = dates.includes(req.query.volDate) ? req.query.volDate : dates.includes(today) ? today : dates[0] || '';
+    return {
+      day: list.day,
+      dayLabel: DAY_LABELS[list.day],
+      dates,
+      dateLabels: dates.map(formatDateLabel),
+      volDateFilter,
+      grid: volDateFilter ? buildListGrid(list.id, volDateFilter) : { sections: [], dates: [], dateLabels: [] },
+    };
+  });
+
   res.render('admin-roster', {
     title: `${roster.name} Roster`,
     roster,
     ...data,
     absenceDateFilter,
     absenceSubmissions: absenceSubmissionsForRoster(id, absenceDateFilter),
+    volunteerLists,
   });
 });
 

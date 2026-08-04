@@ -79,8 +79,53 @@ CREATE TABLE IF NOT EXISTS admins (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- There are exactly two volunteer lists, one per volunteer day, each
+-- optionally linked to a roster so it shows on that roster's view page.
+CREATE TABLE IF NOT EXISTS volunteer_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL UNIQUE CHECK(day IN ('monday','wednesday')),
+  roster_id INTEGER REFERENCES rosters(id) ON DELETE SET NULL
+);
+
+-- The 4 admin-labeled hour blocks used to group a volunteer list's names.
+CREATE TABLE IF NOT EXISTS volunteer_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  UNIQUE(volunteer_list_id, position)
+);
+
+-- Session dates for a volunteer list, admin-chosen and editable any time
+-- (same pattern as roster_dates).
+CREATE TABLE IF NOT EXISTS volunteer_dates (
+  volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
+  session_date TEXT NOT NULL,
+  PRIMARY KEY (volunteer_list_id, session_date)
+);
+
+-- Members on a volunteer list, each assigned to one of its 4 sections.
+CREATE TABLE IF NOT EXISTS volunteer_members (
+  volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  section_id INTEGER NOT NULL REFERENCES volunteer_sections(id) ON DELETE CASCADE,
+  PRIMARY KEY (volunteer_list_id, member_id)
+);
+
+-- Position/room filled in per volunteer per date - can differ every session.
+CREATE TABLE IF NOT EXISTS volunteer_assignments (
+  volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  session_date TEXT NOT NULL,
+  position TEXT,
+  room TEXT,
+  PRIMARY KEY (volunteer_list_id, member_id, session_date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
 CREATE INDEX IF NOT EXISTS idx_roster_members_member ON roster_members(member_id);
 CREATE INDEX IF NOT EXISTS idx_roster_dates_date ON roster_dates(session_date);
+CREATE INDEX IF NOT EXISTS idx_volunteer_members_section ON volunteer_members(section_id);
+CREATE INDEX IF NOT EXISTS idx_volunteer_dates_date ON volunteer_dates(session_date);

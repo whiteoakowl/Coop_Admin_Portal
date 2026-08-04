@@ -414,6 +414,10 @@ button { font-family: inherit; cursor: pointer; }
 .inline-form-flat select,
 .manage-header-row select,
 .quick-add-row select,
+.volunteer-card-link-form select,
+.volunteer-add-form input,
+.volunteer-add-form select,
+.volunteer-sections-form input,
 .btn-secondary {
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--border);
@@ -597,6 +601,125 @@ button { font-family: inherit; cursor: pointer; }
 .badge-logo { height: 56px; width: 56px; margin-bottom: 0.75rem; }
 .badge-name { font-size: 1.6rem; font-weight: 700; margin-bottom: 1rem; }
 .badge-code { margin-top: 0.5rem; font-family: monospace; letter-spacing: 2px; color: var(--muted); }
+
+/* ---------- Volunteers ---------- */
+
+.landing-grid-secondary { margin-top: 1.25rem; }
+
+.volunteer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .volunteer-card-grid { grid-template-columns: 1fr; }
+}
+
+.volunteer-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--brand);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.volunteer-card-link {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+.volunteer-card-link:hover { background: var(--brand-soft); }
+
+.volunteer-card-icon { font-size: 2.5rem; }
+.volunteer-card-label { font-size: 1.2rem; font-weight: 700; color: var(--ink); }
+.volunteer-card-sub { font-size: 0.85rem; color: var(--muted); }
+
+.volunteer-card-link-form {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--border);
+  background: #f8fafc;
+}
+.volunteer-card-link-form select { flex: 1; }
+
+.volunteer-sections-form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: stretch; margin: 0.5rem 0 1rem; }
+.volunteer-sections-form input[type="text"] { flex: 1; min-width: 150px; }
+
+.volunteer-add-form { display: flex; align-items: stretch; gap: 0.5rem; flex-wrap: wrap; }
+.volunteer-add-form select { min-width: 140px; }
+
+.volunteer-section-row td {
+  text-align: left !important;
+  font-weight: 700;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  white-space: normal;
+}
+
+.volunteer-cell-input {
+  width: 6.5rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: var(--surface);
+}
+.volunteer-cell-input:focus { border-color: var(--brand); outline: none; }
+
+.roster-and-volunteers { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; margin: 1.25rem 0; }
+.roster-grid-col { flex: 2 1 480px; margin: 0; }
+
+.volunteer-box {
+  flex: 1 1 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+.volunteer-box .roster-scroll { margin-top: 0.5rem; border: 1px solid var(--border); }
+.volunteer-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.volunteer-box-header h2 { margin: 0; }
+.volunteer-box .btn-secondary { margin-top: 0.75rem; }
+
+.volunteer-public-list { width: 100%; max-width: 640px; text-align: left; }
+.volunteer-public-section {
+  color: var(--brand-dark);
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--brand);
+}
+.volunteer-public-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.15rem;
+}
+.volunteer-public-name { font-weight: 700; flex: 1; }
+.volunteer-public-position { color: var(--muted); }
+.volunteer-public-room {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+}
 
 @media print {
   .no-print { display: none !important; }

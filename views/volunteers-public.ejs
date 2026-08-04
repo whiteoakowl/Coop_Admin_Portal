@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk" data-idle-redirect="20000">
+  <a class="kiosk-home" href="/">&larr; Home</a>
+  <img class="kiosk-logo" src="/img/logo.png" alt="" />
+  <h1><%= dayLabel %> Volunteers</h1>
+
+  <% if (!scheduledToday) { %>
+    <div class="kiosk-wrap">
+      <div class="kiosk-panel kiosk-panel-muted">
+        <p class="kiosk-message">No volunteer schedule for today.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="volunteer-public-list">
+      <% grid.sections.forEach(function(section) { %>
+        <% if (section.members.length > 0) { %>
+          <h2 class="volunteer-public-section"><%= section.label %></h2>
+          <% section.members.forEach(function(row) { %>
+            <div class="volunteer-public-row">
+              <span class="volunteer-public-name"><%= row.member.name %></span>
+              <span class="volunteer-public-position"><%= row.cells[0].position || '—' %></span>
+              <% if (row.cells[0].room) { %><span class="volunteer-public-room">Room <%= row.cells[0].room %></span><% } %>
+            </div>
+          <% }); %>
+        <% } %>
+      <% }); %>
+    </div>
+  <% } %>
+  <script src="/js/idle-redirect.js"></script>
+</body>
+</html>

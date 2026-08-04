@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Volunteers</h1>
+    <p class="subtitle">Manage the Monday and Wednesday volunteer schedules and link each to a roster's view page.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="volunteer-card-grid">
+      <% cards.forEach(function(c) { %>
+        <div class="volunteer-card">
+          <a class="volunteer-card-link" href="/admin/volunteers/<%= c.day %>/manage">
+            <span class="volunteer-card-icon">🙋</span>
+            <span class="volunteer-card-label"><%= c.label %> Volunteers</span>
+            <span class="volunteer-card-sub"><%= c.rosterName ? 'Linked to "' + c.rosterName + '"' : 'Not linked to a roster' %></span>
+          </a>
+          <form method="POST" action="/admin/volunteers/<%= c.day %>/link" class="volunteer-card-link-form">
+            <select name="rosterId">
+              <option value="">No roster</option>
+              <% rosters.forEach(function(r) { %>
+                <option value="<%= r.id %>" <%= c.rosterId === r.id ? 'selected' : '' %>><%= r.name %></option>
+              <% }); %>
+            </select>
+            <button type="submit" class="btn-secondary">Save</button>
+          </form>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

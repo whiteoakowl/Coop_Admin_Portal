@@ -12,6 +12,8 @@ const absenceRouter = require('./routes/absence');
 const adminRouter = require('./routes/admin');
 const adminRostersRouter = require('./routes/admin-rosters');
 const adminMembersRouter = require('./routes/admin-members');
+const adminVolunteersRouter = require('./routes/admin-volunteers');
+const volunteersRouter = require('./routes/volunteers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,9 +45,11 @@ app.get('/', (req, res) => {
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/', absenceRouter);
+app.use('/', volunteersRouter);
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
 app.use('/admin', adminMembersRouter);
+app.use('/admin', adminVolunteersRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });
