@@ -8,14 +8,12 @@
   <main class="admin-main">
     <p class="subtitle"><a href="/admin/volunteers">&larr; Volunteers</a></p>
     <h1><%= dayLabel %> Volunteers</h1>
-    <p class="subtitle"><%= roster ? 'Linked to "' + roster.name + '"' : 'Not linked to a roster' %> &mdash; change this from the <a href="/admin/volunteers">Volunteers</a> page.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="manage-section">
       <h2>Hour Sections</h2>
-      <p class="subtitle">Labels for the 4 groups volunteer names are sorted into below.</p>
       <form method="POST" action="/admin/volunteers/<%= day %>/sections" class="volunteer-sections-form">
         <% sections.forEach(function(s) { %>
           <input type="text" name="labels" value="<%= s.label %>" />
@@ -120,8 +118,7 @@
     </div>
 
     <div class="manage-section">
-      <h2>Positions &amp; Rooms by Date</h2>
-      <p class="subtitle">Fill in where each volunteer is working for each session date. Edit any time and save.</p>
+      <h2><%= dayLabel %> Volunteer Chart</h2>
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!anyMembers) { %>

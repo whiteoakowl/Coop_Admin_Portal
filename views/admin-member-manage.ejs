@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle"><a href="/admin/members">&larr; Members</a></p>
+    <h1><%= member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <h2>Rosters</h2>
+      <div class="checkbox-row">
+        <% if (currentRosters.length === 0) { %><span class="hint">Not on any roster.</span><% } %>
+        <% currentRosters.forEach(function(r) { %>
+          <span class="badge-pill">
+            <%= r.name %>
+            <form method="POST" action="/admin/members/<%= member.id %>/manage/remove-roster/<%= r.id %>" class="inline-block-form">
+              <button type="submit" class="badge-pill-x" aria-label="Remove from <%= r.name %>">&times;</button>
+            </form>
+          </span>
+        <% }); %>
+      </div>
+      <form method="POST" action="/admin/members/<%= member.id %>/manage/add-roster" class="volunteer-add-form">
+        <select name="rosterId" required>
+          <option value="">Add to roster&hellip;</option>
+          <% availableRosters.forEach(function(r) { %>
+            <option value="<%= r.id %>"><%= r.name %></option>
+          <% }); %>
+        </select>
+        <button type="submit" class="btn-secondary">Add</button>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <h2>Volunteer Lists</h2>
+      <% volunteerLists.forEach(function(vl) { %>
+        <div class="member-manage-row">
+          <span class="member-manage-row-label"><%= vl.label %></span>
+          <% if (vl.onList) { %>
+            <form method="POST" action="/admin/members/<%= member.id %>/manage/set-volunteer" class="volunteer-add-form">
+              <input type="hidden" name="day" value="<%= vl.day %>" />
+              <select name="sectionId" onchange="this.form.submit()">
+                <% vl.sections.forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= s.id === vl.sectionId ? 'selected' : '' %>><%= s.label %></option>
+                <% }); %>
+              </select>
+            </form>
+            <form method="POST" action="/admin/members/<%= member.id %>/manage/remove-volunteer/<%= vl.day %>" class="inline-block-form">
+              <button type="submit" class="link-btn link-btn-danger">Remove</button>
+            </form>
+          <% } else { %>
+            <form method="POST" action="/admin/members/<%= member.id %>/manage/set-volunteer" class="volunteer-add-form">
+              <input type="hidden" name="day" value="<%= vl.day %>" />
+              <select name="sectionId" required>
+                <option value="">Add to <%= vl.label %> volunteers&hellip;</option>
+                <% vl.sections.forEach(function(s) { %>
+                  <option value="<%= s.id %>"><%= s.label %></option>
+                <% }); %>
+              </select>
+              <button type="submit" class="btn-secondary">Add</button>
+            </form>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="manage-section">
+      <h2>Absence/Late Form</h2>
+      <div class="member-manage-row">
+        <% if (onAbsenceList) { %>
+          <span class="member-manage-row-label">On the list</span>
+          <form method="POST" action="/admin/members/<%= member.id %>/manage/remove-absence" class="inline-block-form">
+            <button type="submit" class="link-btn link-btn-danger">Remove</button>
+          </form>
+        <% } else { %>
+          <form method="POST" action="/admin/members/<%= member.id %>/manage/add-absence" class="inline-block-form">
+            <button type="submit" class="btn-secondary">Add to Absence/Late Form</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -45,12 +45,10 @@ router.get('/', requireAdmin, (req, res) => {
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
-    username: req.session.username,
     memberCount,
     todayPresent,
     todayLate,
     todayAbsent,
-    today,
   });
 });
 

@@ -7,7 +7,6 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <h1>Members</h1>
-    <p class="subtitle">The full member list. Every member here is available on the Absence/Late form, and can be added to any roster.</p>
 
     <% if (error) { %>
       <div class="alert alert-error"><%= error %></div>
@@ -42,8 +41,7 @@
             <tr>
               <td>
                 <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-name-form">
-                  <input type="text" name="name" value="<%= m.name %>" />
-                  <button type="submit" class="link-btn">Save</button>
+                  <input type="text" name="name" value="<%= m.name %>" onblur="if (this.value.trim() && this.value !== this.defaultValue) this.form.submit();" />
                 </form>
               </td>
               <td class="mono"><%= m.barcode %></td>
@@ -55,12 +53,22 @@
                     <span class="badge-pill"><%= r.name %></span>
                   <% }); %>
                 <% } %>
-                <a class="link-btn" href="/admin/rosters">manage</a>
               </td>
               <td class="actions-cell">
-                <form method="POST" action="/admin/members/<%= m.id %>/delete" class="inline-block-form" onsubmit="return confirm('Permanently delete &quot;<%= m.name %>&quot;? This removes them from all rosters, the absence list, and all attendance history. This cannot be undone.');">
-                  <button type="submit" class="link-btn link-btn-danger">Delete</button>
-                </form>
+                <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
+                <select class="member-action-select" onchange="
+                    if (this.value === 'manage') { location.href = '/admin/members/<%= m.id %>/manage'; }
+                    else if (this.value === 'delete') {
+                      if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, the absence list, and all attendance history. This cannot be undone.')) {
+                        document.getElementById('delete-form-<%= m.id %>').submit();
+                      }
+                    }
+                    this.selectedIndex = 0;
+                  ">
+                  <option value="" selected disabled>Actions&hellip;</option>
+                  <option value="manage">Manage</option>
+                  <option value="delete">Delete</option>
+                </select>
               </td>
             </tr>
           <% }); %>

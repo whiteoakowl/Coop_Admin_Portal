@@ -6,8 +6,7 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <h1>Absence/Late List</h1>
-    <p class="subtitle">Only people added here can be selected on the public Absence/Late form &mdash; just like adding someone to a roster.</p>
+    <h1>Absence/Late Form</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -49,6 +48,30 @@
                   <button type="submit" class="link-btn link-btn-danger">Remove</button>
                 </form>
               </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Submissions</h2>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <% if (submissions.length === 0) { %>
+            <tr><td colspan="6" class="roster-empty">No absence or late submissions yet.</td></tr>
+          <% } %>
+          <% submissions.forEach(function(s) { %>
+            <tr>
+              <td><%= s.memberName %></td>
+              <td><%= s.rosterName %></td>
+              <td><%= s.dateLabel %></td>
+              <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+              <td><%= s.reasonLabel %></td>
+              <td><%= s.description %></td>
             </tr>
           <% }); %>
         </tbody>

@@ -4,8 +4,34 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { formatDateLabel } = require('../utils/dates');
+const { DAYS, DAY_LABELS, isValidDay, getListByDay, sectionsForList } = require('../utils/volunteers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
+
+// Every Absence/Late form submission across all rosters, newest first.
+function allAbsenceSubmissions() {
+  return db
+    .prepare(
+      `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date, a.status,
+              a.reason_category AS reasonCategory, a.reason_text AS reasonText
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.source = 'absence_form'
+       ORDER BY a.session_date DESC, m.name COLLATE NOCASE`
+    )
+    .all()
+    .map((r) => ({
+      memberName: r.memberName,
+      rosterName: r.rosterName,
+      dateLabel: formatDateLabel(r.date),
+      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
+      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+      description: r.reasonText || '—',
+    }));
+}
 
 function rostersForMember(memberId) {
   return db
@@ -83,6 +109,99 @@ router.post('/members/:id/edit', requireAdmin, (req, res) => {
   res.redirect('/admin/members');
 });
 
+// --- Per-member Manage page: add/remove this one member from rosters,
+// volunteer lists, and the absence list, all in one place. ---
+
+router.get('/members/:id/manage', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  const currentRosters = rostersForMember(id);
+  const currentRosterIds = currentRosters.map((r) => r.id);
+  const availableRosters = db
+    .prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE')
+    .all()
+    .filter((r) => !currentRosterIds.includes(r.id));
+
+  const volunteerLists = DAYS.map((day) => {
+    const list = getListByDay(day);
+    const membership = db
+      .prepare('SELECT section_id FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ?')
+      .get(list.id, id);
+    return {
+      day,
+      label: DAY_LABELS[day],
+      sections: sectionsForList(list.id),
+      onList: !!membership,
+      sectionId: membership ? membership.section_id : null,
+    };
+  });
+
+  const onAbsenceList = !!db.prepare('SELECT 1 FROM absence_list_members WHERE member_id = ?').get(id);
+
+  res.render('admin-member-manage', {
+    title: `Manage ${member.name}`,
+    member,
+    currentRosters,
+    availableRosters,
+    volunteerLists,
+    onAbsenceList,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/members/:id/manage/add-roster', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const rosterId = parseInt(req.body.rosterId, 10);
+  if (rosterId) db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, id);
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
+router.post('/members/:id/manage/remove-roster/:rosterId', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const rosterId = parseInt(req.params.rosterId, 10);
+  db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, id);
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
+router.post('/members/:id/manage/set-volunteer', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const day = req.body.day;
+  const sectionId = parseInt(req.body.sectionId, 10);
+  if (isValidDay(day) && sectionId) {
+    const list = getListByDay(day);
+    db.prepare(
+      `INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)
+       ON CONFLICT(volunteer_list_id, member_id) DO UPDATE SET section_id = excluded.section_id`
+    ).run(list.id, id, sectionId);
+  }
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
+router.post('/members/:id/manage/remove-volunteer/:day', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const day = req.params.day;
+  if (isValidDay(day)) {
+    const list = getListByDay(day);
+    db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ?').run(list.id, id);
+  }
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
+router.post('/members/:id/manage/add-absence', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  db.prepare('INSERT OR IGNORE INTO absence_list_members (member_id) VALUES (?)').run(id);
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
+router.post('/members/:id/manage/remove-absence', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  db.prepare('DELETE FROM absence_list_members WHERE member_id = ?').run(id);
+  res.redirect(`/admin/members/${id}/manage`);
+});
+
 router.post('/members/:id/delete', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
@@ -105,9 +224,10 @@ router.get('/absence-list', requireAdmin, (req, res) => {
     .filter((m) => !memberIds.includes(m.id));
 
   res.render('admin-absence-list', {
-    title: 'Absence/Late List',
+    title: 'Absence/Late Form',
     members,
     availableMembers,
+    submissions: allAbsenceSubmissions(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

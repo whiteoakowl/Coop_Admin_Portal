@@ -334,7 +334,9 @@ button { font-family: inherit; cursor: pointer; }
 .roster-card-meta { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
 
 .badge-pill {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background: var(--brand-soft);
   color: var(--brand-dark);
   font-size: 0.75rem;
@@ -343,6 +345,20 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   margin: 0.1rem 0.25rem 0.1rem 0;
 }
+
+.badge-pill-x {
+  background: none;
+  border: none;
+  color: var(--brand-dark);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.6;
+}
+.badge-pill-x:hover { opacity: 1; color: var(--red); }
+
+.member-manage-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; flex-wrap: wrap; }
+.member-manage-row-label { font-weight: 600; min-width: 90px; }
 
 .status-badge {
   display: inline-block;
@@ -381,14 +397,14 @@ button { font-family: inherit; cursor: pointer; }
 .date-list-wrap { margin: 0.4rem 0 0.75rem; }
 .date-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.4rem; }
 .date-list-row { display: flex; align-items: center; gap: 0.5rem; }
-.date-list-row input[type="date"] { flex: 1; }
+.date-list-row input[type="date"] { width: 170px; flex: none; }
 .date-list-remove {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   width: 2.15rem; height: 2.15rem; font-size: 1.1rem; color: var(--muted); line-height: 1; flex-shrink: 0;
 }
 .date-list-remove:hover { border-color: var(--red); color: var(--red); }
 .date-add-form { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
-.date-add-form .date-list-wrap { margin: 0; flex: 1; min-width: 220px; }
+.date-add-form .date-list-wrap { margin: 0; flex: none; min-width: 0; }
 
 .category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
 .category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
@@ -418,6 +434,7 @@ button { font-family: inherit; cursor: pointer; }
 .volunteer-add-form input,
 .volunteer-add-form select,
 .volunteer-sections-form input,
+.member-action-select,
 .btn-secondary {
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--border);
@@ -608,12 +625,12 @@ button { font-family: inherit; cursor: pointer; }
 
 .volunteer-card-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, 180px);
   gap: 1.25rem;
   margin-top: 1.5rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 480px) {
   .volunteer-card-grid { grid-template-columns: 1fr; }
 }
 
@@ -633,32 +650,74 @@ button { font-family: inherit; cursor: pointer; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 2rem 1rem;
+  gap: 0.3rem;
+  padding: 1rem 0.75rem;
   text-align: center;
   transition: background 0.15s ease;
 }
 .volunteer-card-link:hover { background: var(--brand-soft); }
 
-.volunteer-card-icon { font-size: 2.5rem; }
-.volunteer-card-label { font-size: 1.2rem; font-weight: 700; color: var(--ink); }
-.volunteer-card-sub { font-size: 0.85rem; color: var(--muted); }
+.volunteer-card-icon { font-size: 1.6rem; }
+.volunteer-card-label { font-size: 0.9rem; font-weight: 700; color: var(--ink); }
+.volunteer-card-sub { font-size: 0.75rem; color: var(--muted); }
 
 .volunteer-card-link-form {
   display: flex;
   align-items: stretch;
-  gap: 0.5rem;
-  padding: 0.85rem 1rem;
+  gap: 0;
+  padding: 0.6rem;
   border-top: 1px solid var(--border);
   background: #f8fafc;
 }
 .volunteer-card-link-form select { flex: 1; }
 
-.volunteer-sections-form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: stretch; margin: 0.5rem 0 1rem; }
+.volunteer-sections-form { display: flex; flex-wrap: wrap; align-items: stretch; margin: 0.5rem 0 1rem; }
 .volunteer-sections-form input[type="text"] { flex: 1; min-width: 150px; }
 
-.volunteer-add-form { display: flex; align-items: stretch; gap: 0.5rem; flex-wrap: wrap; }
+.volunteer-add-form { display: flex; align-items: stretch; flex-wrap: wrap; }
 .volunteer-add-form select { min-width: 140px; }
+
+/* Joins any run of text-bar/select fields + a trailing button into one
+   seamless control, no gaps, connected corners - same look as the Members
+   page quick-add bar, extended to multi-field forms. */
+.volunteer-card-link-form,
+.volunteer-sections-form,
+.volunteer-add-form {
+  gap: 0;
+}
+.volunteer-card-link-form > *,
+.volunteer-sections-form > *,
+.volunteer-add-form > * {
+  border-radius: 0;
+}
+.volunteer-card-link-form > * + *,
+.volunteer-sections-form > * + *,
+.volunteer-add-form > * + * {
+  margin-left: -1px;
+}
+.volunteer-card-link-form > *:first-child,
+.volunteer-sections-form > *:first-child,
+.volunteer-add-form > *:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.volunteer-card-link-form > button,
+.volunteer-sections-form > button,
+.volunteer-add-form > button {
+  border-radius: 0 8px 8px 0;
+  background: var(--brand-dark);
+  color: #fff;
+  border-color: var(--brand-dark);
+  font-weight: 600;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+.volunteer-card-link-form > button:hover,
+.volunteer-sections-form > button:hover,
+.volunteer-add-form > button:hover {
+  background: var(--brand-darker);
+  border-color: var(--brand-darker);
+}
 
 .volunteer-section-row td {
   text-align: left !important;
@@ -702,24 +761,34 @@ button { font-family: inherit; cursor: pointer; }
   padding-bottom: 0.3rem;
   border-bottom: 2px solid var(--brand);
 }
-.volunteer-public-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0.25rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1.15rem;
+.volunteer-public-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
 }
-.volunteer-public-name { font-weight: 700; flex: 1; }
-.volunteer-public-position { color: var(--muted); }
-.volunteer-public-room {
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  font-weight: 600;
-  font-size: 0.9rem;
-  padding: 0.25rem 0.6rem;
+.volunteer-public-table th,
+.volunteer-public-table td {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  text-align: left;
+  font-size: 1rem;
+}
+.volunteer-public-table thead th { background: #f8fafc; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.volunteer-public-table td:first-child { font-weight: 700; }
+
+.volunteer-bubble {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
   border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
 }
+.volunteer-bubble-position { background: var(--accent); }
+.volunteer-bubble-room { background: var(--brand-darker); }
 
 @media print {
   .no-print { display: none !important; }

@@ -19,13 +19,20 @@
       <% grid.sections.forEach(function(section) { %>
         <% if (section.members.length > 0) { %>
           <h2 class="volunteer-public-section"><%= section.label %></h2>
-          <% section.members.forEach(function(row) { %>
-            <div class="volunteer-public-row">
-              <span class="volunteer-public-name"><%= row.member.name %></span>
-              <span class="volunteer-public-position"><%= row.cells[0].position || '—' %></span>
-              <% if (row.cells[0].room) { %><span class="volunteer-public-room">Room <%= row.cells[0].room %></span><% } %>
-            </div>
-          <% }); %>
+          <table class="volunteer-public-table">
+            <thead>
+              <tr><th>Name</th><th>Volunteer Position</th><th>Location</th></tr>
+            </thead>
+            <tbody>
+              <% section.members.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.member.name %></td>
+                  <td><% if (row.cells[0].position) { %><span class="volunteer-bubble volunteer-bubble-position"><%= row.cells[0].position %></span><% } %></td>
+                  <td><% if (row.cells[0].room) { %><span class="volunteer-bubble volunteer-bubble-room"><%= row.cells[0].room %></span><% } %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         <% } %>
       <% }); %>
     </div>
