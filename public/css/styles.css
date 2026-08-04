@@ -168,10 +168,6 @@ textarea:focus-visible,
 }
 .landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); }
 
-/* Check In is the single most-used button on the kiosk homepage, so it
-   reads as a big checkmark instead of an icon + label like its siblings. */
-.landing-icon-lg { width: 5rem; height: 5rem; font-size: 2.75rem; }
-
 /* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
 .landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
 .landing-card-orange:hover { border-color: var(--btn-bg-hover); }
