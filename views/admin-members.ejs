@@ -55,6 +55,23 @@
                 <% } %>
               </td>
               <td class="actions-cell">
+                <button
+                  type="button"
+                  class="icon-btn<%= m.notes ? ' icon-btn-active' : '' %>"
+                  onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()"
+                  aria-label="Notes for <%= m.name %>"
+                  title="Notes"
+                >📝</button>
+                <dialog id="notes-dialog-<%= m.id %>" class="notes-dialog">
+                  <form method="POST" action="/admin/members/<%= m.id %>/notes">
+                    <h3>Notes &mdash; <%= m.name %></h3>
+                    <textarea name="notes" rows="5" placeholder="Write a note about this member&hellip;"><%= m.notes || '' %></textarea>
+                    <div class="notes-dialog-actions">
+                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                      <button type="submit" class="primary-btn">Save</button>
+                    </div>
+                  </form>
+                </dialog>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
                 <select class="member-action-select" onchange="
                     if (this.value === 'manage') { location.href = '/admin/members/<%= m.id %>/manage'; }

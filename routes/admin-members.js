@@ -109,6 +109,13 @@ router.post('/members/:id/edit', requireAdmin, (req, res) => {
   res.redirect('/admin/members');
 });
 
+router.post('/members/:id/notes', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const notes = (req.body.notes || '').trim();
+  db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
+  res.redirect('/admin/members');
+});
+
 // --- Per-member Manage page: add/remove this one member from rosters,
 // volunteer lists, and the absence list, all in one place. ---
 

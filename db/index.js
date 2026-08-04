@@ -14,6 +14,14 @@ db.exec('PRAGMA foreign_keys = ON');
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
 
+// CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so a column
+// added to schema.sql after someone already has a database needs its own
+// migration here.
+const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
+if (!memberColumns.includes('notes')) {
+  db.exec('ALTER TABLE members ADD COLUMN notes TEXT');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk" data-idle-redirect="20000">
+  <a class="kiosk-home" href="/">&larr; Home</a>
+  <img class="kiosk-logo" src="/img/logo.png" alt="" />
+  <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+
+  <% if (teams.length === 0) { %>
+    <div class="kiosk-wrap">
+      <div class="kiosk-panel kiosk-panel-muted">
+        <p class="kiosk-message">No teams set up yet.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="volunteer-public-list">
+      <% teams.forEach(function(t) { %>
+        <h2 class="volunteer-public-section"><%= t.title %></h2>
+        <% if (t.description) { %><p class="setup-public-desc"><%= t.description %></p><% } %>
+        <% if (t.members.length === 0) { %>
+          <p class="setup-public-desc">No members on this team yet.</p>
+        <% } else { %>
+          <ul class="setup-public-member-list">
+            <% t.members.forEach(function(m) { %><li><%= m.name %></li><% }); %>
+          </ul>
+        <% } %>
+      <% }); %>
+    </div>
+  <% } %>
+  <script src="/js/idle-redirect.js"></script>
+</body>
+</html>

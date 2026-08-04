@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS members (
   name TEXT NOT NULL,
   barcode TEXT NOT NULL UNIQUE,
   active INTEGER NOT NULL DEFAULT 1,
+  notes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -122,6 +123,23 @@ CREATE TABLE IF NOT EXISTS volunteer_assignments (
   PRIMARY KEY (volunteer_list_id, member_id, session_date)
 );
 
+-- Setup/Cleanup teams: unlike volunteer lists, there's no fixed count per
+-- day, no dates, no hours, and no roster link - just an admin-titled team
+-- with a short description and a plain list of member names.
+CREATE TABLE IF NOT EXISTS setup_teams (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  title TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS setup_team_members (
+  team_id INTEGER NOT NULL REFERENCES setup_teams(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  PRIMARY KEY (team_id, member_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
@@ -129,3 +147,4 @@ CREATE INDEX IF NOT EXISTS idx_roster_members_member ON roster_members(member_id
 CREATE INDEX IF NOT EXISTS idx_roster_dates_date ON roster_dates(session_date);
 CREATE INDEX IF NOT EXISTS idx_volunteer_members_section ON volunteer_members(section_id);
 CREATE INDEX IF NOT EXISTS idx_volunteer_dates_date ON volunteer_dates(session_date);
+CREATE INDEX IF NOT EXISTS idx_setup_teams_day ON setup_teams(day);

@@ -47,16 +47,24 @@ button { font-family: inherit; cursor: pointer; }
   padding: 2rem;
 }
 
-.landing-wrap { text-align: center; max-width: 780px; }
+.landing-wrap { text-align: center; max-width: 900px; }
 
 .landing-logo { height: 140px; width: 140px; margin-bottom: 1rem; }
 
 .landing .subtitle { color: var(--muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
 
-.landing-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.landing-columns {
+  display: flex;
+  justify-content: center;
   gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.landing-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 220px;
 }
 
 .landing-card {
@@ -64,20 +72,21 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid var(--border);
   border-top: 3px solid var(--brand);
   border-radius: var(--radius);
-  padding: 2.25rem 1rem;
+  padding: 1.75rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  flex: 1;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .landing-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-top-color: var(--accent); }
 
-.landing-icon { font-size: 2.5rem; }
-.landing-label { font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+.landing-icon { font-size: 2.25rem; }
+.landing-label { font-size: 1rem; font-weight: 600; color: var(--ink); }
 
 .admin-corner-link {
   position: fixed;
@@ -94,8 +103,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
 
-@media (max-width: 480px) {
-  .landing-grid { grid-template-columns: 1fr; }
+@media (max-width: 720px) {
+  .landing-columns { flex-direction: column; align-items: center; }
+  .landing-column { width: 260px; }
 }
 
 /* ---------- Kiosk ---------- */
@@ -620,13 +630,12 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- Volunteers ---------- */
 
-.landing-grid-secondary { margin-top: 1.25rem; }
-
 .volunteer-card-grid {
   display: grid;
   grid-template-columns: repeat(2, 260px);
   gap: 1.25rem;
-  margin-top: 1rem;
+  margin: 1rem auto 0;
+  width: max-content;
 }
 
 @media (max-width: 560px) {
@@ -781,6 +790,78 @@ button { font-family: inherit; cursor: pointer; }
 }
 .volunteer-bubble-position { background: var(--accent); }
 .volunteer-bubble-room { background: var(--brand-darker); }
+
+/* ---------- Setup/Cleanup ---------- */
+
+.setup-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+.setup-card:hover { background: var(--brand-soft); }
+
+.setup-team-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+
+.setup-team-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.setup-team-edit-form { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 220px; }
+.setup-team-title-input { font-size: 1.1rem; font-weight: 700; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.setup-team-title-input:focus { border-color: var(--border); background: #f8fafc; }
+.setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.setup-team-desc-input:focus { border-color: var(--border); background: #f8fafc; }
+
+.setup-public-desc { color: var(--muted); margin: 0 0 0.5rem; }
+.setup-public-member-list { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+.setup-public-member-list li {
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* ---------- Member notes dialog ---------- */
+
+.icon-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--brand); }
+.icon-btn-active { background: var(--brand-soft); border-color: var(--brand); }
+
+.notes-dialog {
+  width: min(420px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.notes-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.notes-dialog h3 { margin: 0 0 0.75rem; }
+.notes-dialog textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.notes-dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
 
 @media print {
   .no-print { display: none !important; }

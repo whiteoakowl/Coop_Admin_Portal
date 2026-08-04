@@ -1,12 +1,6 @@
 const db = require('../db');
 const { formatDateLabel } = require('./dates');
-
-const DAYS = ['monday', 'wednesday'];
-const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
-
-function isValidDay(day) {
-  return DAYS.includes(day);
-}
+const { DAYS, DAY_LABELS, isValidDay } = require('./days');
 
 function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
