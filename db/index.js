@@ -22,6 +22,14 @@ if (!memberColumns.includes('notes')) {
   db.exec('ALTER TABLE members ADD COLUMN notes TEXT');
 }
 
+const rosterMemberColumns = db.prepare('PRAGMA table_info(roster_members)').all().map((c) => c.name);
+if (!rosterMemberColumns.includes('scheduled_arrival')) {
+  db.exec('ALTER TABLE roster_members ADD COLUMN scheduled_arrival TEXT');
+}
+if (!rosterMemberColumns.includes('scheduled_departure')) {
+  db.exec('ALTER TABLE roster_members ADD COLUMN scheduled_departure TEXT');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

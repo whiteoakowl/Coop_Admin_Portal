@@ -35,10 +35,15 @@ CREATE TABLE IF NOT EXISTS roster_dates (
   PRIMARY KEY (roster_id, session_date)
 );
 
--- Members can belong to more than one roster.
+-- Members can belong to more than one roster. scheduled_arrival/departure
+-- are a member's usual drop-off/pick-up time for this roster (edited only
+-- on the manage page) - separate from the actual per-date kiosk
+-- check-in/check-out timestamps recorded in attendance/checkouts.
 CREATE TABLE IF NOT EXISTS roster_members (
   roster_id INTEGER NOT NULL REFERENCES rosters(id) ON DELETE CASCADE,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  scheduled_arrival TEXT,
+  scheduled_departure TEXT,
   PRIMARY KEY (roster_id, member_id)
 );
 
@@ -138,6 +143,16 @@ CREATE TABLE IF NOT EXISTS setup_team_members (
   team_id INTEGER NOT NULL REFERENCES setup_teams(id) ON DELETE CASCADE,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   PRIMARY KEY (team_id, member_id)
+);
+
+-- Submissions from the public Name Tag form (lost tag / schedule change).
+CREATE TABLE IF NOT EXISTS name_tag_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  request_type TEXT NOT NULL CHECK(request_type IN ('lost_tag','schedule_change')),
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday','both')),
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);

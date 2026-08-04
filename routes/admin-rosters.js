@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, formatTimeOfDay, todayISO } = require('../utils/dates');
 const { parseNamesFile, findMemberByName } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 
@@ -12,7 +12,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 102
 function rosterMembers(rosterId) {
   return db
     .prepare(
-      `SELECT m.* FROM members m
+      `SELECT m.*, rm.scheduled_arrival AS scheduledArrival, rm.scheduled_departure AS scheduledDeparture
+       FROM members m
        JOIN roster_members rm ON rm.member_id = m.id
        WHERE rm.roster_id = ? AND m.active = 1
        ORDER BY m.name COLLATE NOCASE`
@@ -80,6 +81,8 @@ function buildRosterGridData(roster) {
 
   const rows = members.map((m) => ({
     member: m,
+    arrivalLabel: formatTimeOfDay(m.scheduledArrival),
+    departureLabel: formatTimeOfDay(m.scheduledDeparture),
     cells: dates.map((d) => {
       const att = attendanceByKey[`${m.id}|${d}`];
       const out = checkoutByKey[`${m.id}|${d}`];
@@ -168,6 +171,33 @@ router.get('/rosters', requireAdmin, (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// A single spreadsheet-style log of every actual kiosk check-in/out across
+// all rosters and dates - distinct from the per-roster attendance grid.
+router.get('/checkinout-log', requireAdmin, (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date,
+              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       JOIN rosters r ON r.id = a.roster_id
+       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+       WHERE a.check_in_time IS NOT NULL
+       ORDER BY a.check_in_time DESC`
+    )
+    .all()
+    .map((r) => ({
+      memberName: r.memberName,
+      rosterName: r.rosterName,
+      dateLabel: formatDateLabel(r.date),
+      checkInTime: formatTime(r.checkInTime) || '—',
+      checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
+      number: r.number ?? '—',
+    }));
+
+  res.render('admin-checkinout-log', { title: 'Check In/Out Log', rows });
 });
 
 router.post('/rosters/categories', requireAdmin, (req, res) => {
@@ -301,6 +331,20 @@ router.post('/rosters/:id/remove-member/:memberId', requireAdmin, (req, res) => 
   const rosterId = parseInt(req.params.id, 10);
   const memberId = parseInt(req.params.memberId, 10);
   db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
+  res.redirect(`/admin/rosters/${rosterId}/manage`);
+});
+
+// A member's usual arrival/departure time for this roster - one value per
+// member per roster, not tied to any specific session date. Only editable
+// here on the manage page; the view page shows it read-only.
+router.post('/rosters/:id/members/:memberId/schedule', requireAdmin, (req, res) => {
+  const rosterId = parseInt(req.params.id, 10);
+  const memberId = parseInt(req.params.memberId, 10);
+  const column = req.body.field === 'departure' ? 'scheduled_departure' : req.body.field === 'arrival' ? 'scheduled_arrival' : null;
+  const value = (req.body.value || '').trim() || null;
+  if (column) {
+    db.prepare(`UPDATE roster_members SET ${column} = ? WHERE roster_id = ? AND member_id = ?`).run(value, rosterId, memberId);
+  }
   res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 

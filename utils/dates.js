@@ -53,6 +53,23 @@ function formatTime(epochMs) {
   return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+// Formats a plain "HH:MM" (24-hour, from an <input type="time">) as a
+// friendly 12-hour label, e.g. "08:30" -> "8:30 AM".
+function formatTimeOfDay(hhmm) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// Formats a SQLite `datetime('now')` string (UTC, "YYYY-MM-DD HH:MM:SS")
+// as a local timestamp label.
+function formatTimestamp(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  return d.toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 module.exports = {
   todayISO,
   addDays,
@@ -61,4 +78,6 @@ module.exports = {
   formatDateLabel,
   formatDateLong,
   formatTime,
+  formatTimeOfDay,
+  formatTimestamp,
 };

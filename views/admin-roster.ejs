@@ -38,6 +38,8 @@
           <thead>
             <tr>
               <th class="roster-name-col">Name</th>
+              <th>Arrival</th>
+              <th>Departure</th>
               <% dateLabels.forEach(function(label) { %>
                 <th><%= label %></th>
               <% }); %>
@@ -45,11 +47,13 @@
           </thead>
           <tbody>
             <% if (rows.length === 0) { %>
-              <tr><td colspan="<%= dateLabels.length + 1 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
+              <tr><td colspan="<%= dateLabels.length + 3 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
             <% } %>
             <% rows.forEach(function(row) { %>
               <tr>
                 <td class="roster-name-col"><%= row.member.name %></td>
+                <td><%= row.arrivalLabel || '—' %></td>
+                <td><%= row.departureLabel || '—' %></td>
                 <% row.cells.forEach(function(cell) { %>
                   <td>
                     <% if (!cell) { %>
@@ -70,14 +74,17 @@
             <tfoot>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Present</td>
+                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Late</td>
+                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Absent</td>
+                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
               </tr>
             </tfoot>

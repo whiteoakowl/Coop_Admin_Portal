@@ -107,16 +107,28 @@
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
-            <tr><th>Name</th><th>Barcode</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>Barcode</th><th>Arrival</th><th>Departure</th><th>Actions</th></tr>
           </thead>
           <tbody>
             <% if (members.length === 0) { %>
-              <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+              <tr><td colspan="5" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% members.forEach(function(m) { %>
               <tr>
                 <td><%= m.name %></td>
                 <td class="mono"><%= m.barcode %></td>
+                <td>
+                  <form method="POST" action="/admin/rosters/<%= roster.id %>/members/<%= m.id %>/schedule" class="inline-block-form schedule-time-form">
+                    <input type="hidden" name="field" value="arrival" />
+                    <input type="time" name="value" value="<%= m.scheduledArrival || '' %>" onchange="this.form.submit()" />
+                  </form>
+                </td>
+                <td>
+                  <form method="POST" action="/admin/rosters/<%= roster.id %>/members/<%= m.id %>/schedule" class="inline-block-form schedule-time-form">
+                    <input type="hidden" name="field" value="departure" />
+                    <input type="time" name="value" value="<%= m.scheduledDeparture || '' %>" onchange="this.form.submit()" />
+                  </form>
+                </td>
                 <td class="actions-cell">
                   <form method="POST" action="/admin/rosters/<%= roster.id %>/remove-member/<%= m.id %>" class="inline-block-form">
                     <button type="submit" class="link-btn">Remove</button>

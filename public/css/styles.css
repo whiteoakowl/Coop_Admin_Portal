@@ -18,6 +18,7 @@
   --red-bg: #fee2e2;
   --yellow: #a16207;
   --yellow-bg: #fef9c3;
+  --yellow-solid: #eab308;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -113,29 +114,11 @@ textarea:focus-visible,
 
 .landing .subtitle { color: var(--muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
 
-.landing-columns {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 220px);
   gap: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.landing-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  width: 220px;
-}
-
-.landing-column-heading { font-size: 1.4rem; font-weight: 800; color: var(--ink); margin: 0; }
-.landing-column-heading-hidden { visibility: hidden; }
-
-.landing-divider {
-  width: 2px;
-  background: var(--ink);
-  opacity: 0.25;
-  align-self: stretch;
+  justify-content: center;
 }
 
 .landing-card {
@@ -168,14 +151,11 @@ textarea:focus-visible,
 }
 .landing-label { font-size: 1.3rem; font-weight: 700; color: var(--ink); }
 
-/* Day-specific button colors on the homepage. */
-.landing-column-monday .landing-card { background: #85BB65; border-color: #85BB65; }
-.landing-column-monday .landing-card:hover { border-color: #6fa350; }
-.landing-column-monday .landing-icon { background: rgba(255,255,255,0.6); color: #2f4a20; }
-
-.landing-column-wednesday .landing-card { background: #C38EC7; border-color: #C38EC7; }
-.landing-column-wednesday .landing-card:hover { border-color: #ad72b1; }
-.landing-column-wednesday .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
+/* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
+.landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
+.landing-card-orange:hover { border-color: var(--btn-bg-hover); }
+.landing-card-orange .landing-icon { background: rgba(255,255,255,0.6); color: #7a3d0a; }
+.landing-card-orange .landing-label { color: #fff; }
 
 .admin-corner-link {
   position: fixed;
@@ -193,10 +173,12 @@ textarea:focus-visible,
 .admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
 
 @media (max-width: 720px) {
-  .landing-columns { flex-direction: column; align-items: center; }
-  .landing-column { width: 260px; }
-  .landing-divider { display: none; }
+  .landing-grid { grid-template-columns: repeat(2, 220px); }
   .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
+}
+
+@media (max-width: 500px) {
+  .landing-grid { grid-template-columns: 220px; }
 }
 
 /* ---------- Kiosk ---------- */
@@ -337,6 +319,10 @@ textarea:focus-visible,
   font-family: inherit;
   background: var(--surface);
 }
+
+.radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+.radio-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+.radio-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 
 .primary-btn {
   margin-top: 1.5rem;
@@ -507,6 +493,16 @@ textarea:focus-visible,
   background: #f8fafc;
 }
 
+.schedule-time-form input[type="time"] {
+  width: 110px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--surface);
+}
+
 .roster-toolbar {
   display: flex;
   justify-content: space-between;
@@ -595,17 +591,17 @@ textarea:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 5px;
-  font-weight: 700;
-  font-size: 0.8rem;
+  min-width: 2rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 0.85rem;
 }
 
-.cell-present { background: var(--green-bg); color: var(--green); }
-.cell-late { background: var(--yellow-bg); color: var(--yellow); }
-.cell-absent { background: var(--red-bg); color: var(--red); }
-.cell-blank { background: transparent; color: var(--border); }
+.cell-present { background: var(--green); color: #fff; }
+.cell-late { background: var(--yellow-solid); color: #1c2530; }
+.cell-absent { background: var(--red); color: #fff; }
+.cell-blank { background: #e7edf5; color: transparent; }
 
 .roster-table-detailed { width: auto; font-size: 0.8rem; }
 .roster-table-detailed th, .roster-table-detailed td { padding: 0.25rem 0.3rem; }

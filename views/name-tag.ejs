@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <main class="form-wrap">
+    <a href="/" class="kiosk-home">&larr; Home</a>
+    <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <h1>Name Tag Form</h1>
+
+    <% if (result) { %>
+      <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
+    <% } %>
+
+    <form method="POST" action="/name-tag/submit" class="stack-form" id="name-tag-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+      <label for="memberId">Your Name</label>
+      <select id="memberId" name="memberId" required>
+        <option value="">Select your name&hellip;</option>
+        <% members.forEach(function(m) { %>
+          <option value="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %></option>
+        <% }); %>
+      </select>
+
+      <label>What do you need?</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="requestType" value="lost_tag" <%= formValues.requestType === 'lost_tag' ? 'checked' : '' %> required />
+          Lost Name Tag
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="requestType" value="schedule_change" <%= formValues.requestType === 'schedule_change' ? 'checked' : '' %> />
+          Schedule Change
+        </label>
+      </div>
+
+      <label>Day</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="day" value="monday" <%= formValues.day === 'monday' ? 'checked' : '' %> required />
+          Monday
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="day" value="wednesday" <%= formValues.day === 'wednesday' ? 'checked' : '' %> />
+          Wednesday
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="day" value="both" <%= formValues.day === 'both' ? 'checked' : '' %> />
+          Both
+        </label>
+      </div>
+
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3" placeholder="Add any details (optional)"><%= formValues.description %></textarea>
+
+      <button type="submit" class="primary-btn">Submit</button>
+    </form>
+  </main>
+  <script src="/js/name-tag.js"></script>
+</body>
+</html>
