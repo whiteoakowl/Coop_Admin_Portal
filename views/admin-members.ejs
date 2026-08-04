@@ -69,13 +69,37 @@
                 <% } %>
               </td>
               <td class="actions-cell">
-                <button
-                  type="button"
-                  class="icon-btn<%= m.notes ? ' icon-btn-active' : '' %>"
-                  onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()"
-                  aria-label="Notes for <%= m.name %>"
-                  title="Notes"
-                ><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <div class="actions-btn-row">
+                  <button
+                    type="button"
+                    class="icon-btn<%= m.notes ? ' icon-btn-active' : '' %>"
+                    onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()"
+                    aria-label="Notes for <%= m.name %>"
+                    title="Notes"
+                  ><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    onclick="var d = document.getElementById('badge-dialog-<%= m.id %>'); d.showModal(); renderNameTagBarcodes(d);"
+                    aria-label="View name tag for <%= m.name %>"
+                    title="View Name Tag"
+                  ><svg class="icon"><use href="#icon-tag"/></svg></button>
+                  <select class="member-action-select" onchange="
+                      if (this.value === 'manage') { location.href = '/admin/members/<%= m.id %>/manage'; }
+                      else if (this.value === 'edit') { location.href = '/admin/members/<%= m.id %>/edit'; }
+                      else if (this.value === 'delete') {
+                        if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, the absence list, and all attendance history. This cannot be undone.')) {
+                          document.getElementById('delete-form-<%= m.id %>').submit();
+                        }
+                      }
+                      this.selectedIndex = 0;
+                    ">
+                    <option value="" selected disabled>Actions&hellip;</option>
+                    <option value="manage">Manage</option>
+                    <option value="edit">Edit</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                </div>
                 <dialog id="notes-dialog-<%= m.id %>" class="notes-dialog">
                   <form method="POST" action="/admin/members/<%= m.id %>/notes">
                     <h3>Notes &mdash; <%= m.name %></h3>
@@ -86,22 +110,15 @@
                     </div>
                   </form>
                 </dialog>
+                <dialog id="badge-dialog-<%= m.id %>" class="badge-preview-dialog">
+                  <h3>Name Tag &mdash; <%= m.name %></h3>
+                  <%- include('partials/name-tag-badge', { layout: m.badgeLayout, data: m.badgeData, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <button type="button" class="primary-btn" onclick="window.open('/admin/members/<%= m.id %>/name-tag/print', '_blank')">Print</button>
+                  </div>
+                </dialog>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
-                <select class="member-action-select" onchange="
-                    if (this.value === 'manage') { location.href = '/admin/members/<%= m.id %>/manage'; }
-                    else if (this.value === 'edit') { location.href = '/admin/members/<%= m.id %>/edit'; }
-                    else if (this.value === 'delete') {
-                      if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, the absence list, and all attendance history. This cannot be undone.')) {
-                        document.getElementById('delete-form-<%= m.id %>').submit();
-                      }
-                    }
-                    this.selectedIndex = 0;
-                  ">
-                  <option value="" selected disabled>Actions&hellip;</option>
-                  <option value="manage">Manage</option>
-                  <option value="edit">Edit</option>
-                  <option value="delete">Delete</option>
-                </select>
               </td>
             </tr>
           <% }); %>
@@ -109,5 +126,7 @@
       </table>
     </div>
   </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
 </body>
 </html>

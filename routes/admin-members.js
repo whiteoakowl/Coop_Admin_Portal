@@ -9,6 +9,8 @@ const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { formatDateLabel } = require('../utils/dates');
 const { DAYS, DAY_LABELS, isValidDay, getListByDay, sectionsForList } = require('../utils/volunteers');
+const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
+const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
@@ -97,14 +99,19 @@ router.get('/members', requireAdmin, (req, res) => {
   const members = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
   const parentNames = {};
   for (const m of members) parentNames[m.id] = m.name;
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
   const withRosters = members.map((m) => ({
     ...m,
     rosters: rostersForMember(m.id),
     parentName: m.parent_id ? parentNames[m.parent_id] || null : null,
+    badgeLayout: templates[m.member_type] || templates.student,
+    badgeData: badgeDataForMember(m),
   }));
   res.render('admin-members', {
     title: 'Members',
     members: withRosters,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -377,6 +384,20 @@ router.post('/members/:id/notes', requireAdmin, (req, res) => {
   const notes = (req.body.notes || '').trim();
   db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
   res.redirect('/admin/members');
+});
+
+router.get('/members/:id/name-tag/print', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  res.render('admin-name-tag-print', {
+    title: `Name Tag - ${member.name}`,
+    layout: getTemplate(member.member_type),
+    data: badgeDataForMember(member),
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+  });
 });
 
 // --- Per-member Manage page: add/remove this one member from rosters,

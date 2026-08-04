@@ -6,8 +6,78 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <h1>Name Tag Requests</h1>
+    <h1>Name Tags</h1>
 
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <div class="manage-section">
+      <h2>Name Tag Design</h2>
+      <p class="hint">Lay out what shows on each type of name tag. Text fields, shapes, and the barcode can be dragged and resized; drop an image in for a logo or background art.</p>
+
+      <div class="name-tag-type-tabs" id="name-tag-type-tabs">
+        <button type="button" class="name-tag-type-tab" data-type="student">Student</button>
+        <button type="button" class="name-tag-type-tab" data-type="parent">Parent</button>
+      </div>
+
+      <div class="name-tag-editor" id="name-tag-editor">
+        <div class="name-tag-editor-toolbar">
+          <div class="name-tag-add-field">
+            <select id="add-field-select"></select>
+            <button type="button" class="btn-secondary" id="add-field-btn">+ Add Field</button>
+          </div>
+          <button type="button" class="btn-secondary" id="add-shape-btn">+ Add Shape</button>
+          <label class="btn-secondary name-tag-upload-label">
+            + Add Image
+            <input type="file" id="add-image-input" accept="image/*" hidden />
+          </label>
+          <button type="button" class="btn-secondary" id="add-barcode-btn">+ Add Barcode</button>
+        </div>
+
+        <div class="name-tag-editor-body">
+          <div class="badge-canvas name-tag-canvas" id="name-tag-canvas"></div>
+          <div class="name-tag-properties" id="name-tag-properties">
+            <p class="hint">Click an element on the badge to edit it.</p>
+          </div>
+        </div>
+
+        <div class="name-tag-editor-actions">
+          <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
+          <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
+          <span id="save-status" class="hint"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <h2>Bulk Print</h2>
+      <p class="hint">Pick members and print their name tags together, 8 to a sheet.</p>
+      <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
+        <div class="name-tag-bulk-filter">
+          <button type="button" class="btn-secondary" data-filter="all">All</button>
+          <button type="button" class="btn-secondary" data-filter="student">Students Only</button>
+          <button type="button" class="btn-secondary" data-filter="parent">Parents Only</button>
+          <button type="button" class="btn-secondary" id="bulk-select-all-btn">Select All Shown</button>
+          <button type="button" class="btn-secondary" id="bulk-select-none-btn">Select None</button>
+        </div>
+        <div class="member-picker-list name-tag-bulk-list" id="name-tag-bulk-list">
+          <% if (members.length === 0) { %>
+            <p class="hint">No members yet.</p>
+          <% } %>
+          <% members.forEach(function(m) { %>
+            <label class="member-picker-row" data-type="<%= m.member_type %>">
+              <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+              <span><%= m.name %></span>
+              <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+            </label>
+          <% }); %>
+        </div>
+        <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+      </form>
+    </div>
+
+    <h2>Submissions</h2>
     <div class="category-filter">
       <label for="date-select">Date</label>
       <select id="date-select" onchange="window.location = '/admin/name-tag' + (this.value ? '?date=' + encodeURIComponent(this.value) : '')">
@@ -40,5 +110,10 @@
       </table>
     </div>
   </main>
+
+  <script id="name-tag-data" type="application/json"><%- JSON.stringify({ templates: templates, defaultLayouts: defaultLayouts, fieldsByType: fieldsByType, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %></script>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/name-tag-editor.js"></script>
 </body>
 </html>

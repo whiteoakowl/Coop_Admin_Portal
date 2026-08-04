@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const bcrypt = require('bcryptjs');
+const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -68,6 +69,17 @@ for (const day of ['monday', 'wednesday']) {
   const listId = info.lastInsertRowid;
   const insertSection = db.prepare('INSERT INTO volunteer_sections (volunteer_list_id, position, label) VALUES (?, ?, ?)');
   for (let i = 1; i <= 4; i++) insertSection.run(listId, i, `Hour ${i}`);
+}
+
+// Seed a starter badge design for each member type so the design editor
+// and badge printing always have something to render.
+for (const memberType of ['student', 'parent']) {
+  const existing = db.prepare('SELECT member_type FROM name_tag_templates WHERE member_type = ?').get(memberType);
+  if (existing) continue;
+  db.prepare('INSERT INTO name_tag_templates (member_type, layout_json) VALUES (?, ?)').run(
+    memberType,
+    JSON.stringify(DEFAULT_LAYOUTS[memberType])
+  );
 }
 
 module.exports = db;

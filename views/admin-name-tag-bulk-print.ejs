@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: auto; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main badge-print-main">
+    <div class="roster-toolbar no-print">
+      <div><h1>Print Name Tags</h1></div>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <% if (badges.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      var pages = [];
+      for (var i = 0; i < badges.length; i += 8) pages.push(badges.slice(i, i + 8));
+    %>
+    <% pages.forEach(function(pageBadges) { %>
+      <div class="badge-sheet-page badge-sheet">
+        <% pageBadges.forEach(function(b) { %>
+          <%- include('partials/name-tag-badge', { layout: b.layout, data: b.data, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+</body>
+</html>

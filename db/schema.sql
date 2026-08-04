@@ -172,6 +172,16 @@ CREATE TABLE IF NOT EXISTS name_tag_requests (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- The printable badge design an admin lays out - one per member type,
+-- since Students and Parents show different fields. layout_json is an
+-- array of positioned elements (text field / shape / image / barcode);
+-- see utils/nameTagBadge.js for the shape.
+CREATE TABLE IF NOT EXISTS name_tag_templates (
+  member_type TEXT PRIMARY KEY CHECK(member_type IN ('student','parent')),
+  layout_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
