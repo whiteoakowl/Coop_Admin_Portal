@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { formatTimestamp } = require('../utils/dates');
+const { formatTimestamp, isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const {
   DAYS,
@@ -15,6 +15,12 @@ const {
   saveMemberSchedule,
   scheduleList,
 } = require('../utils/schedule');
+const {
+  DAY_LABELS: CLASS_DAY_LABELS,
+  hoursForDay,
+  roomGridForDay,
+  absentMemberIdsForDate,
+} = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -38,7 +44,8 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SCHEDULE_TABS = ['classes', 'design', 'print'];
+const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 const PAGE_SIZE = 25;
 
 function summarizeDay(rows) {
@@ -47,103 +54,80 @@ function summarizeDay(rows) {
   return filled.map((r) => r.class_name || r.room || r.time).filter(Boolean).join(', ');
 }
 
+// Only defaults the absence-highlight date picker to today when today
+// actually falls on the tab's day - otherwise there's nothing meaningful
+// to highlight yet (mirrors admin-class-schedule.js's defaultDateFor).
+function defaultDateFor(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
+}
+
 router.get('/schedule', requireAdmin, (req, res) => {
-  const tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'classes';
+  const tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
 
-  const filters = { search: (req.query.search || '').trim() };
+  if (tab === 'monday' || tab === 'wednesday') {
+    const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
+    return res.render('admin-schedule', {
+      title: 'Schedule',
+      tab,
+      day: tab,
+      dayLabel: CLASS_DAY_LABELS[tab],
+      hours: hoursForDay(tab),
+      roomGrid: roomGridForDay(tab),
+      selectedDate,
+      absentIds: absentMemberIdsForDate(selectedDate),
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
 
-  let rows = [];
+  // Student Schedules / Parent Schedules: the same per-member schedule
+  // list, filtered to one member_type.
+  const memberType = tab === 'parents' ? 'parent' : 'student';
+  const filters = { search: (req.query.search || '').trim(), memberType };
+
   let sort = ['name', 'monday', 'wednesday', 'status', 'updated'].includes(req.query.sort) ? req.query.sort : 'name';
   let dir = req.query.dir === 'desc' ? 'desc' : 'asc';
 
-  if (tab === 'classes') {
-    rows = scheduleList(filters);
+  const rows = scheduleList(filters);
 
-    const summarized = rows.map((r) => ({
-      member: r.member,
-      mondaySummary: summarizeDay(r.monday),
-      wednesdaySummary: summarizeDay(r.wednesday),
-      status: r.status,
-      statusLabel: STATUS_LABELS[r.status],
-      lastUpdated: r.lastUpdated ? formatTimestamp(r.lastUpdated) : 'Never',
-      lastUpdatedRaw: r.lastUpdated || '',
-    }));
+  const summarized = rows.map((r) => ({
+    member: r.member,
+    mondaySummary: summarizeDay(r.monday),
+    wednesdaySummary: summarizeDay(r.wednesday),
+    status: r.status,
+    statusLabel: STATUS_LABELS[r.status],
+    lastUpdated: r.lastUpdated ? formatTimestamp(r.lastUpdated) : 'Never',
+    lastUpdatedRaw: r.lastUpdated || '',
+  }));
 
-    const dirMul = dir === 'desc' ? -1 : 1;
-    summarized.sort((a, b) => {
-      let av, bv;
-      if (sort === 'name') { av = a.member.name.toLowerCase(); bv = b.member.name.toLowerCase(); }
-      else if (sort === 'monday') { av = a.mondaySummary; bv = b.mondaySummary; }
-      else if (sort === 'wednesday') { av = a.wednesdaySummary; bv = b.wednesdaySummary; }
-      else if (sort === 'status') { av = a.status; bv = b.status; }
-      else { av = a.lastUpdatedRaw; bv = b.lastUpdatedRaw; }
-      if (av < bv) return -1 * dirMul;
-      if (av > bv) return 1 * dirMul;
-      return 0;
-    });
+  const dirMul = dir === 'desc' ? -1 : 1;
+  summarized.sort((a, b) => {
+    let av, bv;
+    if (sort === 'name') { av = a.member.name.toLowerCase(); bv = b.member.name.toLowerCase(); }
+    else if (sort === 'monday') { av = a.mondaySummary; bv = b.mondaySummary; }
+    else if (sort === 'wednesday') { av = a.wednesdaySummary; bv = b.wednesdaySummary; }
+    else if (sort === 'status') { av = a.status; bv = b.status; }
+    else { av = a.lastUpdatedRaw; bv = b.lastUpdatedRaw; }
+    if (av < bv) return -1 * dirMul;
+    if (av > bv) return 1 * dirMul;
+    return 0;
+  });
 
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
-    const pageRows = summarized.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-    return res.render('admin-schedule', {
-      title: 'Schedule',
-      tab,
-      rows: pageRows,
-      totalCount: summarized.length,
-      page,
-      totalPages,
-      sort,
-      dir,
-      filters,
-      error: req.query.error || null,
-      notice: req.query.notice || null,
-    });
-  }
-
-  if (tab === 'design') {
-    return res.render('admin-schedule', {
-      title: 'Schedule',
-      tab,
-      rows: [],
-      totalCount: 0,
-      page: 1,
-      totalPages: 1,
-      sort,
-      dir,
-      filters,
-      scheduleCardDataJson: jsonScriptSafe({
-        template: getScheduleCardTemplate(),
-        defaultLayout: DEFAULT_LAYOUT,
-        fields: FIELDS,
-        tableFields: TABLE_FIELDS,
-        shapeTypes: SHAPE_TYPES,
-        fontFamilies: FONT_FAMILIES,
-        cardWidth: CARD_WIDTH,
-        cardHeight: CARD_HEIGHT,
-      }),
-      error: req.query.error || null,
-      notice: req.query.notice || null,
-    });
-  }
-
-  // Print Cards tab: a plain member picker (search + select), like the
-  // Name Tag Designer's Print tab.
-  const printMembers = db
-    .prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all();
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
+  const pageRows = summarized.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   res.render('admin-schedule', {
     title: 'Schedule',
     tab,
-    rows: [],
-    totalCount: 0,
-    page: 1,
-    totalPages: 1,
+    rows: pageRows,
+    totalCount: summarized.length,
+    page,
+    totalPages,
     sort,
     dir,
     filters,
-    printMembers,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -152,7 +136,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
 router.post('/schedule/print-cards', requireAdmin, (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
-    return res.redirect('/admin/schedule?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
@@ -210,6 +194,7 @@ router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
     monday,
     wednesday,
     dayLabels: DAY_LABELS,
+    returnTab: member.member_type === 'parent' ? 'parents' : 'students',
     notice: req.query.notice || null,
   });
 });
@@ -272,13 +257,15 @@ function normalizeScheduleRow(row) {
 }
 
 router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) => {
-  if (!req.file) return res.redirect('/admin/schedule?error=' + encodeURIComponent('Please choose a file to import.'));
+  const returnTab = SCHEDULE_TABS.includes(req.body.tab) ? req.body.tab : 'students';
+
+  if (!req.file) return res.redirect(`/admin/schedule?tab=${returnTab}&error=` + encodeURIComponent('Please choose a file to import.'));
 
   let rawRows;
   try {
     rawRows = readRowsFromFile(req.file.buffer).map(normalizeScheduleRow);
   } catch (err) {
-    return res.redirect('/admin/schedule?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+    return res.redirect(`/admin/schedule?tab=${returnTab}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
 
   const summary = { imported: 0, updated: 0, created: 0, duplicate: 0, unmatched: 0, errors: 0, warnings: 0 };
@@ -347,7 +334,7 @@ router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) 
   if (summary.errors) parts.push(`${summary.errors} error(s)`);
   if (summary.warnings) parts.push(`${summary.warnings} warning(s) (blank rows)`);
 
-  res.redirect('/admin/schedule?notice=' + encodeURIComponent(parts.join(', ') + '.'));
+  res.redirect(`/admin/schedule?tab=${returnTab}&notice=` + encodeURIComponent(parts.join(', ') + '.'));
 });
 
 router.get('/schedule/export.csv', requireAdmin, (req, res) => {

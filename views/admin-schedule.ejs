@@ -6,20 +6,6 @@
 <body class="admin-page schedule-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
-    <%
-      function buildQuery(overrides) {
-        const params = new URLSearchParams();
-        if (filters.search) params.set('search', filters.search);
-        if (sort) params.set('sort', sort);
-        if (dir) params.set('dir', dir);
-        Object.keys(overrides || {}).forEach(function (k) {
-          if (overrides[k] === null || overrides[k] === undefined) params.delete(k);
-          else params.set(k, overrides[k]);
-        });
-        const s = params.toString();
-        return s ? '?' + s : '';
-      }
-    %>
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
@@ -29,17 +15,34 @@
     </div>
     <h1>Schedule</h1>
 
-    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
-    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
-
     <div class="view-tabs no-print">
-      <a class="view-tab<%= tab === 'classes' ? ' active' : '' %>" href="/admin/schedule?tab=classes">Class Schedules</a>
-      <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/schedule?tab=design">Design Cards</a>
-      <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/schedule?tab=print">Print Cards</a>
+      <a class="view-tab<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday Schedule</a>
+      <a class="view-tab<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday Schedule</a>
+      <a class="view-tab<%= tab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
+      <a class="view-tab<%= tab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
     </div>
 
     <div class="view-tab-panel">
-      <% if (tab === 'classes') { %>
+      <% if (tab === 'monday' || tab === 'wednesday') { %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds, basePath: `/admin/schedule?tab=${tab}` }) %>
+      <% } else { %>
+        <%
+          function buildQuery(overrides) {
+            const params = new URLSearchParams();
+            params.set('tab', tab);
+            if (filters.search) params.set('search', filters.search);
+            if (sort) params.set('sort', sort);
+            if (dir) params.set('dir', dir);
+            Object.keys(overrides || {}).forEach(function (k) {
+              if (overrides[k] === null || overrides[k] === undefined) params.delete(k);
+              else params.set(k, overrides[k]);
+            });
+            return '?' + params.toString();
+          }
+        %>
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
         <div class="roster-toolbar no-print">
           <div class="schedule-filters">
             <div class="category-filter schedule-search">
@@ -60,6 +63,7 @@
             <h3>Import</h3>
             <p class="hint">Matches rows to existing Members by full name. New people must be added on the <a href="/admin/members">Members page</a> first.</p>
             <a class="btn-secondary import-sample-link" href="/admin/schedule/import-template.xlsx">Download Sample File</a>
+            <input type="hidden" name="tab" value="<%= tab %>" />
             <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
             <div class="notes-dialog-actions">
               <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
@@ -111,91 +115,6 @@
             <a class="btn-secondary<%= page >= totalPages ? ' btn-disabled' : '' %>" href="<%= buildQuery({ page: Math.min(totalPages, page + 1) }) %>">Next &rarr;</a>
           </div>
         <% } %>
-      <% } else if (tab === 'design') { %>
-        <div class="name-tag-design-toolbar">
-          <div class="name-tag-toolbar-group">
-            <button type="button" class="name-tag-icon-btn" id="schedule-card-undo-btn" aria-label="Undo" title="Undo"><svg class="icon"><use href="#icon-undo"/></svg></button>
-            <button type="button" class="name-tag-icon-btn" id="schedule-card-redo-btn" aria-label="Redo" title="Redo"><svg class="icon"><use href="#icon-redo"/></svg></button>
-          </div>
-
-          <div class="name-tag-toolbar-group">
-            <select class="name-tag-zoom-select" id="schedule-card-zoom-select" aria-label="Zoom">
-              <option value="0.25">25%</option>
-              <option value="0.5">50%</option>
-              <option value="0.75">75%</option>
-              <option value="1" selected>100%</option>
-              <option value="1.5">150%</option>
-              <option value="2">200%</option>
-            </select>
-            <button type="button" class="name-tag-icon-btn" id="schedule-card-grid-toggle-btn" aria-label="Toggle Grid" title="Toggle Grid"><svg class="icon"><use href="#icon-grid"/></svg></button>
-            <button type="button" class="name-tag-icon-btn" id="schedule-card-snap-toggle-btn" aria-label="Toggle Snap to Grid" title="Toggle Snap to Grid"><svg class="icon"><use href="#icon-magnet"/></svg></button>
-          </div>
-
-          <div class="name-tag-editor-actions">
-            <button type="button" class="btn-secondary" id="schedule-card-reset-btn">Reset to Default</button>
-            <button type="button" class="primary-btn" id="schedule-card-save-btn">Save Template</button>
-            <span id="schedule-card-save-status" class="hint"></span>
-          </div>
-        </div>
-
-        <div class="name-tag-editor" id="schedule-card-editor">
-          <div class="name-tag-editor-body">
-            <div class="name-tag-canvas-col">
-              <div class="name-tag-canvas-zoom-wrap" id="schedule-card-canvas-zoom-wrap">
-                <div class="badge-canvas name-tag-canvas" id="schedule-card-canvas"></div>
-                <div class="name-tag-grid-overlay" id="schedule-card-grid-overlay"></div>
-                <div class="name-tag-selection-overlay" id="schedule-card-selection-overlay"></div>
-              </div>
-            </div>
-
-            <div class="name-tag-editor-controls">
-              <div class="name-tag-tool-icons" id="schedule-card-tool-icons">
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-field" aria-label="Add Text" title="Add Text"><svg class="icon"><use href="#icon-type"/></svg></button>
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-table" aria-label="Add Schedule Table" title="Add Schedule Table"><svg class="icon"><use href="#icon-grid"/></svg></button>
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-shape" aria-label="Add Element" title="Add Element"><svg class="icon"><use href="#icon-square"/></svg></button>
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-image" aria-label="Add Image" title="Add Image"><svg class="icon"><use href="#icon-image"/></svg></button>
-                <button type="button" class="name-tag-tool-icon-btn" data-tool="background" aria-label="Change Background" title="Change Background"><svg class="icon"><use href="#icon-palette"/></svg></button>
-              </div>
-              <div class="name-tag-tool-panel" id="schedule-card-tool-panel"></div>
-
-              <div class="name-tag-properties" id="schedule-card-properties"></div>
-            </div>
-          </div>
-        </div>
-
-        <script id="schedule-card-data" type="application/json"><%- scheduleCardDataJson %></script>
-        <script src="/js/name-tag-render-core.js"></script>
-        <script src="/js/schedule-card-editor.js"></script>
-      <% } else { %>
-        <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form">
-          <div class="roster-toolbar no-print">
-            <div class="schedule-filters">
-              <div class="category-filter schedule-search">
-                <label for="schedule-print-search-input">Search</label>
-                <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
-              </div>
-              <label class="checkbox-option schedule-print-select-all">
-                <input type="checkbox" id="schedule-print-select-all-checkbox" />
-                Select All
-              </label>
-            </div>
-            <div class="roster-btn-row">
-              <button type="submit" class="primary-btn">Print Selected</button>
-            </div>
-          </div>
-
-          <div class="member-picker-list schedule-print-list" id="schedule-print-list">
-            <% if (printMembers.length === 0) { %>
-              <p class="hint">No members yet.</p>
-            <% } %>
-            <% printMembers.forEach(function(m) { %>
-              <label class="member-picker-row" data-name="<%= m.name.toLowerCase() %>">
-                <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                <span><%= m.name %></span>
-              </label>
-            <% }); %>
-          </div>
-        </form>
       <% } %>
     </div>
   </main>

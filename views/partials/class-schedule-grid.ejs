@@ -1,0 +1,143 @@
+<%
+// locals: day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds,
+// basePath (optional - where the date filter navigates back to; defaults
+// to the standalone class-schedule page).
+const gridBasePath = typeof basePath !== 'undefined' && basePath ? basePath : `/admin/class-schedule/${day}`;
+const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
+%>
+<% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+<% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+<div class="roster-toolbar no-print">
+  <div class="filter-row">
+    <div class="category-filter">
+      <label for="date-select-<%= day %>">Highlight Absences For</label>
+      <input
+        type="date"
+        id="date-select-<%= day %>"
+        value="<%= selectedDate %>"
+        onchange="window.location = '<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : '')"
+      />
+    </div>
+  </div>
+  <div class="roster-btn-row">
+    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
+    <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog-<%= day %>').showModal()">Edit Hours</button>
+    <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+    <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/export.csv">Export</a>
+    <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
+  </div>
+</div>
+
+<dialog id="add-class-dialog-<%= day %>" class="member-picker-dialog">
+  <form method="POST" action="/admin/class-schedule/<%= day %>/classes/new">
+    <h3>Add Class</h3>
+    <label>Hour
+      <select name="hourPosition" required>
+        <% hours.forEach(function(h) { %>
+          <option value="<%= h.position %>"><%= h.label %></option>
+        <% }); %>
+      </select>
+    </label>
+    <input type="text" name="className" placeholder="Class Name" required />
+    <input type="text" name="room" placeholder="Room #" />
+    <input type="text" name="ageGroup" placeholder="Age Group (e.g. Ages 5-7)" />
+    <label class="class-color-label">Color
+      <input type="color" name="color" value="#EE9A4D" />
+    </label>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Add Class</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="edit-hours-dialog-<%= day %>" class="volunteer-edit-dialog">
+  <h3>Edit Hours</h3>
+  <p class="hint">Rename the 4 hour blocks used to organize <%= dayLabel %>'s classes.</p>
+  <form method="POST" action="/admin/class-schedule/<%= day %>/hours" class="volunteer-sections-form">
+    <div class="volunteer-sections-row">
+      <% hours.forEach(function(h) { %>
+        <input type="text" name="labels" value="<%= h.label %>" maxlength="20" />
+      <% }); %>
+    </div>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      <button type="submit" class="primary-btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="import-dialog-<%= day %>" class="member-picker-dialog">
+  <form method="POST" action="/admin/class-schedule/<%= day %>/import" enctype="multipart/form-data">
+    <h3>Import</h3>
+    <p class="hint">Adds new classes for <%= dayLabel %>. Doesn't touch enrollment or staff - add those on each class's Manage page after importing.</p>
+    <a class="btn-secondary import-sample-link" href="/admin/class-schedule/import-template.xlsx">Download Sample File</a>
+    <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Import</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="roster-scroll">
+  <table class="roster-table class-schedule-room-grid">
+    <thead>
+      <tr>
+        <th class="class-schedule-room-col">Room</th>
+        <% roomGrid.hours.forEach(function(h) { %>
+          <th><%= h.label %></th>
+        <% }); %>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (roomGrid.rows.length === 0) { %>
+        <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes yet.</td></tr>
+      <% } %>
+      <% roomGrid.rows.forEach(function(row) { %>
+        <tr>
+          <td class="class-schedule-room-col"><%= row.room %></td>
+          <% row.cells.forEach(function(cell) { %>
+            <td colspan="<%= cell.span %>" class="class-schedule-cell">
+              <% if (cell.classes.length === 0) { %>
+                &nbsp;
+              <% } else { %>
+                <% cell.classes.forEach(function(cls) { %>
+                  <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                    <div class="class-card-header">
+                      <h3><%= cls.class_name %></h3>
+                      <a class="icon-btn no-print" href="/admin/class-schedule/classes/<%= cls.id %>/manage" aria-label="Manage <%= cls.class_name %>" title="Manage">&#9998;</a>
+                    </div>
+                    <p class="class-card-meta">
+                      <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
+                      <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
+                    </p>
+                    <% if (cls.students.length > 0) { %>
+                      <p class="class-card-staff">
+                        <span class="class-card-pill-label">Students:</span>
+                        <% cls.students.forEach(function(s) { %>
+                          <span class="badge-pill<%= absentIds.has(s.id) ? ' badge-pill-absent' : '' %>"><%= s.name %></span>
+                        <% }); %>
+                      </p>
+                    <% } %>
+                    <p class="class-card-staff">
+                      <span class="class-card-pill-label">Staff:</span>
+                      <% if (cls.staff.length === 0) { %>
+                        <span class="hint">No teachers/assistants yet.</span>
+                      <% } else { %>
+                        <% cls.staff.forEach(function(s) { %>
+                          <span class="badge-pill"><%= s.name %><%= s.role === 'assistant' ? ' (Assistant)' : '' %></span>
+                        <% }); %>
+                      <% } %>
+                    </p>
+                  </div>
+                <% }); %>
+              <% } %>
+            </td>
+          <% }); %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>

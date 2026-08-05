@@ -148,6 +148,9 @@ function scheduleList(filters) {
   if (filters.memberId) {
     members = members.filter((m) => m.id === filters.memberId);
   }
+  if (filters.memberType) {
+    members = members.filter((m) => m.member_type === filters.memberType);
+  }
 
   let rows = members.map((m) => {
     const { monday, wednesday, lastUpdated } = getMemberSchedule(m.id);
