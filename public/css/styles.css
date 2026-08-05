@@ -1271,6 +1271,23 @@ textarea:focus-visible,
 .schedule-preview-dialog h4 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
 .schedule-preview-dialog table { width: 100%; margin-bottom: 0.5rem; }
 
+/* Public-form submission result, shown as a centered popup instead of an
+   inline banner so it can't be missed on a long form. */
+.alert-popup-dialog {
+  width: min(420px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  text-align: center;
+}
+.alert-popup-dialog::backdrop { background: rgba(28, 37, 48, 0.55); }
+.alert-popup-icon { width: 48px; height: 48px; margin-bottom: 0.75rem; }
+.alert-popup-success .alert-popup-icon { color: var(--green); }
+.alert-popup-error .alert-popup-icon { color: var(--red); }
+.alert-popup-message { font-size: 1.05rem; margin: 0 0 1.25rem; color: var(--ink); }
+.alert-popup-ok { margin-top: 0; }
+
 /* Member profile "Cards" dialog: Name Tag and (for students) Schedule
    Card previews stacked, each with its own "print this one?" checkbox
    directly above it. */

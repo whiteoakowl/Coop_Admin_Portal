@@ -107,7 +107,7 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks'];
+const SETTINGS_TABS = ['account', 'quicklinks', 'classes'];
 
 function renderSettings(req, res, error, success, activeTab) {
   res.render('admin-settings', {
@@ -156,7 +156,7 @@ router.post('/settings/password', requireAdmin, (req, res) => {
 router.post('/settings/class-schedule-mode', requireAdmin, (req, res) => {
   const mode = req.body.mode === 'edit' ? 'edit' : 'view';
   setAppSetting('class_schedule_public_mode', mode);
-  renderSettings(req, res, null, 'Class Schedule public page updated.', 'quicklinks');
+  renderSettings(req, res, null, 'Class Schedule public page updated.', 'classes');
 });
 
 module.exports = router;

@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, todayISO, ageFromBirthday } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, familyOf } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 const { REASON_LABELS } = require('../utils/rosters');
@@ -347,7 +347,7 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
   const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
   if (!roster) return res.status(404).send('Not found');
 
-  const members = rosterMembers(id);
+  const members = rosterMembers(id).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
   const memberIds = members.map((m) => m.id);
   const availableMembers = db
     .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')

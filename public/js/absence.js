@@ -2,10 +2,20 @@
   const form = document.getElementById('absence-form');
   if (!form) return;
 
-  if (form.dataset.redirectHome === '1') {
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 2000);
+  const resultDialog = document.getElementById('result-dialog');
+  if (resultDialog) {
+    resultDialog.showModal();
+    const goHome = resultDialog.dataset.redirectHome === '1';
+    resultDialog.querySelector('.alert-popup-ok').addEventListener('click', () => {
+      if (goHome) {
+        window.location.href = '/';
+      } else {
+        resultDialog.close();
+      }
+    });
+    if (goHome) {
+      setTimeout(() => { window.location.href = '/'; }, 4000);
+    }
   }
 
   const parentSelect = document.getElementById('parentId');

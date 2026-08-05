@@ -13,10 +13,14 @@
     </div>
 
     <% if (result) { %>
-      <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
+      <dialog id="result-dialog" class="alert-popup-dialog <%= result.ok ? 'alert-popup-success' : 'alert-popup-error' %>" data-redirect-home="<%= result.ok && result.redirectHome ? '1' : '' %>">
+        <svg class="icon alert-popup-icon"><use href="#<%= result.ok ? 'icon-check-circle' : 'icon-x-circle' %>"/></svg>
+        <p class="alert-popup-message"><%= result.message %></p>
+        <button type="button" class="primary-btn alert-popup-ok" autofocus><%= result.ok ? 'Return to Home' : 'OK' %></button>
+      </dialog>
     <% } %>
 
-    <form method="POST" action="/absence/submit" id="absence-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+    <form method="POST" action="/absence/submit" id="absence-form">
       <div class="form-section">
         <h2>Absence or Late</h2>
         <div class="stack-form">

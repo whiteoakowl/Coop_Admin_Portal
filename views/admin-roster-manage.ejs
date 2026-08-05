@@ -123,19 +123,23 @@
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
-            <tr><th>Name</th><th>Barcode</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>Type</th><th>Grade</th><th>Age</th><th>Birthday</th><th>Email</th><th>Actions</th></tr>
           </thead>
           <tbody>
             <% if (members.length === 0) { %>
-              <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+              <tr><td colspan="7" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% members.forEach(function(m) { %>
               <tr>
                 <td><%= m.name %></td>
-                <td class="mono"><%= m.barcode %></td>
+                <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+                <td><%= m.grade_level || '—' %></td>
+                <td><%= m.age != null ? m.age : '—' %></td>
+                <td><%= m.birthday || '—' %></td>
+                <td><%= m.email || '—' %></td>
                 <td class="actions-cell">
                   <form method="POST" action="/admin/rosters/<%= roster.id %>/remove-member/<%= m.id %>" class="inline-block-form">
-                    <button type="submit" class="link-btn">Remove</button>
+                    <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>
               </tr>

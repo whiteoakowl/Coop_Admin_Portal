@@ -70,6 +70,17 @@ function formatTimestamp(sqlTimestamp) {
   return d.toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// Whole-years-old as of today, or null if the birthday isn't a valid date.
+function ageFromBirthday(iso) {
+  if (!isValidISODate(iso)) return null;
+  const birth = parseISO(iso);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear = today.getMonth() > birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age--;
+  return age >= 0 ? age : null;
+}
+
 module.exports = {
   todayISO,
   addDays,
@@ -80,4 +91,5 @@ module.exports = {
   formatTime,
   formatTimeOfDay,
   formatTimestamp,
+  ageFromBirthday,
 };
