@@ -15,7 +15,7 @@
       <form method="POST" action="/admin/rosters/<%= roster.id %>/settings" class="manage-header-form">
         <input type="text" name="name" value="<%= roster.name %>" class="manage-title-input" required disabled />
         <select name="category" disabled>
-          <option value="">No category</option>
+          <option value="">Category: (Wednesday or Monday)</option>
           <% categories.forEach(function(c) { %>
             <option value="<%= c %>" <%= roster.category === c ? 'selected' : '' %>><%= c %></option>
           <% }); %>
@@ -25,7 +25,7 @@
           <option value="monday" <%= roster.schedule_day === 'monday' ? 'selected' : '' %>>Arrival/Departure: Monday schedule</option>
           <option value="wednesday" <%= roster.schedule_day === 'wednesday' ? 'selected' : '' %>>Arrival/Departure: Wednesday schedule</option>
         </select>
-        <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+        <button type="button" class="primary-btn" data-edit-toggle-edit>Edit</button>
         <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
         <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save Changes</button>
       </form>
@@ -33,33 +33,35 @@
 
     <div class="manage-section">
       <h2>Session Dates (<%= dates.length %>)</h2>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <tbody>
-            <% if (dates.length === 0) { %>
-              <tr><td class="roster-empty">No dates yet.</td></tr>
-            <% } %>
-            <% dates.forEach(function(d) { %>
-              <tr>
-                <td><%= d.label %></td>
-                <td class="actions-cell">
-                  <form method="POST" action="/admin/rosters/<%= roster.id %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any attendance recorded for this date on this roster will be deleted too.');">
-                    <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
       <div class="quick-add-row">
-        <button type="button" class="btn-secondary" onclick="document.getElementById('add-dates-dialog').showModal()">+ Add Session Date</button>
+        <button type="button" class="primary-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Session Dates</button>
       </div>
 
-      <dialog id="add-dates-dialog" class="member-picker-dialog">
+      <dialog id="edit-dates-dialog" class="member-picker-dialog">
+        <h3>Session Dates</h3>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <tbody>
+              <% if (dates.length === 0) { %>
+                <tr><td class="roster-empty">No dates yet.</td></tr>
+              <% } %>
+              <% dates.forEach(function(d) { %>
+                <tr>
+                  <td><%= d.label %></td>
+                  <td class="actions-cell">
+                    <form method="POST" action="/admin/rosters/<%= roster.id %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any attendance recorded for this date on this roster will be deleted too.');">
+                      <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
         <form method="POST" action="/admin/rosters/<%= roster.id %>/dates/add">
-          <h3>Add Session Dates</h3>
           <div class="date-list-wrap">
+            <label class="roster-checkbox-label">Add Dates</label>
             <div class="date-list">
               <div class="date-list-row">
                 <input type="date" name="dates" />
@@ -69,8 +71,8 @@
             <button type="button" class="btn-secondary date-list-add">+ Add another date</button>
           </div>
           <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Add Dates</button>
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+            <button type="submit" class="primary-btn">Save</button>
           </div>
         </form>
       </dialog>
