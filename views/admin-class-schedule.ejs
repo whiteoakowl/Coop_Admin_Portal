@@ -20,12 +20,23 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="roster-toolbar no-print">
-      <div class="category-filter" style="margin: 0;">
-        <label for="day-select">Day</label>
-        <select id="day-select" onchange="window.location = '/admin/class-schedule/' + this.value">
-          <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-          <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-        </select>
+      <div class="filter-row">
+        <div class="category-filter">
+          <label for="day-select">Day</label>
+          <select id="day-select" onchange="window.location = '/admin/class-schedule/' + this.value">
+            <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="date-select">Highlight Absences For</label>
+          <input
+            type="date"
+            id="date-select"
+            value="<%= selectedDate %>"
+            onchange="window.location = '/admin/class-schedule/<%= day %>' + (this.value ? '?date=' + this.value : '')"
+          />
+        </div>
       </div>
       <div class="roster-btn-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog').showModal()">+ Add Class</button>
@@ -107,7 +118,16 @@
                     <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
                     <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
                   </p>
+                  <% if (cls.students.length > 0) { %>
+                    <p class="class-card-staff">
+                      <span class="class-card-pill-label">Students:</span>
+                      <% cls.students.forEach(function(s) { %>
+                        <span class="badge-pill<%= absentIds.has(s.id) ? ' badge-pill-absent' : '' %>"><%= s.name %></span>
+                      <% }); %>
+                    </p>
+                  <% } %>
                   <p class="class-card-staff">
+                    <span class="class-card-pill-label">Staff:</span>
                     <% if (cls.staff.length === 0) { %>
                       <span class="hint">No teachers/assistants yet.</span>
                     <% } else { %>

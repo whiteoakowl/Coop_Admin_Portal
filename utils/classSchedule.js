@@ -142,6 +142,16 @@ function activeParentsForStaff() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
 }
 
+// Every member marked absent (any roster) on a given date - the Class
+// Schedule grid cross-references this against each class's enrolled
+// students to highlight who's out that day.
+function absentMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND status = 'absent'`).all(date).map((r) => r.member_id)
+  );
+}
+
 function appSetting(key, fallback) {
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
@@ -173,6 +183,7 @@ module.exports = {
   removeStaff,
   activeStudents,
   activeParentsForStaff,
+  absentMemberIdsForDate,
   appSetting,
   setAppSetting,
 };

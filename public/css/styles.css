@@ -1961,7 +1961,9 @@ textarea:focus-visible,
 .class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .class-card-header h3 { margin: 0; font-size: 1.05rem; }
 .class-card-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin: 0.35rem 0; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
-.class-card-staff { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 0; }
+.class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.5rem 0 0; }
+.class-card-pill-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); margin-right: 0.15rem; }
+.badge-pill-absent { background: var(--red-bg); color: var(--red); }
 
 .class-schedule-print-page .print-page { padding: 0; }
 .class-schedule-print-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }

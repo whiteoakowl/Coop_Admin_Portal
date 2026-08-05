@@ -1,6 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { isValidDay, defaultDay, DAY_LABELS, gridForDay, appSetting, addStaff, activeParentsForStaff } = require('../utils/classSchedule');
+const { todayISO, weekdayOf } = require('../utils/dates');
+const {
+  isValidDay,
+  defaultDay,
+  DAY_LABELS,
+  gridForDay,
+  appSetting,
+  addStaff,
+  activeParentsForStaff,
+  absentMemberIdsForDate,
+} = require('../utils/classSchedule');
+
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 
 router.get('/class-schedule', (req, res) => res.redirect(`/class-schedule/${defaultDay()}`));
 
@@ -9,6 +21,8 @@ router.get('/class-schedule/:day', (req, res) => {
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
   const editMode = appSetting('class_schedule_public_mode', 'view') === 'edit';
+  const today = todayISO();
+  const absentIds = weekdayOf(today) === DAY_WEEKDAY[day] ? absentMemberIdsForDate(today) : new Set();
 
   res.render('class-schedule-public', {
     title: `${DAY_LABELS[day]} Class Schedule`,
@@ -17,6 +31,7 @@ router.get('/class-schedule/:day', (req, res) => {
     grid: gridForDay(day),
     editMode,
     staffOptions: editMode ? activeParentsForStaff() : [],
+    absentIds,
     notice: req.query.notice || null,
   });
 });

@@ -4,6 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { requireDay } = require('../utils/days');
+const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
@@ -21,7 +22,17 @@ const {
   removeStaff,
   activeStudents,
   activeParentsForStaff,
+  absentMemberIdsForDate,
 } = require('../utils/classSchedule');
+
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+
+// Only defaults the date picker to today when today actually falls on the
+// tab's day - otherwise there's nothing meaningful to highlight yet.
+function defaultDateFor(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -29,12 +40,15 @@ router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/c
 
 router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
+  const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(day);
   res.render('admin-class-schedule', {
     title: 'Class Schedule',
     day,
     dayLabel: DAY_LABELS[day],
     hours: hoursForDay(day),
     grid: gridForDay(day),
+    selectedDate,
+    absentIds: absentMemberIdsForDate(selectedDate),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
