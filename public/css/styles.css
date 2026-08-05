@@ -904,6 +904,12 @@ textarea:focus-visible,
 .summary-late { color: var(--yellow); }
 .summary-absent { color: var(--red); }
 
+.roster-empty-state { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 2.25rem 1rem; }
+.roster-empty-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); opacity: 0.5; margin-bottom: 0.25rem; }
+.roster-empty-title { font-weight: 700; color: var(--ink); font-size: 1rem; margin: 0; }
+.roster-empty-subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.5rem; }
+.roster-empty-btn { flex: none; min-width: 0; }
+
 .link-btn-danger { color: var(--red); }
 
 /* Shared sizing so inline buttons and their neighboring inputs/selects match. */
@@ -954,20 +960,24 @@ textarea:focus-visible,
 
 .roster-empty { color: var(--muted); padding: 2rem; }
 
+/* Softer, pill-shaped attendance badges - pastel background with an
+   accessible dark-shade text color, and the P/L/A letter still carries
+   the status so color alone was never the only signal. */
 .cell-tag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2rem;
+  min-width: 2.1rem;
   height: 1.75rem;
-  border-radius: var(--control-radius);
-  font-weight: 800;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  font-weight: 700;
   font-size: 0.85rem;
 }
 
-.cell-present { background: var(--green); color: #fff; }
-.cell-late { background: var(--yellow-solid); color: #1c2530; }
-.cell-absent { background: var(--red); color: #fff; }
+.cell-present { background: var(--green-bg); color: var(--green); }
+.cell-late { background: var(--yellow-bg); color: var(--yellow); }
+.cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: #e7edf5; color: transparent; }
 
 .roster-table-detailed { width: auto; font-size: 0.8rem; }
@@ -975,6 +985,61 @@ textarea:focus-visible,
 .roster-table-detailed td { white-space: nowrap; }
 .cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; }
 .cell-time { font-size: 0.6rem; color: var(--muted); }
+
+/* ---------- View Roster page (P/L/A grid) modernization ----------
+   Scoped under .roster-view-page (set on <body> only in admin-roster.ejs)
+   so the sticky/hover/fade-in treatment below never bleeds into the other
+   pages that reuse the same .roster-table/.roster-scroll/.roster-table-
+   detailed classes (Attendance list, Manage roster, Volunteers, Members,
+   Name Tags). */
+.roster-view-page .roster-scroll { box-shadow: var(--shadow-sm); }
+
+.roster-view-page .roster-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+.roster-view-page .roster-table thead th:first-child { border-top-left-radius: 10px; }
+.roster-view-page .roster-table thead th:last-child { border-top-right-radius: 10px; }
+.roster-view-page .roster-table thead .roster-name-col { background: var(--green-bg); z-index: 2; }
+
+.roster-view-page .roster-table tbody td { transition: background-color 0.18s ease; }
+.roster-view-page .roster-table tbody tr:nth-child(even) td { background: #f7faf7; }
+.roster-view-page .roster-table tbody tr:nth-child(even) .roster-name-col { background: #f7faf7; }
+.roster-view-page .roster-table tbody tr:hover td { background: var(--green-bg); }
+.roster-view-page .roster-table tbody tr:hover .roster-name-col { background: var(--green-bg); }
+
+.roster-view-page .roster-secondary-col { color: var(--muted); font-size: 0.85rem; font-weight: 400; }
+.roster-view-page thead .roster-secondary-col { color: inherit; font-size: inherit; font-weight: inherit; }
+
+.roster-view-page .link-btn:focus-visible,
+.roster-view-page .roster-action-btn:focus-visible,
+.roster-view-page .btn-secondary:focus-visible {
+  outline: 2px solid var(--brand-dark);
+  outline-offset: 2px;
+}
+
+.roster-view-page .roster-scroll,
+.roster-view-page .legend,
+.roster-view-page .roster-toolbar,
+.roster-view-page .volunteer-box {
+  animation: rosterFadeIn 0.35s ease both;
+}
+@keyframes rosterFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roster-view-page .roster-scroll,
+  .roster-view-page .legend,
+  .roster-view-page .roster-toolbar,
+  .roster-view-page .volunteer-box {
+    animation: none;
+  }
+}
 
 .field-warning { color: var(--red); font-size: 0.8rem; min-height: 1em; display: block; }
 
@@ -1786,6 +1851,11 @@ textarea:focus-visible,
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
   .roster-name-col { position: static; }
+  .roster-view-page .roster-table thead th { position: static; }
+  .roster-view-page .roster-scroll,
+  .roster-view-page .legend,
+  .roster-view-page .roster-toolbar,
+  .roster-view-page .volunteer-box { animation: none; }
 
   /* Roster (Attendance) page: printing "Attendance Spreadsheet" should
      show just the grid, not the embedded Floater Assignments box. */

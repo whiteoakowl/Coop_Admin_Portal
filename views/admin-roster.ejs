@@ -3,7 +3,7 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="admin-page">
+<body class="admin-page roster-view-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <div class="print-header">
@@ -38,8 +38,8 @@
           <thead>
             <tr>
               <th class="roster-name-col">Name</th>
-              <th>Arrival</th>
-              <th>Departure</th>
+              <th class="roster-secondary-col">Arrival</th>
+              <th class="roster-secondary-col">Departure</th>
               <% dateLabels.forEach(function(label) { %>
                 <th><%= label %></th>
               <% }); %>
@@ -47,15 +47,24 @@
           </thead>
           <tbody>
             <% if (rows.length === 0) { %>
-              <tr><td colspan="<%= dateLabels.length + 3 %>" class="roster-empty">No members on this roster yet. <a href="/admin/rosters/<%= roster.id %>/manage">Add members</a>.</td></tr>
+              <tr>
+                <td colspan="<%= dateLabels.length + 3 %>" class="roster-empty">
+                  <div class="roster-empty-state">
+                    <svg class="icon roster-empty-icon"><use href="#icon-users"/></svg>
+                    <p class="roster-empty-title">No members on this roster yet</p>
+                    <p class="roster-empty-subtitle">Add students or parents to start tracking attendance.</p>
+                    <a class="roster-action-btn roster-empty-btn" href="/admin/rosters/<%= roster.id %>/manage">+ Add Members</a>
+                  </div>
+                </td>
+              </tr>
             <% } %>
             <% rows.forEach(function(row) { %>
               <tr>
                 <td class="roster-name-col">
-                  <button type="button" class="link-btn" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button>
+                  <button type="button" class="link-btn" title="View profile for <%= row.member.name %>" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button>
                 </td>
-                <td><%= row.arrivalLabel || '—' %></td>
-                <td><%= row.departureLabel || '—' %></td>
+                <td class="roster-secondary-col"><%= row.arrivalLabel || '—' %></td>
+                <td class="roster-secondary-col"><%= row.departureLabel || '—' %></td>
                 <% row.cells.forEach(function(cell) { %>
                   <td>
                     <% if (!cell) { %>
