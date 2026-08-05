@@ -6,8 +6,9 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { formatTimestamp, formatDateLabel } = require('../utils/dates');
-const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
+const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
@@ -79,6 +80,8 @@ router.get('/name-tag', requireAdmin, (req, res) => {
     templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
     defaultLayouts: DEFAULT_LAYOUTS,
     fieldsByType: FIELDS_BY_TYPE,
+    shapeTypes: SHAPE_TYPES,
+    fontFamilies: FONT_FAMILIES,
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
   });
@@ -157,10 +160,14 @@ router.post('/name-tag/print', requireAdmin, (req, res) => {
   const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
 
   const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
-  const badges = members.map((m) => ({
-    layout: templates[m.member_type] || templates.student,
-    data: badgeDataForMember(m),
-  }));
+  const badges = members.map((m) => {
+    const layout = templates[m.member_type] || templates.student;
+    const data = badgeDataForMember(m);
+    return {
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, data),
+      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+    };
+  });
 
   res.render('admin-name-tag-bulk-print', {
     title: 'Print Name Tags',

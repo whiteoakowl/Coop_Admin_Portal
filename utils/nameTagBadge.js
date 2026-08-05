@@ -25,34 +25,71 @@ const FIELDS_BY_TYPE = {
   admin: [{ field: 'name', label: 'Name' }],
 };
 
-// Each template is { background: '#hex', elements: [...] } - background is
-// the badge's page color, elements is the same positioned-element list as
-// before (text field / shape / image / barcode).
+// Shapes offered by the "Add Element" tool - value is what's stored on
+// el.shapeType, label/icon drive the picker button.
+const SHAPE_TYPES = [
+  { value: 'rectangle', label: 'Rectangle', icon: '#icon-square' },
+  { value: 'roundedRect', label: 'Rounded Rectangle', icon: '#icon-rounded-square' },
+  { value: 'circle', label: 'Circle', icon: '#icon-circle' },
+  { value: 'ellipse', label: 'Ellipse', icon: '#icon-ellipse' },
+  { value: 'triangle', label: 'Triangle', icon: '#icon-triangle' },
+  { value: 'diamond', label: 'Diamond', icon: '#icon-diamond' },
+  { value: 'star', label: 'Star', icon: '#icon-star' },
+  { value: 'arrow', label: 'Arrow', icon: '#icon-arrow-right' },
+  { value: 'polygon', label: 'Polygon', icon: '#icon-hexagon' },
+  { value: 'line', label: 'Line', icon: '#icon-line' },
+];
+
+// A handful of clean, print-friendly font choices. Open Sans, Montserrat
+// and Lilita One are already loaded site-wide; the rest are safe system
+// fonts every OS ships with.
+const FONT_FAMILIES = [
+  'Open Sans',
+  'Montserrat',
+  'Lilita One',
+  'Arial',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+  'Verdana',
+];
+
+// Each template is { background, backgroundOpacity, elements: [...] }.
+// Elements share a base shape of { id, type, x, y, width, height, rotation,
+// opacity, locked } plus type-specific fields (text / shape / image /
+// barcode). A text element's content is either a bound data field (e.g.
+// "name") or, when field is 'custom', its own literal `text` string.
 const DEFAULT_LAYOUTS = {
   student: {
     background: '#ffffff',
+    backgroundOpacity: 1,
     elements: [
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 10, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center' },
-      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 42, width: 320, height: 22, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
-      { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 66, width: 320, height: 42, fontSize: 12, color: '#dc2626', bold: true, align: 'center' },
+      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 56, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 78, width: 320, height: 40, fontSize: 11, color: '#dc2626', bold: true, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
     ],
   },
   parent: {
     background: '#ffffff',
+    backgroundOpacity: 1,
     elements: [
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 16, width: 320, height: 34, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
-      { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 54, width: 320, height: 40, fontSize: 13, color: '#1c2530', bold: false, align: 'center' },
+      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 28, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 60, width: 320, height: 36, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
     ],
   },
   admin: {
     background: '#ffffff',
+    backgroundOpacity: 1,
     elements: [
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 38, fontSize: 21, color: '#1c2530', bold: true, align: 'center' },
+      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 58, width: 320, height: 52, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
     ],
   },
 };
 
-module.exports = { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, DEFAULT_LAYOUTS };
+module.exports = { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS };

@@ -1,32 +1,11 @@
 <%
-// locals: layout ({ background, elements }), data (object), badgeWidth, badgeHeight
-var ALIGN_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+// locals: html (pre-rendered element markup string), bgCss (background css
+// value), badgeWidth, badgeHeight. Both html/bgCss are computed by the
+// route handler using public/js/name-tag-render-core.js - the exact same
+// module the design editor uses to draw its live canvas, so print always
+// matches design (one rendering implementation, not two hand-kept-in-sync
+// copies).
 %>
-<div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; background:<%= layout.background || '#ffffff' %>;">
-  <% layout.elements.forEach(function(el) { %>
-    <% if (el.type === 'text') { %>
-      <div
-        class="badge-el badge-el-text"
-        style="left:<%= el.x %>px; top:<%= el.y %>px; width:<%= el.width %>px; height:<%= el.height %>px; font-size:<%= el.fontSize %>px; color:<%= el.color %>; font-weight:<%= el.bold ? 700 : 400 %>; justify-content:<%= ALIGN_JUSTIFY[el.align] || 'center' %>;"
-      ><%= (data && data[el.field]) || '' %></div>
-    <% } else if (el.type === 'shape') { %>
-      <div
-        class="badge-el badge-el-shape"
-        style="left:<%= el.x %>px; top:<%= el.y %>px; width:<%= el.width %>px; height:<%= el.height %>px; background:<%= el.fill || 'transparent' %>; border:<%= el.borderWidth || 0 %>px solid <%= el.borderColor || 'transparent' %>; border-radius:<%= el.borderRadius || 0 %>px;"
-      ></div>
-    <% } else if (el.type === 'image' && el.src) { %>
-      <img
-        class="badge-el badge-el-image"
-        src="<%= el.src %>"
-        alt=""
-        style="left:<%= el.x %>px; top:<%= el.y %>px; width:<%= el.width %>px; height:<%= el.height %>px;"
-      />
-    <% } else if (el.type === 'barcode') { %>
-      <svg
-        class="badge-el badge-el-barcode"
-        data-barcode-value="<%= (data && data.barcodeValue) || '' %>"
-        style="left:<%= el.x %>px; top:<%= el.y %>px; width:<%= el.width %>px; height:<%= el.height %>px;"
-      ></svg>
-    <% } %>
-  <% }); %>
+<div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; background:<%= bgCss %>;">
+  <%- html %>
 </div>

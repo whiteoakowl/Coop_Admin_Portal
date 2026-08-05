@@ -810,17 +810,10 @@ textarea:focus-visible,
   flex-shrink: 0;
 }
 .badge-el { position: absolute; box-sizing: border-box; }
-.badge-el-text {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  line-height: 1.15;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-}
-.badge-el-shape { pointer-events: none; }
-.badge-el-image { object-fit: contain; }
+.badge-el-text { overflow: hidden; }
+.badge-el-text-inner { outline: none; }
+.badge-el-image { overflow: hidden; }
+.badge-el-image img { display: block; }
 .badge-el-barcode { background: #fff; }
 
 .schedule-time-form input[type="time"] {
@@ -1155,12 +1148,13 @@ textarea:focus-visible,
 
 /* ---------- Name tag design editor ---------- */
 
-/* Type dropdown + Reset/Save sit together in one toolbar row above the
-   canvas, instead of the actions being stacked at the bottom of the
-   controls column. */
+/* Type dropdown, undo/redo, zoom/grid/snap, and Reset/Save all sit in one
+   toolbar row above the canvas, instead of the actions being stacked at
+   the bottom of the controls column. */
 .name-tag-design-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 0.75rem 0 1.1rem; }
 .name-tag-design-toolbar .name-tag-type-select { margin: 0; }
 .name-tag-design-toolbar .name-tag-editor-actions { margin-left: auto; }
+.name-tag-toolbar-group { display: flex; align-items: center; gap: 0.4rem; }
 
 .name-tag-type-select {
   padding: var(--control-padding-compact);
@@ -1174,6 +1168,33 @@ textarea:focus-visible,
   margin: 0.75rem 0;
 }
 
+.name-tag-zoom-select {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.name-tag-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-icon-btn:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-icon-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+.name-tag-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* The badge canvas ("the name tag image") and the editing controls sit
    side by side in two equal-width grid columns; the canvas is centered
    within its column since it's a fixed print size, smaller than the
@@ -1181,6 +1202,11 @@ textarea:focus-visible,
 .name-tag-editor-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 
 .name-tag-canvas-col { display: flex; justify-content: center; }
+
+/* Wraps the (possibly zoomed) canvas plus the grid/selection overlay
+   layers, which sit on top un-clipped so resize/rotate handles near the
+   badge's edge are never cut off by the canvas's own overflow:hidden. */
+.name-tag-canvas-zoom-wrap { position: relative; flex-shrink: 0; }
 
 .name-tag-editor-controls { display: flex; flex-direction: column; gap: 1.1rem; }
 
@@ -1217,6 +1243,7 @@ textarea:focus-visible,
 
 .name-tag-add-field { display: flex; gap: 0.4rem; }
 .name-tag-upload-label { cursor: pointer; }
+.name-tag-bg-tool { display: flex; flex-direction: column; gap: 0.75rem; }
 .name-tag-bg-label {
   display: flex;
   align-items: center;
@@ -1236,6 +1263,8 @@ textarea:focus-visible,
 }
 
 .name-tag-canvas {
+  width: 336px;
+  height: 216px;
   background-image:
     linear-gradient(45deg, #f4f7fb 25%, transparent 25%), linear-gradient(-45deg, #f4f7fb 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #f4f7fb 75%), linear-gradient(-45deg, transparent 75%, #f4f7fb 75%);
@@ -1243,21 +1272,74 @@ textarea:focus-visible,
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 .name-tag-canvas .badge-el { cursor: move; }
+.badge-el-locked { cursor: not-allowed; }
 
-.badge-el-selected { outline: 2px solid var(--brand); outline-offset: 1px; }
-.badge-el-resize-handle {
+/* Alignment grid overlay, toggled on via the toolbar - sits above the
+   canvas but below the selection layer, and never intercepts clicks. */
+.name-tag-grid-overlay {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  display: none;
+  background-image: linear-gradient(to right, rgba(28, 37, 48, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(28, 37, 48, 0.12) 1px, transparent 1px);
+}
+
+/* Selection handles live in their own un-clipped, unscaled layer so they
+   stay a consistent screen size and are never cut off at the canvas edge -
+   only the box itself is positioned/sized/rotated to match the zoomed
+   element underneath it. */
+.name-tag-selection-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.name-tag-selection-box {
+  position: absolute;
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  transform-origin: center center;
+}
+.name-tag-selection-box.locked { outline-color: var(--ink-soft, #94a3b8); outline-style: dashed; }
+.name-tag-resize-handle {
+  position: absolute;
   width: 12px;
   height: 12px;
   background: var(--brand);
   border: 2px solid #fff;
   border-radius: 50%;
-  cursor: nwse-resize;
-  display: none;
+  pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
-.badge-el-selected .badge-el-resize-handle { display: block; }
+.name-tag-resize-handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.name-tag-resize-handle-n { top: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.name-tag-resize-handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.name-tag-resize-handle-e { top: 50%; right: -6px; margin-top: -6px; cursor: ew-resize; }
+.name-tag-resize-handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.name-tag-resize-handle-s { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.name-tag-resize-handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.name-tag-resize-handle-w { top: 50%; left: -6px; margin-top: -6px; cursor: ew-resize; }
+.name-tag-rotate-stem {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  background: var(--brand);
+  margin-left: -1px;
+  pointer-events: none;
+}
+.name-tag-rotate-handle {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #fff;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  cursor: grab;
+  pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
 
 .name-tag-properties:empty { display: none; }
 .name-tag-properties {
@@ -1271,10 +1353,35 @@ textarea:focus-visible,
 .name-tag-prop-row label { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
 .name-tag-prop-row input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
 .name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
+.name-tag-prop-row input[type="range"] { width: 130px; }
+.name-tag-text-area { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; resize: vertical; margin-bottom: 0.6rem; }
 .name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
+.name-tag-prop-divider { border-top: 1px solid var(--border); margin: 0.75rem 0; }
+.name-tag-mini-label { font-size: 0.8rem; font-weight: 600; color: var(--ink); margin: 0 0 0.35rem; }
+.name-tag-mini-btn-row { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.name-tag-mini-btn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 2.1rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-mini-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-mini-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+.name-tag-mini-btn .icon { width: 14px; height: 14px; }
 
 .name-tag-add-element { display: flex; flex-direction: column; gap: 0.6rem; }
-.name-tag-shape-picker { display: flex; gap: 0.4rem; }
+.name-tag-shape-picker { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .name-tag-shape-btn {
   display: inline-flex;
   align-items: center;
@@ -1297,6 +1404,22 @@ textarea:focus-visible,
 .name-tag-editor-actions { display: flex; align-items: center; gap: 0.6rem; }
 .name-tag-editor-actions .btn-secondary,
 .name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; }
+
+/* Crop tool - a fixed-aspect frame (locked to the image element's own
+   box ratio) the user pans by dragging and resizes via a zoom slider. */
+.name-tag-crop-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0 0 0.75rem;
+  cursor: move;
+  background: #f4f7fb;
+}
+.name-tag-crop-image { position: absolute; max-width: none; max-height: none; user-select: none; pointer-events: none; }
+.name-tag-crop-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.name-tag-crop-actions .btn-secondary,
+.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
 .name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }
