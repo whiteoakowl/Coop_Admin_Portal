@@ -80,35 +80,27 @@
           <label>Grade Level
             <input type="text" name="gradeLevel" value="<%= member.grade_level || '' %>" placeholder="e.g. 5th Grade" />
           </label>
-          <label>Parent
-            <select name="parentId">
-              <option value="">No parent linked</option>
-              <% parents.forEach(function(p) { %>
-                <option value="<%= p.id %>" <%= member.parent_id === p.id ? 'selected' : '' %>><%= p.name %></option>
-              <% }); %>
-            </select>
-          </label>
           <label class="member-form-full">Medical/Allergy Notes
             <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
           </label>
         </div>
-        <div class="member-form-grid">
-          <div class="member-form-full">
-            <span class="checkbox-group-label">Additional Parents/Guardians</span>
-            <% if (parents.length === 0) { %>
-              <p class="hint">No parent-type members exist yet.</p>
-            <% } else { %>
-              <div class="checkbox-group">
-                <% parents.forEach(function(p) { %>
-                  <label class="checkbox-option">
-                    <input type="checkbox" name="additionalParentIds" value="<%= p.id %>" <%= additionalParentIds.includes(p.id) ? 'checked' : '' %> />
-                    <%= p.name %>
-                  </label>
-                <% }); %>
-              </div>
-            <% } %>
+      </div>
+
+      <div class="manage-section">
+        <h2>Family</h2>
+        <p class="hint">Connect this profile to any other family members (parents, students, or admins) - they'll appear together on the Absence/Late and Name Tag forms.</p>
+        <% if (familyOptions.length === 0) { %>
+          <p class="hint">No other members exist yet.</p>
+        <% } else { %>
+          <div class="checkbox-group">
+            <% familyOptions.forEach(function(p) { %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="familyMemberIds" value="<%= p.id %>" <%= familyMemberIds.includes(p.id) ? 'checked' : '' %> />
+                <%= p.name %>
+              </label>
+            <% }); %>
           </div>
-        </div>
+        <% } %>
       </div>
 
       <div class="manage-section" id="parent-only-fields">

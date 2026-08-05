@@ -15,7 +15,7 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { allParentsForStudent, additionalParentIdsForStudent, setAdditionalParents } = require('../utils/members');
+const { familyOf, setFamilyMembers } = require('../utils/members');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
@@ -84,22 +84,22 @@ function rostersForMember(memberId) {
 
 // --- Members page (the full member list) ---
 
-function activeParents(excludeId) {
+// Every other active member, any type - the picker for "who's in this
+// person's family" on the edit form (family connections aren't
+// restricted to parent/student anymore).
+function activeMembersExcluding(excludeId) {
   return db
-    .prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' AND id != ? ORDER BY name COLLATE NOCASE")
+    .prepare('SELECT id, name, member_type AS memberType FROM members WHERE active = 1 AND id != ? ORDER BY name COLLATE NOCASE')
     .all(excludeId || 0);
 }
 
 function membersWithDetails(typeFilter) {
   const allMembers = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
-  const parentNames = {};
-  for (const m of allMembers) parentNames[m.id] = m.name;
   const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
   return members.map((m) => ({
     ...m,
     rosters: rostersForMember(m.id),
-    parentName: m.parent_id ? parentNames[m.parent_id] || null : null,
-    parentNames: m.member_type === 'student' ? allParentsForStudent(m).map((p) => p.name) : [],
+    familyNames: familyOf(m.id).map((p) => p.name),
   }));
 }
 
@@ -139,9 +139,9 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
 
   const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
   const lines = [
-    toCsvRow(['Name', 'Type', 'Parent', 'Rosters']),
+    toCsvRow(['Name', 'Type', 'Family', 'Rosters']),
     ...members.map((m) =>
-      toCsvRow([m.name, typeLabel(m.member_type), m.parentNames.length ? m.parentNames.join('; ') : m.parentName || '', m.rosters.map((r) => r.name).join('; ')])
+      toCsvRow([m.name, typeLabel(m.member_type), m.familyNames.join('; '), m.rosters.map((r) => r.name).join('; ')])
     ),
   ];
 
@@ -162,11 +162,7 @@ function memberFormFields(req) {
     birthday: memberType === 'student' ? (req.body.birthday || '').trim() || null : null,
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     medicalNotes: memberType === 'student' ? (req.body.medicalNotes || '').trim() || null : null,
-    parentId: memberType === 'student' && req.body.parentId ? parseInt(req.body.parentId, 10) || null : null,
-    additionalParentIds:
-      memberType === 'student'
-        ? [].concat(req.body.additionalParentIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
-        : [],
+    familyMemberIds: [].concat(req.body.familyMemberIds || []).map((id) => parseInt(id, 10)).filter(Boolean),
     cleanupTeamIds:
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
@@ -223,10 +219,9 @@ router.get('/members/new', requireAdmin, (req, res) => {
       birthday: '',
       grade_level: '',
       medical_notes: '',
-      parent_id: null,
     },
-    parents: activeParents(),
-    additionalParentIds: [],
+    familyOptions: activeMembersExcluding(),
+    familyMemberIds: [],
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: [],
     error: req.query.error || null,
@@ -250,8 +245,8 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
   const info = db
     .prepare(
       `INSERT INTO members
-         (name, barcode, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes, parent_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, barcode, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       f.name,
@@ -266,11 +261,10 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
       photoPath,
       f.birthday,
       f.gradeLevel,
-      f.medicalNotes,
-      f.parentId
+      f.medicalNotes
     );
   syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
-  if (f.memberType === 'student') setAdditionalParents(info.lastInsertRowid, f.additionalParentIds);
+  setFamilyMembers(info.lastInsertRowid, f.familyMemberIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
@@ -284,8 +278,8 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
     title: `Edit ${member.name}`,
     mode: 'edit',
     member,
-    parents: activeParents(id),
-    additionalParentIds: member.member_type === 'student' ? additionalParentIdsForStudent(id) : [],
+    familyOptions: activeMembersExcluding(id),
+    familyMemberIds: familyOf(id).map((m) => m.id),
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: cleanupTeamIdsForMember(id),
     error: req.query.error || null,
@@ -304,16 +298,13 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   if (clash) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${barcode}" is already in the member list.`));
   }
-  // A student can't be their own parent.
-  const parentId = f.parentId === id ? null : f.parentId;
-
   const existing = db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : existing ? existing.photo_path : null;
 
   db.prepare(
     `UPDATE members SET
        name = ?, barcode = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
-       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?, parent_id = ?
+       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
      WHERE id = ?`
   ).run(
     f.name,
@@ -329,12 +320,11 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
     f.birthday,
     f.gradeLevel,
     f.medicalNotes,
-    parentId,
     id
   );
   syncCleanupTeams(id, f.cleanupTeamIds);
   clearVolunteerMembershipIfNotParent(id, f.memberType);
-  setAdditionalParents(id, f.memberType === 'student' ? f.additionalParentIds : []);
+  setFamilyMembers(id, f.familyMemberIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });
@@ -445,8 +435,8 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
       .prepare("SELECT id FROM members WHERE active = 1 AND member_type = 'parent' AND name = ? COLLATE NOCASE")
       .get(r.parentName);
     const parentId = nameToId[r.parentName.toLowerCase()] || (parentRow ? parentRow.id : null);
-    if (studentId && parentId) {
-      db.prepare('UPDATE members SET parent_id = ? WHERE id = ?').run(parentId, studentId);
+    if (studentId && parentId && studentId !== parentId) {
+      setFamilyMembers(studentId, [parentId]);
       linkedParents++;
     }
   }

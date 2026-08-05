@@ -776,6 +776,7 @@ textarea:focus-visible,
 }
 .member-form-full { grid-column: 1 / -1; }
 .checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
+.select-all-btn { margin-bottom: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
 .member-form-grid label {
   display: flex;
   flex-direction: column;

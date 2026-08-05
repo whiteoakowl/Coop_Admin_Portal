@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
-const { parseNamesFromUpload, findMemberByName, allParentsForStudent } = require('../utils/members');
+const { parseNamesFromUpload, findMemberByName, familyOf } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
@@ -86,7 +86,7 @@ function buildRosterGridData(roster) {
     const { arrival, departure } = arrivalDepartureLabels(m.id, roster.schedule_day);
     return {
       member: m,
-      parentName: m.member_type === 'student' ? allParentsForStudent(m).map((p) => p.name).join(', ') || null : null,
+      parentName: familyOf(m.id).map((p) => p.name).join(', ') || null,
       arrivalLabel: arrival,
       departureLabel: departure,
       cells: dates.map((d) => {

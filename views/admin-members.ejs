@@ -60,7 +60,7 @@
             <th class="members-col-photo"></th>
             <th>Name</th>
             <th>Type</th>
-            <th class="members-col-parent">Parent</th>
+            <th class="members-col-parent">Family</th>
             <th class="members-col-rosters">Rosters</th>
             <th>Actions</th>
           </tr>
@@ -77,7 +77,7 @@
               </td>
               <td><a href="/admin/members/<%= m.id %>/edit"><%= m.name %></a></td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-              <td class="members-col-parent"><%= (m.parentNames && m.parentNames.length) ? m.parentNames.join(', ') : (m.parentName || '—') %></td>
+              <td class="members-col-parent"><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>

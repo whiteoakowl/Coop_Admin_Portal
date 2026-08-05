@@ -3,9 +3,11 @@
 -- member_type distinguishes a Student (attends co-op, can be checked in/out
 -- and marked absent/late) from a Parent (submits forms and volunteers, but
 -- is never checked in) from an Admin (co-op staff/leaders who mainly just
--- need a printable badge). A student can optionally link to a parent
--- profile via parent_id, used to group students under their parent on the
--- public Absence/Late form.
+-- need a printable badge). Every member is its own profile regardless of
+-- type; family_id is a simple, symmetric grouping - any members sharing
+-- the same family_id are "family" (used to group names on the public
+-- Absence/Late and Name Tag forms). NULL means the member isn't
+-- connected to anyone.
 CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -23,18 +25,8 @@ CREATE TABLE IF NOT EXISTS members (
   birthday TEXT,
   grade_level TEXT,
   medical_notes TEXT,
-  parent_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+  family_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- A student can have more than one parent/guardian (e.g. divorced
--- parents, other guardians) beyond the single primary parent_id above -
--- parent_id stays the "main" one used wherever only one is needed
--- (default form grouping, Members list), these are the extras.
-CREATE TABLE IF NOT EXISTS member_parents (
-  student_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  parent_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  PRIMARY KEY (student_id, parent_id)
 );
 
 -- Categories are managed separately (Attendance page) so the roster

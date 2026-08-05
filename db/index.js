@@ -35,12 +35,72 @@ const newMemberColumns = {
   birthday: 'TEXT',
   grade_level: 'TEXT',
   medical_notes: 'TEXT',
-  parent_id: 'INTEGER REFERENCES members(id) ON DELETE SET NULL',
+  family_id: 'INTEGER',
 };
 for (const [column, definition] of Object.entries(newMemberColumns)) {
   if (!memberColumns.includes(column)) {
     db.exec(`ALTER TABLE members ADD COLUMN ${column} ${definition}`);
   }
+}
+
+// One-time migration: the old asymmetric "primary parent_id + additional
+// parents in member_parents" model is replaced by a single symmetric
+// family_id grouping. Anyone who already has a database with the old
+// columns/table gets their existing links folded into family groups
+// before those old structures are dropped; a fresh install never sees
+// either since schema.sql no longer defines them.
+const memberParentsTableExists = !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='member_parents'").get();
+if (memberColumns.includes('parent_id') || memberParentsTableExists) {
+  const links = [];
+  if (memberColumns.includes('parent_id')) {
+    db.prepare('SELECT id, parent_id FROM members WHERE parent_id IS NOT NULL')
+      .all()
+      .forEach((r) => links.push([r.id, r.parent_id]));
+  }
+  if (memberParentsTableExists) {
+    db.prepare('SELECT student_id, parent_id FROM member_parents')
+      .all()
+      .forEach((r) => links.push([r.student_id, r.parent_id]));
+  }
+
+  // Union-find over every linked pair, so a student linked to two parents
+  // (or two students sharing a parent) end up in one shared group.
+  const parentOf = new Map();
+  function find(x) {
+    if (!parentOf.has(x)) parentOf.set(x, x);
+    let root = x;
+    while (parentOf.get(root) !== root) root = parentOf.get(root);
+    while (parentOf.get(x) !== root) {
+      const next = parentOf.get(x);
+      parentOf.set(x, root);
+      x = next;
+    }
+    return root;
+  }
+  function union(a, b) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parentOf.set(ra, rb);
+  }
+  links.forEach(([a, b]) => union(a, b));
+
+  const groups = new Map(); // root -> [memberIds]
+  for (const id of parentOf.keys()) {
+    const root = find(id);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(id);
+  }
+
+  let nextFamilyId = 1;
+  const assignFamily = db.prepare('UPDATE members SET family_id = ? WHERE id = ?');
+  for (const memberIds of groups.values()) {
+    if (memberIds.length < 2) continue;
+    const familyId = nextFamilyId++;
+    for (const id of memberIds) assignFamily.run(familyId, id);
+  }
+
+  if (memberColumns.includes('parent_id')) db.exec('ALTER TABLE members DROP COLUMN parent_id');
+  if (memberParentsTableExists) db.exec('DROP TABLE member_parents');
 }
 
 const rosterMemberColumns = db.prepare('PRAGMA table_info(roster_members)').all().map((c) => c.name);

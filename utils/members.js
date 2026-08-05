@@ -46,84 +46,91 @@ function activeParentOptions() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
 }
 
-// Every member is selectable on those forms - no separate opt-in list to
-// manage. Groups the full student list by family: parent_id (the primary
-// parent) plus member_parents (any additional parents/guardians), so a
-// student linked to more than one parent shows up under each of them.
+// Every other active member sharing memberId's family_id (any type -
+// family is symmetric and not restricted to parent/student). Empty if the
+// member isn't connected to anyone.
+function familyOf(memberId) {
+  const self = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!self || self.family_id == null) return [];
+  return db
+    .prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY name COLLATE NOCASE')
+    .all(self.family_id, memberId);
+}
+
+// Every other member of each parent's family group, keyed by parent id -
+// the public forms render the parent's own checkbox separately, then
+// this list, so it deliberately excludes the parent themselves (no more
+// "children only" restriction now that family is a symmetric group
+// rather than a parent->child link).
 function familyGroupsByParent() {
-  const primaryRows = db
-    .prepare(
-      `SELECT id, name, parent_id AS parentId
-       FROM members
-       WHERE active = 1 AND member_type = 'student' AND parent_id IS NOT NULL
-       ORDER BY name COLLATE NOCASE`
-    )
-    .all();
-  const additionalRows = db
-    .prepare(
-      `SELECT m.id, m.name, mp.parent_id AS parentId
-       FROM member_parents mp
-       JOIN members m ON m.id = mp.student_id
-       WHERE m.active = 1 AND m.member_type = 'student'
-       ORDER BY m.name COLLATE NOCASE`
-    )
-    .all();
+  const parents = db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all();
   const byParent = {};
-  const seen = new Set();
-  [...primaryRows, ...additionalRows].forEach((r) => {
-    const key = `${r.parentId}|${r.id}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    if (!byParent[r.parentId]) byParent[r.parentId] = [];
-    byParent[r.parentId].push({ id: r.id, name: r.name });
-  });
+  for (const p of parents) {
+    byParent[p.id] = familyOf(p.id).map((m) => ({ id: m.id, name: m.name }));
+  }
   return byParent;
 }
 
-// Confirms memberId is really part of parentId's family (themselves, or a
-// student linked via either parent_id or member_parents) before letting a
-// form submission touch that record.
+// Confirms memberId is really part of parentId's family (themselves, or
+// anyone sharing their family_id) before letting a form submission touch
+// that record.
 function loadFamilyMember(memberId, parentId) {
   if (memberId === parentId) {
     return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
   }
-  const direct = db
-    .prepare("SELECT * FROM members WHERE id = ? AND parent_id = ? AND active = 1 AND member_type = 'student'")
-    .get(memberId, parentId);
-  if (direct) return direct;
-  return db
-    .prepare(
-      `SELECT m.* FROM members m
-       JOIN member_parents mp ON mp.student_id = m.id
-       WHERE m.id = ? AND mp.parent_id = ? AND m.active = 1 AND m.member_type = 'student'`
-    )
-    .get(memberId, parentId);
+  const parent = db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
+  if (!parent || parent.family_id == null) return null;
+  return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, parent.family_id);
 }
 
-function additionalParentIdsForStudent(studentId) {
-  return db.prepare('SELECT parent_id FROM member_parents WHERE student_id = ?').all(studentId).map((r) => r.parent_id);
+function nextFamilyId() {
+  return db.prepare('SELECT COALESCE(MAX(family_id), 0) + 1 AS next FROM members').get().next;
 }
 
-// Every parent (primary + additional) linked to a student, as full member
-// rows - used wherever a profile needs to show "who are this kid's
-// parents" rather than just the one primary link.
-function allParentsForStudent(student) {
-  const ids = new Set(additionalParentIdsForStudent(student.id));
-  if (student.parent_id) ids.add(student.parent_id);
-  if (ids.size === 0) return [];
-  const placeholders = [...ids].map(() => '?').join(',');
-  return db
-    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`)
-    .all(...ids);
-}
+// Rebuilds memberId's family group to be exactly {memberId} + otherIds -
+// this is a direct "here's who's in my family now" action, not a merge:
+// anyone previously grouped with memberId but not in otherIds is dropped
+// from the group (and if that leaves their old group down to one person,
+// that person is cleared too, since a family of one isn't a family).
+// Reuses an existing family_id found among the new group's members if
+// there is one (preferring memberId's own), so connecting into an
+// existing family doesn't fragment it.
+function setFamilyMembers(memberId, otherIds) {
+  const uniqueOtherIds = [...new Set(otherIds)].filter((id) => id !== memberId);
+  const oldFamilyId = (db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId) || {}).family_id;
 
-// Replaces a student's full additional-parent list in one pass (the
-// primary parent_id is a separate column, saved separately).
-function setAdditionalParents(studentId, parentIds) {
-  db.prepare('DELETE FROM member_parents WHERE student_id = ?').run(studentId);
-  const link = db.prepare('INSERT OR IGNORE INTO member_parents (student_id, parent_id) VALUES (?, ?)');
-  for (const parentId of parentIds) {
-    if (parentId !== studentId) link.run(studentId, parentId);
+  // Detach anyone who was in memberId's old group but isn't in the new
+  // list *before* touching memberId's own family_id - the new group often
+  // reuses the same family_id number (nothing new, just re-saving), so
+  // doing this after would make a dropped member indistinguishable from
+  // one who's staying.
+  if (oldFamilyId != null) {
+    const stayingIds = new Set([memberId, ...uniqueOtherIds]);
+    const oldGroupIds = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId).map((r) => r.id);
+    const droppedIds = oldGroupIds.filter((id) => !stayingIds.has(id));
+    if (droppedIds.length > 0) {
+      const placeholders = droppedIds.map(() => '?').join(',');
+      db.prepare(`UPDATE members SET family_id = NULL WHERE id IN (${placeholders})`).run(...droppedIds);
+    }
+  }
+
+  if (uniqueOtherIds.length === 0) {
+    db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(memberId);
+  } else {
+    const groupIds = [memberId, ...uniqueOtherIds];
+    const placeholders = groupIds.map(() => '?').join(',');
+    const rows = db.prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders})`).all(...groupIds);
+    const selfFamilyId = (rows.find((r) => r.id === memberId) || {}).family_id;
+    const anyFamilyId = (rows.find((r) => r.family_id != null) || {}).family_id;
+    const familyId = selfFamilyId != null ? selfFamilyId : anyFamilyId != null ? anyFamilyId : nextFamilyId();
+    db.prepare(`UPDATE members SET family_id = ? WHERE id IN (${placeholders})`).run(familyId, ...groupIds);
+  }
+
+  // If dropping members left the old group down to just one person left,
+  // that person isn't meaningfully "family" anymore either.
+  if (oldFamilyId != null) {
+    const remaining = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId);
+    if (remaining.length === 1) db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(remaining[0].id);
   }
 }
 
@@ -133,7 +140,6 @@ module.exports = {
   activeParentOptions,
   familyGroupsByParent,
   loadFamilyMember,
-  additionalParentIdsForStudent,
-  allParentsForStudent,
-  setAdditionalParents,
+  familyOf,
+  setFamilyMembers,
 };

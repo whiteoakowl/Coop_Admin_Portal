@@ -28,6 +28,7 @@
           </select>
         </div>
 
+        <button type="button" id="select-all-btn" class="btn-secondary select-all-btn" hidden>Select All</button>
         <div id="name-tag-member-groups">
           <% parents.forEach(function(p) { %>
             <% var kids = childrenByParent[p.id] || []; %>
