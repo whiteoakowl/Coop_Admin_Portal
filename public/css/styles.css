@@ -1238,14 +1238,30 @@ textarea:focus-visible,
 .badge-print-main { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
 .badge-print-main .badge-canvas { margin: 0 auto; }
 
+/* Each .badge-sheet-page is sized and inset exactly like the physical US
+   Letter sheet it prints onto (see the matching @page rule in the two
+   views that use this), so the on-screen preview shows the same page
+   boundaries and margins the printout will have - not just badges/cards
+   floating with no sense of the paper they'll land on. The white-page-on-
+   a-shadow look is screen-only chrome, stripped in @media print below. */
+.badge-sheet-page {
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  padding: 0.4in;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+}
+.badge-sheet-page:not(:last-child) { page-break-after: always; }
+
 .badge-sheet {
   display: grid;
   grid-template-columns: repeat(2, auto);
   gap: 0.35in;
   justify-content: center;
 }
-.badge-sheet-page { page-break-after: always; margin-bottom: 0.5in; }
-.badge-sheet-page:last-child { page-break-after: auto; }
 
 /* ---------- Name tag design editor ---------- */
 
@@ -1997,6 +2013,18 @@ textarea:focus-visible,
   }
   .setup-team-title-input { font-weight: 700; }
   .setup-team-card { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+
+  /* The on-screen "sheet of paper" chrome (drop shadow, border, the gap
+     between pages) is there to preview the page, not to print onto it -
+     the physical page IS the boundary once this is actually printing. */
+  .badge-sheet-page {
+    width: auto;
+    height: auto;
+    min-height: 100vh;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+  }
 }
 
 @page {
