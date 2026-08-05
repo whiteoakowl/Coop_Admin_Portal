@@ -99,19 +99,10 @@
                   <button
                     type="button"
                     class="icon-btn"
-                    onclick="var d = document.getElementById('badge-dialog-<%= m.id %>'); d.showModal(); renderNameTagBarcodes(d);"
-                    aria-label="View name tag for <%= m.name %>"
-                    title="View Name Tag"
+                    onclick="var d = document.getElementById('cards-dialog-<%= m.id %>'); d.showModal(); renderNameTagBarcodes(d);"
+                    aria-label="View cards for <%= m.name %>"
+                    title="View Cards"
                   ><svg class="icon"><use href="#icon-badge"/></svg></button>
-                  <% if (m.member_type === 'student') { %>
-                    <button
-                      type="button"
-                      class="icon-btn"
-                      onclick="document.getElementById('schedule-card-dialog-<%= m.id %>').showModal();"
-                      aria-label="View schedule card for <%= m.name %>"
-                      title="View Schedule Card"
-                    ><svg class="icon"><use href="#icon-clock"/></svg></button>
-                  <% } %>
                   <button
                     type="button"
                     class="icon-btn"
@@ -130,24 +121,25 @@
                     </div>
                   </form>
                 </dialog>
-                <dialog id="badge-dialog-<%= m.id %>" class="badge-preview-dialog">
-                  <h3>Name Tag &mdash; <%= m.name %></h3>
-                  <%- include('partials/name-tag-badge', { html: m.badgeHtml, bgCss: m.badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
-                  <div class="notes-dialog-actions">
-                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-                    <a class="primary-btn" href="/admin/members/<%= m.id %>/name-tag/print" target="_blank">Print</a>
-                  </div>
-                </dialog>
-                <% if (m.member_type === 'student') { %>
-                  <dialog id="schedule-card-dialog-<%= m.id %>" class="badge-preview-dialog">
-                    <h3>Schedule Card &mdash; <%= m.name %></h3>
-                    <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+                <dialog id="cards-dialog-<%= m.id %>" class="badge-preview-dialog">
+                  <h3>Cards &mdash; <%= m.name %></h3>
+                  <form method="GET" action="/admin/members/<%= m.id %>/cards/print" target="_blank">
+                    <div class="cards-preview-option">
+                      <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
+                      <%- include('partials/name-tag-badge', { html: m.badgeHtml, bgCss: m.badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+                    </div>
+                    <% if (m.member_type === 'student') { %>
+                      <div class="cards-preview-option">
+                        <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
+                        <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+                      </div>
+                    <% } %>
                     <div class="notes-dialog-actions">
                       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-                      <a class="primary-btn" href="/admin/members/<%= m.id %>/schedule-card/print" target="_blank">Print</a>
+                      <button type="submit" class="primary-btn">Print</button>
                     </div>
-                  </dialog>
-                <% } %>
+                  </form>
+                </dialog>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
               </td>
             </tr>

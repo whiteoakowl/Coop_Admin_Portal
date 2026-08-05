@@ -455,35 +455,48 @@ router.post('/members/:id/notes', requireAdmin, (req, res) => {
   res.redirect('/admin/members');
 });
 
-router.get('/members/:id/name-tag/print', requireAdmin, (req, res) => {
+// Member profile "Cards" dialog: prints whichever of Name Tag / Schedule
+// Card the admin checked, on one preview page. Schedule Card is silently
+// dropped for non-students (only students have class schedules), so
+// checking both boxes on a parent's profile still just prints their name
+// tag rather than erroring.
+router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
-  const layout = getTemplate(member.member_type);
-  const data = badgeDataForMember(member);
-  res.render('admin-name-tag-print', {
-    title: `Name Tag - ${member.name}`,
-    html: NameTagRenderCore.renderBadgeElements(layout.elements, data),
-    bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
-    badgeWidth: BADGE_WIDTH,
-    badgeHeight: BADGE_HEIGHT,
-  });
-});
+  const wanted = [].concat(req.query.cards || []);
+  const cards = [];
 
-router.get('/members/:id/schedule-card/print', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = db.prepare("SELECT * FROM members WHERE id = ? AND member_type = 'student'").get(id);
-  if (!member) return res.status(404).send('Not found');
+  if (wanted.includes('nameTag')) {
+    const layout = getTemplate(member.member_type);
+    cards.push({
+      heading: 'Name Tag',
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, badgeDataForMember(member)),
+      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+      width: BADGE_WIDTH,
+      height: BADGE_HEIGHT,
+    });
+  }
+  if (wanted.includes('scheduleCard') && member.member_type === 'student') {
+    const template = getScheduleCardTemplate();
+    cards.push({
+      heading: 'Schedule Card',
+      html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(member)),
+      bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+    });
+  }
 
-  const template = getScheduleCardTemplate();
-  res.render('admin-name-tag-print', {
-    title: `Schedule Card - ${member.name}`,
-    heading: 'Schedule Card',
-    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(member)),
-    bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
-    badgeWidth: CARD_WIDTH,
-    badgeHeight: CARD_HEIGHT,
+  if (cards.length === 0) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one card to print.'));
+  }
+
+  res.render('admin-member-cards-print', {
+    title: `Cards - ${member.name}`,
+    memberName: member.name,
+    cards,
   });
 });
 

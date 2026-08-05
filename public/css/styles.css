@@ -1235,13 +1235,24 @@ textarea:focus-visible,
 .badge-preview-dialog h3 { margin: 0 0 0.75rem; }
 .badge-preview-dialog .badge-canvas { margin: 0 auto 1rem; }
 
+/* Member profile "Cards" dialog: Name Tag and (for students) Schedule
+   Card previews stacked, each with its own "print this one?" checkbox
+   directly above it. */
+.cards-preview-option { display: flex; flex-direction: column; align-items: center; }
+.cards-preview-option .checkbox-option { margin-bottom: 0.5rem; font-weight: 600; }
+
 .badge-print-main { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
 .badge-print-main .badge-canvas { margin: 0 auto; }
 
+/* Member profile "Cards" print page: 1-2 cards (Name Tag and/or Schedule
+   Card) stacked, each with a small centered label so it's clear which
+   is which when both are printed together. */
+.member-card-print-block h2 { text-align: center; margin: 0 0 0.5rem; color: var(--muted); font-size: 1rem; font-weight: 700; }
+
 /* Print preview pages (Name Tag / Schedule Card / Class Schedule print
    views): the Print button sits directly under the title instead of
-   beside it, so both header elements match this page's build order. */
-.print-preview-header { margin-bottom: 1.5rem; }
+   beside it, and both are centered above the preview content below. */
+.print-preview-header { margin-bottom: 1.5rem; text-align: center; }
 .print-preview-header h1 { margin-bottom: 0.75rem; }
 
 /* Each .badge-sheet-page is sized and inset exactly like the physical US
