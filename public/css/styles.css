@@ -1977,6 +1977,24 @@ textarea:focus-visible,
 .class-color-label input[type="color"] { width: 2.75rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 
 .class-schedule-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* Admin Class Schedule grid: classroom locations as rows, hour blocks as
+   columns, full grid lines - a class spanning two hour blocks gets one
+   cell with colspan="2" instead of two separate cards (see
+   roomGridForDay in utils/classSchedule.js). */
+.class-schedule-room-grid { border: 1px solid var(--border); }
+.class-schedule-room-grid th,
+.class-schedule-room-grid td {
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  vertical-align: top;
+  min-width: 220px;
+}
+.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; }
+.class-schedule-room-col { min-width: 140px; font-weight: 700; white-space: nowrap; background: var(--brand-soft); }
+.class-schedule-cell { background: #fff; }
+.class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.5rem; }
+.class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
 .class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
 .class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
 .class-card {

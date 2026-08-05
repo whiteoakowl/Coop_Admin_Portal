@@ -74,6 +74,59 @@ function gridForDay(day) {
   return hours.map((h) => ({ ...h, classes: byHour[h.position] || [] }));
 }
 
+// The admin grid view: classroom locations as rows, hour blocks as
+// columns. Two consecutive classes in the same room sharing a name and
+// color are treated as one class that runs across both blocks, and
+// rendered as a single cell spanning both columns instead of two
+// separate cards.
+function roomGridForDay(day) {
+  const hours = hoursForDay(day);
+  const classes = db
+    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, class_name COLLATE NOCASE')
+    .all(day)
+    .map((cls) => ({ ...cls, students: studentsForClass(cls.id), staff: staffForClass(cls.id) }));
+
+  const roomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : 'Unassigned')))].sort(
+    (a, b) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    }
+  );
+
+  const rows = roomNames.map((room) => {
+    const byHour = {};
+    for (const h of HOUR_POSITIONS) byHour[h] = [];
+    classes.forEach((cls) => {
+      const clsRoom = cls.room && cls.room.trim() ? cls.room.trim() : 'Unassigned';
+      if (clsRoom === room) byHour[cls.hour_position].push(cls);
+    });
+
+    const cells = [];
+    let h = 1;
+    while (h <= HOUR_POSITIONS.length) {
+      const here = byHour[h];
+      const next = byHour[h + 1];
+      if (
+        here.length === 1 &&
+        next &&
+        next.length === 1 &&
+        next[0].class_name.toLowerCase() === here[0].class_name.toLowerCase() &&
+        next[0].color === here[0].color
+      ) {
+        cells.push({ span: 2, classes: [here[0]] });
+        h += 2;
+      } else {
+        cells.push({ span: 1, classes: here });
+        h += 1;
+      }
+    }
+    return { room, cells };
+  });
+
+  return { hours, rows };
+}
+
 function createClass(fields) {
   const info = db
     .prepare(
@@ -193,6 +246,7 @@ module.exports = {
   hoursForDay,
   saveHourLabels,
   gridForDay,
+  roomGridForDay,
   getClass,
   createClass,
   updateClass,

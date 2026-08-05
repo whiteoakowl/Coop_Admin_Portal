@@ -99,49 +99,65 @@
       </form>
     </dialog>
 
-    <div class="class-schedule-grid">
-      <% grid.forEach(function(hour) { %>
-        <div class="class-schedule-hour">
-          <h2 class="class-schedule-hour-label"><%= hour.label %></h2>
-          <% if (hour.classes.length === 0) { %>
-            <p class="roster-empty">No classes yet.</p>
-          <% } else { %>
-            <div class="class-card-row">
-              <% hour.classes.forEach(function(cls) { %>
-                <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
-                  <div class="class-card-header">
-                    <h3><%= cls.class_name %></h3>
-                    <a class="icon-btn no-print" href="/admin/class-schedule/classes/<%= cls.id %>/manage" aria-label="Manage <%= cls.class_name %>" title="Manage">&#9998;</a>
-                  </div>
-                  <p class="class-card-meta">
-                    <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
-                    <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
-                    <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
-                  </p>
-                  <% if (cls.students.length > 0) { %>
-                    <p class="class-card-staff">
-                      <span class="class-card-pill-label">Students:</span>
-                      <% cls.students.forEach(function(s) { %>
-                        <span class="badge-pill<%= absentIds.has(s.id) ? ' badge-pill-absent' : '' %>"><%= s.name %></span>
-                      <% }); %>
-                    </p>
-                  <% } %>
-                  <p class="class-card-staff">
-                    <span class="class-card-pill-label">Staff:</span>
-                    <% if (cls.staff.length === 0) { %>
-                      <span class="hint">No teachers/assistants yet.</span>
-                    <% } else { %>
-                      <% cls.staff.forEach(function(s) { %>
-                        <span class="badge-pill"><%= s.name %><%= s.role === 'assistant' ? ' (Assistant)' : '' %></span>
-                      <% }); %>
-                    <% } %>
-                  </p>
-                </div>
-              <% }); %>
-            </div>
+    <div class="roster-scroll">
+      <table class="roster-table class-schedule-room-grid">
+        <thead>
+          <tr>
+            <th class="class-schedule-room-col">Room</th>
+            <% roomGrid.hours.forEach(function(h) { %>
+              <th><%= h.label %></th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (roomGrid.rows.length === 0) { %>
+            <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes yet.</td></tr>
           <% } %>
-        </div>
-      <% }); %>
+          <% roomGrid.rows.forEach(function(row) { %>
+            <tr>
+              <td class="class-schedule-room-col"><%= row.room %></td>
+              <% row.cells.forEach(function(cell) { %>
+                <td colspan="<%= cell.span %>" class="class-schedule-cell">
+                  <% if (cell.classes.length === 0) { %>
+                    &nbsp;
+                  <% } else { %>
+                    <% cell.classes.forEach(function(cls) { %>
+                      <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                        <div class="class-card-header">
+                          <h3><%= cls.class_name %></h3>
+                          <a class="icon-btn no-print" href="/admin/class-schedule/classes/<%= cls.id %>/manage" aria-label="Manage <%= cls.class_name %>" title="Manage">&#9998;</a>
+                        </div>
+                        <p class="class-card-meta">
+                          <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
+                          <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
+                        </p>
+                        <% if (cls.students.length > 0) { %>
+                          <p class="class-card-staff">
+                            <span class="class-card-pill-label">Students:</span>
+                            <% cls.students.forEach(function(s) { %>
+                              <span class="badge-pill<%= absentIds.has(s.id) ? ' badge-pill-absent' : '' %>"><%= s.name %></span>
+                            <% }); %>
+                          </p>
+                        <% } %>
+                        <p class="class-card-staff">
+                          <span class="class-card-pill-label">Staff:</span>
+                          <% if (cls.staff.length === 0) { %>
+                            <span class="hint">No teachers/assistants yet.</span>
+                          <% } else { %>
+                            <% cls.staff.forEach(function(s) { %>
+                              <span class="badge-pill"><%= s.name %><%= s.role === 'assistant' ? ' (Assistant)' : '' %></span>
+                            <% }); %>
+                          <% } %>
+                        </p>
+                      </div>
+                    <% }); %>
+                  <% } %>
+                </td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
     </div>
   </main>
 </body>
