@@ -267,6 +267,44 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT NOT NULL
 );
 
+-- Substitutes pilot (Volunteers > Substitutes): permanent jobs are duties
+-- that need a person every single session at a given hour (e.g. "Front
+-- Desk"), separate from both class teaching and Setup/Cleanup teams - an
+-- admin-managed list, not reused from either.
+CREATE TABLE IF NOT EXISTS permanent_jobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  hour_position INTEGER NOT NULL CHECK(hour_position BETWEEN 1 AND 4),
+  title TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Floaters an admin has pre-marked as good fits for a permanent job -
+-- preferred over the general floater-for-that-hour list when suggesting
+-- who should fill it.
+CREATE TABLE IF NOT EXISTS permanent_job_floaters (
+  job_id INTEGER NOT NULL REFERENCES permanent_jobs(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  PRIMARY KEY (job_id, member_id)
+);
+
+-- One row per hour-slot (a class needing a sub, or a permanent job) an
+-- admin has actually assigned for a specific date - suggestions
+-- themselves are computed on the fly, not stored; this only holds what
+-- was accepted or manually chosen. slot_type + slot_id together point at
+-- either a classes.id or a permanent_jobs.id (polymorphic, so no direct
+-- foreign key - both parents clear their own rows here on delete).
+CREATE TABLE IF NOT EXISTS substitute_assignments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_date TEXT NOT NULL,
+  slot_type TEXT NOT NULL CHECK(slot_type IN ('class','job')),
+  slot_id INTEGER NOT NULL,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  is_override INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(session_date, slot_type, slot_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
