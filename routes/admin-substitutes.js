@@ -57,12 +57,15 @@ function subUrl(day, params) {
 router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
-  const hourPosition = parseInt(req.body.hourPosition, 10);
-  if (!title || !HOUR_POSITIONS.includes(hourPosition)) {
-    return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and hour are required.' }));
+  const hourPositions = [].concat(req.body.hourPositions || [])
+    .map((v) => parseInt(v, 10))
+    .filter((p) => HOUR_POSITIONS.includes(p));
+  if (!title || hourPositions.length === 0) {
+    return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and at least one hour are required.' }));
   }
-  createPermanentJob({ day, hourPosition, title });
-  res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added.` }));
+  hourPositions.forEach((hourPosition) => createPermanentJob({ day, hourPosition, title }));
+  const hourNote = hourPositions.length > 1 ? `Hours ${hourPositions.join(', ')}` : `Hour ${hourPositions[0]}`;
+  res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).` }));
 });
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, (req, res) => {

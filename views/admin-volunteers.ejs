@@ -375,13 +375,18 @@
         <dialog id="add-job-dialog" class="member-picker-dialog">
           <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/new">
             <h3>Add Permanent Job</h3>
+            <p class="hint">Add one job to as many hours as it runs - each hour gets its own slot on the board.</p>
             <input type="hidden" name="date" value="<%= selectedDate %>" />
-            <label>Hour
-              <select name="hourPosition" required>
-                <% hourPositions.forEach(function(p) { %><option value="<%= p %>">Hour <%= p %></option><% }); %>
-              </select>
-            </label>
             <input type="text" name="title" placeholder="Job title (e.g. Front Desk)" required />
+            <span class="class-card-pill-label">Hours:</span>
+            <div class="checkbox-row">
+              <% hourPositions.forEach(function(p) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="hourPositions" value="<%= p %>" />
+                  Hour <%= p %>
+                </label>
+              <% }); %>
+            </div>
             <div class="notes-dialog-actions">
               <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
               <button type="submit" class="primary-btn">Add Job</button>

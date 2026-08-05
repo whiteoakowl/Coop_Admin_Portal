@@ -1853,6 +1853,8 @@ textarea:focus-visible,
   max-width: 1100px;
   text-align: left;
 }
+.volunteer-open-slots { margin-top: 2rem; text-align: left; }
+.volunteer-open-slots .volunteer-public-table { max-width: 700px; margin-bottom: 1.25rem; }
 .volunteer-public-card {
   flex: 0 1 460px;
   background: var(--surface);

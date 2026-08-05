@@ -42,6 +42,26 @@
       <% }); %>
     </div>
   <% } %>
+
+  <% if (openHours.length > 0) { %>
+    <div class="kiosk-wrap volunteer-open-slots">
+      <h2 class="volunteer-public-section">Still Needs a Floater</h2>
+      <% openHours.forEach(function(hour) { %>
+        <h3 class="class-schedule-hour-label"><%= hour.label %></h3>
+        <table class="volunteer-public-table">
+          <thead><tr><th>Position</th><th>Room / Detail</th></tr></thead>
+          <tbody>
+            <% hour.slots.forEach(function(slot) { %>
+              <tr>
+                <td><%= slot.label %></td>
+                <td><%= slot.detail %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% }); %>
+    </div>
+  <% } %>
   <script src="/js/idle-redirect.js"></script>
 </body>
 </html>
