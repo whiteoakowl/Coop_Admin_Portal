@@ -54,9 +54,11 @@
           <div class="volunteer-manage-card">
             <h2>Hour Sections</h2>
             <form method="POST" action="/admin/volunteers/<%= day %>/sections" class="volunteer-sections-form">
-              <% sections.forEach(function(s) { %>
-                <input type="text" name="labels" value="<%= s.label %>" />
-              <% }); %>
+              <div class="volunteer-sections-grid">
+                <% sections.forEach(function(s) { %>
+                  <input type="text" name="labels" value="<%= s.label %>" />
+                <% }); %>
+              </div>
               <button type="submit" class="btn-secondary">Save Labels</button>
             </form>
           </div>

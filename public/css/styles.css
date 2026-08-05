@@ -1512,31 +1512,23 @@ textarea:focus-visible,
 
 /* ---------- Volunteers ---------- */
 
-.volunteer-sections-form { display: flex; flex-wrap: wrap; align-items: stretch; margin: 0.5rem 0 1rem; }
-.volunteer-sections-form input[type="text"] { flex: 1; min-width: 150px; }
+.volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin: 0.5rem 0 1rem; }
 
-/* Joins a run of text-bar fields + a trailing button into one seamless
-   control, no gaps, connected corners - same look as the Members page
-   quick-add bar, extended to multi-field forms. Uses explicit input
-   selectors (not :first-child alone) so specificity reliably beats the
-   shared control-sizing rule regardless of field order. */
-.volunteer-sections-form input {
-  border-radius: 0;
-  margin-left: -1px;
-}
-.volunteer-sections-form > *:first-child {
-  border-radius: 8px 0 0 8px;
-  margin-left: 0;
+/* Hour 1/Hour 2 and Hour 3/Hour 4 sit side by side as a 2-column grid,
+   with the Save button centered on its own row underneath. */
+.volunteer-sections-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
 }
 .volunteer-sections-form button {
-  border-radius: 0 8px 8px 0;
+  border-radius: 8px;
   background: var(--btn-bg);
   color: #fff;
   border-color: var(--btn-bg);
   font-weight: 600;
   white-space: nowrap;
-  position: relative;
-  z-index: 1;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .volunteer-sections-form button:hover {
@@ -1829,26 +1821,24 @@ textarea:focus-visible,
   /* Seamless input(s)+button bars can't stay side-by-side once a native
      file picker or several fields are involved - stack them full-width
      instead of overflowing the screen. */
-  .inline-form-flat,
-  .volunteer-sections-form {
+  .inline-form-flat {
     flex-direction: column;
     gap: 0.5rem;
   }
   .inline-form-flat input,
   .inline-form-flat select,
-  .inline-form-flat button,
-  .volunteer-sections-form input,
-  .volunteer-sections-form button {
+  .inline-form-flat button {
     width: 100%;
     max-width: 100%;
     border-radius: 8px !important;
     border: 1px solid var(--border) !important;
     margin-left: 0 !important;
   }
-  .inline-form-flat button,
-  .volunteer-sections-form button {
+  .inline-form-flat button {
     border-color: var(--btn-bg) !important;
   }
+
+  .volunteer-sections-grid { grid-template-columns: 1fr; }
 
   .admin-main { padding: 1rem; }
   .notes-dialog,
