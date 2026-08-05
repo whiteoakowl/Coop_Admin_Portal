@@ -3,6 +3,7 @@ const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const bcrypt = require('bcryptjs');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
+const { DEFAULT_LAYOUT: SCHEDULE_CARD_DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -105,6 +106,14 @@ for (const memberType of ['student', 'parent', 'admin']) {
   db.prepare('INSERT INTO name_tag_templates (member_type, layout_json) VALUES (?, ?)').run(
     memberType,
     JSON.stringify(DEFAULT_LAYOUTS[memberType])
+  );
+}
+
+// Seed the single starter Schedule Card design.
+const hasScheduleCardTemplate = db.prepare('SELECT id FROM schedule_card_templates WHERE id = 1').get();
+if (!hasScheduleCardTemplate) {
+  db.prepare('INSERT INTO schedule_card_templates (id, layout_json) VALUES (1, ?)').run(
+    JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT)
   );
 }
 

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: auto; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main badge-print-main">
+    <div class="roster-toolbar no-print">
+      <div><h1>Print Schedule Cards</h1></div>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <% if (cards.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      // Landscape 3.5x2.25in cards fit 2 across x 4 down on a US Letter
+      // sheet with room for margins - 8 per page (same size as name tags).
+      var pages = [];
+      for (var i = 0; i < cards.length; i += 8) pages.push(cards.slice(i, i + 8));
+    %>
+    <% pages.forEach(function(pageCards) { %>
+      <div class="badge-sheet-page badge-sheet">
+        <% pageCards.forEach(function(c) { %>
+          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+</body>
+</html>

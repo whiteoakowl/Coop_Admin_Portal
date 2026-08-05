@@ -185,11 +185,40 @@
     return '<svg class="badge-el badge-el-barcode" data-id="' + esc(el.id) + '" data-type="barcode" data-barcode-value="' + esc(value) + '" style="' + style + '"></svg>';
   }
 
+  // Schedule Card-only element: a fixed 4-row Class/Time/Class Name/Room
+  // table, bound (via el.field) to an array of up to 4 {time, className,
+  // room} rows - always renders exactly 4 rows, blank ones show an em
+  // dash, matching the schedule editor's "always 4 rows" convention.
+  function renderTableEl(el, data) {
+    var style = elementBaseStyle(el) + ' overflow:hidden;';
+    var rows = (data && data[el.field]) || [];
+    var fontSize = num(el.fontSize, 8);
+    var borderColor = el.borderColor || '#dbe8f5';
+    var headerBg = el.headerColor || '#eaf4fd';
+    var cellStyle = 'padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+    var html = '<table style="width:100%; height:100%; border-collapse:collapse; table-layout:fixed; font-family:inherit;"><thead><tr style="background:' + esc(headerBg) + ';">';
+    ['Class', 'Time', 'Class Name', 'Room'].forEach(function (label) {
+      html += '<th style="' + cellStyle + '">' + esc(label) + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+    for (var i = 0; i < 4; i++) {
+      var r = rows[i] || {};
+      html +=
+        '<tr><td style="' + cellStyle + '">' + (i + 1) + '</td>' +
+        '<td style="' + cellStyle + '">' + esc(r.time || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + esc(r.className || '—') + '</td>' +
+        '<td style="' + cellStyle + '">' + esc(r.room || '—') + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    return '<div class="badge-el badge-el-table" data-id="' + esc(el.id) + '" data-type="table" style="' + style + '">' + html + '</div>';
+  }
+
   function renderElement(el, data) {
     if (el.type === 'text') return renderTextEl(el, data);
     if (el.type === 'shape') return renderShapeEl(el);
     if (el.type === 'image') return renderImageEl(el);
     if (el.type === 'barcode') return renderBarcodeEl(el, data);
+    if (el.type === 'table') return renderTableEl(el, data);
     return '';
   }
 

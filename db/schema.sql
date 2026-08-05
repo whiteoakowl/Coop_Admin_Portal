@@ -197,6 +197,16 @@ CREATE TABLE IF NOT EXISTS member_schedules (
   UNIQUE(member_id, day, class_number)
 );
 
+-- The printable Schedule Card design an admin lays out - one shared
+-- layout for every member (unlike name tags, schedule cards aren't
+-- specialized per member type). Single-row table, same layout_json shape
+-- as name_tag_templates; see utils/scheduleCardBadge.js.
+CREATE TABLE IF NOT EXISTS schedule_card_templates (
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  layout_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);

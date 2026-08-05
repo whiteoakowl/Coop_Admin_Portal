@@ -1893,6 +1893,13 @@ textarea:focus-visible,
 .schedule-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
 .btn-disabled { pointer-events: none; opacity: 0.45; }
 
+.schedule-print-select-all { margin: 0; }
+.schedule-print-list {
+  max-width: 420px;
+  max-height: min(480px, 60vh);
+}
+.schedule-print-list .member-picker-row { justify-content: space-between; }
+
 .schedule-placeholder { padding: 3rem 1rem; }
 
 /* Grid lines - schedule tables get borders on every cell (not just row

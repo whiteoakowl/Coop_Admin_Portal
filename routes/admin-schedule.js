@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { formatTimestamp } = require('../utils/dates');
@@ -13,8 +15,26 @@ const {
   saveMemberSchedule,
   scheduleList,
 } = require('../utils/schedule');
+const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
+const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+
+const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'schedule-cards');
+if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+
+const uploadDesignImage = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, DESIGN_IMAGE_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+});
 
 const SCHEDULE_TABS = ['classes', 'design', 'print'];
 const PAGE_SIZE = 25;
@@ -79,7 +99,36 @@ router.get('/schedule', requireAdmin, (req, res) => {
     });
   }
 
-  // Design Cards / Print Cards - placeholder tabs for a future round.
+  if (tab === 'design') {
+    return res.render('admin-schedule', {
+      title: 'Schedule',
+      tab,
+      rows: [],
+      totalCount: 0,
+      page: 1,
+      totalPages: 1,
+      sort,
+      dir,
+      filters,
+      template: getScheduleCardTemplate(),
+      defaultLayout: DEFAULT_LAYOUT,
+      fields: FIELDS,
+      tableFields: TABLE_FIELDS,
+      shapeTypes: SHAPE_TYPES,
+      fontFamilies: FONT_FAMILIES,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  // Print Cards tab: a plain member picker (search + select), like the
+  // Name Tag Designer's Print tab.
+  const printMembers = db
+    .prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY name COLLATE NOCASE")
+    .all();
+
   res.render('admin-schedule', {
     title: 'Schedule',
     tab,
@@ -90,9 +139,60 @@ router.get('/schedule', requireAdmin, (req, res) => {
     sort,
     dir,
     filters,
+    printMembers,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.post('/schedule/print-cards', requireAdmin, (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/schedule?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = db
+    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) AND member_type = 'student' ORDER BY name COLLATE NOCASE`)
+    .all(...memberIds);
+
+  const template = getScheduleCardTemplate();
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const cards = members.map((m) => ({
+    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(m)),
+    bgCss,
+  }));
+
+  res.render('admin-schedule-print-cards', {
+    title: 'Print Schedule Cards',
+    cards,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
+  });
+});
+
+router.post('/schedule/design/template', requireAdmin, (req, res) => {
+  let layout;
+  try {
+    layout = typeof req.body.layout === 'string' ? JSON.parse(req.body.layout) : req.body.layout;
+  } catch (err) {
+    return res.status(400).json({ ok: false, message: 'Invalid layout.' });
+  }
+  if (!layout || !Array.isArray(layout.elements)) {
+    return res.status(400).json({ ok: false, message: 'Invalid layout.' });
+  }
+
+  db.prepare(
+    `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+  ).run(JSON.stringify(layout));
+
+  res.json({ ok: true });
+});
+
+router.post('/schedule/design-image', requireAdmin, uploadDesignImage.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ ok: false, message: 'No image uploaded.' });
+  res.json({ ok: true, url: `/uploads/schedule-cards/${req.file.filename}` });
 });
 
 router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
