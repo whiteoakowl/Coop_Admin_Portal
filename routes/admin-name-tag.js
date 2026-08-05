@@ -185,4 +185,21 @@ router.post('/name-tag/print', requireAdmin, (req, res) => {
   });
 });
 
+// Barcode-only sheet: just the scan code and name, no name tag design -
+// for a cheap, fast-to-print stack of scan cards.
+router.post('/name-tag/print-barcodes', requireAdmin, (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
+
+  res.render('admin-name-tag-barcode-print', {
+    title: 'Print Barcodes',
+    members,
+  });
+});
+
 module.exports = router;

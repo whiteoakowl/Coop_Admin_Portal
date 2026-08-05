@@ -112,7 +112,10 @@
               </label>
             <% }); %>
           </div>
-          <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+          <div class="name-tag-bulk-submit-row">
+            <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+            <button type="submit" formaction="/admin/name-tag/print-barcodes" class="btn-secondary name-tag-bulk-submit">Print Barcodes Only</button>
+          </div>
         </form>
       <% } else { %>
         <div class="roster-toolbar no-print">

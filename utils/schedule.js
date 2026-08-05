@@ -54,17 +54,20 @@ function splitTimeRange(raw) {
   return { startRaw, endRaw: end };
 }
 
-// A member's earliest class start and latest class end, across their
-// whole schedule (Monday + Wednesday combined) - used to auto-fill
-// Arrival/Departure on the roster view instead of requiring an admin to
-// type them in by hand. Returns raw label strings (whatever the admin
-// typed for that class's time, not reformatted) or null if nothing on
-// the schedule parses.
-function arrivalDepartureLabels(memberId) {
+// A member's earliest class start and latest class end - used to
+// auto-fill Arrival/Departure on the roster view instead of requiring an
+// admin to type them in by hand. `day` ('monday' or 'wednesday') scopes
+// this to the roster's own day, matching Monday rosters to the Monday
+// schedule and Wednesday rosters to the Wednesday schedule; omit it (or
+// pass anything else) to fall back to both days combined. Returns raw
+// label strings (whatever the admin typed for that class's time, not
+// reformatted) or null if nothing on the schedule parses.
+function arrivalDepartureLabels(memberId, day) {
   const { monday, wednesday } = getMemberSchedule(memberId);
+  const rows = day === 'monday' ? monday : day === 'wednesday' ? wednesday : [...monday, ...wednesday];
   let earliest = null;
   let latest = null;
-  [...monday, ...wednesday].forEach((row) => {
+  rows.forEach((row) => {
     if (!row.time) return;
     const { startRaw, endRaw } = splitTimeRange(row.time);
     const startMin = parseClockMinutes(startRaw);

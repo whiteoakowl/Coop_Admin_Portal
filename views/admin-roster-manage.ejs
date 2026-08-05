@@ -27,6 +27,13 @@
           <% }); %>
         </select>
       </form>
+      <form method="POST" action="/admin/rosters/<%= roster.id %>/schedule-day" class="inline-block-form">
+        <select name="scheduleDay" onchange="this.form.submit()" title="Which day's class schedule to base Arrival/Departure times on">
+          <option value="" <%= !roster.schedule_day ? 'selected' : '' %>>Arrival/Departure: Both days</option>
+          <option value="monday" <%= roster.schedule_day === 'monday' ? 'selected' : '' %>>Arrival/Departure: Monday schedule</option>
+          <option value="wednesday" <%= roster.schedule_day === 'wednesday' ? 'selected' : '' %>>Arrival/Departure: Wednesday schedule</option>
+        </select>
+      </form>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

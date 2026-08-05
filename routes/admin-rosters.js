@@ -83,7 +83,7 @@ function buildRosterGridData(roster) {
   for (const r of checkoutRows) checkoutByKey[`${r.member_id}|${r.session_date}`] = r;
 
   const rows = members.map((m) => {
-    const { arrival, departure } = arrivalDepartureLabels(m.id);
+    const { arrival, departure } = arrivalDepartureLabels(m.id, roster.schedule_day);
     return {
       member: m,
       parentName: m.parent_id ? (db.prepare('SELECT name FROM members WHERE id = ?').get(m.parent_id) || {}).name : null,
@@ -368,6 +368,15 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// Which day's class schedule Arrival/Departure is computed from for
+// every member on this roster (see arrivalDepartureLabels).
+router.post('/rosters/:id/schedule-day', requireAdmin, (req, res) => {
+  const rosterId = parseInt(req.params.id, 10);
+  const value = ['monday', 'wednesday'].includes(req.body.scheduleDay) ? req.body.scheduleDay : null;
+  db.prepare('UPDATE rosters SET schedule_day = ? WHERE id = ?').run(value, rosterId);
+  res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 
 router.post('/rosters/:id/add-member', requireAdmin, (req, res) => {

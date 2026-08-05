@@ -43,7 +43,10 @@ CREATE TABLE IF NOT EXISTS rosters (
   name TEXT NOT NULL,
   category TEXT,
   active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  -- Which day's class schedule to pull Arrival/Departure from ('monday' /
+  -- 'wednesday' / NULL = both days combined). Set on the manage page.
+  schedule_day TEXT
 );
 
 -- The specific calendar dates that make up a roster's columns.

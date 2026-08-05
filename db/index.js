@@ -56,6 +56,11 @@ if (!nameTagRequestColumns.includes('archived')) {
   db.exec('ALTER TABLE name_tag_requests ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
 }
 
+const rosterColumns = db.prepare('PRAGMA table_info(rosters)').all().map((c) => c.name);
+if (!rosterColumns.includes('schedule_day')) {
+  db.exec('ALTER TABLE rosters ADD COLUMN schedule_day TEXT');
+}
+
 // volunteer_members used to key on (list, member) alone - one section per
 // member. It now keys on (list, member, section) so a member can be on
 // multiple hours. SQLite can't ALTER a primary key, so rebuild the table
