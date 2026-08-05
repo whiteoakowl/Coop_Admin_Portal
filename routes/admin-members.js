@@ -13,6 +13,7 @@ const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -114,6 +115,7 @@ router.get('/members', requireAdmin, (req, res) => {
       badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
       scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),
       scheduleCardBgCss: scheduleCardBgCss,
+      schedule: getMemberSchedule(m.id),
     };
   });
   res.render('admin-members', {

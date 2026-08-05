@@ -106,6 +106,13 @@
                   <button
                     type="button"
                     class="icon-btn"
+                    onclick="document.getElementById('schedule-dialog-<%= m.id %>').showModal()"
+                    aria-label="View schedule for <%= m.name %>"
+                    title="View Schedule"
+                  ><svg class="icon"><use href="#icon-clock"/></svg></button>
+                  <button
+                    type="button"
+                    class="icon-btn"
                     onclick="if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone.')) { document.getElementById('delete-form-<%= m.id %>').submit(); }"
                     aria-label="Delete <%= m.name %>"
                     title="Delete"
@@ -137,6 +144,30 @@
                       <button type="submit" class="primary-btn">Print</button>
                     </div>
                   </form>
+                </dialog>
+                <dialog id="schedule-dialog-<%= m.id %>" class="schedule-preview-dialog">
+                  <h3>Class Schedule &mdash; <%= m.name %></h3>
+                  <% [['Monday', m.schedule.monday], ['Wednesday', m.schedule.wednesday]].forEach(function(entry) { %>
+                    <% var dayLabel = entry[0], dayRows = entry[1]; %>
+                    <h4><%= dayLabel %></h4>
+                    <table class="roster-table schedule-print-table">
+                      <thead><tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                      <tbody>
+                        <% dayRows.forEach(function(c, i) { %>
+                          <tr>
+                            <td>Class <%= i + 1 %></td>
+                            <td><%= c.time || '—' %></td>
+                            <td><%= c.class_name || '—' %></td>
+                            <td><%= c.room || '—' %></td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  <% }); %>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <a class="primary-btn" href="/admin/schedule/print?memberId=<%= m.id %>" target="_blank">Print</a>
+                  </div>
                 </dialog>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
               </td>

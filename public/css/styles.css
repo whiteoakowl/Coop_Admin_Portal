@@ -818,7 +818,7 @@ textarea:focus-visible,
   position: relative;
   background: #fff;
   border: 1px solid rgba(28, 37, 48, 0.35);
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
   flex-shrink: 0;
@@ -1241,6 +1241,21 @@ textarea:focus-visible,
 .badge-preview-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .badge-preview-dialog h3 { margin: 0 0 0.75rem; }
 .badge-preview-dialog .badge-canvas { margin: 0 auto 1rem; }
+
+/* Member profile "Schedule" popup: a read-only view of the member's
+   Monday/Wednesday class schedule, wider than the other member-row
+   dialogs since it holds two 4-column tables. */
+.schedule-preview-dialog {
+  width: min(560px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.schedule-preview-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.schedule-preview-dialog h3 { margin: 0 0 0.75rem; }
+.schedule-preview-dialog h4 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.schedule-preview-dialog table { width: 100%; margin-bottom: 0.5rem; }
 
 /* Member profile "Cards" dialog: Name Tag and (for students) Schedule
    Card previews stacked, each with its own "print this one?" checkbox

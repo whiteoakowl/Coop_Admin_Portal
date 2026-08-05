@@ -90,10 +90,12 @@
               <% }); %>
             </select>
           </div>
-          <a
-            class="roster-action-btn archived-toggle-btn<%= archived ? ' active' : '' %>"
-            href="<%= archived ? '/admin/rosters' + (selectedCategory ? '?category=' + encodeURIComponent(selectedCategory) : '') : '/admin/rosters?archived=1' + (selectedCategory ? '&category=' + encodeURIComponent(selectedCategory) : '') %>"
-          >Archived</a>
+          <div class="roster-btn-row">
+            <a
+              class="roster-action-btn archived-toggle-btn<%= archived ? ' active' : '' %>"
+              href="<%= archived ? '/admin/rosters' + (selectedCategory ? '?category=' + encodeURIComponent(selectedCategory) : '') : '/admin/rosters?archived=1' + (selectedCategory ? '&category=' + encodeURIComponent(selectedCategory) : '') %>"
+            >Archived</a>
+          </div>
         </div>
 
         <div class="admin-card-grid">
