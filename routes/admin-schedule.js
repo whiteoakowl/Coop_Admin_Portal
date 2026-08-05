@@ -11,25 +11,13 @@ const {
   STATUS_LABELS,
   getMemberSchedule,
   saveMemberSchedule,
-  deleteMemberSchedule,
-  duplicateMemberSchedule,
   scheduleList,
-  distinctScheduleValues,
-  distinctGrades,
 } = require('../utils/schedule');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
 const SCHEDULE_TABS = ['classes', 'design', 'print'];
 const PAGE_SIZE = 25;
-
-function activeRosters() {
-  return db.prepare('SELECT id, name FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
-}
-
-function activeStudents() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY name COLLATE NOCASE").all();
-}
 
 function summarizeDay(rows) {
   const filled = rows.filter((r) => r.class_name || r.room || r.time || r.teacher);
@@ -40,18 +28,7 @@ function summarizeDay(rows) {
 router.get('/schedule', requireAdmin, (req, res) => {
   const tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'classes';
 
-  const filters = {
-    search: (req.query.search || '').trim(),
-    day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
-    grade: req.query.grade || '',
-    teacher: req.query.teacher || '',
-    room: req.query.room || '',
-    className: req.query.className || '',
-    rosterId: req.query.rosterId ? parseInt(req.query.rosterId, 10) : null,
-    memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
-  };
-
-  const viewFor = req.query.viewFor || 'all';
+  const filters = { search: (req.query.search || '').trim() };
 
   let rows = [];
   let sort = ['name', 'monday', 'wednesday', 'status', 'updated'].includes(req.query.sort) ? req.query.sort : 'name';
@@ -97,13 +74,6 @@ router.get('/schedule', requireAdmin, (req, res) => {
       sort,
       dir,
       filters,
-      viewFor,
-      rosters: activeRosters(),
-      students: activeStudents(),
-      grades: distinctGrades(),
-      teachers: distinctScheduleValues('teacher'),
-      roomsList: distinctScheduleValues('room'),
-      classNames: distinctScheduleValues('class_name'),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -120,26 +90,9 @@ router.get('/schedule', requireAdmin, (req, res) => {
     sort,
     dir,
     filters,
-    viewFor,
-    rosters: activeRosters(),
-    students: activeStudents(),
-    grades: [],
-    teachers: [],
-    roomsList: [],
-    classNames: [],
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
-});
-
-router.get('/schedule/new', requireAdmin, (req, res) => {
-  res.render('admin-schedule-pick', { title: 'New Schedule', students: activeStudents(), error: req.query.error || null });
-});
-
-router.post('/schedule/new', requireAdmin, (req, res) => {
-  const memberId = parseInt(req.body.memberId, 10);
-  if (!memberId) return res.redirect('/admin/schedule/new?error=' + encodeURIComponent('Choose a member.'));
-  res.redirect(`/admin/schedule/member/${memberId}/manage`);
 });
 
 router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
@@ -173,22 +126,6 @@ router.post('/schedule/member/:id', requireAdmin, (req, res) => {
   });
   saveMemberSchedule(id, dayRows);
   res.redirect(`/admin/schedule/member/${id}/manage?notice=` + encodeURIComponent('Schedule saved.'));
-});
-
-router.post('/schedule/delete', requireAdmin, (req, res) => {
-  const ids = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  ids.forEach((id) => deleteMemberSchedule(id));
-  res.redirect('/admin/schedule?notice=' + encodeURIComponent(`Cleared schedule for ${ids.length} member(s).`));
-});
-
-router.post('/schedule/duplicate', requireAdmin, (req, res) => {
-  const fromId = parseInt(req.body.fromMemberId, 10);
-  const toIds = [].concat(req.body.toMemberIds || []).map((v) => parseInt(v, 10)).filter((v) => v && v !== fromId);
-  if (!fromId || toIds.length === 0) {
-    return res.redirect('/admin/schedule?error=' + encodeURIComponent('Choose a source schedule and at least one target member.'));
-  }
-  toIds.forEach((id) => duplicateMemberSchedule(fromId, id));
-  res.redirect('/admin/schedule?notice=' + encodeURIComponent(`Copied schedule to ${toIds.length} member(s).`));
 });
 
 router.get('/schedule/import-template.xlsx', requireAdmin, (req, res) => {

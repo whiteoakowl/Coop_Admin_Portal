@@ -1627,7 +1627,7 @@ textarea:focus-visible,
   text-align: left;
 }
 .volunteer-public-card {
-  flex: 0 1 340px;
+  flex: 0 1 460px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1651,10 +1651,11 @@ textarea:focus-visible,
 }
 .volunteer-public-table th,
 .volunteer-public-table td {
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.9rem;
   border: 1px solid var(--border);
   text-align: left;
   font-size: 1rem;
+  white-space: nowrap;
 }
 .volunteer-public-table thead th { background: #f8fafc; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 .volunteer-public-table td:first-child { font-weight: 700; }
@@ -1662,9 +1663,9 @@ textarea:focus-visible,
    stretch to a third of the table each - keep them narrow and give Name
    the rest of the width. */
 .volunteer-public-table th:first-child,
-.volunteer-public-table td:first-child { width: 55%; }
+.volunteer-public-table td:first-child { width: 46%; }
 .volunteer-public-table th:not(:first-child),
-.volunteer-public-table td:not(:first-child) { width: 22.5%; text-align: center; }
+.volunteer-public-table td:not(:first-child) { width: 27%; text-align: center; }
 
 .volunteer-bubble {
   display: inline-block;
@@ -1886,7 +1887,13 @@ textarea:focus-visible,
 
 .schedule-placeholder { padding: 3rem 1rem; }
 
-.schedule-pick-select { display: block; max-width: 320px; margin: 0.5rem 0 1rem; }
+/* Grid lines - schedule tables get borders on every cell (not just row
+   separators) so class/time/room/teacher columns are clearly delineated. */
+#schedule-table th, #schedule-table td,
+.schedule-edit-table th, .schedule-edit-table td,
+.schedule-print-table th, .schedule-print-table td {
+  border: 1px solid var(--border);
+}
 
 .schedule-edit-table th, .schedule-edit-table td { text-align: left; white-space: normal; }
 .schedule-edit-label { font-weight: 600; color: var(--ink); white-space: nowrap !important; }
@@ -1900,6 +1907,11 @@ textarea:focus-visible,
   color: var(--ink);
 }
 .schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.schedule-day-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 900px) {
+  .schedule-day-columns { grid-template-columns: 1fr; }
+}
 
 .schedule-print-main { display: flex; flex-direction: column; gap: 1.5rem; align-items: stretch; }
 .schedule-print-card {
