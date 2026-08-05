@@ -65,13 +65,12 @@ Then click **Attendance** → **+ New Roster**. Fill in:
 - **Title** — whatever you call the group (e.g. "Wednesday Youth", "Monday Adults").
 - **Category** — optional, pick from the categories you've already added.
 - **Session Dates** — click a date field and pick a date, then **+ Add another date** for each additional session. Pick as many or as few as you want up front; you can always add more later from the roster's Manage page.
-- **Import Member Names** — optional; upload a list right here to seed the roster's member list in the same step (see the file format below).
 
 A student in two different groups just gets added to both rosters — create each roster separately and add that member to both.
 
 ## Step 6 — Add your members
 
-If you didn't upload a list when creating the roster, open it and click **Manage**. Two ways to add people:
+Open the roster and click **Manage**. Two ways to add people:
 
 **Import a list** (fastest for a whole group) — a plain text or spreadsheet-exported `.csv`/`.txt` file with one name per line:
 
