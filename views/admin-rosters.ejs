@@ -43,8 +43,8 @@
           </dialog>
         <% } %>
 
-        <% if (tab === 'active') { %>
-          <div class="page-actions no-print">
+        <div class="page-actions no-print">
+          <% if (tab === 'active') { %>
             <details class="add-member-details">
               <summary class="btn-primary-summary">+ New Roster</summary>
               <form method="POST" action="/admin/rosters" enctype="multipart/form-data" class="inline-form">
@@ -76,26 +76,24 @@
                 <button type="submit" class="primary-btn">Create Roster</button>
               </form>
             </details>
-            <button type="button" class="btn-secondary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
-          </div>
-        <% } %>
-
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="category-select">Filter by category</label>
-            <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
-              <option value="">All categories</option>
-              <% categories.forEach(function(c) { %>
-                <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
-              <% }); %>
-            </select>
-          </div>
+            <button type="button" class="btn-primary-summary" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+          <% } %>
           <div class="roster-btn-row">
             <a
               class="roster-action-btn archived-toggle-btn<%= archived ? ' active' : '' %>"
               href="<%= archived ? '/admin/rosters' + (selectedCategory ? '?category=' + encodeURIComponent(selectedCategory) : '') : '/admin/rosters?archived=1' + (selectedCategory ? '&category=' + encodeURIComponent(selectedCategory) : '') %>"
             >Archived</a>
           </div>
+        </div>
+
+        <div class="category-filter no-print">
+          <label for="category-select">Filter by category</label>
+          <select id="category-select" onchange="window.location = '/admin/rosters?<%= archived ? 'archived=1&' : '' %>category=' + encodeURIComponent(this.value)">
+            <option value="">All categories</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c %>" <%= selectedCategory === c ? 'selected' : '' %>><%= c %></option>
+            <% }); %>
+          </select>
         </div>
 
         <div class="admin-card-grid">

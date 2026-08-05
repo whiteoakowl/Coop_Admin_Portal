@@ -31,8 +31,8 @@
   --purple: #6d4a99;       /* accessible text-on-tint variant */
   --purple-dark: #55397a;  /* hover state for --purple text */
   --purple-soft: #f1ecfb;  /* tinted section/badge backgrounds */
-  --btn-purple: #8b5fbf;   /* filled button background - secondary toolbar actions */
-  --btn-purple-hover: #744ea3;
+  --btn-purple: #C38EC7;   /* filled button background - secondary toolbar actions (matches the homepage's purple card) */
+  --btn-purple-hover: #ad72b1;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -1160,7 +1160,7 @@ textarea:focus-visible,
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #fff;
+  color: #000;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
@@ -1172,9 +1172,11 @@ textarea:focus-visible,
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
    switches to a filled dark state while the archived view is showing, so
-   it reads as a pressed toggle rather than a plain button. */
+   it reads as a pressed toggle rather than a plain button. Needs white
+   text once it goes dark - the light homepage-matched purple above uses
+   black text instead, same as the homepage's own purple card. */
 .archived-toggle-btn.active,
-.archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
+.archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 /* Import CSV / Export CSV / Print are the same "work with a file" action
    everywhere in the app, so they always get the same green treatment
