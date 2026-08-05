@@ -1903,11 +1903,17 @@ textarea:focus-visible,
 .schedule-placeholder { padding: 3rem 1rem; }
 
 /* Grid lines - schedule tables get borders on every cell (not just row
-   separators) so class/time/room/teacher columns are clearly delineated. */
+   separators) so class/time/room/teacher columns are clearly delineated.
+   They're also sized to their content (not stretched to fill the page)
+   and set in a smaller, compact text size to match a real schedule sheet. */
+#schedule-table, .schedule-edit-table, .schedule-print-table { width: auto; font-size: 0.8rem; }
+.schedule-table-scroll, .schedule-print-card { width: fit-content; max-width: 100%; }
+
 #schedule-table th, #schedule-table td,
 .schedule-edit-table th, .schedule-edit-table td,
 .schedule-print-table th, .schedule-print-table td {
   border: 1px solid var(--border);
+  padding: 0.35rem 0.55rem;
 }
 
 .schedule-edit-table th, .schedule-edit-table td { text-align: left; white-space: normal; }
@@ -1939,7 +1945,7 @@ textarea:focus-visible,
 }
 .schedule-print-card h2 { margin: 0 0 0.5rem; }
 .schedule-print-card h3 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
-.schedule-print-table { width: 100%; margin-bottom: 0.5rem; }
+.schedule-print-table { margin-bottom: 0.5rem; }
 .schedule-print-table th, .schedule-print-table td { text-align: left; }
 
 /* Hidden on screen, shown only when printing - a consistent branded
