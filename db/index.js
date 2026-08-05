@@ -110,11 +110,31 @@ for (const memberType of ['student', 'parent', 'admin']) {
 }
 
 // Seed the single starter Schedule Card design.
-const hasScheduleCardTemplate = db.prepare('SELECT id FROM schedule_card_templates WHERE id = 1').get();
-if (!hasScheduleCardTemplate) {
+const existingScheduleCardTemplate = db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+if (!existingScheduleCardTemplate) {
   db.prepare('INSERT INTO schedule_card_templates (id, layout_json) VALUES (1, ?)').run(
     JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT)
   );
+} else {
+  // One-time upgrade: the original default had an "org" title line above
+  // the member's name and placed the Monday/Wednesday tables side by side.
+  // Anyone still on that untouched default gets migrated forward to the
+  // current default (no title, tables stacked) rather than needing to
+  // click "Reset to Default" themselves. A layout an admin has actually
+  // customized won't have that 'org' element anymore (or wasn't the
+  // original default to begin with), so it's left alone.
+  let layout;
+  try {
+    layout = JSON.parse(existingScheduleCardTemplate.layout_json);
+  } catch (err) {
+    layout = null;
+  }
+  const stillHasOrgTitle = layout && Array.isArray(layout.elements) && layout.elements.some((el) => el.id === 'org');
+  if (stillHasOrgTitle) {
+    db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(
+      JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT)
+    );
+  }
 }
 
 module.exports = db;
