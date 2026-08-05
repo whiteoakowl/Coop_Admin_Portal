@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: auto; margin: 0.5in; }</style>
+  <style>@page { size: letter; margin: 0; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
@@ -12,7 +12,9 @@
       <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <%- include('partials/name-tag-badge', { html: html, bgCss: bgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+    <div class="print-page">
+      <%- include('partials/name-tag-badge', { html: html, bgCss: bgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+    </div>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>

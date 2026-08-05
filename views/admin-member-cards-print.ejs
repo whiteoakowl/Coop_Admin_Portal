@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: auto; margin: 0.5in; }</style>
+  <style>@page { size: letter; margin: 0; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
@@ -12,12 +12,14 @@
       <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <% cards.forEach(function(c) { %>
-      <div class="member-card-print-block">
-        <h2 class="no-print"><%= c.heading %></h2>
-        <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: c.width, badgeHeight: c.height }) %>
-      </div>
-    <% }); %>
+    <div class="print-page">
+      <% cards.forEach(function(c) { %>
+        <div class="member-card-print-block">
+          <h2 class="no-print"><%= c.heading %></h2>
+          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: c.width, badgeHeight: c.height }) %>
+        </div>
+      <% }); %>
+    </div>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>

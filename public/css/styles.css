@@ -1273,6 +1273,26 @@ textarea:focus-visible,
 }
 .badge-sheet-page:not(:last-child) { page-break-after: always; }
 
+/* Same physical-page look as .badge-sheet-page, for print previews whose
+   content isn't a fixed 8-per-sheet grid (a single badge, a member's
+   stacked cards, or a variable-length list of schedules) - min-height
+   instead of a locked height, so it starts at one letter page and only
+   grows if the content actually needs more than that, rather than either
+   clipping content or leaving a page-shaped box mostly empty. */
+.print-page {
+  width: 8.5in;
+  min-height: 11in;
+  box-sizing: border-box;
+  padding: 0.5in;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
 /* Zero gap so the 8 cards butt edge-to-edge - a straight guillotine cut
    down each shared edge separates them cleanly, instead of the cutter
    having to track a gap. Columns are pinned to the exact card width
@@ -1986,7 +2006,6 @@ textarea:focus-visible,
   .schedule-day-columns { grid-template-columns: 1fr; }
 }
 
-.schedule-print-main { display: flex; flex-direction: column; gap: 1.5rem; align-items: stretch; }
 .schedule-print-card {
   break-inside: avoid;
   background: var(--surface);
@@ -2053,7 +2072,8 @@ textarea:focus-visible,
   /* The on-screen "sheet of paper" chrome (drop shadow, border, the gap
      between pages) is there to preview the page, not to print onto it -
      the physical page IS the boundary once this is actually printing. */
-  .badge-sheet-page {
+  .badge-sheet-page,
+  .print-page {
     width: auto;
     height: auto;
     min-height: 100vh;
