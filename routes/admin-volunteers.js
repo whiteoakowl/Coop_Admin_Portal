@@ -167,19 +167,29 @@ router.post('/volunteers/:day/remove-member/:memberId', requireAdmin, requireDay
   res.redirect(`/admin/volunteers/${day}/manage`);
 });
 
-// Bulk-saves position/room text fields. Used both by the full manage-page
-// grid (many dates at once) and the single-date box on a linked roster's
-// view page. Fields arrive as flat "position:<memberId>:<date>" /
+// Saves position/room text fields. Used by the full manage-page grid
+// (many dates submitted at once), the single-date box on a linked
+// roster's view page, and per-cell autosave-on-blur (one field at a
+// time). Fields arrive as flat "position:<memberId>:<date>" /
 // "room:<memberId>:<date>" keys - nested bracket names like
 // position[1][2026-08-03] get silently mangled by Express's body parser,
 // which treats purely-numeric bracket segments as array indices.
+//
+// A cell's position/room default to null (not '') when their key is
+// absent from the request, and the upsert COALESCEs each column against
+// its existing value - otherwise a single-field autosave request (which
+// only sends one of the two keys) would blank out whichever field wasn't
+// included, since a plain "excluded.field" upsert has no way to tell
+// "not submitted" apart from "submitted as empty".
 router.post('/volunteers/:day/assignments', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const upsert = db.prepare(
     `INSERT INTO volunteer_assignments (volunteer_list_id, member_id, session_date, position, room)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(volunteer_list_id, member_id, session_date) DO UPDATE SET position = excluded.position, room = excluded.room`
+     ON CONFLICT(volunteer_list_id, member_id, session_date) DO UPDATE SET
+       position = COALESCE(excluded.position, volunteer_assignments.position),
+       room = COALESCE(excluded.room, volunteer_assignments.room)`
   );
   const cells = {};
   for (const key of Object.keys(req.body)) {
@@ -187,7 +197,7 @@ router.post('/volunteers/:day/assignments', requireAdmin, requireDay, (req, res)
     if (!match) continue;
     const [, field, memberId, date] = match;
     const cellKey = `${memberId}|${date}`;
-    if (!cells[cellKey]) cells[cellKey] = { memberId: parseInt(memberId, 10), date, position: '', room: '' };
+    if (!cells[cellKey]) cells[cellKey] = { memberId: parseInt(memberId, 10), date, position: null, room: null };
     cells[cellKey][field] = (req.body[key] || '').trim();
   }
   for (const cell of Object.values(cells)) {
