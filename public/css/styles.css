@@ -1210,13 +1210,35 @@ textarea:focus-visible,
 
 /* ---------- Manage roster page ---------- */
 
-.manage-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.manage-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--card-padding);
+}
 .manage-title-form { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 220px; }
 .manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .manage-title-input:focus { border-color: var(--border); background: #f8fafc; }
 .manage-header-form { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; width: 100%; }
 
-.manage-section { margin-bottom: 1.25rem; }
+/* Every admin "manage" page section (Session Dates, Members, Teachers &
+   Assistants, etc.) gets its own boxed card instead of sitting directly on
+   the page background - matches .form-section's treatment of the public
+   forms. */
+.manage-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--card-padding);
+  margin-bottom: 1.25rem;
+}
 .manage-section h2 { margin-top: 0; }
 
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
