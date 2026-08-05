@@ -817,10 +817,10 @@ textarea:focus-visible,
 .badge-canvas {
   position: relative;
   background: #fff;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(28, 37, 48, 0.35);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
   flex-shrink: 0;
 }
 .badge-el { position: absolute; box-sizing: border-box; }
@@ -1168,6 +1168,13 @@ textarea:focus-visible,
 .roster-action-btn:hover { border-color: var(--btn-purple-hover); background: var(--btn-purple-hover); }
 .roster-action-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
 .roster-action-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* View-toggle button (replaces a separate "Archived" tab on pages that
+   have one) - stays purple like any other toolbar action when off, and
+   switches to a filled dark state while the archived view is showing, so
+   it reads as a pressed toggle rather than a plain button. */
+.archived-toggle-btn.active,
+.archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
 
 /* Import CSV / Export CSV / Print are the same "work with a file" action
    everywhere in the app, so they always get the same green treatment

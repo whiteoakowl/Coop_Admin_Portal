@@ -22,8 +22,7 @@
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/name-tag?tab=design">Design</a>
       <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/name-tag?tab=print">Print</a>
-      <a class="view-tab<%= tab === 'requests' ? ' active' : '' %>" href="/admin/name-tag?tab=requests">Requests</a>
-      <a class="view-tab<%= tab === 'archived' ? ' active' : '' %>" href="/admin/name-tag?tab=archived">Archived</a>
+      <a class="view-tab<%= tab === 'requests' || tab === 'archived' ? ' active' : '' %>" href="/admin/name-tag?tab=requests">Requests</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'design') { %>
@@ -127,6 +126,10 @@
             </select>
           </div>
           <div class="roster-btn-row">
+            <a
+              class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
+              href="/admin/name-tag?tab=<%= showArchived ? 'requests' : 'archived' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
+            >Archived</a>
             <a class="roster-action-btn file-action-btn" href="/admin/name-tag/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
             <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
