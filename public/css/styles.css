@@ -1783,20 +1783,44 @@ textarea:focus-visible,
 .volunteer-chart-divider { border-left: 2px solid var(--brand-darker); }
 
 .roster-and-volunteers { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; margin: 1rem 0; }
-.roster-grid-col { flex: 2 1 480px; margin: 0; }
 
-.volunteer-box {
-  flex: 1 1 320px;
+/* Attendance and Floater boxes share the same card treatment and split
+   the page evenly (each ~50% minus half the gap), instead of the
+   attendance grid getting a fixed 2:1 head start. An expanded box takes
+   the full row and its sibling(s) hide (see public/js/roster-view.js). */
+.grid-box {
+  flex: 1 1 calc(50% - 0.5rem);
+  min-width: 320px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
 }
-.volunteer-box .roster-scroll { margin-top: 0.5rem; border: 1px solid var(--border); }
-.volunteer-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-.volunteer-box-header h2 { margin: 0; }
-.volunteer-box .btn-secondary { margin-top: 0.75rem; }
+.grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
+.grid-box.volunteer-box .roster-scroll { margin-top: 0.5rem; border: 1px solid var(--border); }
+.grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.grid-box-header h2 { margin: 0; }
+.grid-box .btn-secondary { margin-top: 0.75rem; }
+.grid-box-expanded { flex: 1 1 100%; }
+
+/* The Name column is already sticky (see .roster-name-col above); these
+   fixed widths make Arrival/Departure sticky offsets predictable so only
+   the date columns actually scroll. */
+.roster-view-page .roster-table-detailed .roster-name-col { width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.roster-view-page .roster-table-detailed .roster-secondary-col {
+  position: sticky;
+  background: var(--surface);
+  z-index: 1;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+}
+.roster-view-page .roster-table-detailed thead .roster-secondary-col { background: var(--orange-bg); }
+.roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(2) { left: 150px; }
+.roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 240px; }
+.roster-view-page .roster-table-detailed tbody tr:nth-child(even) .roster-secondary-col { background: #fdfaf7; }
+.roster-view-page .roster-table-detailed tbody tr:hover .roster-secondary-col { background: var(--orange-bg); }
 
 /* Flexbox (not grid) so cards keep a fixed natural width and wrap onto
    centered rows - a lone card, or a partial last row, stays centered
@@ -2207,6 +2231,8 @@ textarea:focus-visible,
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
   .roster-name-col { position: static; }
+  .roster-secondary-col { position: static; width: auto; min-width: 0; max-width: none; }
+  .grid-box { box-shadow: none; border: none; }
   .roster-view-page .roster-table thead th { position: static; }
   .roster-view-page .roster-scroll,
   .roster-view-page .legend,
