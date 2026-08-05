@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> <%= tab === 'setup' ? 'Setup/Cleanup Teams' : tab === 'substitutes' ? 'Substitutes' : 'Floater Assignments' %></p>
+        <p class="print-header-sub"><%= dayLabel %> <%= tab === 'setup' ? 'Setup/Cleanup Teams' : tab === 'substitutes' ? 'Substitutes' : tab === 'teachers' ? 'Teachers' : tab === 'assistants' ? 'Class Assistants' : 'Floater Assignments' %></p>
       </div>
     </div>
 
@@ -23,6 +23,8 @@
       <a class="view-tab<%= tab === 'floater' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/manage">Floater Assignments</a>
       <a class="view-tab<%= tab === 'setup' ? ' active' : '' %>" href="/admin/setup/<%= day %>/manage">Setup/Cleanup Teams</a>
       <a class="view-tab<%= tab === 'substitutes' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/substitutes">Substitutes</a>
+      <a class="view-tab<%= tab === 'teachers' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/teachers">Teachers</a>
+      <a class="view-tab<%= tab === 'assistants' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/assistants">Class Assistants</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'floater') { %>
@@ -345,7 +347,7 @@
             </div>
           <% }); %>
         </div>
-      <% } else { %>
+      <% } else if (tab === 'substitutes') { %>
         <div class="roster-toolbar no-print">
           <div class="filter-row">
             <div class="category-filter">
@@ -492,6 +494,44 @@
               <% }); %>
             </div>
           <% }); %>
+        </div>
+      <% } else if (tab === 'teachers' || tab === 'assistants') { %>
+        <div class="filter-row no-print">
+          <div class="category-filter">
+            <label for="day-select">Day</label>
+            <select
+              id="day-select"
+              onchange="window.location = '/admin/volunteers/' + this.value + '/<%= tab %>'"
+            >
+              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Name</th><th>Phone</th><th>Email</th><th>Schedule</th></tr>
+            </thead>
+            <tbody>
+              <% if (staffList.length === 0) { %>
+                <tr><td colspan="4" class="roster-empty">No <%= tab === 'teachers' ? 'teachers' : 'class assistants' %> assigned on <%= dayLabel %> yet.</td></tr>
+              <% } %>
+              <% staffList.forEach(function(row) { %>
+                <tr>
+                  <td><%= row.member.name %></td>
+                  <td><%= row.member.phone || '—' %></td>
+                  <td><%= row.member.email || '—' %></td>
+                  <td>
+                    <% row.classes.forEach(function(c) { %>
+                      <span class="badge-pill"><%= c.hourLabel %>: <%= c.className %><%= c.room ? ' (' + c.room + ')' : '' %></span>
+                    <% }); %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         </div>
       <% } %>
     </div>

@@ -7,6 +7,7 @@ const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
+const { staffListForDay } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   getListByDay,
@@ -83,6 +84,32 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     grid: buildListGrid(list.id, null),
     openDialog: dialogParam(req),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.get('/volunteers/:day/teachers', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  res.render('admin-volunteers', {
+    title: `${DAY_LABELS[day]} Teachers`,
+    tab: 'teachers',
+    day,
+    dayLabel: DAY_LABELS[day],
+    staffList: staffListForDay(day, 'teacher'),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.get('/volunteers/:day/assistants', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  res.render('admin-volunteers', {
+    title: `${DAY_LABELS[day]} Class Assistants`,
+    tab: 'assistants',
+    day,
+    dayLabel: DAY_LABELS[day],
+    staffList: staffListForDay(day, 'assistant'),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

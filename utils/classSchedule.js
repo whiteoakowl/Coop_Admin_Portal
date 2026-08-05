@@ -142,6 +142,25 @@ function activeParentsForStaff() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
 }
 
+// Every distinct teacher or assistant staffing a class on this day, each
+// with the full list of classes they're staffing that day - drives the
+// Volunteers page's Teachers/Class Assistants tabs.
+function staffListForDay(day, role) {
+  const hours = gridForDay(day);
+  const byMember = {};
+  hours.forEach((h) => {
+    h.classes.forEach((cls) => {
+      cls.staff
+        .filter((s) => s.role === role)
+        .forEach((s) => {
+          if (!byMember[s.id]) byMember[s.id] = { member: s, classes: [] };
+          byMember[s.id].classes.push({ hourLabel: h.label, className: cls.class_name, room: cls.room });
+        });
+    });
+  });
+  return Object.values(byMember).sort((a, b) => a.member.name.localeCompare(b.member.name, undefined, { sensitivity: 'base' }));
+}
+
 // Every member marked absent (any roster) on a given date - the Class
 // Schedule grid cross-references this against each class's enrolled
 // students to highlight who's out that day.
@@ -183,6 +202,7 @@ module.exports = {
   removeStaff,
   activeStudents,
   activeParentsForStaff,
+  staffListForDay,
   absentMemberIdsForDate,
   appSetting,
   setAppSetting,
