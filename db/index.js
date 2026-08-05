@@ -103,6 +103,15 @@ for (const day of ['monday', 'wednesday']) {
   for (let i = 1; i <= 4; i++) insertSection.run(listId, i, `Hour ${i}`);
 }
 
+// Seed 4 default hour slots for the Class Schedule (Monday/Wednesday),
+// same "Hour N" starter labels as the Floater Assignments sections above.
+for (const day of ['monday', 'wednesday']) {
+  const existing = db.prepare('SELECT id FROM class_schedule_hours WHERE day = ?').get(day);
+  if (existing) continue;
+  const insertHour = db.prepare('INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)');
+  for (let i = 1; i <= 4; i++) insertHour.run(day, i, `Hour ${i}`);
+}
+
 // Seed a starter badge design for each member type so the design editor
 // and badge printing always have something to render.
 for (const memberType of ['student', 'parent', 'admin']) {

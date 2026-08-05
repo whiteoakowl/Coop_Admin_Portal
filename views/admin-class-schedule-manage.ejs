@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/class-schedule/<%= cls.day %>">&larr; <%= dayLabel %> Class Schedule</a></p>
+
+    <div class="roster-toolbar">
+      <div><h1><%= cls.class_name %></h1></div>
+      <div class="roster-btn-row no-print">
+        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/delete" onsubmit="return confirm('Delete &quot;<%= cls.class_name %>&quot;? This cannot be undone.');">
+          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Class</button>
+        </form>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <h2>Class Details</h2>
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>" class="member-form-grid">
+        <label>Class Name
+          <input type="text" name="className" value="<%= cls.class_name %>" required />
+        </label>
+        <label>Hour
+          <select name="hourPosition" required>
+            <% hours.forEach(function(h) { %>
+              <option value="<%= h.position %>" <%= cls.hour_position === h.position ? 'selected' : '' %>><%= h.label %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Room
+          <input type="text" name="room" value="<%= cls.room || '' %>" />
+        </label>
+        <label>Age Group
+          <input type="text" name="ageGroup" value="<%= cls.age_group || '' %>" placeholder="e.g. Ages 5-7" />
+        </label>
+        <label class="class-color-label">Color
+          <input type="color" name="color" value="<%= cls.color %>" />
+        </label>
+        <label class="member-form-full">Notes
+          <textarea name="notes" rows="2"><%= cls.notes || '' %></textarea>
+        </label>
+        <button type="submit" class="primary-btn">Save Changes</button>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <h2>Enrolled Students (<%= enrolledStudents.length %>)</h2>
+      <div class="checkbox-row">
+        <% if (enrolledStudents.length === 0) { %><span class="hint">No students enrolled yet.</span><% } %>
+        <% enrolledStudents.forEach(function(s) { %>
+          <span class="badge-pill">
+            <%= s.name %>
+            <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form">
+              <button type="submit" class="badge-pill-x" aria-label="Remove <%= s.name %>">&times;</button>
+            </form>
+          </span>
+        <% }); %>
+      </div>
+      <button type="button" class="btn-secondary" onclick="document.getElementById('add-students-dialog').showModal()">+ Add Students</button>
+    </div>
+
+    <dialog id="add-students-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/add">
+        <h3>Add Students</h3>
+        <% if (availableStudents.length === 0) { %>
+          <p class="hint">Every active student is already enrolled.</p>
+        <% } else { %>
+          <div class="member-picker-list">
+            <% availableStudents.forEach(function(s) { %>
+              <label class="member-picker-row">
+                <input type="checkbox" name="studentIds" value="<%= s.id %>" />
+                <span><%= s.name %></span>
+              </label>
+            <% }); %>
+          </div>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <% if (availableStudents.length > 0) { %>
+            <button type="submit" class="primary-btn">Add Selected</button>
+          <% } %>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="manage-section">
+      <h2>Teachers &amp; Assistants (<%= cls.staff.length %>)</h2>
+      <div class="checkbox-row">
+        <% if (cls.staff.length === 0) { %><span class="hint">No teachers/assistants yet.</span><% } %>
+        <% cls.staff.forEach(function(s) { %>
+          <span class="badge-pill">
+            <%= s.name %><%= s.role === 'assistant' ? ' (Assistant)' : ' (Teacher)' %>
+            <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/<%= s.id %>/remove" class="inline-block-form">
+              <button type="submit" class="badge-pill-x" aria-label="Remove <%= s.name %>">&times;</button>
+            </form>
+          </span>
+        <% }); %>
+      </div>
+      <button type="button" class="btn-secondary" onclick="document.getElementById('add-staff-dialog').showModal()">+ Add Teacher/Assistant</button>
+    </div>
+
+    <dialog id="add-staff-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/add">
+        <h3>Add Teacher/Assistant</h3>
+        <% if (availableStaff.length === 0) { %>
+          <p class="hint">Every active parent is already assigned to this class.</p>
+        <% } else { %>
+          <label>Member
+            <select name="memberId" required>
+              <% availableStaff.forEach(function(p) { %>
+                <option value="<%= p.id %>"><%= p.name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="role" value="teacher" checked /> Teacher</label>
+            <label class="radio-option"><input type="radio" name="role" value="assistant" /> Assistant</label>
+          </div>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <% if (availableStaff.length > 0) { %>
+            <button type="submit" class="primary-btn">Add</button>
+          <% } %>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

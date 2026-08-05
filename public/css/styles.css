@@ -1939,6 +1939,48 @@ textarea:focus-visible,
 .member-picker-row:hover { background: var(--brand-soft); }
 .member-picker-row input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
 
+.member-picker-dialog label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
+.member-picker-dialog select { width: 100%; margin-top: 0.25rem; }
+
+/* ---------- Class Schedule (admin grid + print) ---------- */
+
+.class-color-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
+.class-color-label input[type="color"] { width: 2.75rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+
+.class-schedule-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+.class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
+.class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
+.class-card {
+  flex: 1 1 260px;
+  max-width: 340px;
+  border-left: 6px solid var(--brand);
+  border-radius: var(--radius);
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-sm);
+}
+.class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.class-card-header h3 { margin: 0; font-size: 1.05rem; }
+.class-card-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin: 0.35rem 0; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.class-card-staff { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 0; }
+
+.class-schedule-print-page .print-page { padding: 0; }
+.class-schedule-print-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+.class-schedule-print-hour h2 { font-size: 0.95rem; margin: 0 0 0.4rem; border-bottom: 2px solid #000; padding-bottom: 0.2rem; }
+.class-schedule-print-empty { font-size: 0.8rem; color: #666; margin: 0; }
+.class-schedule-print-card {
+  border-left: 5px solid var(--brand);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.5rem;
+  break-inside: avoid;
+}
+.class-schedule-print-card h3 { margin: 0; font-size: 0.85rem; }
+.class-schedule-print-staff { margin: 0.25rem 0 0; font-size: 0.7rem; color: #333; }
+@media print {
+  .class-schedule-print-card, .class-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .class-schedule-print-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
 .member-profile-dialog {
   width: min(440px, 90vw);
   border: none;

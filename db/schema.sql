@@ -220,6 +220,53 @@ CREATE TABLE IF NOT EXISTS schedule_card_templates (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Master Class Schedule: a real, shared class roster (distinct from the
+-- freeform per-member member_schedules cards above). Each day has 4 hour
+-- slots; class_schedule_hours gives each slot a per-day label (mirrors
+-- volunteer_sections), and classes sit in one of those slots.
+CREATE TABLE IF NOT EXISTS class_schedule_hours (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 4),
+  label TEXT NOT NULL DEFAULT '',
+  UNIQUE(day, position)
+);
+
+CREATE TABLE IF NOT EXISTS classes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  hour_position INTEGER NOT NULL CHECK(hour_position BETWEEN 1 AND 4),
+  class_name TEXT NOT NULL,
+  room TEXT,
+  age_group TEXT,
+  color TEXT NOT NULL DEFAULT '#EE9A4D',
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Students enrolled in a class - drives the headcount shown on the grid.
+CREATE TABLE IF NOT EXISTS class_enrollments (
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  student_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  PRIMARY KEY (class_id, student_id)
+);
+
+-- Teachers/assistants on a class - an unlimited number of each, either
+-- admin-assigned or self-signed-up from the public edit-mode page.
+CREATE TABLE IF NOT EXISTS class_staff (
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'teacher' CHECK(role IN ('teacher','assistant')),
+  PRIMARY KEY (class_id, member_id)
+);
+
+-- Small generic key/value store for one-off app-wide toggles - currently
+-- just whether the public Class Schedule page allows self-signup.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
