@@ -1518,10 +1518,11 @@ textarea:focus-visible,
    with the Save button centered on its own row underneath. */
 .volunteer-sections-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.5rem;
   width: 100%;
 }
+.volunteer-sections-grid input { min-width: 0; width: 100%; }
 .volunteer-sections-form button {
   border-radius: 8px;
   background: var(--btn-bg);
@@ -1565,7 +1566,7 @@ textarea:focus-visible,
    column of sections. */
 .volunteer-manage-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.65fr) minmax(0, 1.5fr);
   gap: 1.25rem;
   margin-bottom: 1.25rem;
   align-items: stretch;
@@ -1576,6 +1577,7 @@ textarea:focus-visible,
 .volunteer-manage-card {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1584,7 +1586,7 @@ textarea:focus-visible,
 }
 .volunteer-manage-card h2 { margin-top: 0; }
 
-.volunteer-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.volunteer-chart-header { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.75rem; }
 .volunteer-chart-header h2 { margin: 0; }
 .volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
 
