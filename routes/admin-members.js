@@ -339,6 +339,47 @@ function normalizeImportRow(row) {
   return out;
 }
 
+// Fields a matched-by-name import row can contribute to an existing
+// member's profile - never overwrites a value the member already has,
+// only fills in what's currently blank (see mergeableFieldsFor below).
+const IMPORT_MERGE_FIELDS = [
+  ['address', 'Address'],
+  ['city', 'City'],
+  ['state', 'State'],
+  ['zip', 'Zip'],
+  ['phone', 'Phone'],
+  ['email', 'Email'],
+  ['birthday', 'Birthday'],
+  ['gradeLevel', 'Grade Level'],
+  ['medicalNotes', 'Medical/Allergy Notes'],
+];
+
+// The DB column for each importable field differs from its JS name in a
+// couple of cases (gradeLevel -> grade_level, medicalNotes -> medical_notes).
+const IMPORT_FIELD_COLUMNS = {
+  address: 'address',
+  city: 'city',
+  state: 'state',
+  zip: 'zip',
+  phone: 'phone',
+  email: 'email',
+  birthday: 'birthday',
+  gradeLevel: 'grade_level',
+  medicalNotes: 'medical_notes',
+};
+
+function mergeableFieldsFor(existingMember, row) {
+  const updates = {};
+  for (const [field] of IMPORT_MERGE_FIELDS) {
+    const column = IMPORT_FIELD_COLUMNS[field];
+    const incoming = row[field];
+    if (!incoming) continue;
+    if (existingMember[column]) continue; // never overwrite a value that's already set
+    updates[field] = incoming;
+  }
+  return updates;
+}
+
 router.post('/members/import', requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
@@ -354,12 +395,17 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
   let created = 0;
   let skipped = 0;
   const nameToId = {};
+  const mergeCandidates = [];
 
   for (const r of rows) {
-    const existing = db.prepare('SELECT id FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(r.name);
+    const existing = db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(r.name);
     if (existing) {
       nameToId[r.name.toLowerCase()] = existing.id;
       skipped++;
+      const updates = mergeableFieldsFor(existing, r);
+      if (Object.keys(updates).length > 0) {
+        mergeCandidates.push({ memberId: existing.id, memberName: existing.name, updates });
+      }
       continue;
     }
     const typeLower = (r.type || '').toLowerCase();
@@ -405,13 +451,58 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
     }
   }
 
-  res.redirect(
-    '/admin/members?notice=' +
-      encodeURIComponent(
-        `Imported ${rows.length} row(s): ${created} new member(s) created, ${skipped} already existed` +
-          (linkedParents ? `, ${linkedParents} linked to a parent.` : '.')
-      )
-  );
+  const summary =
+    `Imported ${rows.length} row(s): ${created} new member(s) created, ${skipped} already existed` +
+    (linkedParents ? `, ${linkedParents} linked to a parent.` : '.');
+
+  if (mergeCandidates.length === 0) {
+    return res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
+  }
+
+  res.render('admin-members-import-confirm', {
+    title: 'Confirm Import Merge',
+    summary,
+    candidates: mergeCandidates.map((c) => ({
+      memberId: c.memberId,
+      memberName: c.memberName,
+      fields: IMPORT_MERGE_FIELDS.filter(([field]) => c.updates[field] !== undefined).map(([field, label]) => ({
+        label,
+        value: c.updates[field],
+      })),
+      payload: JSON.stringify(c.updates),
+    })),
+  });
+});
+
+router.post('/members/import/confirm', requireAdmin, (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const payloads = [].concat(req.body.payloads || []);
+  const ids = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
+
+  let merged = 0;
+  ids.forEach((id, i) => {
+    if (!memberIds.includes(id)) return; // this row's checkbox wasn't checked
+    let updates;
+    try {
+      updates = JSON.parse(payloads[i] || '{}');
+    } catch (err) {
+      return;
+    }
+    const setClauses = [];
+    const params = [];
+    for (const [field, value] of Object.entries(updates)) {
+      const column = IMPORT_FIELD_COLUMNS[field];
+      if (!column) continue;
+      setClauses.push(`${column} = ?`);
+      params.push(value);
+    }
+    if (setClauses.length === 0) return;
+    params.push(id);
+    db.prepare(`UPDATE members SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+    merged++;
+  });
+
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
 });
 
 router.post('/members/:id/notes', requireAdmin, (req, res) => {
