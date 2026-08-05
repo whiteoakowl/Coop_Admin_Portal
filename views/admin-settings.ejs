@@ -15,6 +15,7 @@
       <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/settings?tab=classes">Class Settings</a>
+      <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
     </div>
     <div class="view-tab-panel">
       <% if (activeTab === 'classes') { %>
@@ -62,6 +63,43 @@
 
             <button type="submit" class="primary-btn">Update</button>
           </form>
+        </div>
+      <% } else if (activeTab === 'documents') { %>
+        <div class="manage-section">
+          <h2>Upload Document</h2>
+          <p class="hint">Add a PDF or Word document to show as a button on the <a href="/admin/documents">Documents</a> page.</p>
+          <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
+            <label for="docTitle">Title</label>
+            <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
+
+            <label for="docFile">File (PDF or Word)</label>
+            <input id="docFile" name="file" type="file" accept=".pdf,.doc,.docx" required />
+
+            <button type="submit" class="primary-btn">Upload</button>
+          </form>
+        </div>
+        <div class="manage-section">
+          <h2>Uploaded Documents</h2>
+          <% if (documents.length === 0) { %>
+            <p class="hint">No documents uploaded yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Title</th><th>File</th><th></th></tr></thead>
+              <tbody>
+                <% documents.forEach(function(d) { %>
+                  <tr>
+                    <td><%= d.title %></td>
+                    <td><%= d.original_name %></td>
+                    <td>
+                      <form method="POST" action="/admin/documents/<%= d.id %>/delete" onsubmit="return confirm('Delete this document?');">
+                        <button type="submit" class="icon-btn" aria-label="Delete <%= d.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
         </div>
       <% } else { %>
         <p class="subtitle">Kiosk screens and public forms, opened in a new tab.</p>

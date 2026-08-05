@@ -259,6 +259,18 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT NOT NULL
 );
 
+-- Documents tab: admin-uploaded files (PDF, Word, etc.) shown as button
+-- boxes; file_path is where the upload landed on disk under
+-- public/uploads/documents.
+CREATE TABLE IF NOT EXISTS documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type TEXT,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Substitutes pilot (Volunteers > Substitutes): permanent jobs are duties
 -- that need a person every single session at a given hour (e.g. "Front
 -- Desk"), separate from both class teaching and Setup/Cleanup teams - an

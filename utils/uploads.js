@@ -14,4 +14,18 @@ function imageFileFilter(req, file, cb) {
   cb(null, okType && IMAGE_EXTENSIONS.has(ext));
 }
 
-module.exports = { imageFileFilter };
+// Documents tab uploads: PDF and the common Word formats, same
+// mimetype-plus-extension check as images above.
+const DOCUMENT_MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+function documentFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const expectedType = DOCUMENT_MIME_BY_EXT[ext];
+  cb(null, Boolean(expectedType) && file.mimetype === expectedType);
+}
+
+module.exports = { imageFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT };

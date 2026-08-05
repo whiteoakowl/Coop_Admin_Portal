@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Documents</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (documents.length === 0) { %>
+      <p class="hint">No documents uploaded yet. Add one from <a href="/admin/settings?tab=documents">Settings &rarr; Documents</a>.</p>
+    <% } else { %>
+      <div class="landing-grid documents-grid">
+        <% documents.forEach(function(d) { %>
+          <a class="landing-card landing-card-purple" href="/admin/documents/<%= d.id %>/view">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+            <span class="landing-label"><%= d.title %></span>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

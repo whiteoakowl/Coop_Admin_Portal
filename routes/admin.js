@@ -107,7 +107,7 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks', 'classes'];
+const SETTINGS_TABS = ['account', 'quicklinks', 'classes', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
   res.render('admin-settings', {
@@ -115,6 +115,7 @@ function renderSettings(req, res, error, success, activeTab) {
     username: req.session.username,
     activeTab: SETTINGS_TABS.includes(activeTab) ? activeTab : 'account',
     classSchedulePublicMode: appSetting('class_schedule_public_mode', 'view'),
+    documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
     error,
     success,
   });
