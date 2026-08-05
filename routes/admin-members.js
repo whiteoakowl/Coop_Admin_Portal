@@ -8,7 +8,6 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel } = require('../utils/dates');
 const { imageFileFilter } = require('../utils/uploads');
-const { REASON_LABELS } = require('../utils/rosters');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -36,41 +35,6 @@ const uploadPhoto = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
-
-// Every Absence/Late form submission across all rosters, newest first.
-function allAbsenceSubmissions(dateFilter) {
-  let sql = `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date, a.status,
-             a.reason_category AS reasonCategory, a.reason_text AS reasonText
-             FROM attendance a
-             JOIN members m ON m.id = a.member_id
-             JOIN rosters r ON r.id = a.roster_id
-             WHERE a.source = 'absence_form'`;
-  const params = [];
-  if (dateFilter) {
-    sql += ' AND a.session_date = ?';
-    params.push(dateFilter);
-  }
-  sql += ' ORDER BY a.session_date DESC, m.name COLLATE NOCASE';
-
-  return db
-    .prepare(sql)
-    .all(...params)
-    .map((r) => ({
-      memberName: r.memberName,
-      rosterName: r.rosterName,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
-      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
-      description: r.reasonText || '—',
-    }));
-}
-
-function absenceSubmissionDates() {
-  return db
-    .prepare(`SELECT DISTINCT session_date FROM attendance WHERE source = 'absence_form' ORDER BY session_date DESC`)
-    .all()
-    .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
-}
 
 function rostersForMember(memberId) {
   return db
@@ -507,35 +471,6 @@ router.post('/members/:id/delete', requireAdmin, (req, res) => {
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
   );
-});
-
-// --- Absence/Late submissions log (every member is always eligible to be
-// picked on the public absence form - no separate opt-in list to manage) ---
-
-router.get('/absence-list', requireAdmin, (req, res) => {
-  const dateFilter = req.query.date || '';
-
-  res.render('admin-rosters', {
-    title: 'Absence/Late Log',
-    tab: 'absence',
-    submissions: allAbsenceSubmissions(dateFilter),
-    submissionDates: absenceSubmissionDates(),
-    dateFilter,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.get('/absence-list/export.csv', requireAdmin, (req, res) => {
-  const dateFilter = req.query.date || '';
-  const submissions = allAbsenceSubmissions(dateFilter);
-
-  const lines = [
-    toCsvRow(['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description']),
-    ...submissions.map((s) => toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || ''])),
-  ];
-
-  sendCsv(res, 'absence-late-log.csv', lines);
 });
 
 module.exports = router;
