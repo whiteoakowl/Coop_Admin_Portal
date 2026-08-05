@@ -1576,12 +1576,14 @@ textarea:focus-visible,
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
   margin-bottom: 1.25rem;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 900px) {
   .volunteer-manage-grid { grid-template-columns: 1fr; }
 }
 .volunteer-manage-card {
+  display: flex;
+  flex-direction: column;
   background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
