@@ -10,6 +10,7 @@ const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadshee
 const { formatDateLabel } = require('../utils/dates');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
@@ -99,11 +100,15 @@ function membersWithDetails(typeFilter) {
 router.get('/members', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
-  const withRosters = membersWithDetails(typeFilter).map((m) => ({
-    ...m,
-    badgeLayout: templates[m.member_type] || templates.student,
-    badgeData: badgeDataForMember(m),
-  }));
+  const withRosters = membersWithDetails(typeFilter).map((m) => {
+    const badgeLayout = templates[m.member_type] || templates.student;
+    const badgeData = badgeDataForMember(m);
+    return {
+      ...m,
+      badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
+      badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
+    };
+  });
   res.render('admin-members', {
     title: 'Members',
     members: withRosters,
@@ -443,10 +448,12 @@ router.get('/members/:id/name-tag/print', requireAdmin, (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
+  const layout = getTemplate(member.member_type);
+  const data = badgeDataForMember(member);
   res.render('admin-name-tag-print', {
     title: `Name Tag - ${member.name}`,
-    layout: getTemplate(member.member_type),
-    data: badgeDataForMember(member),
+    html: NameTagRenderCore.renderBadgeElements(layout.elements, data),
+    bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
   });
