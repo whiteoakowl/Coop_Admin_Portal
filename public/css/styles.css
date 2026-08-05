@@ -891,8 +891,6 @@ textarea:focus-visible,
   width: 2.15rem; height: 2.15rem; font-size: 1.1rem; color: var(--muted); line-height: 1; flex-shrink: 0;
 }
 .date-list-remove:hover { border-color: var(--red); color: var(--red); }
-.date-add-form { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
-.date-add-form .date-list-wrap { margin: 0; flex: none; min-width: 0; }
 
 .category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
 .category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--ink); }
