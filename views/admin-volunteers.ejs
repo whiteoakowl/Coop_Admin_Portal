@@ -38,14 +38,17 @@
             </select>
           </div>
 
-          <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter">
+          <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter edit-section">
             <label for="rosterId-select">Linked Roster</label>
-            <select id="rosterId-select" name="rosterId" onchange="this.form.submit()">
+            <select id="rosterId-select" name="rosterId" disabled>
               <option value="">No roster</option>
               <% rosters.forEach(function(r) { %>
                 <option value="<%= r.id %>" <%= roster && roster.id === r.id ? 'selected' : '' %>><%= r.name %></option>
               <% }); %>
             </select>
+            <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+            <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
+            <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
           </form>
         </div>
 
@@ -126,13 +129,15 @@
                   <tr>
                     <td class="volunteer-member-name"><%= m.name %></td>
                     <td>
-                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/sections?dialog=members" class="volunteer-hour-checks">
+                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/sections?dialog=members" class="volunteer-hour-checks edit-section" onsubmit="return volunteerValidateHours(this)">
                         <% sections.forEach(function(s) { %>
                           <label class="volunteer-hour-check">
-                            <input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= m.sectionIds.includes(s.id) ? 'checked' : '' %> onchange="volunteerToggleHour(this)" />
+                            <input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= m.sectionIds.includes(s.id) ? 'checked' : '' %> disabled />
                             <%= s.label %>
                           </label>
                         <% }); %>
+                        <button type="button" class="btn-secondary volunteer-hour-edit-btn" data-edit-toggle-edit>Edit</button>
+                        <button type="submit" class="primary-btn volunteer-hour-edit-btn" data-edit-toggle-save hidden>Save</button>
                       </form>
                     </td>
                     <td class="actions-cell">
@@ -192,9 +197,17 @@
         <% } %>
 
         <div class="manage-section">
+          <form id="volunteer-grid-form" class="edit-section">
           <div class="volunteer-chart-header">
             <h2><%= dayLabel %> Floater Assignments Chart</h2>
             <span id="volunteer-save-status" class="volunteer-save-status no-print"></span>
+            <% if (dates.length > 0 && anyMembers) { %>
+              <div class="edit-section-actions no-print">
+                <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+                <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
+                <button type="button" class="primary-btn" data-edit-toggle-save hidden>Save Changes</button>
+              </div>
+            <% } %>
           </div>
           <% if (dates.length === 0) { %>
             <p class="roster-empty">Add session dates above first.</p>
@@ -226,8 +239,8 @@
                         <tr>
                           <td class="roster-name-col"><%= row.member.name %></td>
                           <% row.cells.forEach(function(cell) { %>
-                            <td class="volunteer-chart-divider"><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="position" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" /></td>
-                            <td><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="room" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" /></td>
+                            <td class="volunteer-chart-divider"><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="position" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" disabled /></td>
+                            <td><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="room" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" disabled /></td>
                           <% }); %>
                         </tr>
                       <% }); %>
@@ -237,6 +250,7 @@
               </table>
             </div>
           <% } %>
+          </form>
         </div>
       <% } else if (tab === 'setup') { %>
         <div class="roster-toolbar no-print">
@@ -277,22 +291,14 @@
           <% teams.forEach(function(t) { %>
             <div class="setup-team-card">
               <div class="setup-team-header">
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" class="setup-team-edit-form">
-                  <input
-                    type="text"
-                    name="title"
-                    value="<%= t.title %>"
-                    class="setup-team-title-input"
-                    onblur="if (this.value.trim() && this.value !== this.defaultValue) this.form.submit();"
-                  />
-                  <input
-                    type="text"
-                    name="description"
-                    value="<%= t.description || '' %>"
-                    class="setup-team-desc-input"
-                    placeholder="Short description"
-                    onblur="if (this.value !== this.defaultValue) this.form.submit();"
-                  />
+                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" class="setup-team-edit-form edit-section">
+                  <input type="text" name="title" value="<%= t.title %>" class="setup-team-title-input" disabled />
+                  <input type="text" name="description" value="<%= t.description || '' %>" class="setup-team-desc-input" placeholder="Short description" disabled />
+                  <div class="edit-section-actions no-print">
+                    <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+                    <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
+                    <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
+                  </div>
                 </form>
                 <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
                   <button type="submit" class="link-btn link-btn-danger">Delete Team</button>
@@ -388,36 +394,40 @@
               <% jobs.forEach(function(job) { %>
                 <div class="setup-team-card">
                   <div class="setup-team-header">
-                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/edit" class="setup-team-edit-form">
+                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/edit" class="setup-team-edit-form edit-section">
                       <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <input
-                        type="text"
-                        name="title"
-                        value="<%= job.title %>"
-                        class="setup-team-title-input"
-                        onblur="if (this.value.trim() && this.value !== this.defaultValue) this.form.submit();"
-                      />
-                      <select name="hourPosition" class="setup-team-desc-input" onchange="this.form.submit()">
+                      <input type="text" name="title" value="<%= job.title %>" class="setup-team-title-input" disabled />
+                      <select name="hourPosition" class="setup-team-desc-input" disabled>
                         <% hourPositions.forEach(function(p) { %>
                           <option value="<%= p %>" <%= job.hour_position === p ? 'selected' : '' %>>Hour <%= p %></option>
                         <% }); %>
                       </select>
+                      <div class="edit-section-actions no-print">
+                        <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+                        <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
+                        <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
+                      </div>
                     </form>
                     <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete &quot;<%= job.title %>&quot;?');">
                       <input type="hidden" name="date" value="<%= selectedDate %>" />
                       <button type="submit" class="link-btn link-btn-danger">Delete Job</button>
                     </form>
                   </div>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/floaters" class="checkbox-row">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/floaters" class="checkbox-row edit-section">
                     <input type="hidden" name="date" value="<%= selectedDate %>" />
                     <span class="class-card-pill-label">Preferred Floaters:</span>
                     <% if (allParents.length === 0) { %><span class="hint">No parent-type members yet.</span><% } %>
                     <% allParents.forEach(function(p) { %>
                       <label class="checkbox-option">
-                        <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= job.floaterIds.includes(p.id) ? 'checked' : '' %> onchange="this.form.submit()" />
+                        <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= job.floaterIds.includes(p.id) ? 'checked' : '' %> disabled />
                         <%= p.name %>
                       </label>
                     <% }); %>
+                    <div class="edit-section-actions no-print">
+                      <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
+                      <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
+                      <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
+                    </div>
                   </form>
                 </div>
               <% }); %>
@@ -487,6 +497,7 @@
     </div>
   </main>
   <script src="/js/date-list.js"></script>
+  <script src="/js/edit-toggle.js"></script>
   <% if (tab === 'floater') { %><script src="/js/volunteer-assignments.js"></script><% } %>
 </body>
 </html>

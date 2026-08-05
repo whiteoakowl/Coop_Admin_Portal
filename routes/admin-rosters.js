@@ -289,22 +289,20 @@ router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
   res.redirect(`/admin/rosters/${rosterId}/manage?notice=` + encodeURIComponent(notice));
 });
 
-router.post('/rosters/:id/rename', requireAdmin, (req, res) => {
+// scheduleDay picks which day's class schedule Arrival/Departure is
+// computed from for every member on this roster (see arrivalDepartureLabels).
+router.post('/rosters/:id/settings', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const name = (req.body.name || '').trim();
   if (!name) {
     return res.redirect(`/admin/rosters/${id}/manage?error=` + encodeURIComponent('Roster title is required.'));
   }
-  db.prepare('UPDATE rosters SET name = ? WHERE id = ?').run(name, id);
-  res.redirect(`/admin/rosters/${id}/manage`);
-});
-
-router.post('/rosters/:id/category', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
   const rawCategory = (req.body.category || '').trim();
   const category = isKnownCategory(rawCategory) ? rawCategory : null;
-  db.prepare('UPDATE rosters SET category = ? WHERE id = ?').run(category, id);
-  res.redirect(`/admin/rosters/${id}/manage`);
+  const scheduleDay = ['monday', 'wednesday'].includes(req.body.scheduleDay) ? req.body.scheduleDay : null;
+
+  db.prepare('UPDATE rosters SET name = ?, category = ?, schedule_day = ? WHERE id = ?').run(name, category, scheduleDay, id);
+  res.redirect(`/admin/rosters/${id}/manage?notice=` + encodeURIComponent('Roster settings saved.'));
 });
 
 router.post('/rosters/:id/toggle-active', requireAdmin, (req, res) => {
@@ -368,15 +366,6 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
-});
-
-// Which day's class schedule Arrival/Departure is computed from for
-// every member on this roster (see arrivalDepartureLabels).
-router.post('/rosters/:id/schedule-day', requireAdmin, (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const value = ['monday', 'wednesday'].includes(req.body.scheduleDay) ? req.body.scheduleDay : null;
-  db.prepare('UPDATE rosters SET schedule_day = ? WHERE id = ?').run(value, rosterId);
-  res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 
 router.post('/rosters/:id/add-member', requireAdmin, (req, res) => {

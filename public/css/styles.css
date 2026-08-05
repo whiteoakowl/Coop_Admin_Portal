@@ -62,6 +62,11 @@
 
 * { box-sizing: border-box; }
 
+/* The native `hidden` attribute is a low-priority user-agent style, so any
+   component rule setting `display` (e.g. .primary-btn) silently overrides
+   it regardless of specificity or source order. Force it to win. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -777,6 +782,10 @@ textarea:focus-visible,
 .member-form-full { grid-column: 1 / -1; }
 .checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
 .select-all-btn { margin-bottom: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+
+/* ---------- Edit / Save Changes toggle (public/js/edit-toggle.js) ---------- */
+
+.edit-section-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .member-form-grid label {
   display: flex;
   flex-direction: column;
@@ -1205,6 +1214,7 @@ textarea:focus-visible,
 .manage-title-form { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 220px; }
 .manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .manage-title-input:focus { border-color: var(--border); background: #f8fafc; }
+.manage-header-form { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; width: 100%; }
 
 .manage-section { margin-bottom: 1.25rem; }
 .manage-section h2 { margin-top: 0; }
@@ -1702,6 +1712,7 @@ textarea:focus-visible,
 }
 .volunteer-hour-check input[type="checkbox"] { width: 0.95rem; height: 0.95rem; accent-color: var(--purple); flex-shrink: 0; }
 .volunteer-hour-check:has(input:checked) { background: var(--purple-soft); border-color: var(--purple); color: var(--purple-dark); }
+.volunteer-hour-edit-btn { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
 
 .volunteer-section-row td {
   text-align: left !important;
