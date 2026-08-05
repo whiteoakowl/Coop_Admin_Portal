@@ -19,6 +19,8 @@
   --yellow: #a16207;
   --yellow-bg: #fef9c3;
   --yellow-solid: #eab308;
+  --orange: #b25a17;
+  --orange-bg: #fde8d2;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -900,9 +902,22 @@ textarea:focus-visible,
   border-top: 2px solid var(--border);
 }
 .roster-summary-label { text-align: left !important; color: var(--muted); font-weight: 600 !important; }
-.summary-present { color: var(--green); }
-.summary-late { color: var(--yellow); }
-.summary-absent { color: var(--red); }
+
+/* Per-date summary counts get the same pastel pill treatment as the P/L/A
+   cell badges above them, instead of plain colored text, so the two read
+   as one consistent color language. */
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.summary-present { background: var(--green-bg); color: var(--green); }
+.summary-late { background: var(--yellow-bg); color: var(--yellow); }
+.summary-absent { background: var(--red-bg); color: var(--red); }
 
 .roster-empty-state { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 2.25rem 1rem; }
 .roster-empty-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); opacity: 0.5; margin-bottom: 0.25rem; }
@@ -998,19 +1013,19 @@ textarea:focus-visible,
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--green-bg);
-  color: var(--green);
+  background: var(--orange-bg);
+  color: var(--orange);
   font-weight: 700;
 }
 .roster-view-page .roster-table thead th:first-child { border-top-left-radius: 10px; }
 .roster-view-page .roster-table thead th:last-child { border-top-right-radius: 10px; }
-.roster-view-page .roster-table thead .roster-name-col { background: var(--green-bg); z-index: 2; }
+.roster-view-page .roster-table thead .roster-name-col { background: var(--orange-bg); z-index: 2; }
 
 .roster-view-page .roster-table tbody td { transition: background-color 0.18s ease; }
-.roster-view-page .roster-table tbody tr:nth-child(even) td { background: #f7faf7; }
-.roster-view-page .roster-table tbody tr:nth-child(even) .roster-name-col { background: #f7faf7; }
-.roster-view-page .roster-table tbody tr:hover td { background: var(--green-bg); }
-.roster-view-page .roster-table tbody tr:hover .roster-name-col { background: var(--green-bg); }
+.roster-view-page .roster-table tbody tr:nth-child(even) td { background: #fdfaf7; }
+.roster-view-page .roster-table tbody tr:nth-child(even) .roster-name-col { background: #fdfaf7; }
+.roster-view-page .roster-table tbody tr:hover td { background: var(--orange-bg); }
+.roster-view-page .roster-table tbody tr:hover .roster-name-col { background: var(--orange-bg); }
 
 .roster-view-page .roster-secondary-col { color: var(--muted); font-size: 0.85rem; font-weight: 400; }
 .roster-view-page thead .roster-secondary-col { color: inherit; font-size: inherit; font-weight: inherit; }

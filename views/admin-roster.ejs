@@ -115,17 +115,17 @@
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Present</td>
                 <td></td><td></td>
-                <% summary.forEach(function(s) { %><td class="summary-present"><%= s.present %></td><% }); %>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-present"><%= s.present %></span></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Late</td>
                 <td></td><td></td>
-                <% summary.forEach(function(s) { %><td class="summary-late"><%= s.late %></td><% }); %>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-late"><%= s.late %></span></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Absent</td>
                 <td></td><td></td>
-                <% summary.forEach(function(s) { %><td class="summary-absent"><%= s.absent %></td><% }); %>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-absent"><%= s.absent %></span></td><% }); %>
               </tr>
             </tfoot>
           <% } %>
