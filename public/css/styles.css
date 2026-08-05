@@ -995,17 +995,20 @@ textarea:focus-visible,
 
 .roster-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 
+/* Full grid lines (not just row dividers) so every data table reads as a
+   proper chart/grid, matching the pastel treatment used on the Class
+   Schedule and Roster/Floater grids. */
 .roster-table th, .roster-table td {
   padding: 0.55rem 0.7rem;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
   text-align: center;
   white-space: nowrap;
 }
 
-.roster-table thead th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+.roster-table thead th { background: var(--brand-soft); color: var(--brand-dark); font-weight: 700; }
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
-.roster-table thead .roster-name-col { background: #f8fafc; }
+.roster-table thead .roster-name-col { background: var(--brand-soft); }
 
 .roster-empty { color: var(--muted); padding: 2rem; }
 
@@ -1881,7 +1884,7 @@ textarea:focus-visible,
   font-size: 1rem;
   white-space: nowrap;
 }
-.volunteer-public-table thead th { background: #f8fafc; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.volunteer-public-table thead th { background: var(--brand-soft); color: var(--brand-dark); font-size: 0.8rem; font-weight: 700; }
 .volunteer-public-table td:first-child { font-weight: 700; }
 /* Position/Location only ever hold a short bubble tag, so they shouldn't
    stretch to a third of the table each - keep them narrow and give Name
