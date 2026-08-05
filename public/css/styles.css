@@ -1264,16 +1264,29 @@ textarea:focus-visible,
 
 /* Zero gap so the 8 cards butt edge-to-edge - a straight guillotine cut
    down each shared edge separates them cleanly, instead of the cutter
-   having to track a gap. Square corners (overriding .badge-canvas's
-   rounded ones) so those touching edges are flush all the way to each
-   corner, not just along the middle of the edge. */
+   having to track a gap. Columns are pinned to the exact card width
+   (336px - same as BADGE_WIDTH/CARD_WIDTH) rather than "auto", and the
+   grid is shrink-wrapped + margin-centered, rather than leaning on
+   `justify-content: center` to keep "auto" tracks from stretching -
+   that interaction is inconsistently honored across browsers' print
+   engines and was still leaving visible daylight between the columns.
+   Square corners (overriding .badge-canvas's rounded ones) so the
+   touching edges are flush all the way to each corner. */
 .badge-sheet {
   display: grid;
-  grid-template-columns: repeat(2, auto);
+  grid-template-columns: repeat(2, 336px);
+  grid-auto-rows: 216px;
   gap: 0;
-  justify-content: center;
+  width: max-content;
+  margin: 0 auto;
 }
-.badge-sheet .badge-canvas { border-radius: 0; }
+/* Individually each .badge-canvas has a drop shadow (for the single-card
+   previews elsewhere in the app), but here that shadow blurs outward
+   past the touching edge and reads as a soft gap between cards even
+   though there's zero actual space between them - strip it. The 1px
+   border stays as a thin cut guide (doubled to ~2px where two cards
+   share an edge, which isn't visible as "space"). */
+.badge-sheet .badge-canvas { border-radius: 0; margin: 0; box-shadow: none; }
 
 /* ---------- Name tag design editor ---------- */
 
