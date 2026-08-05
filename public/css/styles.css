@@ -1238,6 +1238,12 @@ textarea:focus-visible,
 .badge-print-main { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
 .badge-print-main .badge-canvas { margin: 0 auto; }
 
+/* Print preview pages (Name Tag / Schedule Card / Class Schedule print
+   views): the Print button sits directly under the title instead of
+   beside it, so both header elements match this page's build order. */
+.print-preview-header { margin-bottom: 1.5rem; }
+.print-preview-header h1 { margin-bottom: 0.75rem; }
+
 /* Each .badge-sheet-page is sized and inset exactly like the physical US
    Letter sheet it prints onto (see the matching @page rule in the two
    views that use this), so the on-screen preview shows the same page
@@ -1256,12 +1262,18 @@ textarea:focus-visible,
 }
 .badge-sheet-page:not(:last-child) { page-break-after: always; }
 
+/* Zero gap so the 8 cards butt edge-to-edge - a straight guillotine cut
+   down each shared edge separates them cleanly, instead of the cutter
+   having to track a gap. Square corners (overriding .badge-canvas's
+   rounded ones) so those touching edges are flush all the way to each
+   corner, not just along the middle of the edge. */
 .badge-sheet {
   display: grid;
   grid-template-columns: repeat(2, auto);
-  gap: 0.35in;
+  gap: 0;
   justify-content: center;
 }
+.badge-sheet .badge-canvas { border-radius: 0; }
 
 /* ---------- Name tag design editor ---------- */
 
