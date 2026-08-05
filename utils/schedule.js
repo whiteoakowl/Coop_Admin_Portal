@@ -24,6 +24,61 @@ function rowIsBlank(row) {
   return !row.time && !row.class_name && !row.room && !row.teacher;
 }
 
+// Parses a single "9:00 AM" / "1:15 PM" clock string into minutes-since-
+// midnight for comparison. Returns null if it doesn't match (freeform
+// admin-typed text isn't guaranteed to parse).
+function parseClockMinutes(raw) {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/.exec((raw || '').trim());
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  const period = m[3] ? m[3].toUpperCase() : null;
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+// Splits a "9:00 - 9:45 AM" class time into its start/end pieces. If only
+// the end has an AM/PM suffix, it's borrowed onto the start (same
+// assumption public/js/name-tag-render-core.js makes for schedule cards -
+// both halves of a class period are the same half of the day).
+function splitTimeRange(raw) {
+  const value = (raw || '').trim();
+  const dashIndex = value.indexOf('-');
+  if (dashIndex === -1) return { startRaw: value, endRaw: value };
+  const start = value.slice(0, dashIndex).trim();
+  let end = value.slice(dashIndex + 1).trim();
+  const endAmPm = /(AM|PM|am|pm)\s*$/.exec(end);
+  let startRaw = start;
+  if (endAmPm && !/(AM|PM|am|pm)\s*$/.test(start)) startRaw += ' ' + endAmPm[1].toUpperCase();
+  return { startRaw, endRaw: end };
+}
+
+// A member's earliest class start and latest class end, across their
+// whole schedule (Monday + Wednesday combined) - used to auto-fill
+// Arrival/Departure on the roster view instead of requiring an admin to
+// type them in by hand. Returns raw label strings (whatever the admin
+// typed for that class's time, not reformatted) or null if nothing on
+// the schedule parses.
+function arrivalDepartureLabels(memberId) {
+  const { monday, wednesday } = getMemberSchedule(memberId);
+  let earliest = null;
+  let latest = null;
+  [...monday, ...wednesday].forEach((row) => {
+    if (!row.time) return;
+    const { startRaw, endRaw } = splitTimeRange(row.time);
+    const startMin = parseClockMinutes(startRaw);
+    const endMin = parseClockMinutes(endRaw);
+    if (startMin !== null && (!earliest || startMin < earliest.min)) {
+      earliest = { min: startMin, label: startRaw };
+    }
+    if (endMin !== null && (!latest || endMin > latest.min)) {
+      latest = { min: endMin, label: endRaw };
+    }
+  });
+  return { arrival: earliest ? earliest.label : null, departure: latest ? latest.label : null };
+}
+
 // 'none' - no classes at all. 'partial' - some classes filled in, but not
 // all 8 (4 Monday + 4 Wednesday) slots. 'complete' - every slot filled.
 function scheduleStatus(monday, wednesday) {
@@ -124,4 +179,5 @@ module.exports = {
   scheduleStatus,
   saveMemberSchedule,
   scheduleList,
+  arrivalDepartureLabels,
 };

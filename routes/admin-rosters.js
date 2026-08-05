@@ -3,18 +3,19 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime, formatTimeOfDay, todayISO } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, todayISO } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { arrivalDepartureLabels } = require('../utils/schedule');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
 function rosterMembers(rosterId) {
   return db
     .prepare(
-      `SELECT m.*, rm.scheduled_arrival AS scheduledArrival, rm.scheduled_departure AS scheduledDeparture
+      `SELECT m.*
        FROM members m
        JOIN roster_members rm ON rm.member_id = m.id
        WHERE rm.roster_id = ? AND m.active = 1
@@ -81,24 +82,27 @@ function buildRosterGridData(roster) {
   const checkoutByKey = {};
   for (const r of checkoutRows) checkoutByKey[`${r.member_id}|${r.session_date}`] = r;
 
-  const rows = members.map((m) => ({
-    member: m,
-    parentName: m.parent_id ? (db.prepare('SELECT name FROM members WHERE id = ?').get(m.parent_id) || {}).name : null,
-    arrivalLabel: formatTimeOfDay(m.scheduledArrival),
-    departureLabel: formatTimeOfDay(m.scheduledDeparture),
-    cells: dates.map((d) => {
-      const att = attendanceByKey[`${m.id}|${d}`];
-      const out = checkoutByKey[`${m.id}|${d}`];
-      if (!att) return null;
-      const tag = att.status === 'present' ? 'P' : att.status === 'late' ? 'L' : 'A';
-      return {
-        tag,
-        checkInTime: formatTime(att.check_in_time),
-        checkOutTime: out ? formatTime(out.check_out_time) : null,
-        number: out ? out.number : null,
-      };
-    }),
-  }));
+  const rows = members.map((m) => {
+    const { arrival, departure } = arrivalDepartureLabels(m.id);
+    return {
+      member: m,
+      parentName: m.parent_id ? (db.prepare('SELECT name FROM members WHERE id = ?').get(m.parent_id) || {}).name : null,
+      arrivalLabel: arrival,
+      departureLabel: departure,
+      cells: dates.map((d) => {
+        const att = attendanceByKey[`${m.id}|${d}`];
+        const out = checkoutByKey[`${m.id}|${d}`];
+        if (!att) return null;
+        const tag = att.status === 'present' ? 'P' : att.status === 'late' ? 'L' : 'A';
+        return {
+          tag,
+          checkInTime: formatTime(att.check_in_time),
+          checkOutTime: out ? formatTime(out.check_out_time) : null,
+          number: out ? out.number : null,
+        };
+      }),
+    };
+  });
 
   const summary = dates.map((d, i) => {
     let present = 0, late = 0, absent = 0;
@@ -378,20 +382,6 @@ router.post('/rosters/:id/remove-member/:memberId', requireAdmin, (req, res) => 
   const rosterId = parseInt(req.params.id, 10);
   const memberId = parseInt(req.params.memberId, 10);
   db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
-  res.redirect(`/admin/rosters/${rosterId}/manage`);
-});
-
-// A member's usual arrival/departure time for this roster - one value per
-// member per roster, not tied to any specific session date. Only editable
-// here on the manage page; the view page shows it read-only.
-router.post('/rosters/:id/members/:memberId/schedule', requireAdmin, (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const memberId = parseInt(req.params.memberId, 10);
-  const column = req.body.field === 'departure' ? 'scheduled_departure' : req.body.field === 'arrival' ? 'scheduled_arrival' : null;
-  const value = (req.body.value || '').trim() || null;
-  if (column) {
-    db.prepare(`UPDATE roster_members SET ${column} = ? WHERE roster_id = ? AND member_id = ?`).run(value, rosterId, memberId);
-  }
   res.redirect(`/admin/rosters/${rosterId}/manage`);
 });
 
