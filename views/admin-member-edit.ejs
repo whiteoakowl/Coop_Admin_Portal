@@ -92,6 +92,23 @@
             <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
           </label>
         </div>
+        <div class="member-form-grid">
+          <div class="member-form-full">
+            <span class="checkbox-group-label">Additional Parents/Guardians</span>
+            <% if (parents.length === 0) { %>
+              <p class="hint">No parent-type members exist yet.</p>
+            <% } else { %>
+              <div class="checkbox-group">
+                <% parents.forEach(function(p) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="additionalParentIds" value="<%= p.id %>" <%= additionalParentIds.includes(p.id) ? 'checked' : '' %> />
+                    <%= p.name %>
+                  </label>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+        </div>
       </div>
 
       <div class="manage-section" id="parent-only-fields">

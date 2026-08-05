@@ -3,47 +3,13 @@ const router = express.Router();
 const db = require('../db');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-
-function loadParents() {
-  return db
-    .prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE")
-    .all();
-}
-
-// Every member is selectable - no separate opt-in list to manage. The
-// parent-picker just groups the full member list by family: the parent
-// themselves, plus every student linked to them via parent_id.
-function loadChildrenByParent() {
-  const rows = db
-    .prepare(
-      `SELECT id, name, parent_id AS parentId
-       FROM members
-       WHERE active = 1 AND member_type = 'student' AND parent_id IS NOT NULL
-       ORDER BY name COLLATE NOCASE`
-    )
-    .all();
-  const byParent = {};
-  for (const r of rows) {
-    if (!byParent[r.parentId]) byParent[r.parentId] = [];
-    byParent[r.parentId].push({ id: r.id, name: r.name });
-  }
-  return byParent;
-}
-
-function loadEligibleStudent(studentId, parentId) {
-  if (studentId === parentId) {
-    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
-  }
-  return db
-    .prepare("SELECT * FROM members WHERE id = ? AND parent_id = ? AND active = 1 AND member_type = 'student'")
-    .get(studentId, parentId);
-}
+const { activeParentOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
 
 router.get('/absence', (req, res) => {
   res.render('absence', {
     title: 'Absence/Late Form',
-    parents: loadParents(),
-    childrenByParent: loadChildrenByParent(),
+    parents: activeParentOptions(),
+    childrenByParent: familyGroupsByParent(),
     result: null,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
   });
@@ -57,8 +23,8 @@ router.post('/absence/submit', (req, res) => {
   const reasonCategory = ['personal', 'medical'].includes(req.body.reasonCategory) ? req.body.reasonCategory : null;
   const reason = (req.body.reason || '').trim() || null;
 
-  const parents = loadParents();
-  const childrenByParent = loadChildrenByParent();
+  const parents = activeParentOptions();
+  const childrenByParent = familyGroupsByParent();
   const formValues = {
     type,
     parentId: req.body.parentId || '',
@@ -75,7 +41,7 @@ router.post('/absence/submit', (req, res) => {
   const parent = parentId ? parents.find((p) => p.id === parentId) : null;
   if (!parent) return fail('Please select your name.');
 
-  const students = studentIds.map((id) => loadEligibleStudent(id, parentId)).filter(Boolean);
+  const students = studentIds.map((id) => loadFamilyMember(id, parentId)).filter(Boolean);
   if (students.length === 0) return fail('Please select at least one name.');
 
   if (!isValidISODate(sessionDate)) return fail('Please choose a class date.');

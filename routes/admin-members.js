@@ -15,6 +15,7 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { allParentsForStudent, additionalParentIdsForStudent, setAdditionalParents } = require('../utils/members');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
@@ -98,6 +99,7 @@ function membersWithDetails(typeFilter) {
     ...m,
     rosters: rostersForMember(m.id),
     parentName: m.parent_id ? parentNames[m.parent_id] || null : null,
+    parentNames: m.member_type === 'student' ? allParentsForStudent(m).map((p) => p.name) : [],
   }));
 }
 
@@ -139,7 +141,7 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
   const lines = [
     toCsvRow(['Name', 'Type', 'Parent', 'Rosters']),
     ...members.map((m) =>
-      toCsvRow([m.name, typeLabel(m.member_type), m.parentName || '', m.rosters.map((r) => r.name).join('; ')])
+      toCsvRow([m.name, typeLabel(m.member_type), m.parentNames.length ? m.parentNames.join('; ') : m.parentName || '', m.rosters.map((r) => r.name).join('; ')])
     ),
   ];
 
@@ -161,6 +163,10 @@ function memberFormFields(req) {
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     medicalNotes: memberType === 'student' ? (req.body.medicalNotes || '').trim() || null : null,
     parentId: memberType === 'student' && req.body.parentId ? parseInt(req.body.parentId, 10) || null : null,
+    additionalParentIds:
+      memberType === 'student'
+        ? [].concat(req.body.additionalParentIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
+        : [],
     cleanupTeamIds:
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
@@ -220,6 +226,7 @@ router.get('/members/new', requireAdmin, (req, res) => {
       parent_id: null,
     },
     parents: activeParents(),
+    additionalParentIds: [],
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: [],
     error: req.query.error || null,
@@ -263,6 +270,7 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
       f.parentId
     );
   syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
+  if (f.memberType === 'student') setAdditionalParents(info.lastInsertRowid, f.additionalParentIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
@@ -277,6 +285,7 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
     mode: 'edit',
     member,
     parents: activeParents(id),
+    additionalParentIds: member.member_type === 'student' ? additionalParentIdsForStudent(id) : [],
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: cleanupTeamIdsForMember(id),
     error: req.query.error || null,
@@ -325,6 +334,7 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   );
   syncCleanupTeams(id, f.cleanupTeamIds);
   clearVolunteerMembershipIfNotParent(id, f.memberType);
+  setAdditionalParents(id, f.memberType === 'student' ? f.additionalParentIds : []);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });

@@ -775,6 +775,7 @@ textarea:focus-visible,
   gap: 1rem 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
+.checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
 .member-form-grid label {
   display: flex;
   flex-direction: column;

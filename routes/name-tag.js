@@ -1,50 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { activeParentOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
 
 const REQUEST_TYPES = ['lost_tag', 'schedule_change'];
 const DAYS = ['monday', 'wednesday', 'both'];
 
-function loadParents() {
-  return db
-    .prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE")
-    .all();
-}
-
-// Every member is selectable - no separate opt-in list to manage. The
-// parent-picker groups the full member list by family: the parent
-// themselves, plus every student linked to them via parent_id.
-function loadChildrenByParent() {
-  const rows = db
-    .prepare(
-      `SELECT id, name, parent_id AS parentId
-       FROM members
-       WHERE active = 1 AND member_type = 'student' AND parent_id IS NOT NULL
-       ORDER BY name COLLATE NOCASE`
-    )
-    .all();
-  const byParent = {};
-  for (const r of rows) {
-    if (!byParent[r.parentId]) byParent[r.parentId] = [];
-    byParent[r.parentId].push({ id: r.id, name: r.name });
-  }
-  return byParent;
-}
-
-function loadEligibleMember(memberId, parentId) {
-  if (memberId === parentId) {
-    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
-  }
-  return db
-    .prepare("SELECT * FROM members WHERE id = ? AND parent_id = ? AND active = 1 AND member_type = 'student'")
-    .get(memberId, parentId);
-}
-
 router.get('/name-tag', (req, res) => {
   res.render('name-tag', {
     title: 'Name Tag Form',
-    parents: loadParents(),
-    childrenByParent: loadChildrenByParent(),
+    parents: activeParentOptions(),
+    childrenByParent: familyGroupsByParent(),
     result: null,
     formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
   });
@@ -57,8 +23,8 @@ router.post('/name-tag/submit', (req, res) => {
   const day = DAYS.includes(req.body.day) ? req.body.day : null;
   const description = (req.body.description || '').trim() || null;
 
-  const parents = loadParents();
-  const childrenByParent = loadChildrenByParent();
+  const parents = activeParentOptions();
+  const childrenByParent = familyGroupsByParent();
   const formValues = {
     parentId: req.body.parentId || '',
     memberIds,
@@ -74,7 +40,7 @@ router.post('/name-tag/submit', (req, res) => {
   const parent = parentId ? parents.find((p) => p.id === parentId) : null;
   if (!parent) return fail('Please select your name.');
 
-  const members = memberIds.map((id) => loadEligibleMember(id, parentId)).filter(Boolean);
+  const members = memberIds.map((id) => loadFamilyMember(id, parentId)).filter(Boolean);
   if (members.length === 0) return fail('Please select at least one name.');
 
   if (!requestType) return fail('Please select Lost Name Tag or Schedule Change.');

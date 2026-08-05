@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS members (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- A student can have more than one parent/guardian (e.g. divorced
+-- parents, other guardians) beyond the single primary parent_id above -
+-- parent_id stays the "main" one used wherever only one is needed
+-- (default form grouping, Members list), these are the extras.
+CREATE TABLE IF NOT EXISTS member_parents (
+  student_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  parent_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  PRIMARY KEY (student_id, parent_id)
+);
+
 -- Categories are managed separately (Attendance page) so the roster
 -- creation form can offer a plain dropdown instead of free text.
 CREATE TABLE IF NOT EXISTS categories (
