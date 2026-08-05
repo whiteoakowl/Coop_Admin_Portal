@@ -1462,6 +1462,13 @@ textarea:focus-visible,
 .name-tag-design-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 0.75rem 0 1.1rem; }
 .name-tag-design-toolbar .name-tag-type-select { margin: 0; }
 .name-tag-design-toolbar .name-tag-editor-actions { margin-left: auto; }
+
+/* Unified Design/Print page (#design-type-select, #print-type-select):
+   the per-engine toolbar controls sit in their own flex row segment so
+   toggling one hidden/visible doesn't disturb the top-level toolbar's
+   flex layout. */
+.design-toolbar-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.design-toolbar-inline .name-tag-editor-actions { margin-left: auto; }
 .name-tag-toolbar-group { display: flex; align-items: center; gap: 0.4rem; }
 
 .name-tag-type-select {
