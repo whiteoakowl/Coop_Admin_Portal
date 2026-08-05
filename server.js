@@ -21,6 +21,7 @@ const setupRouter = require('./routes/setup');
 const adminNameTagRouter = require('./routes/admin-name-tag');
 const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
+const classScheduleRouter = require('./routes/class-schedule');
 const { defaultDay } = require('./utils/days');
 
 const app = express();
@@ -68,6 +69,7 @@ app.use('/', absenceRouter);
 app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);
 app.use('/', setupRouter);
+app.use('/', classScheduleRouter);
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
 app.use('/admin', adminMembersRouter);

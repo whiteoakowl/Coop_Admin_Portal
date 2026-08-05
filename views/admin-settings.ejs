@@ -47,6 +47,22 @@
           <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
           <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
           <a class="admin-card" href="/name-tag" target="_blank">Name Tag Form (public link)</a>
+          <a class="admin-card" href="/class-schedule" target="_blank">Class Schedule (public link)</a>
+        </div>
+
+        <div class="manage-section">
+          <h2>Class Schedule Permission</h2>
+          <p class="hint">Control whether the public Class Schedule page is view-only, or lets members add their own name as a teacher/assistant to a class. Members can never change class details - only sign up.</p>
+          <form method="POST" action="/admin/settings/class-schedule-mode" class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="mode" value="view" <%= classSchedulePublicMode !== 'edit' ? 'checked' : '' %> onchange="this.form.submit()" />
+              View Only
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="mode" value="edit" <%= classSchedulePublicMode === 'edit' ? 'checked' : '' %> onchange="this.form.submit()" />
+              Allow Teacher/Assistant Sign-ups
+            </label>
+          </form>
         </div>
       <% } %>
     </div>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk" data-idle-redirect="20000">
+  <%- include('partials/icon-sprite') %>
+  <a class="kiosk-home" href="/"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+  <div class="kiosk-header">
+    <img class="kiosk-logo" src="/img/logo.png" alt="" />
+    <h1><%= dayLabel %> Class Schedule</h1>
+  </div>
+
+  <% if (notice) { %><div class="alert alert-success class-schedule-public-notice"><%= notice %></div><% } %>
+
+  <div class="class-schedule-public-daytabs">
+    <a class="view-tab<%= day === 'monday' ? ' active' : '' %>" href="/class-schedule/monday">Monday</a>
+    <a class="view-tab<%= day === 'wednesday' ? ' active' : '' %>" href="/class-schedule/wednesday">Wednesday</a>
+  </div>
+
+  <% if (editMode) { %>
+    <p class="class-schedule-public-hint">Teaching or assisting a class? Find it below and add your name.</p>
+  <% } %>
+
+  <div class="class-schedule-public-grid">
+    <% grid.forEach(function(hour) { %>
+      <div class="class-schedule-public-hour">
+        <h2 class="class-schedule-hour-label"><%= hour.label %></h2>
+        <% if (hour.classes.length === 0) { %>
+          <p class="roster-empty">No classes this hour.</p>
+        <% } else { %>
+          <div class="class-card-row">
+            <% hour.classes.forEach(function(cls) { %>
+              <div class="class-card class-card-public" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                <h3><%= cls.class_name %></h3>
+                <p class="class-card-meta">
+                  <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
+                  <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
+                  <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
+                </p>
+                <p class="class-card-staff">
+                  <% if (cls.staff.length === 0) { %>
+                    <span class="hint">No teachers/assistants yet.</span>
+                  <% } else { %>
+                    <% cls.staff.forEach(function(s) { %>
+                      <span class="badge-pill"><%= s.name %><%= s.role === 'assistant' ? ' (Assistant)' : '' %></span>
+                    <% }); %>
+                  <% } %>
+                </p>
+                <% if (editMode) { %>
+                  <form method="POST" action="/class-schedule/<%= day %>/classes/<%= cls.id %>/signup" class="class-schedule-signup-form">
+                    <select name="memberId" required>
+                      <option value="" disabled selected>Your name...</option>
+                      <% staffOptions.forEach(function(p) { %>
+                        <option value="<%= p.id %>"><%= p.name %></option>
+                      <% }); %>
+                    </select>
+                    <select name="role">
+                      <option value="teacher">Teacher</option>
+                      <option value="assistant">Assistant</option>
+                    </select>
+                    <button type="submit" class="btn-secondary">Sign Up</button>
+                  </form>
+                <% } %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    <% }); %>
+  </div>
+  <script src="/js/idle-redirect.js"></script>
+</body>
+</html>

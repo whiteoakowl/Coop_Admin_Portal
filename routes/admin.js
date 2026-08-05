@@ -5,6 +5,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
+const { appSetting, setAppSetting } = require('../utils/classSchedule');
 
 // --- Auth ---
 
@@ -113,6 +114,7 @@ function renderSettings(req, res, error, success, activeTab) {
     title: 'Settings',
     username: req.session.username,
     activeTab: SETTINGS_TABS.includes(activeTab) ? activeTab : 'account',
+    classSchedulePublicMode: appSetting('class_schedule_public_mode', 'view'),
     error,
     success,
   });
@@ -149,6 +151,12 @@ router.post('/settings/password', requireAdmin, (req, res) => {
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
   renderSettings(req, res, null, 'Password updated.', 'account');
+});
+
+router.post('/settings/class-schedule-mode', requireAdmin, (req, res) => {
+  const mode = req.body.mode === 'edit' ? 'edit' : 'view';
+  setAppSetting('class_schedule_public_mode', mode);
+  renderSettings(req, res, null, 'Class Schedule public page updated.', 'quicklinks');
 });
 
 module.exports = router;
