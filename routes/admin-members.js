@@ -112,7 +112,7 @@ router.get('/members', requireAdmin, (req, res) => {
       ...m,
       badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
       badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
-      scheduleCardHtml: m.member_type === 'student' ? NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)) : null,
+      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),
       scheduleCardBgCss: scheduleCardBgCss,
     };
   });
@@ -456,10 +456,8 @@ router.post('/members/:id/notes', requireAdmin, (req, res) => {
 });
 
 // Member profile "Cards" dialog: prints whichever of Name Tag / Schedule
-// Card the admin checked, on one preview page. Schedule Card is silently
-// dropped for non-students (only students have class schedules), so
-// checking both boxes on a parent's profile still just prints their name
-// tag rather than erroring.
+// Card the admin checked, on one preview page. Every member type can have
+// a class schedule, so Schedule Card is available regardless of type.
 router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
@@ -478,7 +476,7 @@ router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
       height: BADGE_HEIGHT,
     });
   }
-  if (wanted.includes('scheduleCard') && member.member_type === 'student') {
+  if (wanted.includes('scheduleCard')) {
     const template = getScheduleCardTemplate();
     cards.push({
       heading: 'Schedule Card',

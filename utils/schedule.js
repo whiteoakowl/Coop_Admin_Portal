@@ -71,7 +71,7 @@ function saveMemberSchedule(memberId, dayRows) {
 function scheduleList(filters) {
   filters = filters || {};
   let members = db
-    .prepare("SELECT * FROM members WHERE active = 1 AND member_type = 'student' ORDER BY name COLLATE NOCASE")
+    .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
     .all();
 
   if (filters.search) {

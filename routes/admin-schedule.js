@@ -130,7 +130,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
   // Print Cards tab: a plain member picker (search + select), like the
   // Name Tag Designer's Print tab.
   const printMembers = db
-    .prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY name COLLATE NOCASE")
+    .prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
     .all();
 
   res.render('admin-schedule', {
@@ -157,7 +157,7 @@ router.post('/schedule/print-cards', requireAdmin, (req, res) => {
 
   const placeholders = memberIds.map(() => '?').join(',');
   const members = db
-    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) AND member_type = 'student' ORDER BY name COLLATE NOCASE`)
+    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`)
     .all(...memberIds);
 
   const template = getScheduleCardTemplate();
@@ -201,7 +201,7 @@ router.post('/schedule/design-image', requireAdmin, uploadDesignImage.single('im
 
 router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare("SELECT * FROM members WHERE id = ? AND member_type = 'student'").get(id);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
   const { monday, wednesday } = getMemberSchedule(id);
   res.render('admin-schedule-manage', {
@@ -216,7 +216,7 @@ router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
 
 router.post('/schedule/member/:id', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare("SELECT id FROM members WHERE id = ? AND member_type = 'student'").get(id);
+  const member = db.prepare('SELECT id FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
   const dayRows = {};
@@ -300,7 +300,7 @@ router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) 
       summary.errors++;
       return;
     }
-    const member = db.prepare("SELECT id FROM members WHERE active = 1 AND member_type = 'student' AND name = ? COLLATE NOCASE").get(r.name);
+    const member = db.prepare('SELECT id FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(r.name);
     if (!member) {
       summary.unmatched++;
       return;

@@ -128,12 +128,10 @@
                       <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
                       <%- include('partials/name-tag-badge', { html: m.badgeHtml, bgCss: m.badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
                     </div>
-                    <% if (m.member_type === 'student') { %>
-                      <div class="cards-preview-option">
-                        <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
-                        <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
-                      </div>
-                    <% } %>
+                    <div class="cards-preview-option">
+                      <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
+                      <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+                    </div>
                     <div class="notes-dialog-actions">
                       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
                       <button type="submit" class="primary-btn">Print</button>
