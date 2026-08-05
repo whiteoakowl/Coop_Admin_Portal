@@ -309,6 +309,30 @@ CREATE TABLE IF NOT EXISTS substitute_assignments (
   UNIQUE(session_date, slot_type, slot_id)
 );
 
+-- Library checkout: each title/copy gets its own barcode (kept separate
+-- from members.barcode - scanning a member barcode looks up who is
+-- borrowing, scanning an item barcode looks up what is being borrowed).
+CREATE TABLE IF NOT EXISTS library_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  barcode TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- One row per item a member has checked out; checked_in_at is NULL while
+-- it's still out, set once it's returned so the item becomes available
+-- again. member_id reuses the existing member barcode scan from the door.
+CREATE TABLE IF NOT EXISTS library_checkouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  item_id INTEGER NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
+  checked_out_at TEXT NOT NULL DEFAULT (datetime('now')),
+  checked_in_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_library_checkouts_member ON library_checkouts(member_id);
+CREATE INDEX IF NOT EXISTS idx_library_checkouts_item ON library_checkouts(item_id);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);

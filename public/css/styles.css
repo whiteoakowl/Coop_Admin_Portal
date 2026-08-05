@@ -209,6 +209,22 @@ textarea:focus-visible,
 
 .documents-grid { justify-content: flex-start; }
 
+.library-checkout-section input[type="text"] {
+  width: 100%;
+  max-width: 420px;
+  font-size: 1.1rem;
+  padding: 0.6rem 0.8rem;
+}
+.library-current-member {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--green-bg);
+  color: var(--green);
+  border-radius: var(--radius);
+  font-weight: 700;
+  display: inline-block;
+}
+
 .document-view-main { max-width: 1000px; margin: 0 auto; }
 
 .document-view-frame-wrap {

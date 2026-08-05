@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Library</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="view-tabs">
+      <a class="view-tab<%= tab === 'checkout' ? ' active' : '' %>" href="/admin/library?tab=checkout">Checkout</a>
+      <a class="view-tab<%= tab === 'members' ? ' active' : '' %>" href="/admin/library?tab=members">Members</a>
+      <a class="view-tab<%= tab === 'titles' ? ' active' : '' %>" href="/admin/library?tab=titles">Titles</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'checkout') { %>
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Member</h2>
+          <p class="hint" id="library-member-hint">Scan the member's name tag barcode to start a checkout.</p>
+          <form id="library-member-form" autocomplete="off">
+            <input id="library-member-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type member barcode" />
+          </form>
+          <p id="library-member-display" class="library-current-member" hidden></p>
+        </div>
+
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Items</h2>
+          <p class="hint" id="library-item-hint">Scan a member first, then scan each item being checked out.</p>
+          <form id="library-item-form" autocomplete="off">
+            <input id="library-item-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" disabled />
+          </form>
+          <table class="roster-table" id="library-pending-table" hidden>
+            <thead><tr><th>Item</th><th></th></tr></thead>
+            <tbody id="library-pending-tbody"></tbody>
+          </table>
+          <p class="roster-empty" id="library-pending-empty">No items scanned yet.</p>
+          <div class="edit-section-actions">
+            <button type="button" id="library-clear-btn" class="btn-secondary">Clear</button>
+            <button type="button" id="library-save-btn" class="primary-btn" disabled>Save All</button>
+          </div>
+        </div>
+
+        <form id="library-checkout-form" method="POST" action="/admin/library/checkout" hidden>
+          <input type="hidden" name="memberId" id="library-checkout-member-id" />
+          <div id="library-checkout-item-inputs"></div>
+        </form>
+      <% } else if (tab === 'members') { %>
+        <div class="manage-section">
+          <h2>Currently Checked Out</h2>
+          <% if (membersWithCheckouts.length === 0) { %>
+            <p class="roster-empty">Nobody has any library items checked out right now.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Member</th><th>Item</th><th>Checked Out</th><th></th></tr></thead>
+              <tbody>
+                <% membersWithCheckouts.forEach(function(m) { %>
+                  <% m.items.forEach(function(item, i) { %>
+                    <tr>
+                      <% if (i === 0) { %><td rowspan="<%= m.items.length %>" class="roster-name-col"><%= m.memberName %></td><% } %>
+                      <td><%= item.title %></td>
+                      <td><%= item.checkedOutAt %></td>
+                      <td>
+                        <form method="POST" action="/admin/library/checkouts/<%= item.checkoutId %>/return">
+                          <button type="submit" class="btn-secondary">Return</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% } else { %>
+        <div class="manage-section">
+          <h2>Add Library Title</h2>
+          <form method="POST" action="/admin/library/items/new" class="stack-form stack-form-narrow">
+            <label for="itemTitle">Title</label>
+            <input id="itemTitle" name="title" type="text" required />
+
+            <label for="itemBarcode">Barcode</label>
+            <input id="itemBarcode" name="barcode" type="text" required />
+
+            <button type="submit" class="primary-btn">Add Item</button>
+          </form>
+        </div>
+        <div class="manage-section">
+          <h2>All Titles</h2>
+          <% if (items.length === 0) { %>
+            <p class="roster-empty">No library items yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Title</th><th>Barcode</th><th></th></tr></thead>
+              <tbody>
+                <% items.forEach(function(item) { %>
+                  <tr>
+                    <td><%= item.title %></td>
+                    <td><%= item.barcode %></td>
+                    <td>
+                      <form method="POST" action="/admin/library/items/<%= item.id %>/delete" onsubmit="return confirm('Delete &quot;<%= item.title %>&quot;? This also removes its checkout history.');">
+                        <button type="submit" class="icon-btn" aria-label="Delete <%= item.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/library-checkout.js"></script>
+</body>
+</html>
