@@ -10,6 +10,8 @@ const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadshee
 const { formatDateLabel } = require('../utils/dates');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
+const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -100,6 +102,8 @@ function membersWithDetails(typeFilter) {
 router.get('/members', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
+  const scheduleCardTemplate = getScheduleCardTemplate();
+  const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
   const withRosters = membersWithDetails(typeFilter).map((m) => {
     const badgeLayout = templates[m.member_type] || templates.student;
     const badgeData = badgeDataForMember(m);
@@ -107,6 +111,8 @@ router.get('/members', requireAdmin, (req, res) => {
       ...m,
       badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
       badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
+      scheduleCardHtml: m.member_type === 'student' ? NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)) : null,
+      scheduleCardBgCss: scheduleCardBgCss,
     };
   });
   res.render('admin-members', {
@@ -115,6 +121,8 @@ router.get('/members', requireAdmin, (req, res) => {
     typeFilter,
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -456,6 +464,22 @@ router.get('/members/:id/name-tag/print', requireAdmin, (req, res) => {
     bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
+  });
+});
+
+router.get('/members/:id/schedule-card/print', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare("SELECT * FROM members WHERE id = ? AND member_type = 'student'").get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  const template = getScheduleCardTemplate();
+  res.render('admin-name-tag-print', {
+    title: `Schedule Card - ${member.name}`,
+    heading: 'Schedule Card',
+    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(member)),
+    bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
+    badgeWidth: CARD_WIDTH,
+    badgeHeight: CARD_HEIGHT,
   });
 });
 

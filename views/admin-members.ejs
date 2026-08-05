@@ -103,6 +103,15 @@
                     aria-label="View name tag for <%= m.name %>"
                     title="View Name Tag"
                   ><svg class="icon"><use href="#icon-badge"/></svg></button>
+                  <% if (m.member_type === 'student') { %>
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      onclick="document.getElementById('schedule-card-dialog-<%= m.id %>').showModal();"
+                      aria-label="View schedule card for <%= m.name %>"
+                      title="View Schedule Card"
+                    ><svg class="icon"><use href="#icon-clock"/></svg></button>
+                  <% } %>
                   <button
                     type="button"
                     class="icon-btn"
@@ -129,6 +138,16 @@
                     <a class="primary-btn" href="/admin/members/<%= m.id %>/name-tag/print" target="_blank">Print</a>
                   </div>
                 </dialog>
+                <% if (m.member_type === 'student') { %>
+                  <dialog id="schedule-card-dialog-<%= m.id %>" class="badge-preview-dialog">
+                    <h3>Schedule Card &mdash; <%= m.name %></h3>
+                    <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+                    <div class="notes-dialog-actions">
+                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                      <a class="primary-btn" href="/admin/members/<%= m.id %>/schedule-card/print" target="_blank">Print</a>
+                    </div>
+                  </dialog>
+                <% } %>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
               </td>
             </tr>
