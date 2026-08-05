@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page schedule-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <%
+      function buildQuery(overrides) {
+        const params = new URLSearchParams();
+        if (filters.search) params.set('search', filters.search);
+        if (filters.day) params.set('day', filters.day);
+        if (viewFor && viewFor !== 'all') params.set('viewFor', viewFor);
+        if (filters.rosterId) params.set('rosterId', filters.rosterId);
+        if (filters.className) params.set('className', filters.className);
+        if (filters.teacher) params.set('teacher', filters.teacher);
+        if (filters.grade) params.set('grade', filters.grade);
+        if (filters.room) params.set('room', filters.room);
+        if (sort) params.set('sort', sort);
+        if (dir) params.set('dir', dir);
+        Object.keys(overrides || {}).forEach(function (k) {
+          if (overrides[k] === null || overrides[k] === undefined) params.delete(k);
+          else params.set(k, overrides[k]);
+        });
+        const s = params.toString();
+        return s ? '?' + s : '';
+      }
+    %>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Schedule</p>
+      </div>
+    </div>
+    <h1>Schedule</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'classes' ? ' active' : '' %>" href="/admin/schedule?tab=classes">Class Schedules</a>
+      <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/schedule?tab=design">Design Cards</a>
+      <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/schedule?tab=print">Print Cards</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'classes') { %>
+        <div class="roster-toolbar no-print">
+          <div class="schedule-filters">
+            <div class="category-filter">
+              <label for="view-scope-select">View Schedule For</label>
+              <select id="view-scope-select" onchange="var u=new URL(window.location.href); u.searchParams.set('viewFor', this.value); ['rosterId','className','teacher','grade','room','page'].forEach(function(k){u.searchParams.delete(k);}); window.location = u.toString();">
+                <option value="all" <%= viewFor === 'all' ? 'selected' : '' %>>All Members</option>
+                <option value="roster" <%= viewFor === 'roster' ? 'selected' : '' %>>Individual Roster</option>
+                <option value="class" <%= viewFor === 'class' ? 'selected' : '' %>>Individual Class</option>
+                <option value="teacher" <%= viewFor === 'teacher' ? 'selected' : '' %>>Teacher</option>
+                <option value="grade" <%= viewFor === 'grade' ? 'selected' : '' %>>Grade</option>
+                <option value="room" <%= viewFor === 'room' ? 'selected' : '' %>>Room</option>
+              </select>
+            </div>
+
+            <% if (viewFor === 'roster') { %>
+              <div class="category-filter">
+                <label for="scope-value-select">Roster</label>
+                <select id="scope-value-select" onchange="var u=new URL(window.location.href); u.searchParams.set('rosterId', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                  <option value="">Choose a roster&hellip;</option>
+                  <% rosters.forEach(function(r) { %><option value="<%= r.id %>" <%= filters.rosterId === r.id ? 'selected' : '' %>><%= r.name %></option><% }); %>
+                </select>
+              </div>
+            <% } else if (viewFor === 'class') { %>
+              <div class="category-filter">
+                <label for="scope-value-select">Class</label>
+                <select id="scope-value-select" onchange="var u=new URL(window.location.href); u.searchParams.set('className', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                  <option value="">Choose a class&hellip;</option>
+                  <% classNames.forEach(function(c) { %><option value="<%= c %>" <%= filters.className === c ? 'selected' : '' %>><%= c %></option><% }); %>
+                </select>
+              </div>
+            <% } else if (viewFor === 'teacher') { %>
+              <div class="category-filter">
+                <label for="scope-value-select">Teacher</label>
+                <select id="scope-value-select" onchange="var u=new URL(window.location.href); u.searchParams.set('teacher', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                  <option value="">Choose a teacher&hellip;</option>
+                  <% teachers.forEach(function(t) { %><option value="<%= t %>" <%= filters.teacher === t ? 'selected' : '' %>><%= t %></option><% }); %>
+                </select>
+              </div>
+            <% } else if (viewFor === 'grade') { %>
+              <div class="category-filter">
+                <label for="scope-value-select">Grade</label>
+                <select id="scope-value-select" onchange="var u=new URL(window.location.href); u.searchParams.set('grade', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                  <option value="">Choose a grade&hellip;</option>
+                  <% grades.forEach(function(g) { %><option value="<%= g %>" <%= filters.grade === g ? 'selected' : '' %>><%= g %></option><% }); %>
+                </select>
+              </div>
+            <% } else if (viewFor === 'room') { %>
+              <div class="category-filter">
+                <label for="scope-value-select">Room</label>
+                <select id="scope-value-select" onchange="var u=new URL(window.location.href); u.searchParams.set('room', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                  <option value="">Choose a room&hellip;</option>
+                  <% roomsList.forEach(function(rm) { %><option value="<%= rm %>" <%= filters.room === rm ? 'selected' : '' %>><%= rm %></option><% }); %>
+                </select>
+              </div>
+            <% } %>
+
+            <div class="category-filter">
+              <label for="day-select">Day</label>
+              <select id="day-select" onchange="var u=new URL(window.location.href); u.searchParams.set('day', this.value); u.searchParams.delete('page'); window.location = u.toString();">
+                <option value="">All Days</option>
+                <option value="monday" <%= filters.day === 'monday' ? 'selected' : '' %>>Monday</option>
+                <option value="wednesday" <%= filters.day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+              </select>
+            </div>
+
+            <div class="category-filter schedule-search">
+              <label for="schedule-search-input">Search</label>
+              <input type="search" id="schedule-search-input" placeholder="Search by member name&hellip;" value="<%= filters.search %>" />
+            </div>
+          </div>
+
+          <div class="roster-btn-row">
+            <a class="roster-action-btn" href="/admin/schedule/new">+ New Schedule</a>
+            <button type="button" class="roster-action-btn" id="schedule-edit-btn">Edit</button>
+            <button type="button" class="roster-action-btn roster-action-btn-danger" id="schedule-delete-btn">Delete</button>
+            <button type="button" class="roster-action-btn" id="schedule-duplicate-btn">Duplicate</button>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+            <a class="roster-action-btn file-action-btn" href="/admin/schedule/export.csv<%= buildQuery({}) %>">Export</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank">Print</a>
+          </div>
+        </div>
+
+        <form method="POST" action="/admin/schedule/delete" id="schedule-delete-form"></form>
+
+        <dialog id="import-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/schedule/import" enctype="multipart/form-data">
+            <h3>Import</h3>
+            <p class="hint">Matches rows to existing Members by full name. New people must be added on the <a href="/admin/members">Members page</a> first.</p>
+            <a class="btn-secondary import-sample-link" href="/admin/schedule/import-template.xlsx">Download Sample File</a>
+            <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Import</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="duplicate-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/schedule/duplicate">
+            <h3>Duplicate Schedule</h3>
+            <p class="hint">Copy the selected member's schedule onto one or more other members.</p>
+            <input type="hidden" name="fromMemberId" id="duplicate-from-member-id" />
+            <div class="member-picker-list">
+              <% students.forEach(function(s) { %>
+                <label class="member-picker-row">
+                  <input type="checkbox" name="toMemberIds" value="<%= s.id %>" />
+                  <span><%= s.name %></span>
+                </label>
+              <% }); %>
+            </div>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Copy Schedule</button>
+            </div>
+          </form>
+        </dialog>
+
+        <div class="roster-scroll">
+          <table class="roster-table members-table" id="schedule-table">
+            <thead>
+              <tr>
+                <th class="no-print"><input type="checkbox" id="schedule-select-all" aria-label="Select all" /></th>
+                <th><a href="<%= buildQuery({ sort: 'name', dir: sort === 'name' && dir === 'asc' ? 'desc' : 'asc' }) %>">Member Name</a></th>
+                <th><a href="<%= buildQuery({ sort: 'monday', dir: sort === 'monday' && dir === 'asc' ? 'desc' : 'asc' }) %>">Monday Schedule</a></th>
+                <th><a href="<%= buildQuery({ sort: 'wednesday', dir: sort === 'wednesday' && dir === 'asc' ? 'desc' : 'asc' }) %>">Wednesday Schedule</a></th>
+                <th><a href="<%= buildQuery({ sort: 'status', dir: sort === 'status' && dir === 'asc' ? 'desc' : 'asc' }) %>">Status</a></th>
+                <th><a href="<%= buildQuery({ sort: 'updated', dir: sort === 'updated' && dir === 'asc' ? 'desc' : 'asc' }) %>">Last Updated</a></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (rows.length === 0) { %>
+                <tr>
+                  <td colspan="6" class="roster-empty">
+                    <div class="roster-empty-state">
+                      <svg class="icon roster-empty-icon"><use href="#icon-clock"/></svg>
+                      <p class="roster-empty-title">No schedules found</p>
+                      <p class="roster-empty-subtitle">Create a new schedule or adjust your filters.</p>
+                      <a class="roster-action-btn roster-empty-btn" href="/admin/schedule/new">+ New Schedule</a>
+                    </div>
+                  </td>
+                </tr>
+              <% } %>
+              <% rows.forEach(function(r) { %>
+                <tr>
+                  <td class="no-print"><input type="checkbox" class="schedule-row-check" value="<%= r.member.id %>" aria-label="Select <%= r.member.name %>" /></td>
+                  <td class="roster-name-col"><a href="/admin/schedule/member/<%= r.member.id %>/manage"><%= r.member.name %></a></td>
+                  <td class="schedule-summary-cell" title="<%= r.mondaySummary %>"><%= r.mondaySummary %></td>
+                  <td class="schedule-summary-cell" title="<%= r.wednesdaySummary %>"><%= r.wednesdaySummary %></td>
+                  <td><span class="status-badge status-badge-<%= r.status %>"><%= r.statusLabel %></span></td>
+                  <td><%= r.lastUpdated %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <% if (totalPages > 1) { %>
+          <div class="schedule-pagination no-print">
+            <a class="btn-secondary<%= page <= 1 ? ' btn-disabled' : '' %>" href="<%= buildQuery({ page: Math.max(1, page - 1) }) %>">&larr; Previous</a>
+            <span class="hint">Page <%= page %> of <%= totalPages %> (<%= totalCount %> total)</span>
+            <a class="btn-secondary<%= page >= totalPages ? ' btn-disabled' : '' %>" href="<%= buildQuery({ page: Math.min(totalPages, page + 1) }) %>">Next &rarr;</a>
+          </div>
+        <% } %>
+      <% } else { %>
+        <div class="roster-empty-state schedule-placeholder">
+          <svg class="icon roster-empty-icon"><use href="#icon-clock"/></svg>
+          <p class="roster-empty-title"><%= tab === 'design' ? 'Schedule Card Designer' : 'Print Schedule Cards' %></p>
+          <p class="roster-empty-subtitle">This tool is coming in a future update.</p>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/schedule.js"></script>
+</body>
+</html>

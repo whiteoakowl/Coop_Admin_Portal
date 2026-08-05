@@ -18,6 +18,7 @@ const volunteersRouter = require('./routes/volunteers');
 const adminSetupRouter = require('./routes/admin-setup');
 const setupRouter = require('./routes/setup');
 const adminNameTagRouter = require('./routes/admin-name-tag');
+const adminScheduleRouter = require('./routes/admin-schedule');
 const { defaultDay } = require('./utils/days');
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/admin', adminMembersRouter);
 app.use('/admin', adminVolunteersRouter);
 app.use('/admin', adminSetupRouter);
 app.use('/admin', adminNameTagRouter);
+app.use('/admin', adminScheduleRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });

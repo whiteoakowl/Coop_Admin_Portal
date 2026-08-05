@@ -178,6 +178,23 @@ CREATE TABLE IF NOT EXISTS name_tag_templates (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- A member's weekly class schedule: up to 4 classes on Monday and 4 on
+-- Wednesday (the co-op's only two session days). Each row is one class
+-- period; a day with fewer than 4 classes just has fewer rows, not blank
+-- placeholders - the UI fills in blank rows up to 4 for display/print.
+CREATE TABLE IF NOT EXISTS member_schedules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  class_number INTEGER NOT NULL CHECK(class_number BETWEEN 1 AND 4),
+  time TEXT,
+  class_name TEXT,
+  room TEXT,
+  teacher TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(member_id, day, class_number)
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);

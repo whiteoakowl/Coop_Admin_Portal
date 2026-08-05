@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/schedule">&larr; All Schedules</a></p>
+    <h1><%= member.name %></h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="/admin/schedule/member/<%= member.id %>">
+      <% [['monday', 'Monday', monday], ['wednesday', 'Wednesday', wednesday]].forEach(function (entry) { %>
+        <% var dayKey = entry[0], dayLabel = entry[1], rows = entry[2]; %>
+        <div class="form-section">
+          <h2><%= dayLabel %> Schedule</h2>
+          <div class="roster-scroll">
+            <table class="roster-table schedule-edit-table">
+              <thead>
+                <tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th><th>Teacher</th></tr>
+              </thead>
+              <tbody>
+                <% rows.forEach(function (r, i) { %>
+                  <tr>
+                    <td class="schedule-edit-label">Class <%= i + 1 %></td>
+                    <td><input type="text" name="time:<%= dayKey %>:<%= i + 1 %>" value="<%= r.time %>" placeholder="9:00 - 9:45 AM" /></td>
+                    <td><input type="text" name="className:<%= dayKey %>:<%= i + 1 %>" value="<%= r.class_name %>" placeholder="Class Name" /></td>
+                    <td><input type="text" name="room:<%= dayKey %>:<%= i + 1 %>" value="<%= r.room %>" placeholder="Room" /></td>
+                    <td><input type="text" name="teacher:<%= dayKey %>:<%= i + 1 %>" value="<%= r.teacher %>" placeholder="Teacher" /></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% }); %>
+
+      <button type="submit" class="primary-btn">Save Schedule</button>
+    </form>
+  </main>
+</body>
+</html>

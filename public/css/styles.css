@@ -1854,6 +1854,67 @@ textarea:focus-visible,
   .member-form-grid { grid-template-columns: 1fr; }
 }
 
+/* ---------- Schedule module ---------- */
+
+.schedule-filters { display: flex; align-items: center; gap: 1rem 1.5rem; flex-wrap: wrap; }
+.schedule-filters .category-filter { margin: 0; }
+.schedule-search input[type="search"] {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 200px;
+}
+.schedule-search input[type="search"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.schedule-summary-cell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left !important;
+}
+
+.status-badge-none { background: #e2e8f0; color: var(--muted); }
+.status-badge-partial { background: var(--yellow-bg); color: var(--yellow); }
+.status-badge-complete { background: var(--green-bg); color: var(--green); }
+
+.schedule-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
+.btn-disabled { pointer-events: none; opacity: 0.45; }
+
+.schedule-placeholder { padding: 3rem 1rem; }
+
+.schedule-pick-select { display: block; max-width: 320px; margin: 0.5rem 0 1rem; }
+
+.schedule-edit-table th, .schedule-edit-table td { text-align: left; white-space: normal; }
+.schedule-edit-label { font-weight: 600; color: var(--ink); white-space: nowrap !important; }
+.schedule-edit-table input[type="text"] {
+  width: 100%;
+  min-width: 110px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-family: inherit;
+  color: var(--ink);
+}
+.schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.schedule-print-main { display: flex; flex-direction: column; gap: 1.5rem; align-items: stretch; }
+.schedule-print-card {
+  break-inside: avoid;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: var(--shadow-sm);
+}
+.schedule-print-card h2 { margin: 0 0 0.5rem; }
+.schedule-print-card h3 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.schedule-print-table { width: 100%; margin-bottom: 0.5rem; }
+.schedule-print-table th, .schedule-print-table td { text-align: left; }
+
 /* Hidden on screen, shown only when printing - a consistent branded
    header (logo + co-op name + page title) at the top of every printout. */
 .print-header { display: none; }

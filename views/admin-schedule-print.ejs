@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main schedule-print-main">
+    <div class="roster-toolbar no-print">
+      <div><h1>Print Schedules</h1></div>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No schedules match your filters.</p>
+    <% } %>
+
+    <% rows.forEach(function(r) { %>
+      <div class="schedule-print-card">
+        <h2><%= r.member.name %></h2>
+        <% [['Monday', r.monday], ['Wednesday', r.wednesday]].forEach(function (entry) { %>
+          <% var label = entry[0], dayRows = entry[1]; %>
+          <h3><%= label %></h3>
+          <table class="roster-table schedule-print-table">
+            <thead><tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+            <tbody>
+              <% dayRows.forEach(function (c, i) { %>
+                <tr>
+                  <td>Class <%= i + 1 %></td>
+                  <td><%= c.time || '—' %></td>
+                  <td><%= c.class_name || '—' %></td>
+                  <td><%= c.room || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+</body>
+</html>
