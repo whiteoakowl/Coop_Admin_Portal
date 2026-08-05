@@ -1,6 +1,7 @@
 require('dotenv').config();
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 
@@ -31,9 +32,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Falling back to a fixed, source-controlled secret would let anyone who's
+// seen this repo forge a valid admin session cookie against any install
+// that forgot to set SESSION_SECRET. A random secret is generated instead
+// so a missed .env entry fails safe - admins just get logged out on
+// restart rather than the app running with a publicly-known secret.
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  sessionSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('\nSESSION_SECRET is not set in .env - using a random secret for this run.');
+  console.warn('Admins will be logged out every time the server restarts until you set SESSION_SECRET in .env.\n');
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'sh-check-in-out-dev-secret-change-me',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -64,6 +77,14 @@ app.use('/admin', adminScheduleRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });
+});
+
+// Catches anything an individual route didn't handle itself (a thrown
+// error, a rejected promise passed to next()) so a bug never surfaces a
+// raw stack trace to someone using the kiosk - it's logged here instead.
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).render('500', { title: 'Error' });
 });
 
 function lanAddresses() {

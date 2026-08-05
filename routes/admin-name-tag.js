@@ -8,10 +8,17 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { formatTimestamp, formatDateLabel } = require('../utils/dates');
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const { imageFileFilter } = require('../utils/uploads');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { jsonScriptSafe } = require('../utils/json');
+const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
-const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
+// A name tag request can also be filed for "both" days, unlike every other
+// :day-scoped feature - extend the shared Monday/Wednesday labels rather
+// than redefining them.
+const DAY_LABELS = { ...BASE_DAY_LABELS, both: 'Both' };
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
@@ -25,7 +32,7 @@ const uploadDesignImage = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+  fileFilter: imageFileFilter,
 });
 
 const NAME_TAG_TABS = ['design', 'print', 'requests', 'archived'];
@@ -77,13 +84,15 @@ router.get('/name-tag', requireAdmin, (req, res) => {
     dateFilter,
     showArchived,
     members,
-    templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
-    defaultLayouts: DEFAULT_LAYOUTS,
-    fieldsByType: FIELDS_BY_TYPE,
-    shapeTypes: SHAPE_TYPES,
-    fontFamilies: FONT_FAMILIES,
-    badgeWidth: BADGE_WIDTH,
-    badgeHeight: BADGE_HEIGHT,
+    nameTagDataJson: jsonScriptSafe({
+      templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
+      defaultLayouts: DEFAULT_LAYOUTS,
+      fieldsByType: FIELDS_BY_TYPE,
+      shapeTypes: SHAPE_TYPES,
+      fontFamilies: FONT_FAMILIES,
+      badgeWidth: BADGE_WIDTH,
+      badgeHeight: BADGE_HEIGHT,
+    }),
   });
 });
 
@@ -92,21 +101,20 @@ router.get('/name-tag/requests/export.csv', requireAdmin, (req, res) => {
   const dateFilter = req.query.date || '';
   const submissions = nameTagSubmissions(showArchived, dateFilter);
 
-  const header = ['Submitted', 'Name', 'Request', 'Day', 'Description'];
-  const lines = submissions.map((r) =>
-    [
-      formatTimestamp(r.createdAt),
-      `"${r.memberName.replace(/"/g, '""')}"`,
-      REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
-      DAY_LABELS[r.day] || r.day,
-      `"${(r.description || '').replace(/"/g, '""')}"`,
-    ].join(',')
-  );
+  const lines = [
+    toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
+    ...submissions.map((r) =>
+      toCsvRow([
+        formatTimestamp(r.createdAt),
+        r.memberName,
+        REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+        DAY_LABELS[r.day] || r.day,
+        r.description || '',
+      ])
+    ),
+  ];
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="name-tag-${showArchived ? 'archived' : 'requests'}.csv"`);
-  res.send(csv);
+  sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
 router.post('/name-tag/:id/archive', requireAdmin, (req, res) => {

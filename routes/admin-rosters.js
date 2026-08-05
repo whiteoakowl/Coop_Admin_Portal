@@ -6,6 +6,8 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatTime, formatTimeOfDay, todayISO } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
 const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
+const { REASON_LABELS } = require('../utils/rosters');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -118,8 +120,6 @@ function buildRosterGridData(roster) {
   };
 }
 
-const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
-
 // Absence/Late form submissions recorded against this roster, optionally
 // narrowed to a single session date.
 function absenceSubmissionsForRoster(rosterId, dateFilter) {
@@ -230,22 +230,21 @@ router.get('/checkinout-log/export.csv', requireAdmin, (req, res) => {
   const dateFilter = req.query.date || '';
   const rows = checkinoutLogRows(dateFilter);
 
-  const header = ['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number'];
-  const lines = rows.map((r) =>
-    [
-      `"${r.memberName.replace(/"/g, '""')}"`,
-      `"${r.rosterName.replace(/"/g, '""')}"`,
-      formatDateLabel(r.date),
-      formatTime(r.checkInTime) || '',
-      r.checkOutTime ? formatTime(r.checkOutTime) : '',
-      r.number ?? '',
-    ].join(',')
-  );
+  const lines = [
+    toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
+    ...rows.map((r) =>
+      toCsvRow([
+        r.memberName,
+        r.rosterName,
+        formatDateLabel(r.date),
+        formatTime(r.checkInTime) || '',
+        r.checkOutTime ? formatTime(r.checkOutTime) : '',
+        r.number ?? '',
+      ])
+    ),
+  ];
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="check-in-out-log.csv"');
-  res.send(csv);
+  sendCsv(res, 'check-in-out-log.csv', lines);
 });
 
 router.post('/rosters/categories', requireAdmin, (req, res) => {
@@ -460,27 +459,24 @@ router.get('/roster/:id/export.csv', requireAdmin, (req, res) => {
     header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`);
   }
 
-  const lines = data.rows.map((r) => {
-    const row = [`"${r.member.name.replace(/"/g, '""')}"`];
+  const rowLines = data.rows.map((r) => {
+    const row = [r.member.name];
     for (const cell of r.cells) {
       row.push(cell ? cell.tag : '', cell?.checkInTime || '', cell?.checkOutTime || '', cell?.number ?? '');
     }
-    return row.join(',');
+    return toCsvRow(row);
   });
 
-  const summaryRows = ['Present', 'Late', 'Absent'].map((label, idx) => {
+  const summaryRows = ['Present', 'Late', 'Absent'].map((label) => {
     const key = label.toLowerCase();
     const row = [label];
     for (const s of data.summary) {
       row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
     }
-    return row.join(',');
+    return toCsvRow(row);
   });
 
-  const csv = [header.join(','), ...lines, ...summaryRows].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${roster.name.replace(/[^a-z0-9]+/gi, '-')}-roster.csv"`);
-  res.send(csv);
+  sendCsv(res, `${roster.name.replace(/[^a-z0-9]+/gi, '-')}-roster.csv`, [toCsvRow(header), ...rowLines, ...summaryRows]);
 });
 
 module.exports = router;

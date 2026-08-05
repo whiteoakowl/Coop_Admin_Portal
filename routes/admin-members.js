@@ -5,9 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
-const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel } = require('../utils/dates');
+const { imageFileFilter } = require('../utils/uploads');
+const { REASON_LABELS } = require('../utils/rosters');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -15,7 +16,7 @@ const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
-const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
+const MEMBER_TYPES = ['student', 'parent', 'admin'];
 
 // Member profile photos - stored on disk (not memory) since they're kept
 // long-term and served back out, unlike the CSV imports above.
@@ -31,7 +32,7 @@ const uploadPhoto = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+  fileFilter: imageFileFilter,
 });
 
 // Every Absence/Late form submission across all rosters, newest first.
@@ -133,29 +134,20 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
   const members = membersWithDetails(typeFilter);
 
   const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
-  const header = ['Name', 'Type', 'Parent', 'Rosters'];
-  const lines = members.map((m) =>
-    [
-      `"${m.name.replace(/"/g, '""')}"`,
-      typeLabel(m.member_type),
-      m.parentName ? `"${m.parentName.replace(/"/g, '""')}"` : '',
-      `"${m.rosters.map((r) => r.name).join('; ').replace(/"/g, '""')}"`,
-    ].join(',')
-  );
+  const lines = [
+    toCsvRow(['Name', 'Type', 'Parent', 'Rosters']),
+    ...members.map((m) =>
+      toCsvRow([m.name, typeLabel(m.member_type), m.parentName || '', m.rosters.map((r) => r.name).join('; ')])
+    ),
+  ];
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="members${typeFilter ? '-' + typeFilter : ''}.csv"`);
-  res.send(csv);
+  sendCsv(res, `members${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
 });
-
-const MEMBER_TYPES = ['student', 'parent', 'admin'];
 
 function memberFormFields(req) {
   const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
   return {
     name: (req.body.name || '').trim(),
-    barcode: (req.body.barcode || '').trim(),
     memberType,
     address: (req.body.address || '').trim() || null,
     city: (req.body.city || '').trim() || null,
@@ -176,12 +168,25 @@ function memberFormFields(req) {
 
 // Keeps setup_team_members in sync with the Cleanup Team checkboxes on a
 // parent's profile, so editing it there is reflected on the actual
-// Setup/Cleanup team charts (and vice versa - both read/write the same table).
+// Setup/Cleanup team charts (and vice versa - both read/write the same
+// table). Always clears existing rows first (not just when teamIds is a
+// real list) so converting an existing parent to student/admin drops their
+// stale team membership instead of leaving them stuck on a chart they can
+// no longer manage from their own profile.
 function syncCleanupTeams(memberId, teamIds) {
-  if (teamIds === null) return;
   db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
+  if (!teamIds) return;
   const link = db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)');
   for (const teamId of teamIds) link.run(teamId, memberId);
+}
+
+// Floater Assignments (volunteer_members) only ever gets a parent added to
+// it via the Volunteers admin page, never from a member's own profile - so
+// there's nothing here to sync, only to clear if they're no longer a
+// parent, for the same "converted away from parent" staleness as above.
+function clearVolunteerMembershipIfNotParent(memberId, memberType) {
+  if (memberType === 'parent') return;
+  db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
 }
 
 function allSetupTeams() {
@@ -225,11 +230,10 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
   if (!f.name) {
     return res.redirect('/admin/members/new?error=' + encodeURIComponent('Name is required.'));
   }
-  const barcode = f.barcode || f.name;
+  const barcode = f.name;
   const exists = db.prepare('SELECT id FROM members WHERE barcode = ?').get(barcode);
   if (exists) {
-    const msg = f.barcode ? 'That barcode is already in use.' : `"${barcode}" is already in the member list.`;
-    return res.redirect('/admin/members/new?error=' + encodeURIComponent(msg));
+    return res.redirect('/admin/members/new?error=' + encodeURIComponent(`"${barcode}" is already in the member list.`));
   }
 
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : null;
@@ -284,11 +288,10 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   if (!f.name) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   }
-  const barcode = f.barcode || f.name;
+  const barcode = f.name;
   const clash = db.prepare('SELECT id FROM members WHERE barcode = ? AND id != ?').get(barcode, id);
   if (clash) {
-    const msg = f.barcode ? 'That barcode is already in use.' : `"${barcode}" is already in the member list.`;
-    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(msg));
+    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${barcode}" is already in the member list.`));
   }
   // A student can't be their own parent.
   const parentId = f.parentId === id ? null : f.parentId;
@@ -319,6 +322,7 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
     id
   );
   syncCleanupTeams(id, f.cleanupTeamIds);
+  clearVolunteerMembershipIfNotParent(id, f.memberType);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });
@@ -513,22 +517,12 @@ router.get('/absence-list/export.csv', requireAdmin, (req, res) => {
   const dateFilter = req.query.date || '';
   const submissions = allAbsenceSubmissions(dateFilter);
 
-  const header = ['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description'];
-  const lines = submissions.map((s) =>
-    [
-      `"${s.memberName.replace(/"/g, '""')}"`,
-      `"${s.rosterName.replace(/"/g, '""')}"`,
-      s.dateLabel,
-      s.statusLabel,
-      s.reasonLabel,
-      `"${(s.description || '').replace(/"/g, '""')}"`,
-    ].join(',')
-  );
+  const lines = [
+    toCsvRow(['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description']),
+    ...submissions.map((s) => toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || ''])),
+  ];
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="absence-late-log.csv"');
-  res.send(csv);
+  sendCsv(res, 'absence-late-log.csv', lines);
 });
 
 module.exports = router;

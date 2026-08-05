@@ -8,14 +8,22 @@ const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 
 // --- Auth ---
 
+// Only ever redirect back to a path within this app - an unvalidated
+// `next` would let a crafted login link send a freshly-authenticated
+// admin off-site (e.g. ?next=https://evil.example).
+function safeNext(value) {
+  if (typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')) return value;
+  return '/admin';
+}
+
 router.get('/login', (req, res) => {
   if (req.session.adminId) return res.redirect('/admin');
-  res.render('admin-login', { title: 'Admin Login', error: null, next: req.query.next || '/admin' });
+  res.render('admin-login', { title: 'Admin Login', error: null, next: safeNext(req.query.next) });
 });
 
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const next = req.body.next || '/admin';
+  const next = safeNext(req.body.next);
   const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get((username || '').trim());
   if (!admin || !bcrypt.compareSync(password || '', admin.password_hash)) {
     return res.render('admin-login', { title: 'Admin Login', error: 'Invalid username or password.', next });

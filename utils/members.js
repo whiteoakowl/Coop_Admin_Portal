@@ -24,21 +24,6 @@ function parseNamesFromUpload(buffer, filename) {
     .filter((name) => name && name.toLowerCase() !== 'name');
 }
 
-// Finds an existing active member by exact name, or creates one. Barcode
-// scanners here read a person's name directly, so a new member's barcode
-// defaults to their name unless that value is already taken.
-function findOrCreateMemberByName(name) {
-  const existing = db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name);
-  if (existing) return { member: existing, created: false };
-
-  let barcode = name;
-  if (db.prepare('SELECT id FROM members WHERE barcode = ?').get(barcode)) {
-    barcode = `${name} (${Date.now().toString(36)})`;
-  }
-  const info = db.prepare('INSERT INTO members (name, barcode) VALUES (?, ?)').run(name, barcode);
-  return { member: { id: info.lastInsertRowid, name, barcode }, created: true };
-}
-
 // Looks up an existing active member by exact name - never creates one.
 // Used everywhere except the Members page itself, which is the only place
 // new members get added to the system. An optional memberType restricts the
@@ -55,4 +40,4 @@ function findMemberByName(name, memberType) {
   return db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name) || null;
 }
 
-module.exports = { parseNamesFile, parseNamesFromUpload, findOrCreateMemberByName, findMemberByName };
+module.exports = { parseNamesFromUpload, findMemberByName };

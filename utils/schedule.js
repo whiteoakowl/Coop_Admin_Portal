@@ -1,8 +1,7 @@
 const db = require('../db');
+const { DAYS, DAY_LABELS } = require('./days');
 
-const DAYS = ['monday', 'wednesday'];
 const CLASS_NUMBERS = [1, 2, 3, 4];
-const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
 
 // Always returns exactly 4 rows (class_number 1-4) for a day, filling any
 // missing class number with a blank placeholder row so the UI/print layout
@@ -67,21 +66,6 @@ function saveMemberSchedule(memberId, dayRows) {
   });
 }
 
-function deleteMemberSchedule(memberId) {
-  db.prepare('DELETE FROM member_schedules WHERE member_id = ?').run(memberId);
-}
-
-function duplicateMemberSchedule(fromMemberId, toMemberId) {
-  const rows = db.prepare('SELECT * FROM member_schedules WHERE member_id = ?').all(fromMemberId);
-  deleteMemberSchedule(toMemberId);
-  const insert = db.prepare(
-    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-  );
-  rows.forEach((r) => insert.run(toMemberId, r.day, r.class_number, r.time, r.class_name, r.room, r.teacher));
-  return rows.length;
-}
-
 // One row per active student, joined with their schedule summary, for the
 // Class Schedules table. Filters are all optional/AND-combined.
 function scheduleList(filters) {
@@ -130,23 +114,6 @@ function scheduleList(filters) {
   return rows;
 }
 
-// Distinct, sorted values for filter dropdowns - pulled from actual saved
-// schedule data (not a separate managed catalog, since teachers/rooms/
-// classes aren't first-class entities in this app's simple schedule model).
-function distinctScheduleValues(column) {
-  const rows = db
-    .prepare(`SELECT DISTINCT ${column} AS v FROM member_schedules WHERE ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column} COLLATE NOCASE`)
-    .all();
-  return rows.map((r) => r.v);
-}
-
-function distinctGrades() {
-  return db
-    .prepare("SELECT DISTINCT grade_level AS v FROM members WHERE active = 1 AND member_type = 'student' AND grade_level IS NOT NULL AND grade_level != '' ORDER BY grade_level COLLATE NOCASE")
-    .all()
-    .map((r) => r.v);
-}
-
 module.exports = {
   DAYS,
   CLASS_NUMBERS,
@@ -156,9 +123,5 @@ module.exports = {
   rowIsBlank,
   scheduleStatus,
   saveMemberSchedule,
-  deleteMemberSchedule,
-  duplicateMemberSchedule,
   scheduleList,
-  distinctScheduleValues,
-  distinctGrades,
 };

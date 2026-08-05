@@ -6,7 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { formatTimestamp } = require('../utils/dates');
-const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const {
   DAYS,
   DAY_LABELS,
@@ -18,6 +18,8 @@ const {
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { imageFileFilter } = require('../utils/uploads');
+const { jsonScriptSafe } = require('../utils/json');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -33,7 +35,7 @@ const uploadDesignImage = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+  fileFilter: imageFileFilter,
 });
 
 const SCHEDULE_TABS = ['classes', 'design', 'print'];
@@ -110,14 +112,16 @@ router.get('/schedule', requireAdmin, (req, res) => {
       sort,
       dir,
       filters,
-      template: getScheduleCardTemplate(),
-      defaultLayout: DEFAULT_LAYOUT,
-      fields: FIELDS,
-      tableFields: TABLE_FIELDS,
-      shapeTypes: SHAPE_TYPES,
-      fontFamilies: FONT_FAMILIES,
-      cardWidth: CARD_WIDTH,
-      cardHeight: CARD_HEIGHT,
+      scheduleCardDataJson: jsonScriptSafe({
+        template: getScheduleCardTemplate(),
+        defaultLayout: DEFAULT_LAYOUT,
+        fields: FIELDS,
+        tableFields: TABLE_FIELDS,
+        shapeTypes: SHAPE_TYPES,
+        fontFamilies: FONT_FAMILIES,
+        cardWidth: CARD_WIDTH,
+        cardHeight: CARD_HEIGHT,
+      }),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -267,10 +271,6 @@ function normalizeScheduleRow(row) {
   return out;
 }
 
-router.get('/schedule/import', requireAdmin, (req, res) => {
-  res.redirect('/admin/schedule');
-});
-
 router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.redirect('/admin/schedule?error=' + encodeURIComponent('Please choose a file to import.'));
 
@@ -363,30 +363,17 @@ router.get('/schedule/export.csv', requireAdmin, (req, res) => {
   };
   const rows = scheduleList(filters);
 
-  const header = ['Member Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'];
-  const lines = [header.join(',')];
+  const lines = [toCsvRow(['Member Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'])];
   rows.forEach((r) => {
     [['monday', r.monday], ['wednesday', r.wednesday]].forEach(([day, dayRows]) => {
       dayRows.forEach((c) => {
         if (!c.class_name && !c.room && !c.time && !c.teacher) return;
-        lines.push(
-          [
-            `"${r.member.name.replace(/"/g, '""')}"`,
-            day,
-            c.class_number,
-            `"${(c.time || '').replace(/"/g, '""')}"`,
-            `"${(c.class_name || '').replace(/"/g, '""')}"`,
-            `"${(c.room || '').replace(/"/g, '""')}"`,
-            `"${(c.teacher || '').replace(/"/g, '""')}"`,
-          ].join(',')
-        );
+        lines.push(toCsvRow([r.member.name, day, c.class_number, c.time || '', c.class_name || '', c.room || '', c.teacher || '']));
       });
     });
   });
 
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="class-schedules.csv"');
-  res.send(lines.join('\n'));
+  sendCsv(res, 'class-schedules.csv', lines);
 });
 
 router.get('/schedule/print', requireAdmin, (req, res) => {

@@ -1,5 +1,10 @@
 const db = require('../db');
 
+// Display labels for attendance.reason_category, shared by the admin
+// Absence/Late log (admin-members.js, admin-rosters.js) and anywhere else
+// that renders a submitted absence/late reason.
+const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
+
 // All active rosters an active member belongs to that include the given
 // calendar date as one of their session dates.
 function getMemberRostersForDate(memberId, dateISO) {
@@ -14,4 +19,4 @@ function getMemberRostersForDate(memberId, dateISO) {
     .all(dateISO, memberId);
 }
 
-module.exports = { getMemberRostersForDate };
+module.exports = { getMemberRostersForDate, REASON_LABELS };

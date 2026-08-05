@@ -5,10 +5,10 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { defaultDay, requireDay } = require('../utils/days');
 const {
   DAY_LABELS,
-  isValidDay,
-  defaultDay,
   getListByDay,
   sectionsForList,
   datesForList,
@@ -17,11 +17,6 @@ const {
 } = require('../utils/volunteers');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
-
-function requireDay(req, res, next) {
-  if (!isValidDay(req.params.day)) return res.status(404).send('Not found');
-  next();
-}
 
 const EDIT_DIALOGS = ['hours', 'dates', 'members'];
 
@@ -244,19 +239,16 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, (req, res) =
   const header = ['Name', 'Section'];
   for (const label of grid.dateLabels) header.push(`${label} Position`, `${label} Room`);
 
-  const lines = [];
+  const lines = [toCsvRow(header)];
   for (const section of grid.sections) {
     for (const row of section.members) {
-      const line = [`"${row.member.name.replace(/"/g, '""')}"`, `"${section.label.replace(/"/g, '""')}"`];
-      for (const cell of row.cells) line.push(cell.position || '', cell.room || '');
-      lines.push(line.join(','));
+      const fields = [row.member.name, section.label];
+      for (const cell of row.cells) fields.push(cell.position || '', cell.room || '');
+      lines.push(toCsvRow(fields));
     }
   }
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${day}-floater-assignments.csv"`);
-  res.send(csv);
+  sendCsv(res, `${day}-floater-assignments.csv`, lines);
 });
 
 module.exports = router;

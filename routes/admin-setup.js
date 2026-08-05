@@ -2,13 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
+const { DAY_LABELS, defaultDay, requireDay } = require('../utils/days');
 const { teamsForDay, membersForTeam } = require('../utils/setup');
-
-function requireDay(req, res, next) {
-  if (!isValidDay(req.params.day)) return res.status(404).send('Not found');
-  next();
-}
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 
 // The landing page now lives on the combined Volunteers page, tabbed
 // between Floater Assignments and Setup/Cleanup Teams.
@@ -98,24 +94,16 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const teams = teamsWithMembers(day);
 
-  const header = ['Team', 'Description', 'Member'];
-  const lines = [];
+  const lines = [toCsvRow(['Team', 'Description', 'Member'])];
   for (const t of teams) {
-    const title = `"${t.title.replace(/"/g, '""')}"`;
-    const description = `"${(t.description || '').replace(/"/g, '""')}"`;
     if (t.members.length === 0) {
-      lines.push([title, description, ''].join(','));
+      lines.push(toCsvRow([t.title, t.description || '', '']));
     } else {
-      for (const m of t.members) {
-        lines.push([title, description, `"${m.name.replace(/"/g, '""')}"`].join(','));
-      }
+      for (const m of t.members) lines.push(toCsvRow([t.title, t.description || '', m.name]));
     }
   }
 
-  const csv = [header.join(','), ...lines].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${day}-setup-cleanup-teams.csv"`);
-  res.send(csv);
+  sendCsv(res, `${day}-setup-cleanup-teams.csv`, lines);
 });
 
 module.exports = router;
