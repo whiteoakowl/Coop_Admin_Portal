@@ -18,18 +18,19 @@ const TABLE_FIELDS = [
   { field: 'wednesdaySchedule', label: 'Wednesday Schedule', day: 'wednesday' },
 ];
 
-// One shared layout for every member - the member's name, then both day
-// tables stacked one above the other (full card width each) rather than
-// side by side, with no organization title line above the name.
+// One shared layout for every member - the member's name (smaller than a
+// section title, leaving blank space at the bottom of the card rather
+// than stretching to fill it), then both day tables stacked one above the
+// other (full card width each) rather than side by side.
 const DEFAULT_LAYOUT = {
   background: '#ffffff',
   backgroundOpacity: 1,
   elements: [
-    { id: 'name', type: 'text', field: 'name', x: 8, y: 6, width: 320, height: 24, fontSize: 16, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
-    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 32, width: 320, height: 13, fontSize: 10, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
-    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 46, width: 320, height: 76, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
-    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 124, width: 320, height: 13, fontSize: 10, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
-    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 138, width: 320, height: 76, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 6, width: 320, height: 18, fontSize: 13, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 26, width: 320, height: 12, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
+    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 39, width: 320, height: 72, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 113, width: 320, height: 12, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
+    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 126, width: 320, height: 72, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
   ],
 };
 

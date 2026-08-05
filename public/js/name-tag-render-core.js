@@ -27,6 +27,21 @@
     return typeof n === 'number' && !isNaN(n) ? n : fallback;
   }
 
+  // Schedule Card table only ever shows a class's start time, not the
+  // full "9:00 - 9:45 AM" range typed into the schedule editor. If the
+  // start half is missing an AM/PM marker but the end half has one (e.g.
+  // "9:00 - 9:45 AM"), borrow it so "9:00" doesn't print ambiguous.
+  function startTimeOnly(value) {
+    if (!value) return value;
+    var dashIndex = value.indexOf('-');
+    if (dashIndex === -1) return value.trim();
+    var start = value.slice(0, dashIndex).trim();
+    var end = value.slice(dashIndex + 1).trim();
+    var endAmPm = /(AM|PM|am|pm)\s*$/.exec(end);
+    if (endAmPm && !/(AM|PM|am|pm)\s*$/.test(start)) start += ' ' + endAmPm[1].toUpperCase();
+    return start;
+  }
+
   function hexToRgb(hex) {
     var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
     if (!m) return { r: 255, g: 255, b: 255 };
@@ -189,25 +204,34 @@
   // table, bound (via el.field) to an array of up to 4 {time, className,
   // room} rows - always renders exactly 4 rows, blank ones show an em
   // dash, matching the schedule editor's "always 4 rows" convention.
+  // Column widths: Class just fits its single digit (header shortened to
+  // "#" to match, since the full word "Class" wouldn't fit that width),
+  // Time just fits a start-time-only value ("9:00 AM"), Room is a short
+  // word, and Class Name - the longest, most-typed-into field - gets
+  // whatever's left.
+  var TABLE_COLUMN_WIDTHS = ['6%', '16%', '58%', '20%'];
+
   function renderTableEl(el, data) {
     var style = elementBaseStyle(el) + ' overflow:hidden;';
     var rows = (data && data[el.field]) || [];
     var fontSize = num(el.fontSize, 8);
     var borderColor = el.borderColor || '#dbe8f5';
     var headerBg = el.headerColor || '#eaf4fd';
-    var cellStyle = 'padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+    function cellStyle(colIndex) {
+      return 'width:' + TABLE_COLUMN_WIDTHS[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+    }
     var html = '<table style="width:100%; height:100%; border-collapse:collapse; table-layout:fixed; font-family:inherit;"><thead><tr style="background:' + esc(headerBg) + ';">';
-    ['Class', 'Time', 'Class Name', 'Room'].forEach(function (label) {
-      html += '<th style="' + cellStyle + '">' + esc(label) + '</th>';
+    ['#', 'Time', 'Class Name', 'Room'].forEach(function (label, colIndex) {
+      html += '<th style="' + cellStyle(colIndex) + '">' + esc(label) + '</th>';
     });
     html += '</tr></thead><tbody>';
     for (var i = 0; i < 4; i++) {
       var r = rows[i] || {};
       html +=
-        '<tr><td style="' + cellStyle + '">' + (i + 1) + '</td>' +
-        '<td style="' + cellStyle + '">' + esc(r.time || '—') + '</td>' +
-        '<td style="' + cellStyle + '">' + esc(r.className || '—') + '</td>' +
-        '<td style="' + cellStyle + '">' + esc(r.room || '—') + '</td></tr>';
+        '<tr><td style="' + cellStyle(0) + '">' + (i + 1) + '</td>' +
+        '<td style="' + cellStyle(1) + '">' + esc(startTimeOnly(r.time) || '—') + '</td>' +
+        '<td style="' + cellStyle(2) + '">' + esc(r.className || '—') + '</td>' +
+        '<td style="' + cellStyle(3) + '">' + esc(r.room || '—') + '</td></tr>';
     }
     html += '</tbody></table>';
     return '<div class="badge-el badge-el-table" data-id="' + esc(el.id) + '" data-type="table" style="' + style + '">' + html + '</div>';
