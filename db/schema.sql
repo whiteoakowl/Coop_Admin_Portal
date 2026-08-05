@@ -122,12 +122,14 @@ CREATE TABLE IF NOT EXISTS volunteer_dates (
   PRIMARY KEY (volunteer_list_id, session_date)
 );
 
--- Members on a volunteer list, each assigned to one of its 4 sections.
+-- Members on a volunteer list, each assigned to one or more of its 4
+-- sections (one row per member+section pairing, so a member can float
+-- across multiple hours on the same day).
 CREATE TABLE IF NOT EXISTS volunteer_members (
   volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   section_id INTEGER NOT NULL REFERENCES volunteer_sections(id) ON DELETE CASCADE,
-  PRIMARY KEY (volunteer_list_id, member_id)
+  PRIMARY KEY (volunteer_list_id, member_id, section_id)
 );
 
 -- Position/room filled in per volunteer per date - can differ every session.

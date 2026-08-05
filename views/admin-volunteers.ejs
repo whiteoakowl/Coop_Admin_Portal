@@ -50,133 +50,150 @@
 
         <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
 
-        <div class="volunteer-manage-grid no-print">
-          <div class="volunteer-manage-card">
-            <h2>Hour Sections</h2>
-            <form method="POST" action="/admin/volunteers/<%= day %>/sections" class="volunteer-sections-form">
-              <div class="volunteer-sections-grid">
-                <% sections.forEach(function(s) { %>
-                  <input type="text" name="labels" value="<%= s.label %>" />
-                <% }); %>
-              </div>
-              <button type="submit" class="btn-secondary">Save Labels</button>
-            </form>
-          </div>
-
-          <div class="volunteer-manage-card">
-            <h2>Session Dates (<%= dates.length %>)</h2>
-            <div class="roster-scroll">
-              <table class="roster-table members-table condensed-table">
-                <tbody>
-                  <% if (dates.length === 0) { %>
-                    <tr><td class="roster-empty">No dates yet.</td></tr>
-                  <% } %>
-                  <% dates.forEach(function(d) { %>
-                    <tr>
-                      <td><%= d.label %></td>
-                      <td class="actions-cell">
-                        <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room entries for this date will be deleted too.');">
-                          <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                        </form>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-            <form method="POST" action="/admin/volunteers/<%= day %>/dates/add" class="volunteer-date-add-form">
-              <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
-            </form>
-          </div>
-
-          <div class="volunteer-manage-card">
-            <h2>Members</h2>
-            <div class="quick-add-row">
-              <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-              <button type="button" class="btn-secondary file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
-            </div>
-
-            <dialog id="add-member-dialog" class="member-picker-dialog">
-              <form method="POST" action="/admin/volunteers/<%= day %>/add-member">
-                <h3>Add Members</h3>
-                <% if (availableMembers.length === 0) { %>
-                  <p class="hint">Everyone in Members is already on this list. Add new members on the <a href="/admin/members">Members page</a>.</p>
-                <% } else { %>
-                  <div class="member-picker-list">
-                    <% availableMembers.forEach(function(m) { %>
-                      <label class="member-picker-row">
-                        <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                        <span><%= m.name %></span>
-                      </label>
-                    <% }); %>
-                  </div>
-                <% } %>
-                <div class="notes-dialog-actions">
-                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                  <% if (availableMembers.length > 0) { %>
-                    <button type="submit" class="primary-btn">Add Selected</button>
-                  <% } %>
-                </div>
-              </form>
-            </dialog>
-
-            <dialog id="import-dialog" class="member-picker-dialog">
-              <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
-                <h3>Import</h3>
-                <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
-                <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
-                <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
-                <div class="notes-dialog-actions">
-                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                  <button type="submit" class="primary-btn">Import</button>
-                </div>
-              </form>
-            </dialog>
-
-            <div class="roster-scroll">
-              <table class="roster-table members-table condensed-table">
-                <thead>
-                  <tr><th>Name</th><th>Section</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  <% if (!anyMembers) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% grid.sections.forEach(function(section) { %>
-                    <% section.members.forEach(function(row) { %>
-                      <tr>
-                        <td><%= row.member.name %></td>
-                        <td>
-                          <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= row.member.id %>/section" class="inline-block-form">
-                            <select name="sectionId" onchange="this.form.submit()">
-                              <% sections.forEach(function(s) { %>
-                                <option value="<%= s.id %>" <%= s.id === section.id ? 'selected' : '' %>><%= s.label %></option>
-                              <% }); %>
-                            </select>
-                          </form>
-                        </td>
-                        <td class="actions-cell">
-                          <form method="POST" action="/admin/volunteers/<%= day %>/remove-member/<%= row.member.id %>" class="inline-block-form">
-                            <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                          </form>
-                        </td>
-                      </tr>
-                    <% }); %>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
+        <div class="roster-toolbar no-print">
+          <div></div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog').showModal()">Edit Hours</button>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-members-dialog').showModal()">Edit Members</button>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+            <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
+
+        <dialog id="edit-hours-dialog" class="volunteer-edit-dialog">
+          <h3>Edit Hours</h3>
+          <p class="hint">Rename the 4 hour blocks used to group this list.</p>
+          <form method="POST" action="/admin/volunteers/<%= day %>/sections?dialog=hours" class="volunteer-sections-form">
+            <div class="volunteer-sections-row">
+              <% sections.forEach(function(s) { %>
+                <input type="text" name="labels" value="<%= s.label %>" maxlength="20" />
+              <% }); %>
+            </div>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
+          <h3>Edit Session Dates</h3>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <tbody>
+                <% if (dates.length === 0) { %>
+                  <tr><td class="roster-empty">No dates yet.</td></tr>
+                <% } %>
+                <% dates.forEach(function(d) { %>
+                  <tr>
+                    <td><%= d.label %></td>
+                    <td class="actions-cell">
+                      <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room entries for this date will be deleted too.');">
+                        <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates" class="volunteer-date-add-form">
+            <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
+          </form>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+          </div>
+        </dialog>
+
+        <dialog id="edit-members-dialog" class="volunteer-edit-dialog">
+          <h3>Edit Members</h3>
+          <div class="quick-add-row">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+          </div>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table volunteer-members-table">
+              <thead>
+                <tr><th>Name</th><th>Hours</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                <% if (!anyMembers) { %>
+                  <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+                <% } %>
+                <% members.forEach(function(m) { %>
+                  <tr>
+                    <td class="volunteer-member-name"><%= m.name %></td>
+                    <td>
+                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/sections?dialog=members" class="volunteer-hour-checks">
+                        <% sections.forEach(function(s) { %>
+                          <label class="volunteer-hour-check">
+                            <input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= m.sectionIds.includes(s.id) ? 'checked' : '' %> onchange="volunteerToggleHour(this)" />
+                            <%= s.label %>
+                          </label>
+                        <% }); %>
+                      </form>
+                    </td>
+                    <td class="actions-cell">
+                      <form method="POST" action="/admin/volunteers/<%= day %>/remove-member/<%= m.id %>?dialog=members" class="inline-block-form">
+                        <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+          </div>
+        </dialog>
+
+        <dialog id="add-member-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/volunteers/<%= day %>/add-member?dialog=members">
+            <h3>Add Members</h3>
+            <% if (availableMembers.length === 0) { %>
+              <p class="hint">Everyone in Members is already on this list. Add new members on the <a href="/admin/members">Members page</a>.</p>
+            <% } else { %>
+              <div class="member-picker-list">
+                <% availableMembers.forEach(function(m) { %>
+                  <label class="member-picker-row">
+                    <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                    <span><%= m.name %></span>
+                  </label>
+                <% }); %>
+              </div>
+            <% } %>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <% if (availableMembers.length > 0) { %>
+                <button type="submit" class="primary-btn">Add Selected</button>
+              <% } %>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="import-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
+            <h3>Import</h3>
+            <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
+            <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
+            <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Import</button>
+            </div>
+          </form>
+        </dialog>
+
+        <% if (openDialog) { %>
+          <script>document.getElementById('edit-<%= openDialog %>-dialog').showModal();</script>
+        <% } %>
 
         <div class="manage-section">
           <div class="volunteer-chart-header">
             <h2><%= dayLabel %> Floater Assignments Chart</h2>
-            <div class="roster-btn-row no-print">
-              <span id="volunteer-save-status" class="volunteer-save-status"></span>
-              <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
-              <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
-            </div>
+            <span id="volunteer-save-status" class="volunteer-save-status no-print"></span>
           </div>
           <% if (dates.length === 0) { %>
             <p class="roster-empty">Add session dates above first.</p>

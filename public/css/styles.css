@@ -14,6 +14,8 @@
   --btn-bg-hover: #d9822f; /* hover state for --btn-bg */
   --green: #16a34a;
   --green-bg: #dcfce7;
+  --btn-green: #85BB65;    /* filled button background - file actions (Import/Export/Print) */
+  --btn-green-hover: #6fa350;
   --red: #dc2626;
   --red-bg: #fee2e2;
   --yellow: #a16207;
@@ -21,6 +23,16 @@
   --yellow-solid: #eab308;
   --orange: #b25a17;
   --orange-bg: #fde8d2;
+
+  /* Site-wide button/card color system: orange = primary (save/add/
+     submit, --btn-bg above), green = file actions (--btn-green above),
+     purple = secondary toolbar actions (edit/manage/view-toggle). Red is
+     kept as the one accepted exception, for destructive actions only. */
+  --purple: #6d4a99;       /* accessible text-on-tint variant */
+  --purple-dark: #55397a;  /* hover state for --purple text */
+  --purple-soft: #f1ecfb;  /* tinted section/badge backgrounds */
+  --btn-purple: #8b5fbf;   /* filled button background - secondary toolbar actions */
+  --btn-purple-hover: #744ea3;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -951,8 +963,11 @@ textarea:focus-visible,
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.btn-secondary { color: var(--ink); cursor: pointer; font-weight: 600; }
-.btn-secondary:hover { border-color: var(--brand); background: var(--brand-soft); }
+/* Secondary actions (dialog Cancel, small standalone buttons) get a
+   purple outline - present but lower-emphasis next to a solid orange
+   .primary-btn or a solid purple .roster-action-btn. */
+.btn-secondary { color: var(--purple); border-color: var(--btn-purple); cursor: pointer; font-weight: 600; }
+.btn-secondary:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
 
 .legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
@@ -1125,6 +1140,12 @@ textarea:focus-visible,
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
+/* Site-wide toolbar action button (New/Edit/Duplicate/view-toggle, etc.)
+   - solid purple fill by default. Import/Export/Print override to green
+   via .file-action-btn below, and destructive actions override to red
+   via .roster-action-btn-danger - those two are the only exceptions to
+   the orange/purple/green system, kept because "this deletes something"
+   is a near-universal red convention worth preserving. */
 .roster-action-btn {
   flex: 1 0 auto;
   min-width: 5.5rem;
@@ -1133,20 +1154,20 @@ textarea:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--btn-purple);
+  border: 1px solid var(--btn-purple);
   border-radius: 8px;
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ink);
+  color: #fff;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
-.roster-action-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
-.roster-action-btn-danger { color: var(--red); }
-.roster-action-btn-danger:hover { border-color: var(--red); color: var(--red); }
+.roster-action-btn:hover { border-color: var(--btn-purple-hover); background: var(--btn-purple-hover); }
+.roster-action-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.roster-action-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
 
 /* Import CSV / Export CSV / Print are the same "work with a file" action
    everywhere in the app, so they always get the same green treatment
@@ -1155,15 +1176,15 @@ textarea:focus-visible,
 .file-action-btn,
 .file-action-btn.btn-secondary,
 .file-action-btn.roster-action-btn {
-  background: #85BB65;
-  border-color: #85BB65;
+  background: var(--btn-green);
+  border-color: var(--btn-green);
   color: #fff;
 }
 .file-action-btn:hover,
 .file-action-btn.btn-secondary:hover,
 .file-action-btn.roster-action-btn:hover {
-  background: #6fa350;
-  border-color: #6fa350;
+  background: var(--btn-green-hover);
+  border-color: var(--btn-green-hover);
   color: #fff;
 }
 
@@ -1512,33 +1533,51 @@ textarea:focus-visible,
 
 /* ---------- Volunteers ---------- */
 
-.volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin: 0.5rem 0 1rem; }
+/* Hour Sections / Session Dates / Members used to sit as three
+   always-visible cards; they're now editors inside their own popup
+   dialogs, opened from the Edit Hours/Edit Dates/Edit Members toolbar
+   buttons, so the page itself just shows the toolbar and the chart. */
+.volunteer-edit-dialog {
+  width: min(560px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.volunteer-edit-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.volunteer-edit-dialog h3 { margin: 0 0 0.5rem; }
+.volunteer-edit-dialog .hint { margin: 0 0 0.75rem; }
+.volunteer-edit-dialog .roster-scroll { max-height: min(340px, 50vh); }
 
-/* Hour 1/Hour 2 and Hour 3/Hour 4 sit side by side as a 2-column grid,
-   with the Save button centered on its own row underneath. */
-.volunteer-sections-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.5rem;
-  width: 100%;
-}
-.volunteer-sections-grid input { min-width: 0; width: 100%; }
-.volunteer-sections-form button {
-  border-radius: 8px;
-  background: var(--btn-bg);
-  color: #fff;
-  border-color: var(--btn-bg);
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-.volunteer-sections-form button:hover {
-  background: var(--btn-bg-hover);
-  border-color: var(--btn-bg-hover);
-}
+.volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+
+/* Hour labels only ever hold a short word ("Hour 1"), so they stay
+   compact instead of stretching to fill the dialog. */
+.volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
+.volunteer-sections-row input { width: 10ch; text-align: center; }
 
 .volunteer-date-add-form { margin-top: 0.5rem; }
 .volunteer-date-add-form input[type="date"] { width: 192px; }
+
+/* A member's name is plain display text (not editable here), capped to a
+   sane column width so the Hours/Actions columns stay put regardless of
+   how long a name runs. */
+.volunteer-member-name { max-width: 30ch; white-space: normal; }
+
+.volunteer-hour-checks { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.volunteer-hour-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.volunteer-hour-check input[type="checkbox"] { width: 0.95rem; height: 0.95rem; accent-color: var(--purple); flex-shrink: 0; }
+.volunteer-hour-check:has(input:checked) { background: var(--purple-soft); border-color: var(--purple); color: var(--purple-dark); }
 
 .volunteer-section-row td {
   text-align: left !important;
@@ -1561,32 +1600,7 @@ textarea:focus-visible,
 .volunteer-cell-input[data-field="position"] { width: 30ch; }
 .volunteer-cell-input[data-field="room"] { width: 15ch; }
 
-/* Hour Sections / Session Dates / Members sit as three equal cards in a
-   row on the Floater Assignments manage tab, instead of one long stacked
-   column of sections. */
-.volunteer-manage-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.65fr) minmax(0, 1.5fr);
-  gap: 1.25rem;
-  margin-bottom: 1.25rem;
-  align-items: stretch;
-}
-@media (max-width: 900px) {
-  .volunteer-manage-grid { grid-template-columns: 1fr; }
-}
-.volunteer-manage-card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: #f8fafc;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding-compact);
-  box-shadow: var(--shadow-sm);
-}
-.volunteer-manage-card h2 { margin-top: 0; }
-
-.volunteer-chart-header { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.75rem; }
+.volunteer-chart-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .volunteer-chart-header h2 { margin: 0; }
 .volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
 

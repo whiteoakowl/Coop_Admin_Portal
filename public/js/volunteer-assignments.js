@@ -1,3 +1,17 @@
+// A member must stay on at least one hour section - unchecking the last
+// one is a no-op on the server, so revert it here rather than let the
+// checkbox silently drift out of sync with what's actually saved.
+function volunteerToggleHour(checkbox) {
+  const form = checkbox.form;
+  const anyChecked = form.querySelectorAll('input[type="checkbox"]:checked').length > 0;
+  if (!anyChecked) {
+    checkbox.checked = true;
+    alert('A member needs at least one hour. Use Remove to take them off the list entirely.');
+    return;
+  }
+  form.requestSubmit();
+}
+
 (function () {
   const inputs = document.querySelectorAll('.volunteer-cell-input[data-field]');
   if (!inputs.length) return;

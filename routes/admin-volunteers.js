@@ -23,6 +23,25 @@ function requireDay(req, res, next) {
   next();
 }
 
+const EDIT_DIALOGS = ['hours', 'dates', 'members'];
+
+// Every Edit Hours/Dates/Members action lives inside a <dialog>, and a
+// plain form POST fully reloads the page - so each form's action carries
+// ?dialog=<name>, and every redirect back to the manage page echoes it
+// through, letting the view reopen the same dialog on load instead of
+// dropping the admin back at a closed popup after every save.
+function manageUrl(day, params) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== null && value !== undefined && value !== '') query.set(key, value);
+  }
+  const qs = query.toString();
+  return `/admin/volunteers/${day}/manage` + (qs ? `?${qs}` : '');
+}
+function dialogParam(req) {
+  return EDIT_DIALOGS.includes(req.query.dialog) ? req.query.dialog : null;
+}
+
 // The landing page now lives on the combined Volunteers page, tabbed
 // between Floater Assignments and Setup/Cleanup Teams.
 router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volunteers/${defaultDay()}/manage`));
@@ -64,9 +83,11 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     roster,
     rosters,
     sections,
+    members,
     availableMembers,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     grid: buildListGrid(list.id, null),
+    openDialog: dialogParam(req),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -81,7 +102,7 @@ router.post('/volunteers/:day/sections', requireAdmin, requireDay, (req, res) =>
     const trimmed = (label || '').trim() || `Hour ${i + 1}`;
     update.run(trimmed, list.id, i + 1);
   });
-  res.redirect(`/admin/volunteers/${day}/manage?notice=` + encodeURIComponent('Section labels updated.'));
+  res.redirect(manageUrl(day, { notice: 'Section labels updated.', dialog: dialogParam(req) }));
 });
 
 router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, (req, res) => {
@@ -90,7 +111,7 @@ router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, (req, res) =
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare('INSERT OR IGNORE INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)');
   for (const d of dates) insertDate.run(list.id, d);
-  res.redirect(`/admin/volunteers/${day}/manage?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
+  res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req) }));
 });
 
 router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, (req, res) => {
@@ -99,7 +120,7 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, (re
   const date = req.params.date;
   db.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
   db.prepare('DELETE FROM volunteer_assignments WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
-  res.redirect(`/admin/volunteers/${day}/manage?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
+  res.redirect(manageUrl(day, { notice: `Removed ${formatDateLabel(date)}.`, dialog: dialogParam(req) }));
 });
 
 // New additions default into the first hour section; admins reassign from
@@ -119,7 +140,7 @@ router.post('/volunteers/:day/add-member', requireAdmin, requireDay, (req, res) 
     const link = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
     for (const memberId of memberIds) link.run(list.id, memberId, sectionId);
   }
-  res.redirect(`/admin/volunteers/${day}/manage`);
+  res.redirect(manageUrl(day, { dialog: dialogParam(req) }));
 });
 
 router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), (req, res) => {
@@ -127,7 +148,7 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   const list = getListByDay(day);
   const sectionId = firstSectionId(list.id);
   if (!req.file) {
-    return res.redirect(`/admin/volunteers/${day}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
+    return res.redirect(manageUrl(day, { error: 'Please choose a file to import.', dialog: dialogParam(req) }));
   }
   const names = parseNamesFromUpload(req.file.buffer, req.file.originalname);
   const linkMember = db.prepare('INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
@@ -140,31 +161,37 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
     if (result.changes > 0) added++;
   }
   res.redirect(
-    `/admin/volunteers/${day}/manage?notice=` +
-      encodeURIComponent(`Imported ${added} member(s) added to the list` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'))
+    manageUrl(day, {
+      notice: `Imported ${added} member(s) added to the list` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'),
+      dialog: dialogParam(req),
+    })
   );
 });
 
-router.post('/volunteers/:day/members/:memberId/section', requireAdmin, requireDay, (req, res) => {
+// A member can be assigned to more than one hour, so this replaces their
+// full set of section memberships with whatever's checked. Ignored if
+// nothing is checked - a member can't be on the list with zero hours,
+// they'd just fall out of every query that joins through volunteer_members.
+router.post('/volunteers/:day/members/:memberId/sections', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const memberId = parseInt(req.params.memberId, 10);
-  const sectionId = parseInt(req.body.sectionId, 10);
-  if (sectionId) {
-    db.prepare('UPDATE volunteer_members SET section_id = ? WHERE volunteer_list_id = ? AND member_id = ?').run(
-      sectionId,
-      list.id,
-      memberId
-    );
+  const sectionIds = [].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+
+  if (sectionIds.length > 0) {
+    const del = db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ?');
+    const insert = db.prepare('INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
+    del.run(list.id, memberId);
+    for (const sectionId of sectionIds) insert.run(list.id, memberId, sectionId);
   }
-  res.redirect(`/admin/volunteers/${day}/manage`);
+  res.redirect(manageUrl(day, { dialog: dialogParam(req) }));
 });
 
 router.post('/volunteers/:day/remove-member/:memberId', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ?').run(list.id, req.params.memberId);
-  res.redirect(`/admin/volunteers/${day}/manage`);
+  res.redirect(manageUrl(day, { dialog: dialogParam(req) }));
 });
 
 // Saves position/room text fields. Used by the full manage-page grid

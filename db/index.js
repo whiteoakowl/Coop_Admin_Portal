@@ -55,6 +55,27 @@ if (!nameTagRequestColumns.includes('archived')) {
   db.exec('ALTER TABLE name_tag_requests ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
 }
 
+// volunteer_members used to key on (list, member) alone - one section per
+// member. It now keys on (list, member, section) so a member can be on
+// multiple hours. SQLite can't ALTER a primary key, so rebuild the table
+// in place for anyone who already has the old shape.
+const volunteerMemberColumns = db.prepare('PRAGMA table_info(volunteer_members)').all();
+const hasNewVolunteerMembersPk = volunteerMemberColumns.some((c) => c.name === 'section_id' && c.pk > 0);
+if (volunteerMemberColumns.length > 0 && !hasNewVolunteerMembersPk) {
+  db.exec(`
+    ALTER TABLE volunteer_members RENAME TO volunteer_members_old;
+    CREATE TABLE volunteer_members (
+      volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
+      member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      section_id INTEGER NOT NULL REFERENCES volunteer_sections(id) ON DELETE CASCADE,
+      PRIMARY KEY (volunteer_list_id, member_id, section_id)
+    );
+    INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id)
+      SELECT volunteer_list_id, member_id, section_id FROM volunteer_members_old;
+    DROP TABLE volunteer_members_old;
+  `);
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

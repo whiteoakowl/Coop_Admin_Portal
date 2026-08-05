@@ -21,8 +21,10 @@ function datesForList(listId) {
     .map((r) => r.session_date);
 }
 
+// One row per member on the list, each carrying the full set of section
+// IDs they're assigned to (a member can float across multiple hours).
 function membersForList(listId) {
-  return db
+  const rows = db
     .prepare(
       `SELECT m.*, vm.section_id AS sectionId FROM members m
        JOIN volunteer_members vm ON vm.member_id = m.id
@@ -30,10 +32,23 @@ function membersForList(listId) {
        ORDER BY m.name COLLATE NOCASE`
     )
     .all(listId);
+
+  const byMemberId = {};
+  const order = [];
+  for (const row of rows) {
+    if (!byMemberId[row.id]) {
+      byMemberId[row.id] = { ...row, sectionIds: [] };
+      order.push(row.id);
+    }
+    byMemberId[row.id].sectionIds.push(row.sectionId);
+  }
+  return order.map((id) => byMemberId[id]);
 }
 
 // Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
-// for a list, optionally narrowed to a single date.
+// for a list, optionally narrowed to a single date. A member appears once
+// under every section they're assigned to, sharing the same per-date
+// position/room across all of their hours.
 function buildListGrid(listId, dateFilter) {
   const sections = sectionsForList(listId);
   const members = membersForList(listId);
@@ -52,15 +67,17 @@ function buildListGrid(listId, dateFilter) {
   const sectionMap = {};
   for (const s of sections) sectionMap[s.id] = { ...s, members: [] };
   for (const m of members) {
-    const bucket = sectionMap[m.sectionId];
-    if (!bucket) continue;
-    bucket.members.push({
+    const entry = {
       member: m,
       cells: dates.map((d) => {
         const a = byKey[`${m.id}|${d}`];
         return { date: d, position: a ? a.position || '' : '', room: a ? a.room || '' : '' };
       }),
-    });
+    };
+    for (const sectionId of m.sectionIds) {
+      const bucket = sectionMap[sectionId];
+      if (bucket) bucket.members.push(entry);
+    }
   }
 
   return {
