@@ -431,6 +431,14 @@ CREATE TABLE IF NOT EXISTS library_items (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Managed list of library item types (mirrors the `categories` table used
+-- for rosters) - picked from a dropdown rather than typed freeform.
+CREATE TABLE IF NOT EXISTS library_item_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- One row per item a member has checked out; checked_in_at is NULL while
 -- it's still out, set once it's returned so the item becomes available
 -- again. member_id reuses the existing member barcode scan from the door.

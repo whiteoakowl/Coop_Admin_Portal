@@ -15,11 +15,19 @@ function allItems(typeFilter) {
   return db.prepare('SELECT * FROM library_items ORDER BY title COLLATE NOCASE').all();
 }
 
-function distinctTypes() {
-  return db
-    .prepare("SELECT DISTINCT type FROM library_items WHERE type IS NOT NULL AND type != '' ORDER BY type COLLATE NOCASE")
-    .all()
-    .map((r) => r.type);
+// Managed list of item types (mirrors utils used for roster categories) -
+// picked from a dropdown when adding/editing an item rather than typed
+// freeform.
+function allLibraryTypes() {
+  return db.prepare('SELECT name FROM library_item_types ORDER BY name COLLATE NOCASE').all().map((r) => r.name);
+}
+
+function isKnownLibraryType(name) {
+  return !!db.prepare('SELECT 1 FROM library_item_types WHERE name = ?').get(name);
+}
+
+function createLibraryType(name) {
+  db.prepare('INSERT OR IGNORE INTO library_item_types (name) VALUES (?)').run(name);
 }
 
 function createItem(title, barcode, type) {
@@ -84,7 +92,9 @@ module.exports = {
   findMemberByBarcode,
   findItemByBarcode,
   allItems,
-  distinctTypes,
+  allLibraryTypes,
+  isKnownLibraryType,
+  createLibraryType,
   createItem,
   updateItem,
   deleteItem,

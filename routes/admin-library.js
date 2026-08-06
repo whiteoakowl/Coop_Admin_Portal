@@ -10,7 +10,9 @@ const {
   findMemberByBarcode,
   findItemByBarcode,
   allItems,
-  distinctTypes,
+  allLibraryTypes,
+  isKnownLibraryType,
+  createLibraryType,
   createItem,
   updateItem,
   deleteItem,
@@ -20,7 +22,7 @@ const {
   membersWithActiveCheckouts,
 } = require('../utils/library');
 
-const TABS = ['checkout', 'members', 'titles'];
+const TABS = ['checkout', 'checkin', 'members', 'titles'];
 
 router.get('/library', requireAdmin, (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'checkout';
@@ -29,12 +31,18 @@ router.get('/library', requireAdmin, (req, res) => {
     title: 'Library',
     tab,
     items: allItems(typeFilter),
-    types: distinctTypes(),
+    types: allLibraryTypes(),
     typeFilter,
     membersWithCheckouts: membersWithActiveCheckouts(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.post('/library/types', requireAdmin, (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (name) createLibraryType(name);
+  res.redirect('/admin/library?tab=titles');
 });
 
 // Checkout scan flow - AJAX lookups so the scan screen can build a pending
@@ -56,6 +64,22 @@ router.post('/library/scan-item', requireAdmin, (req, res) => {
     return res.json({ ok: false, message: `"${item.title}" is already checked out to ${holder ? holder.name : 'someone'}.` });
   }
   res.json({ ok: true, item: { id: item.id, title: item.title } });
+});
+
+// Check-in scan flow - scan an item barcode and, if it's currently checked
+// out, return it immediately (no need to also scan the member - the active
+// checkout row already says who has it).
+router.post('/library/scan-checkin', requireAdmin, (req, res) => {
+  const barcode = (req.body.barcode || '').trim();
+  const item = barcode ? findItemByBarcode(barcode) : null;
+  if (!item) return res.json({ ok: false, message: 'No library item matches that barcode.' });
+
+  const activeCheckout = activeCheckoutForItem(item.id);
+  if (!activeCheckout) return res.json({ ok: false, message: `"${item.title}" is not currently checked out.` });
+
+  const holder = db.prepare('SELECT name FROM members WHERE id = ?').get(activeCheckout.member_id);
+  returnCheckout(activeCheckout.id);
+  res.json({ ok: true, item: { id: item.id, title: item.title }, memberName: holder ? holder.name : 'Unknown' });
 });
 
 router.post('/library/checkout', requireAdmin, (req, res) => {
@@ -82,7 +106,8 @@ router.post('/library/checkouts/:id/return', requireAdmin, (req, res) => {
 router.post('/library/items/new', requireAdmin, (req, res) => {
   const title = (req.body.title || '').trim();
   const barcode = (req.body.barcode || '').trim();
-  const type = (req.body.type || '').trim();
+  const rawType = (req.body.type || '').trim();
+  const type = isKnownLibraryType(rawType) ? rawType : null;
   if (!title || !barcode) {
     return res.redirect('/admin/library?tab=titles&error=' + encodeURIComponent('Title and barcode are required.'));
   }
@@ -97,7 +122,8 @@ router.post('/library/items/:id/edit', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const title = (req.body.title || '').trim();
   const barcode = (req.body.barcode || '').trim();
-  const type = (req.body.type || '').trim();
+  const rawType = (req.body.type || '').trim();
+  const type = isKnownLibraryType(rawType) ? rawType : null;
   if (title && barcode) updateItem(id, title, barcode, type);
   res.redirect('/admin/library?tab=titles');
 });

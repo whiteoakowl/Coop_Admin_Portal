@@ -13,6 +13,7 @@
 
     <div class="view-tabs">
       <a class="view-tab<%= tab === 'checkout' ? ' active' : '' %>" href="/admin/library?tab=checkout">Checkout</a>
+      <a class="view-tab<%= tab === 'checkin' ? ' active' : '' %>" href="/admin/library?tab=checkin">Check In</a>
       <a class="view-tab<%= tab === 'members' ? ' active' : '' %>" href="/admin/library?tab=members">Members</a>
       <a class="view-tab<%= tab === 'titles' ? ' active' : '' %>" href="/admin/library?tab=titles">Titles</a>
     </div>
@@ -49,6 +50,23 @@
           <input type="hidden" name="memberId" id="library-checkout-member-id" />
           <div id="library-checkout-item-inputs"></div>
         </form>
+      <% } else if (tab === 'checkin') { %>
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Items</h2>
+          <p class="hint" id="library-checkin-hint">Scan an item's barcode to check it back in.</p>
+          <form id="library-checkin-form" autocomplete="off">
+            <input id="library-checkin-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" autofocus />
+          </form>
+        </div>
+
+        <div class="manage-section">
+          <h2>Just Checked In</h2>
+          <table class="roster-table" id="library-checkin-table" hidden>
+            <thead><tr><th>Item</th><th>Returned By</th></tr></thead>
+            <tbody id="library-checkin-tbody"></tbody>
+          </table>
+          <p class="roster-empty" id="library-checkin-empty">No items checked in yet this session.</p>
+        </div>
       <% } else if (tab === 'members') { %>
         <div class="manage-section">
           <h2>Currently Checked Out</h2>
@@ -88,9 +106,26 @@
             </select>
           </div>
           <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-type-dialog').showModal()">+ Add Type</button>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('add-item-dialog').showModal()">+ Add Item</button>
           </div>
         </div>
+
+        <dialog id="add-type-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/library/types">
+            <h3>Add Type</h3>
+            <p class="hint">Used to organize library items &mdash; pick it from the dropdown when adding or editing an item.</p>
+            <input type="text" name="name" placeholder="e.g. Book, Curriculum Kit" required />
+            <div class="checkbox-row">
+              <% if (types.length === 0) { %><span class="hint">No types yet.</span><% } %>
+              <% types.forEach(function(t) { %><span class="badge-pill"><%= t %></span><% }); %>
+            </div>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add</button>
+            </div>
+          </form>
+        </dialog>
 
         <dialog id="add-item-dialog" class="member-picker-dialog">
           <form method="POST" action="/admin/library/items/new">
@@ -102,7 +137,10 @@
             <input id="itemTitle" name="title" type="text" required />
 
             <label for="itemType">Type</label>
-            <input id="itemType" name="type" type="text" placeholder="e.g. Book, Curriculum Kit" />
+            <select id="itemType" name="type">
+              <option value="">No type</option>
+              <% types.forEach(function(t) { %><option value="<%= t %>"><%= t %></option><% }); %>
+            </select>
 
             <div class="notes-dialog-actions">
               <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
@@ -124,7 +162,10 @@
                     <td><%= item.title %></td>
                     <td><%= item.barcode %></td>
                     <td>
-                      <input type="text" name="type" form="type-form-<%= item.id %>" value="<%= item.type || '' %>" placeholder="Type" />
+                      <select name="type" form="type-form-<%= item.id %>">
+                        <option value="">No type</option>
+                        <% types.forEach(function(t) { %><option value="<%= t %>" <%= item.type === t ? 'selected' : '' %>><%= t %></option><% }); %>
+                      </select>
                     </td>
                     <td class="actions-cell">
                       <button type="submit" form="type-form-<%= item.id %>" class="icon-btn" aria-label="Save type for <%= item.title %>" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>

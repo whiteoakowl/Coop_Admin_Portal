@@ -145,3 +145,66 @@
   renderPending();
   memberInput.focus();
 })();
+
+(function () {
+  const checkinForm = document.getElementById('library-checkin-form');
+  if (!checkinForm) return; // not the Check In tab
+
+  const checkinInput = document.getElementById('library-checkin-input');
+  const checkinHint = document.getElementById('library-checkin-hint');
+  const checkinTable = document.getElementById('library-checkin-table');
+  const checkinTbody = document.getElementById('library-checkin-tbody');
+  const checkinEmpty = document.getElementById('library-checkin-empty');
+
+  const checkedIn = [];
+
+  function renderCheckedIn() {
+    checkinTbody.innerHTML = '';
+    if (checkedIn.length === 0) {
+      checkinTable.hidden = true;
+      checkinEmpty.hidden = false;
+      return;
+    }
+    checkinTable.hidden = false;
+    checkinEmpty.hidden = true;
+    checkedIn.forEach((entry) => {
+      const tr = document.createElement('tr');
+      const titleTd = document.createElement('td');
+      titleTd.textContent = entry.title;
+      const memberTd = document.createElement('td');
+      memberTd.textContent = entry.memberName;
+      tr.appendChild(titleTd);
+      tr.appendChild(memberTd);
+      checkinTbody.appendChild(tr);
+    });
+  }
+
+  checkinForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const barcode = checkinInput.value.trim();
+    checkinInput.value = '';
+    if (!barcode) return;
+
+    try {
+      const res = await fetch('/admin/library/scan-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'barcode=' + encodeURIComponent(barcode),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        checkedIn.unshift({ title: data.item.title, memberName: data.memberName });
+        checkinHint.textContent = `"${data.item.title}" checked in from ${data.memberName}.`;
+        renderCheckedIn();
+      } else {
+        checkinHint.textContent = data.message;
+      }
+    } catch (err) {
+      checkinHint.textContent = 'Connection error. Please try again.';
+    }
+    checkinInput.focus();
+  });
+
+  renderCheckedIn();
+  checkinInput.focus();
+})();
