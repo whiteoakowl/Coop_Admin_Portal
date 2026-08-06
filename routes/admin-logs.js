@@ -6,7 +6,7 @@ const { formatDateLabel, formatTime, formatTimestamp } = require('../utils/dates
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 
-const LOG_TABS = ['absence', 'checkinout', 'nametag', 'messages'];
+const LOG_TABS = ['absence', 'checkinout', 'nametag', 'messages', 'membership'];
 
 // Every Absence/Late form submission across all rosters, newest first.
 function allAbsenceSubmissions(dateFilter) {
@@ -87,6 +87,19 @@ function nameTagSubmissions(showArchived, dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
+function membershipRequests(showArchived, dateFilter) {
+  let sql = `SELECT * FROM membership_requests WHERE archived = ?`;
+  const params = [showArchived ? 1 : 0];
+  if (dateFilter) {
+    sql += ' AND date(created_at) = ?';
+    params.push(dateFilter);
+  }
+  sql += ' ORDER BY created_at DESC';
+  const requests = db.prepare(sql).all(...params);
+  const childrenStmt = db.prepare('SELECT * FROM membership_request_children WHERE request_id = ? ORDER BY id');
+  return requests.map((r) => ({ ...r, children: childrenStmt.all(r.id) }));
+}
+
 function contactAdminMessages(showArchived, dateFilter) {
   let sql = `SELECT * FROM contact_admin_messages WHERE archived = ?`;
   const params = [showArchived ? 1 : 0];
@@ -101,6 +114,28 @@ function contactAdminMessages(showArchived, dateFilter) {
 router.get('/logs', requireAdmin, (req, res) => {
   const tab = LOG_TABS.includes(req.query.tab) ? req.query.tab : 'absence';
   const dateFilter = req.query.date || '';
+
+  if (tab === 'membership') {
+    const showArchived = req.query.archived === '1';
+    const requests = membershipRequests(showArchived, dateFilter).map((r) => ({
+      ...r,
+      timestamp: formatTimestamp(r.created_at),
+    }));
+    const dates = db
+      .prepare(`SELECT DISTINCT date(created_at) AS d FROM membership_requests WHERE archived = ? ORDER BY d DESC`)
+      .all(showArchived ? 1 : 0)
+      .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
+    return res.render('admin-logs', {
+      title: 'Membership Requests',
+      tab,
+      requests,
+      dates,
+      dateFilter,
+      showArchived,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
 
   if (tab === 'messages') {
     const showArchived = req.query.archived === '1';
@@ -264,6 +299,16 @@ router.post('/logs/messages/:id/archive', requireAdmin, (req, res) => {
 router.post('/logs/messages/:id/unarchive', requireAdmin, (req, res) => {
   db.prepare('UPDATE contact_admin_messages SET archived = 0 WHERE id = ?').run(parseInt(req.params.id, 10));
   res.redirect('/admin/logs?tab=messages&archived=1');
+});
+
+router.post('/logs/membership/:id/archive', requireAdmin, (req, res) => {
+  db.prepare('UPDATE membership_requests SET archived = 1 WHERE id = ?').run(parseInt(req.params.id, 10));
+  res.redirect('/admin/logs?tab=membership');
+});
+
+router.post('/logs/membership/:id/unarchive', requireAdmin, (req, res) => {
+  db.prepare('UPDATE membership_requests SET archived = 0 WHERE id = ?').run(parseInt(req.params.id, 10));
+  res.redirect('/admin/logs?tab=membership&archived=1');
 });
 
 // Old standalone URLs now live under the unified Logs tab.

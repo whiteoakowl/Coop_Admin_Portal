@@ -15,11 +15,17 @@ const { formatDateLabel, formatTime } = require('../utils/dates');
 const PORTAL_ROLE_PRIORITY = ['coop_admin', 'parent', 'student'];
 
 router.post('/login', (req, res) => {
-  const username = (req.body.username || '').trim();
+  // The sign-in card asks for "Email Address" (matching members' own
+  // contact email), but accounts are still set up with an admin-chosen
+  // username - so a login attempt matches either, whichever the member
+  // actually types.
+  const identifier = (req.body.username || '').trim();
   const password = req.body.password || '';
   const member = db
-    .prepare("SELECT * FROM members WHERE username = ? AND active = 1 AND password_hash IS NOT NULL")
-    .get(username);
+    .prepare(
+      "SELECT * FROM members WHERE (username = ? OR email = ?) AND active = 1 AND password_hash IS NOT NULL"
+    )
+    .get(identifier, identifier);
 
   if (!member || !bcrypt.compareSync(password, member.password_hash)) {
     return res.render('index', { title: 'SH Check-In / Check-Out', error: 'Invalid username or password.' });

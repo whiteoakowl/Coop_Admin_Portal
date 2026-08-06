@@ -332,6 +332,41 @@ CREATE TABLE IF NOT EXISTS contact_admin_messages (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- New-family sign-up requests from the public Membership Form. Deliberately
+-- a review queue, not a live member/family creation path - members are
+-- only ever created through the admin-controlled Members page (see
+-- "Data integrity" note on the members table below), so a full Admin
+-- reviews each request here and adds the family manually.
+CREATE TABLE IF NOT EXISTS membership_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  parent1_first_name TEXT NOT NULL,
+  parent1_last_name TEXT NOT NULL,
+  parent1_email TEXT NOT NULL,
+  parent1_phone TEXT,
+  parent2_first_name TEXT,
+  parent2_last_name TEXT,
+  parent2_email TEXT,
+  parent2_phone TEXT,
+  address TEXT,
+  city TEXT,
+  state TEXT,
+  zipcode TEXT,
+  volunteer_interests TEXT, -- comma-separated list of checked options
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS membership_request_children (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES membership_requests(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  birthdate TEXT,
+  grade_level TEXT,
+  medical_notes TEXT,
+  photo_path TEXT
+);
+
 -- Documents tab: admin-uploaded files (PDF, Word, etc.) shown as button
 -- boxes; file_path is where the upload landed on disk under
 -- public/uploads/documents.

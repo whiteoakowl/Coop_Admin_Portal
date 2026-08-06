@@ -217,8 +217,24 @@ textarea:focus-visible,
   margin: 0 auto;
   text-align: left;
 }
-.home-login-title { margin-top: 0; text-align: center; }
+.home-login-title { margin: 0; text-align: center; color: var(--brand-dark); font-size: 1.6rem; line-height: 1.25; }
+.home-login-subtitle { margin: 0.35rem 0 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
 .home-login-hint { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 1rem 0 0; }
+
+/* Visually hidden but still reachable by screen readers - used where a
+   field's placeholder alone communicates its purpose (matches a reference
+   design with no visible label), like the homepage sign-in card. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .home-staff-login {
   display: inline-block;
   margin-top: 1.5rem;
@@ -450,6 +466,23 @@ textarea:focus-visible,
   margin-bottom: 1.25rem;
 }
 .form-section h2 { margin: 0 0 0.85rem; }
+
+/* ---------- Membership Form ---------- */
+
+.membership-add-parent2 { margin-top: 1rem; }
+.membership-child-block { margin-bottom: 1rem; }
+.membership-child-block:last-child { margin-bottom: 0; }
+.membership-child-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.membership-child-header h3 { margin: 0; }
+.membership-volunteer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem 1.25rem;
+}
+.membership-submit-btn { width: 100%; }
+@media (max-width: 640px) {
+  .membership-volunteer-grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 .stack-form { display: flex; flex-direction: column; gap: 0.35rem; }
 .stack-form-narrow { max-width: 360px; }

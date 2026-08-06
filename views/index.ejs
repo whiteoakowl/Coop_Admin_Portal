@@ -12,20 +12,21 @@
     </div>
 
     <div class="home-login-card">
-      <h2 class="home-login-title">Member Login</h2>
+      <h2 class="home-login-title">Sanford Homeschoolers</h2>
+      <p class="home-login-subtitle">Member Sign In</p>
 
       <% if (error) { %>
         <div class="alert alert-error"><%= error %></div>
       <% } %>
 
       <form method="POST" action="/login" class="stack-form">
-        <label for="username">Username</label>
-        <input id="username" name="username" type="text" autocomplete="username" required autofocus />
+        <label for="username" class="sr-only">Email Address</label>
+        <input id="username" name="username" type="text" placeholder="Email Address" autocomplete="username" required autofocus />
 
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <label for="password" class="sr-only">Password</label>
+        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required />
 
-        <button type="submit" class="primary-btn">Log In</button>
+        <button type="submit" class="primary-btn">Sign In</button>
       </form>
 
       <p class="home-login-hint">Don't have a login yet? Ask a co-op admin to set one up for you.</p>

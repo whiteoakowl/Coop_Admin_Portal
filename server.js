@@ -30,6 +30,7 @@ const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
 const classScheduleRouter = require('./routes/class-schedule');
 const contactAdminsRouter = require('./routes/contact-admins');
+const membershipRouter = require('./routes/membership');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -114,6 +115,7 @@ app.use('/', volunteersRouter);
 app.use('/', setupRouter);
 app.use('/', classScheduleRouter);
 app.use('/', contactAdminsRouter);
+app.use('/', membershipRouter);
 // Order matters here: several of these routers gate themselves with a
 // blanket `router.use(requireFullAdmin)` (no path), which - because Express
 // matches on the shared '/admin' mount prefix, not on that router's own
