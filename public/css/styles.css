@@ -1208,6 +1208,27 @@ textarea:focus-visible,
 .cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: #e7edf5; color: transparent; }
 
+/* Attendance grid's editable status cell - a plain select styled to read
+   like the colored cell-tag badge above when locked (disabled), so the
+   page looks the same whether or not Edit has been clicked. Its printed
+   twin, .print-only-tag, is the actual .cell-tag badge (a <select> can't
+   render sensibly on paper). */
+.roster-cell-select {
+  min-width: 4.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.4rem;
+}
+.roster-cell-select:disabled { opacity: 1; -webkit-appearance: none; appearance: none; }
+.roster-cell-select:not(:disabled) { border-color: var(--border); background-color: #fff; }
+.roster-cell-select-present { background: var(--green-bg); color: var(--green); }
+.roster-cell-select-late { background: var(--yellow-bg); color: var(--yellow); }
+.roster-cell-select-absent { background: var(--red-bg); color: var(--red); }
+.roster-cell-select-blank { background: #e7edf5; color: var(--muted); }
+.print-only-tag { display: none; }
+
 .roster-table-detailed { width: auto; font-size: 0.8rem; }
 .roster-table-detailed th, .roster-table-detailed td {
   padding: 0.25rem 0.3rem;
@@ -2441,6 +2462,11 @@ textarea:focus-visible,
   .roster-view-page .legend,
   .roster-view-page .roster-toolbar,
   .roster-view-page .volunteer-box { animation: none; }
+
+  /* Attendance grid: the editable <select> can't render sensibly on
+     paper, so swap it for the plain colored cell-tag badge. */
+  .roster-cell-select { display: none !important; }
+  .print-only-tag { display: inline-flex; }
 
   /* Roster (Attendance) page: printing "Attendance Spreadsheet" should
      show just the grid, not the embedded Floater Assignments box. */
