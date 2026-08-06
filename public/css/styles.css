@@ -1129,6 +1129,30 @@ textarea:focus-visible,
 
 .link-btn-danger { color: var(--red); }
 
+/* Every native date picker in the app, styled identically to the
+   dropdowns next to it - same border/radius/padding/background - so a
+   date field and a <select> always read as one consistent control
+   system instead of the browser's unstyled default box. */
+input[type="date"] {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  line-height: 1.3;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+input[type="date"]:hover { border-color: var(--btn-purple); }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  opacity: 0.65;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; background: var(--purple-soft); }
+
 /* Shared sizing so inline buttons and their neighboring inputs/selects match. */
 .date-list-row input[type="date"],
 .category-filter select,
@@ -1415,14 +1439,14 @@ textarea:focus-visible,
 .file-action-btn.roster-action-btn {
   background: var(--btn-green);
   border-color: var(--btn-green);
-  color: #fff;
+  color: #000;
 }
 .file-action-btn:hover,
 .file-action-btn.btn-secondary:hover,
 .file-action-btn.roster-action-btn:hover {
   background: var(--btn-green-hover);
   border-color: var(--btn-green-hover);
-  color: #fff;
+  color: #000;
 }
 
 /* ---------- Manage roster page ---------- */
@@ -2020,6 +2044,7 @@ textarea:focus-visible,
   margin: 1rem 0;
 }
 .grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
+.grid-box-header + .legend { margin-top: 0.5rem; margin-bottom: 0; }
 .grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .grid-box-header h2 { margin: 0; }
 .grid-box .btn-secondary { margin-top: 0.75rem; }

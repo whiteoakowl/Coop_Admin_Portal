@@ -33,6 +33,7 @@
           <a class="roster-action-btn" href="/admin/volunteers/<%= day === 'monday' ? 'wednesday' : 'monday' %>/manage">View <%= day === 'monday' ? 'Wednesday' : 'Monday' %></a>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog').showModal()">Edit Hours</button>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Permanent Job</button>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-members-dialog').showModal()">Edit Members</button>
             <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
@@ -251,9 +252,6 @@
                 onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')"
               />
             </div>
-          </div>
-          <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Permanent Job</button>
           </div>
         </div>
 
