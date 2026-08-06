@@ -247,19 +247,12 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
   if (!roster) return res.status(404).send('Not found');
 
   const members = rosterMembers(id).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
-  const memberIds = members.map((m) => m.id);
-  const availableMembers = db
-    .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all()
-    .filter((m) => !memberIds.includes(m.id));
-
   const dates = rosterDates(id);
 
   res.render('admin-roster-manage', {
     title: `Manage ${roster.name}`,
     roster,
     members,
-    availableMembers,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     categories: allCategories(),
     error: req.query.error || null,
@@ -267,37 +260,11 @@ router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/rosters/:id/add-member', requireAdmin, (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  const link = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
-  for (const memberId of memberIds) link.run(rosterId, memberId);
-  res.redirect(`/admin/rosters/${rosterId}/manage`);
-});
-
 router.post('/rosters/:id/remove-member/:memberId', requireAdmin, (req, res) => {
   const rosterId = parseInt(req.params.id, 10);
   const memberId = parseInt(req.params.memberId, 10);
   db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
   res.redirect(`/admin/rosters/${rosterId}/manage`);
-});
-
-// --- Bulk import (names-only file, one name per line) into an existing roster ---
-
-router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
-  if (!roster) return res.status(404).send('Not found');
-
-  if (!req.file) {
-    return res.redirect(`/admin/rosters/${rosterId}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
-  }
-
-  const result = importNamesIntoRoster(rosterId, req.file.buffer, req.file.originalname);
-  res.redirect(
-    `/admin/rosters/${rosterId}/manage?notice=` +
-      encodeURIComponent(`Imported ${result.linked} member(s) added to this roster` + (result.notFound ? `, ${result.notFound} name(s) not found in Members.` : '.'))
-  );
 });
 
 // --- Combined roster grid + export ---

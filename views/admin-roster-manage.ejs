@@ -80,47 +80,10 @@
 
     <div class="manage-section">
       <h2>Members (<%= members.length %>)</h2>
+      <p class="hint">Membership fills in automatically from class schedules.</p>
       <div class="quick-add-row">
-        <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-        <button type="button" class="btn-secondary file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
       </div>
-
-      <dialog id="add-member-dialog" class="member-picker-dialog">
-        <form method="POST" action="/admin/rosters/<%= roster.id %>/add-member">
-          <h3>Add Members</h3>
-          <% if (availableMembers.length === 0) { %>
-            <p class="hint">Everyone in Members is already on this roster. Add new members on the <a href="/admin/members">Members page</a>.</p>
-          <% } else { %>
-            <div class="member-picker-list">
-              <% availableMembers.forEach(function(m) { %>
-                <label class="member-picker-row">
-                  <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                  <span><%= m.name %></span>
-                </label>
-              <% }); %>
-            </div>
-          <% } %>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <% if (availableMembers.length > 0) { %>
-              <button type="submit" class="primary-btn">Add Selected</button>
-            <% } %>
-          </div>
-        </form>
-      </dialog>
-
-      <dialog id="import-dialog" class="member-picker-dialog">
-        <form method="POST" action="/admin/rosters/<%= roster.id %>/import" enctype="multipart/form-data">
-          <h3>Import</h3>
-          <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
-          <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
-          <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Import</button>
-          </div>
-        </form>
-      </dialog>
 
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
