@@ -1062,17 +1062,21 @@ textarea:focus-visible,
 
 .roster-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 
-/* Full grid lines (not just row dividers) so every data table reads as a
-   proper chart/grid, matching the pastel treatment used on the Class
-   Schedule and Roster/Floater grids. */
+/* Row-divider style (bottom border only, left-aligned, generous padding)
+   for plain record lists (Members, Logs, Documents, Schedules, etc.) -
+   .roster-table-detailed and .class-schedule-room-grid opt back into full
+   grid lines below since those really are spreadsheet-shaped charts
+   (rows=names, columns=dates/hours) where vertical dividers earn their
+   keep. */
 .roster-table th, .roster-table td {
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
-  text-align: center;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
   white-space: nowrap;
 }
 
-.roster-table thead th { background: var(--brand-soft); color: var(--brand-dark); font-weight: 700; }
+.roster-table thead th { background: var(--brand-soft); color: var(--ink); font-weight: 700; }
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
@@ -1100,7 +1104,11 @@ textarea:focus-visible,
 .cell-blank { background: #e7edf5; color: transparent; }
 
 .roster-table-detailed { width: auto; font-size: 0.8rem; }
-.roster-table-detailed th, .roster-table-detailed td { padding: 0.25rem 0.3rem; }
+.roster-table-detailed th, .roster-table-detailed td {
+  padding: 0.25rem 0.3rem;
+  border: 1px solid var(--border);
+  text-align: center;
+}
 .roster-table-detailed td { white-space: nowrap; }
 .cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; }
 .cell-time { font-size: 0.6rem; color: var(--muted); }
