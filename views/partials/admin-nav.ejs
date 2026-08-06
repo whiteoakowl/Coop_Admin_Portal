@@ -9,17 +9,12 @@
     <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
     <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
     <a href="/admin/volunteers" data-match="/admin/setup"><svg class="icon"><use href="#icon-users"/></svg> Volunteers</a>
-    <% if (isFullAdmin) { %>
-      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg> Design/Print</a>
-    <% } %>
     <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg> Schedules</a>
-    <% if (isFullAdmin) { %>
-      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
-    <% } %>
     <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Logs</a>
     <% if (isFullAdmin) { %>
-      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg> Documents</a>
       <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg> Library</a>
+      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg> Documents</a>
+      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg> Design/Print</a>
     <% } %>
   </nav>
   <div class="admin-sidebar-bottom">
@@ -48,17 +43,12 @@
     <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg><span>Home</span></a>
     <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg><span>Attendance</span></a>
     <a href="/admin/volunteers" data-match="/admin/setup"><svg class="icon"><use href="#icon-users"/></svg><span>Volunteers</span></a>
-    <% if (isFullAdmin) { %>
-      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg><span>Design/Print</span></a>
-    <% } %>
     <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg><span>Schedules</span></a>
-    <% if (isFullAdmin) { %>
-      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg><span>Members</span></a>
-    <% } %>
     <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Logs</span></a>
     <% if (isFullAdmin) { %>
-      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg><span>Documents</span></a>
       <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg><span>Library</span></a>
+      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg><span>Documents</span></a>
+      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg><span>Design/Print</span></a>
     <% } %>
   </nav>
 </div>
