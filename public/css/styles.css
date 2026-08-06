@@ -31,12 +31,11 @@
   --purple: #6d4a99;       /* accessible text-on-tint variant */
   --purple-dark: #55397a;  /* hover state for --purple text */
   --purple-soft: #f1ecfb;  /* tinted section/badge backgrounds */
-  /* The homepage's purple card (#C38EC7) doesn't hold white text at a
-     readable contrast, so toolbar buttons use this closer-but-darker
-     shade instead - same purple family, legible white text like every
-     other filled button. */
-  --btn-purple: #8b5fbf;
-  --btn-purple-hover: #744ea3;
+  /* Same pastel purple as the kiosk homepage's purple card (#C38EC7) -
+     too light for white text, so purple buttons use dark text instead,
+     same as the homepage card's own label does. */
+  --btn-purple: #C38EC7;
+  --btn-purple-hover: #ad72b1;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -1391,7 +1390,7 @@ textarea:focus-visible,
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #fff;
+  color: #000;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
