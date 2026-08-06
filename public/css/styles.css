@@ -1,6 +1,6 @@
 :root {
   /* Sanford Homeschoolers brand palette */
-  --bg: #659EC7;
+  --bg: #4682B4;
   --surface: #ffffff;
   --ink: #1c2530;
   --muted: #64748b;
@@ -8,10 +8,10 @@
   --brand-dark: #2e6da4;  /* accessible mid blue - links, text (not button fills) */
   --brand-darker: #1f4e7a; /* hover state for brand-dark */
   --brand-soft: #eaf4fd;  /* tinted section backgrounds */
-  --accent: #e49b0f;      /* logo gold - highlights, focus, secondary accents */
-  --accent-dark: #b97a0a; /* hover state for accent */
-  --btn-bg: #EE9A4D;      /* filled button background, every page */
-  --btn-bg-hover: #d9822f; /* hover state for --btn-bg */
+  --accent: #E7AA7B;      /* highlights, focus, secondary accents, admin sidebar */
+  --accent-dark: #C49068; /* hover state for accent */
+  --btn-bg: #E7AA7B;      /* filled button background, every page */
+  --btn-bg-hover: #C49068; /* hover state for --btn-bg */
   --green: #16a34a;
   --green-bg: #dcfce7;
   --btn-green: #85BB65;    /* filled button background - file actions (Import/Export/Print) */
