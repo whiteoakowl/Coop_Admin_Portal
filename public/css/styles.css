@@ -1099,8 +1099,7 @@ textarea:focus-visible,
 
 .roster-view-page .roster-scroll,
 .roster-view-page .legend,
-.roster-view-page .roster-toolbar,
-.roster-view-page .volunteer-box {
+.roster-view-page .roster-toolbar {
   animation: rosterFadeIn 0.35s ease both;
 }
 @keyframes rosterFadeIn {
@@ -1110,8 +1109,7 @@ textarea:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .roster-view-page .roster-scroll,
   .roster-view-page .legend,
-  .roster-view-page .roster-toolbar,
-  .roster-view-page .volunteer-box {
+  .roster-view-page .roster-toolbar {
     animation: none;
   }
 }
@@ -1835,23 +1833,16 @@ textarea:focus-visible,
    Volunteer Chart, so one session's data is visually separated from the next. */
 .volunteer-chart-divider { border-left: 2px solid var(--brand-darker); }
 
-.roster-and-volunteers { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; margin: 1rem 0; }
-
-/* Attendance and Floater boxes share the same card treatment and split
-   the page evenly (each ~50% minus half the gap), instead of the
-   attendance grid getting a fixed 2:1 head start. An expanded box takes
-   the full row and its sibling(s) hide (see public/js/roster-view.js). */
 .grid-box {
-  flex: 1 1 calc(50% - 0.5rem);
   min-width: 320px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
+  margin: 1rem 0;
 }
 .grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
-.grid-box.volunteer-box .roster-scroll { margin-top: 0.5rem; border: 1px solid var(--border); }
 .grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .grid-box-header h2 { margin: 0; }
 .grid-box .btn-secondary { margin-top: 0.75rem; }

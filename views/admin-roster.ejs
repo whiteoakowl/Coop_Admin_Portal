@@ -20,7 +20,6 @@
 
     <div class="roster-toolbar">
       <div class="roster-btn-row no-print">
-        <a class="roster-action-btn" href="/admin/logs?tab=absence">Absence/Late Log</a>
         <a class="roster-action-btn" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
       </div>
       <div class="roster-btn-row no-print">
@@ -35,12 +34,10 @@
       <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
     </div>
 
-    <div class="roster-and-volunteers">
-      <div class="grid-box roster-grid-col" id="grid-box-attendance">
-        <div class="grid-box-header">
-          <h2>Attendance</h2>
-          <button type="button" class="btn-secondary no-print grid-expand-btn" data-expand-target="grid-box-attendance">Expand</button>
-        </div>
+    <div class="grid-box roster-grid-col" id="grid-box-attendance">
+      <div class="grid-box-header">
+        <h2>Attendance</h2>
+      </div>
       <div class="roster-scroll">
         <table class="roster-table roster-table-detailed">
           <thead>
@@ -139,56 +136,7 @@
           <% } %>
         </table>
       </div>
-      </div>
-
-      <% volunteerLists.forEach(function(vl, vlIndex) { %>
-        <div class="grid-box volunteer-box" id="grid-box-floater-<%= vlIndex %>">
-          <div class="grid-box-header">
-            <h2><%= vl.dayLabel %> Floater Assignments</h2>
-            <% if (vl.dates.length > 0) { %>
-              <select class="no-print" onchange="window.location = '/admin/roster/<%= roster.id %>?volDate=' + encodeURIComponent(this.value)<% if (absenceDateFilter) { %> + '&absenceDate=<%= absenceDateFilter %>'<% } %>;">
-                <% vl.dates.forEach(function(d, i) { %>
-                  <option value="<%= d %>" <%= vl.volDateFilter === d ? 'selected' : '' %>><%= vl.dateLabels[i] %></option>
-                <% }); %>
-              </select>
-            <% } %>
-            <button type="button" class="btn-secondary no-print grid-expand-btn" data-expand-target="grid-box-floater-<%= vlIndex %>">Expand</button>
-          </div>
-          <% if (vl.dates.length === 0) { %>
-            <p class="roster-empty">No session dates set for this floater assignments list yet. <a href="/admin/volunteers/<%= vl.day %>/manage">Manage it</a>.</p>
-          <% } else { %>
-            <% var anyVolMembers = vl.grid.sections.some(function(s) { return s.members.length > 0; }); %>
-            <form method="POST" action="/admin/volunteers/<%= vl.day %>/assignments">
-              <input type="hidden" name="redirectTo" value="/admin/roster/<%= roster.id %>?volDate=<%= vl.volDateFilter %>" />
-              <div class="roster-scroll">
-                <table class="roster-table members-table condensed-table">
-                  <thead><tr><th>Name</th><th>Position</th><th>Room</th></tr></thead>
-                  <tbody>
-                    <% if (!anyVolMembers) { %>
-                      <tr><td colspan="3" class="roster-empty">No floater assignments yet.</td></tr>
-                    <% } %>
-                    <% vl.grid.sections.forEach(function(section) { %>
-                      <% if (section.members.length > 0) { %>
-                        <tr class="volunteer-section-row"><td colspan="3"><%= section.label %></td></tr>
-                        <% section.members.forEach(function(row) { %>
-                          <tr>
-                            <td><%= row.member.name %></td>
-                            <td><input type="text" class="volunteer-cell-input" name="position:<%= row.member.id %>:<%= vl.volDateFilter %>" value="<%= row.cells[0].position %>" placeholder="Position" /></td>
-                            <td><input type="text" class="volunteer-cell-input" name="room:<%= row.member.id %>:<%= vl.volDateFilter %>" value="<%= row.cells[0].room %>" placeholder="Room" /></td>
-                          </tr>
-                        <% }); %>
-                      <% } %>
-                    <% }); %>
-                  </tbody>
-                </table>
-              </div>
-              <% if (anyVolMembers) { %><button type="submit" class="btn-secondary no-print">Save</button><% } %>
-            </form>
-          <% } %>
-        </div>
-      <% }); %>
     </div>
   </main>
-  <script src="/js/roster-view.js"></script>
 </body>
 </html>

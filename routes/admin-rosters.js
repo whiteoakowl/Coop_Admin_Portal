@@ -3,10 +3,8 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime, todayISO, ageFromBirthday } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, familyOf } = require('../utils/members');
-const { getListsByRosterId, DAY_LABELS, datesForList, buildListGrid } = require('../utils/volunteers');
-const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { arrivalDepartureLabels } = require('../utils/schedule');
 
@@ -122,33 +120,6 @@ function buildRosterGridData(roster) {
     rows,
     summary,
   };
-}
-
-// Absence/Late form submissions recorded against this roster, optionally
-// narrowed to a single session date.
-function absenceSubmissionsForRoster(rosterId, dateFilter) {
-  let sql = `SELECT m.name AS memberName, a.session_date AS date, a.status,
-             a.reason_category AS reasonCategory, a.reason_text AS reasonText
-             FROM attendance a
-             JOIN members m ON m.id = a.member_id
-             WHERE a.roster_id = ? AND a.source = 'absence_form'`;
-  const params = [rosterId];
-  if (dateFilter) {
-    sql += ' AND a.session_date = ?';
-    params.push(dateFilter);
-  }
-  sql += ' ORDER BY a.session_date DESC, m.name COLLATE NOCASE';
-
-  return db
-    .prepare(sql)
-    .all(...params)
-    .map((r) => ({
-      memberName: r.memberName,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
-      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
-      description: r.reasonText || '—',
-    }));
 }
 
 // --- Roster list & creation ---
@@ -337,29 +308,11 @@ router.get('/roster/:id', requireAdmin, (req, res) => {
   if (!roster) return res.status(404).send('Not found');
 
   const data = buildRosterGridData(roster);
-  const absenceDateFilter = data.dates.includes(req.query.absenceDate) ? req.query.absenceDate : '';
-
-  const today = todayISO();
-  const volunteerLists = getListsByRosterId(id).map((list) => {
-    const dates = datesForList(list.id);
-    const volDateFilter = dates.includes(req.query.volDate) ? req.query.volDate : dates.includes(today) ? today : dates[0] || '';
-    return {
-      day: list.day,
-      dayLabel: DAY_LABELS[list.day],
-      dates,
-      dateLabels: dates.map(formatDateLabel),
-      volDateFilter,
-      grid: volDateFilter ? buildListGrid(list.id, volDateFilter) : { sections: [], dates: [], dateLabels: [] },
-    };
-  });
 
   res.render('admin-roster', {
     title: `${roster.name} Roster`,
     roster,
     ...data,
-    absenceDateFilter,
-    absenceSubmissions: absenceSubmissionsForRoster(id, absenceDateFilter),
-    volunteerLists,
   });
 });
 
