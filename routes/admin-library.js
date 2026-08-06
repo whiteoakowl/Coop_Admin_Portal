@@ -22,10 +22,10 @@ const {
   membersWithActiveCheckouts,
 } = require('../utils/library');
 
-const TABS = ['checkout', 'checkin', 'members', 'titles'];
+const TABS = ['checkin', 'checkout', 'members', 'titles'];
 
 router.get('/library', requireAdmin, (req, res) => {
-  const tab = TABS.includes(req.query.tab) ? req.query.tab : 'checkout';
+  const tab = TABS.includes(req.query.tab) ? req.query.tab : 'checkin';
   const typeFilter = (req.query.type || '').trim();
   res.render('admin-library', {
     title: 'Library',

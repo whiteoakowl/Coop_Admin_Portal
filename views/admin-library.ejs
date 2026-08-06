@@ -12,10 +12,10 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="view-tabs">
-      <a class="view-tab<%= tab === 'checkout' ? ' active' : '' %>" href="/admin/library?tab=checkout">Checkout</a>
       <a class="view-tab<%= tab === 'checkin' ? ' active' : '' %>" href="/admin/library?tab=checkin">Check In</a>
+      <a class="view-tab<%= tab === 'checkout' ? ' active' : '' %>" href="/admin/library?tab=checkout">Check Out</a>
       <a class="view-tab<%= tab === 'members' ? ' active' : '' %>" href="/admin/library?tab=members">Members</a>
-      <a class="view-tab<%= tab === 'titles' ? ' active' : '' %>" href="/admin/library?tab=titles">Titles</a>
+      <a class="view-tab<%= tab === 'titles' ? ' active' : '' %>" href="/admin/library?tab=titles">Catalog</a>
     </div>
 
     <div class="view-tab-panel">
