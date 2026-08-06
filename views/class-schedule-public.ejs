@@ -11,16 +11,10 @@
     <h1><%= dayLabel %> Class Schedule</h1>
   </div>
 
-  <% if (notice) { %><div class="alert alert-success class-schedule-public-notice"><%= notice %></div><% } %>
-
   <div class="class-schedule-public-daytabs">
     <a class="view-tab<%= day === 'monday' ? ' active' : '' %>" href="/class-schedule/monday">Monday</a>
     <a class="view-tab<%= day === 'wednesday' ? ' active' : '' %>" href="/class-schedule/wednesday">Wednesday</a>
   </div>
-
-  <% if (editMode) { %>
-    <p class="class-schedule-public-hint">Teaching or assisting a class? Find it below and add your name.</p>
-  <% } %>
 
   <div class="class-schedule-public-grid">
     <% grid.forEach(function(hour) { %>
@@ -56,21 +50,6 @@
                     <% }); %>
                   <% } %>
                 </p>
-                <% if (editMode) { %>
-                  <form method="POST" action="/class-schedule/<%= day %>/classes/<%= cls.id %>/signup" class="class-schedule-signup-form">
-                    <select name="memberId" required>
-                      <option value="" disabled selected>Your name...</option>
-                      <% staffOptions.forEach(function(p) { %>
-                        <option value="<%= p.id %>"><%= p.name %></option>
-                      <% }); %>
-                    </select>
-                    <select name="role">
-                      <option value="teacher">Teacher</option>
-                      <option value="assistant">Assistant</option>
-                    </select>
-                    <button type="submit" class="btn-secondary">Sign Up</button>
-                  </form>
-                <% } %>
               </div>
             <% }); %>
           </div>

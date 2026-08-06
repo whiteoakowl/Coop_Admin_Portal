@@ -6,7 +6,6 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { appSetting, setAppSetting } = require('../utils/classSchedule');
 
 // --- Auth ---
 
@@ -108,13 +107,13 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks', 'classes', 'documents'];
+const SETTINGS_TABS = ['account', 'quicklinks', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links here - Username/Password manages the single master admin
-  // account, and Class Settings/Documents are full-Admin-only.
+  // account, and Documents is full-Admin-only.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
   if (!isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
@@ -122,7 +121,6 @@ function renderSettings(req, res, error, success, activeTab) {
     username: req.session.username,
     isFullAdmin,
     activeTab: tab,
-    classSchedulePublicMode: appSetting('class_schedule_public_mode', 'view'),
     documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
     error,
     success,
@@ -160,12 +158,6 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => 
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
   renderSettings(req, res, null, 'Password updated.', 'account');
-});
-
-router.post('/settings/class-schedule-mode', requireAdmin, requireFullAdmin, (req, res) => {
-  const mode = req.body.mode === 'edit' ? 'edit' : 'view';
-  setAppSetting('class_schedule_public_mode', mode);
-  renderSettings(req, res, null, 'Class Schedule public page updated.', 'classes');
 });
 
 module.exports = router;

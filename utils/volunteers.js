@@ -6,10 +6,6 @@ function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
 }
 
-function getListsByRosterId(rosterId) {
-  return db.prepare('SELECT * FROM volunteer_lists WHERE roster_id = ?').all(rosterId);
-}
-
 function sectionsForList(listId) {
   return db.prepare('SELECT * FROM volunteer_sections WHERE volunteer_list_id = ? ORDER BY position').all(listId);
 }
@@ -111,7 +107,6 @@ module.exports = {
   RANK_LABELS,
   RANK_ORDER,
   getListByDay,
-  getListsByRosterId,
   sectionsForList,
   datesForList,
   membersForList,

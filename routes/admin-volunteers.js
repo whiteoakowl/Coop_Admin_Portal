@@ -56,18 +56,6 @@ function dialogParam(req) {
 // between Floater Assignments and Setup/Cleanup Teams.
 router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volunteers/${defaultDay()}/manage`));
 
-router.post('/volunteers/:day/link', requireAdmin, requireDay, (req, res) => {
-  const day = req.params.day;
-  const list = getListByDay(day);
-  const rosterId = parseInt(req.body.rosterId, 10) || null;
-  db.prepare('UPDATE volunteer_lists SET roster_id = ? WHERE id = ?').run(rosterId, list.id);
-  const roster = rosterId ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId) : null;
-  const notice = roster
-    ? `${DAY_LABELS[day]} Floater Assignments linked to "${roster.name}".`
-    : `${DAY_LABELS[day]} Floater Assignments unlinked from any roster.`;
-  res.redirect('/admin/volunteers?notice=' + encodeURIComponent(notice));
-});
-
 // --- Manage page: sections, dates, members, position/room grid ---
 
 router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
@@ -82,8 +70,6 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     .all()
     .filter((m) => !memberIds.includes(m.id));
   const dates = datesForList(list.id);
-  const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
-  const rosters = db.prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
   const infantByMemberId = {};
   members.forEach((m) => { infantByMemberId[m.id] = hasInfantChild(m.id); });
 
@@ -98,8 +84,6 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     tab: 'floater',
     day,
     dayLabel: DAY_LABELS[day],
-    roster,
-    rosters,
     sections,
     members,
     infantByMemberId,

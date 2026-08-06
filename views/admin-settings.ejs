@@ -17,34 +17,11 @@
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <% if (isFullAdmin) { %>
-        <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/settings?tab=classes">Class Settings</a>
         <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
       <% } %>
     </div>
     <div class="view-tab-panel">
-      <% if (activeTab === 'classes') { %>
-        <div class="manage-section edit-section">
-          <h2>Class Schedule Permission</h2>
-          <p class="hint">Control whether the public Class Schedule page is view-only, or lets members add their own name as a teacher/assistant to a class. Members can never change class details - only sign up.</p>
-          <form method="POST" action="/admin/settings/class-schedule-mode">
-            <div class="radio-group">
-              <label class="radio-option">
-                <input type="radio" name="mode" value="view" <%= classSchedulePublicMode !== 'edit' ? 'checked' : '' %> disabled />
-                View Only
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="mode" value="edit" <%= classSchedulePublicMode === 'edit' ? 'checked' : '' %> disabled />
-                Allow Teacher/Assistant Sign-ups
-              </label>
-            </div>
-            <div class="edit-section-actions">
-              <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-              <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-              <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save Changes</button>
-            </div>
-          </form>
-        </div>
-      <% } else if (activeTab === 'account') { %>
+      <% if (activeTab === 'account') { %>
         <div class="settings-account-grid">
           <form method="POST" action="/admin/settings/username" class="stack-form stack-form-narrow">
             <h3>Username</h3>

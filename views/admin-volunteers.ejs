@@ -27,36 +27,10 @@
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'floater') { %>
-        <div class="filter-row no-print">
-          <div class="category-filter">
-            <label for="day-select">Day</label>
-            <select
-              id="day-select"
-              onchange="window.location = '/admin/volunteers/' + this.value + '/manage'"
-            >
-              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-            </select>
-          </div>
-
-          <form method="POST" action="/admin/volunteers/<%= day %>/link" class="category-filter edit-section">
-            <label for="rosterId-select">Linked Roster</label>
-            <select id="rosterId-select" name="rosterId" disabled>
-              <option value="">No roster</option>
-              <% rosters.forEach(function(r) { %>
-                <option value="<%= r.id %>" <%= roster && roster.id === r.id ? 'selected' : '' %>><%= r.name %></option>
-              <% }); %>
-            </select>
-            <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-            <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-            <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
-          </form>
-        </div>
-
         <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
 
         <div class="roster-toolbar no-print">
-          <div></div>
+          <a class="roster-action-btn" href="/admin/volunteers/<%= day === 'monday' ? 'wednesday' : 'monday' %>/manage">View <%= day === 'monday' ? 'Wednesday' : 'Monday' %></a>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog').showModal()">Edit Hours</button>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
@@ -421,16 +395,7 @@
         </div>
       <% } else if (tab === 'setup') { %>
         <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="day-select">Day</label>
-            <select
-              id="day-select"
-              onchange="window.location = '/admin/setup/' + this.value + '/manage'"
-            >
-              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-            </select>
-          </div>
+          <a class="roster-action-btn" href="/admin/setup/<%= day === 'monday' ? 'wednesday' : 'monday' %>/manage">View <%= day === 'monday' ? 'Wednesday' : 'Monday' %></a>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
             <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export</a>
