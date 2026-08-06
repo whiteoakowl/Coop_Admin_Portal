@@ -14,8 +14,10 @@ const {
   deletePermanentJob,
   setJobFloaters,
   setAssignment,
+  approveAssignment,
   clearAssignment,
   substituteBoard,
+  pendingApprovalsForToday,
 } = require('../utils/substitutes');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
@@ -115,6 +117,26 @@ router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, (
   const slotId = parseInt(req.body.slotId, 10);
   if (isValidISODate(date) && slotId) clearAssignment(date, slotType, slotId);
   res.redirect(subUrl(day, { date }));
+});
+
+// Confirms the automated sub system's own pick as-is - a one-click
+// approve, distinct from /assign (which is also used to override with a
+// different person entirely).
+router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const date = req.body.date;
+  const slotType = req.body.slotType === 'job' ? 'job' : 'class';
+  const slotId = parseInt(req.body.slotId, 10);
+  if (isValidISODate(date) && slotId) approveAssignment(date, slotType, slotId);
+  res.redirect(subUrl(day, { date }));
+});
+
+// Polled from every admin page (see public/js/pending-approvals.js) to
+// power the sitewide "floater position needs approval" popup - also
+// where the automated sub system's today's-board auto-fill actually
+// happens for admins who never open the Substitutes tab themselves.
+router.get('/pending-approvals.json', requireAdmin, (req, res) => {
+  res.json(pendingApprovalsForToday());
 });
 
 module.exports = router;

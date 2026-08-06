@@ -142,6 +142,16 @@ if (volunteerMemberColumns.length > 0 && !hasNewVolunteerMembersPk) {
   `);
 }
 
+const volunteerMemberColumns2 = db.prepare('PRAGMA table_info(volunteer_members)').all().map((c) => c.name);
+if (!volunteerMemberColumns2.includes('rank')) {
+  db.exec("ALTER TABLE volunteer_members ADD COLUMN rank TEXT NOT NULL DEFAULT 'sometimes'");
+}
+
+const substituteAssignmentColumns = db.prepare('PRAGMA table_info(substitute_assignments)').all().map((c) => c.name);
+if (!substituteAssignmentColumns.includes('status')) {
+  db.exec("ALTER TABLE substitute_assignments ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

@@ -1,5 +1,6 @@
 const db = require('../db');
 const { readRowsFromFile } = require('./spreadsheet');
+const { ageFromBirthday } = require('./dates');
 
 // Names-only file (.csv/.txt), one name per line or name in the first column.
 function parseNamesFile(buffer) {
@@ -55,6 +56,16 @@ function familyOf(memberId) {
   return db
     .prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY name COLLATE NOCASE')
     .all(self.family_id, memberId);
+}
+
+// True if any of memberId's family members is 2 years old or younger -
+// used to flag a parent as having an infant on floater lists, since a
+// floater with an infant may need a different kind of coverage.
+function hasInfantChild(memberId) {
+  return familyOf(memberId).some((m) => {
+    const age = ageFromBirthday(m.birthday);
+    return age !== null && age <= 2;
+  });
 }
 
 // Every other member of each parent's family group, keyed by parent id -
@@ -141,5 +152,6 @@ module.exports = {
   familyGroupsByParent,
   loadFamilyMember,
   familyOf,
+  hasInfantChild,
   setFamilyMembers,
 };

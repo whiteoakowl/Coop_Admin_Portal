@@ -21,12 +21,19 @@ function datesForList(listId) {
     .map((r) => r.session_date);
 }
 
+const RANKS = ['first', 'sometimes', 'backup'];
+const RANK_LABELS = { first: 'Choose First', sometimes: 'Sometimes', backup: 'Backup Only' };
+// Lower sorts first - used to order candidate floaters when the automated
+// sub system picks who to auto-assign.
+const RANK_ORDER = { first: 0, sometimes: 1, backup: 2 };
+
 // One row per member on the list, each carrying the full set of section
-// IDs they're assigned to (a member can float across multiple hours).
+// IDs they're assigned to (a member can float across multiple hours) and
+// their rank (kept identical across all of that member's section rows).
 function membersForList(listId) {
   const rows = db
     .prepare(
-      `SELECT m.*, vm.section_id AS sectionId FROM members m
+      `SELECT m.*, vm.section_id AS sectionId, vm.rank AS rank FROM members m
        JOIN volunteer_members vm ON vm.member_id = m.id
        WHERE vm.volunteer_list_id = ? AND m.active = 1
        ORDER BY m.name COLLATE NOCASE`
@@ -43,6 +50,14 @@ function membersForList(listId) {
     byMemberId[row.id].sectionIds.push(row.sectionId);
   }
   return order.map((id) => byMemberId[id]);
+}
+
+// Writes rank to every one of memberId's section rows on this list, so a
+// member has exactly one rank regardless of which/how many hours they're
+// assigned to.
+function setMemberRank(listId, memberId, rank) {
+  if (!RANKS.includes(rank)) return;
+  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ?').run(rank, listId, memberId);
 }
 
 // Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
@@ -92,10 +107,14 @@ module.exports = {
   DAY_LABELS,
   isValidDay,
   defaultDay,
+  RANKS,
+  RANK_LABELS,
+  RANK_ORDER,
   getListByDay,
   getListsByRosterId,
   sectionsForList,
   datesForList,
   membersForList,
+  setMemberRank,
   buildListGrid,
 };

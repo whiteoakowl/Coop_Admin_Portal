@@ -780,6 +780,13 @@ textarea:focus-visible,
 }
 .badge-pill-x:hover { opacity: 1; color: var(--red); }
 
+.badge-pill-pending { background: var(--yellow-bg); color: var(--yellow); }
+
+/* Floater lists: a parent with a child 2 or younger, and each name's
+   auto-sub ranking (set via .volunteer-rank-select in Edit Members). */
+.infant-tag { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; }
+
 .status-badge {
   display: inline-block;
   font-size: 0.75rem;
@@ -1765,6 +1772,10 @@ textarea:focus-visible,
 .volunteer-edit-dialog .roster-scroll { max-height: min(340px, 50vh); }
 
 .volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+
+.pending-approvals-list { list-style: none; margin: 0 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.pending-approvals-list li { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.75rem; }
+.pending-approvals-list a { font-weight: 600; }
 
 /* Hour labels only ever hold a short word ("Hour 1"), so they stay
    compact instead of stretching to fill the dialog. */

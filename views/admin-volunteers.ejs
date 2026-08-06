@@ -121,15 +121,26 @@
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table volunteer-members-table">
               <thead>
-                <tr><th>Name</th><th>Hours</th><th>Actions</th></tr>
+                <tr><th>Name</th><th>Rank</th><th>Hours</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 <% if (!anyMembers) { %>
-                  <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+                  <tr><td colspan="4" class="roster-empty">No members yet.</td></tr>
                 <% } %>
                 <% members.forEach(function(m) { %>
                   <tr>
-                    <td class="volunteer-member-name"><%= m.name %></td>
+                    <td class="volunteer-member-name">
+                      <%= m.name %><% if (infantByMemberId[m.id]) { %> <span class="infant-tag">(infant)</span><% } %>
+                    </td>
+                    <td>
+                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/rank?dialog=members" class="inline-block-form">
+                        <select name="rank" class="volunteer-rank-select" onchange="this.form.submit()">
+                          <% ranks.forEach(function(r) { %>
+                            <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
+                          <% }); %>
+                        </select>
+                      </form>
+                    </td>
                     <td>
                       <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/sections?dialog=members" class="volunteer-hour-checks edit-section" onsubmit="return volunteerValidateHours(this)">
                         <% sections.forEach(function(s) { %>
@@ -239,7 +250,7 @@
                       </tr>
                       <% section.members.forEach(function(row) { %>
                         <tr>
-                          <td class="roster-name-col"><%= row.member.name %></td>
+                          <td class="roster-name-col"><%= row.member.name %><% if (infantByMemberId[row.member.id]) { %> <span class="infant-tag">(infant)</span><% } %></td>
                           <% row.cells.forEach(function(cell) { %>
                             <td class="volunteer-chart-divider"><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="position" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" disabled /></td>
                             <td><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="room" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" disabled /></td>
@@ -460,9 +471,9 @@
                   <div class="class-card-header"><h3><%= slot.label %></h3></div>
                   <p class="class-card-meta"><span><%= slot.detail %></span></p>
                   <p class="hint"><%= slot.reason %></p>
-                  <% if (slot.assigned) { %>
+                  <% if (slot.assigned && slot.assigned.status === 'approved') { %>
                     <p class="class-card-staff">
-                      <span class="badge-pill">Assigned: <%= slot.assigned.name %><%= slot.assigned.isOverride ? ' (admin choice)' : '' %></span>
+                      <span class="badge-pill">Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %><%= slot.assigned.isOverride ? ' (admin choice)' : '' %></span>
                     </p>
                     <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
                       <input type="hidden" name="date" value="<%= selectedDate %>" />
@@ -471,15 +482,23 @@
                       <button type="submit" class="btn-secondary">Unassign</button>
                     </form>
                   <% } else { %>
-                    <% if (slot.suggestion) { %>
-                      <p class="class-card-staff"><span class="badge-pill">Suggested: <%= slot.suggestion.name %></span></p>
-                      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/assign" class="inline-block-form">
-                        <input type="hidden" name="date" value="<%= selectedDate %>" />
-                        <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                        <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                        <input type="hidden" name="memberId" value="<%= slot.suggestion.id %>" />
-                        <button type="submit" class="primary-btn">Accept</button>
-                      </form>
+                    <% if (slot.assigned) { %>
+                      <p class="class-card-staff"><span class="badge-pill badge-pill-pending">Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></span></p>
+                      <p class="hint">Auto-picked by the ranked sub system.</p>
+                      <div class="class-schedule-signup-form">
+                        <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/approve" class="inline-block-form">
+                          <input type="hidden" name="date" value="<%= selectedDate %>" />
+                          <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                          <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                          <button type="submit" class="primary-btn">Approve</button>
+                        </form>
+                        <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
+                          <input type="hidden" name="date" value="<%= selectedDate %>" />
+                          <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                          <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                          <button type="submit" class="btn-secondary">Unassign</button>
+                        </form>
+                      </div>
                     <% } else { %>
                       <p class="hint">No floaters available this hour.</p>
                     <% } %>
@@ -492,7 +511,7 @@
                         <option value="" disabled selected>Choose someone else...</option>
                         <% allParents.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }); %>
                       </select>
-                      <button type="submit" class="btn-secondary">Assign</button>
+                      <button type="submit" class="btn-secondary">Change</button>
                     </form>
                   <% } %>
                 </div>

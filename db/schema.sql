@@ -129,11 +129,17 @@ CREATE TABLE IF NOT EXISTS volunteer_dates (
 
 -- Members on a volunteer list, each assigned to one or more of its 4
 -- sections (one row per member+section pairing, so a member can float
--- across multiple hours on the same day).
+-- across multiple hours on the same day). rank is a per-member (not
+-- per-section) preference for how eagerly the automated sub system
+-- should offer them a slot - 'first' beats 'sometimes' beats 'backup';
+-- kept on every one of a member's section rows in lockstep (see
+-- setMemberRank) rather than a separate table, since it's simplest to
+-- always write it alongside section membership changes.
 CREATE TABLE IF NOT EXISTS volunteer_members (
   volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   section_id INTEGER NOT NULL REFERENCES volunteer_sections(id) ON DELETE CASCADE,
+  rank TEXT NOT NULL DEFAULT 'sometimes',
   PRIMARY KEY (volunteer_list_id, member_id, section_id)
 );
 
@@ -292,10 +298,12 @@ CREATE TABLE IF NOT EXISTS permanent_job_floaters (
   PRIMARY KEY (job_id, member_id)
 );
 
--- One row per hour-slot (a class needing a sub, or a permanent job) an
--- admin has actually assigned for a specific date - suggestions
--- themselves are computed on the fly, not stored; this only holds what
--- was accepted or manually chosen. slot_type + slot_id together point at
+-- One row per hour-slot (a class needing a sub, or a permanent job) for
+-- a specific date - either chosen by an admin (status 'approved') or
+-- auto-picked by the ranked automated sub system and awaiting review
+-- (status 'pending'); an admin approving a pending row just flips its
+-- status, changing their mind reuses the normal assign flow (which
+-- always writes 'approved'). slot_type + slot_id together point at
 -- either a classes.id or a permanent_jobs.id (polymorphic, so no direct
 -- foreign key - both parents clear their own rows here on delete).
 CREATE TABLE IF NOT EXISTS substitute_assignments (
@@ -305,6 +313,7 @@ CREATE TABLE IF NOT EXISTS substitute_assignments (
   slot_id INTEGER NOT NULL,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   is_override INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'approved',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(session_date, slot_type, slot_id)
 );

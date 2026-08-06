@@ -4,16 +4,19 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
-const { parseNamesFromUpload, findMemberByName } = require('../utils/members');
+const { parseNamesFromUpload, findMemberByName, hasInfantChild } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
 const { staffListForDay } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
+  RANKS,
+  RANK_LABELS,
   getListByDay,
   sectionsForList,
   datesForList,
   membersForList,
+  setMemberRank,
   buildListGrid,
 } = require('../utils/volunteers');
 
@@ -70,6 +73,8 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const dates = datesForList(list.id);
   const roster = list.roster_id ? db.prepare('SELECT * FROM rosters WHERE id = ?').get(list.roster_id) : null;
   const rosters = db.prepare('SELECT * FROM rosters WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
+  const infantByMemberId = {};
+  members.forEach((m) => { infantByMemberId[m.id] = hasInfantChild(m.id); });
 
   res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
@@ -80,6 +85,9 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     rosters,
     sections,
     members,
+    infantByMemberId,
+    ranks: RANKS,
+    rankLabels: RANK_LABELS,
     availableMembers,
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     grid: buildListGrid(list.id, null),
@@ -194,6 +202,8 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
 // full set of section memberships with whatever's checked. Ignored if
 // nothing is checked - a member can't be on the list with zero hours,
 // they'd just fall out of every query that joins through volunteer_members.
+// Rank lives on these same rows, so it's read before the delete and
+// carried over to every re-inserted row rather than resetting to default.
 router.post('/volunteers/:day/members/:memberId/sections', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
@@ -201,11 +211,23 @@ router.post('/volunteers/:day/members/:memberId/sections', requireAdmin, require
   const sectionIds = [].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
 
   if (sectionIds.length > 0) {
+    const existingRank = db
+      .prepare('SELECT rank FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? LIMIT 1')
+      .get(list.id, memberId);
+    const rank = existingRank ? existingRank.rank : 'sometimes';
     const del = db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ?');
-    const insert = db.prepare('INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?)');
+    const insert = db.prepare('INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, ?)');
     del.run(list.id, memberId);
-    for (const sectionId of sectionIds) insert.run(list.id, memberId, sectionId);
+    for (const sectionId of sectionIds) insert.run(list.id, memberId, sectionId, rank);
   }
+  res.redirect(manageUrl(day, { dialog: dialogParam(req) }));
+});
+
+router.post('/volunteers/:day/members/:memberId/rank', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const list = getListByDay(day);
+  const memberId = parseInt(req.params.memberId, 10);
+  setMemberRank(list.id, memberId, req.body.rank);
   res.redirect(manageUrl(day, { dialog: dialogParam(req) }));
 });
 
