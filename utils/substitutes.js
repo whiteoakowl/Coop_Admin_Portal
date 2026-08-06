@@ -1,5 +1,5 @@
 const db = require('../db');
-const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate } = require('./classSchedule');
+const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate, absenceFormMemberIdsForDate } = require('./classSchedule');
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForList, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
 const { todayISO, weekdayOf } = require('./dates');
@@ -122,6 +122,7 @@ function assignedInfo(existing) {
 // of a fresh choice every time the board is viewed.
 function substituteBoard(day, date) {
   const absentIds = date ? absentMemberIdsForDate(date) : new Set();
+  const formExcludedIds = date ? absenceFormMemberIdsForDate(date) : new Set();
   const grid = gridForDay(day);
   const jobs = permanentJobsForDay(day);
   const jobsByHour = {};
@@ -132,7 +133,7 @@ function substituteBoard(day, date) {
 
   return grid.map((hourGroup) => {
     const hourPosition = hourGroup.position;
-    const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !absentIds.has(m.id));
+    const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !absentIds.has(m.id) && !formExcludedIds.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 

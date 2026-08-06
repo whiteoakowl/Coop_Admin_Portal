@@ -2302,6 +2302,10 @@ textarea:focus-visible,
      an interactive table - hide the action icon buttons column. */
   .members-table .actions-cell { display: none; }
 
+  /* Infant flag is an admin-only note for staffing decisions - never let
+     it end up on a physical printout that could be seen by members. */
+  .infant-tag { display: none !important; }
+
   .print-header {
     display: flex;
     align-items: center;

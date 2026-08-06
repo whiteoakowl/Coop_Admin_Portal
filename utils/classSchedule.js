@@ -224,6 +224,20 @@ function absentMemberIdsForDate(date) {
   );
 }
 
+// Everyone who submitted an Absence/Late form for a given date (either
+// type - a "late" submission means they still won't be at their usual
+// spot on time, so the automated sub system shouldn't count on them for a
+// floater slot that day either).
+function absenceFormMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    db
+      .prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND source = 'absence_form' AND status IN ('absent', 'late')`)
+      .all(date)
+      .map((r) => r.member_id)
+  );
+}
+
 function appSetting(key, fallback) {
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
@@ -258,6 +272,7 @@ module.exports = {
   activeParentsForStaff,
   staffListForDay,
   absentMemberIdsForDate,
+  absenceFormMemberIdsForDate,
   appSetting,
   setAppSetting,
 };
