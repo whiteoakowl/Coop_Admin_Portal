@@ -3,8 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel } = require('../utils/dates');
 const { imageFileFilter } = require('../utils/uploads');
@@ -15,6 +17,8 @@ const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { familyOf, setFamilyMembers } = require('../utils/members');
+
+router.use(requireFullAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
@@ -291,6 +295,48 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   setFamilyMembers(id, f.familyMemberIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
+});
+
+// Grants/updates a member's own login for the Parent/Student/Co-op Admin
+// portals - separate from the main profile form so an admin can flip
+// access on/off without touching the rest of the profile. Password is
+// only changed when a new one is actually typed in, so re-saving the
+// checkboxes doesn't force a reset every time.
+router.post('/members/:id/portal-access', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  const username = (req.body.username || '').trim();
+  const password = req.body.password || '';
+  const portalParent = req.body.portalParent === '1' ? 1 : 0;
+  const portalStudent = req.body.portalStudent === '1' ? 1 : 0;
+  const portalCoopAdmin = req.body.portalCoopAdmin === '1' ? 1 : 0;
+  const anyAccessGranted = portalParent || portalStudent || portalCoopAdmin;
+
+  if (anyAccessGranted && !username) {
+    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('A username is required to grant portal access.'));
+  }
+  if (username) {
+    const taken = db.prepare('SELECT id FROM members WHERE username = ? AND id != ?').get(username, id);
+    if (taken) return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('That username is already in use.'));
+  }
+  if (!member.password_hash && anyAccessGranted && !password) {
+    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('Set a password to grant portal access for the first time.'));
+  }
+
+  if (password) {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare(
+      'UPDATE members SET username = ?, password_hash = ?, portal_parent = ?, portal_student = ?, portal_coop_admin = ? WHERE id = ?'
+    ).run(username || null, hash, portalParent, portalStudent, portalCoopAdmin, id);
+  } else {
+    db.prepare(
+      'UPDATE members SET username = ?, portal_parent = ?, portal_student = ?, portal_coop_admin = ? WHERE id = ?'
+    ).run(username || null, portalParent, portalStudent, portalCoopAdmin, id);
+  }
+
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Portal access updated for ${member.name}.`));
 });
 
 // Full-profile bulk import - the Members page is the only place a CSV/XLSX

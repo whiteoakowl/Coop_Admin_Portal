@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_TYPES, FONT_FAMILIES: CARD_FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { jsonScriptSafe } = require('../utils/json');
+
+router.use(requireFullAdmin);
 
 const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard'];
 const TABS = ['design', 'print'];

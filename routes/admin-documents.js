@@ -5,7 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { documentFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
+
+router.use(requireFullAdmin);
 
 const DOCUMENT_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
 if (!fs.existsSync(DOCUMENT_DIR)) fs.mkdirSync(DOCUMENT_DIR, { recursive: true });

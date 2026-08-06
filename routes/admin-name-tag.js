@@ -5,7 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { formatTimestamp, formatDateLabel } = require('../utils/dates');
+
+router.use(requireFullAdmin);
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { imageFileFilter } = require('../utils/uploads');

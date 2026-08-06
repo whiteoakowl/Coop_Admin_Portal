@@ -27,9 +27,16 @@ CREATE TABLE IF NOT EXISTS members (
   medical_notes TEXT,
   family_id INTEGER,
   -- Portal login credentials, set by an admin on the member's profile - NULL
-  -- until an admin grants that Parent or Student portal access.
+  -- until an admin grants that member portal access. Which portal(s) they
+  -- can reach with those credentials is controlled by the portal_* flags
+  -- below, checked by an admin on the member's profile - independent of
+  -- member_type, so e.g. a Parent-type member can also be granted Co-op
+  -- Admin access.
   username TEXT UNIQUE,
   password_hash TEXT,
+  portal_parent INTEGER NOT NULL DEFAULT 0,
+  portal_student INTEGER NOT NULL DEFAULT 0,
+  portal_coop_admin INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -99,14 +106,14 @@ CREATE TABLE IF NOT EXISTS checkouts (
   UNIQUE(member_id, roster_id, session_date)
 );
 
+-- The single master Admin login (full, unrestricted access) - there is
+-- only ever meant to be one of these. Everyone else (Co-op Admin, Parent,
+-- Student) logs in as themselves via members.username/password_hash, with
+-- the portal_* flags on their own profile controlling what they can reach.
 CREATE TABLE IF NOT EXISTS admins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('admin','coop_admin')),
-  -- Optionally links a staff login to their own Parent member record, so the
-  -- portal switcher can offer a one-click jump to "My Parent Portal".
-  member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

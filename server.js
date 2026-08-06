@@ -64,6 +64,15 @@ app.use(
   })
 );
 
+// Available in every EJS view (including partials/admin-nav) without each
+// route having to pass it explicitly. True only for the single master Admin
+// account - a Co-op Admin is a member with portal_coop_admin access, let
+// into /admin/* by requireAdmin but not treated as a full Admin.
+app.use((req, res, next) => {
+  res.locals.isFullAdmin = !!(req.session && req.session.adminId);
+  next();
+});
+
 app.get('/', (req, res) => {
   if (req.session && req.session.portalMemberId) return res.redirect('/portal');
   res.render('index', { title: 'SH Check-In / Check-Out', error: null });

@@ -128,6 +128,36 @@
 
       <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Changes' %></button>
     </form>
+
+    <% if (mode === 'edit') { %>
+      <div class="manage-section">
+        <h2>Portal Access</h2>
+        <p class="hint">Grant this member their own login to the Parent, Student, or Co-op Admin portal. Admin use only - members log in themselves at the site's home page with these credentials.</p>
+        <form method="POST" action="/admin/members/<%= member.id %>/portal-access" class="member-form-grid">
+          <label>Username
+            <input type="text" name="username" value="<%= member.username || '' %>" autocomplete="off" />
+          </label>
+          <label>Password<%= member.password_hash ? ' (leave blank to keep current)' : '' %>
+            <input type="password" name="password" autocomplete="new-password" minlength="8" />
+          </label>
+          <div class="member-form-full checkbox-group">
+            <label class="checkbox-option">
+              <input type="checkbox" name="portalParent" value="1" <%= member.portal_parent ? 'checked' : '' %> />
+              Parent Portal
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="portalStudent" value="1" <%= member.portal_student ? 'checked' : '' %> />
+              Student Portal
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="portalCoopAdmin" value="1" <%= member.portal_coop_admin ? 'checked' : '' %> />
+              Co-op Admin
+            </label>
+          </div>
+          <button type="submit" class="primary-btn member-form-full">Save Portal Access</button>
+        </form>
+      </div>
+    <% } %>
   </main>
   <script src="/js/member-form.js"></script>
 </body>

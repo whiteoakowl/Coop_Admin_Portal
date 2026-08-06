@@ -12,10 +12,14 @@
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
     <div class="view-tabs">
-      <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
+      <% if (isFullAdmin) { %>
+        <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
+      <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
-      <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/settings?tab=classes">Class Settings</a>
-      <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
+      <% if (isFullAdmin) { %>
+        <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/settings?tab=classes">Class Settings</a>
+        <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
+      <% } %>
     </div>
     <div class="view-tab-panel">
       <% if (activeTab === 'classes') { %>
@@ -64,6 +68,7 @@
             <button type="submit" class="primary-btn">Update</button>
           </form>
         </div>
+        <p class="hint">Members can be given portal access (Parent, Student, or Co-op Admin) from their profile on the <a href="/admin/members">Members page</a>.</p>
       <% } else if (activeTab === 'documents') { %>
         <div class="manage-section">
           <h2>Upload Document</h2>

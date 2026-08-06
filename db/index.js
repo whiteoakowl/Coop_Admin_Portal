@@ -152,20 +152,17 @@ if (!substituteAssignmentColumns.includes('status')) {
   db.exec("ALTER TABLE substitute_assignments ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
 }
 
-const adminColumns = db.prepare('PRAGMA table_info(admins)').all().map((c) => c.name);
-if (!adminColumns.includes('role')) {
-  db.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
-}
-if (!adminColumns.includes('member_id')) {
-  db.exec('ALTER TABLE admins ADD COLUMN member_id INTEGER REFERENCES members(id) ON DELETE SET NULL');
-}
-
 const memberPortalColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
 if (!memberPortalColumns.includes('username')) {
   db.exec('ALTER TABLE members ADD COLUMN username TEXT UNIQUE');
 }
 if (!memberPortalColumns.includes('password_hash')) {
   db.exec('ALTER TABLE members ADD COLUMN password_hash TEXT');
+}
+for (const column of ['portal_parent', 'portal_student', 'portal_coop_admin']) {
+  if (!memberPortalColumns.includes(column)) {
+    db.exec(`ALTER TABLE members ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+  }
 }
 
 // Seed a default admin account on first run so the dashboard is reachable.

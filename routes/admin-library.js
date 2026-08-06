@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
+
+router.use(requireFullAdmin);
+
 const {
   findMemberByBarcode,
   findItemByBarcode,

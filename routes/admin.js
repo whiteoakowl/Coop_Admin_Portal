@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { appSetting, setAppSetting } = require('../utils/classSchedule');
@@ -110,10 +111,17 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 const SETTINGS_TABS = ['account', 'quicklinks', 'classes', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
+  const isFullAdmin = !!req.session.adminId;
+  // A Co-op Admin (a member, not the master admin account) only ever gets
+  // Quick Links here - Username/Password manages the single master admin
+  // account, and Class Settings/Documents are full-Admin-only.
+  let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
+  if (!isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
     title: 'Settings',
     username: req.session.username,
-    activeTab: SETTINGS_TABS.includes(activeTab) ? activeTab : 'account',
+    isFullAdmin,
+    activeTab: tab,
     classSchedulePublicMode: appSetting('class_schedule_public_mode', 'view'),
     documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
     error,
@@ -125,7 +133,7 @@ router.get('/settings', requireAdmin, (req, res) => {
   renderSettings(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
 });
 
-router.post('/settings/username', requireAdmin, (req, res) => {
+router.post('/settings/username', requireAdmin, requireFullAdmin, (req, res) => {
   const newUsername = (req.body.newUsername || '').trim();
 
   if (!newUsername) return renderSettings(req, res, 'New username is required.', null, 'account');
@@ -138,7 +146,7 @@ router.post('/settings/username', requireAdmin, (req, res) => {
   renderSettings(req, res, null, 'Username updated.', 'account');
 });
 
-router.post('/settings/password', requireAdmin, (req, res) => {
+router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.session.adminId);
 
@@ -154,7 +162,7 @@ router.post('/settings/password', requireAdmin, (req, res) => {
   renderSettings(req, res, null, 'Password updated.', 'account');
 });
 
-router.post('/settings/class-schedule-mode', requireAdmin, (req, res) => {
+router.post('/settings/class-schedule-mode', requireAdmin, requireFullAdmin, (req, res) => {
   const mode = req.body.mode === 'edit' ? 'edit' : 'view';
   setAppSetting('class_schedule_public_mode', mode);
   renderSettings(req, res, null, 'Class Schedule public page updated.', 'classes');
