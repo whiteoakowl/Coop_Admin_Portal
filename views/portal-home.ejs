@@ -5,15 +5,7 @@
 </head>
 <body class="admin-page portal-page">
   <%- include('partials/icon-sprite') %>
-  <div class="landing-corner-actions">
-    <%- include('partials/portal-switcher') %>
-    <form method="POST" action="/portal/logout" class="logout-form">
-      <button type="submit" class="admin-corner-link">
-        <svg class="icon"><use href="#icon-log-out"/></svg>
-        Log Out
-      </button>
-    </form>
-  </div>
+  <%- include('partials/portal-topbar') %>
   <main class="portal-main">
     <div class="portal-header">
       <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />

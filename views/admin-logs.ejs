@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'messages' ? 'Contact Admins Messages' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -22,6 +22,7 @@
       <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/logs?tab=absence">Absence/Late Log</a>
       <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
+      <a class="view-tab<%= tab === 'messages' ? ' active' : '' %>" href="/admin/logs?tab=messages">Contact Admins Messages</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
@@ -102,7 +103,7 @@
             </tbody>
           </table>
         </div>
-      <% } else { %>
+      <% } else if (tab === 'nametag') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
@@ -141,6 +142,53 @@
                   <td><%= s.description %></td>
                   <td class="no-print">
                     <form method="POST" action="/admin/logs/nametag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
+                      <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="date-select">Date</label>
+            <select id="date-select" onchange="window.location = '/admin/logs?tab=messages<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+              <option value="">All dates</option>
+              <% dates.forEach(function(d) { %>
+                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="roster-btn-row">
+            <a
+              class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
+              href="/admin/logs?tab=messages<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
+            >Archived</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/messages/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Submitted</th><th>Leadership Team</th><th>From</th><th>Title</th><th>Message</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% if (messages.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> messages yet.</td></tr>
+              <% } %>
+              <% messages.forEach(function(m) { %>
+                <tr>
+                  <td><%= m.timestamp %></td>
+                  <td><%= m.leadershipTeam %></td>
+                  <td><a href="mailto:<%= m.senderEmail %>"><%= m.senderEmail %></a></td>
+                  <td><%= m.title %></td>
+                  <td><%= m.message %></td>
+                  <td class="no-print">
+                    <form method="POST" action="/admin/logs/messages/<%= m.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
                       <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
                     </form>
                   </td>

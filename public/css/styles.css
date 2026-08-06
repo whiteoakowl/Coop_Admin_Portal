@@ -776,20 +776,90 @@ textarea:focus-visible,
 .portal-family-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
 .portal-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
 
-/* Portal switcher - a member granted more than one portal (e.g. Co-op
-   Admin + Parent) can jump between them without logging out. */
-.portal-switcher select {
-  border-radius: 999px;
-  border: 1px solid var(--border);
+/* Shared top bar (partials/portal-topbar) - identical on every portal
+   (Admin, Co-op Admin, Parent, Student): current-portal pill on the left,
+   Contact Admins + Profile on the right. Sits above .admin-main on the
+   admin layout (offset past the fixed sidebar) or at the top of the plain
+   member-portal page. Desktop only on the admin layout - mobile keeps its
+   existing compact topbar/switcher below instead of stacking a second bar. */
+.portal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
   background: var(--surface);
-  padding: 0.35rem 0.9rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 2rem;
 }
-.admin-sidebar .portal-switcher { margin: 0.75rem 1.25rem 0; }
-.admin-sidebar .portal-switcher select { width: 100%; }
-.admin-nav-right-mobile .portal-switcher select { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+.portal-topbar-admin { margin-left: 220px; }
+@media (max-width: 860px) {
+  .portal-topbar-admin { display: none; }
+}
+
+.portal-topbar-left { display: flex; align-items: center; gap: 0.6rem; }
+.portal-topbar-current-label { font-weight: 600; color: var(--ink); font-size: 0.9rem; }
+.portal-topbar-right { display: flex; align-items: center; gap: 1rem; }
+
+/* Portal switcher pill - a member granted more than one portal (e.g.
+   Co-op Admin + Parent) can jump between them without logging out; anyone
+   else (incl. the master Admin, who only ever has one) gets a static pill
+   with nothing to click. */
+.portal-switcher-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.portal-switcher-pill .icon { width: 1.05em; height: 1.05em; }
+.portal-switcher-pill-interactive select {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.portal-switcher-pill-interactive select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.admin-nav-right-mobile .portal-switcher-pill { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+
+.portal-topbar-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease;
+}
+.portal-topbar-contact:hover { background: var(--btn-bg-hover); }
+.portal-topbar-contact .icon { width: 1.05em; height: 1.05em; }
+
+.portal-topbar-profile { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--ink); font-weight: 600; font-size: 0.9rem; }
+.portal-topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--brand-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
 
 .roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
 .roster-card-top { display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem; }

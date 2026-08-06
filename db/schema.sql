@@ -307,6 +307,31 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT NOT NULL
 );
 
+-- Contact Admins: the leadership directory shown on the public/portal
+-- Contact Admins page, admin-managed via Settings. position controls
+-- display order (and doubles as the "Leadership Team" dropdown on the
+-- message form).
+CREATE TABLE IF NOT EXISTS leadership_contacts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  role TEXT NOT NULL,
+  name TEXT,
+  email TEXT,
+  position INTEGER NOT NULL DEFAULT 0
+);
+
+-- Messages submitted through the Contact Admins form - reviewed by a full
+-- Admin on the Logs page (mirrors name_tag_requests' submission/review
+-- shape).
+CREATE TABLE IF NOT EXISTS contact_admin_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  leadership_team TEXT NOT NULL,
+  sender_email TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Documents tab: admin-uploaded files (PDF, Word, etc.) shown as button
 -- boxes; file_path is where the upload landed on disk under
 -- public/uploads/documents.

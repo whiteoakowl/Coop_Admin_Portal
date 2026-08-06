@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 
-require('./db'); // initialize database + seed default admin
+const db = require('./db'); // initialize database + seed default admin
 
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
@@ -29,6 +29,7 @@ const adminNameTagRouter = require('./routes/admin-name-tag');
 const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
 const classScheduleRouter = require('./routes/class-schedule');
+const contactAdminsRouter = require('./routes/contact-admins');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,8 @@ app.use(
 // route having to pass it explicitly. True only for the single master Admin
 // account - a Co-op Admin is a member with portal_coop_admin access, let
 // into /admin/* by requireAdmin but not treated as a full Admin.
+const PORTAL_LABELS = { coop_admin: 'Co-op Admin', parent: 'Parent Portal', student: 'Student Portal' };
+
 app.use((req, res, next) => {
   res.locals.isFullAdmin = !!(req.session && req.session.adminId);
   // A logged-in member's current portal and every portal they're granted -
@@ -76,6 +79,24 @@ app.use((req, res, next) => {
   // Co-op Admin who's also a Parent).
   res.locals.portalRole = (req.session && req.session.portalRole) || null;
   res.locals.portalRoles = (req.session && req.session.portalRoles) || [];
+
+  // Drives the shared top bar (partials/portal-topbar) on every portal -
+  // who's logged in, what to call their current portal, and where their
+  // Profile button goes.
+  if (res.locals.isFullAdmin) {
+    res.locals.currentPortalLabel = 'Admin Portal';
+    res.locals.profileHref = '/admin/settings';
+    res.locals.profileInitial = ((req.session.username || 'A')[0] || 'A').toUpperCase();
+  } else if (req.session && req.session.portalMemberId && res.locals.portalRole) {
+    res.locals.currentPortalLabel = PORTAL_LABELS[res.locals.portalRole] || res.locals.portalRole;
+    res.locals.profileHref = '/portal/profile';
+    const member = db.prepare('SELECT name FROM members WHERE id = ?').get(req.session.portalMemberId);
+    res.locals.profileInitial = member ? member.name[0].toUpperCase() : '?';
+  } else {
+    res.locals.currentPortalLabel = null;
+    res.locals.profileHref = null;
+    res.locals.profileInitial = null;
+  }
   next();
 });
 
@@ -92,6 +113,7 @@ app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);
 app.use('/', setupRouter);
 app.use('/', classScheduleRouter);
+app.use('/', contactAdminsRouter);
 // Order matters here: several of these routers gate themselves with a
 // blanket `router.use(requireFullAdmin)` (no path), which - because Express
 // matches on the shared '/admin' mount prefix, not on that router's own

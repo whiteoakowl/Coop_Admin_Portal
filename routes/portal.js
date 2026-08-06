@@ -103,6 +103,46 @@ function classScheduleFor(memberIds) {
   });
 }
 
+// Every portal member's account hub - basic info + a self-service password
+// change (only Full Admin gets its own account page at /admin/settings;
+// everyone else's Profile button lands here). Also where Log Out lives for
+// the Parent/Student portal, since the shared top bar doesn't have room
+// for it (see partials/portal-topbar.ejs).
+router.get('/portal/profile', requireMemberPortal, (req, res) => {
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.session.portalMemberId);
+  if (!member) {
+    req.session.destroy(() => res.redirect('/'));
+    return;
+  }
+  res.render('portal-profile', {
+    title: 'Profile',
+    member,
+    portalRole: req.session.portalRole,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/portal/profile/password', requireMemberPortal, (req, res) => {
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.session.portalMemberId);
+  if (!member) {
+    req.session.destroy(() => res.redirect('/'));
+    return;
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  if (!bcrypt.compareSync(currentPassword || '', member.password_hash)) {
+    return res.redirect('/portal/profile?error=' + encodeURIComponent('Current password is incorrect.'));
+  }
+  if (!newPassword || newPassword.length < 8) {
+    return res.redirect('/portal/profile?error=' + encodeURIComponent('New password must be at least 8 characters.'));
+  }
+
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE members SET password_hash = ? WHERE id = ?').run(hash, member.id);
+  res.redirect('/portal/profile?notice=' + encodeURIComponent('Password updated.'));
+});
+
 router.get('/portal', requireMemberPortal, (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.session.portalMemberId);
   if (!member) {

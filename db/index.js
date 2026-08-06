@@ -252,4 +252,15 @@ if (!existingScheduleCardTemplate) {
   }
 }
 
+// Seed the starter leadership roles for Contact Admins - name/email left
+// blank for a full Admin to fill in via Settings, rather than inventing
+// fake contacts.
+const leadershipCount = db.prepare('SELECT COUNT(*) AS c FROM leadership_contacts').get().c;
+if (leadershipCount === 0) {
+  const insertRole = db.prepare('INSERT INTO leadership_contacts (role, position) VALUES (?, ?)');
+  ['Director', 'Assistant Director', 'Co-op Classes', 'Finance Team', 'Events Coordinator', 'Yearbook Team'].forEach(
+    (role, i) => insertRole.run(role, i)
+  );
+}
+
 module.exports = db;

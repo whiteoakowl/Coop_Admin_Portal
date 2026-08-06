@@ -108,13 +108,13 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks', 'classes', 'documents'];
+const SETTINGS_TABS = ['account', 'quicklinks', 'classes', 'documents', 'leadership'];
 
 function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links here - Username/Password manages the single master admin
-  // account, and Class Settings/Documents are full-Admin-only.
+  // account, and Class Settings/Documents/Leadership are full-Admin-only.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
   if (!isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
@@ -124,6 +124,7 @@ function renderSettings(req, res, error, success, activeTab) {
     activeTab: tab,
     classSchedulePublicMode: appSetting('class_schedule_public_mode', 'view'),
     documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
+    leadershipContacts: db.prepare('SELECT * FROM leadership_contacts ORDER BY position, role COLLATE NOCASE').all(),
     error,
     success,
   });
@@ -166,6 +167,36 @@ router.post('/settings/class-schedule-mode', requireAdmin, requireFullAdmin, (re
   const mode = req.body.mode === 'edit' ? 'edit' : 'view';
   setAppSetting('class_schedule_public_mode', mode);
   renderSettings(req, res, null, 'Class Schedule public page updated.', 'classes');
+});
+
+// --- Leadership contacts (Contact Admins directory) ---
+
+router.post('/settings/leadership/new', requireAdmin, requireFullAdmin, (req, res) => {
+  const role = (req.body.role || '').trim();
+  if (!role) return renderSettings(req, res, 'A role name is required.', null, 'leadership');
+
+  const position = db.prepare('SELECT COUNT(*) AS c FROM leadership_contacts').get().c;
+  db.prepare('INSERT INTO leadership_contacts (role, position) VALUES (?, ?)').run(role, position);
+  renderSettings(req, res, null, 'Leadership role added.', 'leadership');
+});
+
+router.post('/settings/leadership/:id', requireAdmin, requireFullAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const role = (req.body.role || '').trim();
+  if (!role) return renderSettings(req, res, 'A role name is required.', null, 'leadership');
+
+  db.prepare('UPDATE leadership_contacts SET role = ?, name = ?, email = ? WHERE id = ?').run(
+    role,
+    (req.body.name || '').trim() || null,
+    (req.body.email || '').trim() || null,
+    id
+  );
+  renderSettings(req, res, null, 'Leadership contact updated.', 'leadership');
+});
+
+router.post('/settings/leadership/:id/delete', requireAdmin, requireFullAdmin, (req, res) => {
+  db.prepare('DELETE FROM leadership_contacts WHERE id = ?').run(parseInt(req.params.id, 10));
+  renderSettings(req, res, null, 'Leadership role removed.', 'leadership');
 });
 
 module.exports = router;
