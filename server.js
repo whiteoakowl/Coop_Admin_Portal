@@ -9,6 +9,7 @@ require('./db'); // initialize database + seed default admin
 
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
+const portalRouter = require('./routes/portal');
 const absenceRouter = require('./routes/absence');
 const nameTagRouter = require('./routes/name-tag');
 const adminRouter = require('./routes/admin');
@@ -27,7 +28,6 @@ const adminNameTagRouter = require('./routes/admin-name-tag');
 const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
 const classScheduleRouter = require('./routes/class-schedule');
-const { defaultDay } = require('./utils/days');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -65,9 +65,11 @@ app.use(
 );
 
 app.get('/', (req, res) => {
-  res.render('index', { title: 'SH Check-In / Check-Out', defaultDay: defaultDay() });
+  if (req.session && req.session.portalMemberId) return res.redirect('/portal');
+  res.render('index', { title: 'SH Check-In / Check-Out', error: null });
 });
 
+app.use('/', portalRouter);
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/', absenceRouter);

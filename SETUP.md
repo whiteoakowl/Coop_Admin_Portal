@@ -49,7 +49,7 @@ npm start
 
 ## Step 4 — Log in and set a real password
 
-Go to `/admin`, or click the small **Admin** link in the top-right corner of the home page. Log in with:
+Go to `/admin`, or click the small **Staff Login** link on the home page. Log in with:
 
 - Username: `admin`
 - Password: `changeme123`

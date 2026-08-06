@@ -152,6 +152,22 @@ if (!substituteAssignmentColumns.includes('status')) {
   db.exec("ALTER TABLE substitute_assignments ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
 }
 
+const adminColumns = db.prepare('PRAGMA table_info(admins)').all().map((c) => c.name);
+if (!adminColumns.includes('role')) {
+  db.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+}
+if (!adminColumns.includes('member_id')) {
+  db.exec('ALTER TABLE admins ADD COLUMN member_id INTEGER REFERENCES members(id) ON DELETE SET NULL');
+}
+
+const memberPortalColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
+if (!memberPortalColumns.includes('username')) {
+  db.exec('ALTER TABLE members ADD COLUMN username TEXT UNIQUE');
+}
+if (!memberPortalColumns.includes('password_hash')) {
+  db.exec('ALTER TABLE members ADD COLUMN password_hash TEXT');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

@@ -41,7 +41,7 @@
       const data = await res.json();
       if (data.ok) {
         setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'info-circle' : 'check-circle');
-        setTimeout(() => { window.location.href = '/'; }, 1800);
+        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
         return;
       }
       setState('error', data.message, 'x-circle');

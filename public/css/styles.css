@@ -207,6 +207,27 @@ textarea:focus-visible,
 .landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
 .landing-card-purple .landing-label { color: #000; }
 
+.home-login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: left;
+}
+.home-login-title { margin-top: 0; text-align: center; }
+.home-login-hint { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 1rem 0 0; }
+.home-staff-login {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.home-staff-login:hover { color: var(--brand-dark); }
+
 .documents-grid { justify-content: flex-start; }
 
 .library-checkout-section input[type="text"] {

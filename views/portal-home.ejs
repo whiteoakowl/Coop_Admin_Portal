@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="landing">
+  <%- include('partials/icon-sprite') %>
+  <div class="landing-corner-actions">
+    <form method="POST" action="/portal/logout" class="logout-form">
+      <button type="submit" class="admin-corner-link">
+        <svg class="icon"><use href="#icon-log-out"/></svg>
+        Log Out
+      </button>
+    </form>
+  </div>
+  <main class="landing-wrap">
+    <div class="landing-banner">
+      <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <div class="landing-welcome">Welcome, <%= member.name %>!</div>
+    </div>
+    <div class="home-login-card">
+      <h2 class="home-login-title"><%= portalRole === 'student' ? 'Student' : 'Parent' %> Portal</h2>
+      <p class="home-login-hint">Your portal dashboard is on its way - check back soon.</p>
+    </div>
+  </main>
+</body>
+</html>

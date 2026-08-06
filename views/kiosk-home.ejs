@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="landing">
+  <%- include('partials/icon-sprite') %>
+  <div class="landing-corner-actions">
+    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
+    <a class="admin-corner-link" href="/">
+      <svg class="icon"><use href="#icon-home"/></svg>
+      Home
+    </a>
+  </div>
+  <main class="landing-wrap">
+    <div class="landing-banner">
+      <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <div class="landing-welcome">Welcome to Co-op!</div>
+    </div>
+
+    <div class="landing-grid">
+      <a class="landing-card landing-card-green" href="/volunteers/<%= defaultDay %>">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+        <span class="landing-label">Floater Assignments</span>
+      </a>
+      <a class="landing-card landing-card-orange" href="/kiosk/checkin">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+        <span class="landing-label">Check In</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/absence">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+        <span class="landing-label">Absence/Late Form</span>
+      </a>
+      <a class="landing-card landing-card-green" href="/setup/<%= defaultDay %>">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+        <span class="landing-label">Setup/Cleanup Teams</span>
+      </a>
+      <a class="landing-card landing-card-orange" href="/kiosk/checkout">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
+        <span class="landing-label">Check Out</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/name-tag">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
+        <span class="landing-label">Name Tag Form</span>
+      </a>
+    </div>
+  </main>
+  <script src="/js/fullscreen-toggle.js"></script>
+</body>
+</html>

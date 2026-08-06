@@ -3,6 +3,14 @@ const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
+const { defaultDay } = require('../utils/days');
+
+// Full kiosk landing screen (Check In/Out, Floater Assignments, forms) -
+// not the site's homepage anymore (that's now the member/staff login),
+// reached via the "Full Kiosk Screen" quick link in admin Settings.
+router.get('/', (req, res) => {
+  res.render('kiosk-home', { title: 'Kiosk', defaultDay: defaultDay() });
+});
 
 // --- Check-in kiosk ---
 

@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS members (
   grade_level TEXT,
   medical_notes TEXT,
   family_id INTEGER,
+  -- Portal login credentials, set by an admin on the member's profile - NULL
+  -- until an admin grants that Parent or Student portal access.
+  username TEXT UNIQUE,
+  password_hash TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -99,6 +103,10 @@ CREATE TABLE IF NOT EXISTS admins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin' CHECK(role IN ('admin','coop_admin')),
+  -- Optionally links a staff login to their own Parent member record, so the
+  -- portal switcher can offer a one-click jump to "My Parent Portal".
+  member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
