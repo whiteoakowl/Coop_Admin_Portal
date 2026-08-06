@@ -1,9 +1,12 @@
 <%
 // locals: day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds,
 // basePath (optional - where the date filter navigates back to; defaults
-// to the standalone class-schedule page).
+// to the standalone class-schedule page), readOnly (optional - hides every
+// creation/edit control, leaving just the visual grid + Export/Print for
+// viewers who aren't a full Admin, e.g. Co-op Admin).
 const gridBasePath = typeof basePath !== 'undefined' && basePath ? basePath : `/admin/class-schedule/${day}`;
 const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
+const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 %>
 <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -21,14 +24,17 @@ const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
     </div>
   </div>
   <div class="roster-btn-row">
-    <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
-    <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog-<%= day %>').showModal()">Edit Hours</button>
-    <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+    <% if (!gridReadOnly) { %>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog-<%= day %>').showModal()">Edit Hours</button>
+      <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+    <% } %>
     <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/export.csv">Export</a>
     <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
 </div>
 
+<% if (!gridReadOnly) { %>
 <dialog id="add-class-dialog-<%= day %>" class="member-picker-dialog">
   <form method="POST" action="/admin/class-schedule/<%= day %>/classes/new">
     <h3>Add Class</h3>
@@ -80,6 +86,7 @@ const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
     </div>
   </form>
 </dialog>
+<% } %>
 
 <div class="roster-scroll">
   <table class="roster-table class-schedule-room-grid">
@@ -107,7 +114,9 @@ const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
                   <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
                     <div class="class-card-header">
                       <h3><%= cls.class_name %></h3>
-                      <a class="icon-btn no-print" href="/admin/class-schedule/classes/<%= cls.id %>/manage" aria-label="Manage <%= cls.class_name %>" title="Manage">&#9998;</a>
+                      <% if (!gridReadOnly) { %>
+                        <a class="icon-btn no-print" href="/admin/class-schedule/classes/<%= cls.id %>/manage" aria-label="Manage <%= cls.class_name %>" title="Manage">&#9998;</a>
+                      <% } %>
                     </div>
                     <p class="class-card-meta">
                       <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>

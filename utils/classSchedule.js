@@ -142,10 +142,13 @@ function createClass(fields) {
       fields.color || nextPaletteColor(),
       fields.notes || null
     );
-  return info.lastInsertRowid;
+  const id = info.lastInsertRowid;
+  ensureClassRoster(id);
+  return id;
 }
 
 function updateClass(id, fields) {
+  const before = db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(id);
   db.prepare(
     `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ? WHERE id = ?`
   ).run(
@@ -158,16 +161,33 @@ function updateClass(id, fields) {
     fields.notes || null,
     id
   );
+  // Keep the class's auto-roster's name/day in step with the class itself.
+  if (before && before.roster_id) {
+    db.prepare('UPDATE rosters SET name = ?, schedule_day = ? WHERE id = ?').run(fields.className, fields.day, before.roster_id);
+  }
 }
 
+// Deactivates (never hard-deletes) the class's auto-roster before removing
+// the class - a hard delete would cascade-wipe its attendance history
+// (attendance.roster_id references rosters ON DELETE CASCADE). Deactivating
+// just retires it from active use, same as manually archiving any roster.
 function deleteClass(id) {
+  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
+  if (!cls) return;
+  if (cls.roster_id) {
+    db.prepare('UPDATE rosters SET active = 0 WHERE id = ?').run(cls.roster_id);
+  }
   db.prepare('DELETE FROM classes WHERE id = ?').run(id);
+  syncDayMemberRosters(cls.day);
 }
 
 function setEnrollment(classId, studentIds) {
   db.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
   const link = db.prepare('INSERT OR IGNORE INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
   for (const studentId of studentIds) link.run(classId, studentId);
+  syncClassRosterMembers(classId);
+  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) syncDayMemberRosters(cls.day);
 }
 
 // Adds one teacher/assistant - used by both the admin manage form (one at
@@ -178,10 +198,14 @@ function addStaff(classId, memberId, role) {
     memberId,
     role === 'assistant' ? 'assistant' : 'teacher'
   );
+  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) syncDayMemberRosters(cls.day);
 }
 
 function removeStaff(classId, memberId) {
   db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, memberId);
+  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) syncDayMemberRosters(cls.day);
 }
 
 // Active students, for the enrollment picker.
@@ -238,6 +262,113 @@ function absenceFormMemberIdsForDate(date) {
   );
 }
 
+// --- Rosters auto-created from class registration ------------------------
+//
+// Every class gets its own students-only roster, and each day gets one
+// Parent and one Student roster covering everyone registered that day
+// (enrolled in, or staffing, any class on it). Only MEMBERSHIP is kept in
+// sync here - each roster keeps its own independently admin-editable
+// roster_dates, exactly like a manually-created roster; nothing here ever
+// touches roster_dates.
+
+// Adds/removes roster_members rows so a roster's membership matches
+// memberIdSet exactly, without touching anyone's scheduled_arrival/
+// departure or the roster's dates.
+function setRosterMembership(rosterId, memberIdSet) {
+  const existingIds = db
+    .prepare('SELECT member_id FROM roster_members WHERE roster_id = ?')
+    .all(rosterId)
+    .map((r) => r.member_id);
+  const existing = new Set(existingIds);
+  const insert = db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)');
+  const remove = db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?');
+  for (const memberId of memberIdSet) {
+    if (!existing.has(memberId)) insert.run(rosterId, memberId);
+  }
+  for (const memberId of existingIds) {
+    if (!memberIdSet.has(memberId)) remove.run(rosterId, memberId);
+  }
+}
+
+// Creates (once) the students-only roster for a single class, or returns
+// its existing one.
+function ensureClassRoster(classId) {
+  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+  if (!cls) return null;
+  if (cls.roster_id) {
+    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(cls.roster_id);
+    if (existing) return existing.id;
+  }
+  const info = db
+    .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
+    .run(cls.class_name, 'Class Roster', cls.day);
+  db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(info.lastInsertRowid, classId);
+  return info.lastInsertRowid;
+}
+
+// Rebuilds a class's roster membership from its current enrollment
+// (students only - a class roster never includes its teachers/assistants).
+function syncClassRosterMembers(classId) {
+  const rosterId = ensureClassRoster(classId);
+  if (!rosterId) return;
+  const studentIds = new Set(
+    db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId).map((r) => r.student_id)
+  );
+  setRosterMembership(rosterId, studentIds);
+}
+
+const DAY_ROSTER_LABEL = { monday: 'Monday', wednesday: 'Wednesday' };
+
+function dayRosterSettingKey(day, role) {
+  return `${day}_${role}_roster_id`;
+}
+
+// Creates (once) one of the 4 day-level rosters (Monday/Wednesday x
+// Parent/Student), remembering its id via app_settings, or returns the
+// existing one.
+function ensureDayRoster(day, role) {
+  const key = dayRosterSettingKey(day, role);
+  const existingId = appSetting(key, null);
+  if (existingId) {
+    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId);
+    if (existing) return existing.id;
+  }
+  const name = `${DAY_ROSTER_LABEL[day]} ${role === 'parent' ? 'Parents' : 'Students'}`;
+  const info = db
+    .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
+    .run(name, 'Class Schedule', day);
+  setAppSetting(key, String(info.lastInsertRowid));
+  return info.lastInsertRowid;
+}
+
+// Ensures all 4 day-level rosters exist and returns their ids.
+function ensureDayMemberRosters() {
+  const ids = {};
+  DAYS.forEach((day) => {
+    ids[day] = { parent: ensureDayRoster(day, 'parent'), student: ensureDayRoster(day, 'student') };
+  });
+  return ids;
+}
+
+// Rebuilds a day's Parent and Student roster membership from everyone
+// enrolled in (students) or staffing (parents) any class on that day.
+function syncDayMemberRosters(day) {
+  const classIds = db.prepare('SELECT id FROM classes WHERE day = ?').all(day).map((r) => r.id);
+  const studentIds = new Set();
+  const parentIds = new Set();
+  if (classIds.length > 0) {
+    const placeholders = classIds.map(() => '?').join(',');
+    db.prepare(`SELECT DISTINCT student_id FROM class_enrollments WHERE class_id IN (${placeholders})`)
+      .all(...classIds)
+      .forEach((r) => studentIds.add(r.student_id));
+    db.prepare(`SELECT DISTINCT member_id FROM class_staff WHERE class_id IN (${placeholders})`)
+      .all(...classIds)
+      .forEach((r) => parentIds.add(r.member_id));
+  }
+  setRosterMembership(ensureDayRoster(day, 'student'), studentIds);
+  setRosterMembership(ensureDayRoster(day, 'parent'), parentIds);
+}
+
 function appSetting(key, fallback) {
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
@@ -275,4 +406,9 @@ module.exports = {
   absenceFormMemberIdsForDate,
   appSetting,
   setAppSetting,
+  ensureClassRoster,
+  syncClassRosterMembers,
+  ensureDayRoster,
+  ensureDayMemberRosters,
+  syncDayMemberRosters,
 };

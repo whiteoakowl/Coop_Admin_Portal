@@ -165,6 +165,11 @@ for (const column of ['portal_parent', 'portal_student', 'portal_coop_admin']) {
   }
 }
 
+const classColumns = db.prepare('PRAGMA table_info(classes)').all().map((c) => c.name);
+if (!classColumns.includes('roster_id')) {
+  db.exec('ALTER TABLE classes ADD COLUMN roster_id INTEGER REFERENCES rosters(id) ON DELETE SET NULL');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {
@@ -203,6 +208,17 @@ for (const memberType of ['student', 'parent', 'admin']) {
   db.prepare('INSERT INTO name_tag_templates (member_type, layout_json) VALUES (?, ?)').run(
     memberType,
     JSON.stringify(DEFAULT_LAYOUTS[memberType])
+  );
+}
+
+// Seed a starter design for each misc badge type (Setup/Cleanup, Custom),
+// same pattern as the per-member-type name tag seeding above.
+for (const badgeType of ['setupCleanup', 'custom']) {
+  const existing = db.prepare('SELECT badge_type FROM misc_badge_templates WHERE badge_type = ?').get(badgeType);
+  if (existing) continue;
+  db.prepare('INSERT INTO misc_badge_templates (badge_type, layout_json) VALUES (?, ?)').run(
+    badgeType,
+    JSON.stringify(DEFAULT_LAYOUTS[badgeType])
   );
 }
 

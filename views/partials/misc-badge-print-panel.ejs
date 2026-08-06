@@ -1,0 +1,48 @@
+<%
+// locals: type ('setupCleanup' | 'custom'), label, badges (rows from
+// listMiscBadges). Import always replaces the whole list for this type;
+// Print with nothing checked prints every badge, checking rows prints just
+// those (see routes/admin-misc-badges.js).
+%>
+<form method="POST" action="/admin/design/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form">
+  <div class="roster-toolbar no-print">
+    <div class="schedule-filters">
+      <label class="checkbox-option schedule-print-select-all">
+        <input type="checkbox" class="<%= type %>-badge-select-all-checkbox" />
+        Select All
+      </label>
+    </div>
+    <div class="roster-btn-row">
+      <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('<%= type %>-badge-import-dialog').showModal()">Import</button>
+      <a class="roster-action-btn file-action-btn" href="/admin/design/badges/<%= type %>/import-template.xlsx">Sample File</a>
+      <button type="submit" class="primary-btn"><%= badges.length === 0 ? 'Print' : 'Print Selected / All' %></button>
+    </div>
+  </div>
+
+  <% if (badges.length === 0) { %>
+    <p class="hint">No <%= label %> badges imported yet.</p>
+  <% } else { %>
+    <div class="member-picker-list">
+      <% badges.forEach(function(b) { %>
+        <label class="member-picker-row">
+          <input type="checkbox" name="badgeIds" value="<%= b.id %>" />
+          <span><%= b.badge_number ? '#' + b.badge_number + ' — ' : '' %><%= b.title || 'Untitled' %></span>
+          <% if (b.description) { %><span class="hint"><%= b.description %></span><% } %>
+        </label>
+      <% }); %>
+    </div>
+  <% } %>
+</form>
+
+<dialog id="<%= type %>-badge-import-dialog" class="member-picker-dialog">
+  <form method="POST" action="/admin/design/badges/<%= type %>/import" enctype="multipart/form-data">
+    <h3>Import <%= label %> Badges</h3>
+    <p class="hint">Replaces the current list with the rows in this file - Badge Number, Title, Description.</p>
+    <a class="btn-secondary import-sample-link" href="/admin/design/badges/<%= type %>/import-template.xlsx">Download Sample File</a>
+    <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Import</button>
+    </div>
+  </form>
+</dialog>

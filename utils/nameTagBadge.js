@@ -11,7 +11,12 @@
 const BADGE_WIDTH = 336;
 const BADGE_HEIGHT = 216;
 
-// Fields available to place on each badge type's canvas.
+// Fields available to place on each badge type's canvas. student/parent/
+// admin are per-member name tags; setupCleanup/custom are the two
+// non-member "misc badge" types (see misc_badge_templates/misc_badges in
+// schema.sql and utils/miscBadgeData.js) - each row of an admin-imported
+// list, not a member, so they share a plain Badge Number/Title/Description
+// shape instead of member fields.
 const FIELDS_BY_TYPE = {
   student: [
     { field: 'name', label: 'Name' },
@@ -23,6 +28,16 @@ const FIELDS_BY_TYPE = {
     { field: 'cleanupTeam', label: 'Cleanup Team' },
   ],
   admin: [{ field: 'name', label: 'Name' }],
+  setupCleanup: [
+    { field: 'badgeNumber', label: 'Badge Number' },
+    { field: 'title', label: 'Title' },
+    { field: 'description', label: 'Description' },
+  ],
+  custom: [
+    { field: 'badgeNumber', label: 'Badge Number' },
+    { field: 'title', label: 'Title' },
+    { field: 'description', label: 'Description' },
+  ],
 };
 
 // Shapes offered by the "Add Element" tool - value is what's stored on
@@ -88,6 +103,24 @@ const DEFAULT_LAYOUTS = {
       { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 58, width: 320, height: 52, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
+    ],
+  },
+  setupCleanup: {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 28, width: 320, height: 40, fontSize: 28, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'title', type: 'text', field: 'title', x: 8, y: 74, width: 320, height: 26, fontSize: 16, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'description', type: 'text', field: 'description', x: 8, y: 104, width: 320, height: 100, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+    ],
+  },
+  custom: {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'title', type: 'text', field: 'title', x: 8, y: 20, width: 320, height: 32, fontSize: 20, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'description', type: 'text', field: 'description', x: 8, y: 60, width: 320, height: 140, fontSize: 13, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
     ],
   },
 };

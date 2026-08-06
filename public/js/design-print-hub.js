@@ -40,6 +40,8 @@
   const sections = {
     scheduleCards: document.getElementById('print-schedule-cards-section'),
     nameTags: document.getElementById('print-name-tags-section'),
+    setupCleanupBadges: document.getElementById('print-setupCleanupBadges-section'),
+    customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
     logs: document.getElementById('print-logs-section'),
   };
@@ -109,4 +111,19 @@
       });
     }
   }
+
+  // Setup/Cleanup + Custom badge lists (partials/misc-badge-print-panel):
+  // one Select All checkbox per form, wired the same way as the schedule
+  // cards list above.
+  ['setupCleanup', 'custom'].forEach((type) => {
+    const form = document.getElementById(type + '-badge-print-form');
+    if (!form) return;
+    const selectAll = form.querySelector('.' + type + '-badge-select-all-checkbox');
+    if (!selectAll) return;
+    selectAll.addEventListener('change', () => {
+      form.querySelectorAll('input[name="badgeIds"]').forEach((cb) => {
+        cb.checked = selectAll.checked;
+      });
+    });
+  });
 })();

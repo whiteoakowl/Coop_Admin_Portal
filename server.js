@@ -18,6 +18,7 @@ const adminLogsRouter = require('./routes/admin-logs');
 const adminDocumentsRouter = require('./routes/admin-documents');
 const adminLibraryRouter = require('./routes/admin-library');
 const adminDesignRouter = require('./routes/admin-design');
+const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
 const adminMembersRouter = require('./routes/admin-members');
 const adminVolunteersRouter = require('./routes/admin-volunteers');
 const adminSubstitutesRouter = require('./routes/admin-substitutes');
@@ -91,19 +92,31 @@ app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);
 app.use('/', setupRouter);
 app.use('/', classScheduleRouter);
+// Order matters here: several of these routers gate themselves with a
+// blanket `router.use(requireFullAdmin)` (no path), which - because Express
+// matches on the shared '/admin' mount prefix, not on that router's own
+// route table - runs for ANY /admin/* request that reaches it, not just
+// requests one of its own routes would've matched. Mounting those
+// full-admin-only routers (Documents, Library, Design/Print, misc badges,
+// Members, Name Tag) AFTER every router a Co-op Admin needs (Rosters, Logs,
+// Volunteers, Substitutes, Setup, Schedule, Class Schedule) ensures the
+// latter's own (permissive) requireAdmin routes get first chance to handle
+// the request, instead of being hijacked by an unrelated router's
+// full-admin gate before they're ever reached.
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
 app.use('/admin', adminLogsRouter);
-app.use('/admin', adminDocumentsRouter);
-app.use('/admin', adminLibraryRouter);
-app.use('/admin', adminDesignRouter);
-app.use('/admin', adminMembersRouter);
 app.use('/admin', adminVolunteersRouter);
 app.use('/admin', adminSubstitutesRouter);
 app.use('/admin', adminSetupRouter);
-app.use('/admin', adminNameTagRouter);
 app.use('/admin', adminScheduleRouter);
 app.use('/admin', adminClassScheduleRouter);
+app.use('/admin', adminDocumentsRouter);
+app.use('/admin', adminLibraryRouter);
+app.use('/admin', adminDesignRouter);
+app.use('/admin', adminMiscBadgesRouter);
+app.use('/admin', adminMembersRouter);
+app.use('/admin', adminNameTagRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });

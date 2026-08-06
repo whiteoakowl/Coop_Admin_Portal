@@ -18,16 +18,23 @@
   }
 
   // Working copy - edits happen here until "Save Template" persists them.
+  // student/parent/admin are per-member name tags; setupCleanup/custom are
+  // the two non-member "misc badge" types (see utils/miscBadgeData.js) -
+  // same editor, own save table server-side.
   const layouts = {
     student: cloneLayout(seed.templates.student),
     parent: cloneLayout(seed.templates.parent),
     admin: cloneLayout(seed.templates.admin),
+    setupCleanup: cloneLayout(seed.templates.setupCleanup),
+    custom: cloneLayout(seed.templates.custom),
   };
 
   const PLACEHOLDER_DATA = {
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', barcodeValue: '0123456789' },
     parent: { name: 'Jordan Parent', cleanupTeam: 'Chairs & Tables', barcodeValue: '0123456789' },
     admin: { name: 'Sam Admin', barcodeValue: '0123456789' },
+    setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.' },
+    custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
 
   let currentType = 'student';

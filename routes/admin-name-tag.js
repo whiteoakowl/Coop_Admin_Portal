@@ -11,6 +11,7 @@ const { formatTimestamp, formatDateLabel } = require('../utils/dates');
 router.use(requireFullAdmin);
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const { isMiscBadgeType, saveMiscTemplate } = require('../utils/miscBadgeData');
 const { imageFileFilter } = require('../utils/uploads');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { jsonScriptSafe } = require('../utils/json');
@@ -134,9 +135,13 @@ router.post('/name-tag/:id/unarchive', requireAdmin, (req, res) => {
 
 const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
 
+// This same save endpoint is shared by the Setup/Cleanup and Custom badge
+// types (they use the same editor - see public/js/name-tag-editor.js) -
+// member-type name tags persist to name_tag_templates, misc badge types to
+// their own misc_badge_templates table (see utils/miscBadgeData.js).
 router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
   const type = req.params.type;
-  if (!NAME_TAG_TYPES.includes(type)) return res.status(404).json({ ok: false });
+  if (!NAME_TAG_TYPES.includes(type) && !isMiscBadgeType(type)) return res.status(404).json({ ok: false });
 
   let layout;
   try {
@@ -146,6 +151,11 @@ router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
   }
   if (!layout || !Array.isArray(layout.elements)) {
     return res.status(400).json({ ok: false, message: 'Invalid layout.' });
+  }
+
+  if (isMiscBadgeType(type)) {
+    saveMiscTemplate(type, layout);
+    return res.json({ ok: true });
   }
 
   db.prepare(

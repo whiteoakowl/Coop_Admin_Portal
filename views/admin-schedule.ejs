@@ -18,13 +18,15 @@
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday Schedule</a>
       <a class="view-tab<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday Schedule</a>
-      <a class="view-tab<%= tab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
-      <a class="view-tab<%= tab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
+      <% if (isFullAdmin) { %>
+        <a class="view-tab<%= tab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
+        <a class="view-tab<%= tab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
+      <% } %>
     </div>
 
     <div class="view-tab-panel">
       <% if (tab === 'monday' || tab === 'wednesday') { %>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds, basePath: `/admin/schedule?tab=${tab}` }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else { %>
         <%
           function buildQuery(overrides) {

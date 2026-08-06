@@ -7,11 +7,12 @@ const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, D
 const { getTemplate } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_TYPES, FONT_FAMILIES: CARD_FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
 
 router.use(requireFullAdmin);
 
-const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard'];
+const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
 const TABS = ['design', 'print'];
 
 // Unified Design/Print page: Design has one dropdown (Student/Parent/Admin
@@ -35,8 +36,18 @@ router.get('/design', requireAdmin, (req, res) => {
     initialType,
     members,
     error: req.query.error || null,
+    initialPrintPanel: ['setupCleanupBadges', 'customBadges'].includes(req.query.print) ? req.query.print : null,
+    notice: req.query.notice || null,
+    setupCleanupBadges: listMiscBadges('setupCleanup'),
+    customBadges: listMiscBadges('custom'),
     nameTagDataJson: jsonScriptSafe({
-      templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
+      templates: {
+        student: getTemplate('student'),
+        parent: getTemplate('parent'),
+        admin: getTemplate('admin'),
+        setupCleanup: getMiscTemplate('setupCleanup'),
+        custom: getMiscTemplate('custom'),
+      },
       defaultLayouts: DEFAULT_LAYOUTS,
       fieldsByType: FIELDS_BY_TYPE,
       shapeTypes: SHAPE_TYPES,

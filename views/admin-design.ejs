@@ -9,6 +9,7 @@
     <h1>Design / Print</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/design?tab=design">Design</a>
@@ -23,15 +24,19 @@
             <option value="parent" <%= initialType === 'parent' ? 'selected' : '' %>>Parent Name Tag</option>
             <option value="admin" <%= initialType === 'admin' ? 'selected' : '' %>>Admin Name Tag</option>
             <option value="scheduleCard" <%= initialType === 'scheduleCard' ? 'selected' : '' %>>Schedule Card</option>
+            <option value="setupCleanup" <%= initialType === 'setupCleanup' ? 'selected' : '' %>>Setup/Cleanup Badge</option>
+            <option value="custom" <%= initialType === 'custom' ? 'selected' : '' %>>Custom Badge</option>
           </select>
           <!-- name-tag-editor.js reads/drives this select directly; the
                visible control above delegates into it (see design-print-hub.js)
-               so switching among Student/Parent/Admin still uses the
-               editor's own type-switch logic unmodified. -->
+               so switching among Student/Parent/Admin/Setup-Cleanup/Custom
+               still uses the editor's own type-switch logic unmodified. -->
           <select id="name-tag-type-select" hidden>
             <option value="student">Student</option>
             <option value="parent">Parent</option>
             <option value="admin">Admin</option>
+            <option value="setupCleanup">Setup/Cleanup</option>
+            <option value="custom">Custom</option>
           </select>
 
           <div id="design-name-tag-toolbar-controls" class="design-toolbar-inline">
@@ -146,6 +151,8 @@
           <select class="name-tag-type-select" id="print-type-select">
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
+            <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
+            <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
             <option value="schedules">Schedules</option>
             <option value="logs">Logs</option>
           </select>
@@ -217,6 +224,14 @@
               <button type="submit" formaction="/admin/name-tag/print-barcodes" class="btn-secondary name-tag-bulk-submit">Print Barcodes Only</button>
             </div>
           </form>
+        </div>
+
+        <div id="print-setupCleanupBadges-section" hidden>
+          <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges }) %>
+        </div>
+
+        <div id="print-customBadges-section" hidden>
+          <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges }) %>
         </div>
 
         <div id="print-schedules-section" class="manage-section" hidden>

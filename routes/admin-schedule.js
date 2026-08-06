@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { formatTimestamp, isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const {
@@ -63,7 +64,13 @@ function defaultDateFor(day) {
 }
 
 router.get('/schedule', requireAdmin, (req, res) => {
-  const tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
+  let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
+
+  // Student/Parent Schedules is the per-member schedule list + editor -
+  // full-Admin-only. A Co-op Admin only gets the read-only day grid.
+  if ((tab === 'students' || tab === 'parents') && !res.locals.isFullAdmin) {
+    tab = 'monday';
+  }
 
   if (tab === 'monday' || tab === 'wednesday') {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
@@ -133,7 +140,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/schedule/print-cards', requireAdmin, (req, res) => {
+router.post('/schedule/print-cards', requireFullAdmin, (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
@@ -159,7 +166,7 @@ router.post('/schedule/print-cards', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/schedule/design/template', requireAdmin, (req, res) => {
+router.post('/schedule/design/template', requireFullAdmin, (req, res) => {
   let layout;
   try {
     layout = typeof req.body.layout === 'string' ? JSON.parse(req.body.layout) : req.body.layout;
@@ -178,12 +185,12 @@ router.post('/schedule/design/template', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/schedule/design-image', requireAdmin, uploadDesignImage.single('image'), (req, res) => {
+router.post('/schedule/design-image', requireFullAdmin, uploadDesignImage.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, message: 'No image uploaded.' });
   res.json({ ok: true, url: `/uploads/schedule-cards/${req.file.filename}` });
 });
 
-router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
+router.get('/schedule/member/:id/manage', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
@@ -199,7 +206,7 @@ router.get('/schedule/member/:id/manage', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/schedule/member/:id', requireAdmin, (req, res) => {
+router.post('/schedule/member/:id', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT id FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
@@ -217,7 +224,7 @@ router.post('/schedule/member/:id', requireAdmin, (req, res) => {
   res.redirect(`/admin/schedule/member/${id}/manage?notice=` + encodeURIComponent('Schedule saved.'));
 });
 
-router.get('/schedule/import-template.xlsx', requireAdmin, (req, res) => {
+router.get('/schedule/import-template.xlsx', requireFullAdmin, (req, res) => {
   const buffer = buildTemplateWorkbook(
     ['Full Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'],
     [
@@ -256,7 +263,7 @@ function normalizeScheduleRow(row) {
   return out;
 }
 
-router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) => {
+router.post('/schedule/import', requireFullAdmin, upload.single('file'), (req, res) => {
   const returnTab = SCHEDULE_TABS.includes(req.body.tab) ? req.body.tab : 'students';
 
   if (!req.file) return res.redirect(`/admin/schedule?tab=${returnTab}&error=` + encodeURIComponent('Please choose a file to import.'));
@@ -337,7 +344,7 @@ router.post('/schedule/import', requireAdmin, upload.single('file'), (req, res) 
   res.redirect(`/admin/schedule?tab=${returnTab}&notice=` + encodeURIComponent(parts.join(', ') + '.'));
 });
 
-router.get('/schedule/export.csv', requireAdmin, (req, res) => {
+router.get('/schedule/export.csv', requireFullAdmin, (req, res) => {
   const filters = {
     search: (req.query.search || '').trim(),
     day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
@@ -363,7 +370,7 @@ router.get('/schedule/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, 'class-schedules.csv', lines);
 });
 
-router.get('/schedule/print', requireAdmin, (req, res) => {
+router.get('/schedule/print', requireFullAdmin, (req, res) => {
   const filters = {
     search: (req.query.search || '').trim(),
     day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',

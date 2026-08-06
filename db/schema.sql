@@ -206,6 +206,28 @@ CREATE TABLE IF NOT EXISTS name_tag_templates (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Setup/Cleanup and Custom/Miscellaneous badges: unlike name tags, these
+-- aren't tied to a member - each is one row of an admin-imported list
+-- (Badge Number/Title/Description), designed once per badge_type and
+-- printed either all at once or one at a time. Mirrors name_tag_templates'
+-- shape (see utils/nameTagBadge.js) but kept in its own table rather than
+-- widening name_tag_templates' member_type CHECK, so existing name tag
+-- data/constraints are untouched.
+CREATE TABLE IF NOT EXISTS misc_badge_templates (
+  badge_type TEXT PRIMARY KEY CHECK(badge_type IN ('setupCleanup','custom')),
+  layout_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS misc_badges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  badge_type TEXT NOT NULL CHECK(badge_type IN ('setupCleanup','custom')),
+  badge_number TEXT,
+  title TEXT,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- A member's weekly class schedule: up to 4 classes on Monday and 4 on
 -- Wednesday (the co-op's only two session days). Each row is one class
 -- period; a day with fewer than 4 classes just has fewer rows, not blank
@@ -254,7 +276,12 @@ CREATE TABLE IF NOT EXISTS classes (
   age_group TEXT,
   color TEXT NOT NULL DEFAULT '#EE9A4D',
   notes TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  -- Auto-created/maintained class roster (students only) that mirrors this
+  -- class's enrollment - see ensureClassRoster/syncClassRosterMembers in
+  -- utils/classSchedule.js. SET NULL (not CASCADE) so deleting the roster
+  -- itself never takes the class down with it.
+  roster_id INTEGER REFERENCES rosters(id) ON DELETE SET NULL
 );
 
 -- Students enrolled in a class - drives the headcount shown on the grid.

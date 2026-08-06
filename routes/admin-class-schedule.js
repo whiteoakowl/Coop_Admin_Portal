@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay } = require('../utils/days');
 const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
@@ -55,14 +56,14 @@ router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
   });
 });
 
-router.post('/class-schedule/:day/hours', requireAdmin, requireDay, (req, res) => {
+router.post('/class-schedule/:day/hours', requireFullAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const labels = [].concat(req.body.labels || []);
   saveHourLabels(day, labels);
   res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent('Hour labels updated.'));
 });
 
-router.post('/class-schedule/:day/classes/new', requireAdmin, requireDay, (req, res) => {
+router.post('/class-schedule/:day/classes/new', requireFullAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const className = (req.body.className || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
@@ -80,7 +81,7 @@ router.post('/class-schedule/:day/classes/new', requireAdmin, requireDay, (req, 
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
-router.get('/class-schedule/classes/:id/manage', requireAdmin, (req, res) => {
+router.get('/class-schedule/classes/:id/manage', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -101,7 +102,7 @@ router.get('/class-schedule/classes/:id/manage', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/class-schedule/classes/:id', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -124,7 +125,7 @@ router.post('/class-schedule/classes/:id', requireAdmin, (req, res) => {
   res.redirect(`/admin/class-schedule/classes/${id}/manage?notice=` + encodeURIComponent('Class updated.'));
 });
 
-router.post('/class-schedule/classes/:id/delete', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id/delete', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -132,7 +133,7 @@ router.post('/class-schedule/classes/:id/delete', requireAdmin, (req, res) => {
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`Deleted "${cls.class_name}".`));
 });
 
-router.post('/class-schedule/classes/:id/enrollment/add', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -142,7 +143,7 @@ router.post('/class-schedule/classes/:id/enrollment/add', requireAdmin, (req, re
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
-router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -151,7 +152,7 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireA
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
-router.post('/class-schedule/classes/:id/staff/add', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id/staff/add', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -161,7 +162,7 @@ router.post('/class-schedule/classes/:id/staff/add', requireAdmin, (req, res) =>
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
-router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireAdmin, (req, res) => {
+router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -169,7 +170,7 @@ router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireAdmin, 
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
-router.get('/class-schedule/import-template.xlsx', requireAdmin, (req, res) => {
+router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) => {
   const buffer = buildTemplateWorkbook(
     ['Day', 'Hour', 'Class Name', 'Room', 'Age Group'],
     [
@@ -206,7 +207,7 @@ function normalizeImportRow(row) {
   return out;
 }
 
-router.post('/class-schedule/:day/import', requireAdmin, requireDay, upload.single('file'), (req, res) => {
+router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.single('file'), (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Please choose a file to import.'));
