@@ -8,17 +8,27 @@ function findItemByBarcode(barcode) {
   return db.prepare('SELECT * FROM library_items WHERE barcode = ?').get(barcode);
 }
 
-function allItems() {
+function allItems(typeFilter) {
+  if (typeFilter) {
+    return db.prepare('SELECT * FROM library_items WHERE type = ? ORDER BY title COLLATE NOCASE').all(typeFilter);
+  }
   return db.prepare('SELECT * FROM library_items ORDER BY title COLLATE NOCASE').all();
 }
 
-function createItem(title, barcode) {
-  const info = db.prepare('INSERT INTO library_items (title, barcode) VALUES (?, ?)').run(title, barcode);
+function distinctTypes() {
+  return db
+    .prepare("SELECT DISTINCT type FROM library_items WHERE type IS NOT NULL AND type != '' ORDER BY type COLLATE NOCASE")
+    .all()
+    .map((r) => r.type);
+}
+
+function createItem(title, barcode, type) {
+  const info = db.prepare('INSERT INTO library_items (title, barcode, type) VALUES (?, ?, ?)').run(title, barcode, type || null);
   return info.lastInsertRowid;
 }
 
-function updateItem(id, title, barcode) {
-  db.prepare('UPDATE library_items SET title = ?, barcode = ? WHERE id = ?').run(title, barcode, id);
+function updateItem(id, title, barcode, type) {
+  db.prepare('UPDATE library_items SET title = ?, barcode = ?, type = ? WHERE id = ?').run(title, barcode, type || null, id);
 }
 
 function deleteItem(id) {
@@ -74,6 +84,7 @@ module.exports = {
   findMemberByBarcode,
   findItemByBarcode,
   allItems,
+  distinctTypes,
   createItem,
   updateItem,
   deleteItem,

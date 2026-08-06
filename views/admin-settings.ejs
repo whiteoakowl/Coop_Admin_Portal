@@ -19,7 +19,6 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/settings?tab=classes">Class Settings</a>
         <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
-        <a class="view-tab<%= activeTab === 'leadership' ? ' active' : '' %>" href="/admin/settings?tab=leadership">Leadership</a>
       <% } %>
     </div>
     <div class="view-tab-panel">
@@ -105,45 +104,6 @@
                 <% }); %>
               </tbody>
             </table>
-          <% } %>
-        </div>
-      <% } else if (activeTab === 'leadership') { %>
-        <div class="manage-section">
-          <h2>Add Leadership Role</h2>
-          <p class="hint">Shows up on the <a href="/contact-admins">Contact Admins</a> page's leadership directory and the Send Message team dropdown.</p>
-          <form method="POST" action="/admin/settings/leadership/new" class="inline-form-row">
-            <label>Role
-              <input type="text" name="role" placeholder="e.g. Field Trip Coordinator" required />
-            </label>
-            <button type="submit" class="primary-btn">Add Role</button>
-          </form>
-        </div>
-        <div class="manage-section">
-          <h2>Leadership Contacts</h2>
-          <% if (leadershipContacts.length === 0) { %>
-            <p class="hint">No leadership roles yet.</p>
-          <% } else { %>
-            <table class="roster-table">
-              <thead><tr><th>Role</th><th>Name</th><th>Email</th><th></th></tr></thead>
-              <tbody>
-                <% leadershipContacts.forEach(function(c) { %>
-                  <tr>
-                    <td><input type="text" name="role" form="leadership-form-<%= c.id %>" value="<%= c.role %>" required /></td>
-                    <td><input type="text" name="name" form="leadership-form-<%= c.id %>" value="<%= c.name || '' %>" placeholder="Name" /></td>
-                    <td><input type="email" name="email" form="leadership-form-<%= c.id %>" value="<%= c.email || '' %>" placeholder="Email" /></td>
-                    <td class="actions-cell">
-                      <button type="submit" form="leadership-form-<%= c.id %>" class="icon-btn" aria-label="Save <%= c.role %>" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
-                      <form method="POST" action="/admin/settings/leadership/<%= c.id %>/delete" onsubmit="return confirm('Remove this leadership role?');">
-                        <button type="submit" class="icon-btn" aria-label="Delete <%= c.role %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      </form>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-            <% leadershipContacts.forEach(function(c) { %>
-              <form id="leadership-form-<%= c.id %>" method="POST" action="/admin/settings/leadership/<%= c.id %>"></form>
-            <% }); %>
           <% } %>
         </div>
       <% } else { %>

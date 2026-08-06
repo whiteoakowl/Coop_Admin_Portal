@@ -3,11 +3,11 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel } = require('../utils/dates');
-const { parseNamesFromUpload, findMemberByName, hasInfantChild } = require('../utils/members');
+const { isValidISODate, formatDateLabel, todayISO, weekdayOf } = require('../utils/dates');
+const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
-const { staffListForDay } = require('../utils/classSchedule');
+const { staffListForDay, HOUR_POSITIONS } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -19,6 +19,17 @@ const {
   setMemberRank,
   buildListGrid,
 } = require('../utils/volunteers');
+const {
+  permanentJobsForDay,
+  floaterIdsForJob,
+  substituteBoard,
+} = require('../utils/substitutes');
+
+const SUB_DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+function defaultSubDateFor(day) {
+  const today = todayISO();
+  return weekdayOf(today) === SUB_DAY_WEEKDAY[day] ? today : '';
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -76,6 +87,12 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const infantByMemberId = {};
   members.forEach((m) => { infantByMemberId[m.id] = hasInfantChild(m.id); });
 
+  // Substitutes board - folded into this same Floater Assignments tab
+  // (no longer a separate tab) since it's just another view over the same
+  // day's floater pool.
+  const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultSubDateFor(day);
+  const jobs = permanentJobsForDay(day).map((j) => ({ ...j, floaterIds: floaterIdsForJob(j.id) }));
+
   res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
     tab: 'floater',
@@ -92,6 +109,11 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     grid: buildListGrid(list.id, null),
     openDialog: dialogParam(req),
+    selectedDate,
+    board: substituteBoard(day, selectedDate),
+    jobs,
+    allParents: activeParentOptions(),
+    hourPositions: HOUR_POSITIONS,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

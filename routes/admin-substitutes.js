@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const requireAdmin = require('../middleware/requireAdmin');
-const { requireDay, DAY_LABELS } = require('../utils/days');
-const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
+const { requireDay } = require('../utils/days');
+const { isValidISODate } = require('../utils/dates');
 const { HOUR_POSITIONS } = require('../utils/classSchedule');
-const { activeParentOptions } = require('../utils/members');
 const {
-  permanentJobsForDay,
   getPermanentJob,
-  floaterIdsForJob,
   createPermanentJob,
   updatePermanentJob,
   deletePermanentJob,
@@ -16,35 +13,16 @@ const {
   setAssignment,
   approveAssignment,
   clearAssignment,
-  substituteBoard,
   pendingApprovalsForToday,
 } = require('../utils/substitutes');
 
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
-
-function defaultDateFor(day) {
-  const today = todayISO();
-  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
-}
-
+// Substitutes is no longer its own tab - it's folded into the Floater
+// Assignments manage page (routes/admin-volunteers.js). Keep this as a
+// redirect so any old bookmarks/links still land somewhere useful.
 router.get('/volunteers/:day/substitutes', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
-  const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(day);
-  const jobs = permanentJobsForDay(day).map((j) => ({ ...j, floaterIds: floaterIdsForJob(j.id) }));
-
-  res.render('admin-volunteers', {
-    title: 'Volunteers',
-    tab: 'substitutes',
-    day,
-    dayLabel: DAY_LABELS[day],
-    selectedDate,
-    board: substituteBoard(day, selectedDate),
-    jobs,
-    allParents: activeParentOptions(),
-    hourPositions: HOUR_POSITIONS,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
+  const qs = req.query.date ? `?date=${encodeURIComponent(req.query.date)}` : '';
+  res.redirect(`/admin/volunteers/${day}/manage${qs}`);
 });
 
 function subUrl(day, params) {
@@ -53,7 +31,7 @@ function subUrl(day, params) {
     if (value !== null && value !== undefined && value !== '') query.set(key, value);
   }
   const qs = query.toString();
-  return `/admin/volunteers/${day}/substitutes` + (qs ? `?${qs}` : '');
+  return `/admin/volunteers/${day}/manage` + (qs ? `?${qs}` : '');
 }
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, (req, res) => {

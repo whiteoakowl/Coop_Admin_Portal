@@ -427,6 +427,7 @@ CREATE TABLE IF NOT EXISTS library_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   barcode TEXT NOT NULL UNIQUE,
+  type TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

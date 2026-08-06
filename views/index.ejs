@@ -5,34 +5,29 @@
 </head>
 <body class="landing">
   <%- include('partials/icon-sprite') %>
+  <div class="landing-corner-actions">
+    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
+  </div>
   <main class="landing-wrap">
     <div class="landing-banner">
       <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
       <div class="landing-welcome">Welcome to Co-op!</div>
     </div>
 
-    <div class="home-login-card">
-      <h2 class="home-login-title">Sanford Homeschoolers</h2>
-      <p class="home-login-subtitle">Member Sign In</p>
-
-      <% if (error) { %>
-        <div class="alert alert-error"><%= error %></div>
-      <% } %>
-
-      <form method="POST" action="/login" class="stack-form">
-        <label for="username" class="sr-only">Email Address</label>
-        <input id="username" name="username" type="text" placeholder="Email Address" autocomplete="username" required autofocus />
-
-        <label for="password" class="sr-only">Password</label>
-        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required />
-
-        <button type="submit" class="primary-btn">Sign In</button>
-      </form>
-
-      <p class="home-login-hint">Don't have a login yet? Ask a co-op admin to set one up for you.</p>
+    <div class="landing-grid landing-grid-two">
+      <a class="landing-card landing-card-orange" href="/kiosk">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+        <span class="landing-label">Kiosk</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/admin/login">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-sliders"/></svg></span>
+        <span class="landing-label">Admin Login</span>
+      </a>
     </div>
-
-    <a class="home-staff-login" href="/admin/login">Staff Login</a>
   </main>
+  <script src="/js/fullscreen-toggle.js"></script>
 </body>
 </html>

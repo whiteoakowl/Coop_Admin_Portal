@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'messages' ? 'Contact Admins Messages' : tab === 'membership' ? 'Membership Requests' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -22,8 +22,6 @@
       <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/logs?tab=absence">Absence/Late Log</a>
       <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
-      <a class="view-tab<%= tab === 'messages' ? ' active' : '' %>" href="/admin/logs?tab=messages">Contact Admins Messages</a>
-      <a class="view-tab<%= tab === 'membership' ? ' active' : '' %>" href="/admin/logs?tab=membership">Membership Requests</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
@@ -151,127 +149,6 @@
             </tbody>
           </table>
         </div>
-      <% } else if (tab === 'messages') { %>
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=messages<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
-              <option value="">All dates</option>
-              <% dates.forEach(function(d) { %>
-                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
-              <% }); %>
-            </select>
-          </div>
-          <div class="roster-btn-row">
-            <a
-              class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
-              href="/admin/logs?tab=messages<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
-            >Archived</a>
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/messages/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
-          </div>
-        </div>
-
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr><th>Submitted</th><th>Leadership Team</th><th>From</th><th>Title</th><th>Message</th><th></th></tr>
-            </thead>
-            <tbody>
-              <% if (messages.length === 0) { %>
-                <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> messages yet.</td></tr>
-              <% } %>
-              <% messages.forEach(function(m) { %>
-                <tr>
-                  <td><%= m.timestamp %></td>
-                  <td><%= m.leadershipTeam %></td>
-                  <td><a href="mailto:<%= m.senderEmail %>"><%= m.senderEmail %></a></td>
-                  <td><%= m.title %></td>
-                  <td><%= m.message %></td>
-                  <td class="no-print">
-                    <form method="POST" action="/admin/logs/messages/<%= m.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
-                      <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
-                    </form>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } else { %>
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=membership<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
-              <option value="">All dates</option>
-              <% dates.forEach(function(d) { %>
-                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
-              <% }); %>
-            </select>
-          </div>
-          <div class="roster-btn-row">
-            <a
-              class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
-              href="/admin/logs?tab=membership<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
-            >Archived</a>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
-          </div>
-        </div>
-
-        <% if (requests.length === 0) { %>
-          <p class="roster-empty">No <%= showArchived ? 'archived' : '' %> membership requests yet.</p>
-        <% } %>
-        <% requests.forEach(function(r) { %>
-          <div class="manage-section membership-request-card">
-            <div class="membership-child-header">
-              <h2><%= r.parent1_first_name %> <%= r.parent1_last_name %> Family</h2>
-              <form method="POST" action="/admin/logs/membership/<%= r.id %>/<%= showArchived ? 'unarchive' : 'archive' %>" class="no-print">
-                <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
-              </form>
-            </div>
-            <p class="hint">Submitted <%= r.timestamp %></p>
-
-            <div class="member-form-grid">
-              <div>
-                <strong>Parent/Guardian #1</strong><br />
-                <%= r.parent1_first_name %> <%= r.parent1_last_name %><br />
-                <a href="mailto:<%= r.parent1_email %>"><%= r.parent1_email %></a><br />
-                <%= r.parent1_phone || '—' %>
-              </div>
-              <% if (r.parent2_first_name) { %>
-                <div>
-                  <strong>Parent/Guardian #2</strong><br />
-                  <%= r.parent2_first_name %> <%= r.parent2_last_name %><br />
-                  <% if (r.parent2_email) { %><a href="mailto:<%= r.parent2_email %>"><%= r.parent2_email %></a><br /><% } %>
-                  <%= r.parent2_phone || '—' %>
-                </div>
-              <% } %>
-              <div class="member-form-full">
-                <strong>Address</strong><br />
-                <%= r.address || '—' %><% if (r.city || r.state || r.zipcode) { %>, <%= [r.city, r.state, r.zipcode].filter(Boolean).join(' ') %><% } %>
-              </div>
-              <% if (r.volunteer_interests) { %>
-                <div class="member-form-full">
-                  <strong>Volunteer Interests</strong><br />
-                  <%= r.volunteer_interests %>
-                </div>
-              <% } %>
-            </div>
-
-            <h3>Children</h3>
-            <div class="admin-card-grid">
-              <% r.children.forEach(function(c) { %>
-                <div class="admin-card portal-family-card">
-                  <% if (c.photo_path) { %><img class="member-photo-preview" src="<%= c.photo_path %>" alt="<%= c.first_name %>" /><% } %>
-                  <strong><%= c.first_name %> <%= c.last_name %></strong>
-                  <% if (c.grade_level) { %><span class="hint"><%= c.grade_level %></span><% } %>
-                  <% if (c.birthdate) { %><span class="hint">Born <%= c.birthdate %></span><% } %>
-                  <% if (c.medical_notes) { %><span class="hint">Medical/Allergy: <%= c.medical_notes %></span><% } %>
-                </div>
-              <% }); %>
-            </div>
-          </div>
-        <% }); %>
       <% } %>
     </div>
   </main>

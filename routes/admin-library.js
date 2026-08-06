@@ -10,6 +10,7 @@ const {
   findMemberByBarcode,
   findItemByBarcode,
   allItems,
+  distinctTypes,
   createItem,
   updateItem,
   deleteItem,
@@ -23,10 +24,13 @@ const TABS = ['checkout', 'members', 'titles'];
 
 router.get('/library', requireAdmin, (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'checkout';
+  const typeFilter = (req.query.type || '').trim();
   res.render('admin-library', {
     title: 'Library',
     tab,
-    items: allItems(),
+    items: allItems(typeFilter),
+    types: distinctTypes(),
+    typeFilter,
     membersWithCheckouts: membersWithActiveCheckouts(),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -78,13 +82,14 @@ router.post('/library/checkouts/:id/return', requireAdmin, (req, res) => {
 router.post('/library/items/new', requireAdmin, (req, res) => {
   const title = (req.body.title || '').trim();
   const barcode = (req.body.barcode || '').trim();
+  const type = (req.body.type || '').trim();
   if (!title || !barcode) {
     return res.redirect('/admin/library?tab=titles&error=' + encodeURIComponent('Title and barcode are required.'));
   }
   if (findItemByBarcode(barcode)) {
     return res.redirect('/admin/library?tab=titles&error=' + encodeURIComponent('That barcode is already in use.'));
   }
-  createItem(title, barcode);
+  createItem(title, barcode, type);
   res.redirect('/admin/library?tab=titles&notice=' + encodeURIComponent(`"${title}" added.`));
 });
 
@@ -92,7 +97,8 @@ router.post('/library/items/:id/edit', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const title = (req.body.title || '').trim();
   const barcode = (req.body.barcode || '').trim();
-  if (title && barcode) updateItem(id, title, barcode);
+  const type = (req.body.type || '').trim();
+  if (title && barcode) updateItem(id, title, barcode, type);
   res.redirect('/admin/library?tab=titles');
 });
 

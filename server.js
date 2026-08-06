@@ -7,6 +7,15 @@ const session = require('express-session');
 
 const db = require('./db'); // initialize database + seed default admin
 
+// The Monday/Wednesday Parent/Student rosters are normally created lazily
+// the first time a class enrolls/staffs someone that day - ensure all 4
+// always exist up front so they're visible on Attendance immediately, even
+// before any classes are set up.
+const { ensureDayRoster } = require('./utils/classSchedule');
+['monday', 'wednesday'].forEach((day) => {
+  ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
+});
+
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
 const portalRouter = require('./routes/portal');

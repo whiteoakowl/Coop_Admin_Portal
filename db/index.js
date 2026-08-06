@@ -170,6 +170,11 @@ if (!classColumns.includes('roster_id')) {
   db.exec('ALTER TABLE classes ADD COLUMN roster_id INTEGER REFERENCES rosters(id) ON DELETE SET NULL');
 }
 
+const libraryItemColumns = db.prepare('PRAGMA table_info(library_items)').all().map((c) => c.name);
+if (!libraryItemColumns.includes('type')) {
+  db.exec('ALTER TABLE library_items ADD COLUMN type TEXT');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

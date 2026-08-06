@@ -77,32 +77,58 @@
           <% } %>
         </div>
       <% } else { %>
-        <div class="manage-section">
-          <h2>Add Library Title</h2>
-          <form method="POST" action="/admin/library/items/new" class="stack-form stack-form-narrow">
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="type-select">Filter by type</label>
+            <select id="type-select" onchange="window.location = '/admin/library?tab=titles' + (this.value ? '&type=' + encodeURIComponent(this.value) : '')">
+              <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
+              <% types.forEach(function(t) { %>
+                <option value="<%= t %>" <%= typeFilter === t ? 'selected' : '' %>><%= t %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-item-dialog').showModal()">+ Add Item</button>
+          </div>
+        </div>
+
+        <dialog id="add-item-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/library/items/new">
+            <h3>Add Library Item</h3>
+            <label for="itemBarcode">Barcode</label>
+            <input id="itemBarcode" name="barcode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" autofocus required />
+
             <label for="itemTitle">Title</label>
             <input id="itemTitle" name="title" type="text" required />
 
-            <label for="itemBarcode">Barcode</label>
-            <input id="itemBarcode" name="barcode" type="text" required />
+            <label for="itemType">Type</label>
+            <input id="itemType" name="type" type="text" placeholder="e.g. Book, Curriculum Kit" />
 
-            <button type="submit" class="primary-btn">Add Item</button>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add Item</button>
+            </div>
           </form>
-        </div>
+        </dialog>
+
         <div class="manage-section">
           <h2>All Titles</h2>
           <% if (items.length === 0) { %>
             <p class="roster-empty">No library items yet.</p>
           <% } else { %>
             <table class="roster-table">
-              <thead><tr><th>Title</th><th>Barcode</th><th></th></tr></thead>
+              <thead><tr><th>Title</th><th>Barcode</th><th>Type</th><th></th></tr></thead>
               <tbody>
                 <% items.forEach(function(item) { %>
                   <tr>
                     <td><%= item.title %></td>
                     <td><%= item.barcode %></td>
                     <td>
-                      <form method="POST" action="/admin/library/items/<%= item.id %>/delete" onsubmit="return confirm('Delete &quot;<%= item.title %>&quot;? This also removes its checkout history.');">
+                      <input type="text" name="type" form="type-form-<%= item.id %>" value="<%= item.type || '' %>" placeholder="Type" />
+                    </td>
+                    <td class="actions-cell">
+                      <button type="submit" form="type-form-<%= item.id %>" class="icon-btn" aria-label="Save type for <%= item.title %>" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      <form method="POST" action="/admin/library/items/<%= item.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete &quot;<%= item.title %>&quot;? This also removes its checkout history.');">
                         <button type="submit" class="icon-btn" aria-label="Delete <%= item.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                       </form>
                     </td>
@@ -110,6 +136,12 @@
                 <% }); %>
               </tbody>
             </table>
+            <% items.forEach(function(item) { %>
+              <form id="type-form-<%= item.id %>" method="POST" action="/admin/library/items/<%= item.id %>/edit">
+                <input type="hidden" name="title" value="<%= item.title %>" />
+                <input type="hidden" name="barcode" value="<%= item.barcode %>" />
+              </form>
+            <% }); %>
           <% } %>
         </div>
       <% } %>

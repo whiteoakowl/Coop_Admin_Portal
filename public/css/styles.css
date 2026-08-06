@@ -161,6 +161,8 @@ textarea:focus-visible,
   justify-content: center;
 }
 
+.landing-grid-two { grid-template-columns: repeat(2, 220px); }
+
 .landing-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -189,7 +191,7 @@ textarea:focus-visible,
   color: var(--brand-dark);
   font-size: 1.5rem;
 }
-.landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); }
+.landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); text-align: center; }
 
 /* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
 .landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
@@ -563,8 +565,8 @@ textarea:focus-visible,
   box-shadow: 2px 0 10px rgba(0,0,0,0.12);
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  padding: 1.5rem 1.25rem;
+  gap: 1rem;
+  padding: 1.1rem 1rem;
   overflow-y: auto;
   z-index: 40;
 }
@@ -573,7 +575,7 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 0 1rem;
+  padding: 0.15rem 0 0.4rem;
 }
 .admin-mobile-topbar .brand {
   display: flex;
@@ -582,18 +584,18 @@ textarea:focus-visible,
   color: var(--ink);
   font-weight: 700;
 }
-.admin-sidebar .brand img { height: 160px; width: 160px; border-radius: 50%; flex-shrink: 0; }
+.admin-sidebar .brand img { height: 84px; width: 84px; border-radius: 50%; flex-shrink: 0; }
 .admin-mobile-topbar .brand img { height: 28px; width: 28px; border-radius: 50%; flex-shrink: 0; }
 
-.admin-sidebar nav { display: flex; flex-direction: column; gap: 0.3rem; }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: 0.15rem; }
 .admin-sidebar nav a {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.6rem;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  padding: 0.65rem 0.75rem;
+  padding: 0.45rem 0.65rem;
   border-radius: 8px;
   transition: background-color 0.15s ease;
 }
