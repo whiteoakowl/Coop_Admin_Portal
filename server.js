@@ -70,6 +70,11 @@ app.use(
 // into /admin/* by requireAdmin but not treated as a full Admin.
 app.use((req, res, next) => {
   res.locals.isFullAdmin = !!(req.session && req.session.adminId);
+  // A logged-in member's current portal and every portal they're granted -
+  // powers the portal switcher when a member holds more than one (e.g. a
+  // Co-op Admin who's also a Parent).
+  res.locals.portalRole = (req.session && req.session.portalRole) || null;
+  res.locals.portalRoles = (req.session && req.session.portalRoles) || [];
   next();
 });
 

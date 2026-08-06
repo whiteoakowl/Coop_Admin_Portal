@@ -1,0 +1,11 @@
+<% if (typeof portalRoles !== 'undefined' && portalRoles.length > 1) { %>
+  <form method="POST" action="/portal/switch-role" class="portal-switcher">
+    <select name="role" onchange="this.form.submit()" aria-label="Switch portal">
+      <% portalRoles.forEach(function(r) { %>
+        <option value="<%= r %>" <%= portalRole === r ? 'selected' : '' %>>
+          <%= r === 'coop_admin' ? 'Co-op Admin' : r === 'parent' ? 'Parent Portal' : 'Student Portal' %>
+        </option>
+      <% }); %>
+    </select>
+  </form>
+<% } %>

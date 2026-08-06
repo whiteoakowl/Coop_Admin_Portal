@@ -43,6 +43,17 @@ router.post('/portal/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/'));
 });
 
+// Switches which of a member's granted portals is active this session -
+// only ever between roles they actually hold, so this can't be used to
+// grant access they weren't given on their profile.
+router.post('/portal/switch-role', requireMemberPortal, (req, res) => {
+  const role = req.body.role;
+  if (req.session.portalRoles && req.session.portalRoles.includes(role)) {
+    req.session.portalRole = role;
+  }
+  res.redirect(req.session.portalRole === 'coop_admin' ? '/admin' : '/portal');
+});
+
 // A Student only ever sees their own info; a Parent sees their whole
 // family group (themselves plus anyone sharing their family_id).
 function familyMembersFor(member, portalRole) {

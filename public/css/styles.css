@@ -776,6 +776,21 @@ textarea:focus-visible,
 .portal-family-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
 .portal-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
 
+/* Portal switcher - a member granted more than one portal (e.g. Co-op
+   Admin + Parent) can jump between them without logging out. */
+.portal-switcher select {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.admin-sidebar .portal-switcher { margin: 0.75rem 1.25rem 0; }
+.admin-sidebar .portal-switcher select { width: 100%; }
+.admin-nav-right-mobile .portal-switcher select { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+
 .roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
 .roster-card-top { display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem; }
 .roster-card-title-link { color: var(--ink); font-weight: 700; text-decoration: none; }
