@@ -28,15 +28,12 @@ router.post('/login', (req, res) => {
     .get(identifier, identifier);
 
   if (!member || !bcrypt.compareSync(password, member.password_hash)) {
-    return res.render('index', { title: 'SH Check-In / Check-Out', error: 'Invalid username or password.' });
+    return res.redirect('/');
   }
 
   const grantedRoles = PORTAL_ROLE_PRIORITY.filter((role) => member[`portal_${role}`]);
   if (grantedRoles.length === 0) {
-    return res.render('index', {
-      title: 'SH Check-In / Check-Out',
-      error: "This account doesn't have portal access yet. Ask a co-op admin to grant it.",
-    });
+    return res.redirect('/');
   }
 
   req.session.portalMemberId = member.id;

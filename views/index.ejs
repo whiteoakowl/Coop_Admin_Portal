@@ -10,6 +10,7 @@
       <svg class="icon"><use href="#icon-maximize"/></svg>
       <span id="fullscreen-toggle-label">Full Screen View</span>
     </button>
+    <a class="admin-corner-link" href="/admin">Admin</a>
   </div>
   <main class="landing-wrap">
     <div class="landing-banner">
@@ -17,14 +18,30 @@
       <div class="landing-welcome">Welcome to Co-op!</div>
     </div>
 
-    <div class="landing-grid landing-grid-two">
-      <a class="landing-card landing-card-orange" href="/kiosk">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
-        <span class="landing-label">Kiosk</span>
+    <div class="landing-grid">
+      <a class="landing-card landing-card-green" href="/volunteers/<%= defaultDay %>">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+        <span class="landing-label">Floater Assignments</span>
       </a>
-      <a class="landing-card landing-card-purple" href="/admin/login">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-sliders"/></svg></span>
-        <span class="landing-label">Admin Login</span>
+      <a class="landing-card landing-card-orange" href="/kiosk/checkin">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+        <span class="landing-label">Check In</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/absence">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+        <span class="landing-label">Absence/Late Form</span>
+      </a>
+      <a class="landing-card landing-card-green" href="/setup/<%= defaultDay %>">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+        <span class="landing-label">Setup/Cleanup Teams</span>
+      </a>
+      <a class="landing-card landing-card-orange" href="/kiosk/checkout">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
+        <span class="landing-label">Check Out</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/name-tag">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
+        <span class="landing-label">Name Tag Form</span>
       </a>
     </div>
   </main>

@@ -16,6 +16,8 @@ const { ensureDayRoster } = require('./utils/classSchedule');
   ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
 });
 
+const { defaultDay } = require('./utils/days');
+
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
 const portalRouter = require('./routes/portal');
@@ -112,7 +114,7 @@ app.use((req, res, next) => {
 
 app.get('/', (req, res) => {
   if (req.session && req.session.portalMemberId) return res.redirect('/portal');
-  res.render('index', { title: 'SH Check-In / Check-Out', error: null });
+  res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
 });
 
 app.use('/', portalRouter);
