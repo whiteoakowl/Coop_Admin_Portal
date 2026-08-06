@@ -175,6 +175,11 @@ if (!libraryItemColumns.includes('type')) {
   db.exec('ALTER TABLE library_items ADD COLUMN type TEXT');
 }
 
+const libraryCheckoutColumns = db.prepare('PRAGMA table_info(library_checkouts)').all().map((c) => c.name);
+if (!libraryCheckoutColumns.includes('due_date')) {
+  db.exec('ALTER TABLE library_checkouts ADD COLUMN due_date TEXT');
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

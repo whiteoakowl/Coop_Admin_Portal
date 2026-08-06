@@ -19,6 +19,8 @@
   const checkoutForm = document.getElementById('library-checkout-form');
   const checkoutMemberId = document.getElementById('library-checkout-member-id');
   const checkoutItemInputs = document.getElementById('library-checkout-item-inputs');
+  const checkoutDueDate = document.getElementById('library-checkout-due-date');
+  const dueDateInput = document.getElementById('library-due-date-input');
 
   let currentMember = null;
   let pendingItems = [];
@@ -62,6 +64,7 @@
     itemInput.value = '';
     itemHint.textContent = 'Scan a member first, then scan each item being checked out.';
     memberInput.value = '';
+    dueDateInput.value = '';
     renderPending();
     memberInput.focus();
   }
@@ -131,6 +134,7 @@
   saveBtn.addEventListener('click', () => {
     if (!currentMember || pendingItems.length === 0) return;
     checkoutMemberId.value = currentMember.id;
+    checkoutDueDate.value = dueDateInput.value;
     checkoutItemInputs.innerHTML = '';
     pendingItems.forEach((item) => {
       const input = document.createElement('input');

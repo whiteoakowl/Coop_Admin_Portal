@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
+const { isValidISODate } = require('../utils/dates');
 
 router.use(requireFullAdmin);
 
@@ -86,12 +87,13 @@ router.post('/library/checkout', requireAdmin, (req, res) => {
   const memberId = parseInt(req.body.memberId, 10);
   const itemIds = [].concat(req.body.itemIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const member = memberId ? db.prepare('SELECT * FROM members WHERE id = ?').get(memberId) : null;
+  const dueDate = isValidISODate(req.body.dueDate) ? req.body.dueDate : null;
 
   if (!member || itemIds.length === 0) {
     return res.redirect('/admin/library?error=' + encodeURIComponent('Scan a member and at least one item first.'));
   }
 
-  checkoutItems(memberId, itemIds);
+  checkoutItems(memberId, itemIds, dueDate);
   res.redirect(
     '/admin/library?notice=' + encodeURIComponent(`Checked out ${itemIds.length} item(s) to ${member.name}.`)
   );

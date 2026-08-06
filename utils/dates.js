@@ -70,6 +70,20 @@ function formatTimestamp(sqlTimestamp) {
   return d.toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Formats a SQLite `datetime('now')` string (UTC, "YYYY-MM-DD HH:MM:SS") as
+// "December 1, 2025 9:52am" - used for the library's scan timestamps.
+function formatFriendlyTimestamp(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  let hours = d.getHours();
+  const minutes = pad(d.getMinutes());
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${hours}:${minutes}${ampm}`;
+}
+
 // Whole-years-old as of today, or null if the birthday isn't a valid date.
 function ageFromBirthday(iso) {
   if (!isValidISODate(iso)) return null;
@@ -91,5 +105,6 @@ module.exports = {
   formatTime,
   formatTimeOfDay,
   formatTimestamp,
+  formatFriendlyTimestamp,
   ageFromBirthday,
 };

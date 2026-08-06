@@ -40,6 +40,8 @@
             <tbody id="library-pending-tbody"></tbody>
           </table>
           <p class="roster-empty" id="library-pending-empty">No items scanned yet.</p>
+          <label for="library-due-date-input" class="roster-checkbox-label">Due Date (optional)</label>
+          <input type="date" id="library-due-date-input" />
           <div class="edit-section-actions">
             <button type="button" id="library-clear-btn" class="btn-secondary">Clear</button>
             <button type="button" id="library-save-btn" class="primary-btn" disabled>Save All</button>
@@ -48,6 +50,7 @@
 
         <form id="library-checkout-form" method="POST" action="/admin/library/checkout" hidden>
           <input type="hidden" name="memberId" id="library-checkout-member-id" />
+          <input type="hidden" name="dueDate" id="library-checkout-due-date" />
           <div id="library-checkout-item-inputs"></div>
         </form>
       <% } else if (tab === 'checkin') { %>
@@ -74,14 +77,15 @@
             <p class="roster-empty">Nobody has any library items checked out right now.</p>
           <% } else { %>
             <table class="roster-table">
-              <thead><tr><th>Member</th><th>Item</th><th>Checked Out</th><th></th></tr></thead>
+              <thead><tr><th>Member</th><th>Item</th><th>Checked Out</th><th>Due Date</th><th></th></tr></thead>
               <tbody>
                 <% membersWithCheckouts.forEach(function(m) { %>
                   <% m.items.forEach(function(item, i) { %>
-                    <tr>
+                    <tr class="<%= item.overdue ? 'library-overdue-row' : '' %>">
                       <% if (i === 0) { %><td rowspan="<%= m.items.length %>" class="roster-name-col"><%= m.memberName %></td><% } %>
                       <td><%= item.title %></td>
                       <td><%= item.checkedOutAt %></td>
+                      <td><%= item.dueDateLabel || '—' %><% if (item.overdue) { %> <span class="badge-pill badge-pill-absent">Overdue</span><% } %></td>
                       <td>
                         <form method="POST" action="/admin/library/checkouts/<%= item.checkoutId %>/return">
                           <button type="submit" class="btn-secondary">Return</button>
@@ -155,7 +159,7 @@
             <p class="roster-empty">No library items yet.</p>
           <% } else { %>
             <table class="roster-table">
-              <thead><tr><th>Title</th><th>Barcode</th><th>Type</th><th></th></tr></thead>
+              <thead><tr><th>Title</th><th>Barcode</th><th>Type</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 <% items.forEach(function(item) { %>
                   <tr>
@@ -167,6 +171,7 @@
                         <% types.forEach(function(t) { %><option value="<%= t %>" <%= item.type === t ? 'selected' : '' %>><%= t %></option><% }); %>
                       </select>
                     </td>
+                    <td><span class="badge-pill <%= item.checkedOut ? 'badge-pill-absent' : 'badge-pill-present' %>"><%= item.checkedOut ? 'Checked Out' : 'Checked In' %></span></td>
                     <td class="actions-cell">
                       <button type="submit" form="type-form-<%= item.id %>" class="icon-btn" aria-label="Save type for <%= item.title %>" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
                       <form method="POST" action="/admin/library/items/<%= item.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete &quot;<%= item.title %>&quot;? This also removes its checkout history.');">

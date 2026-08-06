@@ -447,7 +447,8 @@ CREATE TABLE IF NOT EXISTS library_checkouts (
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   item_id INTEGER NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
   checked_out_at TEXT NOT NULL DEFAULT (datetime('now')),
-  checked_in_at TEXT
+  checked_in_at TEXT,
+  due_date TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_library_checkouts_member ON library_checkouts(member_id);

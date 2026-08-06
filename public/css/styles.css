@@ -929,6 +929,7 @@ textarea:focus-visible,
 .badge-pill-x:hover { opacity: 1; color: var(--red); }
 
 .badge-pill-pending { background: var(--yellow-bg); color: var(--yellow); }
+.badge-pill-present { background: var(--green-bg); color: var(--green); }
 
 /* Floater lists: a parent with a child 2 or younger, and each name's
    auto-sub ranking (set via .volunteer-rank-select in Edit Members). */
@@ -1060,9 +1061,13 @@ textarea:focus-visible,
   transition: background-color 0.15s ease;
 }
 .view-tab:hover { background: rgba(255,255,255,0.75); }
-.view-tab.active { background: var(--surface); border-bottom: 1px solid var(--surface); }
+.view-tab.active { background: #eef2f6; border-bottom: 1px solid #eef2f6; }
 .view-tab-panel {
-  background: var(--surface);
+  /* Deliberately a shade off-white - and distinct from #f8fafc, which
+     .admin-card also uses - so nested .manage-section/.grid-box/
+     .admin-card boxes actually read as cards sitting on top of this
+     panel instead of blending into one flat area. */
+  background: #eef2f6;
   border: 1px solid var(--border);
   border-radius: 0 var(--radius) var(--radius) var(--radius);
   padding: var(--card-padding-compact);
@@ -1225,6 +1230,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-weight: 700;
   font-size: 0.85rem;
 }
+
+/* Library "Currently Checked Out" row whose due date has passed. */
+.library-overdue-row { background: var(--red-bg); }
 
 .cell-present { background: var(--green-bg); color: var(--green); }
 .cell-late { background: var(--yellow-bg); color: var(--yellow); }
@@ -1476,7 +1484,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   padding: var(--card-padding);
   margin-bottom: 1.25rem;
 }
@@ -2040,7 +2048,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   margin: 1rem 0;
 }
 .grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
