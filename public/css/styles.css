@@ -1898,7 +1898,7 @@ textarea:focus-visible,
 .name-tag-crop-actions .btn-secondary,
 .name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; }
 
-.name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+.name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
 .name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }
 .name-tag-bulk-list .member-picker-row { justify-content: space-between; }
 .name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }

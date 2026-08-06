@@ -40,6 +40,7 @@
   const sections = {
     scheduleCards: document.getElementById('print-schedule-cards-section'),
     nameTags: document.getElementById('print-name-tags-section'),
+    barcodes: document.getElementById('print-barcodes-section'),
     setupCleanupBadges: document.getElementById('print-setupCleanupBadges-section'),
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
@@ -77,11 +78,14 @@
     }
   }
 
-  // Name Tags list: type filter + select-all/select-none (mirrors the bulk
-  // print list wiring in name-tag-editor.js).
-  const bulkList = document.getElementById('name-tag-bulk-list');
-  if (bulkList) {
-    const filterSelect = document.getElementById('name-tag-bulk-filter-select');
+  // Member-type-filterable checkbox lists (Name Tags, Barcodes Only): type
+  // filter + select-all/select-none, mirrors the bulk print list wiring in
+  // name-tag-editor.js. Shared across both panels since they're the same
+  // member-picker-list markup with different id prefixes.
+  function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId) {
+    const bulkList = document.getElementById(listId);
+    if (!bulkList) return;
+    const filterSelect = document.getElementById(filterSelectId);
     if (filterSelect) {
       filterSelect.addEventListener('change', () => {
         const filter = filterSelect.value;
@@ -90,7 +94,7 @@
         });
       });
     }
-    const selectAllCheckbox = document.getElementById('name-tag-select-all-checkbox');
+    const selectAllCheckbox = document.getElementById(selectAllId);
     if (selectAllCheckbox) {
       selectAllCheckbox.addEventListener('change', () => {
         bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
@@ -98,7 +102,7 @@
         });
       });
     }
-    const selectNoneCheckbox = document.getElementById('name-tag-select-none-checkbox');
+    const selectNoneCheckbox = document.getElementById(selectNoneId);
     if (selectNoneCheckbox) {
       selectNoneCheckbox.addEventListener('change', () => {
         if (selectNoneCheckbox.checked) {
@@ -111,6 +115,9 @@
       });
     }
   }
+
+  wireBulkMemberList('name-tag-bulk-list', 'name-tag-bulk-filter-select', 'name-tag-select-all-checkbox', 'name-tag-select-none-checkbox');
+  wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
 
   // Setup/Cleanup + Custom badge lists (partials/misc-badge-print-panel):
   // one Select All checkbox per form, wired the same way as the schedule

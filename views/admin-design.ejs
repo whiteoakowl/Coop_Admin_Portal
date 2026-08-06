@@ -151,6 +151,7 @@
           <select class="name-tag-type-select" id="print-type-select">
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
+            <option value="barcodes">Barcodes Only</option>
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
             <option value="schedules">Schedules</option>
@@ -221,7 +222,42 @@
             </div>
             <div class="name-tag-bulk-submit-row">
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
-              <button type="submit" formaction="/admin/name-tag/print-barcodes" class="btn-secondary name-tag-bulk-submit">Print Barcodes Only</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="print-barcodes-section" hidden>
+          <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form">
+            <div class="name-tag-bulk-filter">
+              <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
+                <option value="all">All</option>
+                <option value="student">Students Only</option>
+                <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
+              </select>
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="barcodes-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="barcodes-select-none-checkbox" />
+                Select None
+              </label>
+            </div>
+            <div class="member-picker-list name-tag-bulk-list" id="barcodes-bulk-list">
+              <% if (members.length === 0) { %>
+                <p class="hint">No members yet.</p>
+              <% } %>
+              <% members.forEach(function(m) { %>
+                <label class="member-picker-row" data-type="<%= m.member_type %>">
+                  <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                  <span><%= m.name %></span>
+                  <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
+                </label>
+              <% }); %>
+            </div>
+            <div class="name-tag-bulk-submit-row">
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Barcodes</button>
             </div>
           </form>
         </div>
