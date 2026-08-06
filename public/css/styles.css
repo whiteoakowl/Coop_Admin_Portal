@@ -768,6 +768,14 @@ textarea:focus-visible,
 .admin-card-sub { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
 .admin-card-muted { color: var(--muted); display: flex; align-items: center; justify-content: center; text-align: center; }
 
+/* ---------- Member portal (Parent/Student) ---------- */
+
+.portal-main { max-width: 1000px; margin: 0 auto; padding: 1.75rem 2rem 2rem; }
+.portal-header { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
+.portal-header h1 { margin-bottom: 0; }
+.portal-family-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+.portal-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+
 .roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
 .roster-card-top { display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem; }
 .roster-card-title-link { color: var(--ink); font-weight: 700; text-decoration: none; }
