@@ -2,11 +2,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { formatDateLabel, formatTime, formatTimestamp } = require('../utils/dates');
+const { formatDateLabel, formatTime, formatTimestamp, todayISO, weekdayOf } = require('../utils/dates');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
+const { classesAtRiskForDay } = require('../utils/classSchedule');
 
-const LOG_TABS = ['absence', 'checkinout', 'nametag'];
+const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk'];
+
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+function todayIfSessionDay(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
+}
 
 // Every Absence/Late form submission across all rosters, newest first.
 function allAbsenceSubmissions(dateFilter) {
@@ -132,6 +140,21 @@ router.get('/logs', requireAdmin, (req, res) => {
       dates,
       dateFilter,
       showArchived,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  if (tab === 'classrisk') {
+    const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
+    const alertDate = todayIfSessionDay(day);
+    return res.render('admin-logs', {
+      title: 'Class Cancellation Risk',
+      tab,
+      day,
+      dayLabel: DAY_LABELS[day],
+      alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
+      classesAtRisk: classesAtRiskForDay(day, alertDate),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });

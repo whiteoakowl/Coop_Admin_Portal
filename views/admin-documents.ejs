@@ -14,9 +14,12 @@
     <% if (documents.length === 0) { %>
       <p class="hint">No documents uploaded yet. Add one from <a href="/admin/settings?tab=documents">Settings &rarr; Documents</a>.</p>
     <% } else { %>
+      <%
+        var docColors = ['landing-card-orange', 'landing-card-purple', 'landing-card-green'];
+      %>
       <div class="landing-grid documents-grid">
-        <% documents.forEach(function(d) { %>
-          <a class="landing-card landing-card-purple" href="/admin/documents/<%= d.id %>/view">
+        <% documents.forEach(function(d, i) { %>
+          <a class="landing-card <%= docColors[i % docColors.length] %>" href="/admin/documents/<%= d.id %>/view">
             <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
             <span class="landing-label"><%= d.title %></span>
           </a>

@@ -63,7 +63,7 @@
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         const q = searchInput.value.trim().toLowerCase();
-        scheduleList.querySelectorAll('.member-picker-row').forEach((row) => {
+        scheduleList.querySelectorAll('.print-picker-row').forEach((row) => {
           row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none';
         });
       });
@@ -71,7 +71,7 @@
     const scheduleSelectAll = document.getElementById('schedule-print-select-all-checkbox');
     if (scheduleSelectAll) {
       scheduleSelectAll.addEventListener('change', () => {
-        scheduleList.querySelectorAll('.member-picker-row').forEach((row) => {
+        scheduleList.querySelectorAll('.print-picker-row').forEach((row) => {
           if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = scheduleSelectAll.checked;
         });
       });
@@ -89,7 +89,7 @@
     if (filterSelect) {
       filterSelect.addEventListener('change', () => {
         const filter = filterSelect.value;
-        bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
+        bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
           row.style.display = filter === 'all' || row.dataset.type === filter ? '' : 'none';
         });
       });
@@ -97,7 +97,7 @@
     const selectAllCheckbox = document.getElementById(selectAllId);
     if (selectAllCheckbox) {
       selectAllCheckbox.addEventListener('change', () => {
-        bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
+        bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
           if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = selectAllCheckbox.checked;
         });
       });
@@ -106,7 +106,7 @@
     if (selectNoneCheckbox) {
       selectNoneCheckbox.addEventListener('change', () => {
         if (selectNoneCheckbox.checked) {
-          bulkList.querySelectorAll('.member-picker-row').forEach((row) => {
+          bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
             if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = false;
           });
           if (selectAllCheckbox) selectAllCheckbox.checked = false;

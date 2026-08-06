@@ -1416,8 +1416,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--btn-purple);
-  border: 1px solid var(--btn-purple);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
   border-radius: 8px;
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
@@ -1427,7 +1427,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
-.roster-action-btn:hover { border-color: var(--btn-purple-hover); background: var(--btn-purple-hover); }
+.roster-action-btn:hover { border-color: var(--btn-bg-hover); background: var(--btn-bg-hover); }
 .roster-action-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
 .roster-action-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
 
@@ -1951,8 +1951,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
-.name-tag-bulk-list { max-width: 360px; max-height: 260px; overflow-y: auto; }
-.name-tag-bulk-list .member-picker-row { justify-content: space-between; }
 .name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .name-tag-bulk-submit { margin-top: 1rem; }
 
@@ -2422,11 +2420,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .btn-disabled { pointer-events: none; opacity: 0.45; }
 
 .schedule-print-select-all { margin: 0; }
-.schedule-print-list {
-  max-width: 420px;
-  max-height: min(480px, 60vh);
+/* Live print preview at the bottom of the Print tab - every print form
+   targets this shared iframe instead of a new tab, so the result renders
+   right on the page as a normal sheet of paper. */
+.print-preview-wrap { margin-top: 1.75rem; }
+.print-preview-paper {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  max-width: 850px;
+  margin: 0 auto;
+  overflow: hidden;
 }
-.schedule-print-list .member-picker-row { justify-content: space-between; }
+.print-preview-paper iframe {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  min-height: 500px;
+  border: 0;
+  background: #fff;
+}
+
+/* Print tab member picker (Schedule Cards/Name Tags/Barcodes selection) -
+   the member log's own table styling with a checkbox column, capped to a
+   scrollable box instead of pushing the rest of the page down. */
+.print-picker-scroll { max-height: min(420px, 55vh); overflow-y: auto; }
 
 .schedule-placeholder { padding: 3rem 1rem; }
 

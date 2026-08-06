@@ -219,6 +219,29 @@ function activeParentsForStaff() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
 }
 
+// Every class on this day missing a teacher and/or an assistant - drives
+// the Floater Assignments page's "needs a teacher or assistant" log.
+function classesNeedingStaffForDay(day) {
+  const hours = gridForDay(day);
+  const result = [];
+  hours.forEach((h) => {
+    h.classes.forEach((cls) => {
+      const hasTeacher = cls.staff.some((s) => s.role === 'teacher');
+      const hasAssistant = cls.staff.some((s) => s.role === 'assistant');
+      if (!hasTeacher || !hasAssistant) {
+        result.push({
+          hourLabel: h.label,
+          className: cls.class_name,
+          room: cls.room,
+          missingTeacher: !hasTeacher,
+          missingAssistant: !hasAssistant,
+        });
+      }
+    });
+  });
+  return result;
+}
+
 // Every distinct teacher or assistant staffing a class on this day, each
 // with the full list of classes they're staffing that day - drives the
 // Volunteers page's Teachers/Class Assistants tabs.
@@ -236,6 +259,33 @@ function staffListForDay(day, role) {
     });
   });
   return Object.values(byMember).sort((a, b) => a.member.name.localeCompare(b.member.name, undefined, { sensitivity: 'base' }));
+}
+
+// Every class on this day whose expected attendee count (enrolled minus
+// anyone confirmed absent for `date`) is 3 or fewer - flags classes that
+// may need to be canceled for low turnout. Counts both students who've
+// already checked in and those who haven't checked in yet, only
+// excluding students confirmed absent for that date.
+function classesAtRiskForDay(day, date) {
+  const hours = gridForDay(day);
+  const absentIds = date ? absentMemberIdsForDate(date) : new Set();
+  const result = [];
+  hours.forEach((h) => {
+    h.classes.forEach((cls) => {
+      if (cls.students.length === 0) return;
+      const expectedCount = cls.students.filter((s) => !absentIds.has(s.id)).length;
+      if (expectedCount <= 3) {
+        result.push({
+          hourLabel: h.label,
+          className: cls.class_name,
+          room: cls.room,
+          enrolledCount: cls.students.length,
+          expectedCount,
+        });
+      }
+    });
+  });
+  return result;
 }
 
 // Every member marked absent (any roster) on a given date - the Class
@@ -402,6 +452,8 @@ module.exports = {
   activeStudents,
   activeParentsForStaff,
   staffListForDay,
+  classesNeedingStaffForDay,
+  classesAtRiskForDay,
   absentMemberIdsForDate,
   absenceFormMemberIdsForDate,
   appSetting,

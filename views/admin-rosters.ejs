@@ -192,6 +192,58 @@
         </table>
       </div>
     </div>
+
+    <div class="manage-section no-print">
+      <h2><%= dayLabel %> Alerts<% if (!alertDateLabel) { %> <span class="hint">(no session today)</span><% } else { %> <span class="hint">&mdash; <%= alertDateLabel %></span><% } %></h2>
+
+      <h3 class="class-schedule-hour-label">Absence Forms</h3>
+      <% if (absenceAlerts.absences.length === 0) { %>
+        <p class="roster-empty">No absence forms submitted<%= alertDateLabel ? ' for today' : '' %>.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% absenceAlerts.absences.forEach(function(a) { %>
+            <li><strong><%= a.memberName %></strong> &mdash; <%= a.reasonLabel %><% if (a.description && a.description !== '—') { %>: <%= a.description %><% } %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Late Forms</h3>
+      <% if (absenceAlerts.lates.length === 0) { %>
+        <p class="roster-empty">No late forms submitted<%= alertDateLabel ? ' for today' : '' %>.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% absenceAlerts.lates.forEach(function(a) { %>
+            <li><strong><%= a.memberName %></strong> &mdash; <%= a.reasonLabel %><% if (a.description && a.description !== '—') { %>: <%= a.description %><% } %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Classes That May Need to Be Canceled</h3>
+      <% if (classesAtRisk.length === 0) { %>
+        <p class="roster-empty">No classes are at risk of low attendance.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% classesAtRisk.forEach(function(c) { %>
+            <li><strong><%= c.className %></strong> (<%= c.hourLabel %>) &mdash; <%= c.expectedCount %> of <%= c.enrolledCount %> expected</li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Classes Needing a Teacher or Assistant</h3>
+      <% if (classesNeedingStaff.length === 0) { %>
+        <p class="roster-empty">Every class has a teacher and an assistant assigned.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% classesNeedingStaff.forEach(function(c) { %>
+            <li>
+              <strong><%= c.className %></strong> (<%= c.hourLabel %>) &mdash;
+              <% if (c.missingTeacher) { %><span class="badge-pill badge-pill-absent">Teacher</span><% } %>
+              <% if (c.missingAssistant) { %><span class="badge-pill badge-pill-pending">Assistant</span><% } %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
   </main>
   <script src="/js/date-list.js"></script>
   <script src="/js/attendance-grid.js"></script>

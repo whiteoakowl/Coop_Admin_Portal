@@ -7,7 +7,7 @@ const { isValidISODate, formatDateLabel, todayISO, weekdayOf } = require('../uti
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
-const { staffListForDay, HOUR_POSITIONS } = require('../utils/classSchedule');
+const { staffListForDay, classesNeedingStaffForDay, HOUR_POSITIONS } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -98,6 +98,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     jobs,
     allParents: activeParentOptions(),
     hourPositions: HOUR_POSITIONS,
+    classesNeedingStaff: classesNeedingStaffForDay(day),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

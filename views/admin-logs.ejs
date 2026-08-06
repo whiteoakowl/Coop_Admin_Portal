@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -22,6 +22,7 @@
       <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/logs?tab=absence">Absence/Late Log</a>
       <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
+      <a class="view-tab<%= tab === 'classrisk' ? ' active' : '' %>" href="/admin/logs?tab=classrisk">Class Cancellation Risk</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
@@ -144,6 +145,39 @@
                       <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
                     </form>
                   </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (tab === 'classrisk') { %>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="day-select">Day</label>
+            <select id="day-select" onchange="window.location = '/admin/logs?tab=classrisk&day=' + this.value">
+              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+        <p class="hint"><%= dayLabel %> classes whose expected attendance (enrolled minus confirmed absences<%= alertDateLabel ? ' for ' + alertDateLabel : '' %>) has dropped to 3 or fewer students.</p>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead><tr><th>Hour</th><th>Class</th><th>Room</th><th>Expected</th><th>Enrolled</th></tr></thead>
+            <tbody>
+              <% if (classesAtRisk.length === 0) { %>
+                <tr><td colspan="5" class="roster-empty">No classes are at risk of low attendance on <%= dayLabel %>.</td></tr>
+              <% } %>
+              <% classesAtRisk.forEach(function(c) { %>
+                <tr>
+                  <td><%= c.hourLabel %></td>
+                  <td><%= c.className %></td>
+                  <td><%= c.room || '—' %></td>
+                  <td><span class="badge-pill badge-pill-absent"><%= c.expectedCount %></span></td>
+                  <td><%= c.enrolledCount %></td>
                 </tr>
               <% }); %>
             </tbody>

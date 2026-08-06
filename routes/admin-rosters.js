@@ -2,12 +2,47 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, todayISO, weekdayOf } = require('../utils/dates');
 const { familyOf } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { arrivalDepartureLabels } = require('../utils/schedule');
-const { ensureDayRoster } = require('../utils/classSchedule');
-const { defaultDay } = require('../utils/days');
+const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay } = require('../utils/classSchedule');
+const { defaultDay, DAY_LABELS } = require('../utils/days');
+const { REASON_LABELS } = require('../utils/rosters');
+
+// The alert log below the grid only makes sense for today, and only when
+// today is actually a session day for this roster's day-of-week (mirrors
+// the Floater Assignments Substitutes board's same-shaped default).
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+function todayIfSessionDay(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
+}
+
+// Absence/Late form submissions on this roster for one date, split by
+// status - feeds the Attendance page's "Today's Alerts" log.
+function absenceFormSubmissionsForRoster(rosterId, date) {
+  if (!date) return { absences: [], lates: [] };
+  const rows = db
+    .prepare(
+      `SELECT m.name AS memberName, a.status, a.reason_category AS reasonCategory, a.reason_text AS reasonText
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form'
+       ORDER BY m.name COLLATE NOCASE`
+    )
+    .all(rosterId, date)
+    .map((r) => ({
+      memberName: r.memberName,
+      status: r.status,
+      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+      description: r.reasonText || '—',
+    }));
+  return {
+    absences: rows.filter((r) => r.status === 'absent'),
+    lates: rows.filter((r) => r.status === 'late'),
+  };
+}
 
 // Attendance is now exactly these 4 always-existing, schedule-driven
 // rosters - membership fills in automatically from class enrollment/
@@ -121,15 +156,22 @@ router.get('/rosters', requireAdmin, (req, res) => {
   const rosterId = rosterIdForTab(tab);
   const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   const dates = rosterDates(rosterId);
+  const alertDate = todayIfSessionDay(cfg.day);
 
   res.render('admin-rosters', {
     title: 'Attendance',
     tabs: TABS,
     tab,
     tabLabel: cfg.label,
+    dayLabel: DAY_LABELS[cfg.day],
     roster,
     ...buildRosterGridData(roster),
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    alertDate,
+    alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
+    absenceAlerts: absenceFormSubmissionsForRoster(rosterId, alertDate),
+    classesAtRisk: classesAtRiskForDay(cfg.day, alertDate),
+    classesNeedingStaff: classesNeedingStaffForDay(cfg.day),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
