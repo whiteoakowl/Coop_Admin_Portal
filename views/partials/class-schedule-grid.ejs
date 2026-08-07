@@ -49,6 +49,21 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <input type="text" name="className" placeholder="Enter class title" required />
       </div>
       <div class="class-form-field">
+        <span class="class-form-field-label required">Color</span>
+        <div class="class-color-swatches">
+          <% (typeof colorPalette !== 'undefined' ? colorPalette : ['#EE9A4D']).forEach(function(c, i) { %>
+            <label class="class-color-swatch">
+              <input type="radio" name="color" value="<%= c %>" <%= i === 0 ? 'checked' : '' %> />
+              <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
+              <svg class="icon"><use href="#icon-check"/></svg>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-form-row">
+      <div class="class-form-field">
         <span class="class-form-field-label required">Class Day</span>
         <select name="day" required>
           <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
@@ -64,27 +79,12 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
           <% }); %>
         </select>
       </div>
-    </div>
-
-    <div class="class-form-row">
       <div class="class-form-field">
         <span class="class-form-field-label required">Class Room</span>
         <input type="text" name="room" list="room-options-<%= day %>" placeholder="Select or type a room #" autocomplete="off" />
         <datalist id="room-options-<%= day %>">
           <% (typeof rooms !== 'undefined' ? rooms : []).forEach(function(r) { %><option value="<%= r %>"></option><% }); %>
         </datalist>
-      </div>
-      <div class="class-form-field">
-        <span class="class-form-field-label required">Color</span>
-        <div class="class-color-swatches">
-          <% (typeof colorPalette !== 'undefined' ? colorPalette : ['#EE9A4D']).forEach(function(c, i) { %>
-            <label class="class-color-swatch">
-              <input type="radio" name="color" value="<%= c %>" <%= i === 0 ? 'checked' : '' %> />
-              <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
-              <svg class="icon"><use href="#icon-check"/></svg>
-            </label>
-          <% }); %>
-        </div>
       </div>
     </div>
 

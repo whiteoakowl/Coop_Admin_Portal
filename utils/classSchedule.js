@@ -5,13 +5,13 @@ const HOUR_POSITIONS = [1, 2, 3, 4];
 
 // Every grade a class's Age Group can be checked for (create/edit class
 // form) - classes.age_group stores whichever of these are checked as a
-// comma-joined string (e.g. "Infant, Preschool 2's"), same pattern as any
-// other multi-select-into-one-TEXT-column field in this app.
+// comma-joined string (e.g. "Infant, Toddler"), same pattern as any other
+// multi-select-into-one-TEXT-column field in this app.
 const GRADE_LEVELS = [
   'Infant',
-  "Preschool 2's",
-  "Preschool 3's",
-  "PreK 4's",
+  'Toddler',
+  'Preschool',
+  'PreK',
   'Kindergarten',
   '1st',
   '2nd',
