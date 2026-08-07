@@ -18,6 +18,10 @@ const {
   DAY_LABELS: CLASS_DAY_LABELS,
   hoursForDay,
   roomGridForDay,
+  roomsForDay,
+  renameRoom,
+  GRADE_LEVELS,
+  activeParentsForStaff,
   absentMemberIdsForDate,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
@@ -77,6 +81,9 @@ router.get('/schedule', requireAdmin, (req, res) => {
       dayLabel: CLASS_DAY_LABELS[tab],
       hours: hoursForDay(tab),
       roomGrid: roomGridForDay(tab),
+      rooms: roomsForDay(tab),
+      gradeLevels: GRADE_LEVELS,
+      availableStaff: activeParentsForStaff(),
       selectedDate,
       absentIds: absentMemberIdsForDate(selectedDate),
       error: req.query.error || null,

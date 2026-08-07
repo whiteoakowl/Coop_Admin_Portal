@@ -26,7 +26,7 @@
 
     <div class="view-tab-panel">
       <% if (tab === 'monday' || tab === 'wednesday') { %>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, availableStaff, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else { %>
         <%
           function buildQuery(overrides) {

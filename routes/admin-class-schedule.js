@@ -5,16 +5,20 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay } = require('../utils/days');
-const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
+const { isValidISODate, todayISO, weekdayOf, ageFromBirthday } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
   HOUR_POSITIONS,
+  GRADE_LEVELS,
+  ageGroupList,
   defaultDay,
   hoursForDay,
   saveHourLabels,
   gridForDay,
   roomGridForDay,
+  roomsForDay,
+  renameRoom,
   getClass,
   createClass,
   updateClass,
@@ -49,11 +53,29 @@ router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
     dayLabel: DAY_LABELS[day],
     hours: hoursForDay(day),
     roomGrid: roomGridForDay(day),
+    rooms: roomsForDay(day),
+    gradeLevels: GRADE_LEVELS,
+    availableStaff: activeParentsForStaff(),
     selectedDate,
     absentIds: absentMemberIdsForDate(selectedDate),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.post('/class-schedule/:day/rooms', requireFullAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const oldNames = [].concat(req.body.oldNames || []);
+  const newNames = [].concat(req.body.newNames || []);
+  let renamed = 0;
+  oldNames.forEach((oldName, i) => {
+    const newName = (newNames[i] || '').trim();
+    if (newName && newName !== oldName) {
+      renameRoom(day, oldName, newName);
+      renamed++;
+    }
+  });
+  res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent(renamed ? `Renamed ${renamed} room(s).` : 'No changes made.'));
 });
 
 router.post('/class-schedule/:day/hours', requireFullAdmin, requireDay, (req, res) => {
@@ -75,11 +97,20 @@ router.post('/class-schedule/:day/classes/new', requireFullAdmin, requireDay, (r
     hourPosition,
     className,
     room: (req.body.room || '').trim(),
-    ageGroup: (req.body.ageGroup || '').trim(),
+    ageGroup: [].concat(req.body.ageGroup || []).join(', '),
     color: req.body.color || null,
+    notes: (req.body.notes || '').trim(),
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
   });
+
+  const teacherId = parseInt(req.body.teacherId, 10);
+  if (teacherId) addStaff(id, teacherId, 'teacher');
+  [].concat(req.body.assistantIds || [])
+    .map((v) => parseInt(v, 10))
+    .filter(Boolean)
+    .forEach((assistantId) => addStaff(id, assistantId, 'assistant'));
+
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
 
@@ -96,8 +127,10 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, (req, res) =>
     cls,
     dayLabel: DAY_LABELS[cls.day],
     hours: hoursForDay(cls.day),
+    gradeLevels: GRADE_LEVELS,
+    selectedGrades: ageGroupList(cls.age_group),
     availableStudents: activeStudents().filter((s) => !enrolledIds.includes(s.id)),
-    enrolledStudents: cls.students,
+    enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
     availableStaff: activeParentsForStaff().filter((p) => !staffIds.includes(p.id)),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -120,7 +153,7 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, (req, res) => {
     hourPosition,
     className,
     room: (req.body.room || '').trim(),
-    ageGroup: (req.body.ageGroup || '').trim(),
+    ageGroup: [].concat(req.body.ageGroup || []).join(', '),
     color: req.body.color || cls.color,
     notes: (req.body.notes || '').trim(),
     startTime: (req.body.startTime || '').trim(),

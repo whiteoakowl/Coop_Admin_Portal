@@ -27,33 +27,81 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <% if (!gridReadOnly) { %>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog-<%= day %>').showModal()">Edit Hours</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-rooms-dialog-<%= day %>').showModal()">Edit Room Numbers</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
     <% } %>
-    <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/<%= day %>/export.csv">Export</a>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
 </div>
 
 <% if (!gridReadOnly) { %>
-<dialog id="add-class-dialog-<%= day %>" class="member-picker-dialog">
+<dialog id="add-class-dialog-<%= day %>" class="member-picker-dialog class-form-dialog">
   <form method="POST" action="/admin/class-schedule/<%= day %>/classes/new">
-    <h3>Add Class</h3>
-    <label>Hour
-      <select name="hourPosition" required>
-        <% hours.forEach(function(h) { %>
-          <option value="<%= h.position %>"><%= h.label %></option>
-        <% }); %>
-      </select>
+    <div class="class-form-dialog-header">
+      <svg class="icon"><use href="#icon-book"/></svg>
+      <h3>Create New Class</h3>
+    </div>
+    <div class="member-form-grid">
+      <label>Class Name
+        <input type="text" name="className" placeholder="Enter class title" required />
+      </label>
+      <label>Class Hour
+        <select name="hourPosition" required>
+          <option value="" disabled selected>Select class hour</option>
+          <% hours.forEach(function(h) { %>
+            <option value="<%= h.position %>"><%= h.label %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label>Room
+        <input type="text" name="room" list="room-options-<%= day %>" placeholder="Room #" autocomplete="off" />
+        <datalist id="room-options-<%= day %>">
+          <% (typeof rooms !== 'undefined' ? rooms : []).forEach(function(r) { %><option value="<%= r %>"></option><% }); %>
+        </datalist>
+      </label>
+      <label class="class-color-label">Color
+        <input type="color" name="color" value="#EE9A4D" />
+      </label>
+      <label>Start Time
+        <input type="text" name="startTime" placeholder="9:00 AM" />
+      </label>
+      <label>End Time
+        <input type="text" name="endTime" placeholder="10:00 AM" />
+      </label>
+    </div>
+
+    <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
+    <div class="grade-pill-grid">
+      <% gradeLevels.forEach(function(g) { %>
+        <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
+      <% }); %>
+    </div>
+
+    <div class="member-form-grid">
+      <label>Teacher
+        <select name="teacherId">
+          <option value="">Select teacher&hellip;</option>
+          <% availableStaff.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.name %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label>Assistant(s)
+        <select name="assistantIds" multiple size="3">
+          <% availableStaff.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.name %></option>
+          <% }); %>
+        </select>
+      </label>
+    </div>
+
+    <label>Class Description
+      <textarea name="notes" rows="3" placeholder="Enter class description and activities&hellip;"></textarea>
     </label>
-    <input type="text" name="className" placeholder="Class Name" required />
-    <input type="text" name="room" placeholder="Room #" />
-    <input type="text" name="ageGroup" placeholder="Age Group (e.g. Ages 5-7)" />
-    <label class="class-color-label">Color
-      <input type="color" name="color" value="#EE9A4D" />
-    </label>
+
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-      <button type="submit" class="primary-btn">Add Class</button>
+      <button type="submit" class="primary-btn">Create Class</button>
     </div>
   </form>
 </dialog>
@@ -70,6 +118,29 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
       <button type="submit" class="primary-btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="edit-rooms-dialog-<%= day %>" class="volunteer-edit-dialog">
+  <h3>Edit Room Numbers</h3>
+  <p class="hint">Renames a room across every <%= dayLabel %> class currently using it.</p>
+  <form method="POST" action="/admin/class-schedule/<%= day %>/rooms">
+    <% if (!rooms || rooms.length === 0) { %>
+      <p class="hint">No rooms in use yet - set a room while adding or editing a class.</p>
+    <% } else { %>
+      <div class="volunteer-sections-row">
+        <% rooms.forEach(function(r) { %>
+          <input type="hidden" name="oldNames" value="<%= r %>" />
+          <input type="text" name="newNames" value="<%= r %>" />
+        <% }); %>
+      </div>
+    <% } %>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      <% if (rooms && rooms.length > 0) { %>
+        <button type="submit" class="primary-btn">Save</button>
+      <% } %>
     </div>
   </form>
 </dialog>

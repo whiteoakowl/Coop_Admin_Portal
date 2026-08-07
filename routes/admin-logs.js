@@ -7,8 +7,9 @@ const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { classesAtRiskForDay } = require('../utils/classSchedule');
+const { substituteBoard } = require('../utils/substitutes');
 
-const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk'];
+const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes'];
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
@@ -155,6 +156,21 @@ router.get('/logs', requireAdmin, (req, res) => {
       dayLabel: DAY_LABELS[day],
       alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
       classesAtRisk: classesAtRiskForDay(day, alertDate),
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  if (tab === 'substitutes') {
+    const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
+    const dateFilter = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIfSessionDay(day) || '';
+    return res.render('admin-logs', {
+      title: 'Substitutes Needed',
+      tab,
+      day,
+      dayLabel: DAY_LABELS[day],
+      dateFilter,
+      board: substituteBoard(day, dateFilter || null),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });

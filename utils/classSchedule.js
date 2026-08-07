@@ -3,6 +3,37 @@ const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
+// Every grade a class's Age Group can be checked for (create/edit class
+// form) - classes.age_group stores whichever of these are checked as a
+// comma-joined string (e.g. "Infant, Preschool 2's"), same pattern as any
+// other multi-select-into-one-TEXT-column field in this app.
+const GRADE_LEVELS = [
+  'Infant',
+  "Preschool 2's",
+  "Preschool 3's",
+  "PreK 4's",
+  'Kindergarten',
+  '1st',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  '6th',
+  '7th',
+  '8th',
+  '9th',
+  '10th',
+  '11th',
+  '12th',
+];
+
+function ageGroupList(ageGroup) {
+  return (ageGroup || '')
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
+}
+
 // Cycled through in order as new classes are created, so a freshly built
 // schedule is colorful without an admin having to pick a color every time.
 const COLOR_PALETTE = ['#EE9A4D', '#5B9BD5', '#70AD47', '#9B6BC7', '#E06666', '#4EB8B0', '#D6A429', '#C77BA6'];
@@ -125,6 +156,24 @@ function roomGridForDay(day) {
   });
 
   return { hours, rows };
+}
+
+// Every distinct room name in use on a day - rooms aren't their own
+// managed entity (just whatever string is typed into each class's room
+// field), so "Edit Room Numbers" works off whatever's actually in use,
+// same idea as Edit Hours but derived instead of a fixed table.
+function roomsForDay(day) {
+  return db
+    .prepare("SELECT DISTINCT room FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY room COLLATE NOCASE")
+    .all(day)
+    .map((r) => r.room);
+}
+
+// Renames a room across every class on a day that currently uses it - the
+// bulk-edit half of "Edit Room Numbers".
+function renameRoom(day, oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return;
+  db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
 }
 
 function createClass(fields) {
@@ -515,10 +564,14 @@ module.exports = {
   defaultDay,
   HOUR_POSITIONS,
   COLOR_PALETTE,
+  GRADE_LEVELS,
+  ageGroupList,
   hoursForDay,
   saveHourLabels,
   gridForDay,
   roomGridForDay,
+  roomsForDay,
+  renameRoom,
   getClass,
   createClass,
   updateClass,
