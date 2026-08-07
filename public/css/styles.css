@@ -1,3 +1,21 @@
+/* ============================================================
+   DESIGN SYSTEM - every page in the app loads this one stylesheet
+   via views/partials/head.ejs, so the tokens below are the single
+   source of truth for the site's look. When adding a new page or
+   component:
+     - Colors: use the named color/button variables below, never a
+       new hex literal that happens to match one.
+     - Logo: use one of the --logo-* sizes with border-radius: 50%,
+       never a one-off pixel value.
+     - Shape/spacing: use --radius/--control-radius for corners,
+       --shadow-sm/--shadow-md/--shadow-lg for elevation, and the
+       --card-padding and --control-padding scales for spacing, so
+       every box and control lines up with the rest of the site.
+     - Buttons: reuse .roster-action-btn (primary toolbar action),
+       .file-action-btn (Import/Export/Print, green), .primary-btn
+       (form submit), .btn-secondary (cancel/secondary) instead of
+       inventing a new button class.
+   ============================================================ */
 :root {
   /* Sanford Homeschoolers brand palette */
   --bg: #4682B4;
@@ -57,6 +75,18 @@
   --control-font-size: 0.95rem;
   --control-padding-compact: 0.55rem 0.8rem;
   --control-font-size-compact: 0.9rem;
+
+  /* Logo sizing scale - every place the round logo appears (admin sidebar,
+     login, kiosk headers, public form headers, mobile top bar) picks one
+     of these named sizes instead of a one-off pixel value, so resizing
+     "the logo" in any context is a single-variable change. Always paired
+     with border-radius: 50% for the circular crop. */
+  --logo-xl: 160px;  /* admin sidebar */
+  --logo-lg: 120px;  /* login page */
+  --logo-md: 96px;   /* kiosk landing header */
+  --logo-sm: 84px;   /* kiosk check-in/check-out header */
+  --logo-xs: 72px;   /* public form header (absence, name tag, membership) */
+  --logo-2xs: 28px;  /* mobile top bar */
 }
 
 * { box-sizing: border-box; }
@@ -143,7 +173,7 @@ textarea:focus-visible,
   flex-wrap: wrap;
 }
 
-.landing-logo-sm { height: 96px; width: 96px; flex-shrink: 0; border-radius: 50%; }
+.landing-logo-sm { height: var(--logo-md); width: var(--logo-md); flex-shrink: 0; border-radius: 50%; }
 
 .landing-welcome {
   color: var(--ink);
@@ -198,13 +228,13 @@ textarea:focus-visible,
 .landing-card-orange .landing-icon { background: rgba(255,255,255,0.6); color: #7a3d0a; }
 .landing-card-orange .landing-label { color: #000; }
 
-.landing-card-green { background: #85BB65; border-color: #85BB65; }
-.landing-card-green:hover { border-color: #6fa350; }
+.landing-card-green { background: var(--btn-green); border-color: var(--btn-green); }
+.landing-card-green:hover { border-color: var(--btn-green-hover); }
 .landing-card-green .landing-icon { background: rgba(255,255,255,0.6); color: #2f4a20; }
 .landing-card-green .landing-label { color: #000; }
 
-.landing-card-purple { background: #C38EC7; border-color: #C38EC7; }
-.landing-card-purple:hover { border-color: #ad72b1; }
+.landing-card-purple { background: var(--btn-purple); border-color: var(--btn-purple); }
+.landing-card-purple:hover { border-color: var(--btn-purple-hover); }
 .landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
 .landing-card-purple .landing-label { color: #000; }
 
@@ -340,7 +370,7 @@ textarea:focus-visible,
 }
 .kiosk-home:hover { border-color: var(--brand); background: var(--brand-soft); }
 
-.kiosk-logo { height: 84px; width: 84px; margin-bottom: 0.5rem; border-radius: 50%; }
+.kiosk-logo { height: var(--logo-sm); width: var(--logo-sm); margin-bottom: 0.5rem; border-radius: 50%; }
 .kiosk h1 { font-size: 2.4rem; }
 .kiosk-date { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
 
@@ -448,11 +478,11 @@ textarea:focus-visible,
 
 .form-wrap { max-width: 560px; margin: 0 auto; }
 .form-wrap-narrow { max-width: 400px; }
-.form-logo { height: 72px; width: 72px; margin-bottom: 0.75rem; border-radius: 50%; }
+.form-logo { height: var(--logo-xs); width: var(--logo-xs); margin-bottom: 0.75rem; border-radius: 50%; }
 
 .login-wrap { text-align: center; }
 .login-wrap .stack-form { text-align: left; }
-.login-logo { height: 120px; width: 120px; display: block; margin: 0 auto 1rem; border-radius: 50%; }
+.login-logo { height: var(--logo-lg); width: var(--logo-lg); display: block; margin: 0 auto 1rem; border-radius: 50%; }
 
 .form-wrap .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
 
@@ -597,8 +627,8 @@ textarea:focus-visible,
   color: var(--ink);
   font-weight: 700;
 }
-.admin-sidebar .brand img { height: 160px; width: 160px; border-radius: 50%; flex-shrink: 0; }
-.admin-mobile-topbar .brand img { height: 28px; width: 28px; border-radius: 50%; flex-shrink: 0; }
+.admin-sidebar .brand img { height: var(--logo-xl); width: var(--logo-xl); border-radius: 50%; flex-shrink: 0; }
+.admin-mobile-topbar .brand img { height: var(--logo-2xs); width: var(--logo-2xs); border-radius: 50%; flex-shrink: 0; }
 
 .admin-sidebar nav { display: flex; flex-direction: column; gap: 0.15rem; }
 .admin-sidebar nav a {
