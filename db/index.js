@@ -179,6 +179,11 @@ if (!classColumns.includes('end_time')) {
   db.exec('ALTER TABLE classes ADD COLUMN end_time TEXT');
 }
 
+const permanentJobColumns = db.prepare('PRAGMA table_info(permanent_jobs)').all().map((c) => c.name);
+if (!permanentJobColumns.includes('room')) {
+  db.exec('ALTER TABLE permanent_jobs ADD COLUMN room TEXT');
+}
+
 const libraryItemColumns = db.prepare('PRAGMA table_info(library_items)').all().map((c) => c.name);
 if (!libraryItemColumns.includes('type')) {
   db.exec('ALTER TABLE library_items ADD COLUMN type TEXT');

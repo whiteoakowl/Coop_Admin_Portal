@@ -1,0 +1,8 @@
+<%
+// locals: day, activeFloaterTab ('monday' | 'wednesday' | 'teams')
+%>
+<div class="view-tabs no-print">
+  <a class="view-tab<%= activeFloaterTab === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/manage">Monday Floaters</a>
+  <a class="view-tab<%= activeFloaterTab === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/manage">Wednesday Floaters</a>
+  <a class="view-tab<%= activeFloaterTab === 'teams' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/teams">Floater Teams</a>
+</div>

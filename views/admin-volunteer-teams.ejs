@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Floater Teams</p>
+      </div>
+    </div>
+
+    <h1>Volunteers</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'teams' }) %>
+
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="category-filter" style="margin: 0;">
+          <select onchange="window.location = this.value">
+            <option value="/admin/volunteers/monday/teams" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
+            <option value="/admin/volunteers/wednesday/teams" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
+          </select>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('add-team-member-dialog').showModal()">+ Add Member</button>
+          <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/teams/export.csv">Export</a>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        </div>
+      </div>
+
+      <% if (teams.every(function(t) { return t.members.length === 0; })) { %>
+        <p class="roster-empty">No floaters on <%= dayLabel %>'s list yet - use + Add Member above.</p>
+      <% } %>
+
+      <div class="team-card-grid">
+        <% teams.forEach(function(team, i) { %>
+          <div class="team-card">
+            <div class="team-card-header">
+              <span class="team-card-icon team-card-icon-<%= i % 5 %>"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <div class="team-card-title-group">
+                <h3 class="team-card-title"><%= team.hourLabel %></h3>
+                <span class="team-card-sub"><%= team.members.length %> floater<%= team.members.length === 1 ? '' : 's' %></span>
+              </div>
+            </div>
+            <div class="team-card-members">
+              <% if (team.members.length === 0) { %>
+                <p class="team-card-empty">No floaters assigned to this hour yet.</p>
+              <% } %>
+              <% team.members.forEach(function(m) { %>
+                <div class="team-member-row">
+                  <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(child &le;2)</span><% } %></span>
+                  <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
+                    <select name="rank" class="team-member-rank-select" onchange="this.form.submit()">
+                      <% ranks.forEach(function(r) { %>
+                        <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
+                      <% }); %>
+                    </select>
+                  </form>
+                  <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" onsubmit="return confirm('Remove <%= m.name %> from <%= team.hourLabel %>?');">
+                    <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <dialog id="add-team-member-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/volunteers/<%= day %>/teams/add-member">
+        <h3>Add Member to a Floater Team</h3>
+        <label>Member
+          <select name="memberId" required>
+            <option value="" disabled selected>Select member&hellip;</option>
+            <% availableParents.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Hour
+          <select name="sectionId" required>
+            <% teams.forEach(function(t) { %>
+              <option value="<%= t.section.id %>"><%= t.hourLabel %></option>
+            <% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

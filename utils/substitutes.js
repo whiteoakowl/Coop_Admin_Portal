@@ -20,13 +20,18 @@ function floaterIdsForJob(jobId) {
 
 function createPermanentJob(fields) {
   const info = db
-    .prepare('INSERT INTO permanent_jobs (day, hour_position, title) VALUES (?, ?, ?)')
-    .run(fields.day, fields.hourPosition, fields.title);
+    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES (?, ?, ?, ?)')
+    .run(fields.day, fields.hourPosition, fields.title, fields.room || null);
   return info.lastInsertRowid;
 }
 
 function updatePermanentJob(id, fields) {
-  db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ? WHERE id = ?').run(fields.hourPosition, fields.title, id);
+  db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ?, room = ? WHERE id = ?').run(
+    fields.hourPosition,
+    fields.title,
+    fields.room || null,
+    id
+  );
 }
 
 function deletePermanentJob(id) {
@@ -183,14 +188,50 @@ function substituteBoard(day, date) {
         slotType: 'job',
         slotId: job.id,
         label: job.title,
+        room: job.room || '',
         detail: 'Permanent Job',
         reason: 'Staffed every session',
         assigned: assignedInfo(existing),
       });
     });
 
-    return { position: hourPosition, label: hourGroup.label, slots };
+    // Ranked, still-available candidates for this hour (best/"Choose
+    // First" ranked members first) - the Substitutes Needed card's assign
+    // dropdown lists these ahead of everyone else so the best-fit floater
+    // is the top suggestion, while still allowing an admin to pick anyone.
+    const suggestedFloaters = rankSort(floaterPool.filter((m) => !usedThisHour.has(m.id)));
+
+    return { position: hourPosition, label: hourGroup.label, slots, suggestedFloaters };
   });
+}
+
+// Multi-date planning grid for the Monday/Wednesday Floater Assignments
+// tab: every permanent job, grouped by hour, with one assigned-member
+// column per session date - the forward-planning counterpart to
+// substituteBoard's single-date "who needs a sub today" view. Both read
+// the same substitute_assignments table (setAssignment/assignmentFor), so
+// assigning someone here is exactly the same action as approving a
+// substitute - there's only one "who's covering this slot" system,
+// whether it's being planned weeks ahead or filled last-minute.
+function jobAssignmentGrid(day, dates) {
+  const jobs = permanentJobsForDay(day);
+  const byHour = {};
+  jobs.forEach((j) => {
+    if (!byHour[j.hour_position]) byHour[j.hour_position] = [];
+    byHour[j.hour_position].push(j);
+  });
+  return HOUR_POSITIONS.map((hourPosition) => ({
+    position: hourPosition,
+    jobs: (byHour[hourPosition] || []).map((job) => ({
+      id: job.id,
+      title: job.title,
+      room: job.room || '',
+      cells: dates.map((date) => ({
+        date,
+        assigned: assignedInfo(assignmentFor(date, 'job', job.id)),
+      })),
+    })),
+  })).filter((h) => h.jobs.length > 0);
 }
 
 // Auto-fills (see substituteBoard) and collects every slot left in
@@ -240,5 +281,6 @@ module.exports = {
   approveAssignment,
   clearAssignment,
   substituteBoard,
+  jobAssignmentGrid,
   pendingApprovalsForToday,
 };

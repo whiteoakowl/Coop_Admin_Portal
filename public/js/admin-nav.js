@@ -32,7 +32,13 @@
   function highlightNav(containerSelector) {
     const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a'));
     const activeLink = bestMatch(links, (a) => matchPrefixes(a, a.getAttribute('href')));
-    if (activeLink) activeLink.classList.add('active');
+    if (activeLink) {
+      activeLink.classList.add('active');
+      // Auto-expand the Volunteers <details> group when one of its two
+      // sub-pages (Floater Assignments / Setup-Cleanup) is the active page.
+      const group = activeLink.closest('details');
+      if (group) group.open = true;
+    }
   }
 
   highlightNav('#admin-nav-links');

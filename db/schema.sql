@@ -400,6 +400,7 @@ CREATE TABLE IF NOT EXISTS permanent_jobs (
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
   hour_position INTEGER NOT NULL CHECK(hour_position BETWEEN 1 AND 4),
   title TEXT NOT NULL,
+  room TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -5,12 +5,12 @@
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
-  <main class="admin-main">
+  <main class="admin-main" data-day="<%= day %>">
     <div class="print-header">
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> <%= tab === 'setup' ? 'Setup/Cleanup Teams' : tab === 'teachers' ? 'Teachers' : tab === 'assistants' ? 'Class Assistants' : 'Floater Assignments' %></p>
+        <p class="print-header-sub"><%= dayLabel %> Floater Assignments</p>
       </div>
     </div>
 
@@ -19,515 +19,228 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="view-tabs no-print">
-      <a class="view-tab<%= tab === 'floater' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/manage">Floater Assignments</a>
-      <a class="view-tab<%= tab === 'setup' ? ' active' : '' %>" href="/admin/setup/<%= day %>/manage">Setup/Cleanup Teams</a>
-      <a class="view-tab<%= tab === 'teachers' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/teachers">Teachers</a>
-      <a class="view-tab<%= tab === 'assistants' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/assistants">Class Assistants</a>
-    </div>
-    <div class="view-tab-panel">
-      <% if (tab === 'floater') { %>
-        <% var anyMembers = grid.sections.some(function(s) { return s.members.length > 0; }); %>
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: day }) %>
 
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <select onchange="window.location = this.value">
-              <option value="/admin/volunteers/monday/manage" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-              <option value="/admin/volunteers/wednesday/manage" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-            </select>
-          </div>
-          <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-hours-dialog').showModal()">Edit Hours</button>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Permanent Job</button>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-members-dialog').showModal()">Edit Members</button>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
-            <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="category-filter" style="margin: 0;">
+          <select onchange="window.location = this.value">
+            <option value="/admin/volunteers/monday/manage" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
+            <option value="/admin/volunteers/wednesday/manage" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
+          </select>
+        </div>
+        <div class="roster-btn-row">
+          <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        </div>
+      </div>
+
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2><%= dayLabel %> Floater Assignments Chart</h2>
+          <div class="roster-btn-row no-print">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Position</button>
           </div>
         </div>
 
-        <dialog id="edit-hours-dialog" class="volunteer-edit-dialog">
-          <h3>Edit Hours</h3>
-          <p class="hint">Rename the 4 hour blocks used to group this list.</p>
-          <form method="POST" action="/admin/volunteers/<%= day %>/sections?dialog=hours" class="volunteer-sections-form">
-            <div class="volunteer-sections-row">
-              <% sections.forEach(function(s) { %>
-                <input type="text" name="labels" value="<%= s.label %>" maxlength="20" />
-              <% }); %>
-            </div>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-              <button type="submit" class="primary-btn">Save</button>
-            </div>
-          </form>
-        </dialog>
-
-        <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
-          <h3>Edit Session Dates</h3>
+        <% if (dates.length === 0) { %>
+          <p class="roster-empty">Add session dates above first.</p>
+        <% } else if (grid.length === 0) { %>
+          <p class="roster-empty">Add a position above first (e.g. Front Desk, Hallway Monitor).</p>
+        <% } else { %>
           <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
-              <tbody>
-                <% if (dates.length === 0) { %>
-                  <tr><td class="roster-empty">No dates yet.</td></tr>
-                <% } %>
-                <% dates.forEach(function(d) { %>
-                  <tr>
-                    <td><%= d.label %></td>
-                    <td class="actions-cell">
-                      <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room entries for this date will be deleted too.');">
-                        <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                      </form>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-          <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates" class="volunteer-date-add-form">
-            <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
-          </form>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-          </div>
-        </dialog>
-
-        <dialog id="edit-members-dialog" class="volunteer-edit-dialog">
-          <h3>Edit Members</h3>
-          <div class="quick-add-row">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
-          </div>
-          <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table volunteer-members-table">
+            <table class="job-grid-table">
               <thead>
-                <tr><th>Name</th><th>Rank</th><th>Hours</th><th>Actions</th></tr>
+                <tr>
+                  <th class="job-grid-position-col">Position</th>
+                  <th class="job-grid-room-col">Room</th>
+                  <% dateLabels.forEach(function(label) { %><th><%= label %></th><% }); %>
+                </tr>
               </thead>
               <tbody>
-                <% if (!anyMembers) { %>
-                  <tr><td colspan="4" class="roster-empty">No members yet.</td></tr>
-                <% } %>
-                <% members.forEach(function(m) { %>
-                  <tr>
-                    <td class="volunteer-member-name">
-                      <%= m.name %><% if (infantByMemberId[m.id]) { %> <span class="infant-tag">(infant)</span><% } %>
-                    </td>
-                    <td>
-                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/rank?dialog=members" class="inline-block-form">
-                        <select name="rank" class="volunteer-rank-select" onchange="this.form.submit()">
-                          <% ranks.forEach(function(r) { %>
-                            <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
-                          <% }); %>
-                        </select>
-                      </form>
-                    </td>
-                    <td>
-                      <form method="POST" action="/admin/volunteers/<%= day %>/members/<%= m.id %>/sections?dialog=members" class="volunteer-hour-checks edit-section" onsubmit="return volunteerValidateHours(this)">
-                        <% sections.forEach(function(s) { %>
-                          <label class="volunteer-hour-check">
-                            <input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= m.sectionIds.includes(s.id) ? 'checked' : '' %> disabled />
-                            <%= s.label %>
-                          </label>
-                        <% }); %>
-                        <button type="button" class="btn-secondary volunteer-hour-edit-btn" data-edit-toggle-edit>Edit</button>
-                        <button type="submit" class="primary-btn volunteer-hour-edit-btn" data-edit-toggle-save hidden>Save</button>
-                      </form>
-                    </td>
-                    <td class="actions-cell">
-                      <form method="POST" action="/admin/volunteers/<%= day %>/remove-member/<%= m.id %>?dialog=members" class="inline-block-form">
-                        <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                      </form>
-                    </td>
-                  </tr>
+                <% grid.forEach(function(hour) { %>
+                  <tr class="job-grid-hour-row"><td colspan="<%= dateLabels.length + 2 %>"><%= hour.label %></td></tr>
+                  <% hour.jobs.forEach(function(job) { %>
+                    <tr>
+                      <td class="job-grid-position-col"><%= job.title %></td>
+                      <td class="job-grid-room-col"><%= job.room || '—' %></td>
+                      <% job.cells.forEach(function(cell) { %>
+                        <td>
+                          <div
+                            class="job-assign-cell"
+                            data-hour="<%= hour.position %>"
+                            data-date="<%= cell.date %>"
+                            data-job-id="<%= job.id %>"
+                            data-member-id="<%= cell.assigned ? cell.assigned.id : '' %>"
+                          >
+                            <span class="job-assign-name<%= cell.assigned ? '' : ' job-assign-name-empty' %>"><%= cell.assigned ? cell.assigned.name + (cell.assigned.infant ? ' (infant)' : '') : 'Unassigned' %></span>
+                            <button type="button" class="btn-secondary job-assign-edit-btn no-print" data-mode="edit">Edit</button>
+                          </div>
+                        </td>
+                      <% }); %>
+                    </tr>
+                  <% }); %>
                 <% }); %>
               </tbody>
             </table>
           </div>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-          </div>
-        </dialog>
-
-        <dialog id="add-member-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/volunteers/<%= day %>/add-member?dialog=members">
-            <h3>Add Members</h3>
-            <% if (availableMembers.length === 0) { %>
-              <p class="hint">Everyone in Members is already on this list. Add new members on the <a href="/admin/members">Members page</a>.</p>
-            <% } else { %>
-              <div class="member-picker-list">
-                <% availableMembers.forEach(function(m) { %>
-                  <label class="member-picker-row">
-                    <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                    <span><%= m.name %></span>
-                  </label>
-                <% }); %>
-              </div>
-            <% } %>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <% if (availableMembers.length > 0) { %>
-                <button type="submit" class="primary-btn">Add Selected</button>
-              <% } %>
-            </div>
-          </form>
-        </dialog>
-
-        <dialog id="import-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
-            <h3>Import</h3>
-            <p class="hint">Only names already in <a href="/admin/members">Members</a> will be added. New people must be added there first.</p>
-            <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
-            <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Import</button>
-            </div>
-          </form>
-        </dialog>
-
-        <% if (openDialog) { %>
-          <script>document.getElementById('edit-<%= openDialog %>-dialog').showModal();</script>
         <% } %>
+      </div>
+    </div>
 
-        <div class="manage-section">
-          <form id="volunteer-grid-form" class="edit-section">
-          <div class="volunteer-chart-header">
-            <h2><%= dayLabel %> Floater Assignments Chart</h2>
-            <span id="volunteer-save-status" class="volunteer-save-status no-print"></span>
-            <% if (dates.length > 0 && anyMembers) { %>
-              <div class="edit-section-actions no-print">
-                <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-                <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-                <button type="button" class="primary-btn" data-edit-toggle-save hidden>Save Changes</button>
-              </div>
+    <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
+      <h3>Edit Session Dates</h3>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <tbody>
+            <% if (dates.length === 0) { %>
+              <tr><td class="roster-empty">No dates yet.</td></tr>
             <% } %>
-          </div>
-          <% if (dates.length === 0) { %>
-            <p class="roster-empty">Add session dates above first.</p>
-          <% } else if (!anyMembers) { %>
-            <p class="roster-empty">Add members above first.</p>
-          <% } else { %>
-            <div class="roster-scroll">
-              <table class="roster-table roster-table-detailed volunteer-grid">
-                <thead>
-                  <tr>
-                    <th class="roster-name-col" rowspan="2">Name</th>
-                    <% grid.dateLabels.forEach(function(label) { %>
-                      <th class="volunteer-chart-divider" colspan="2"><%= label %></th>
-                    <% }); %>
-                  </tr>
-                  <tr>
-                    <% grid.dates.forEach(function() { %>
-                      <th class="volunteer-chart-divider">Position</th><th>Room</th>
-                    <% }); %>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% grid.sections.forEach(function(section) { %>
-                    <% if (section.members.length > 0) { %>
-                      <tr class="volunteer-section-row">
-                        <td colspan="<%= grid.dates.length * 2 + 1 %>"><%= section.label %></td>
-                      </tr>
-                      <% section.members.forEach(function(row) { %>
-                        <tr>
-                          <td class="roster-name-col"><%= row.member.name %><% if (infantByMemberId[row.member.id]) { %> <span class="infant-tag">(infant)</span><% } %></td>
-                          <% row.cells.forEach(function(cell) { %>
-                            <td class="volunteer-chart-divider"><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="position" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.position %>" placeholder="Position" disabled /></td>
-                            <td><input type="text" class="volunteer-cell-input" data-day="<%= day %>" data-field="room" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" value="<%= cell.room %>" placeholder="Room" disabled /></td>
-                          <% }); %>
-                        </tr>
-                      <% }); %>
-                    <% } %>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
-          </form>
+            <% dates.forEach(function(d) { %>
+              <tr>
+                <td><%= d.label %></td>
+                <td class="actions-cell">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.');">
+                    <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates" class="volunteer-date-add-form">
+        <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
+      </form>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="add-job-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/new">
+        <h3>Add Position</h3>
+        <p class="hint">Add one position to as many hours as it runs - each hour gets its own row on the chart.</p>
+        <input type="hidden" name="date" value="<%= selectedDate %>" />
+        <input type="text" name="title" placeholder="Position title (e.g. Front Desk)" required />
+        <input type="text" name="room" placeholder="Room # (optional)" />
+        <span class="class-card-pill-label">Hours:</span>
+        <div class="checkbox-row">
+          <% hours.forEach(function(h) { %>
+            <label class="checkbox-option">
+              <input type="checkbox" name="hourPositions" value="<%= h.position %>" />
+              <%= h.label %>
+            </label>
+          <% }); %>
         </div>
-
-        <h2 class="dashboard-section-title">Substitutes</h2>
-        <div class="roster-toolbar no-print">
-          <div class="filter-row">
-            <div class="category-filter">
-              <label for="sub-date-select">For Date</label>
-              <input
-                type="date"
-                id="sub-date-select"
-                value="<%= selectedDate %>"
-                onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')"
-              />
-            </div>
-          </div>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Position</button>
         </div>
+      </form>
+    </dialog>
 
-        <dialog id="add-job-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/new">
-            <h3>Add Permanent Job</h3>
-            <p class="hint">Add one job to as many hours as it runs - each hour gets its own slot on the board.</p>
-            <input type="hidden" name="date" value="<%= selectedDate %>" />
-            <input type="text" name="title" placeholder="Job title (e.g. Front Desk)" required />
-            <span class="class-card-pill-label">Hours:</span>
-            <div class="checkbox-row">
-              <% hourPositions.forEach(function(p) { %>
-                <label class="checkbox-option">
-                  <input type="checkbox" name="hourPositions" value="<%= p %>" />
-                  Hour <%= p %>
-                </label>
-              <% }); %>
-            </div>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Add Job</button>
-            </div>
-          </form>
-        </dialog>
+    <% if (openDialog) { %>
+      <script>document.getElementById('edit-<%= openDialog %>-dialog').showModal();</script>
+    <% } %>
 
-        <% if (jobs.length > 0) { %>
-          <div class="manage-section">
-            <h2>Permanent Jobs</h2>
-            <div class="setup-team-grid">
-              <% jobs.forEach(function(job) { %>
-                <div class="setup-team-card">
-                  <div class="setup-team-header">
-                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/edit" class="setup-team-edit-form edit-section">
-                      <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <input type="text" name="title" value="<%= job.title %>" class="setup-team-title-input" disabled />
-                      <select name="hourPosition" class="setup-team-desc-input" disabled>
-                        <% hourPositions.forEach(function(p) { %>
-                          <option value="<%= p %>" <%= job.hour_position === p ? 'selected' : '' %>>Hour <%= p %></option>
-                        <% }); %>
-                      </select>
-                      <div class="edit-section-actions no-print">
-                        <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-                        <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-                        <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
-                      </div>
-                    </form>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete &quot;<%= job.title %>&quot;?');">
-                      <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <button type="submit" class="link-btn link-btn-danger">Delete Job</button>
-                    </form>
-                  </div>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/<%= job.id %>/floaters" class="checkbox-row edit-section">
+    <h2 class="dashboard-section-title">Substitutes Needed</h2>
+    <div class="roster-toolbar no-print">
+      <div class="category-filter" style="margin: 0;">
+        <label for="sub-date-select">For Date</label>
+        <input
+          type="date"
+          id="sub-date-select"
+          value="<%= selectedDate %>"
+          onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')"
+        />
+      </div>
+    </div>
+
+    <% if (!selectedDate) { %>
+      <p class="roster-empty">Pick a date above to see who needs a substitute.</p>
+    <% } %>
+    <% var anySlots = board.some(function(h) { return h.slots.length > 0; }); %>
+    <% if (selectedDate && !anySlots) { %>
+      <p class="roster-empty">Nobody needs a substitute for <%= selectedDate %>.</p>
+    <% } %>
+    <% board.forEach(function(hour) { %>
+      <% if (hour.slots.length === 0) return; %>
+      <div class="sub-needed-grid">
+        <% hour.slots.forEach(function(slot) { %>
+          <div class="sub-needed-card">
+            <div class="sub-needed-header">
+              <svg class="icon"><use href="#icon-redo"/></svg>
+              <h3>Substitute Needed</h3>
+              <span class="badge-pill sub-needed-hour-pill"><svg class="icon"><use href="#icon-clock"/></svg> <%= hour.label %></span>
+            </div>
+            <div class="sub-needed-position">
+              <span class="sub-needed-position-icon"><svg class="icon"><use href="#<%= slot.slotType === 'job' ? 'icon-tag' : 'icon-book' %>"/></svg></span>
+              <div>
+                <strong><%= slot.label %><% if (slot.room) { %> &mdash; Room <%= slot.room %><% } else if (slot.detail && slot.slotType === 'class') { %> &mdash; <%= slot.detail %><% } %></strong>
+                <p><%= slot.slotType === 'job' ? 'Permanent Staff Position' : slot.reason %></p>
+              </div>
+            </div>
+
+            <% if (slot.slotType === 'job') { %>
+              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Normally staffed each session</div>
+            <% } %>
+
+            <% if (slot.assigned && slot.assigned.status === 'approved') { %>
+              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></div>
+              <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
+                <input type="hidden" name="date" value="<%= selectedDate %>" />
+                <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                <button type="submit" class="btn-secondary">Unassign</button>
+              </form>
+            <% } else { %>
+              <% if (slot.assigned) { %>
+                <div class="sub-needed-banner sub-needed-banner-pending"><svg class="icon"><use href="#icon-info-circle"/></svg> Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></div>
+                <p class="hint">Auto-picked by the ranked sub system.</p>
+                <div class="class-schedule-signup-form">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/approve" class="inline-block-form">
                     <input type="hidden" name="date" value="<%= selectedDate %>" />
-                    <span class="class-card-pill-label">Preferred Floaters:</span>
-                    <% if (allParents.length === 0) { %><span class="hint">No parent-type members yet.</span><% } %>
-                    <% allParents.forEach(function(p) { %>
-                      <label class="checkbox-option">
-                        <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= job.floaterIds.includes(p.id) ? 'checked' : '' %> disabled />
-                        <%= p.name %>
-                      </label>
-                    <% }); %>
-                    <div class="edit-section-actions no-print">
-                      <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-                      <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-                      <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
-                    </div>
+                    <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                    <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                    <button type="submit" class="primary-btn">Approve</button>
+                  </form>
+                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
+                    <input type="hidden" name="date" value="<%= selectedDate %>" />
+                    <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                    <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                    <button type="submit" class="btn-secondary">Unassign</button>
                   </form>
                 </div>
-              <% }); %>
-            </div>
-          </div>
-        <% } %>
-
-        <div class="manage-section">
-          <h2>Needs a Substitute</h2>
-          <% if (!selectedDate) { %>
-            <p class="roster-empty">Pick a date above to see who needs a substitute.</p>
-          <% } %>
-          <% var anySlots = board.some(function(h) { return h.slots.length > 0; }); %>
-          <% if (selectedDate && !anySlots) { %>
-            <p class="roster-empty">Nobody needs a substitute for <%= selectedDate %>.</p>
-          <% } %>
-          <% board.forEach(function(hour) { %>
-            <% if (hour.slots.length === 0) return; %>
-            <h3 class="class-schedule-hour-label"><%= hour.label %></h3>
-            <div class="class-card-row">
-              <% hour.slots.forEach(function(slot) { %>
-                <div class="class-card">
-                  <div class="class-card-header"><h3><%= slot.label %></h3></div>
-                  <p class="class-card-meta"><span><%= slot.detail %></span></p>
-                  <p class="hint"><%= slot.reason %></p>
-                  <% if (slot.assigned && slot.assigned.status === 'approved') { %>
-                    <p class="class-card-staff">
-                      <span class="badge-pill">Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %><%= slot.assigned.isOverride ? ' (admin choice)' : '' %></span>
-                    </p>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
-                      <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                      <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                      <button type="submit" class="btn-secondary">Unassign</button>
-                    </form>
-                  <% } else { %>
-                    <% if (slot.assigned) { %>
-                      <p class="class-card-staff"><span class="badge-pill badge-pill-pending">Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></span></p>
-                      <p class="hint">Auto-picked by the ranked sub system.</p>
-                      <div class="class-schedule-signup-form">
-                        <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/approve" class="inline-block-form">
-                          <input type="hidden" name="date" value="<%= selectedDate %>" />
-                          <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                          <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                          <button type="submit" class="primary-btn">Approve</button>
-                        </form>
-                        <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
-                          <input type="hidden" name="date" value="<%= selectedDate %>" />
-                          <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                          <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                          <button type="submit" class="btn-secondary">Unassign</button>
-                        </form>
-                      </div>
-                    <% } else { %>
-                      <p class="hint">No floaters available this hour.</p>
-                    <% } %>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/assign" class="class-schedule-signup-form">
-                      <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                      <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                      <input type="hidden" name="isOverride" value="1" />
-                      <select name="memberId" required>
-                        <option value="" disabled selected>Choose someone else...</option>
-                        <% allParents.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }); %>
-                      </select>
-                      <button type="submit" class="btn-secondary">Change</button>
-                    </form>
-                  <% } %>
-                </div>
-              <% }); %>
-            </div>
-          <% }); %>
-        </div>
-      <% } else if (tab === 'setup') { %>
-        <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <select onchange="window.location = this.value">
-              <option value="/admin/setup/monday/manage" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-              <option value="/admin/setup/wednesday/manage" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-            </select>
-          </div>
-          <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
-            <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export</a>
-            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-          </div>
-        </div>
-
-        <dialog id="new-team-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/setup/<%= day %>/teams">
-            <h3>Create New Team</h3>
-            <input type="text" name="title" placeholder="Team title (e.g. Chairs &amp; Tables)" required />
-            <input type="text" name="description" placeholder="Short description (optional)" />
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Create Team</button>
-            </div>
-          </form>
-        </dialog>
-
-        <% if (teams.length === 0) { %>
-          <p class="roster-empty">No teams yet &mdash; create one above.</p>
-        <% } %>
-
-        <div class="setup-team-grid">
-          <% teams.forEach(function(t) { %>
-            <div class="setup-team-card">
-              <div class="setup-team-header">
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" class="setup-team-edit-form edit-section">
-                  <input type="text" name="title" value="<%= t.title %>" class="setup-team-title-input" disabled />
-                  <input type="text" name="description" value="<%= t.description || '' %>" class="setup-team-desc-input" placeholder="Short description" disabled />
-                  <div class="edit-section-actions no-print">
-                    <button type="button" class="btn-secondary" data-edit-toggle-edit>Edit</button>
-                    <button type="button" class="btn-secondary" data-edit-toggle-cancel hidden>Cancel</button>
-                    <button type="submit" class="primary-btn" data-edit-toggle-save hidden>Save</button>
-                  </div>
-                </form>
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
-                  <button type="submit" class="link-btn link-btn-danger">Delete Team</button>
-                </form>
-              </div>
-
-              <div class="checkbox-row">
-                <% if (t.members.length === 0) { %><span class="hint">No members yet.</span><% } %>
-                <% t.members.forEach(function(m) { %>
-                  <span class="badge-pill">
-                    <%= m.name %>
-                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form no-print">
-                      <button type="submit" class="badge-pill-x" aria-label="Remove <%= m.name %>">&times;</button>
-                    </form>
-                  </span>
-                <% }); %>
-              </div>
-              <div class="no-print">
-                <button type="button" class="btn-secondary" onclick="document.getElementById('add-member-dialog-<%= t.id %>').showModal()">+ Add Member</button>
-              </div>
-              <dialog id="add-member-dialog-<%= t.id %>" class="member-picker-dialog">
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/add-member">
-                  <h3>Add Members &mdash; <%= t.title %></h3>
-                  <% if (t.availableMembers.length === 0) { %>
-                    <p class="hint">Everyone in Members is already on this team. Add new members on the <a href="/admin/members">Members page</a>.</p>
-                  <% } else { %>
-                    <div class="member-picker-list">
-                      <% t.availableMembers.forEach(function(m) { %>
-                        <label class="member-picker-row">
-                          <input type="checkbox" name="memberIds" value="<%= m.id %>" />
-                          <span><%= m.name %></span>
-                        </label>
-                      <% }); %>
-                    </div>
-                  <% } %>
-                  <div class="notes-dialog-actions">
-                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                    <% if (t.availableMembers.length > 0) { %>
-                      <button type="submit" class="primary-btn">Add Selected</button>
-                    <% } %>
-                  </div>
-                </form>
-              </dialog>
-            </div>
-          <% }); %>
-        </div>
-      <% } else if (tab === 'teachers' || tab === 'assistants') { %>
-        <div class="filter-row no-print">
-          <div class="category-filter">
-            <label for="day-select">Day</label>
-            <select
-              id="day-select"
-              onchange="window.location = '/admin/volunteers/' + this.value + '/<%= tab %>'"
-            >
-              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr><th>Name</th><th>Phone</th><th>Email</th><th>Schedule</th></tr>
-            </thead>
-            <tbody>
-              <% if (staffList.length === 0) { %>
-                <tr><td colspan="4" class="roster-empty">No <%= tab === 'teachers' ? 'teachers' : 'class assistants' %> assigned on <%= dayLabel %> yet.</td></tr>
+              <% } else { %>
+                <div class="sub-needed-banner sub-needed-banner-warn"><svg class="icon"><use href="#icon-info-circle"/></svg> No unassigned floaters are currently available for <%= hour.label %>.</div>
               <% } %>
-              <% staffList.forEach(function(row) { %>
-                <tr>
-                  <td><%= row.member.name %></td>
-                  <td><%= row.member.phone || '—' %></td>
-                  <td><%= row.member.email || '—' %></td>
-                  <td>
-                    <% row.classes.forEach(function(c) { %>
-                      <span class="badge-pill"><%= c.hourLabel %>: <%= c.className %><%= c.room ? ' (' + c.room + ')' : '' %></span>
-                    <% }); %>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
-    </div>
+
+              <div class="sub-needed-assign-box">
+                <label for="assign-select-<%= slot.slotType %>-<%= slot.slotId %>">Assign Available Substitute</label>
+                <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/assign">
+                  <input type="hidden" name="date" value="<%= selectedDate %>" />
+                  <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                  <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                  <input type="hidden" name="isOverride" value="1" />
+                  <select name="memberId" id="assign-select-<%= slot.slotType %>-<%= slot.slotId %>" required>
+                    <option value="" disabled selected>Choose someone&hellip;</option>
+                    <% (hour.suggestedFloaters || []).forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %><% if (infantByMemberId[p.id]) { %> (infant)<% } %></option><% }); %>
+                    <% if (hour.suggestedFloaters && hour.suggestedFloaters.length > 0) { %><option disabled>&mdash;&mdash;&mdash;</option><% } %>
+                    <% allParents.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }); %>
+                  </select>
+                  <button type="submit" class="primary-btn">Assign Substitute</button>
+                </form>
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    <% }); %>
   </main>
   <script src="/js/date-list.js"></script>
-  <script src="/js/edit-toggle.js"></script>
-  <% if (tab === 'floater') { %><script src="/js/volunteer-assignments.js"></script><% } %>
+  <script type="application/json" id="floaters-by-hour-data"><%- floatersByHourJson %></script>
+  <script src="/js/floater-grid.js"></script>
 </body>
 </html>
