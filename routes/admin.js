@@ -6,6 +6,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
+const { todaysAlerts } = require('../utils/alerts');
 
 // --- Auth ---
 
@@ -92,6 +93,7 @@ router.get('/', requireAdmin, (req, res) => {
     parentCount,
     studentStats: todayStatsForType('student', today),
     parentStats: todayStatsForType('parent', today),
+    alerts: todaysAlerts(),
   });
 });
 

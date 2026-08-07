@@ -1,58 +1,31 @@
-// Attendance grid Edit/Save toggle: unlike the generic edit-toggle.js
-// (single form/inputs), this page also has to reveal an "Edit Session
-// Dates" button and a per-row Remove button, and batches every changed
-// cell into one POST on Save (mirrors public/js/volunteer-assignments.js).
+// Attendance grid: each P/L/A cell is always editable and auto-saves on
+// change (one request per cell, mirrors the Floater Assignments rank
+// select's onchange="this.form.submit()" pattern) - there's no separate
+// Edit/Save/Cancel step for the grid itself. Dates and roster membership
+// are still handled through their own popups (Edit Dates / Add Member).
 (function () {
-  const editBtn = document.getElementById('roster-edit-btn');
-  if (!editBtn) return;
-
-  const cancelBtn = document.getElementById('roster-cancel-btn');
-  const saveBtn = document.getElementById('roster-save-btn');
-  const editDatesBtn = document.getElementById('roster-edit-dates-btn');
   const status = document.getElementById('roster-save-status');
   const selects = document.querySelectorAll('.roster-cell-select');
-  const removeBtns = document.querySelectorAll('.roster-remove-btn');
-  const tab = editBtn.dataset.tab;
+  if (selects.length === 0) return;
 
-  function setEditing(on) {
-    selects.forEach((sel) => { sel.disabled = !on; });
-    removeBtns.forEach((btn) => { btn.hidden = !on; });
-    if (editDatesBtn) editDatesBtn.hidden = !on;
-    editBtn.hidden = on;
-    if (cancelBtn) cancelBtn.hidden = !on;
-    if (saveBtn) saveBtn.hidden = !on;
-  }
-
-  editBtn.addEventListener('click', () => setEditing(true));
-
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      selects.forEach((sel) => { sel.value = sel.dataset.original; });
-      setEditing(false);
-    });
-  }
-
-  if (saveBtn) {
-    saveBtn.addEventListener('click', async () => {
+  selects.forEach((sel) => {
+    sel.addEventListener('change', async () => {
       const body = new URLSearchParams();
-      selects.forEach((sel) => {
-        body.set(`status:${sel.dataset.member}:${sel.dataset.date}`, sel.value);
-      });
+      body.set(`status:${sel.dataset.member}:${sel.dataset.date}`, sel.value);
+      sel.className = 'roster-cell-select roster-cell-select-' + (sel.value || 'blank');
 
       if (status) status.textContent = 'Saving…';
       try {
-        await fetch(`/admin/rosters/${tab}/attendance`, {
+        await fetch(`/admin/rosters/${sel.dataset.tab}/attendance`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
           body: body.toString(),
         });
         if (status) status.textContent = 'Saved';
+        sel.dataset.original = sel.value;
       } catch (err) {
         if (status) status.textContent = 'Connection error saving.';
       }
-
-      selects.forEach((sel) => { sel.dataset.original = sel.value; });
-      setEditing(false);
     });
-  }
+  });
 })();

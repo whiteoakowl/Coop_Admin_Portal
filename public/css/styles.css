@@ -808,7 +808,61 @@ textarea:focus-visible,
 .stat-value { font-size: 2rem; font-weight: 700; }
 .stat-label { color: var(--muted); font-size: 0.85rem; }
 
+/* Total Students/Parents/Members - one card, three segments, so the
+   dashboard opens with a single glance-able headline instead of three
+   separate cards. */
+.totals-card {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+.totals-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--border);
+}
+.totals-item:last-child { border-right: none; }
+
+@media (max-width: 720px) {
+  /* Mobile: all three totals stay on one line inside the single card. */
+  .totals-item { padding: 0.75rem 0.4rem; }
+  .totals-item .stat-value { font-size: 1.4rem; }
+  .totals-item .stat-label { font-size: 0.7rem; }
+}
+
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
+
+/* Alert Log - a running feed of today's substitute-needed, pending-
+   approval, and class-cancellation-risk items. Same list backs the
+   sitewide alert popup (see public/js/alerts.js). */
+.alert-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.alert-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+}
+.alert-log-item-danger { border-left-color: var(--red); }
+.alert-log-item-warning { border-left-color: var(--yellow-solid); }
+.alert-log-icon { flex-shrink: 0; margin-top: 0.15rem; }
+.alert-log-item-danger .alert-log-icon { color: var(--red); }
+.alert-log-item-warning .alert-log-icon { color: var(--yellow-solid); }
+.alert-log-body { display: flex; flex-direction: column; gap: 0.1rem; }
+.alert-log-day { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); }
+.alert-log-message a { color: var(--ink); font-weight: 600; }
+.alert-log-message a:hover { color: var(--brand-dark); }
 
 .dashboard-analytics-grid {
   display: grid;
@@ -836,7 +890,7 @@ textarea:focus-visible,
   gap: 0.75rem;
 }
 .analytics-stat {
-  background: #f8fafc;
+  background: #fff;
   border-radius: 10px;
   border-left: 4px solid var(--border);
   padding: 0.7rem 0.9rem;
@@ -853,7 +907,7 @@ textarea:focus-visible,
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
 .admin-card {
-  background: #f8fafc;
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
@@ -1113,8 +1167,10 @@ textarea:focus-visible,
 .view-tabs::-webkit-scrollbar { display: none; }
 .view-tab {
   padding: 0.6rem 1.35rem;
-  background: rgba(255,255,255,0.5);
-  border: 1px solid var(--border);
+  /* Medium blue - the untabbed state, distinct from both the page's darker
+     --bg blue behind it and the white panel/active-tab it sits next to. */
+  background: var(--brand);
+  border: 1px solid var(--brand);
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   font-weight: 700;
@@ -1125,14 +1181,11 @@ textarea:focus-visible,
   flex-shrink: 0;
   transition: background-color 0.15s ease;
 }
-.view-tab:hover { background: rgba(255,255,255,0.75); }
-.view-tab.active { background: #eef2f6; border-bottom: 1px solid #eef2f6; }
+.view-tab:hover { background: var(--brand-dark); color: #fff; }
+.view-tab.active { background: #eef2f6; border-color: var(--border); color: var(--ink); }
 .view-tab-panel {
-  /* Deliberately a shade off-white - and distinct from #f8fafc, which
-     .admin-card also uses - so nested .manage-section/.grid-box/
-     .admin-card boxes actually read as cards sitting on top of this
-     panel instead of blending into one flat area. */
-  background: #eef2f6;
+  /* White, like every other text/info box in the admin UI. */
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: 0 var(--radius) var(--radius) var(--radius);
   padding: var(--card-padding-compact);
@@ -1464,6 +1517,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .page-actions { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 
+/* Class Rosters tab (Attendance page) - every class as a stacked, full-
+   width row button; clicking one switches to that class's own roster +
+   attendance grid. */
+.class-roster-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.class-roster-row-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.class-roster-row-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.class-roster-row-meta { display: flex; gap: 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
@@ -1503,10 +1580,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .archived-toggle-btn.active,
 .archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
 
-/* Import CSV / Export CSV / Print are the same "work with a file" action
+/* Import CSV / Export CSV are the same "work with a file" action
    everywhere in the app, so they always get the same green treatment
    regardless of which button component (.btn-secondary or
-   .roster-action-btn) they're built from. */
+   .roster-action-btn) they're built from. Print is promoted to the
+   primary orange (.print-action-btn below) so it reads as the one you'll
+   actually reach for. */
 .file-action-btn,
 .file-action-btn.btn-secondary,
 .file-action-btn.roster-action-btn {
@@ -1519,6 +1598,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .file-action-btn.roster-action-btn:hover {
   background: var(--btn-green-hover);
   border-color: var(--btn-green-hover);
+  color: #000;
+}
+
+.print-action-btn,
+.print-action-btn.btn-secondary,
+.print-action-btn.roster-action-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: #000;
+}
+.print-action-btn:hover,
+.print-action-btn.btn-secondary:hover,
+.print-action-btn.roster-action-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
   color: #000;
 }
 

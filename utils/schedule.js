@@ -1,5 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS } = require('./days');
+const { familyOf } = require('./members');
 
 const CLASS_NUMBERS = [1, 2, 3, 4];
 
@@ -54,30 +55,37 @@ function splitTimeRange(raw) {
   return { startRaw, endRaw: end };
 }
 
-// A member's earliest class start and latest class end - used to
-// auto-fill Arrival/Departure on the roster view instead of requiring an
-// admin to type them in by hand. `day` ('monday' or 'wednesday') scopes
-// this to the roster's own day, matching Monday rosters to the Monday
-// schedule and Wednesday rosters to the Wednesday schedule; omit it (or
-// pass anything else) to fall back to both days combined. Returns raw
-// label strings (whatever the admin typed for that class's time, not
-// reformatted) or null if nothing on the schedule parses.
+// A family's earliest class start and latest class end - used to auto-fill
+// Arrival/Departure on the roster view instead of requiring an admin to
+// type them in by hand. Reads memberId's own schedule plus every other
+// member of their family (a parent's drop-off/pick-up is set by whichever
+// of their kids' classes runs earliest/latest, not just their own), so
+// every member of one family lands on the same arrival/departure pair.
+// `day` ('monday' or 'wednesday') scopes this to the roster's own day,
+// matching Monday rosters to the Monday schedule and Wednesday rosters to
+// the Wednesday schedule; omit it (or pass anything else) to fall back to
+// both days combined. Returns raw label strings (whatever the admin typed
+// for that class's time, not reformatted) or null if nothing on the
+// schedule parses.
 function arrivalDepartureLabels(memberId, day) {
-  const { monday, wednesday } = getMemberSchedule(memberId);
-  const rows = day === 'monday' ? monday : day === 'wednesday' ? wednesday : [...monday, ...wednesday];
+  const familyIds = [memberId, ...familyOf(memberId).map((m) => m.id)];
   let earliest = null;
   let latest = null;
-  rows.forEach((row) => {
-    if (!row.time) return;
-    const { startRaw, endRaw } = splitTimeRange(row.time);
-    const startMin = parseClockMinutes(startRaw);
-    const endMin = parseClockMinutes(endRaw);
-    if (startMin !== null && (!earliest || startMin < earliest.min)) {
-      earliest = { min: startMin, label: startRaw };
-    }
-    if (endMin !== null && (!latest || endMin > latest.min)) {
-      latest = { min: endMin, label: endRaw };
-    }
+  familyIds.forEach((id) => {
+    const { monday, wednesday } = getMemberSchedule(id);
+    const rows = day === 'monday' ? monday : day === 'wednesday' ? wednesday : [...monday, ...wednesday];
+    rows.forEach((row) => {
+      if (!row.time) return;
+      const { startRaw, endRaw } = splitTimeRange(row.time);
+      const startMin = parseClockMinutes(startRaw);
+      const endMin = parseClockMinutes(endRaw);
+      if (startMin !== null && (!earliest || startMin < earliest.min)) {
+        earliest = { min: startMin, label: startRaw };
+      }
+      if (endMin !== null && (!latest || endMin > latest.min)) {
+        latest = { min: endMin, label: endRaw };
+      }
+    });
   });
   return { arrival: earliest ? earliest.label : null, departure: latest ? latest.label : null };
 }

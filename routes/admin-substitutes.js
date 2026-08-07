@@ -13,8 +13,8 @@ const {
   setAssignment,
   approveAssignment,
   clearAssignment,
-  pendingApprovalsForToday,
 } = require('../utils/substitutes');
+const { todaysAlerts } = require('../utils/alerts');
 
 // Substitutes is no longer its own tab - it's folded into the Floater
 // Assignments manage page (routes/admin-volunteers.js). Keep this as a
@@ -109,12 +109,15 @@ router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, (r
   res.redirect(subUrl(day, { date }));
 });
 
-// Polled from every admin page (see public/js/pending-approvals.js) to
-// power the sitewide "floater position needs approval" popup - also
-// where the automated sub system's today's-board auto-fill actually
-// happens for admins who never open the Substitutes tab themselves.
-router.get('/pending-approvals.json', requireAdmin, (req, res) => {
-  res.json(pendingApprovalsForToday());
+// Polled from every admin page (see public/js/alerts.js) to power the
+// sitewide alert popup - the same list rendered as the Home dashboard's
+// Alert Log (utils/alerts.js), so the popup only ever surfaces what an
+// admin could also find there. Also where the automated sub system's
+// today's-board auto-fill actually happens for admins who never open the
+// Floater Assignments manage page themselves.
+router.get('/alerts.json', requireAdmin, (req, res) => {
+  const items = todaysAlerts();
+  res.json({ count: items.length, items });
 });
 
 module.exports = router;

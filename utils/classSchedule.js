@@ -321,23 +321,50 @@ function absenceFormMemberIdsForDate(date) {
 // roster_dates, exactly like a manually-created roster; nothing here ever
 // touches roster_dates.
 
-// Adds/removes roster_members rows so a roster's membership matches
+// Adds/removes roster_members rows so a roster's 'auto' membership matches
 // memberIdSet exactly, without touching anyone's scheduled_arrival/
-// departure or the roster's dates.
+// departure or the roster's dates. Rows an admin added by hand (source =
+// 'manual', via the Attendance page's Add Member popup) are never touched
+// here, so they survive every resync instead of getting silently dropped
+// the next time class enrollment/staffing changes.
 function setRosterMembership(rosterId, memberIdSet) {
   const existingIds = db
-    .prepare('SELECT member_id FROM roster_members WHERE roster_id = ?')
+    .prepare("SELECT member_id FROM roster_members WHERE roster_id = ? AND source = 'auto'")
     .all(rosterId)
     .map((r) => r.member_id);
   const existing = new Set(existingIds);
-  const insert = db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)');
-  const remove = db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?');
+  const insert = db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')");
+  const remove = db.prepare("DELETE FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'");
   for (const memberId of memberIdSet) {
     if (!existing.has(memberId)) insert.run(rosterId, memberId);
   }
   for (const memberId of existingIds) {
     if (!memberIdSet.has(memberId)) remove.run(rosterId, memberId);
   }
+}
+
+// Every class across both days, for the Attendance page's Class Rosters
+// tab - each row links to that class's own auto-maintained roster (see
+// ensureClassRoster) via its roster_id.
+function allClassesList() {
+  const rows = db
+    .prepare(
+      `SELECT c.*, h.label AS hourLabel,
+              (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS studentCount
+       FROM classes c
+       JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
+       ORDER BY c.day, c.hour_position, c.class_name COLLATE NOCASE`
+    )
+    .all();
+  return rows.map((r) => ({ ...r, dayLabel: DAY_LABELS[r.day] }));
+}
+
+// Adds someone to a roster by hand (Attendance page's Add Member popup) -
+// tagged source = 'manual' so setRosterMembership's auto-resync never
+// removes them again. INSERT OR IGNORE so re-adding an existing auto
+// member is a harmless no-op rather than an error.
+function addManualRosterMember(rosterId, memberId) {
+  db.prepare("INSERT OR IGNORE INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(rosterId, memberId);
 }
 
 // Creates (once) the students-only roster for a single class, or returns
@@ -463,4 +490,6 @@ module.exports = {
   ensureDayRoster,
   ensureDayMemberRosters,
   syncDayMemberRosters,
+  addManualRosterMember,
+  allClassesList,
 };

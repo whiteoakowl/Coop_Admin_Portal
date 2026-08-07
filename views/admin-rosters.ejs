@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tabLabel %> &mdash; Attendance Spreadsheet</p>
+        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : tabLabel %> &mdash; Attendance Spreadsheet</p>
       </div>
     </div>
     <h1>Attendance</h1>
@@ -20,20 +20,42 @@
 
     <div class="view-tabs no-print">
       <% Object.keys(tabs).forEach(function(key) { %>
-        <a class="view-tab<%= tab === key ? ' active' : '' %>" href="/admin/rosters?tab=<%= key %>"><%= tabs[key].label %></a>
+        <a class="view-tab<%= activeTab === key ? ' active' : '' %>" href="/admin/rosters?tab=<%= key %>"><%= tabs[key].label %></a>
       <% }); %>
+      <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/rosters?tab=classes">Class Rosters</a>
     </div>
+
+    <% if (view === 'classList') { %>
+      <div class="view-tab-panel">
+        <% if (classes.length === 0) { %>
+          <p class="roster-empty">No classes yet &mdash; add one on the <a href="/admin/schedule">Schedules</a> page.</p>
+        <% } else { %>
+          <div class="class-roster-list">
+            <% classes.forEach(function(c) { %>
+              <a class="class-roster-row-btn" href="/admin/rosters?tab=class-<%= c.id %>" style="border-left: 5px solid <%= c.color %>;">
+                <span class="class-roster-row-name"><%= c.class_name %></span>
+                <span class="class-roster-row-meta">
+                  <span><%= c.dayLabel %></span>
+                  <span><%= c.hourLabel %></span>
+                  <% if (c.room) { %><span>Room <%= c.room %></span><% } %>
+                  <span><%= c.studentCount %> student<%= c.studentCount === 1 ? '' : 's' %></span>
+                </span>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    <% } else { %>
+    <% if (classId) { %><p class="subtitle no-print"><a href="/admin/rosters?tab=classes">&larr; All Class Rosters</a></p><% } %>
 
     <div class="roster-toolbar no-print">
       <div>
         <span id="roster-save-status" class="volunteer-save-status"></span>
       </div>
       <div class="roster-btn-row">
-        <button type="button" id="roster-edit-dates-btn" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()" hidden>Edit Session Dates</button>
-        <button type="button" id="roster-edit-btn" class="roster-action-btn" data-tab="<%= tab %>">Edit</button>
-        <button type="button" id="roster-cancel-btn" class="roster-action-btn" hidden>Cancel</button>
-        <button type="button" id="roster-save-btn" class="roster-action-btn" hidden>Save Changes</button>
-        <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
 
@@ -72,6 +94,30 @@
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
           <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="add-member-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/rosters/<%= tab %>/add-member">
+        <h3>Add Members &mdash; <%= tabLabel %></h3>
+        <% if (availableMembers.length === 0) { %>
+          <p class="hint">Everyone eligible is already on this roster. Add new members on the <a href="/admin/members">Members page</a>.</p>
+        <% } else { %>
+          <div class="member-picker-list">
+            <% availableMembers.forEach(function(m) { %>
+              <label class="member-picker-row">
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                <span><%= m.name %></span>
+              </label>
+            <% }); %>
+          </div>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <% if (availableMembers.length > 0) { %>
+            <button type="submit" class="primary-btn">Add Selected</button>
+          <% } %>
         </div>
       </form>
     </dialog>
@@ -119,7 +165,7 @@
                 <td class="roster-secondary-col"><%= row.departureLabel || '—' %></td>
                 <% row.cells.forEach(function(cell) { %>
                   <td>
-                    <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" disabled>
+                    <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>">
                       <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
                       <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>Present</option>
                       <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>Late</option>
@@ -131,8 +177,8 @@
                   </td>
                 <% }); %>
                 <td class="actions-cell no-print">
-                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %>" class="inline-block-form">
-                    <button type="submit" class="icon-btn roster-remove-btn" aria-label="Remove <%= row.member.name %>" title="Remove" hidden><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %>" class="inline-block-form" onsubmit="return confirm('Remove <%= row.member.name %> from this roster?');">
+                    <button type="submit" class="icon-btn roster-remove-btn" aria-label="Remove <%= row.member.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>
               </tr>
@@ -244,6 +290,7 @@
         </ul>
       <% } %>
     </div>
+    <% } %>
   </main>
   <script src="/js/date-list.js"></script>
   <script src="/js/attendance-grid.js"></script>

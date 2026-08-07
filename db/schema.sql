@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS roster_members (
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   scheduled_arrival TEXT,
   scheduled_departure TEXT,
+  -- 'auto' rows are kept in lockstep with class enrollment/staffing by
+  -- setRosterMembership (utils/classSchedule.js) - it only ever adds/
+  -- removes 'auto' rows, so a 'manual' row (added by an admin on the
+  -- Attendance page's Add Member popup, for someone not on any class)
+  -- survives every resync untouched.
+  source TEXT NOT NULL DEFAULT 'auto' CHECK(source IN ('auto','manual')),
   PRIMARY KEY (roster_id, member_id)
 );
 

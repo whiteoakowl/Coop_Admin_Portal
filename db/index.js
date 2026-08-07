@@ -110,6 +110,9 @@ if (!rosterMemberColumns.includes('scheduled_arrival')) {
 if (!rosterMemberColumns.includes('scheduled_departure')) {
   db.exec('ALTER TABLE roster_members ADD COLUMN scheduled_departure TEXT');
 }
+if (!rosterMemberColumns.includes('source')) {
+  db.exec("ALTER TABLE roster_members ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'");
+}
 
 const nameTagRequestColumns = db.prepare('PRAGMA table_info(name_tag_requests)').all().map((c) => c.name);
 if (!nameTagRequestColumns.includes('archived')) {
