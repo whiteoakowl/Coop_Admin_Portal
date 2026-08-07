@@ -2242,6 +2242,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
 
 .team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+
+/* Setup/Cleanup: exactly 5 cards per row on a full-width desktop screen,
+   stepping down smoothly as the viewport narrows instead of just wrapping
+   whatever fits at a fixed minimum width. */
+.setup-team-card-grid { grid-template-columns: repeat(5, 1fr); gap: 0.85rem; }
+@media (max-width: 1400px) { .setup-team-card-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 1100px) { .setup-team-card-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 800px) { .setup-team-card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .setup-team-card-grid { grid-template-columns: 1fr; } }
 .team-card {
   background: #fff;
   border: 1px solid var(--border);
