@@ -4,12 +4,13 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { requireDay } = require('../utils/days');
+const { requireDay, isValidDay } = require('../utils/days');
 const { isValidISODate, todayISO, weekdayOf, ageFromBirthday } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
   HOUR_POSITIONS,
+  COLOR_PALETTE,
   GRADE_LEVELS,
   ageGroupList,
   defaultDay,
@@ -55,6 +56,7 @@ router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
     roomGrid: roomGridForDay(day),
     rooms: roomsForDay(day),
     gradeLevels: GRADE_LEVELS,
+    colorPalette: COLOR_PALETTE,
     availableStaff: activeParentsForStaff(),
     selectedDate,
     absentIds: absentMemberIdsForDate(selectedDate),
@@ -85,12 +87,17 @@ router.post('/class-schedule/:day/hours', requireFullAdmin, requireDay, (req, re
   res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent('Hour labels updated.'));
 });
 
-router.post('/class-schedule/:day/classes/new', requireFullAdmin, requireDay, (req, res) => {
-  const day = req.params.day;
+// Day-agnostic: the Create New Class form itself has a Class Day field
+// (matching the reference design) rather than being locked to whichever
+// day page the dialog was opened from, so this reads day from the body
+// instead of a route param. Falls back to the day-scoped page on error so
+// the admin lands back where they started.
+router.post('/class-schedule/classes/new', requireFullAdmin, (req, res) => {
+  const day = isValidDay(req.body.day) ? req.body.day : null;
   const className = (req.body.className || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
-  if (!className || !HOUR_POSITIONS.includes(hourPosition)) {
-    return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Class name and hour are required.'));
+  if (!day || !className || !HOUR_POSITIONS.includes(hourPosition)) {
+    return res.redirect(`/admin/class-schedule/${day || 'monday'}?error=` + encodeURIComponent('Class day, name, and hour are required.'));
   }
   const id = createClass({
     day,
@@ -128,6 +135,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, (req, res) =>
     dayLabel: DAY_LABELS[cls.day],
     hours: hoursForDay(cls.day),
     gradeLevels: GRADE_LEVELS,
+    colorPalette: COLOR_PALETTE,
     selectedGrades: ageGroupList(cls.age_group),
     availableStudents: activeStudents().filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),

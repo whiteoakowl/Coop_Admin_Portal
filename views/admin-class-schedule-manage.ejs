@@ -44,9 +44,18 @@
             <label>End Time
               <input type="text" name="endTime" value="<%= cls.end_time || '' %>" placeholder="10:00 AM" />
             </label>
-            <label class="class-color-label member-form-full">Color
-              <input type="color" name="color" value="<%= cls.color %>" />
-            </label>
+            <div class="member-form-full">
+              <label class="roster-checkbox-label">Color</label>
+              <div class="class-color-swatches">
+                <% (typeof colorPalette !== 'undefined' ? colorPalette : [cls.color]).forEach(function(c) { %>
+                  <label class="class-color-swatch">
+                    <input type="radio" name="color" value="<%= c %>" <%= (cls.color || '').toLowerCase() === c.toLowerCase() ? 'checked' : '' %> />
+                    <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
+                    <svg class="icon"><use href="#icon-check"/></svg>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
 
             <div class="member-form-full">
               <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>

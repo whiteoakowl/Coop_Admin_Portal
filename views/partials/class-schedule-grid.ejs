@@ -35,73 +35,120 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 </div>
 
 <% if (!gridReadOnly) { %>
-<dialog id="add-class-dialog-<%= day %>" class="member-picker-dialog class-form-dialog">
-  <form method="POST" action="/admin/class-schedule/<%= day %>/classes/new">
+<dialog id="add-class-dialog-<%= day %>" class="class-form-dialog">
+  <form method="POST" action="/admin/class-schedule/classes/new">
     <div class="class-form-dialog-header">
-      <svg class="icon"><use href="#icon-book"/></svg>
+      <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
       <h3>Create New Class</h3>
+      <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
     </div>
-    <div class="member-form-grid">
-      <label>Class Name
+
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Title</span>
         <input type="text" name="className" placeholder="Enter class title" required />
-      </label>
-      <label>Class Hour
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Day</span>
+        <select name="day" required>
+          <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+          <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+        </select>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Hour</span>
         <select name="hourPosition" required>
           <option value="" disabled selected>Select class hour</option>
           <% hours.forEach(function(h) { %>
             <option value="<%= h.position %>"><%= h.label %></option>
           <% }); %>
         </select>
-      </label>
-      <label>Room
-        <input type="text" name="room" list="room-options-<%= day %>" placeholder="Room #" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Room</span>
+        <input type="text" name="room" list="room-options-<%= day %>" placeholder="Select or type a room #" autocomplete="off" />
         <datalist id="room-options-<%= day %>">
           <% (typeof rooms !== 'undefined' ? rooms : []).forEach(function(r) { %><option value="<%= r %>"></option><% }); %>
         </datalist>
-      </label>
-      <label class="class-color-label">Color
-        <input type="color" name="color" value="#EE9A4D" />
-      </label>
-      <label>Start Time
-        <input type="text" name="startTime" placeholder="9:00 AM" />
-      </label>
-      <label>End Time
-        <input type="text" name="endTime" placeholder="10:00 AM" />
-      </label>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Color</span>
+        <div class="class-color-swatches">
+          <% (typeof colorPalette !== 'undefined' ? colorPalette : ['#EE9A4D']).forEach(function(c, i) { %>
+            <label class="class-color-swatch">
+              <input type="radio" name="color" value="<%= c %>" <%= i === 0 ? 'checked' : '' %> />
+              <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
+              <svg class="icon"><use href="#icon-check"/></svg>
+            </label>
+          <% }); %>
+        </div>
+      </div>
     </div>
 
-    <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
+    <span class="class-form-section-label required">Grade Level <span class="optional-tag">(Select all that apply)</span></span>
     <div class="grade-pill-grid">
       <% gradeLevels.forEach(function(g) { %>
         <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
       <% }); %>
     </div>
 
-    <div class="member-form-grid">
-      <label>Teacher
-        <select name="teacherId">
-          <option value="">Select teacher&hellip;</option>
-          <% availableStaff.forEach(function(p) { %>
-            <option value="<%= p.id %>"><%= p.name %></option>
-          <% }); %>
-        </select>
-      </label>
-      <label>Assistant(s)
-        <select name="assistantIds" multiple size="3">
-          <% availableStaff.forEach(function(p) { %>
-            <option value="<%= p.id %>"><%= p.name %></option>
-          <% }); %>
-        </select>
-      </label>
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Start Time</span>
+        <div class="class-time-input-wrap">
+          <svg class="icon icon-clock"><use href="#icon-clock"/></svg>
+          <input type="text" name="startTime" placeholder="9:00 AM" />
+          <svg class="icon icon-chevron-down"><use href="#icon-chevron-down"/></svg>
+        </div>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">End Time</span>
+        <div class="class-time-input-wrap">
+          <svg class="icon icon-clock"><use href="#icon-clock"/></svg>
+          <input type="text" name="endTime" placeholder="10:00 AM" />
+          <svg class="icon icon-chevron-down"><use href="#icon-chevron-down"/></svg>
+        </div>
+      </div>
     </div>
 
-    <label>Class Description
-      <textarea name="notes" rows="3" placeholder="Enter class description and activities&hellip;"></textarea>
-    </label>
+    <span class="class-form-section-label">Teacher / Assistants</span>
+    <p class="class-form-section-hint">Add 1 teacher (required) and up to 3 assistants (optional)</p>
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Teacher</span>
+        <select name="teacherId" required>
+          <option value="" disabled selected>Select teacher&hellip;</option>
+          <% availableStaff.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.name %></option>
+          <% }); %>
+        </select>
+      </div>
+      <% [1, 2, 3].forEach(function(n) { %>
+        <div class="class-form-field">
+          <span class="class-form-field-label">Assistant <%= n %> <span class="optional-tag">(optional)</span></span>
+          <select name="assistantIds">
+            <option value="">Select&hellip;</option>
+            <% availableStaff.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+        </div>
+      <% }); %>
+    </div>
 
-    <div class="notes-dialog-actions">
+    <span class="class-form-section-label">Class Description</span>
+    <p class="class-form-section-hint">Provide a brief description of the class content and activities.</p>
+    <div class="class-form-textarea-wrap">
+      <textarea name="notes" rows="4" placeholder="Enter class description&hellip;" maxlength="500" oninput="this.nextElementSibling.textContent = this.value.length + '/500'"></textarea>
+      <span class="class-form-char-count">0/500</span>
+    </div>
+
+    <div class="class-form-dialog-footer">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-      <button type="submit" class="primary-btn">Create Class</button>
+      <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-check"/></svg> Create Class</button>
     </div>
   </form>
 </dialog>
