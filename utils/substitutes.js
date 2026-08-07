@@ -3,8 +3,28 @@ const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate, absenceFormMemberIds
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForList, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
 const { todayISO, weekdayOf } = require('./dates');
+const { parseClockMinutes, splitTimeRange } = require('./schedule');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+
+// True once it's more than 5 minutes past an hour's start time on today's
+// date and the person assigned to cover it still hasn't checked in
+// anywhere - the board re-flags the slot as still needing a substitute
+// instead of quietly trusting a no-show assignment. Only meaningful for
+// today (there's no "current time" to compare a future/past date against).
+function assignedIsOverdue(existing, date, hourLabel) {
+  if (!existing || existing.status !== 'approved') return false;
+  if (date !== todayISO()) return false;
+  const { startRaw } = splitTimeRange(hourLabel);
+  const startMin = parseClockMinutes(startRaw);
+  if (startMin === null) return false;
+  const now = new Date();
+  if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
+  const checkedIn = db
+    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
+    .get(existing.member_id, date);
+  return !checkedIn;
+}
 
 function permanentJobsForDay(day) {
   return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? ORDER BY hour_position, title COLLATE NOCASE').all(day);
@@ -178,6 +198,7 @@ function substituteBoard(day, date) {
         detail: cls.room ? `Room ${cls.room}` : '',
         reason: `Teacher${teachers.length > 1 ? 's' : ''} absent: ${teachers.map((t) => t.name).join(', ')}`,
         assigned: assignedInfo(existing),
+        overdue: assignedIsOverdue(existing, date, hourGroup.label),
       });
     });
 
@@ -185,6 +206,7 @@ function substituteBoard(day, date) {
       const existing = resolveSlot('job', job.id, floaterIdsForJob(job.id));
 
       slots.push({
+        overdue: assignedIsOverdue(existing, date, hourGroup.label),
         slotType: 'job',
         slotId: job.id,
         label: job.title,

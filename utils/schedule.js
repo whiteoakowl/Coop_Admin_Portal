@@ -163,4 +163,6 @@ module.exports = {
   scheduleStatus,
   scheduleList,
   arrivalDepartureLabels,
+  parseClockMinutes,
+  splitTimeRange,
 };

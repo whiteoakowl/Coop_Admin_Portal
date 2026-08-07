@@ -226,6 +226,8 @@
                     <td>
                       <% if (!slot.assigned) { %>
                         <span class="badge-pill badge-pill-absent">Needs Substitute</span>
+                      <% } else if (slot.overdue) { %>
+                        <span class="badge-pill badge-pill-absent">No-show &mdash; Needs Sub Again</span>
                       <% } else if (slot.assigned.status === 'pending') { %>
                         <span class="badge-pill badge-pill-pending">Awaiting Approval</span>
                       <% } else { %>
