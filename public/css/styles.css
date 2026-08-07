@@ -2401,6 +2401,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .sub-needed-banner-ok { background: var(--green-bg); color: var(--green); }
 .sub-needed-banner-warn { background: var(--red-bg); color: var(--red); }
 .sub-needed-banner-pending { background: var(--yellow-bg); color: var(--yellow); }
+/* Approve / Unassign are the two possible responses to the same pending
+   decision, so they sit side by side as equal-width twins instead of the
+   generic .primary-btn/.btn-secondary sizing (which made Approve read as
+   a large, offset block next to a small Unassign pill). A lone Unassign
+   (already-approved state) reuses the same row/sizing for consistency,
+   just without a partner to sit next to. */
+.sub-needed-decision-row { display: flex; gap: 0.5rem; }
+.sub-needed-decision-row form { flex: 1; display: flex; }
+.sub-needed-decision-row .primary-btn,
+.sub-needed-decision-row .btn-secondary {
+  flex: 1;
+  margin-top: 0;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.82rem;
+  border-radius: 8px;
+  text-align: center;
+  white-space: nowrap;
+}
 .sub-needed-assign-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .sub-needed-assign-box label { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
 .sub-needed-select-wrap {
@@ -2423,7 +2441,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   min-width: 0;
 }
 /* This one button is deliberately blue (not the site's usual orange
-   primary) to match the reference design exactly. */
+   primary) to match the reference design - using the site's own brand
+   blue (--brand-dark/--brand-darker) rather than a one-off hex value, so
+   it's the same blue as the rest of the app. */
 .sub-needed-assign-btn {
   display: flex;
   align-items: center;
@@ -2433,14 +2453,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: none;
   border-radius: var(--control-radius);
   padding: 0.7rem;
-  background: #2f5fdb;
+  background: var(--brand-dark);
   color: #fff;
   font-weight: 700;
   font-size: 0.92rem;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
-.sub-needed-assign-btn:hover { background: #2549ad; }
+.sub-needed-assign-btn:hover { background: var(--brand-darker); }
 .sub-needed-assign-btn .icon { width: 1rem; height: 1rem; }
 .sub-needed-footer { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.6rem; }
 .sub-needed-footer .icon { width: 0.85rem; height: 0.85rem; }
