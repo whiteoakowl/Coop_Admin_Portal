@@ -706,9 +706,11 @@ textarea:focus-visible,
 
 .admin-mobile-tabs { display: none; }
 
-/* Modern mobile nav: the sidebar collapses into a sticky top bar with a
-   brand row (+ compact Settings/Log out) and a row of icon tabs below it
-   instead of 5+ links wrapping into a messy multi-row header. */
+/* Modern mobile nav: the sidebar collapses into a sticky top bar (brand +
+   compact Settings/Log out) and the section tabs move to a bar fixed to
+   the bottom of the screen. There are more tabs than fit one screen width,
+   so the bar scrolls horizontally ("slide to show all") instead of
+   squeezing every tab down to fit. */
 @media (max-width: 860px) {
   .admin-sidebar { display: none; }
 
@@ -728,21 +730,38 @@ textarea:focus-visible,
   .admin-nav-right-mobile .admin-nav-right-link { padding: 0.4rem; }
   .admin-nav-right-mobile .admin-nav-right-link:hover { background: rgba(255,255,255,0.6); color: var(--brand-darker); }
 
-  .admin-mobile-tabs { display: flex; gap: 0.2rem; }
+  .admin-mobile-tabs {
+    display: flex;
+    gap: 0.2rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    background: var(--accent);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
+    padding: 0.4rem 0.6rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .admin-mobile-tabs::-webkit-scrollbar { display: none; }
   .admin-mobile-tabs a {
-    flex: 1;
+    flex: 0 0 auto;
+    min-width: 4.25rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.2rem;
-    padding: 0.4rem 0.15rem;
+    padding: 0.4rem 0.5rem;
     border-radius: 8px;
     color: var(--ink);
     font-size: 0.65rem;
     font-weight: 600;
     line-height: 1.15;
     text-align: center;
+    white-space: nowrap;
     transition: background-color 0.15s ease;
   }
   .admin-mobile-tabs a .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
@@ -767,7 +786,9 @@ textarea:focus-visible,
 }
 
 @media (max-width: 860px) {
-  .admin-main { margin-left: 0; padding: 1.5rem; }
+  /* Bottom padding clears the fixed .admin-mobile-tabs bar so page content
+     never sits underneath it. */
+  .admin-main { margin-left: 0; padding: 1.5rem 1.5rem 4.75rem; }
 }
 
 .subtitle { color: var(--muted); }
@@ -2426,7 +2447,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
   .volunteer-sections-grid { grid-template-columns: 1fr; }
 
-  .admin-main { padding: 1rem; }
+  .admin-main { padding: 1rem 1rem 4.75rem; }
   .notes-dialog,
   .member-picker-dialog,
   .member-profile-dialog { width: 92vw; padding: 1rem; }
@@ -2544,7 +2565,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 @media print {
   .no-print { display: none !important; }
-  .admin-sidebar, .admin-mobile-topbar, .kiosk-home { display: none; }
+  .admin-sidebar, .admin-mobile-topbar, .admin-mobile-tabs, .kiosk-home { display: none; }
   html, body { background: #fff; }
   .admin-main { max-width: none; margin-left: 0; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }
