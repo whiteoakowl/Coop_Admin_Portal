@@ -2625,7 +2625,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-form-field input[type="text"]::placeholder { color: var(--muted); }
 
-.class-form-section-label { margin: 0.2rem 0 0.15rem; font-weight: 700; font-size: 0.88rem; }
+.class-form-section-label { margin: 0.2rem 0 0.5rem; font-weight: 700; font-size: 0.88rem; }
 .class-form-section-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
 .class-form-section-hint { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; }
 
