@@ -1,8 +1,8 @@
 const db = require('../db');
 const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate, absenceFormMemberIdsForDate } = require('./classSchedule');
-const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForList, RANK_ORDER } = require('./volunteers');
+const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
-const { todayISO, weekdayOf } = require('./dates');
+const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
 const { parseClockMinutes, splitTimeRange } = require('./schedule');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
@@ -72,13 +72,16 @@ function rankSort(members) {
 // Everyone on the day's Floater Assignments list for a given hour block,
 // ranked (Choose First before Sometimes before Backup Only) - the pool
 // substitute suggestions are drawn from, best candidate first. Hour
-// positions line up 1-4 across both features by convention.
+// positions line up 1-4 across both features by convention. Reads each
+// member's rank for THIS specific hour (membersForSection), not a
+// single member-wide rank, since Floater Teams now lets rank vary hour
+// to hour.
 function floaterMembersForHour(day, hourPosition) {
   const list = getListByDay(day);
   if (!list) return [];
   const section = sectionsForList(list.id).find((s) => s.position === hourPosition);
   if (!section) return [];
-  return rankSort(membersForList(list.id).filter((m) => m.sectionIds.includes(section.id)));
+  return rankSort(membersForSection(list.id, section.id));
 }
 
 function assignmentFor(date, slotType, slotId) {
@@ -133,6 +136,7 @@ function assignedInfo(existing) {
     isOverride: !!existing.is_override,
     status: existing.status,
     infant: hasInfantChild(existing.member_id),
+    updatedLabel: formatTimestamp(existing.created_at),
   };
 }
 
@@ -196,6 +200,7 @@ function substituteBoard(day, date) {
         slotId: cls.id,
         label: cls.class_name,
         detail: cls.room ? `Room ${cls.room}` : '',
+        ageGroup: cls.age_group || '',
         reason: `Teacher${teachers.length > 1 ? 's' : ''} absent: ${teachers.map((t) => t.name).join(', ')}`,
         assigned: assignedInfo(existing),
         overdue: assignedIsOverdue(existing, date, hourGroup.label),

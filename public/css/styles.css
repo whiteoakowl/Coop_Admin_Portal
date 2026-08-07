@@ -2248,48 +2248,118 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    whatever fits at a fixed minimum width. */
 .setup-team-card-grid { grid-template-columns: repeat(5, 1fr); gap: 0.85rem; }
 @media (max-width: 1400px) { .setup-team-card-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 1100px) { .setup-team-card-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 800px) { .setup-team-card-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .setup-team-card-grid { grid-template-columns: 1fr; } }
-.team-card {
+
+/* Tablet and mobile: rather than wrapping into more (shorter, cramped)
+   rows, keep every card at a readable width and let the row scroll
+   horizontally - a gentle side-to-side "roll" through the cards instead
+   of a squeezed multi-row stack. */
+@media (max-width: 1100px) {
+  .setup-team-card-grid {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 0.6rem;
+    gap: 1rem;
+  }
+  .setup-team-card-grid .team-col {
+    flex: 0 0 240px;
+    scroll-snap-align: start;
+  }
+}
+/* Each team is a column with two stacked cards - an info card (icon,
+   title, leader, a colored detail pill) and a Members list card below it -
+   matching the reference "Our Teams" design exactly. */
+.team-col { display: flex; flex-direction: column; gap: 1rem; }
+
+.team-info-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: var(--card-padding-compact);
+  padding: 1.35rem 1.1rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
-.team-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.team-card-header { display: flex; align-items: center; gap: 0.65rem; }
-.team-card-icon {
-  width: 2.35rem;
-  height: 2.35rem;
+.team-info-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.team-info-delete {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+}
+.team-info-icon {
+  width: 3.75rem;
+  height: 3.75rem;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  flex-shrink: 0;
+  margin-bottom: 0.2rem;
 }
-.team-card-icon .icon { width: 1.1rem; height: 1.1rem; }
+.team-info-icon .icon { width: 1.7rem; height: 1.7rem; }
 /* A small color rotation so a row of cards reads as distinct teams at a
-   glance, cycling the same 5-color set the Setup/Cleanup reference design
-   uses - purely decorative, no meaning attached to which color lands where. */
-.team-card-icon-0 { background: var(--brand-soft); color: var(--brand-dark); }
-.team-card-icon-1 { background: var(--green-bg); color: var(--green); }
-.team-card-icon-2 { background: var(--purple-soft); color: var(--purple); }
-.team-card-icon-3 { background: var(--orange-bg); color: var(--orange); }
-.team-card-icon-4 { background: #d7f3f1; color: #1f7a72; }
-.team-card-title-group { min-width: 0; flex: 1; }
-.team-card-title { margin: 0; font-size: 0.98rem; font-weight: 800; }
-.team-card-sub { font-size: 0.76rem; color: var(--muted); font-weight: 600; }
-.team-card-delete-btn { flex-shrink: 0; }
+   glance, cycling a 5-color set - purely decorative, no meaning attached
+   to which color lands where. */
+.team-accent-0 .team-info-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-0 .team-info-title { color: var(--brand-dark); }
+.team-accent-0 .team-info-pill { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-1 .team-info-icon { background: var(--green-bg); color: var(--green); }
+.team-accent-1 .team-info-title { color: var(--green); }
+.team-accent-1 .team-info-pill { background: var(--green-bg); color: var(--green); }
+.team-accent-2 .team-info-icon { background: var(--purple-soft); color: var(--purple); }
+.team-accent-2 .team-info-title { color: var(--purple); }
+.team-accent-2 .team-info-pill { background: var(--purple-soft); color: var(--purple); }
+.team-accent-3 .team-info-icon { background: var(--orange-bg); color: var(--orange); }
+.team-accent-3 .team-info-title { color: var(--orange); }
+.team-accent-3 .team-info-pill { background: var(--orange-bg); color: var(--orange); }
+.team-accent-4 .team-info-icon { background: #d7f3f1; color: #1f7a72; }
+.team-accent-4 .team-info-title { color: #1f7a72; }
+.team-accent-4 .team-info-pill { background: #d7f3f1; color: #1f7a72; }
+
+.team-info-title { margin: 0; font-size: 1.1rem; font-weight: 800; }
+.team-info-leader { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.team-info-leader .icon { width: 0.95rem; height: 0.95rem; flex-shrink: 0; }
+.team-info-leader-select {
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 12rem;
+}
+.team-info-pill {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  max-width: 100%;
+}
+.team-info-pill .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.team-info-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.team-members-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+  flex: 1;
+}
+.team-members-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 800; }
 .team-card-members { display: flex; flex-direction: column; }
-.team-member-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
+.team-member-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-top: 1px solid var(--border); }
 .team-member-row:first-child { border-top: none; }
 .team-member-avatar {
   width: 1.85rem;
@@ -2347,11 +2417,50 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .sub-needed-banner-ok { background: var(--green-bg); color: var(--green); }
 .sub-needed-banner-warn { background: var(--red-bg); color: var(--red); }
 .sub-needed-banner-pending { background: var(--yellow-bg); color: var(--yellow); }
-.sub-needed-assign-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.sub-needed-assign-box label { font-size: 0.76rem; font-weight: 700; color: var(--ink); }
-.sub-needed-assign-box select { width: 100%; }
-.sub-needed-footer { display: flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); }
+.sub-needed-assign-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.sub-needed-assign-box label { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+.sub-needed-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.7rem;
+  background: #fff;
+}
+.sub-needed-select-wrap .icon { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
+.sub-needed-select-wrap select {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 0.6rem 0;
+  background: none;
+  font: inherit;
+  min-width: 0;
+}
+/* This one button is deliberately blue (not the site's usual orange
+   primary) to match the reference design exactly. */
+.sub-needed-assign-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  border: none;
+  border-radius: var(--control-radius);
+  padding: 0.7rem;
+  background: #2f5fdb;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.sub-needed-assign-btn:hover { background: #2549ad; }
+.sub-needed-assign-btn .icon { width: 1rem; height: 1rem; }
+.sub-needed-footer { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.6rem; }
 .sub-needed-footer .icon { width: 0.85rem; height: 0.85rem; }
+.sub-needed-candidate-detail { font-size: 0.72rem; color: var(--muted); }
 
 .grid-box {
   min-width: 320px;
@@ -2476,31 +2585,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .setup-team-desc-input:focus { border-color: var(--border); background: var(--surface); }
 
-.setup-public-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+/* Public kiosk Setup/Cleanup view reuses the admin "Our Teams" two-part
+   card design (.team-info-card + .team-members-card) so the two screens
+   match exactly - this just widens the kiosk's normal ~900px content
+   column so all 5 cards fit side by side, and switches the text back to
+   left-aligned inside each card (the kiosk page itself is centered/text-
+   align:center for its headings). */
+.kiosk-team-card-grid {
   width: 100%;
-  max-width: 900px;
+  max-width: 1500px;
   text-align: left;
 }
-.setup-public-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-}
-.setup-public-card h2 { margin: 0 0 0.4rem; font-size: 1.15rem; color: var(--brand-dark); }
-.setup-public-desc { color: var(--muted); margin: 0 0 0.5rem; }
-.setup-public-member-list { list-style: none; margin: 0; padding: 0; }
-.setup-public-member-list li {
-  padding: 0.5rem 0.15rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1rem;
-  font-weight: 600;
-}
-.setup-public-member-list li:last-child { border-bottom: none; }
 
 /* ---------- Member notes dialog ---------- */
 
@@ -2625,7 +2720,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-form-field input[type="text"]::placeholder { color: var(--muted); }
 
-.class-form-section-label { margin: 0.2rem 0 0.5rem; font-weight: 700; font-size: 0.88rem; }
+.class-form-section-label { margin: 0.2rem 0 0.9rem; font-weight: 700; font-size: 0.88rem; }
 .class-form-section-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
 .class-form-section-hint { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; }
 

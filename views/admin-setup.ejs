@@ -41,30 +41,45 @@
 
       <div class="team-card-grid setup-team-card-grid">
         <% teams.forEach(function(t, i) { %>
-          <div class="team-card">
-            <div class="team-card-header">
-              <span class="team-card-icon team-card-icon-<%= i % 5 %>"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <div class="team-card-title-group">
-                <h3 class="team-card-title"><%= t.title %></h3>
-                <span class="team-card-sub"><%= t.description ? t.description : (t.members.length + ' member' + (t.members.length === 1 ? '' : 's')) %></span>
-              </div>
-              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form no-print" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
-                <button type="submit" class="icon-btn team-card-delete-btn" aria-label="Delete <%= t.title %>" title="Delete Team"><svg class="icon"><use href="#icon-trash"/></svg></button>
+          <div class="team-col">
+            <div class="team-info-card team-accent-<%= i % 5 %>">
+              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form no-print team-info-delete" onsubmit="return confirm('Delete team &quot;<%= t.title %>&quot;? This cannot be undone.');">
+                <button type="submit" class="icon-btn" aria-label="Delete <%= t.title %>" title="Delete Team"><svg class="icon"><use href="#icon-trash"/></svg></button>
               </form>
-            </div>
-            <div class="team-card-members">
-              <% if (t.members.length === 0) { %>
-                <p class="team-card-empty">No members yet.</p>
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+              <h3 class="team-info-title"><%= t.title %></h3>
+              <div class="team-info-leader">
+                <svg class="icon"><use href="#icon-user"/></svg>
+                Leader:
+                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/leader" class="inline-block-form no-print">
+                  <select name="leaderId" class="team-info-leader-select" onchange="this.form.submit()">
+                    <option value="">No leader</option>
+                    <% availableParents.forEach(function(p) { %>
+                      <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
+                    <% }); %>
+                  </select>
+                </form>
+              </div>
+              <% if (t.description) { %>
+                <span class="team-info-pill"><svg class="icon"><use href="#icon-tag"/></svg> <span><%= t.description %></span></span>
               <% } %>
-              <% t.members.forEach(function(m) { %>
-                <div class="team-member-row">
-                  <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
-                  <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form no-print">
-                    <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </div>
-              <% }); %>
+            </div>
+            <div class="team-members-card">
+              <h4>Members</h4>
+              <div class="team-card-members">
+                <% if (t.members.length === 0) { %>
+                  <p class="team-card-empty">No members yet.</p>
+                <% } %>
+                <% t.members.forEach(function(m) { %>
+                  <div class="team-member-row">
+                    <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form no-print">
+                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                <% }); %>
+              </div>
             </div>
           </div>
         <% }); %>
@@ -76,6 +91,14 @@
         <h3>Create New Team</h3>
         <input type="text" name="title" placeholder="Team title (e.g. Chairs &amp; Tables)" required />
         <input type="text" name="description" placeholder="Short description (optional)" />
+        <label>Leader (optional)
+          <select name="leaderId">
+            <option value="">No leader</option>
+            <% availableParents.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+        </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Create Team</button>

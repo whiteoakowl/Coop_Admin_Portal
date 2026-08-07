@@ -64,21 +64,20 @@
               <div class="roster-scroll schedule-table-scroll">
                 <table class="roster-table schedule-edit-table">
                   <thead>
-                    <tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th><th>Teacher</th></tr>
+                    <tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr>
                   </thead>
                   <tbody>
                     <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
                     <% if (!anyRows) { %>
-                      <tr><td colspan="5" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                      <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
                     <% } %>
                     <% rows.forEach(function (r, i) { %>
                       <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
                       <tr>
-                        <td class="schedule-edit-label">Class <%= i + 1 %></td>
+                        <td class="schedule-edit-label"><%= i + 1 %></td>
                         <td><%= r.time || '—' %></td>
                         <td><%= r.class_name || '—' %></td>
                         <td><%= r.room || '—' %></td>
-                        <td><%= r.teacher || '—' %></td>
                       </tr>
                     <% }); %>
                   </tbody>

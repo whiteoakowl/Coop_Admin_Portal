@@ -104,6 +104,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     jobs,
     allParents,
     infantByMemberId,
+    rankLabels: RANK_LABELS,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

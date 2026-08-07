@@ -40,36 +40,37 @@
         <p class="roster-empty">No floaters on <%= dayLabel %>'s list yet - use + Add Member above.</p>
       <% } %>
 
-      <div class="team-card-grid">
+      <div class="team-card-grid setup-team-card-grid">
         <% teams.forEach(function(team, i) { %>
-          <div class="team-card">
-            <div class="team-card-header">
-              <span class="team-card-icon team-card-icon-<%= i % 5 %>"><svg class="icon"><use href="#icon-users"/></svg></span>
-              <div class="team-card-title-group">
-                <h3 class="team-card-title"><%= team.hourLabel %></h3>
-                <span class="team-card-sub"><%= team.members.length %> floater<%= team.members.length === 1 ? '' : 's' %></span>
-              </div>
+          <div class="team-col">
+            <div class="team-info-card team-accent-<%= i % 5 %>">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <h3 class="team-info-title"><%= team.hourLabel %></h3>
+              <span class="team-info-pill"><svg class="icon"><use href="#icon-users"/></svg> <span><%= team.members.length %> floater<%= team.members.length === 1 ? '' : 's' %></span></span>
             </div>
-            <div class="team-card-members">
-              <% if (team.members.length === 0) { %>
-                <p class="team-card-empty">No floaters assigned to this hour yet.</p>
-              <% } %>
-              <% team.members.forEach(function(m) { %>
-                <div class="team-member-row">
-                  <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(child &le;2)</span><% } %></span>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
-                    <select name="rank" class="team-member-rank-select" onchange="this.form.submit()">
-                      <% ranks.forEach(function(r) { %>
-                        <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
-                      <% }); %>
-                    </select>
-                  </form>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" onsubmit="return confirm('Remove <%= m.name %> from <%= team.hourLabel %>?');">
-                    <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </div>
-              <% }); %>
+            <div class="team-members-card">
+              <h4>Members</h4>
+              <div class="team-card-members">
+                <% if (team.members.length === 0) { %>
+                  <p class="team-card-empty">No floaters assigned to this hour yet.</p>
+                <% } %>
+                <% team.members.forEach(function(m) { %>
+                  <div class="team-member-row">
+                    <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(child &le;2)</span><% } %></span>
+                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
+                      <select name="rank" class="team-member-rank-select" onchange="this.form.submit()">
+                        <% ranks.forEach(function(r) { %>
+                          <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
+                        <% }); %>
+                      </select>
+                    </form>
+                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" onsubmit="return confirm('Remove <%= m.name %> from <%= team.hourLabel %>?');">
+                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                <% }); %>
+              </div>
             </div>
           </div>
         <% }); %>

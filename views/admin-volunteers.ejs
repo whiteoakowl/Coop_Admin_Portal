@@ -170,6 +170,21 @@
       <div class="sub-needed-grid">
         <% hour.slots.forEach(function(slot) { %>
           <div class="sub-needed-card">
+            <%
+              // One combined, de-duplicated candidate list for the assign
+              // dropdown: the ranked/available floater pool first (each
+              // annotated with their priority level and a child-2-or-
+              // younger note so an admin can choose accordingly), then
+              // every other active parent with no hour-specific data.
+              var usedIds = {};
+              var rankedCandidates = (hour.suggestedFloaters || []).map(function(p) {
+                usedIds[p.id] = true;
+                return { id: p.id, name: p.name, rankLabel: rankLabels[p.rank] || null, infant: !!infantByMemberId[p.id] };
+              });
+              var otherCandidates = allParents.filter(function(p) { return !usedIds[p.id]; }).map(function(p) {
+                return { id: p.id, name: p.name, rankLabel: null, infant: !!infantByMemberId[p.id] };
+              });
+            %>
             <div class="sub-needed-header">
               <svg class="icon"><use href="#icon-redo"/></svg>
               <h3>Substitute Needed</h3>
@@ -179,7 +194,7 @@
               <span class="sub-needed-position-icon"><svg class="icon"><use href="#<%= slot.slotType === 'job' ? 'icon-tag' : 'icon-book' %>"/></svg></span>
               <div>
                 <strong><%= slot.label %><% if (slot.room) { %> &mdash; Room <%= slot.room %><% } else if (slot.detail && slot.slotType === 'class') { %> &mdash; <%= slot.detail %><% } %></strong>
-                <p><%= slot.slotType === 'job' ? 'Permanent Staff Position' : slot.reason %></p>
+                <p><%= slot.slotType === 'job' ? 'Permanent Staff Position' : (slot.ageGroup || slot.reason) %></p>
               </div>
             </div>
 
@@ -188,35 +203,18 @@
             <% } %>
 
             <% if (slot.assigned && slot.assigned.status === 'approved' && !slot.overdue) { %>
-              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></div>
+              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (child &le;2)<% } %></div>
               <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign" class="inline-block-form">
                 <input type="hidden" name="date" value="<%= selectedDate %>" />
                 <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
                 <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
                 <button type="submit" class="btn-secondary">Unassign</button>
               </form>
-            <% } else if (slot.assigned && slot.overdue) { %>
-              <div class="sub-needed-banner sub-needed-banner-warn"><svg class="icon"><use href="#icon-info-circle"/></svg> <%= slot.assigned.name %> hasn't checked in - this position needs a sub again.</div>
-              <div class="sub-needed-assign-box">
-                <label for="assign-select-<%= slot.slotType %>-<%= slot.slotId %>">Assign Available Substitute</label>
-                <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/assign">
-                  <input type="hidden" name="date" value="<%= selectedDate %>" />
-                  <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                  <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                  <input type="hidden" name="isOverride" value="1" />
-                  <select name="memberId" id="assign-select-<%= slot.slotType %>-<%= slot.slotId %>" required>
-                    <option value="" disabled selected>Choose someone&hellip;</option>
-                    <% (hour.suggestedFloaters || []).forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %><% if (infantByMemberId[p.id]) { %> (infant)<% } %></option><% }); %>
-                    <% if (hour.suggestedFloaters && hour.suggestedFloaters.length > 0) { %><option disabled>&mdash;&mdash;&mdash;</option><% } %>
-                    <% allParents.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }); %>
-                  </select>
-                  <button type="submit" class="primary-btn">Assign Substitute</button>
-                </form>
-              </div>
             <% } else { %>
-              <% if (slot.assigned) { %>
-                <div class="sub-needed-banner sub-needed-banner-pending"><svg class="icon"><use href="#icon-info-circle"/></svg> Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (infant)<% } %></div>
-                <p class="hint">Auto-picked by the ranked sub system.</p>
+              <% if (slot.assigned && slot.overdue) { %>
+                <div class="sub-needed-banner sub-needed-banner-warn"><svg class="icon"><use href="#icon-info-circle"/></svg> <%= slot.assigned.name %> hasn't checked in - this position needs a sub again.</div>
+              <% } else if (slot.assigned) { %>
+                <div class="sub-needed-banner sub-needed-banner-pending"><svg class="icon"><use href="#icon-info-circle"/></svg> Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (child &le;2)<% } %></div>
                 <div class="class-schedule-signup-form">
                   <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/approve" class="inline-block-form">
                     <input type="hidden" name="date" value="<%= selectedDate %>" />
@@ -242,16 +240,32 @@
                   <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
                   <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
                   <input type="hidden" name="isOverride" value="1" />
-                  <select name="memberId" id="assign-select-<%= slot.slotType %>-<%= slot.slotId %>" required>
-                    <option value="" disabled selected>Choose someone&hellip;</option>
-                    <% (hour.suggestedFloaters || []).forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %><% if (infantByMemberId[p.id]) { %> (infant)<% } %></option><% }); %>
-                    <% if (hour.suggestedFloaters && hour.suggestedFloaters.length > 0) { %><option disabled>&mdash;&mdash;&mdash;</option><% } %>
-                    <% allParents.forEach(function(p) { %><option value="<%= p.id %>"><%= p.name %></option><% }); %>
-                  </select>
-                  <button type="submit" class="primary-btn">Assign Substitute</button>
+                  <div class="sub-needed-select-wrap">
+                    <svg class="icon"><use href="#icon-user"/></svg>
+                    <select name="memberId" id="assign-select-<%= slot.slotType %>-<%= slot.slotId %>" required>
+                      <option value="" disabled selected>Choose someone&hellip;</option>
+                      <% rankedCandidates.forEach(function(p) { %>
+                        <option value="<%= p.id %>"><%= p.name %><% if (p.infant) { %> &middot; child &le;2<% } %><% if (p.rankLabel) { %> &middot; <%= p.rankLabel %><% } %></option>
+                      <% }); %>
+                      <% if (rankedCandidates.length > 0 && otherCandidates.length > 0) { %><option disabled>&mdash;&mdash;&mdash;</option><% } %>
+                      <% otherCandidates.forEach(function(p) { %>
+                        <option value="<%= p.id %>"><%= p.name %><% if (p.infant) { %> &middot; child &le;2<% } %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <button type="submit" class="sub-needed-assign-btn"><svg class="icon"><use href="#icon-user-plus"/></svg> Assign Substitute</button>
                 </form>
               </div>
             <% } %>
+
+            <div class="sub-needed-footer">
+              <svg class="icon"><use href="#icon-clock"/></svg>
+              <% if (slot.assigned && slot.assigned.updatedLabel) { %>
+                Last updated: <%= slot.assigned.updatedLabel %>
+              <% } else { %>
+                Not yet assigned
+              <% } %>
+            </div>
           </div>
         <% }); %>
       </div>

@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { DAY_LABELS, defaultDay, requireDay } = require('../utils/days');
-const { teamsForDay, membersForTeam } = require('../utils/setup');
+const { teamsForDay, membersForTeam, setTeamLeader } = require('../utils/setup');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { activeParentOptions } = require('../utils/members');
 
@@ -35,11 +35,22 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
+  const leaderId = parseInt(req.body.leaderId, 10) || null;
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  db.prepare('INSERT INTO setup_teams (day, title, description) VALUES (?, ?, ?)').run(day, title, description || null);
+  db.prepare('INSERT INTO setup_teams (day, title, description, leader_id) VALUES (?, ?, ?, ?)').run(day, title, description || null, leaderId);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
+});
+
+// Leader dropdown auto-submits on change, same pattern as a Floater
+// Teams rank select - no separate "edit" step.
+router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const teamId = parseInt(req.params.teamId, 10);
+  const leaderId = parseInt(req.body.leaderId, 10) || null;
+  setTeamLeader(teamId, leaderId);
+  res.redirect(`/admin/setup/${day}/manage`);
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, (req, res) => {

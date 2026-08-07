@@ -184,6 +184,11 @@ if (!permanentJobColumns.includes('room')) {
   db.exec('ALTER TABLE permanent_jobs ADD COLUMN room TEXT');
 }
 
+const setupTeamColumns = db.prepare('PRAGMA table_info(setup_teams)').all().map((c) => c.name);
+if (!setupTeamColumns.includes('leader_id')) {
+  db.exec('ALTER TABLE setup_teams ADD COLUMN leader_id INTEGER REFERENCES members(id) ON DELETE SET NULL');
+}
+
 const libraryItemColumns = db.prepare('PRAGMA table_info(library_items)').all().map((c) => c.name);
 if (!libraryItemColumns.includes('type')) {
   db.exec('ALTER TABLE library_items ADD COLUMN type TEXT');

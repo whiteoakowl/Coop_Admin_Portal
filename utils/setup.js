@@ -1,7 +1,15 @@
 const db = require('../db');
 
 function teamsForDay(day) {
-  return db.prepare('SELECT * FROM setup_teams WHERE day = ? ORDER BY title COLLATE NOCASE').all(day);
+  return db
+    .prepare(
+      `SELECT st.*, m.name AS leaderName
+       FROM setup_teams st
+       LEFT JOIN members m ON m.id = st.leader_id AND m.active = 1
+       WHERE st.day = ?
+       ORDER BY st.title COLLATE NOCASE`
+    )
+    .all(day);
 }
 
 function membersForTeam(teamId) {
@@ -15,4 +23,8 @@ function membersForTeam(teamId) {
     .all(teamId);
 }
 
-module.exports = { teamsForDay, membersForTeam };
+function setTeamLeader(teamId, leaderId) {
+  db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(leaderId || null, teamId);
+}
+
+module.exports = { teamsForDay, membersForTeam, setTeamLeader };

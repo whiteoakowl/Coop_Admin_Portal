@@ -151,11 +151,11 @@
                     <% var dayLabel = entry[0], dayRows = entry[1]; %>
                     <h4><%= dayLabel %></h4>
                     <table class="roster-table schedule-print-table">
-                      <thead><tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                      <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
                       <tbody>
                         <% dayRows.forEach(function(c, i) { %>
                           <tr>
-                            <td>Class <%= i + 1 %></td>
+                            <td><%= i + 1 %></td>
                             <td><%= c.time || '—' %></td>
                             <td><%= c.class_name || '—' %></td>
                             <td><%= c.room || '—' %></td>

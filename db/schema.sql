@@ -182,6 +182,9 @@ CREATE TABLE IF NOT EXISTS setup_teams (
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
   title TEXT NOT NULL,
   description TEXT,
+  -- The team's leader, picked from active parent members - shown on the
+  -- team card and settable/changeable there via a dropdown.
+  leader_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
