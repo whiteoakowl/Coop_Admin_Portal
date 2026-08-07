@@ -597,7 +597,7 @@ textarea:focus-visible,
   color: var(--ink);
   font-weight: 700;
 }
-.admin-sidebar .brand img { height: 112px; width: 112px; border-radius: 50%; flex-shrink: 0; }
+.admin-sidebar .brand img { height: 160px; width: 160px; border-radius: 50%; flex-shrink: 0; }
 .admin-mobile-topbar .brand img { height: 28px; width: 28px; border-radius: 50%; flex-shrink: 0; }
 
 .admin-sidebar nav { display: flex; flex-direction: column; gap: 0.15rem; }
