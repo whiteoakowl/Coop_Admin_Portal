@@ -10,42 +10,43 @@
     <div class="roster-toolbar">
       <div><h1><%= member.name %></h1></div>
       <div class="roster-btn-row no-print">
-        <a class="roster-action-btn file-action-btn" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+        <a class="roster-action-btn print-action-btn" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
       </div>
     </div>
 
-    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <p class="hint no-print">Generated automatically from the Class Schedule - enroll or staff <%= member.name %> on a class there to change what shows up here.</p>
 
-    <form method="POST" action="/admin/schedule/member/<%= member.id %>">
-      <div class="schedule-day-columns">
-        <% [['monday', 'Monday', monday], ['wednesday', 'Wednesday', wednesday]].forEach(function (entry) { %>
-          <% var dayKey = entry[0], dayLabel = entry[1], rows = entry[2]; %>
-          <div class="form-section">
-            <h2><%= dayLabel %> Schedule</h2>
-            <div class="roster-scroll schedule-table-scroll">
-              <table class="roster-table schedule-edit-table">
-                <thead>
-                  <tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th><th>Teacher</th></tr>
-                </thead>
-                <tbody>
-                  <% rows.forEach(function (r, i) { %>
-                    <tr>
-                      <td class="schedule-edit-label">Class <%= i + 1 %></td>
-                      <td><input type="text" name="time:<%= dayKey %>:<%= i + 1 %>" value="<%= r.time %>" placeholder="9:00 - 9:45 AM" /></td>
-                      <td><input type="text" name="className:<%= dayKey %>:<%= i + 1 %>" value="<%= r.class_name %>" placeholder="Class Name" /></td>
-                      <td><input type="text" name="room:<%= dayKey %>:<%= i + 1 %>" value="<%= r.room %>" placeholder="Room" /></td>
-                      <td><input type="text" name="teacher:<%= dayKey %>:<%= i + 1 %>" value="<%= r.teacher %>" placeholder="Teacher" /></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
+    <div class="schedule-day-columns">
+      <% [['monday', 'Monday', monday], ['wednesday', 'Wednesday', wednesday]].forEach(function (entry) { %>
+        <% var dayKey = entry[0], dayLabel = entry[1], rows = entry[2]; %>
+        <div class="form-section">
+          <h2><%= dayLabel %> Schedule</h2>
+          <div class="roster-scroll schedule-table-scroll">
+            <table class="roster-table schedule-edit-table">
+              <thead>
+                <tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th><th>Teacher</th></tr>
+              </thead>
+              <tbody>
+                <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                <% if (!anyRows) { %>
+                  <tr><td colspan="5" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                <% } %>
+                <% rows.forEach(function (r, i) { %>
+                  <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                  <tr>
+                    <td class="schedule-edit-label">Class <%= i + 1 %></td>
+                    <td><%= r.time || '—' %></td>
+                    <td><%= r.class_name || '—' %></td>
+                    <td><%= r.room || '—' %></td>
+                    <td><%= r.teacher || '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
           </div>
-        <% }); %>
-      </div>
-
-      <button type="submit" class="primary-btn no-print">Save Schedule</button>
-    </form>
+        </div>
+      <% }); %>
+    </div>
   </main>
 </body>
 </html>

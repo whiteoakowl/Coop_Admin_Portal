@@ -77,6 +77,8 @@ router.post('/class-schedule/:day/classes/new', requireFullAdmin, requireDay, (r
     room: (req.body.room || '').trim(),
     ageGroup: (req.body.ageGroup || '').trim(),
     color: req.body.color || null,
+    startTime: (req.body.startTime || '').trim(),
+    endTime: (req.body.endTime || '').trim(),
   });
   res.redirect(`/admin/class-schedule/classes/${id}/manage`);
 });
@@ -121,6 +123,8 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, (req, res) => {
     ageGroup: (req.body.ageGroup || '').trim(),
     color: req.body.color || cls.color,
     notes: (req.body.notes || '').trim(),
+    startTime: (req.body.startTime || '').trim(),
+    endTime: (req.body.endTime || '').trim(),
   });
   res.redirect(`/admin/class-schedule/classes/${id}/manage?notice=` + encodeURIComponent('Class updated.'));
 });

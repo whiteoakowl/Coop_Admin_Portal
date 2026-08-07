@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/members">&larr; Members</a></p>
+
+    <div class="roster-toolbar">
+      <div>
+        <h1><%= member.name %></h1>
+      </div>
+      <div class="roster-btn-row no-print">
+        <a class="roster-action-btn" href="/admin/members/<%= member.id %>/edit">Edit Profile</a>
+      </div>
+    </div>
+
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'profile' ? ' active' : '' %>" href="/admin/members/<%= member.id %>?tab=profile">Profile</a>
+      <a class="view-tab<%= tab === 'schedule' ? ' active' : '' %>" href="/admin/members/<%= member.id %>?tab=schedule">Class Schedule</a>
+      <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="/admin/members/<%= member.id %>?tab=attendance">Attendance</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'profile') { %>
+        <div class="member-profile-header">
+          <% if (member.photo_path) { %>
+            <img class="member-photo-preview" src="<%= member.photo_path %>" alt="" />
+          <% } %>
+          <div>
+            <span class="badge-pill"><%= member.member_type === 'parent' ? 'Parent' : member.member_type === 'admin' ? 'Admin' : 'Student' %></span>
+          </div>
+        </div>
+        <dl class="member-profile-list">
+          <% if (member.address || member.city || member.state || member.zip) { %>
+            <dt>Address</dt>
+            <dd><%= [member.address, member.city, [member.state, member.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') %></dd>
+          <% } %>
+          <% if (member.phone) { %><dt>Phone</dt><dd><%= member.phone %></dd><% } %>
+          <% if (member.email) { %><dt>Email</dt><dd><%= member.email %></dd><% } %>
+          <% if (member.member_type !== 'parent') { %>
+            <% if (member.birthday) { %><dt>Birthday</dt><dd><%= member.birthday %></dd><% } %>
+            <% if (member.grade_level) { %><dt>Grade Level</dt><dd><%= member.grade_level %></dd><% } %>
+            <% if (member.medical_notes) { %><dt>Medical/Allergy Notes</dt><dd><%= member.medical_notes %></dd><% } %>
+          <% } %>
+          <dt>Family</dt>
+          <dd><%= familyNames.length ? familyNames.join(', ') : '—' %></dd>
+          <dt>Rosters</dt>
+          <dd>
+            <% if (rosters.length === 0) { %>—<% } %>
+            <% rosters.forEach(function(r) { %><span class="badge-pill"><%= r.name %></span><% }); %>
+          </dd>
+          <% if (member.notes) { %><dt>Notes</dt><dd><%= member.notes %></dd><% } %>
+        </dl>
+      <% } else if (tab === 'schedule') { %>
+        <p class="hint">Generated automatically from the Class Schedule - enroll or staff <%= member.name %> on a class there to change what shows up here.</p>
+        <div class="schedule-day-columns">
+          <% [['monday', 'Monday', schedule.monday], ['wednesday', 'Wednesday', schedule.wednesday]].forEach(function (entry) { %>
+            <% var dayLabel = entry[1], rows = entry[2]; %>
+            <div class="form-section">
+              <h2><%= dayLabel %> Schedule</h2>
+              <div class="roster-scroll schedule-table-scroll">
+                <table class="roster-table schedule-edit-table">
+                  <thead>
+                    <tr><th>Class</th><th>Time</th><th>Class Name</th><th>Room</th><th>Teacher</th></tr>
+                  </thead>
+                  <tbody>
+                    <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                    <% if (!anyRows) { %>
+                      <tr><td colspan="5" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                    <% } %>
+                    <% rows.forEach(function (r, i) { %>
+                      <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                      <tr>
+                        <td class="schedule-edit-label">Class <%= i + 1 %></td>
+                        <td><%= r.time || '—' %></td>
+                        <td><%= r.class_name || '—' %></td>
+                        <td><%= r.room || '—' %></td>
+                        <td><%= r.teacher || '—' %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Number</th></tr>
+            </thead>
+            <tbody>
+              <% if (history.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No attendance recorded yet.</td></tr>
+              <% } %>
+              <% history.forEach(function(h) { %>
+                <tr>
+                  <td><%= h.rosterName %></td>
+                  <td><%= h.dateLabel %></td>
+                  <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                  <td><%= h.checkInTime || '—' %></td>
+                  <td><%= h.checkOutTime || '—' %></td>
+                  <td><%= h.number ?? '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

@@ -8,7 +8,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel } = require('../utils/dates');
+const { formatDateLabel, formatTime } = require('../utils/dates');
 const { imageFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
@@ -46,6 +46,22 @@ function rostersForMember(memberId) {
       `SELECT r.* FROM rosters r
        JOIN roster_members rm ON rm.roster_id = r.id
        WHERE rm.member_id = ? ORDER BY r.name COLLATE NOCASE`
+    )
+    .all(memberId);
+}
+
+// Every attendance record for this member across every roster they're on,
+// newest first - the Members profile page's Attendance tab.
+function attendanceHistoryForMember(memberId) {
+  return db
+    .prepare(
+      `SELECT r.name AS rosterName, a.session_date AS date, a.status,
+              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+       FROM attendance a
+       JOIN rosters r ON r.id = a.roster_id
+       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+       WHERE a.member_id = ?
+       ORDER BY a.session_date DESC`
     )
     .all(memberId);
 }
@@ -237,6 +253,56 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
 
+// Full-profile bulk import - the Members page is the only place a CSV/XLSX
+// upload can create brand-new member records, so unlike every other import
+// popup in the app, this one reads the full set of profile columns.
+// Registered here (before the /members/:id routes below) so its literal
+// path never gets shadowed by the :id param.
+router.get('/members/import-template.xlsx', requireAdmin, (req, res) => {
+  const buffer = buildTemplateWorkbook(
+    ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
+    [
+      ['Jane Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', ''],
+      ['Alice Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane Smith'],
+    ]
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
+  res.send(buffer);
+});
+
+const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
+
+// Clicking a member's name anywhere lands here - a read-only profile with
+// Profile / Class Schedule / Attendance tabs. Class Schedule reflects
+// class enrollment/staffing automatically (see syncMemberSchedulesForDay
+// in utils/classSchedule.js); actually editing the profile itself is
+// still the dedicated Edit page, linked from the Profile tab.
+router.get('/members/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+  const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
+
+  res.render('admin-member-profile', {
+    title: member.name,
+    member,
+    tab,
+    familyNames: familyOf(id).map((m) => m.name),
+    rosters: rostersForMember(id),
+    schedule: getMemberSchedule(id),
+    history: attendanceHistoryForMember(id).map((r) => ({
+      rosterName: r.rosterName,
+      dateLabel: formatDateLabel(r.date),
+      statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+      status: r.status,
+      checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+      checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+      number: r.number,
+    })),
+  });
+});
+
 router.get('/members/:id/edit', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
@@ -337,22 +403,6 @@ router.post('/members/:id/portal-access', requireAdmin, (req, res) => {
   }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Portal access updated for ${member.name}.`));
-});
-
-// Full-profile bulk import - the Members page is the only place a CSV/XLSX
-// upload can create brand-new member records, so unlike every other import
-// popup in the app, this one reads the full set of profile columns.
-router.get('/members/import-template.xlsx', requireAdmin, (req, res) => {
-  const buffer = buildTemplateWorkbook(
-    ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
-    [
-      ['Jane Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', ''],
-      ['Alice Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane Smith'],
-    ]
-  );
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
-  res.send(buffer);
 });
 
 const MEMBER_IMPORT_HEADER_ALIASES = {

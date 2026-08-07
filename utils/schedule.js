@@ -102,36 +102,6 @@ function scheduleStatus(monday, wednesday) {
 
 const STATUS_LABELS = { none: 'No Schedule', partial: 'Incomplete', complete: 'Complete' };
 
-// Replaces a member's full schedule (both days) in one transaction-like
-// pass. dayRows is { monday: [{time,className,room,teacher} x4], wednesday: [...] }.
-// A blank row (all 4 fields empty) is deleted rather than stored, so
-// clearing a class removes it instead of leaving an empty row behind.
-function saveMemberSchedule(memberId, dayRows) {
-  const del = db.prepare('DELETE FROM member_schedules WHERE member_id = ? AND day = ? AND class_number = ?');
-  const upsert = db.prepare(
-    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(member_id, day, class_number) DO UPDATE SET
-       time = excluded.time, class_name = excluded.class_name, room = excluded.room,
-       teacher = excluded.teacher, updated_at = datetime('now')`
-  );
-  DAYS.forEach((day) => {
-    const rows = (dayRows[day] || []).slice(0, 4);
-    CLASS_NUMBERS.forEach((n) => {
-      const row = rows[n - 1] || {};
-      const time = (row.time || '').trim();
-      const className = (row.className || '').trim();
-      const room = (row.room || '').trim();
-      const teacher = (row.teacher || '').trim();
-      if (!time && !className && !room && !teacher) {
-        del.run(memberId, day, n);
-      } else {
-        upsert.run(memberId, day, n, time, className, room, teacher);
-      }
-    });
-  });
-}
-
 // One row per active student, joined with their schedule summary, for the
 // Class Schedules table. Filters are all optional/AND-combined.
 function scheduleList(filters) {
@@ -191,7 +161,6 @@ module.exports = {
   getMemberSchedule,
   rowIsBlank,
   scheduleStatus,
-  saveMemberSchedule,
   scheduleList,
   arrivalDepartureLabels,
 };

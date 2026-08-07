@@ -130,8 +130,8 @@ function roomGridForDay(day) {
 function createClass(fields) {
   const info = db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -140,7 +140,9 @@ function createClass(fields) {
       fields.room || null,
       fields.ageGroup || null,
       fields.color || nextPaletteColor(),
-      fields.notes || null
+      fields.notes || null,
+      fields.startTime || null,
+      fields.endTime || null
     );
   const id = info.lastInsertRowid;
   ensureClassRoster(id);
@@ -148,9 +150,9 @@ function createClass(fields) {
 }
 
 function updateClass(id, fields) {
-  const before = db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(id);
+  const before = db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ? WHERE id = ?`
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ? WHERE id = ?`
   ).run(
     fields.day,
     fields.hourPosition,
@@ -159,12 +161,19 @@ function updateClass(id, fields) {
     fields.ageGroup || null,
     fields.color || '#EE9A4D',
     fields.notes || null,
+    fields.startTime || null,
+    fields.endTime || null,
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.
   if (before && before.roster_id) {
     db.prepare('UPDATE rosters SET name = ?, schedule_day = ? WHERE id = ?').run(fields.className, fields.day, before.roster_id);
   }
+  // Re-derive roster membership + member_schedules for whichever day(s)
+  // are affected - both the old day (in case this class just moved off
+  // it) and the new one.
+  syncDayMemberRosters(fields.day);
+  if (before && before.day && before.day !== fields.day) syncDayMemberRosters(before.day);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing
@@ -444,6 +453,47 @@ function syncDayMemberRosters(day) {
   }
   setRosterMembership(ensureDayRoster(day, 'student'), studentIds);
   setRosterMembership(ensureDayRoster(day, 'parent'), parentIds);
+  syncMemberSchedulesForDay(day);
+}
+
+// A class's display time range: its own start_time/end_time if an admin
+// set them, otherwise its hour block's shared label (e.g. "Hour 1" or
+// whatever an admin renamed it to via Edit Hours).
+function timeRangeForClass(cls) {
+  if (cls.start_time && cls.end_time) return `${cls.start_time} - ${cls.end_time}`;
+  const hour = db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
+  return (hour && hour.label) || '';
+}
+
+// member_schedules (the per-member "Schedule Card" / profile Class
+// Schedule tab data) is entirely derived from the master Class Schedule -
+// there's no separate hand-typed version anymore, so this fully rebuilds
+// one day's rows from current enrollment/staffing every time either
+// changes (called from syncDayMemberRosters, which already runs on every
+// enrollment/staff/class edit). A person shows up once per class they're
+// either enrolled in (student) or staffing (teacher/assistant); "teacher"
+// on their row lists that class's teacher(s), themselves included if
+// that's their own class.
+function syncMemberSchedulesForDay(day) {
+  const classes = db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
+  const upsert = db.prepare(
+    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(member_id, day, class_number) DO UPDATE SET
+       time = excluded.time, class_name = excluded.class_name, room = excluded.room,
+       teacher = excluded.teacher, updated_at = datetime('now')`
+  );
+
+  classes.forEach((cls) => {
+    const time = timeRangeForClass(cls);
+    const staff = staffForClass(cls.id);
+    const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
+    const people = [...studentsForClass(cls.id), ...staff];
+    people.forEach((person) => {
+      upsert.run(person.id, day, cls.hour_position, time, cls.class_name, cls.room || '', teacherNames);
+    });
+  });
 }
 
 function appSetting(key, fallback) {

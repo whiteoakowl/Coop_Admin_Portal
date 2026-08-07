@@ -172,6 +172,12 @@ const classColumns = db.prepare('PRAGMA table_info(classes)').all().map((c) => c
 if (!classColumns.includes('roster_id')) {
   db.exec('ALTER TABLE classes ADD COLUMN roster_id INTEGER REFERENCES rosters(id) ON DELETE SET NULL');
 }
+if (!classColumns.includes('start_time')) {
+  db.exec('ALTER TABLE classes ADD COLUMN start_time TEXT');
+}
+if (!classColumns.includes('end_time')) {
+  db.exec('ALTER TABLE classes ADD COLUMN end_time TEXT');
+}
 
 const libraryItemColumns = db.prepare('PRAGMA table_info(library_items)').all().map((c) => c.name);
 if (!libraryItemColumns.includes('type')) {

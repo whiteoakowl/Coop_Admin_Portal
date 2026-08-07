@@ -75,7 +75,7 @@
                   <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                 <% } %>
               </td>
-              <td><a href="/admin/members/<%= m.id %>/edit"><%= m.name %></a></td>
+              <td><a href="/admin/members/<%= m.id %>"><%= m.name %></a></td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
               <td class="members-col-rosters">

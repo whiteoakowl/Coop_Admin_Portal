@@ -282,6 +282,12 @@ CREATE TABLE IF NOT EXISTS classes (
   age_group TEXT,
   color TEXT NOT NULL DEFAULT '#EE9A4D',
   notes TEXT,
+  -- Per-class start/end time, e.g. "9:00 AM"/"9:45 AM" - two classes can
+  -- share the same hour_position slot but still run at slightly different
+  -- times. Falls back to the hour block's own label (class_schedule_hours)
+  -- when blank - see timeRangeForClass in utils/classSchedule.js.
+  start_time TEXT,
+  end_time TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   -- Auto-created/maintained class roster (students only) that mirrors this
   -- class's enrollment - see ensureClassRoster/syncClassRosterMembers in

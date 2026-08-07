@@ -10,10 +10,15 @@ const db = require('./db'); // initialize database + seed default admin
 // The Monday/Wednesday Parent/Student rosters are normally created lazily
 // the first time a class enrolls/staffs someone that day - ensure all 4
 // always exist up front so they're visible on Attendance immediately, even
-// before any classes are set up.
-const { ensureDayRoster } = require('./utils/classSchedule');
+// before any classes are set up. syncDayMemberRosters then backfills both
+// days' roster membership AND member_schedules (the derived Schedule Card
+// / profile Class Schedule data) from current enrollment/staffing, so
+// existing classes are reflected everywhere on every boot, not just after
+// their next edit.
+const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
 ['monday', 'wednesday'].forEach((day) => {
   ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
+  syncDayMemberRosters(day);
 });
 
 const { defaultDay } = require('./utils/days');
