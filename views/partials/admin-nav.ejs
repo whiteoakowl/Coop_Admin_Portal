@@ -7,14 +7,8 @@
   <nav id="admin-nav-links">
     <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
     <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
-    <details class="admin-nav-group">
-      <summary>
-        <svg class="icon"><use href="#icon-users"/></svg> Volunteers
-        <svg class="icon icon-chevron"><use href="#icon-chevron-down"/></svg>
-      </summary>
-      <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Floater Assignments</a>
-      <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg> Setup/Cleanup</a>
-    </details>
+    <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Floater Assignments</a>
+    <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg> Setup/Cleanup</a>
     <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg> Schedules</a>
     <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Logs</a>
     <% if (isFullAdmin) { %>
