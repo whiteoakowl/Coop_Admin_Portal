@@ -16,7 +16,7 @@
       <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
     <% } %>
 
-    <form method="POST" action="/name-tag/submit" id="name-tag-form" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+    <form method="POST" action="/name-tag/submit" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
       <div class="form-section">
         <div class="stack-form">
           <label for="parentId">Parent Name</label>

@@ -245,32 +245,6 @@
           </form>
         </div>
 
-        <div class="manage-section no-print">
-          <h2>Classes Needing a Teacher or Assistant</h2>
-          <% if (classesNeedingStaff.length === 0) { %>
-            <p class="roster-empty">Every class on <%= dayLabel %> has a teacher and an assistant assigned.</p>
-          <% } else { %>
-            <div class="roster-scroll">
-              <table class="roster-table members-table condensed-table">
-                <thead><tr><th>Hour</th><th>Class</th><th>Room</th><th>Missing</th></tr></thead>
-                <tbody>
-                  <% classesNeedingStaff.forEach(function(c) { %>
-                    <tr>
-                      <td><%= c.hourLabel %></td>
-                      <td><%= c.className %></td>
-                      <td><%= c.room || '—' %></td>
-                      <td>
-                        <% if (c.missingTeacher) { %><span class="badge-pill badge-pill-absent">Teacher</span><% } %>
-                        <% if (c.missingAssistant) { %><span class="badge-pill badge-pill-pending">Assistant</span><% } %>
-                      </td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } %>
-        </div>
-
         <h2 class="dashboard-section-title">Substitutes</h2>
         <div class="roster-toolbar no-print">
           <div class="filter-row">
