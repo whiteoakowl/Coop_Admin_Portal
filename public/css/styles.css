@@ -3326,7 +3326,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .roster-log-empty { color: var(--muted); font-size: 0.9rem; padding: 0.5rem 0; }
 
-.class-schedule-print-page .print-page { padding: 0; }
+/* This page prints landscape (see the @page rule in the view) - the
+   on-screen .print-page preview is normally portrait 8.5x11in, so it's
+   resized here to landscape 11x8.5in with the same 0.4in margin the real
+   @page rule uses, so what's previewed on screen is what actually
+   prints, not a taller/narrower shape with more headroom than the paper
+   really has. Fixed height (not .print-page's usual min-height) gives
+   .class-schedule-print-fit below a hard boundary to shrink-to-fit
+   against. */
+.class-schedule-print-page .print-page {
+  width: 11in;
+  height: 8.5in;
+  min-height: 0;
+  padding: 0.4in;
+}
+/* Takes up whatever height is left under the header within that fixed
+   11x8.5in page - print-shrink-to-fit.js measures this box and zooms
+   .class-schedule-print-grid down (never up) to land inside it, so a
+   busy day's classes shrink to stay on one page instead of spilling onto
+   a second. */
+.class-schedule-print-fit { flex: 1; min-height: 0; overflow: hidden; }
 .class-schedule-print-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
 .class-schedule-print-hour h2 { font-size: 0.95rem; margin: 0 0 0.4rem; border-bottom: 2px solid #000; padding-bottom: 0.2rem; }
 .class-schedule-print-empty { font-size: 0.8rem; color: #666; margin: 0; }
@@ -3586,6 +3605,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     margin: 0;
     border: none;
     box-shadow: none;
+  }
+
+  /* Keep a hard, exactly-one-landscape-page box at actual print time too
+     (not the generic auto/100vh above) - print-shrink-to-fit.js's
+     beforeprint recalculation needs a real page-sized box to measure
+     against, or there'd be nothing to shrink the schedule to fit into. */
+  .class-schedule-print-page .print-page {
+    width: 11in;
+    height: 8.5in;
+    min-height: 0;
+    padding: 0.4in;
   }
 }
 

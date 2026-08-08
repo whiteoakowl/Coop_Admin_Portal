@@ -21,33 +21,36 @@
         </div>
       </div>
 
-      <div class="class-schedule-print-grid">
-        <% grid.forEach(function(hour) { %>
-          <div class="class-schedule-print-hour">
-            <h2><%= hour.label %></h2>
-            <% if (hour.classes.length === 0) { %>
-              <p class="class-schedule-print-empty">No classes</p>
-            <% } else { %>
-              <% hour.classes.forEach(function(cls) { %>
-                <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
-                  <h3><%= cls.class_name %></h3>
-                  <p class="class-card-meta">
-                    <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
-                    <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
-                    <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
-                  </p>
-                  <% if (cls.staff.length > 0) { %>
-                    <p class="class-schedule-print-staff">
-                      <%= cls.staff.map(function(s) { return s.name + (s.role === 'assistant' ? ' (A)' : ''); }).join(', ') %>
+      <div class="class-schedule-print-fit" data-shrink-to-fit>
+        <div class="class-schedule-print-grid">
+          <% grid.forEach(function(hour) { %>
+            <div class="class-schedule-print-hour">
+              <h2><%= hour.label %></h2>
+              <% if (hour.classes.length === 0) { %>
+                <p class="class-schedule-print-empty">No classes</p>
+              <% } else { %>
+                <% hour.classes.forEach(function(cls) { %>
+                  <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                    <h3><%= cls.class_name %></h3>
+                    <p class="class-card-meta">
+                      <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
+                      <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
+                      <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
                     </p>
-                  <% } %>
-                </div>
-              <% }); %>
-            <% } %>
-          </div>
-        <% }); %>
+                    <% if (cls.staff.length > 0) { %>
+                      <p class="class-schedule-print-staff">
+                        <%= cls.staff.map(function(s) { return s.name + (s.role === 'assistant' ? ' (A)' : ''); }).join(', ') %>
+                      </p>
+                    <% } %>
+                  </div>
+                <% }); %>
+              <% } %>
+            </div>
+          <% }); %>
+        </div>
       </div>
     </div>
   </main>
+  <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>
