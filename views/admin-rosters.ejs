@@ -141,7 +141,7 @@
               <% dateLabels.forEach(function(label) { %>
                 <th><%= label %></th>
               <% }); %>
-              <th class="no-print">Actions</th>
+              <th class="no-print"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -159,7 +159,7 @@
             <% rows.forEach(function(row) { %>
               <tr>
                 <td class="roster-name-col">
-                  <button type="button" class="link-btn" title="View profile for <%= row.member.name %>" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button>
+                  <button type="button" class="link-btn" title="View profile for <%= row.member.name %>" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button><%- include('partials/medical-flag', { member: row.member }) %>
                 </td>
                 <td class="roster-secondary-col"><%= row.arrivalLabel || '—' %></td>
                 <td class="roster-secondary-col"><%= row.departureLabel || '—' %></td>
@@ -188,7 +188,7 @@
                     <img class="member-photo-preview" src="<%= row.member.photo_path %>" alt="" />
                   <% } %>
                   <div>
-                    <h3><%= row.member.name %></h3>
+                    <h3><%= row.member.name %><%- include('partials/medical-flag', { member: row.member }) %></h3>
                     <span class="badge-pill"><%= row.member.member_type === 'parent' ? 'Parent' : 'Student' %></span>
                   </div>
                 </div>

@@ -10,7 +10,7 @@
 
     <div class="roster-toolbar">
       <div>
-        <h1><%= member.name %></h1>
+        <h1><%= member.name %><%- include('partials/medical-flag', { member: member }) %></h1>
       </div>
       <div class="roster-btn-row no-print">
         <a class="roster-action-btn" href="/admin/members/<%= member.id %>/edit">Edit Profile</a>

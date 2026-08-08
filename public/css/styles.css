@@ -1446,6 +1446,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .members-table td { text-align: left; }
 .members-table th { text-align: left; }
+.members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
 /* Mobile member list: keep it to Name, Type, and the action icons - Photo,
@@ -2360,6 +2361,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-member-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-member-flag { font-size: 0.62rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+
+/* Small red medical-bag flag next to a member's name wherever one shows -
+   a same-glance heads-up that they have allergy/medical notes on file,
+   without having to open their profile. */
+.medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
+.medical-flag .icon { width: 0.95em; height: 0.95em; }
 .team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
@@ -3132,13 +3139,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      show just the grid, not the embedded Floater Assignments box. */
   .volunteer-box { display: none !important; }
 
-  /* Members page: printed roster is a name/type/parent/rosters list, not
-     an interactive table - hide the action icon buttons column. */
-  .members-table .actions-cell { display: none; }
+  /* Members page: printing swaps the interactive table for a plain
+     Name/Type/Family/Roster/Grade/Birthday grid (.members-print-table,
+     hidden on screen below) instead of trying to print photo thumbnails
+     and icon buttons. */
+  .members-table { display: none; }
+  .members-print-table { display: table; }
 
   /* Infant flag is an admin-only note for staffing decisions - never let
-     it end up on a physical printout that could be seen by members. */
+     it end up on a physical printout that could be seen by members. Same
+     for the medical-notes flag - the dedicated Allergies/Medical log is
+     the intentional, admin-only place to print that information. */
   .infant-tag { display: none !important; }
+  .medical-flag { display: none !important; }
 
   .print-header {
     display: flex;

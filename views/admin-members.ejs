@@ -16,10 +16,10 @@
     <h1>Members</h1>
 
     <% if (error) { %>
-      <div class="alert alert-error"><%= error %></div>
+      <div class="alert alert-error no-print"><%= error %></div>
     <% } %>
     <% if (notice) { %>
-      <div class="alert alert-success"><%= notice %></div>
+      <div class="alert alert-success no-print"><%= notice %></div>
     <% } %>
 
     <div class="roster-toolbar no-print">
@@ -75,7 +75,7 @@
                   <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                 <% } %>
               </td>
-              <td><a href="/admin/members/<%= m.id %>"><%= m.name %></a></td>
+              <td><a href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %></td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
               <td class="members-col-rosters">
@@ -176,6 +176,34 @@
         </tbody>
       </table>
     </div>
+
+    <%# Printing shows this plain grid instead of the interactive table
+        above (screen icons/dropdowns don't belong on paper) - see
+        .members-print-table in styles.css. %>
+    <table class="roster-table members-print-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Family</th>
+          <th>Roster</th>
+          <th>Grade</th>
+          <th>Birthday</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% members.forEach(function(m) { %>
+          <tr>
+            <td><%= m.name %></td>
+            <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
+            <td><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
+            <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
+            <td><%= m.grade_level || '—' %></td>
+            <td><%= m.birthday || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>
