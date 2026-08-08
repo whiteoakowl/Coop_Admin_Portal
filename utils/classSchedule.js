@@ -77,8 +77,9 @@ function saveHourLabels(day, labels) {
 function studentsForClass(classId) {
   return db
     .prepare(
-      `SELECT m.* FROM class_enrollments ce
+      `SELECT m.*, f.name AS family_name FROM class_enrollments ce
        JOIN members m ON m.id = ce.student_id
+       LEFT JOIN families f ON f.id = m.family_id
        WHERE ce.class_id = ? AND m.active = 1
        ORDER BY m.name COLLATE NOCASE`
     )

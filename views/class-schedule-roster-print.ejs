@@ -40,13 +40,19 @@
 
       <h3>Student Roster</h3>
       <table class="roster-table">
-        <thead><tr><th>Name</th><th>Grade</th></tr></thead>
+        <thead><tr><th>Name</th><th>Family</th><th>Age</th><th>Grade</th><th>Birthday</th></tr></thead>
         <tbody>
           <% if (cls.students.length === 0) { %>
-            <tr><td colspan="2" class="roster-empty">No students enrolled yet.</td></tr>
+            <tr><td colspan="5" class="roster-empty">No students enrolled yet.</td></tr>
           <% } %>
           <% cls.students.forEach(function(s) { %>
-            <tr><td><%= s.name %></td><td><%= s.grade_level || '—' %></td></tr>
+            <tr>
+              <td><%= s.name %></td>
+              <td><%= s.family_name || '—' %></td>
+              <td><%= s.age !== null && s.age !== undefined ? s.age : '—' %></td>
+              <td><%= s.grade_level || '—' %></td>
+              <td><%= s.birthday || '—' %></td>
+            </tr>
           <% }); %>
         </tbody>
       </table>

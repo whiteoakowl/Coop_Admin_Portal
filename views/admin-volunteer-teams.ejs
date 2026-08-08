@@ -31,6 +31,7 @@
         </div>
         <div class="roster-btn-row">
           <button type="button" class="btn-secondary" onclick="document.getElementById('add-team-member-dialog').showModal()">+ Add Member</button>
+          <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('floater-import-dialog').showModal()">Import</button>
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/teams/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         </div>
@@ -98,6 +99,19 @@
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="floater-import-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
+        <h3>Import</h3>
+        <p class="hint">Adds active parents to <%= dayLabel %>'s first floater hour by name - matched to an existing Members-page profile, never creates one.</p>
+        <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
         </div>
       </form>
     </dialog>

@@ -293,9 +293,21 @@ router.get('/class-schedule/classes/:id/roster/export.csv', requireFullAdmin, (r
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
 
-  const lines = [toCsvRow(['Name', 'Role', 'Grade Level', 'Medical Notes'])];
-  cls.staff.forEach((s) => lines.push(toCsvRow([s.name, s.role === 'assistant' ? 'Assistant' : 'Teacher', '', ''])));
-  cls.students.forEach((s) => lines.push(toCsvRow([s.name, 'Student', s.grade_level || '', s.medical_notes || ''])));
+  const lines = [toCsvRow(['Name', 'Role', 'Family', 'Age', 'Grade Level', 'Birthday', 'Medical Notes'])];
+  cls.staff.forEach((s) => lines.push(toCsvRow([s.name, s.role === 'assistant' ? 'Assistant' : 'Teacher', '', '', '', '', ''])));
+  cls.students.forEach((s) =>
+    lines.push(
+      toCsvRow([
+        s.name,
+        'Student',
+        s.family_name || '',
+        ageFromBirthday(s.birthday) ?? '',
+        s.grade_level || '',
+        s.birthday || '',
+        s.medical_notes || '',
+      ])
+    )
+  );
 
   sendCsv(res, `${cls.class_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-roster.csv`, lines);
 });
@@ -306,7 +318,7 @@ router.get('/class-schedule/classes/:id/roster/print', requireFullAdmin, (req, r
   if (!cls) return res.status(404).send('Not found');
   res.render('class-schedule-roster-print', {
     title: `${cls.class_name} Roster`,
-    cls,
+    cls: { ...cls, students: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })) },
     dayLabel: DAY_LABELS[cls.day],
   });
 });
