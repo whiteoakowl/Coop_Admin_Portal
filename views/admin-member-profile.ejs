@@ -46,7 +46,10 @@
             <% if (member.medical_notes) { %><dt>Medical/Allergy Notes</dt><dd><%= member.medical_notes %></dd><% } %>
           <% } %>
           <dt>Family</dt>
-          <dd><%= familyNames.length ? familyNames.join(', ') : '—' %></dd>
+          <dd>
+            <% if (familyName) { %>The <%= familyName %> Family<% } else { %>—<% } %>
+            <% if (familyMembers.length) { %> (<%= familyMembers.join(', ') %>)<% } %>
+          </dd>
           <dt>Rosters</dt>
           <dd>
             <% if (rosters.length === 0) { %>—<% } %>

@@ -1,13 +1,24 @@
 -- SH Check-in/out schema
 
+-- A family is a named group (just a surname/label) that an admin creates
+-- explicitly - the Members page's "+ Add Family" button - before it can be
+-- chosen on any member's profile ("Choose a Family" dropdown). Replaces the
+-- old free-form "pick your other family members" checkbox list.
+CREATE TABLE IF NOT EXISTS families (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- member_type distinguishes a Student (attends co-op, can be checked in/out
 -- and marked absent/late) from a Parent (submits forms and volunteers, but
 -- is never checked in) from an Admin (co-op staff/leaders who mainly just
 -- need a printable badge). Every member is its own profile regardless of
--- type; family_id is a simple, symmetric grouping - any members sharing
--- the same family_id are "family" (used to group names on the public
--- Absence/Late and Name Tag forms). NULL means the member isn't
--- connected to anyone.
+-- type; family_id points at a families row - any members sharing the same
+-- family_id are "family" (used to group names on the public Absence/Late
+-- and Name Tag forms, and to fill each family's roster on the Membership
+-- Form's "Choose a Family" dropdown). NULL means the member isn't
+-- connected to a family yet.
 CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -25,7 +36,7 @@ CREATE TABLE IF NOT EXISTS members (
   birthday TEXT,
   grade_level TEXT,
   medical_notes TEXT,
-  family_id INTEGER,
+  family_id INTEGER REFERENCES families(id) ON DELETE SET NULL,
   -- Marks the one member per family who's the primary contact - listed
   -- first within their family group on the Members page and highlighted
   -- there. Purely a display/organization flag, not tied to any

@@ -1516,6 +1516,147 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .primary-parent-option { margin-top: 0.75rem; }
 
+/* ---------- Membership Form (Add/Edit member + Members list view popup) ---------- */
+/* Shared by views/partials/member-form-fields.ejs, used both on the full
+   Add/Edit page and inside the Members list's view/edit dialog - styled to
+   match the Parent/Student Membership Form reference design: an icon
+   header (blue for Student, green for Parent), a Parent/Student/Admin
+   toggle, a circular photo upload, and colored boxed sections for Family
+   and Setup/Cleanup Team. */
+.member-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brand-dark);
+  cursor: pointer;
+  text-decoration: none;
+}
+.member-name-link:hover { text-decoration: underline; }
+
+.member-form-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.member-form-header-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.member-form-header-icon .icon { width: 1.5rem; height: 1.5rem; }
+.member-form-header-student .member-form-header-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.member-form-header-parent .member-form-header-icon { background: var(--green-bg); color: var(--green); }
+.member-form-header-text { flex: 1; min-width: 180px; }
+.member-form-header-text h3 { margin: 0; font-size: 1.25rem; }
+.member-form-header-text p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.member-type-toggle {
+  display: flex;
+  gap: 0.3rem;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+.member-type-toggle-option {
+  position: relative;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.member-type-toggle-option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.member-type-toggle-option:has(input:checked) { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.member-type-toggle-option:has(input:disabled) { cursor: default; }
+.member-type-toggle-option:has(input:disabled) input { cursor: default; }
+
+.member-form-parent-flag { margin: -0.5rem 0 1.25rem; }
+.primary-parent-top-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+}
+.primary-parent-top-option .icon { width: 1rem; height: 1rem; }
+.primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--green); }
+
+.member-photo-upload { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; margin: 0 auto 1.25rem; width: fit-content; }
+.member-photo-circle {
+  position: relative;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--brand-soft);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.member-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+.member-photo-placeholder { font-size: 2rem; font-weight: 700; color: var(--brand-dark); }
+.member-photo-camera {
+  position: absolute;
+  right: -0.1rem;
+  bottom: -0.1rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  background: var(--btn-bg);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+}
+.member-photo-camera .icon { width: 1rem; height: 1rem; }
+.member-photo-upload:has(input:disabled) .member-photo-circle { cursor: default; }
+.member-photo-upload:has(input:disabled) .member-photo-camera { display: none; }
+
+.member-form-city-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem 1.5rem; }
+@media (max-width: 640px) {
+  .member-form-city-row { grid-template-columns: 1fr; }
+}
+
+.member-form-section-box { border-width: 2px; }
+.member-form-section-box h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; }
+.member-form-section-box h2 .icon { width: 1.1rem; height: 1.1rem; }
+.member-form-section-blue { border-color: var(--brand); background: var(--brand-soft); }
+.member-form-section-blue h2 { color: var(--brand-dark); }
+.member-form-section-green { border-color: var(--green); background: var(--green-bg); }
+.member-form-section-green h2 { color: var(--green); }
+
+.member-form-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; min-width: 0; }
+.member-form-footer-view,
+.member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
+.member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+.member-view-dialog { width: min(760px, 94vw); }
+.member-view-close-row { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+.member-view-close-row .class-form-dialog-close { position: static; }
+
 .add-member-details { margin-bottom: 1.5rem; }
 
 /* Same size/padding/font as .roster-action-btn (the toolbar action

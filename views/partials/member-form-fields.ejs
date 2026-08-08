@@ -1,0 +1,142 @@
+<%
+// Shared Membership Form fields - included by both the full Add/Edit page
+// (views/admin-member-edit.ejs) and the Members list's view/edit popup
+// (views/member-view-fragment.ejs), so the two never drift apart.
+//
+// locals: member, mode ('create'|'edit'|'view'), families, memberFamilyId,
+// setupTeams, memberCleanupTeamIds, gradeLevels
+const disabled = mode === 'view';
+const isParent = member.member_type === 'parent';
+const isAdmin = member.member_type === 'admin';
+const uid = 'mf-' + mode + '-' + (member.id || 'new');
+const typeLabel = isParent ? 'Parent' : isAdmin ? 'Admin' : 'Student';
+%>
+<div class="member-form-header member-form-header-<%= isParent ? 'parent' : 'student' %>" data-member-form-header>
+  <span class="member-form-header-icon">
+    <svg class="icon"><use href="#icon-<%= isParent ? 'users' : 'graduation-cap' %>"/></svg>
+  </span>
+  <div class="member-form-header-text">
+    <h3><%= typeLabel %> Membership Form</h3>
+    <p><%= isParent ? 'Enter parent/guardian information' : isAdmin ? 'Enter admin information' : 'Enter student information' %></p>
+  </div>
+  <div class="member-type-toggle" role="group" aria-label="Member type">
+    <label class="member-type-toggle-option">
+      <input type="radio" name="memberType" value="student" <%= !isParent && !isAdmin ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+      Student
+    </label>
+    <label class="member-type-toggle-option">
+      <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+      Parent
+    </label>
+    <label class="member-type-toggle-option member-type-toggle-admin">
+      <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+      Admin
+    </label>
+  </div>
+</div>
+
+<div class="member-form-parent-flag" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
+  <label class="checkbox-option primary-parent-top-option">
+    <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+    <svg class="icon"><use href="#icon-star"/></svg> Primary Parent for this family
+  </label>
+</div>
+
+<div class="manage-section">
+  <div class="member-photo-upload">
+    <label class="member-photo-circle" for="<%= uid %>-photo">
+      <% if (member.photo_path) { %>
+        <img src="<%= member.photo_path %>" alt="" />
+      <% } else { %>
+        <span class="member-photo-placeholder"><%= (member.name || '?').charAt(0).toUpperCase() %></span>
+      <% } %>
+      <span class="member-photo-camera"><svg class="icon"><use href="#icon-camera"/></svg></span>
+    </label>
+    <input type="file" name="photo" id="<%= uid %>-photo" accept="image/*" <%= disabled ? 'disabled' : '' %> hidden />
+    <span class="hint">Profile Photo</span>
+  </div>
+
+  <div class="member-form-grid">
+    <label class="member-form-full">Full Name
+      <input type="text" name="name" value="<%= member.name %>" required <%= disabled ? 'disabled' : '' %> />
+    </label>
+    <label class="member-form-full">Address
+      <input type="text" name="address" value="<%= member.address || '' %>" <%= disabled ? 'disabled' : '' %> />
+    </label>
+    <div class="member-form-full member-form-city-row">
+      <label>City
+        <input type="text" name="city" value="<%= member.city || '' %>" <%= disabled ? 'disabled' : '' %> />
+      </label>
+      <label>State
+        <input type="text" name="state" value="<%= member.state || '' %>" <%= disabled ? 'disabled' : '' %> />
+      </label>
+      <label>Zip Code
+        <input type="text" name="zip" value="<%= member.zip || '' %>" <%= disabled ? 'disabled' : '' %> />
+      </label>
+    </div>
+    <label>Phone
+      <input type="tel" name="phone" value="<%= member.phone || '' %>" <%= disabled ? 'disabled' : '' %> />
+    </label>
+    <label>Email
+      <input type="email" name="email" value="<%= member.email || '' %>" <%= disabled ? 'disabled' : '' %> />
+    </label>
+    <label class="member-form-full">Medical / Allergy Notes
+      <textarea name="medicalNotes" rows="3" <%= disabled ? 'disabled' : '' %>><%= member.medical_notes || '' %></textarea>
+    </label>
+  </div>
+</div>
+
+<div class="manage-section" id="student-only-fields" data-student-only style="<%= !isParent && !isAdmin ? '' : 'display:none;' %>">
+  <h2>Student Info</h2>
+  <div class="member-form-grid">
+    <label>Birthday
+      <input type="date" name="birthday" value="<%= member.birthday || '' %>" <%= disabled ? 'disabled' : '' %> />
+    </label>
+    <label>Grade Level
+      <select name="gradeLevel" <%= disabled ? 'disabled' : '' %>>
+        <option value="">Select grade&hellip;</option>
+        <% gradeLevels.forEach(function(g) { %>
+          <option value="<%= g %>" <%= member.grade_level === g ? 'selected' : '' %>><%= g %></option>
+        <% }); %>
+      </select>
+    </label>
+  </div>
+</div>
+
+<div class="manage-section member-form-section-box member-form-section-<%= isParent ? 'green' : 'blue' %>" data-family-box>
+  <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
+  <% if (families.length === 0) { %>
+    <p class="hint">No families yet - use "+ Add Family" on the Members page first.</p>
+  <% } %>
+  <label class="member-form-full">Select Family
+    <select name="familyId" <%= disabled ? 'disabled' : '' %>>
+      <option value="">No family</option>
+      <% families.forEach(function(f) { %>
+        <option value="<%= f.id %>" <%= memberFamilyId === f.id ? 'selected' : '' %>>The <%= f.name %> Family</option>
+      <% }); %>
+    </select>
+  </label>
+</div>
+
+<div class="manage-section member-form-section-box member-form-section-green" id="parent-only-fields" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
+  <h2><svg class="icon"><use href="#icon-broom"/></svg> Setup / Cleanup Team</h2>
+  <% if (setupTeams.length === 0) { %>
+    <p class="hint">No Setup/Cleanup teams exist yet.</p>
+  <% } else { %>
+    <% ['monday', 'wednesday'].forEach(function(day) { %>
+      <% var dayTeams = setupTeams.filter(function(t) { return t.day === day; }); %>
+      <% if (dayTeams.length === 0) return; %>
+      <div class="cleanup-team-day-group">
+        <h3 class="cleanup-team-day-heading"><%= day.charAt(0).toUpperCase() + day.slice(1) %></h3>
+        <div class="checkbox-group">
+          <% dayTeams.forEach(function(t) { %>
+            <label class="checkbox-option">
+              <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+              <%= t.title %>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+  <% } %>
+</div>

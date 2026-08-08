@@ -7,7 +7,6 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <p class="subtitle"><a href="/admin/members">&larr; Members</a></p>
-    <h1><%= mode === 'create' ? 'Add Member' : 'Edit ' + member.name %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
@@ -16,122 +15,16 @@
       action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
       enctype="multipart/form-data"
       id="member-form"
-      class="member-edit-form"
+      class="member-edit-form member-edit-form-page"
     >
-      <div class="manage-section">
-        <h2>Member Type</h2>
-        <div class="radio-group">
-          <label class="radio-option">
-            <input type="radio" name="memberType" value="student" <%= member.member_type !== 'parent' && member.member_type !== 'admin' ? 'checked' : '' %> />
-            Student
-          </label>
-          <label class="radio-option">
-            <input type="radio" name="memberType" value="parent" <%= member.member_type === 'parent' ? 'checked' : '' %> />
-            Parent
-          </label>
-          <label class="radio-option">
-            <input type="radio" name="memberType" value="admin" <%= member.member_type === 'admin' ? 'checked' : '' %> />
-            Admin
-          </label>
+      <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <a class="btn-secondary" href="/admin/members">Cancel</a>
+          <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
         </div>
       </div>
-
-      <div class="manage-section">
-        <h2>Basic Info</h2>
-        <div class="member-form-grid">
-          <label>Name
-            <input type="text" name="name" value="<%= member.name %>" required />
-          </label>
-          <label>Phone
-            <input type="tel" name="phone" value="<%= member.phone || '' %>" />
-          </label>
-          <label>Email
-            <input type="email" name="email" value="<%= member.email || '' %>" />
-          </label>
-          <label class="member-form-full">Address
-            <input type="text" name="address" value="<%= member.address || '' %>" />
-          </label>
-          <label>City
-            <input type="text" name="city" value="<%= member.city || '' %>" />
-          </label>
-          <label>State
-            <input type="text" name="state" value="<%= member.state || '' %>" />
-          </label>
-          <label>Zip Code
-            <input type="text" name="zip" value="<%= member.zip || '' %>" />
-          </label>
-        </div>
-      </div>
-
-      <div class="manage-section">
-        <h2>Photo</h2>
-        <% if (member.photo_path) { %>
-          <img class="member-photo-preview" src="<%= member.photo_path %>" alt="<%= member.name %>" />
-        <% } %>
-        <input type="file" name="photo" accept="image/*" />
-      </div>
-
-      <div class="manage-section" id="student-only-fields">
-        <h2>Student Info</h2>
-        <div class="member-form-grid">
-          <label>Birthday
-            <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
-          </label>
-          <label>Grade Level
-            <input type="text" name="gradeLevel" value="<%= member.grade_level || '' %>" placeholder="e.g. 5th Grade" />
-          </label>
-          <label class="member-form-full">Medical/Allergy Notes
-            <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
-          </label>
-        </div>
-      </div>
-
-      <div class="manage-section">
-        <h2>Family</h2>
-        <p class="hint">Connect this profile to any other family members (parents, students, or admins) - they'll appear together on the Absence/Late and Name Tag forms.</p>
-        <% if (familyOptions.length === 0) { %>
-          <p class="hint">No other members exist yet.</p>
-        <% } else { %>
-          <div class="checkbox-group">
-            <% familyOptions.forEach(function(p) { %>
-              <label class="checkbox-option">
-                <input type="checkbox" name="familyMemberIds" value="<%= p.id %>" <%= familyMemberIds.includes(p.id) ? 'checked' : '' %> />
-                <%= p.name %>
-              </label>
-            <% }); %>
-          </div>
-        <% } %>
-        <label class="checkbox-option member-form-full primary-parent-option">
-          <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
-          Primary Parent for this family
-        </label>
-        <p class="hint">Listed first and highlighted within their family on the Members page. Only one primary parent per family - marking this one clears it from anyone else in the same family.</p>
-      </div>
-
-      <div class="manage-section" id="parent-only-fields">
-        <h2>Cleanup Team</h2>
-        <% if (setupTeams.length === 0) { %>
-          <p class="hint">No Setup/Cleanup teams exist yet.</p>
-        <% } else { %>
-          <% ['monday', 'wednesday'].forEach(function(day) { %>
-            <% var dayTeams = setupTeams.filter(function(t) { return t.day === day; }); %>
-            <% if (dayTeams.length === 0) return; %>
-            <div class="cleanup-team-day-group">
-              <h3 class="cleanup-team-day-heading"><%= day.charAt(0).toUpperCase() + day.slice(1) %></h3>
-              <div class="checkbox-group">
-                <% dayTeams.forEach(function(t) { %>
-                  <label class="checkbox-option">
-                    <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
-                    <%= t.title %>
-                  </label>
-                <% }); %>
-              </div>
-            </div>
-          <% }); %>
-        <% } %>
-      </div>
-
-      <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Changes' %></button>
     </form>
 
   </main>

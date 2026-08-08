@@ -94,55 +94,27 @@ function loadFamilyMember(memberId, parentId) {
   return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, parent.family_id);
 }
 
-function nextFamilyId() {
-  return db.prepare('SELECT COALESCE(MAX(family_id), 0) + 1 AS next FROM members').get().next;
+// Every family an admin has created ("+ Add Family" on the Members page) -
+// the full list backing the "Choose a Family" dropdown on the member form.
+// A family only ever appears there once it's been added here first.
+function allFamilies() {
+  return db.prepare('SELECT id, name FROM families ORDER BY name COLLATE NOCASE').all();
 }
 
-// Rebuilds memberId's family group to be exactly {memberId} + otherIds -
-// this is a direct "here's who's in my family now" action, not a merge:
-// anyone previously grouped with memberId but not in otherIds is dropped
-// from the group (and if that leaves their old group down to one person,
-// that person is cleared too, since a family of one isn't a family).
-// Reuses an existing family_id found among the new group's members if
-// there is one (preferring memberId's own), so connecting into an
-// existing family doesn't fragment it.
-function setFamilyMembers(memberId, otherIds) {
-  const uniqueOtherIds = [...new Set(otherIds)].filter((id) => id !== memberId);
-  const oldFamilyId = (db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId) || {}).family_id;
-
-  // Detach anyone who was in memberId's old group but isn't in the new
-  // list *before* touching memberId's own family_id - the new group often
-  // reuses the same family_id number (nothing new, just re-saving), so
-  // doing this after would make a dropped member indistinguishable from
-  // one who's staying.
-  if (oldFamilyId != null) {
-    const stayingIds = new Set([memberId, ...uniqueOtherIds]);
-    const oldGroupIds = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId).map((r) => r.id);
-    const droppedIds = oldGroupIds.filter((id) => !stayingIds.has(id));
-    if (droppedIds.length > 0) {
-      const placeholders = droppedIds.map(() => '?').join(',');
-      db.prepare(`UPDATE members SET family_id = NULL WHERE id IN (${placeholders})`).run(...droppedIds);
-    }
-  }
-
-  if (uniqueOtherIds.length === 0) {
+// Directly assigns memberId to an existing family (or clears it with a
+// null/blank familyId) - the single "Choose a Family" dropdown replaces
+// the old "pick your other family members" checkbox list, so this is a
+// plain assignment rather than a group-rebuild. Silently no-ops (leaves
+// family_id untouched) if familyId doesn't match a real family, so a
+// tampered/stale form value can't attach a member to a bogus id.
+function setMemberFamily(memberId, familyId) {
+  if (familyId == null) {
     db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(memberId);
-  } else {
-    const groupIds = [memberId, ...uniqueOtherIds];
-    const placeholders = groupIds.map(() => '?').join(',');
-    const rows = db.prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders})`).all(...groupIds);
-    const selfFamilyId = (rows.find((r) => r.id === memberId) || {}).family_id;
-    const anyFamilyId = (rows.find((r) => r.family_id != null) || {}).family_id;
-    const familyId = selfFamilyId != null ? selfFamilyId : anyFamilyId != null ? anyFamilyId : nextFamilyId();
-    db.prepare(`UPDATE members SET family_id = ? WHERE id IN (${placeholders})`).run(familyId, ...groupIds);
+    return;
   }
-
-  // If dropping members left the old group down to just one person left,
-  // that person isn't meaningfully "family" anymore either.
-  if (oldFamilyId != null) {
-    const remaining = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId);
-    if (remaining.length === 1) db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(remaining[0].id);
-  }
+  const exists = db.prepare('SELECT id FROM families WHERE id = ?').get(familyId);
+  if (!exists) return;
+  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, memberId);
 }
 
 // Only one member per family can be "primary" - marking a new one clears
@@ -179,7 +151,8 @@ module.exports = {
   loadFamilyMember,
   familyOf,
   hasInfantChild,
-  setFamilyMembers,
+  allFamilies,
+  setMemberFamily,
   membersWithMedicalNotes,
   setPrimaryParent,
 };

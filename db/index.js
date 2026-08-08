@@ -103,6 +103,43 @@ if (memberColumns.includes('parent_id') || memberParentsTableExists) {
   if (memberParentsTableExists) db.exec('DROP TABLE member_parents');
 }
 
+// One-time migration: family_id used to be an arbitrary grouping number
+// with no name attached anywhere. It's now a real FK into the new
+// `families` table (a family the admin names via "+ Add Family" before
+// picking it on a member's profile). Anyone who already has family_id
+// groupings gets a families row invented for each one (named after the
+// group's primary parent, or its first member, surname) so their existing
+// groupings survive the switch instead of being silently dropped. A fresh
+// install has no family_id values set yet, so this is a no-op for it.
+if (db.prepare('SELECT COUNT(*) AS c FROM families').get().c === 0) {
+  const legacyFamilyIds = db
+    .prepare('SELECT DISTINCT family_id FROM members WHERE family_id IS NOT NULL')
+    .all()
+    .map((r) => r.family_id);
+  const insertFamily = db.prepare('INSERT INTO families (name) VALUES (?)');
+  const familyNameTaken = db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE');
+  for (const legacyId of legacyFamilyIds) {
+    // Snapshot this group's member ids up front - reassigning family_id
+    // below (to a brand-new families.id) never risks re-matching a
+    // still-unprocessed legacy id's own WHERE clause, since every update
+    // targets these specific ids rather than a family_id value.
+    const groupMembers = db.prepare('SELECT id, name, is_primary_parent FROM members WHERE family_id = ?').all(legacyId);
+    if (groupMembers.length === 0) continue;
+    const primary = groupMembers.find((m) => m.is_primary_parent) || groupMembers[0];
+    const lastName = primary.name.trim().split(/\s+/).pop() || 'Family';
+    let name = lastName;
+    let suffix = 1;
+    while (familyNameTaken.get(name)) {
+      suffix++;
+      name = `${lastName} ${suffix}`;
+    }
+    const newFamilyId = insertFamily.run(name).lastInsertRowid;
+    const ids = groupMembers.map((m) => m.id);
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`UPDATE members SET family_id = ? WHERE id IN (${placeholders})`).run(newFamilyId, ...ids);
+  }
+}
+
 const rosterMemberColumns = db.prepare('PRAGMA table_info(roster_members)').all().map((c) => c.name);
 if (!rosterMemberColumns.includes('scheduled_arrival')) {
   db.exec('ALTER TABLE roster_members ADD COLUMN scheduled_arrival TEXT');

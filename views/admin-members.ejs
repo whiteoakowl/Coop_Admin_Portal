@@ -34,11 +34,26 @@
       </div>
       <div class="roster-btn-row">
         <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
+
+    <dialog id="add-family-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/families/new">
+        <h3>Add Family</h3>
+        <p class="hint">A family must be added here before it shows up on a member's "Choose a Family" dropdown.</p>
+        <label>Family Last Name
+          <input type="text" name="name" placeholder="e.g. Anderson" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Family</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
@@ -76,11 +91,11 @@
                 <% } %>
               </td>
               <td>
-                <a href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
+                <button type="button" class="member-name-link" data-view-member="<%= m.id %>"><%= m.name %></button><%- include('partials/medical-flag', { member: m }) %>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
               </td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-              <td class="members-col-parent"><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
+              <td class="members-col-parent"><%= m.familyName || '—' %></td>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>
@@ -199,7 +214,7 @@
           <tr>
             <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
             <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
-            <td><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
+            <td><%= m.familyName || '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
             <td><%= m.grade_level || '—' %></td>
             <td><%= m.birthday || '—' %></td>
@@ -207,8 +222,11 @@
         <% }); %>
       </tbody>
     </table>
+    <dialog id="member-view-dialog" class="class-view-dialog member-view-dialog"></dialog>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>
+  <script src="/js/member-form.js"></script>
+  <script src="/js/member-view.js"></script>
 </body>
 </html>
