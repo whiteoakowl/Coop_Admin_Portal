@@ -67,7 +67,7 @@
         </thead>
         <tbody>
           <% members.forEach(function(m) { %>
-            <tr>
+            <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>">
               <td class="members-col-photo">
                 <% if (m.photo_path) { %>
                   <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
@@ -75,7 +75,10 @@
                   <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                 <% } %>
               </td>
-              <td><a href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %></td>
+              <td>
+                <a href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
+                <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+              </td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
               <td class="members-col-rosters">
@@ -194,7 +197,7 @@
       <tbody>
         <% members.forEach(function(m) { %>
           <tr>
-            <td><%= m.name %></td>
+            <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
             <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
             <td><%= m.familyNames.length ? m.familyNames.join(', ') : '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>

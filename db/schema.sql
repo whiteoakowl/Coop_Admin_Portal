@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS members (
   grade_level TEXT,
   medical_notes TEXT,
   family_id INTEGER,
+  -- Marks the one member per family who's the primary contact - listed
+  -- first within their family group on the Members page and highlighted
+  -- there. Purely a display/organization flag, not tied to any
+  -- permission - set from a member's edit page.
+  is_primary_parent INTEGER NOT NULL DEFAULT 0,
   -- Portal login credentials, set by an admin on the member's profile - NULL
   -- until an admin grants that member portal access. Which portal(s) they
   -- can reach with those credentials is controlled by the portal_* flags

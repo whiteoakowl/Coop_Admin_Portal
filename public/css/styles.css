@@ -1461,6 +1461,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .row-inactive { opacity: 0.5; }
 
+/* Primary parent row on the Members list - a light highlight plus a
+   left accent bar so the family's main contact stands out at a glance
+   without looking like a status/warning color. */
+.row-primary-parent { background: var(--brand-soft); }
+.row-primary-parent td:first-child { box-shadow: inset 3px 0 0 var(--brand-dark); }
+.primary-parent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--brand-dark);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.primary-parent-option { margin-top: 0.75rem; }
+
 .add-member-details { margin-bottom: 1.5rem; }
 
 /* Same size/padding/font as .roster-action-btn (the toolbar action

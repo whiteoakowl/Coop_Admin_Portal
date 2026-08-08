@@ -101,6 +101,11 @@
             <% }); %>
           </div>
         <% } %>
+        <label class="checkbox-option member-form-full primary-parent-option">
+          <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
+          Primary Parent for this family
+        </label>
+        <p class="hint">Listed first and highlighted within their family on the Members page. Only one primary parent per family - marking this one clears it from anyone else in the same family.</p>
       </div>
 
       <div class="manage-section" id="parent-only-fields">

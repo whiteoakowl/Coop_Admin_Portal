@@ -15,7 +15,7 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { familyOf, setFamilyMembers } = require('../utils/members');
+const { familyOf, setFamilyMembers, setPrimaryParent } = require('../utils/members');
 
 router.use(requireFullAdmin);
 
@@ -76,10 +76,44 @@ function activeMembersExcluding(excludeId) {
     .all(excludeId || 0);
 }
 
+// Groups members by family (family_id, or a solo "family of one" for
+// anyone without one), sorted alphabetically by the group's own sort
+// name - the primary parent's name if one's been designated, otherwise
+// whichever member's name sorts first. Within a group, the primary
+// parent is always listed first, everyone else alphabetically after.
+// Inactive members are kept out of the family grouping entirely (sunk
+// to the bottom, plain alphabetical) so a former member doesn't drag
+// their old family's sort position around.
+function sortMembersByFamily(members) {
+  const active = members.filter((m) => m.active);
+  const inactive = members.filter((m) => !m.active).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const groups = new Map();
+  active.forEach((m) => {
+    const key = m.family_id != null ? `f${m.family_id}` : `solo${m.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  });
+
+  const orderedGroups = Array.from(groups.values()).map((group) => {
+    const primary = group.find((m) => m.is_primary_parent);
+    group.sort((a, b) => {
+      if (a === primary) return -1;
+      if (b === primary) return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    const sortName = (primary || group[0]).name;
+    return { sortName, group };
+  });
+  orderedGroups.sort((a, b) => a.sortName.localeCompare(b.sortName, undefined, { sensitivity: 'base' }));
+
+  return [...orderedGroups.flatMap((g) => g.group), ...inactive];
+}
+
 function membersWithDetails(typeFilter) {
-  const allMembers = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
+  const allMembers = db.prepare('SELECT * FROM members').all();
   const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
-  return members.map((m) => ({
+  return sortMembersByFamily(members).map((m) => ({
     ...m,
     rosters: rostersForMember(m.id),
     familyNames: familyOf(m.id).map((p) => p.name),
@@ -140,6 +174,7 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
       'Grade Level',
       'Medical Notes',
       'Family',
+      'Primary Parent',
       'Rosters',
       'Notes',
     ]),
@@ -158,6 +193,7 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
         m.grade_level || '',
         m.medical_notes || '',
         m.familyNames.join('; '),
+        m.is_primary_parent ? 'Yes' : '',
         m.rosters.map((r) => r.name).join('; '),
         m.notes || '',
       ])
@@ -182,6 +218,7 @@ function memberFormFields(req) {
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
     medicalNotes: memberType === 'student' ? (req.body.medicalNotes || '').trim() || null : null,
     familyMemberIds: [].concat(req.body.familyMemberIds || []).map((id) => parseInt(id, 10)).filter(Boolean),
+    isPrimaryParent: req.body.isPrimaryParent === '1',
     cleanupTeamIds:
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
@@ -284,6 +321,7 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
     );
   syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
   setFamilyMembers(info.lastInsertRowid, f.familyMemberIds);
+  setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
@@ -394,6 +432,7 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   syncCleanupTeams(id, f.cleanupTeamIds);
   clearVolunteerMembershipIfNotParent(id, f.memberType);
   setFamilyMembers(id, f.familyMemberIds);
+  setPrimaryParent(id, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });

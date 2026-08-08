@@ -167,6 +167,9 @@ for (const column of ['portal_parent', 'portal_student', 'portal_coop_admin']) {
     db.exec(`ALTER TABLE members ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
   }
 }
+if (!memberPortalColumns.includes('is_primary_parent')) {
+  db.exec('ALTER TABLE members ADD COLUMN is_primary_parent INTEGER NOT NULL DEFAULT 0');
+}
 
 const classColumns = db.prepare('PRAGMA table_info(classes)').all().map((c) => c.name);
 if (!classColumns.includes('roster_id')) {

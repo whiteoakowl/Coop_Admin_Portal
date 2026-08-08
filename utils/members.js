@@ -145,6 +145,19 @@ function setFamilyMembers(memberId, otherIds) {
   }
 }
 
+// Only one member per family can be "primary" - marking a new one clears
+// the flag off anyone else sharing the same family_id first. A member
+// with no family yet can still be marked (harmless - they just sort as
+// their own one-person "family" either way).
+function setPrimaryParent(memberId, isPrimary) {
+  const member = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!member) return;
+  if (isPrimary && member.family_id != null) {
+    db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(member.family_id);
+  }
+  db.prepare('UPDATE members SET is_primary_parent = ? WHERE id = ?').run(isPrimary ? 1 : 0, memberId);
+}
+
 // Every active member (any type) with something written in Allergies &
 // Medical Notes - the Allergies/Medical log's one data source, shared by
 // the Logs tab and the popup button on roster/class view pages.
@@ -168,4 +181,5 @@ module.exports = {
   hasInfantChild,
   setFamilyMembers,
   membersWithMedicalNotes,
+  setPrimaryParent,
 };
