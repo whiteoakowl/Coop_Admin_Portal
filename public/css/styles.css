@@ -1579,10 +1579,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   margin: 0;
   cursor: pointer;
 }
-/* Both toggle states use the site's primary orange (--btn-bg) when
-   checked - a single consistent "selected" fill instead of the green
-   this form used to reserve for Parent. */
-.member-type-toggle-btn:has(input:checked) { background: var(--btn-bg); border-color: var(--btn-bg); color: #fff; }
+/* Selected Parent/Student button is a plain solid grey - a neutral
+   "this one's picked" indicator, not another color competing with the
+   form's orange accents. */
+.member-type-toggle-btn:has(input:checked) { background: var(--muted); border-color: var(--muted); color: #fff; }
 .member-type-toggle-btn:has(input:disabled) { cursor: default; }
 .member-type-toggle-btn:has(input:disabled) input { cursor: default; }
 
