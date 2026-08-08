@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk kiosk-checkin" data-idle-redirect="20000">
+  <%- include('partials/icon-sprite') %>
+  <main class="kiosk-wrap">
+    <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+    <div class="kiosk-header">
+      <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1>Find a Parent</h1>
+    </div>
+
+    <div id="scan-view" class="kiosk-panel">
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan student name tag</p>
+      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+      </div>
+      <form id="scan-form" autocomplete="off">
+        <input
+          id="barcode-input"
+          name="barcode"
+          type="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="none"
+        />
+      </form>
+    </div>
+
+    <div id="results-view" class="kiosk-panel find-parent-results" hidden>
+      <h2 id="result-student-heading" class="find-parent-heading"></h2>
+      <div id="result-parents"></div>
+      <button type="button" id="scan-again-btn" class="primary-btn find-parent-scan-again">Scan Another Student</button>
+    </div>
+  </main>
+  <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-find-parent.js"></script>
+  <script src="/js/idle-redirect.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
+</body>
+</html>

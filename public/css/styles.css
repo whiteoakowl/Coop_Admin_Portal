@@ -468,6 +468,54 @@ textarea:focus-visible,
   font-size: 1rem;
 }
 
+/* Find a Parent - corner button (mirrors .admin-corner-link's pill shape
+   but filled orange, since this is a real kiosk feature, not a quiet
+   utility link) and the scan-result cards. */
+.landing-corner-actions-left { position: fixed; top: 1rem; left: 1rem; z-index: 10; }
+.find-parent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+.find-parent-results { max-width: 720px; text-align: left; }
+.find-parent-heading { margin: 0 0 1.25rem; font-size: 1.3rem; text-align: center; }
+.find-parent-parent-card {
+  background: var(--brand-soft);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 1rem;
+}
+.find-parent-parent-card h3 { margin: 0 0 0.6rem; font-size: 1.15rem; color: var(--brand-dark); }
+.find-parent-day { margin-bottom: 0.6rem; }
+.find-parent-day:last-child { margin-bottom: 0; }
+.find-parent-day h4 { margin: 0 0 0.3rem; font-size: 0.8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.find-parent-class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+}
+.find-parent-class-row:last-child { margin-bottom: 0; }
+.find-parent-class-time { font-weight: 700; color: var(--ink); flex-shrink: 0; min-width: 6rem; }
+.find-parent-class-name { flex: 1; font-weight: 600; }
+.find-parent-class-room { color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+.find-parent-scan-again { margin-top: 0.5rem; width: 100%; }
+
 @media (max-width: 640px) {
   .numpad { grid-template-columns: repeat(5, 1fr); }
 }
