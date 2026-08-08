@@ -19,6 +19,10 @@
     <% } %>
   </nav>
   <div class="admin-sidebar-bottom">
+    <button type="button" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
     <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
@@ -61,3 +65,5 @@
 
 <script src="/js/admin-nav.js"></script>
 <script src="/js/alerts.js"></script>
+<script src="/js/fullscreen-toggle.js"></script>
+<script src="/js/fullscreen-nav.js"></script>
