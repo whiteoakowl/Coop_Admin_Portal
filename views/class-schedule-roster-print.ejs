@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <div class="print-header" style="display: flex;">
+    <img src="/img/logo.png" alt="" />
+    <div>
+      <p class="print-header-title">Sanford Homeschoolers</p>
+      <p class="print-header-sub"><%= dayLabel %> &mdash; <%= cls.class_name %> Roster</p>
+    </div>
+  </div>
+  <main class="admin-main">
+    <h1><%= cls.class_name %></h1>
+    <p class="hint">
+      <%= dayLabel %><% if (cls.room) { %> &middot; Room <%= cls.room %><% } %><% if (cls.start_time) { %> &middot; <%= cls.start_time %><% if (cls.end_time) { %>&ndash;<%= cls.end_time %><% } %><% } %>
+    </p>
+
+    <h2>Teachers &amp; Assistants</h2>
+    <table class="roster-table">
+      <thead><tr><th>Name</th><th>Role</th></tr></thead>
+      <tbody>
+        <% if (cls.staff.length === 0) { %>
+          <tr><td colspan="2" class="roster-empty">No teachers/assistants yet.</td></tr>
+        <% } %>
+        <% cls.staff.forEach(function(s) { %>
+          <tr><td><%= s.name %></td><td><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></td></tr>
+        <% }); %>
+      </tbody>
+    </table>
+
+    <h2>Student Roster</h2>
+    <table class="roster-table">
+      <thead><tr><th>Name</th><th>Grade</th></tr></thead>
+      <tbody>
+        <% if (cls.students.length === 0) { %>
+          <tr><td colspan="2" class="roster-empty">No students enrolled yet.</td></tr>
+        <% } %>
+        <% cls.students.forEach(function(s) { %>
+          <tr><td><%= s.name %></td><td><%= s.grade_level || '—' %></td></tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

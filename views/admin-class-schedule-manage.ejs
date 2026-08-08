@@ -109,11 +109,10 @@
             <% } %>
             <% enrolledStudents.forEach(function(s) { %>
               <div class="roster-log-row">
-                <span class="roster-log-name"><%= s.name %></span>
+                <span class="roster-log-name"><%= s.name %><%- include('partials/medical-flag', { member: s }) %></span>
                 <span class="roster-log-meta">
                   <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
                   <% if (s.age !== null && s.age !== undefined) { %><span><%= s.age %> yrs</span><% } %>
-                  <% if (s.medical_notes) { %><span class="medical-flag" title="Has medical/allergy notes: <%= s.medical_notes %>">+</span><% } %>
                 </span>
                 <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form no-print">
                   <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>

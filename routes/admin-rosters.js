@@ -261,13 +261,33 @@ router.get('/rosters', requireAdmin, (req, res) => {
 
 // --- Session dates ---
 
+// Parents and students at the same co-op session meet on the same actual
+// calendar dates - there's no such thing as a Monday that students have
+// but parents don't. So a session date always applies to BOTH the
+// Parent and Student rosters for that day, not just whichever tab it was
+// added from. Without this, a date added only to "Monday Students" (the
+// common case, since that's what daily check-in cares about) left the
+// "Monday Parents" roster without that date - so a teaching parent
+// reporting their own absence via the public form would be told they
+// "aren't on any roster" for a date their own kids' roster had just fine.
+function siblingRosterId(tab) {
+  const info = TABS[tab];
+  if (!info) return null;
+  const otherRole = info.role === 'parent' ? 'student' : 'parent';
+  return ensureDayRoster(info.day, otherRole);
+}
+
 router.post('/rosters/:tab/dates/add', requireAdmin, (req, res) => {
   const tab = req.params.tab;
   const rosterId = rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
-  for (const d of dates) insertDate.run(rosterId, d);
+  const siblingId = siblingRosterId(tab);
+  for (const d of dates) {
+    insertDate.run(rosterId, d);
+    if (siblingId) insertDate.run(siblingId, d);
+  }
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
 
@@ -276,9 +296,11 @@ router.post('/rosters/:tab/dates/:date/remove', requireAdmin, (req, res) => {
   const rosterId = rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const date = req.params.date;
-  db.prepare('DELETE FROM roster_dates WHERE roster_id = ? AND session_date = ?').run(rosterId, date);
-  db.prepare('DELETE FROM attendance WHERE roster_id = ? AND session_date = ?').run(rosterId, date);
-  db.prepare('DELETE FROM checkouts WHERE roster_id = ? AND session_date = ?').run(rosterId, date);
+  const rosterIds = [rosterId, siblingRosterId(tab)].filter(Boolean);
+  const placeholders = rosterIds.map(() => '?').join(',');
+  db.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  db.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  db.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
 });
 

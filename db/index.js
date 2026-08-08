@@ -281,6 +281,41 @@ if (!existingScheduleCardTemplate) {
   }
 }
 
+// One-time backfill: a session date used to only get added to whichever
+// single roster tab it was entered from (e.g. "Monday Students"), leaving
+// the sibling "Monday Parents" roster without it - so a teaching parent
+// reporting their own absence for that date via the public form would be
+// told they "aren't on any roster", even though their own kids' roster
+// had that exact date. Parents and students at the same session always
+// meet on the same calendar dates, so this merges each day's Parent/
+// Student roster_dates together. Going forward, routes/admin-rosters.js
+// keeps them in sync itself whenever a date is added or removed.
+{
+  // Scoped to category = 'Class Schedule' - the 4 fixed Monday/Wednesday
+  // Parent/Student rosters - NOT 'Class Roster' (each class's own
+  // auto-maintained roster, which also carries a schedule_day but has
+  // never needed to share dates with anything).
+  const scheduleDays = db
+    .prepare("SELECT DISTINCT schedule_day FROM rosters WHERE schedule_day IS NOT NULL AND category = 'Class Schedule'")
+    .all();
+  const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
+  for (const { schedule_day: day } of scheduleDays) {
+    const rosterIds = db
+      .prepare("SELECT id FROM rosters WHERE schedule_day = ? AND category = 'Class Schedule'")
+      .all(day)
+      .map((r) => r.id);
+    if (rosterIds.length < 2) continue;
+    const placeholders = rosterIds.map(() => '?').join(',');
+    const allDates = db
+      .prepare(`SELECT DISTINCT session_date FROM roster_dates WHERE roster_id IN (${placeholders})`)
+      .all(...rosterIds)
+      .map((r) => r.session_date);
+    for (const rosterId of rosterIds) {
+      for (const date of allDates) insertDate.run(rosterId, date);
+    }
+  }
+}
+
 // Seed the starter leadership roles for Contact Admins - name/email left
 // blank for a full Admin to fill in via Settings, rather than inventing
 // fake contacts.

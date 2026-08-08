@@ -1107,6 +1107,9 @@ textarea:focus-visible,
 .member-form-grid textarea {
   color: var(--ink);
   font-weight: 400;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .member-photo-preview {
   width: 96px;
@@ -2737,7 +2740,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* Circular color swatches, selected one ringed + checkmarked - replaces a
    plain native color input. */
-.class-color-swatches { display: flex; align-items: center; gap: 0.65rem; height: 2.7rem; }
+/* flex-wrap + min-width: 0 so a full row of 12 swatches wraps onto more
+   lines instead of blowing out its container's width when there isn't
+   room for all of them in one row (e.g. the View/Edit popup's narrower
+   details column). */
+.class-color-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; min-width: 0; }
 .class-color-swatch {
   position: relative;
   width: 1.85rem;
@@ -2872,10 +2879,51 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-manage-layout { display: flex; align-items: flex-start; gap: 1.5rem; }
 .class-manage-form-col { flex: 0 0 33%; max-width: 33%; min-width: 280px; }
 .class-manage-roster-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.class-manage-form-col .member-form-grid { min-width: 0; }
 @media (max-width: 900px) {
   .class-manage-layout { flex-direction: column; }
   .class-manage-form-col { max-width: 100%; flex-basis: auto; }
 }
+
+/* "View" button on each class card, and the popup it opens (fetched as
+   an HTML fragment - see public/js/class-schedule-view.js) - reuses the
+   Create Class dialog's header treatment, just wider to fit the details
+   form + roster side by side. */
+.class-card-view-btn { flex-shrink: 0; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+.class-view-dialog {
+  width: min(1100px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  border: none;
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.class-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.class-view-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-view-header h3 { margin: 0; font-size: 1.3rem; flex: 1; }
+.class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
+
+/* Fields start disabled (view-only) until "Edit Class" is clicked - keep
+   them legible instead of the browser's washed-out default disabled
+   look, so "view mode" still reads as real content, not a broken form. */
+.class-view-form input:disabled,
+.class-view-form select:disabled,
+.class-view-form textarea:disabled {
+  background: #f8fafc;
+  color: var(--ink);
+  opacity: 1;
+  border-color: var(--border);
+}
+.class-view-form .class-color-swatch:has(input:disabled) { cursor: default; }
+
+.class-view-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; min-width: 0; }
+.class-view-footer-view,
+.class-view-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; }
+.class-view-footer-view { justify-content: space-between; }
+.class-view-footer-edit { justify-content: flex-end; }
+.class-view-footer .roster-action-btn-danger { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+.class-view-roster-actions { margin-top: 0.25rem; }
 
 /* Age Group checkboxes - pill-style buttons (checked = filled), grid of
    every grade the co-op serves (see GRADE_LEVELS, utils/classSchedule.js). */

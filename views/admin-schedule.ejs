@@ -54,12 +54,24 @@
           </div>
 
           <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('schedule-import-dialog').showModal()">Import</button>
             <a class="roster-action-btn file-action-btn" href="/admin/schedule/export.csv<%= buildQuery({}) %>">Export</a>
             <a class="roster-action-btn print-action-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank">Print</a>
           </div>
         </div>
 
-        <p class="hint">This list is generated automatically from the Class Schedule (<a href="/admin/schedule?tab=monday">Monday</a> / <a href="/admin/schedule?tab=wednesday">Wednesday</a>) - enroll or staff someone there to change what shows up here.</p>
+        <dialog id="schedule-import-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/schedule/<%= tab %>/import" enctype="multipart/form-data">
+            <h3>Import <%= tab === 'parents' ? 'Parent' : 'Student' %> Schedules</h3>
+            <p class="hint">Matches each row to an existing class by day, class name, and start time, then adds that person to its roster <%= tab === 'parents' ? 'as teacher' : 'as a student' %>. Doesn't create classes - set those up on the Class Schedule first.</p>
+            <a class="btn-secondary import-sample-link" href="/admin/schedule/<%= tab %>/import-template.xlsx">Download Sample File</a>
+            <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Import</button>
+            </div>
+          </form>
+        </dialog>
 
         <div class="roster-scroll schedule-table-scroll">
           <table class="roster-table members-table" id="schedule-table">

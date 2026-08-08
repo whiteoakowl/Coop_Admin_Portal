@@ -36,7 +36,22 @@ function ageGroupList(ageGroup) {
 
 // Cycled through in order as new classes are created, so a freshly built
 // schedule is colorful without an admin having to pick a color every time.
-const COLOR_PALETTE = ['#EE9A4D', '#5B9BD5', '#70AD47', '#9B6BC7', '#E06666', '#4EB8B0', '#D6A429', '#C77BA6'];
+// 12 soft pastel tones spanning the hue wheel, so classes stay easy to
+// pick out on the grid without looking like a highlighter box.
+const COLOR_PALETTE = [
+  '#FFD3B0', // peach
+  '#FFF1AE', // yellow
+  '#D8F0B0', // lime
+  '#B8E8C8', // mint
+  '#B0E6DE', // teal
+  '#B3D9FA', // sky blue
+  '#C2CEFA', // periwinkle
+  '#D3C3F5', // lavender
+  '#EFC3F0', // orchid
+  '#F9C6DD', // pink
+  '#FAC7C0', // coral
+  '#E3D2BE', // sand
+];
 
 function nextPaletteColor() {
   const count = db.prepare('SELECT COUNT(*) AS c FROM classes').get().c;
