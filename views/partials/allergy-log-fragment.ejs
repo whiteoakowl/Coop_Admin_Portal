@@ -1,0 +1,29 @@
+<%# Shared list markup for the Allergies/Medical log - used both inline on
+    the Logs tab and (wrapped with its own header/actions) inside the
+    popup dialog fetched by public/js/allergy-log-popup.js. %>
+<% if (!medicalMembers || medicalMembers.length === 0) { %>
+  <p class="roster-empty">No active members currently have allergy/medical notes on file.</p>
+<% } else { %>
+  <div class="roster-scroll">
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Grade</th>
+          <th>Allergies/Medical Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% medicalMembers.forEach(function(m) { %>
+          <tr>
+            <td><%= m.name %></td>
+            <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+            <td><%= m.grade_level || '—' %></td>
+            <td><%= m.medical_notes %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>

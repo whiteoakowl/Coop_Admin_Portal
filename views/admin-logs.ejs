@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -24,6 +24,7 @@
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
       <a class="view-tab<%= tab === 'classrisk' ? ' active' : '' %>" href="/admin/logs?tab=classrisk">Class Cancellation Risk</a>
       <a class="view-tab<%= tab === 'substitutes' ? ' active' : '' %>" href="/admin/logs?tab=substitutes">Substitutes Needed</a>
+      <a class="view-tab<%= tab === 'allergies' ? ' active' : '' %>" href="/admin/logs?tab=allergies">Allergies/Medical</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
@@ -241,6 +242,15 @@
             </table>
           </div>
         <% }); %>
+      <% } else if (tab === 'allergies') { %>
+        <div class="roster-toolbar no-print">
+          <div></div>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/allergies/export.csv">Export</a>
+            <a class="roster-action-btn print-action-btn" href="/admin/logs/allergies/print" target="_blank">Print</a>
+          </div>
+        </div>
+        <%- include('partials/allergy-log-fragment', { medicalMembers }) %>
       <% } %>
     </div>
   </main>

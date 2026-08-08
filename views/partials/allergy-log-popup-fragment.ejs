@@ -1,0 +1,13 @@
+<%# Fetched by public/js/allergy-log-popup.js and injected into the shared
+    #allergy-log-dialog on whichever roster/class view page the "Allergies/
+    Medical" button lives on. %>
+<div class="class-view-header">
+  <svg class="icon"><use href="#icon-medical-bag"/></svg>
+  <h3>Allergies/Medical Log</h3>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+<div class="roster-btn-row allergy-log-popup-actions">
+  <a class="roster-action-btn file-action-btn" href="/admin/logs/allergies/export.csv">Export</a>
+  <a class="roster-action-btn print-action-btn" href="/admin/logs/allergies/print" target="_blank">Print</a>
+</div>
+<%- include('allergy-log-fragment', { medicalMembers }) %>

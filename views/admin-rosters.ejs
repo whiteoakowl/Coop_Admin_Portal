@@ -56,8 +56,11 @@
         <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
       </div>
     </div>
+
+    <dialog id="allergy-log-dialog" class="class-view-dialog allergy-log-dialog"></dialog>
 
     <dialog id="edit-dates-dialog" class="member-picker-dialog">
       <h3>Session Dates</h3>
@@ -294,5 +297,6 @@
   </main>
   <script src="/js/date-list.js"></script>
   <script src="/js/attendance-grid.js"></script>
+  <script src="/js/allergy-log-popup.js"></script>
 </body>
 </html>

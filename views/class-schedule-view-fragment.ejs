@@ -124,6 +124,7 @@
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('roster-import-dialog-<%= cls.id %>').showModal()">Import</button>
       <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/export.csv">Export</a>
       <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/print" target="_blank">Print</a>
+      <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
     </div>
   </div>
 </div>

@@ -8,8 +8,9 @@ const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { classesAtRiskForDay } = require('../utils/classSchedule');
 const { substituteBoard } = require('../utils/substitutes');
+const { membersWithMedicalNotes } = require('../utils/members');
 
-const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes'];
+const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
@@ -176,6 +177,16 @@ router.get('/logs', requireAdmin, (req, res) => {
     });
   }
 
+  if (tab === 'allergies') {
+    return res.render('admin-logs', {
+      title: 'Allergies/Medical Log',
+      tab,
+      medicalMembers: membersWithMedicalNotes(),
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
   res.render('admin-logs', {
     title: 'Absence/Late Log',
     tab,
@@ -185,6 +196,27 @@ router.get('/logs', requireAdmin, (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// --- Allergies/Medical: shared by the Logs tab above and the popup
+// button on roster/class view pages (fetched as a fragment, same pattern
+// as the Class Schedule "View" popup). ---
+
+router.get('/logs/allergies/fragment', requireAdmin, (req, res) => {
+  res.render('partials/allergy-log-popup-fragment', { medicalMembers: membersWithMedicalNotes() });
+});
+
+router.get('/logs/allergies/export.csv', requireAdmin, (req, res) => {
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
+  const lines = [
+    toCsvRow(['Name', 'Type', 'Grade Level', 'Medical Notes']),
+    ...membersWithMedicalNotes().map((m) => toCsvRow([m.name, typeLabel(m.member_type), m.grade_level || '', m.medical_notes])),
+  ];
+  sendCsv(res, 'allergies-medical-log.csv', lines);
+});
+
+router.get('/logs/allergies/print', requireAdmin, (req, res) => {
+  res.render('logs-allergies-print', { title: 'Allergies/Medical Log', medicalMembers: membersWithMedicalNotes() });
 });
 
 router.get('/logs/absence/export.csv', requireAdmin, (req, res) => {

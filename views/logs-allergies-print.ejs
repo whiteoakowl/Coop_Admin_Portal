@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <div class="print-header" style="display: flex;">
+    <img src="/img/logo.png" alt="" />
+    <div>
+      <p class="print-header-title">Sanford Homeschoolers</p>
+      <p class="print-header-sub">Allergies/Medical Log</p>
+    </div>
+  </div>
+  <main class="admin-main">
+    <h1>Allergies/Medical Log</h1>
+    <%- include('partials/allergy-log-fragment', { medicalMembers }) %>
+  </main>
+</body>
+</html>

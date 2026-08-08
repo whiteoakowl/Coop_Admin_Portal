@@ -1563,6 +1563,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   background: var(--btn-bg);
   border: 1px solid var(--btn-bg);
   border-radius: 8px;
@@ -2924,6 +2925,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-footer-edit { justify-content: flex-end; }
 .class-view-footer .roster-action-btn-danger { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
 .class-view-roster-actions { margin-top: 0.25rem; }
+
+/* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
+   narrower, since it's just a header + a list, no two-column form. */
+.allergy-log-dialog { width: min(700px, 92vw); }
+.allergy-log-dialog .class-view-header .icon { width: 1.35rem; height: 1.35rem; color: var(--red); flex-shrink: 0; }
+.allergy-log-popup-actions { margin-bottom: 1rem; }
 
 /* Age Group checkboxes - pill-style buttons (checked = filled), grid of
    every grade the co-op serves (see GRADE_LEVELS, utils/classSchedule.js). */

@@ -145,6 +145,19 @@ function setFamilyMembers(memberId, otherIds) {
   }
 }
 
+// Every active member (any type) with something written in Allergies &
+// Medical Notes - the Allergies/Medical log's one data source, shared by
+// the Logs tab and the popup button on roster/class view pages.
+function membersWithMedicalNotes() {
+  return db
+    .prepare(
+      `SELECT id, name, member_type, grade_level, medical_notes FROM members
+       WHERE active = 1 AND medical_notes IS NOT NULL AND TRIM(medical_notes) != ''
+       ORDER BY name COLLATE NOCASE`
+    )
+    .all();
+}
+
 module.exports = {
   parseNamesFromUpload,
   findMemberByName,
@@ -154,4 +167,5 @@ module.exports = {
   familyOf,
   hasInfantChild,
   setFamilyMembers,
+  membersWithMedicalNotes,
 };
