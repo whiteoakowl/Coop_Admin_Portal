@@ -430,7 +430,10 @@ router.get('/class-schedule/:day/print', requireAdmin, requireDay, (req, res) =>
   res.render('admin-class-schedule-print', {
     title: `${DAY_LABELS[day]} Class Schedule`,
     dayLabel: DAY_LABELS[day],
-    grid: gridForDay(day),
+    // Room-by-hour grid (same shape the on-screen grid uses) - not the
+    // hour-only gridForDay - so the printout keeps room number as its own
+    // grid column instead of just a line of text inside each card.
+    roomGrid: roomGridForDay(day),
   });
 });
 

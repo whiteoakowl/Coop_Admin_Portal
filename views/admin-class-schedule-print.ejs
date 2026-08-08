@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: letter landscape; margin: 0.4in; }</style>
+  <style>@page { size: letter; margin: 0.4in; }</style>
 </head>
 <body class="admin-page class-schedule-print-page">
   <%- include('partials/admin-nav') %>
@@ -22,32 +22,41 @@
       </div>
 
       <div class="class-schedule-print-fit" data-shrink-to-fit>
-        <div class="class-schedule-print-grid">
-          <% grid.forEach(function(hour) { %>
-            <div class="class-schedule-print-hour">
-              <h2><%= hour.label %></h2>
-              <% if (hour.classes.length === 0) { %>
-                <p class="class-schedule-print-empty">No classes</p>
-              <% } else { %>
-                <% hour.classes.forEach(function(cls) { %>
-                  <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
-                    <h3><%= cls.class_name %></h3>
-                    <p class="class-card-meta">
-                      <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
-                      <% if (cls.age_group) { %><span><%= cls.age_group %></span><% } %>
-                      <span><%= cls.students.length %> student<%= cls.students.length === 1 ? '' : 's' %></span>
-                    </p>
-                    <% if (cls.staff.length > 0) { %>
-                      <p class="class-schedule-print-staff">
-                        <%= cls.staff.map(function(s) { return s.name + (s.role === 'assistant' ? ' (A)' : ''); }).join(', ') %>
-                      </p>
+        <table class="class-schedule-print-grid">
+          <thead>
+            <tr>
+              <th class="class-schedule-print-room-col">Room</th>
+              <% roomGrid.hours.forEach(function(h) { %><th><%= h.label %></th><% }); %>
+            </tr>
+          </thead>
+          <tbody>
+            <% roomGrid.rows.forEach(function(row) { %>
+              <tr>
+                <td class="class-schedule-print-room-col"><%= row.room %></td>
+                <% row.cells.forEach(function(cell) { %>
+                  <td colspan="<%= cell.span %>">
+                    <% if (cell.classes.length === 0) { %>
+                      &nbsp;
+                    <% } else { %>
+                      <% cell.classes.forEach(function(cls) { %>
+                        <%
+                          var teachers = cls.staff.filter(function(s) { return s.role !== 'assistant'; }).map(function(s) { return s.name; });
+                          var assistants = cls.staff.filter(function(s) { return s.role === 'assistant'; }).map(function(s) { return s.name; });
+                        %>
+                        <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                          <h3><%= cls.class_name %></h3>
+                          <% if (cls.age_group) { %><p class="class-schedule-print-grade"><%= cls.age_group %></p><% } %>
+                          <% if (teachers.length > 0) { %><p class="class-schedule-print-staff">Teacher: <%= teachers.join(', ') %></p><% } %>
+                          <% if (assistants.length > 0) { %><p class="class-schedule-print-staff">Assistant: <%= assistants.join(', ') %></p><% } %>
+                        </div>
+                      <% }); %>
                     <% } %>
-                  </div>
+                  </td>
                 <% }); %>
-              <% } %>
-            </div>
-          <% }); %>
-        </div>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
