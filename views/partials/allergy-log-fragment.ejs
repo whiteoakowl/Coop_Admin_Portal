@@ -18,7 +18,7 @@
         <% medicalMembers.forEach(function(m) { %>
           <tr>
             <td><%= m.name %></td>
-            <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+            <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
             <td><%= m.grade_level || '—' %></td>
             <td><%= m.medical_notes %></td>
           </tr>

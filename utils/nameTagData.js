@@ -24,9 +24,6 @@ function badgeDataForMember(member) {
       barcodeValue: member.barcode,
     };
   }
-  if (member.member_type === 'admin') {
-    return { name: member.name, barcodeValue: member.barcode };
-  }
   return {
     name: member.name,
     gradeLevel: member.grade_level || '',

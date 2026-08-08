@@ -12,7 +12,7 @@ const { jsonScriptSafe } = require('../utils/json');
 
 router.use(requireFullAdmin);
 
-const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
+const DESIGN_TYPES = ['student', 'parent', 'scheduleCard', 'setupCleanup', 'custom'];
 const TABS = ['design', 'print'];
 
 // Unified Design/Print page: Design has one dropdown (Student/Parent/Admin
@@ -44,7 +44,6 @@ router.get('/design', requireAdmin, (req, res) => {
       templates: {
         student: getTemplate('student'),
         parent: getTemplate('parent'),
-        admin: getTemplate('admin'),
         setupCleanup: getMiscTemplate('setupCleanup'),
         custom: getMiscTemplate('custom'),
       },

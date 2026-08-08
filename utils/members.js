@@ -97,8 +97,18 @@ function loadFamilyMember(memberId, parentId) {
 // Every family an admin has created ("+ Add Family" on the Members page) -
 // the full list backing the "Choose a Family" dropdown on the member form.
 // A family only ever appears there once it's been added here first.
+// memberCount (active members currently in that family) is included for
+// the form's "The Anderson Family - 2 members" checklist display.
 function allFamilies() {
-  return db.prepare('SELECT id, name FROM families ORDER BY name COLLATE NOCASE').all();
+  return db
+    .prepare(
+      `SELECT f.id, f.name, COUNT(m.id) AS memberCount
+       FROM families f
+       LEFT JOIN members m ON m.family_id = f.id AND m.active = 1
+       GROUP BY f.id
+       ORDER BY f.name COLLATE NOCASE`
+    )
+    .all();
 }
 
 // Directly assigns memberId to an existing family (or clears it with a

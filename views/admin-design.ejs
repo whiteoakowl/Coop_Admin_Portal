@@ -22,19 +22,17 @@
           <select class="name-tag-type-select" id="design-type-select">
             <option value="student" <%= initialType === 'student' ? 'selected' : '' %>>Student Name Tag</option>
             <option value="parent" <%= initialType === 'parent' ? 'selected' : '' %>>Parent Name Tag</option>
-            <option value="admin" <%= initialType === 'admin' ? 'selected' : '' %>>Admin Name Tag</option>
             <option value="scheduleCard" <%= initialType === 'scheduleCard' ? 'selected' : '' %>>Schedule Card</option>
             <option value="setupCleanup" <%= initialType === 'setupCleanup' ? 'selected' : '' %>>Setup/Cleanup Badge</option>
             <option value="custom" <%= initialType === 'custom' ? 'selected' : '' %>>Custom Badge</option>
           </select>
           <!-- name-tag-editor.js reads/drives this select directly; the
                visible control above delegates into it (see design-print-hub.js)
-               so switching among Student/Parent/Admin/Setup-Cleanup/Custom
+               so switching among Student/Parent/Setup-Cleanup/Custom
                still uses the editor's own type-switch logic unmodified. -->
           <select id="name-tag-type-select" hidden>
             <option value="student">Student</option>
             <option value="parent">Parent</option>
-            <option value="admin">Admin</option>
             <option value="setupCleanup">Setup/Cleanup</option>
             <option value="custom">Custom</option>
           </select>
@@ -202,7 +200,6 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="name-tag-select-all-checkbox" />
@@ -224,7 +221,7 @@
                     <tr class="print-picker-row" data-type="<%= m.member_type %>">
                       <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
                       <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
                     </tr>
                   <% }); %>
                 </tbody>
@@ -243,7 +240,6 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcodes-select-all-checkbox" />
@@ -265,7 +261,7 @@
                     <tr class="print-picker-row" data-type="<%= m.member_type %>">
                       <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
                       <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
                     </tr>
                   <% }); %>
                 </tbody>

@@ -10,22 +10,24 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form
-      method="POST"
-      action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
-      enctype="multipart/form-data"
-      id="member-form"
-      class="member-edit-form member-edit-form-page"
-    >
-      <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
+    <div class="member-form-page-panel">
+      <form
+        method="POST"
+        action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
+        enctype="multipart/form-data"
+        id="member-form"
+        class="member-edit-form member-edit-form-page"
+      >
+        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
 
-      <div class="member-form-footer">
-        <div class="member-form-footer-edit">
-          <a class="btn-secondary" href="/admin/members">Cancel</a>
-          <button type="submit" class="primary-btn"><%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <a class="btn-secondary" href="/admin/members">Cancel</a>
+            <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> <%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
+    </div>
 
   </main>
   <script src="/js/member-form.js"></script>

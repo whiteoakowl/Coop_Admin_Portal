@@ -21,7 +21,7 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 router.use(requireFullAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
-const MEMBER_TYPES = ['student', 'parent', 'admin'];
+const MEMBER_TYPES = ['student', 'parent'];
 
 // Member profile photos - stored on disk (not memory) since they're kept
 // long-term and served back out, unlike the CSV imports above.
@@ -120,7 +120,7 @@ function membersWithDetails(typeFilter) {
 
 router.get('/members', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
   const scheduleCardTemplate = getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
   const withRosters = membersWithDetails(typeFilter).map((m) => {
@@ -156,7 +156,7 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const members = membersWithDetails(typeFilter);
 
-  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [
     toCsvRow([
       'Name',
@@ -272,8 +272,18 @@ function ensureFamilyForParent(parentId) {
   return familyId;
 }
 
+// memberCount included for the form's "Setup Team - 2 members" checklist
+// display, same idea as allFamilies() in utils/members.js.
 function allSetupTeams() {
-  return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, title COLLATE NOCASE').all();
+  return db
+    .prepare(
+      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS memberCount
+       FROM setup_teams t
+       LEFT JOIN setup_team_members stm ON stm.team_id = t.id
+       GROUP BY t.id
+       ORDER BY t.day, t.title COLLATE NOCASE`
+    )
+    .all();
 }
 
 function cleanupTeamIdsForMember(memberId) {

@@ -103,6 +103,14 @@ if (memberColumns.includes('parent_id') || memberParentsTableExists) {
   if (memberParentsTableExists) db.exec('DROP TABLE member_parents');
 }
 
+// The Admin member type (co-op staff/leaders as a Membership Form profile
+// type) has been removed - Members are only Student or Parent now. Anyone
+// who already has member_type = 'admin' is folded into Parent, the closest
+// equivalent (an adult, not checked in/out), rather than left on a value
+// nothing in the app can create or edit into anymore. This is separate
+// from the site's own Admin login (the `admins` table) - unaffected.
+db.exec("UPDATE members SET member_type = 'parent' WHERE member_type = 'admin'");
+
 // One-time migration: family_id used to be an arbitrary grouping number
 // with no name attached anywhere. It's now a real FK into the new
 // `families` table (a family the admin names via "+ Add Family" before
@@ -271,7 +279,7 @@ for (const day of ['monday', 'wednesday']) {
 
 // Seed a starter badge design for each member type so the design editor
 // and badge printing always have something to render.
-for (const memberType of ['student', 'parent', 'admin']) {
+for (const memberType of ['student', 'parent']) {
   const existing = db.prepare('SELECT member_type FROM name_tag_templates WHERE member_type = ?').get(memberType);
   if (existing) continue;
   db.prepare('INSERT INTO name_tag_templates (member_type, layout_json) VALUES (?, ?)').run(

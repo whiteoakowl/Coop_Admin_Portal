@@ -11,12 +11,12 @@
 const BADGE_WIDTH = 336;
 const BADGE_HEIGHT = 216;
 
-// Fields available to place on each badge type's canvas. student/parent/
-// admin are per-member name tags; setupCleanup/custom are the two
-// non-member "misc badge" types (see misc_badge_templates/misc_badges in
-// schema.sql and utils/miscBadgeData.js) - each row of an admin-imported
-// list, not a member, so they share a plain Badge Number/Title/Description
-// shape instead of member fields.
+// Fields available to place on each badge type's canvas. student/parent
+// are per-member name tags; setupCleanup/custom are the two non-member
+// "misc badge" types (see misc_badge_templates/misc_badges in schema.sql
+// and utils/miscBadgeData.js) - each row of an admin-imported list, not a
+// member, so they share a plain Badge Number/Title/Description shape
+// instead of member fields.
 const FIELDS_BY_TYPE = {
   student: [
     { field: 'name', label: 'Name' },
@@ -27,7 +27,6 @@ const FIELDS_BY_TYPE = {
     { field: 'name', label: 'Name' },
     { field: 'cleanupTeam', label: 'Cleanup Team' },
   ],
-  admin: [{ field: 'name', label: 'Name' }],
   setupCleanup: [
     { field: 'badgeNumber', label: 'Badge Number' },
     { field: 'title', label: 'Title' },
@@ -93,15 +92,6 @@ const DEFAULT_LAYOUTS = {
       { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 28, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
       { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 60, width: 320, height: 36, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
-      { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
-    ],
-  },
-  admin: {
-    background: '#ffffff',
-    backgroundOpacity: 1,
-    elements: [
-      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 58, width: 320, height: 52, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
     ],
   },

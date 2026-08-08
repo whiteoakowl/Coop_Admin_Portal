@@ -29,7 +29,6 @@
           <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
           <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
           <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
         </select>
       </div>
       <div class="roster-btn-row">
@@ -94,7 +93,7 @@
                 <button type="button" class="member-name-link" data-view-member="<%= m.id %>"><%= m.name %></button><%- include('partials/medical-flag', { member: m }) %>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
               </td>
-              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyName || '—' %></td>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
@@ -213,7 +212,7 @@
         <% members.forEach(function(m) { %>
           <tr>
             <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
-            <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
+            <td><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
             <td><%= m.familyName || '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
             <td><%= m.grade_level || '—' %></td>

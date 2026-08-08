@@ -1543,80 +1543,85 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding-bottom: 1.1rem;
   border-bottom: 1px solid var(--border);
 }
-.member-form-header-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.member-form-header-icon .icon { width: 1.5rem; height: 1.5rem; }
+/* .member-form-header-icon also carries .class-form-dialog-icon (the same
+   round icon badge used by the Create Class dialog header) - Student
+   keeps its own blue tint; Parent just uses that shared orange default
+   (no override needed) so every orange element on this form matches. */
+.member-form-header-icon .icon { width: 1.35rem; height: 1.35rem; }
 .member-form-header-student .member-form-header-icon { background: var(--brand-soft); color: var(--brand-dark); }
-.member-form-header-parent .member-form-header-icon { background: var(--green-bg); color: var(--green); }
 .member-form-header-text { flex: 1; min-width: 180px; }
 .member-form-header-text h3 { margin: 0; font-size: 1.25rem; }
 .member-form-header-text p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.85rem; }
 
-.member-type-toggle {
-  display: flex;
-  gap: 0.3rem;
-  background: #f1f5f9;
-  border-radius: 999px;
-  padding: 0.25rem;
-}
-.member-type-toggle-option {
+.member-type-toggle { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.member-type-toggle-btn {
   position: relative;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--muted);
   cursor: pointer;
 }
-.member-type-toggle-option input {
+.member-type-toggle-btn .icon { width: 0.95rem; height: 0.95rem; }
+.member-type-toggle-btn input {
   position: absolute;
   inset: 0;
   opacity: 0;
   margin: 0;
   cursor: pointer;
 }
-.member-type-toggle-option:has(input:checked) { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
-.member-type-toggle-option:has(input:disabled) { cursor: default; }
-.member-type-toggle-option:has(input:disabled) input { cursor: default; }
+/* Both toggle states use the site's primary orange (--btn-bg) when
+   checked - a single consistent "selected" fill instead of the green
+   this form used to reserve for Parent. */
+.member-type-toggle-btn:has(input:checked) { background: var(--btn-bg); border-color: var(--btn-bg); color: #fff; }
+.member-type-toggle-btn:has(input:disabled) { cursor: default; }
+.member-type-toggle-btn:has(input:disabled) input { cursor: default; }
 
 .member-form-parent-flag { margin: -0.5rem 0 1.25rem; }
 .primary-parent-top-option {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--green-bg);
-  color: var(--green);
-  border: 1px solid var(--green);
+  background: var(--orange-bg);
+  color: var(--orange);
+  border: 1px solid var(--btn-bg);
   border-radius: 10px;
   padding: 0.6rem 0.9rem;
   font-weight: 700;
 }
 .primary-parent-top-option .icon { width: 1rem; height: 1rem; }
-.primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--green); }
+.primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--btn-bg); }
 
-.member-photo-upload { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; margin: 0 auto 1.25rem; width: fit-content; }
+/* Photo sits in its own fixed-width left column, fields to the right -
+   matches the reference design's "photo | Full Name/Address/City-State-
+   Zip" side-by-side layout instead of a centered-on-top photo. */
+.member-form-card { display: flex; flex-direction: column; gap: 1.1rem; }
+.member-form-top-row { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
+.member-photo-col { flex: 0 0 108px; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; }
+.member-fields-col { flex: 1 1 320px; min-width: 0; }
 .member-photo-circle {
   position: relative;
   width: 6rem;
   height: 6rem;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--brand-soft);
-  border: 2px solid var(--border);
+  background: #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
 .member-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
-.member-photo-placeholder { font-size: 2rem; font-weight: 700; color: var(--brand-dark); }
+.member-photo-placeholder-icon { width: 3rem; height: 3rem; color: #94a3b8; }
 .member-photo-camera {
   position: absolute;
   right: -0.1rem;
@@ -1624,7 +1629,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   width: 1.85rem;
   height: 1.85rem;
   border-radius: 50%;
-  background: var(--btn-bg);
+  background: var(--brand-dark);
   color: #fff;
   display: flex;
   align-items: center;
@@ -1632,26 +1637,158 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 2px solid var(--surface);
 }
 .member-photo-camera .icon { width: 1rem; height: 1rem; }
-.member-photo-upload:has(input:disabled) .member-photo-circle { cursor: default; }
-.member-photo-upload:has(input:disabled) .member-photo-camera { display: none; }
+.member-photo-upload-link { color: var(--brand-dark); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.member-photo-upload-link:hover { text-decoration: underline; }
+.member-photo-hint { font-size: 0.75rem; color: var(--muted); }
+.member-photo-col:has(input:disabled) .member-photo-circle { cursor: default; }
+.member-photo-col:has(input:disabled) .member-photo-camera { display: none; }
 
-.member-form-city-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem 1.5rem; }
+@media (max-width: 640px) {
+  .member-form-top-row { flex-direction: column; align-items: center; }
+}
+
+.member-form-city-row { display: grid; grid-template-columns: 1.3fr 1.15fr 1fr; gap: 0.75rem 1rem; }
+.member-form-city-row select { padding-right: 0.4rem; font-size: 0.88rem; }
 @media (max-width: 640px) {
   .member-form-city-row { grid-template-columns: 1fr; }
 }
 
-.member-form-section-box { border-width: 2px; }
+/* Required-looking field labels (cosmetic asterisk only - actual server
+   validation still just requires Full Name, so an admin can save a
+   partial profile and fill the rest in later). The asterisk goes on the
+   label-text span (not the label itself) since .member-form-grid label is
+   a column flexbox - appending ::after straight on the label would flow
+   it as its own line below the input instead of right after the text. */
+.required-label .field-label-text::after { content: " *"; color: var(--red); font-weight: 700; }
+
+.input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.65rem;
+  background: #fff;
+}
+.input-with-icon .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+.input-with-icon input { border: none; outline: none; padding: 0.65rem 0; flex: 1; min-width: 0; }
+.input-with-icon:has(input:disabled) { background: #f8fafc; }
+
+.member-form-lower-grid { margin-top: 0.25rem; }
+
+/* Family + Setup/Cleanup Team boxes sit side by side. auto-fit (not a
+   fixed 1fr 1fr) collapses the second track when there's no Team box
+   (Student form) so the lone Family box grows to fill the row instead of
+   leaving an empty blank column/panel next to it. */
+.member-form-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
+@media (max-width: 760px) {
+  .member-form-boxes { grid-template-columns: 1fr; }
+}
+
+.member-form-box-hint { margin: -0.4rem 0 0.75rem; color: var(--muted); font-size: 0.82rem; }
+
+.member-form-section-box { border-width: 2px; margin-bottom: 0; }
 .member-form-section-box h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; }
 .member-form-section-box h2 .icon { width: 1.1rem; height: 1.1rem; }
 .member-form-section-blue { border-color: var(--brand); background: var(--brand-soft); }
 .member-form-section-blue h2 { color: var(--brand-dark); }
-.member-form-section-green { border-color: var(--green); background: var(--green-bg); }
-.member-form-section-green h2 { color: var(--green); }
 
-.member-form-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; min-width: 0; }
+/* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
+   dropdown is a quick-pick that checks/selects the matching row below;
+   each row shows a member count, same as the reference design. */
+.member-form-checklist { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.member-form-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.member-form-checklist-box {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.member-form-checklist-box .icon { width: 0.8rem; height: 0.8rem; color: #fff; opacity: 0; }
+.member-form-checklist-row.is-checked .member-form-checklist-box { background: var(--btn-bg); border-color: var(--btn-bg); }
+.member-form-checklist-row.is-checked .member-form-checklist-box .icon { opacity: 1; }
+.member-form-checklist-name { flex: 1; font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.member-form-checklist-count { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
+.member-form-checklist-row:has(input:disabled) { cursor: default; }
+.member-form-checklist-row:disabled { cursor: default; }
+/* The real checkbox on the Team checklist rows is visually replaced by
+   .member-form-checklist-box above - hide the native control itself. */
+.member-form-checklist-checkbox { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.member-form-section-green { border-color: var(--btn-bg); background: var(--orange-bg); }
+.member-form-section-green h2 { color: var(--orange); }
+
+.member-form-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; min-width: 0; }
 .member-form-footer-view,
 .member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
 .member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+/* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
+   different padding/font-size scales elsewhere in the app - matched here
+   explicitly so the two footer buttons read as the same size and shape. */
+.member-form-footer .btn-secondary,
+.member-form-footer .primary-btn {
+  padding: 0.7rem 1.4rem;
+  font-size: 0.92rem;
+  border-radius: var(--control-radius);
+  margin-top: 0;
+}
+.member-form-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.member-form-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+/* The whole Membership Form (header, fields, Family/Team boxes, footer)
+   sits in one white card - same shape/chrome as the Create Class dialog
+   (.class-form-dialog: white surface, rounded corners, this padding,
+   this shadow) - instead of separate pieces floating on the site's blue
+   page background. */
+.member-form-page-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-md);
+  /* Sized to its content (the 720px-capped form) instead of stretching to
+     fill the rest of .admin-main - otherwise a big blank strip of white
+     panel shows to the right of the actual form. */
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* Phone/Email (icon-wrapped) already get their box treatment from
+   .input-with-icon; Birthday and Medical/Allergy Notes are plain direct
+   children of .class-form-field, so they need the same input styling
+   Create Class's own text/select fields get (that rule only covers
+   type="text"/select, not date/textarea). */
+.class-form-field > input[type="date"],
+.class-form-field > textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.65rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+}
+.class-form-field > textarea::placeholder { color: var(--muted); }
+
+.member-form-section-box select { width: 100%; box-sizing: border-box; }
 
 .member-view-dialog { width: min(760px, 94vw); }
 .member-view-close-row { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }

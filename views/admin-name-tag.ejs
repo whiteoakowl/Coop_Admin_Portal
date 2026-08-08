@@ -30,7 +30,6 @@
           <select class="name-tag-type-select" id="name-tag-type-select">
             <option value="student">Student</option>
             <option value="parent">Parent</option>
-            <option value="admin">Admin</option>
           </select>
 
           <div class="name-tag-toolbar-group">
@@ -89,7 +88,6 @@
               <option value="all">All</option>
               <option value="student">Students Only</option>
               <option value="parent">Parents Only</option>
-              <option value="admin">Admins Only</option>
             </select>
             <label class="checkbox-option name-tag-select-all">
               <input type="checkbox" id="name-tag-select-all-checkbox" />
@@ -108,7 +106,7 @@
               <label class="member-picker-row" data-type="<%= m.member_type %>">
                 <input type="checkbox" name="memberIds" value="<%= m.id %>" />
                 <span><%= m.name %></span>
-                <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
+                <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
               </label>
             <% }); %>
           </div>

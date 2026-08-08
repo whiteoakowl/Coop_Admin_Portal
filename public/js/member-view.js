@@ -10,15 +10,16 @@
 
   let currentId = null;
 
-  // updateMemberFormForType is defined in member-form.js (loaded on this
-  // page too, ahead of this script) - shared so the header/Family box
-  // re-theme identically whether the toggle lives on the full Add/Edit
-  // page or in here.
+  // updateMemberFormForType/initMemberFormInteractions are defined in
+  // member-form.js (loaded on this page too, ahead of this script) -
+  // shared so the toggle/family-checklist/team-picker behave identically
+  // whether they live on the full Add/Edit page or in this popup.
   function initTypeToggle(root) {
     const form = root.querySelector('[data-member-view-form]');
     if (!form) return;
     form.querySelectorAll('input[name="memberType"]').forEach((r) => r.addEventListener('change', () => updateMemberFormForType(form)));
     updateMemberFormForType(form);
+    initMemberFormInteractions(form);
   }
 
   function loadMember(id) {

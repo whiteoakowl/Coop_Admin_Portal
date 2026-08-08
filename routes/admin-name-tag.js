@@ -89,7 +89,7 @@ router.get('/name-tag', requireAdmin, (req, res) => {
     showArchived,
     members,
     nameTagDataJson: jsonScriptSafe({
-      templates: { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') },
+      templates: { student: getTemplate('student'), parent: getTemplate('parent') },
       defaultLayouts: DEFAULT_LAYOUTS,
       fieldsByType: FIELDS_BY_TYPE,
       shapeTypes: SHAPE_TYPES,
@@ -133,7 +133,7 @@ router.post('/name-tag/:id/unarchive', requireAdmin, (req, res) => {
   res.redirect('/admin/name-tag?tab=archived');
 });
 
-const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
+const NAME_TAG_TYPES = ['student', 'parent'];
 
 // This same save endpoint is shared by the Setup/Cleanup and Custom badge
 // types (they use the same editor - see public/js/name-tag-editor.js) -
@@ -180,7 +180,7 @@ router.post('/name-tag/print', requireAdmin, (req, res) => {
   const placeholders = memberIds.map(() => '?').join(',');
   const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
 
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
   const badges = members.map((m) => {
     const layout = templates[m.member_type] || templates.student;
     const data = badgeDataForMember(m);
