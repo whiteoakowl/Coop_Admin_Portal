@@ -5,7 +5,9 @@ const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { defaultDay } = require('../utils/days');
 const { familyOf } = require('../utils/members');
-const { getMemberSchedule, rowIsBlank, DAY_LABELS: SCHEDULE_DAY_LABELS } = require('../utils/schedule');
+const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
+const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 // Full kiosk landing screen (Check In/Out, Floater Assignments, forms) -
 // not the site's homepage anymore (that's now the member/staff login),
@@ -98,24 +100,22 @@ router.post('/find-parent/scan', (req, res) => {
 
   const parents = familyOf(student.id).filter((m) => m.member_type === 'parent');
   if (parents.length === 0) {
-    return res.json({ ok: true, studentName: student.name, parents: [] });
+    return res.json({ ok: true, studentName: student.name, parents: [], cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
   }
 
-  const formatDay = (rows) =>
-    rows.filter((r) => !rowIsBlank(r)).map((r) => ({ time: r.time, className: r.class_name, room: r.room }));
+  // Same rendering pipeline as the Members "View Cards" dialog and the
+  // Design/Print Schedule Card print run - the parent's schedule here
+  // looks exactly like their printed Schedule Card because it IS that
+  // card, not a separate hand-built view.
+  const template = getScheduleCardTemplate();
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const parentData = parents.map((p) => ({
+    name: p.name,
+    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(p)),
+    bgCss,
+  }));
 
-  const parentData = parents.map((p) => {
-    const schedule = getMemberSchedule(p.id);
-    return {
-      name: p.name,
-      days: [
-        { label: SCHEDULE_DAY_LABELS.monday, items: formatDay(schedule.monday) },
-        { label: SCHEDULE_DAY_LABELS.wednesday, items: formatDay(schedule.wednesday) },
-      ],
-    };
-  });
-
-  res.json({ ok: true, studentName: student.name, parents: parentData });
+  res.json({ ok: true, studentName: student.name, parents: parentData, cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
 });
 
 module.exports = router;

@@ -33,6 +33,11 @@
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  // Renders each parent's actual Schedule Card - the same
+  // NameTagRenderCore-generated markup used by the Members "View Cards"
+  // dialog and the Design/Print Schedule Card run, sent over as
+  // pre-rendered HTML (data.parents[].html/bgCss) so this is guaranteed
+  // to look exactly like the printed card, not a hand-built lookalike.
   function renderResults(data) {
     studentHeading.textContent = 'Parents for ' + data.studentName;
 
@@ -40,31 +45,15 @@
       parentsEl.innerHTML = '<p class="roster-empty">No parent information found for ' + escapeHtml(data.studentName) + '.</p>';
     } else {
       parentsEl.innerHTML = data.parents
-        .map((p) => {
-          const days = p.days
-            .map((d) => {
-              if (d.items.length === 0) return '';
-              const rows = d.items
-                .map(
-                  (i) =>
-                    '<div class="find-parent-class-row">' +
-                    '<span class="find-parent-class-time">' + escapeHtml(i.time || '') + '</span>' +
-                    '<span class="find-parent-class-name">' + escapeHtml(i.className || '') + '</span>' +
-                    (i.room ? '<span class="find-parent-class-room">Room ' + escapeHtml(i.room) + '</span>' : '') +
-                    '</div>'
-                )
-                .join('');
-              return '<div class="find-parent-day"><h4>' + escapeHtml(d.label) + '</h4>' + rows + '</div>';
-            })
-            .join('');
-          const hasAnySchedule = p.days.some((d) => d.items.length > 0);
-          return (
+        .map(
+          (p) =>
             '<div class="find-parent-parent-card">' +
             '<h3>' + escapeHtml(p.name) + '</h3>' +
-            (hasAnySchedule ? days : '<p class="roster-empty">Not currently scheduled for a class.</p>') +
+            '<div class="badge-canvas find-parent-badge-canvas" style="width:' + data.cardWidth + 'px; height:' + data.cardHeight + 'px; background:' + p.bgCss + ';">' +
+            p.html +
+            '</div>' +
             '</div>'
-          );
-        })
+        )
         .join('');
     }
 

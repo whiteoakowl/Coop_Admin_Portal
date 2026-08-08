@@ -7,7 +7,7 @@ const { isValidISODate, formatDateLabel, todayISO, weekdayOf } = require('../uti
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
-const { hoursForDay } = require('../utils/classSchedule');
+const { hoursForDay, syncDayMemberRosters } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -187,7 +187,12 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, (req,
   const list = getListByDay(day);
   const memberId = parseInt(req.body.memberId, 10);
   const sectionId = parseInt(req.body.sectionId, 10);
-  if (memberId && sectionId) addMemberToSection(list.id, memberId, sectionId);
+  if (memberId && sectionId) {
+    addMemberToSection(list.id, memberId, sectionId);
+    // A floater's own schedule/roster picks this hour up too - see
+    // syncDayMemberRosters/syncMemberSchedulesForDay in utils/classSchedule.
+    syncDayMemberRosters(day);
+  }
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Member added.'));
 });
 
@@ -202,6 +207,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requir
   const day = req.params.day;
   const list = getListByDay(day);
   removeMemberFromSection(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10));
+  syncDayMemberRosters(day);
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
 });
 
@@ -242,6 +248,7 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
     addMemberToSection(list.id, member.id, firstSection.id);
     added++;
   }
+  if (added) syncDayMemberRosters(day);
   res.redirect(
     `/admin/volunteers/${day}/teams?notice=` +
       encodeURIComponent(`Imported ${added} member(s) added to ${firstSection.label}` + (notFound ? `, ${notFound} name(s) not found in Members.` : '.'))

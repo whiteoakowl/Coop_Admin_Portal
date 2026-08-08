@@ -16,6 +16,7 @@ const {
   defaultDay,
   hoursForDay,
   saveHourLabels,
+  syncMemberSchedulesForDay,
   gridForDay,
   roomGridForDay,
   roomsForDay,
@@ -88,6 +89,9 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, (req, res
   const day = req.params.day;
   const labels = [].concat(req.body.labels || []);
   saveHourLabels(day, labels);
+  // Every schedule row (class or floater) that falls back to the hour's
+  // shared label for its displayed time needs to pick up the rename.
+  syncMemberSchedulesForDay(day);
 
   const oldNames = [].concat(req.body.oldNames || []);
   const newNames = [].concat(req.body.newNames || []);

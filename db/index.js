@@ -277,7 +277,19 @@ if (!existingScheduleCardTemplate) {
   const elements = layout && Array.isArray(layout.elements) ? layout.elements : [];
   const nameEl = elements.find((el) => el.id === 'name');
   const stillOnPriorDefault = elements.some((el) => el.id === 'org') || (nameEl && nameEl.fontSize === 16);
-  if (stillOnPriorDefault) {
+
+  // Same idea, second fingerprint: the pre-"Primary Parent Phone" default
+  // had exactly these 5 elements and no primaryParentPhone field. Anyone
+  // still on that gets the new phone line for free too.
+  const priorFieldDefaultIds = ['name', 'mon-label', 'mon-table', 'wed-label', 'wed-table'];
+  const currentIds = elements.map((el) => el.id).sort();
+  const hasPhoneField = elements.some((el) => el.field === 'primaryParentPhone');
+  const stillMissingPhoneField =
+    !hasPhoneField &&
+    currentIds.length === priorFieldDefaultIds.length &&
+    priorFieldDefaultIds.slice().sort().every((id, i) => currentIds[i] === id);
+
+  if (stillOnPriorDefault || stillMissingPhoneField) {
     db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(
       JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT)
     );

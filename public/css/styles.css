@@ -488,32 +488,16 @@ textarea:focus-visible,
 }
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
-.find-parent-results { max-width: 720px; text-align: left; }
-.find-parent-heading { margin: 0 0 1.25rem; font-size: 1.3rem; text-align: center; }
-.find-parent-parent-card {
-  background: var(--brand-soft);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.3rem;
-  margin-bottom: 1rem;
-}
+/* Find a Parent results - each parent's actual Schedule Card
+   (.badge-canvas, same rendering as the Members "View Cards" dialog and
+   Design/Print), just centered in a scrollable stack instead of a
+   printable sheet. */
+.find-parent-results { max-width: 760px; text-align: center; }
+.find-parent-heading { margin: 0 0 1.25rem; font-size: 1.3rem; }
+.find-parent-parent-card { margin-bottom: 1.5rem; }
+.find-parent-parent-card:last-child { margin-bottom: 0; }
 .find-parent-parent-card h3 { margin: 0 0 0.6rem; font-size: 1.15rem; color: var(--brand-dark); }
-.find-parent-day { margin-bottom: 0.6rem; }
-.find-parent-day:last-child { margin-bottom: 0; }
-.find-parent-day h4 { margin: 0 0 0.3rem; font-size: 0.8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.find-parent-class-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.6rem;
-  background: #fff;
-  border-radius: 8px;
-  margin-bottom: 0.3rem;
-  font-size: 0.9rem;
-}
-.find-parent-class-row:last-child { margin-bottom: 0; }
-.find-parent-class-time { font-weight: 700; color: var(--ink); flex-shrink: 0; min-width: 6rem; }
-.find-parent-class-name { flex: 1; font-weight: 600; }
-.find-parent-class-room { color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+.find-parent-badge-canvas { margin: 0 auto; }
 .find-parent-scan-again { margin-top: 0.5rem; width: 100%; }
 
 @media (max-width: 640px) {

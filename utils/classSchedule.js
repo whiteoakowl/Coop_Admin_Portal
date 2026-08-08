@@ -1,5 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+const { getListByDay, sectionsForList, membersForList } = require('./volunteers');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -500,8 +501,19 @@ function ensureDayMemberRosters() {
   return ids;
 }
 
+// Everyone floating any hour on a day's Floater Assignments list - a
+// parent only needs to be assigned to ONE hour to count as floating that
+// day, same "day-level" granularity as teaching/assisting a class.
+function floaterMemberIdsForDay(day) {
+  const list = getListByDay(day);
+  if (!list) return [];
+  return membersForList(list.id).map((m) => m.id);
+}
+
 // Rebuilds a day's Parent and Student roster membership from everyone
-// enrolled in (students) or staffing (parents) any class on that day.
+// enrolled in (students) or staffing/floating (parents) that day - a
+// class's teacher/assistants, or anyone on the Floater Assignments list
+// for any hour that day.
 function syncDayMemberRosters(day) {
   const classIds = db.prepare('SELECT id FROM classes WHERE day = ?').all(day).map((r) => r.id);
   const studentIds = new Set();
@@ -515,6 +527,7 @@ function syncDayMemberRosters(day) {
       .all(...classIds)
       .forEach((r) => parentIds.add(r.member_id));
   }
+  floaterMemberIdsForDay(day).forEach((id) => parentIds.add(id));
   setRosterMembership(ensureDayRoster(day, 'student'), studentIds);
   setRosterMembership(ensureDayRoster(day, 'parent'), parentIds);
   syncMemberSchedulesForDay(day);
@@ -530,14 +543,19 @@ function timeRangeForClass(cls) {
 }
 
 // member_schedules (the per-member "Schedule Card" / profile Class
-// Schedule tab data) is entirely derived from the master Class Schedule -
-// there's no separate hand-typed version anymore, so this fully rebuilds
-// one day's rows from current enrollment/staffing every time either
-// changes (called from syncDayMemberRosters, which already runs on every
-// enrollment/staff/class edit). A person shows up once per class they're
-// either enrolled in (student) or staffing (teacher/assistant); "teacher"
-// on their row lists that class's teacher(s), themselves included if
-// that's their own class.
+// Schedule tab data) is entirely derived from the master Class Schedule
+// and the Floater Assignments list - there's no separate hand-typed
+// version anymore, so this fully rebuilds one day's rows every time
+// either changes (called from syncDayMemberRosters, which already runs
+// on every enrollment/staff/class/floater edit). A person shows up once
+// per class they're either enrolled in (student) or staffing (teacher/
+// assistant); "teacher" on their row lists that class's teacher(s),
+// themselves included if that's their own class. A floater then fills in
+// any of THEIR hours that aren't already a real class slot on their own
+// schedule, labeled "Floater" - matched purely by hour position (the
+// Floater Assignments chart's "Hour N" against the class grid's own
+// "Hour N", the same position class_schedule_hours already keys both by),
+// not to any specific class, so it never overwrites a real one.
 function syncMemberSchedulesForDay(day) {
   const classes = db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
   db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
@@ -558,6 +576,36 @@ function syncMemberSchedulesForDay(day) {
       upsert.run(person.id, day, cls.hour_position, time, cls.class_name, cls.room || '', teacherNames);
     });
   });
+
+  const insertIfEmpty = db.prepare(
+    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
+     VALUES (?, ?, ?, ?, 'Floater', '', '', datetime('now'))
+     ON CONFLICT(member_id, day, class_number) DO NOTHING`
+  );
+  const list = getListByDay(day);
+  if (list) {
+    const hourLabels = {};
+    hoursForDay(day).forEach((h) => { hourLabels[h.position] = h.label; });
+    sectionsForList(list.id).forEach((section) => {
+      membersForSectionRaw(list.id, section.id).forEach((memberId) => {
+        insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
+      });
+    });
+  }
+}
+
+// Bare member ids on one floater hour section - a lightweight variant of
+// utils/volunteers.js's membersForSection (which joins in rank/other
+// display fields this sync doesn't need).
+function membersForSectionRaw(listId, sectionId) {
+  return db
+    .prepare(
+      `SELECT m.id FROM members m
+       JOIN volunteer_members vm ON vm.member_id = m.id
+       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1`
+    )
+    .all(listId, sectionId)
+    .map((r) => r.id);
 }
 
 function appSetting(key, fallback) {
@@ -608,6 +656,7 @@ module.exports = {
   ensureDayRoster,
   ensureDayMemberRosters,
   syncDayMemberRosters,
+  syncMemberSchedulesForDay,
   addManualRosterMember,
   allClassesList,
 };
