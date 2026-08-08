@@ -207,7 +207,7 @@ router.get('/logs/allergies/fragment', requireAdmin, (req, res) => {
 });
 
 router.get('/logs/allergies/export.csv', requireAdmin, (req, res) => {
-  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [
     toCsvRow(['Name', 'Type', 'Grade Level', 'Medical Notes']),
     ...membersWithMedicalNotes().map((m) => toCsvRow([m.name, typeLabel(m.member_type), m.grade_level || '', m.medical_notes])),
