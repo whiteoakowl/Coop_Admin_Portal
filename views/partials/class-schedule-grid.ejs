@@ -215,7 +215,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
               <% } else { %>
                 <% cell.classes.forEach(function(cls) { %>
                   <% var cardAbsentCount = cls.students.filter(function(s) { return absentIds.has(s.id); }).length; %>
-                  <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                  <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                     <div class="class-card-header">
                       <h3><%= cls.class_name %></h3>
                       <% if (!gridReadOnly) { %>

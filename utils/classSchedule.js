@@ -59,21 +59,22 @@ function formatGradeRange(ageGroup) {
 
 // Cycled through in order as new classes are created, so a freshly built
 // schedule is colorful without an admin having to pick a color every time.
-// 12 soft pastel tones spanning the hue wheel, so classes stay easy to
-// pick out on the grid without looking like a highlighter box.
+// 12 pastel tones spanning the hue wheel, deep/saturated enough to stand
+// out on the grid at a glance (not the washed-out, barely-there pastels
+// this palette started as) while still reading as "pastel", not neon.
 const COLOR_PALETTE = [
-  '#FFD3B0', // peach
-  '#FFF1AE', // yellow
-  '#D8F0B0', // lime
-  '#B8E8C8', // mint
-  '#B0E6DE', // teal
-  '#B3D9FA', // sky blue
-  '#C2CEFA', // periwinkle
-  '#D3C3F5', // lavender
-  '#EFC3F0', // orchid
-  '#F9C6DD', // pink
-  '#FAC7C0', // coral
-  '#E3D2BE', // sand
+  '#F5B67D', // peach
+  '#F0DB6E', // yellow
+  '#B8DE7A', // lime
+  '#86D1A3', // mint
+  '#7BD2C6', // teal
+  '#7CBBF0', // sky blue
+  '#93A4F0', // periwinkle
+  '#B79BEA', // lavender
+  '#DE93E0', // orchid
+  '#F291BE', // pink
+  '#F29A8E', // coral
+  '#CBAE8B', // sand
 ];
 
 function nextPaletteColor() {

@@ -43,7 +43,7 @@
                           var teachers = cls.staff.filter(function(s) { return s.role !== 'assistant'; }).map(function(s) { return s.name; });
                           var assistants = cls.staff.filter(function(s) { return s.role === 'assistant'; }).map(function(s) { return s.name; });
                         %>
-                        <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+                        <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                           <h3><%= cls.class_name %></h3>
                           <% if (cls.age_group) { %><p class="class-schedule-print-grade"><%= cls.age_group %></p><% } %>
                           <% if (teachers.length > 0) { %><p class="class-schedule-print-staff">Teacher: <%= teachers.join(', ') %></p><% } %>
