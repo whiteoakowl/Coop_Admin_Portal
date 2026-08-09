@@ -2544,6 +2544,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-archive-view-header { margin-bottom: 1rem; }
 .volunteer-archive-view-header h2 { margin: 0 0 0.2rem; }
 
+/* Roster Archive popup (fetched fragment shown in
+   #roster-archive-view-dialog) - reuses the Floater archive popup's chrome
+   (.member-view-close-row/.volunteer-archive-actions-row/
+   .volunteer-archive-view-header are all shared), just wider and taller
+   since it stacks a full Parent + Student + every class grid instead of
+   one card layout. */
+.roster-archive-view-dialog { width: min(1300px, 96vw); max-height: 90vh; overflow-y: auto; border: none; border-radius: var(--radius); padding: var(--card-padding); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+.roster-archive-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.roster-archive-view-dialog .grid-box + .grid-box { margin-top: 1.5rem; }
+
+/* Parent/Student pill toggle sits next to the save-status text on the
+   toolbar's left side (mirrors .category-filter's row on the right). */
+.roster-toolbar-left { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
 /* Archive print page: portrait, 2 cards per row (2 rows for a day's 4
    hour cards) - the print page's own @page rule matches (see the view). */
 .volunteer-archive-print-page .floater-cards-grid { grid-template-columns: repeat(2, 1fr); }
