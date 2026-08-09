@@ -390,26 +390,6 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
   });
 });
 
-// Fetched by public/js/member-view.js and injected into the Members list
-// page's shared dialog - a view-only Membership Form (fields disabled) with
-// an Edit button that unlocks them in place. Same field partial as the
-// full Add/Edit page (views/partials/member-form-fields.ejs), just started
-// in 'view' mode instead of 'create'/'edit'.
-router.get('/members/:id/view-fragment', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (!member) return res.status(404).send('Not found');
-
-  res.render('member-view-fragment', {
-    member,
-    families: allFamilies(),
-    memberFamilyId: member.family_id,
-    gradeLevels: GRADE_LEVELS,
-    setupTeams: allSetupTeams(),
-    memberCleanupTeamIds: cleanupTeamIdsForMember(id),
-  });
-});
-
 router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const f = memberFormFields(req);

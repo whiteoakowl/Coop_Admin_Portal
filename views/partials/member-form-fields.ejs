@@ -1,14 +1,12 @@
 <%
-// Shared Membership Form fields - included by both the full Add/Edit page
-// (views/admin-member-edit.ejs) and the Members list's view/edit popup
-// (views/member-view-fragment.ejs), so the two never drift apart. Field
-// layout/wording follows the Student/Parent Membership Form reference
-// design exactly.
+// Shared Membership Form fields - included by the full Add/Edit page
+// (views/admin-member-edit.ejs) for both 'create' and 'edit' modes, so
+// the two never drift apart. Field layout/wording follows the
+// Student/Parent Membership Form reference design exactly.
 //
-// locals: member, mode ('create'|'edit'|'view'), families (with
-// memberCount), memberFamilyId, setupTeams (with memberCount),
-// memberCleanupTeamIds, gradeLevels
-const disabled = mode === 'view';
+// locals: member, mode ('create'|'edit'), families (with memberCount),
+// memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
+// gradeLevels
 const isParent = member.member_type === 'parent';
 const uid = 'mf-' + mode + '-' + (member.id || 'new');
 const typeLabel = isParent ? 'Parent' : 'Student';
@@ -36,11 +34,11 @@ const US_STATES = [
   </div>
   <div class="member-type-toggle" role="group" aria-label="Member type">
     <label class="member-type-toggle-btn member-type-toggle-parent">
-      <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+      <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
       <svg class="icon"><use href="#icon-user"/></svg> Parent
     </label>
     <label class="member-type-toggle-btn member-type-toggle-student">
-      <input type="radio" name="memberType" value="student" <%= !isParent ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+      <input type="radio" name="memberType" value="student" <%= !isParent ? 'checked' : '' %> />
       <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
     </label>
   </div>
@@ -48,7 +46,7 @@ const US_STATES = [
 
 <div class="member-form-parent-flag" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
   <label class="checkbox-option primary-parent-top-option">
-    <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+    <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
     <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
   </label>
 </div>
@@ -64,33 +62,31 @@ const US_STATES = [
         <% } %>
         <span class="member-photo-camera"><svg class="icon"><use href="#icon-camera"/></svg></span>
       </label>
-      <input type="file" name="photo" id="<%= uid %>-photo" accept="image/*" <%= disabled ? 'disabled' : '' %> hidden />
-      <% if (!disabled) { %>
-        <label class="member-photo-upload-link" for="<%= uid %>-photo">Upload a photo</label>
-      <% } %>
+      <input type="file" name="photo" id="<%= uid %>-photo" accept="image/*" hidden />
+      <label class="member-photo-upload-link" for="<%= uid %>-photo">Upload a photo</label>
       <span class="member-photo-hint">JPG, PNG up to 5MB</span>
     </div>
     <div class="member-fields-col">
       <div class="class-form-row">
         <div class="class-form-field">
           <span class="class-form-field-label required">Full Name</span>
-          <input type="text" name="name" value="<%= member.name %>" placeholder="Enter full name" required <%= disabled ? 'disabled' : '' %> />
+          <input type="text" name="name" value="<%= member.name %>" placeholder="Enter full name" required />
         </div>
       </div>
       <div class="class-form-row">
         <div class="class-form-field">
           <span class="class-form-field-label required">Address</span>
-          <input type="text" name="address" value="<%= member.address || '' %>" placeholder="Enter street address" <%= disabled ? 'disabled' : '' %> />
+          <input type="text" name="address" value="<%= member.address || '' %>" placeholder="Enter street address" />
         </div>
       </div>
       <div class="class-form-row">
         <div class="class-form-field">
           <span class="class-form-field-label required">City</span>
-          <input type="text" name="city" value="<%= member.city || '' %>" placeholder="Enter city" <%= disabled ? 'disabled' : '' %> />
+          <input type="text" name="city" value="<%= member.city || '' %>" placeholder="Enter city" />
         </div>
         <div class="class-form-field">
           <span class="class-form-field-label required">State</span>
-          <select name="state" <%= disabled ? 'disabled' : '' %>>
+          <select name="state">
             <option value="">Select state</option>
             <% US_STATES.forEach(function(s) { %>
               <option value="<%= s[0] %>" <%= member.state === s[0] ? 'selected' : '' %>><%= s[1] %></option>
@@ -99,7 +95,7 @@ const US_STATES = [
         </div>
         <div class="class-form-field">
           <span class="class-form-field-label required">Zip Code</span>
-          <input type="text" name="zip" value="<%= member.zip || '' %>" placeholder="Enter zip code" <%= disabled ? 'disabled' : '' %> />
+          <input type="text" name="zip" value="<%= member.zip || '' %>" placeholder="Enter zip code" />
         </div>
       </div>
     </div>
@@ -110,31 +106,31 @@ const US_STATES = [
       <span class="class-form-field-label required">Phone</span>
       <span class="input-with-icon">
         <svg class="icon"><use href="#icon-phone"/></svg>
-        <input type="tel" name="phone" value="<%= member.phone || '' %>" placeholder="(123) 456-7890" <%= disabled ? 'disabled' : '' %> />
+        <input type="tel" name="phone" value="<%= member.phone || '' %>" placeholder="(123) 456-7890" />
       </span>
     </div>
     <div class="class-form-field">
       <span class="class-form-field-label required">Email</span>
       <span class="input-with-icon">
         <svg class="icon"><use href="#icon-mail"/></svg>
-        <input type="email" name="email" value="<%= member.email || '' %>" placeholder="name@example.com" <%= disabled ? 'disabled' : '' %> />
+        <input type="email" name="email" value="<%= member.email || '' %>" placeholder="name@example.com" />
       </span>
     </div>
   </div>
   <div class="class-form-row">
     <div class="class-form-field">
       <span class="class-form-field-label">Medical / Allergy Notes</span>
-      <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes" <%= disabled ? 'disabled' : '' %>><%= member.medical_notes || '' %></textarea>
+      <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes"><%= member.medical_notes || '' %></textarea>
     </div>
   </div>
   <div class="class-form-row" data-student-only style="<%= !isParent ? '' : 'display:none;' %>">
     <div class="class-form-field">
       <span class="class-form-field-label required">Birthday</span>
-      <input type="date" name="birthday" value="<%= member.birthday || '' %>" <%= disabled ? 'disabled' : '' %> />
+      <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
     </div>
     <div class="class-form-field">
       <span class="class-form-field-label required">Grade Level</span>
-      <select name="gradeLevel" <%= disabled ? 'disabled' : '' %>>
+      <select name="gradeLevel">
         <option value="">Select grade level</option>
         <% gradeLevels.forEach(function(g) { %>
           <option value="<%= g %>" <%= member.grade_level === g ? 'selected' : '' %>><%= g %></option>
@@ -148,7 +144,7 @@ const US_STATES = [
   <div class="manage-section member-form-section-box member-form-section-<%= isParent ? 'green' : 'blue' %>" data-family-box>
     <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
     <label class="member-form-full">Select Family
-      <select name="familyId" data-family-select <%= disabled ? 'disabled' : '' %>>
+      <select name="familyId" data-family-select>
         <option value="">Choose from available families</option>
         <% families.forEach(function(f) { %>
           <option value="<%= f.id %>" <%= memberFamilyId === f.id ? 'selected' : '' %>>The <%= f.name %> Family</option>
@@ -160,7 +156,7 @@ const US_STATES = [
     <% } else { %>
       <div class="member-form-checklist" data-family-checklist>
         <% families.forEach(function(f) { %>
-          <button type="button" class="member-form-checklist-row<%= memberFamilyId === f.id ? ' is-checked' : '' %>" data-family-option="<%= f.id %>" <%= disabled ? 'disabled' : '' %>>
+          <button type="button" class="member-form-checklist-row<%= memberFamilyId === f.id ? ' is-checked' : '' %>" data-family-option="<%= f.id %>">
             <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
             <span class="member-form-checklist-name">The <%= f.name %> Family</span>
             <span class="member-form-checklist-count"><%= f.memberCount %> member<%= f.memberCount === 1 ? '' : 's' %></span>
@@ -176,7 +172,7 @@ const US_STATES = [
       <p class="hint">No Setup/Cleanup teams exist yet.</p>
     <% } else { %>
       <label class="member-form-full">Add a Team
-        <select data-team-picker <%= disabled ? 'disabled' : '' %>>
+        <select data-team-picker>
           <option value="">Choose from available teams</option>
           <% setupTeams.forEach(function(t) { %>
             <option value="<%= t.id %>"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></option>
@@ -186,7 +182,7 @@ const US_STATES = [
       <div class="member-form-checklist" data-team-checklist>
         <% setupTeams.forEach(function(t) { %>
           <label class="member-form-checklist-row<%= memberCleanupTeamIds.includes(t.id) ? ' is-checked' : '' %>">
-            <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" class="member-form-checklist-checkbox" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> <%= disabled ? 'disabled' : '' %> />
+            <input type="checkbox" name="cleanupTeamIds" value="<%= t.id %>" class="member-form-checklist-checkbox" <%= memberCleanupTeamIds.includes(t.id) ? 'checked' : '' %> />
             <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
             <span class="member-form-checklist-name"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></span>
             <span class="member-form-checklist-count"><%= t.memberCount %> member<%= t.memberCount === 1 ? '' : 's' %></span>
