@@ -13,6 +13,7 @@ const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, D
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { isMiscBadgeType, saveMiscTemplate } = require('../utils/miscBadgeData');
 const { imageFileFilter } = require('../utils/uploads');
+const { sweepNameTagImages } = require('../utils/designImageGC');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { jsonScriptSafe } = require('../utils/json');
 const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
@@ -155,6 +156,7 @@ router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
 
   if (isMiscBadgeType(type)) {
     saveMiscTemplate(type, layout);
+    sweepNameTagImages();
     return res.json({ ok: true });
   }
 
@@ -162,6 +164,14 @@ router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
     `INSERT INTO name_tag_templates (member_type, layout_json, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
   ).run(type, JSON.stringify(layout));
+
+  // Removing/replacing an image element in the editor doesn't delete the
+  // old upload on its own (a layout can add/remove any number of images,
+  // unlike a member's single photo_path - there's no simple "this upload
+  // replaces that one" moment to hook cleanup onto). Re-derive what's
+  // still referenced across every name tag/misc badge template - they
+  // share this upload directory - and sweep anything left over.
+  sweepNameTagImages();
 
   res.json({ ok: true });
 });

@@ -30,6 +30,7 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
+const { sweepScheduleCardImages } = require('../utils/designImageGC');
 
 const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -283,6 +284,13 @@ router.post('/schedule/design/template', requireFullAdmin, (req, res) => {
     `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, datetime('now'))
      ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
   ).run(JSON.stringify(layout));
+
+  // See the equivalent comment in routes/admin-name-tag.js's own
+  // template-save route - a layout can add/remove any number of image
+  // elements with no simple "this upload replaces that one" moment to
+  // hook cleanup onto, so this re-derives what's still referenced and
+  // sweeps anything left over instead.
+  sweepScheduleCardImages();
 
   res.json({ ok: true });
 });
