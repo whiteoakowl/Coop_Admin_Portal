@@ -1,0 +1,67 @@
+<%# Read-only rendering of one archived grid section (Parent, Student, or
+    one class) - shared by the Archive tab's view-fragment popup and its
+    print page. Deliberately has none of the live grid's editable
+    controls (no <select>, no remove-member button, no profile-dialog
+    links) since an archive is a frozen historical record, and no member
+    id to link to anyway (see routes/admin-rosters.js's archiveRow). %>
+<div class="grid-box roster-grid-col">
+  <div class="grid-box-header">
+    <h2><%= heading %></h2>
+  </div>
+  <% if (grid.rows.length === 0) { %>
+    <p class="roster-empty">No members were on this roster when it was archived.</p>
+  <% } else { %>
+    <div class="legend">
+      <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+      <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+      <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+    </div>
+    <div class="roster-scroll">
+      <table class="roster-table roster-table-detailed">
+        <thead>
+          <tr>
+            <th class="roster-name-col">Name</th>
+            <th class="roster-secondary-col">Arrival</th>
+            <th class="roster-secondary-col">Departure</th>
+            <% grid.dateLabels.forEach(function(label) { %>
+              <th><%= label %></th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% grid.rows.forEach(function(row) { %>
+            <tr>
+              <td class="roster-name-col"><%= row.name %></td>
+              <td class="roster-secondary-col"><%= row.arrivalLabel || '—' %></td>
+              <td class="roster-secondary-col"><%= row.departureLabel || '—' %></td>
+              <% row.cells.forEach(function(cell) { %>
+                <td>
+                  <span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '' %></span>
+                  <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                  <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                </td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+        <tfoot>
+          <tr class="roster-summary-row">
+            <td class="roster-summary-label">Present</td>
+            <td></td><td></td>
+            <% grid.summary.forEach(function(s) { %><td><span class="summary-badge summary-present"><%= s.present %></span></td><% }); %>
+          </tr>
+          <tr class="roster-summary-row">
+            <td class="roster-summary-label">Late</td>
+            <td></td><td></td>
+            <% grid.summary.forEach(function(s) { %><td><span class="summary-badge summary-late"><%= s.late %></span></td><% }); %>
+          </tr>
+          <tr class="roster-summary-row">
+            <td class="roster-summary-label">Absent</td>
+            <td></td><td></td>
+            <% grid.summary.forEach(function(s) { %><td><span class="summary-badge summary-absent"><%= s.absent %></span></td><% }); %>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  <% } %>
+</div>

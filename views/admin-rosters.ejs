@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : tabLabel %> &mdash; Attendance Spreadsheet</p>
+        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'archive' ? 'Attendance Archive' : tabLabel %> &mdash; Attendance Spreadsheet</p>
       </div>
     </div>
     <h1>Attendance</h1>
@@ -19,10 +19,10 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="view-tabs no-print">
-      <% Object.keys(tabs).forEach(function(key) { %>
-        <a class="view-tab<%= activeTab === key ? ' active' : '' %>" href="/admin/rosters?tab=<%= key %>"><%= tabs[key].label %></a>
-      <% }); %>
-      <a class="view-tab<%= activeTab === 'classes' ? ' active' : '' %>" href="/admin/rosters?tab=classes">Class Rosters</a>
+      <a class="view-tab<%= topTab === 'monday' ? ' active' : '' %>" href="/admin/rosters?tab=monday-student">Monday</a>
+      <a class="view-tab<%= topTab === 'wednesday' ? ' active' : '' %>" href="/admin/rosters?tab=wednesday-student">Wednesday</a>
+      <a class="view-tab<%= topTab === 'classes' ? ' active' : '' %>" href="/admin/rosters?tab=classes">Class</a>
+      <a class="view-tab<%= topTab === 'archive' ? ' active' : '' %>" href="/admin/rosters?tab=archive">Archive</a>
     </div>
 
     <% if (view === 'classList') { %>
@@ -56,11 +56,60 @@
           </div>
         <% } %>
       </div>
+    <% } else if (view === 'archive') { %>
+      <div class="view-tab-panel">
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="roster-archive-day-select">Day</label>
+            <select id="roster-archive-day-select" onchange="window.location = '/admin/rosters?tab=archive' + (this.value ? '&day=' + this.value : '')">
+              <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
+              <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
+        </div>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Archived</th>
+                <th>Day</th>
+                <th>Session Dates</th>
+                <th>Parents</th>
+                <th>Students</th>
+                <th>Classes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (archives.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No archives yet<%= dayFilter ? ' for this day' : '' %> &mdash; use the Archive button on the Monday/Wednesday rosters to save and clear a term's attendance.</td></tr>
+              <% } %>
+              <% archives.forEach(function(a) { %>
+                <tr>
+                  <td><button type="button" class="member-name-link" data-view-archive-id="<%= a.id %>"><%= a.archivedAtLabel %></button></td>
+                  <td><%= a.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= a.dateCount %></td>
+                  <td><%= a.parentCount %></td>
+                  <td><%= a.studentCount %></td>
+                  <td><%= a.classCount %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <dialog id="roster-archive-view-dialog" class="roster-archive-view-dialog"></dialog>
+      </div>
     <% } else { %>
     <% if (classId) { %><p class="subtitle no-print"><a href="/admin/rosters?tab=classes">&larr; All Class Rosters</a></p><% } %>
 
     <div class="roster-toolbar no-print">
-      <div>
+      <div class="roster-toolbar-left">
+        <% if (!classId) { %>
+          <div class="day-toggle">
+            <a class="day-toggle-option<%= tab === day + '-parent' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-parent">Parent</a>
+            <a class="day-toggle-option<%= tab === day + '-student' ? ' active' : '' %>" href="/admin/rosters?tab=<%= day %>-student">Student</a>
+          </div>
+        <% } %>
         <span id="roster-save-status" class="volunteer-save-status"></span>
       </div>
       <div class="roster-btn-row">
@@ -70,6 +119,11 @@
         <% } %>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
+        <% if (!classId) { %>
+          <form method="POST" action="/admin/rosters/<%= day %>/archive" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected.">
+            <button type="submit" class="roster-action-btn">Archive</button>
+          </form>
+        <% } %>
       </div>
     </div>
 
@@ -311,5 +365,6 @@
   <script src="/js/date-list.js"></script>
   <script src="/js/attendance-grid.js"></script>
   <script src="/js/allergy-log-popup.js"></script>
+  <script src="/js/roster-archive-view.js"></script>
 </body>
 </html>

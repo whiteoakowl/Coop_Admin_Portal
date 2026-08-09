@@ -1,0 +1,20 @@
+<%# Injected into #roster-archive-view-dialog by public/js/roster-archive-view.js
+    - mirrors views/volunteer-archive-view-fragment.ejs's shape (Export/Print
+    top-right next to the close button, then the content itself). %>
+<div class="member-view-close-row volunteer-archive-actions-row">
+  <div class="volunteer-archive-actions">
+    <a class="roster-action-btn file-action-btn condensed-btn" href="/admin/rosters/archive/<%= archive.id %>/export.csv">Export</a>
+    <a class="roster-action-btn print-action-btn condensed-btn" href="/admin/rosters/archive/<%= archive.id %>/print" target="_blank">Print</a>
+  </div>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+<div class="volunteer-archive-view-header">
+  <h2><%= dayLabel %> Attendance Archive</h2>
+  <p class="hint"><%= archive.archivedAtLabel %></p>
+</div>
+
+<%- include('partials/roster-archive-grid-table', { heading: archive.parent.label, grid: archive.parent }) %>
+<%- include('partials/roster-archive-grid-table', { heading: archive.student.label, grid: archive.student }) %>
+<% archive.classes.forEach(function(c) { %>
+  <%- include('partials/roster-archive-grid-table', { heading: `${c.className} (${c.hourLabel})`, grid: c }) %>
+<% }); %>

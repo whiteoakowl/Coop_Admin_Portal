@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page roster-view-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= dayLabel %> Attendance Archive &mdash; <%= archive.archivedAtLabel %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= dayLabel %> Attendance Archive &mdash; <%= archive.archivedAtLabel %></p>
+        </div>
+      </div>
+
+      <%- include('partials/roster-archive-grid-table', { heading: archive.parent.label, grid: archive.parent }) %>
+      <%- include('partials/roster-archive-grid-table', { heading: archive.student.label, grid: archive.student }) %>
+      <% archive.classes.forEach(function(c) { %>
+        <%- include('partials/roster-archive-grid-table', { heading: `${c.className} (${c.hourLabel})`, grid: c }) %>
+      <% }); %>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

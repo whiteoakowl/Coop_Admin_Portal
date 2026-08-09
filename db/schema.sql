@@ -510,6 +510,23 @@ CREATE TABLE IF NOT EXISTS library_checkouts (
 CREATE INDEX IF NOT EXISTS idx_library_checkouts_member ON library_checkouts(member_id);
 CREATE INDEX IF NOT EXISTS idx_library_checkouts_item ON library_checkouts(item_id);
 
+-- A term-end (or whenever an admin chooses) snapshot of one day's
+-- Parent, Student, and every that-day class's grid, taken by the
+-- Attendance page's Archive button. Self-contained (member names and
+-- attendance baked directly into data_json, not just member_id
+-- references) so the record stays accurate forever even if a member is
+-- later deleted from the system - see routes/admin-rosters.js's
+-- archiveDay() for the exact shape. Archiving also clears the live
+-- roster_dates/attendance/checkouts it snapshotted, so the live
+-- Attendance grid starts fresh for the next term.
+CREATE TABLE IF NOT EXISTS roster_archives (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  archived_at TEXT NOT NULL DEFAULT (datetime('now')),
+  data_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_roster_archives_day ON roster_archives(day, archived_at);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);

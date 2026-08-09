@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime, todayISO, weekdayOf } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatTime, formatTimestamp, todayISO, weekdayOf } = require('../utils/dates');
 const { familyOf, byLastName } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { arrivalDepartureLabels } = require('../utils/schedule');
@@ -13,7 +13,7 @@ const {
   allClassesList,
   addManualRosterMember,
 } = require('../utils/classSchedule');
-const { defaultDay, DAY_LABELS } = require('../utils/days');
+const { defaultDay, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
 const { REASON_LABELS } = require('../utils/rosters');
 
 // The alert log below the grid only makes sense for today, and only when
@@ -206,16 +206,161 @@ function buildRosterGridData(roster, datesOverride) {
   };
 }
 
+// --- Roster Archive ---
+//
+// A day's Parent, Student, and every that-day class's grid can be
+// snapshotted (typically at term's end) into one combined, permanent
+// record, then cleared so the live Attendance grid starts fresh - see the
+// AskUserQuestion-confirmed design decision in the roster_archives schema
+// comment. A class's own attendance lives under its own roster_id (not
+// the day's Parent/Student rosters - see ensureClassRoster in
+// utils/classSchedule.js), and a class's displayed dates are always
+// borrowed from the day's Student roster (see the datesOverride used by
+// GET /rosters below) - so archiving only the Parent/Student rosters
+// would leave every class's attendance orphaned and its dates showing
+// empty. Every class meeting that day is archived and cleared right
+// alongside Parent/Student for that reason.
+
+// Strips a grid row down to exactly what an archive should keep forever:
+// display-ready values baked in by name, not a member_id reference that
+// would go stale (or point at nothing) once a member is later edited or
+// deleted. Also deliberately drops every sensitive/PII field (medical
+// notes, photo, address, phone, email) that buildRosterGridData's row.member
+// carries - an attendance archive has no business retaining those
+// permanently (see this session's earlier data-retention audit).
+function archiveRow(row) {
+  return {
+    name: row.member.name,
+    memberType: row.member.member_type,
+    parentName: row.parentName,
+    arrivalLabel: row.arrivalLabel,
+    departureLabel: row.departureLabel,
+    cells: row.cells.map((c) => ({ date: c.date, tag: c.tag, checkInTime: c.checkInTime, checkOutTime: c.checkOutTime, number: c.number })),
+  };
+}
+
+function archiveGrid(gridData) {
+  return {
+    dates: gridData.dates,
+    dateLabels: gridData.dateLabels,
+    rows: gridData.rows.map(archiveRow),
+    summary: gridData.summary,
+  };
+}
+
+// Builds the full self-contained snapshot for one day - Parent, Student,
+// and every class meeting that day, each with its own grid (a class's
+// dates mirror the Student roster's, same as the live view).
+function buildDaySnapshot(day) {
+  const parentRosterId = ensureDayRoster(day, 'parent');
+  const studentRosterId = ensureDayRoster(day, 'student');
+  const parentRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(parentRosterId);
+  const studentRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(studentRosterId);
+  const studentDates = rosterDates(studentRosterId);
+
+  const classes = allClassesList(day).map((c) => {
+    const classRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(c.roster_id);
+    return {
+      className: c.class_name,
+      hourLabel: c.hourLabel,
+      gradeLabel: c.gradeLabel,
+      timeLabel: c.timeLabel,
+      teacherNames: c.teacherNames,
+      assistantNames: c.assistantNames,
+      ...archiveGrid(buildRosterGridData(classRoster, studentDates)),
+    };
+  });
+
+  return {
+    day,
+    parent: { label: TABS[`${day}-parent`].label, ...archiveGrid(buildRosterGridData(parentRoster)) },
+    student: { label: TABS[`${day}-student`].label, ...archiveGrid(buildRosterGridData(studentRoster)) },
+    classes,
+  };
+}
+
+// Wipes exactly what buildDaySnapshot just captured for one roster - the
+// same three tables dates/:date/remove already clears for a single date
+// (see below), just for every date at once.
+function clearDayRosterData(rosterId) {
+  db.prepare('DELETE FROM roster_dates WHERE roster_id = ?').run(rosterId);
+  db.prepare('DELETE FROM attendance WHERE roster_id = ?').run(rosterId);
+  db.prepare('DELETE FROM checkouts WHERE roster_id = ?').run(rosterId);
+}
+
+// The one write path for the whole archive-and-clear operation - snapshot
+// first, then clear, wrapped in a transaction so a mid-operation failure
+// can never leave a day half-cleared without ever having been saved.
+function archiveDay(day) {
+  const snapshot = buildDaySnapshot(day);
+  if (snapshot.parent.dates.length === 0 && snapshot.student.dates.length === 0) {
+    return { ok: false, message: `${DAY_LABELS[day]} has no session dates to archive yet.` };
+  }
+
+  const parentRosterId = ensureDayRoster(day, 'parent');
+  const studentRosterId = ensureDayRoster(day, 'student');
+  const classRosterIds = allClassesList(day).map((c) => c.roster_id).filter(Boolean);
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('INSERT INTO roster_archives (day, data_json) VALUES (?, ?)').run(day, JSON.stringify(snapshot));
+    for (const rosterId of [parentRosterId, studentRosterId, ...classRosterIds]) clearDayRosterData(rosterId);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+
+  return { ok: true, message: `Archived ${DAY_LABELS[day]} attendance. The live roster has been cleared for a fresh start.` };
+}
+
+// One row of the Archive tab's log list - counts only, not the full
+// (potentially large) snapshot.
+function archiveSummary(row) {
+  const data = JSON.parse(row.data_json);
+  return {
+    id: row.id,
+    day: row.day,
+    archivedAtLabel: formatTimestamp(row.archived_at),
+    dateCount: new Set([...data.parent.dates, ...data.student.dates]).size,
+    parentCount: data.parent.rows.length,
+    studentCount: data.student.rows.length,
+    classCount: data.classes.length,
+  };
+}
+
+function loadArchive(id) {
+  const row = db.prepare('SELECT * FROM roster_archives WHERE id = ?').get(id);
+  if (!row) return null;
+  return { id: row.id, day: row.day, archivedAtLabel: formatTimestamp(row.archived_at), ...JSON.parse(row.data_json) };
+}
+
 router.get('/rosters', requireAdmin, (req, res) => {
   const requestedTab = req.query.tab || '';
+
+  if (requestedTab === 'archive') {
+    const dayFilter = isValidDay(req.query.day) ? req.query.day : '';
+    const rows = db
+      .prepare(`SELECT * FROM roster_archives ${dayFilter ? 'WHERE day = ?' : ''} ORDER BY archived_at DESC`)
+      .all(...(dayFilter ? [dayFilter] : []));
+    return res.render('admin-rosters', {
+      title: 'Attendance',
+      tab: 'archive',
+      topTab: 'archive',
+      view: 'archive',
+      archives: rows.map(archiveSummary),
+      dayFilter,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
 
   if (requestedTab === 'classes') {
     const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
     return res.render('admin-rosters', {
       title: 'Attendance',
-      tabs: TABS,
       tab: 'classes',
-      activeTab: 'classes',
+      topTab: 'classes',
       view: 'classList',
       classes: allClassesList(dayFilter || null),
       dayFilter,
@@ -253,11 +398,11 @@ router.get('/rosters', requireAdmin, (req, res) => {
 
   res.render('admin-rosters', {
     title: 'Attendance',
-    tabs: TABS,
     tab,
-    activeTab: classId ? 'classes' : tab,
+    topTab: classId ? 'classes' : day,
     view: 'grid',
     classId,
+    day,
     tabLabel,
     dayLabel: DAY_LABELS[day],
     roster,
@@ -373,6 +518,69 @@ router.post('/rosters/:tab/attendance', requireAdmin, (req, res) => {
 
   if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent('Attendance saved.'));
+});
+
+// --- Archive routes ---
+
+router.post('/rosters/:day/archive', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const result = archiveDay(day);
+  const query = result.ok
+    ? `notice=${encodeURIComponent(result.message)}`
+    : `error=${encodeURIComponent(result.message)}`;
+  res.redirect(`/admin/rosters?tab=${day}-student&${query}`);
+});
+
+router.get('/rosters/archive/:id/view-fragment', requireAdmin, (req, res) => {
+  const archive = loadArchive(parseInt(req.params.id, 10));
+  if (!archive) return res.status(404).send('Not found');
+  res.render('roster-archive-view-fragment', { archive, dayLabel: DAY_LABELS[archive.day] });
+});
+
+router.get('/rosters/archive/:id/print', requireAdmin, (req, res) => {
+  const archive = loadArchive(parseInt(req.params.id, 10));
+  if (!archive) return res.status(404).send('Not found');
+  res.render('admin-rosters-archive-print', {
+    title: `${DAY_LABELS[archive.day]} Attendance Archive — ${archive.archivedAtLabel}`,
+    archive,
+    dayLabel: DAY_LABELS[archive.day],
+  });
+});
+
+// One combined CSV: each of Parent/Student/every class gets its own
+// labeled section, in the same Name + per-date Status/Check-In/Check-Out/#
+// column shape the live roster export already uses.
+function gridCsvSection(sectionLabel, grid) {
+  const header = ['Name'];
+  for (const d of grid.dates) header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`);
+
+  const rowLines = grid.rows.map((r) => {
+    const row = [r.name];
+    for (const cell of r.cells) row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '');
+    return toCsvRow(row);
+  });
+
+  const summaryRows = ['Present', 'Late', 'Absent'].map((label) => {
+    const key = label.toLowerCase();
+    const row = [label];
+    for (const s of grid.summary) row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
+    return toCsvRow(row);
+  });
+
+  return [toCsvRow([sectionLabel]), toCsvRow(header), ...rowLines, ...summaryRows, toCsvRow([])];
+}
+
+router.get('/rosters/archive/:id/export.csv', requireAdmin, (req, res) => {
+  const archive = loadArchive(parseInt(req.params.id, 10));
+  if (!archive) return res.status(404).send('Not found');
+
+  const lines = [
+    ...gridCsvSection(archive.parent.label, archive.parent),
+    ...gridCsvSection(archive.student.label, archive.student),
+    ...archive.classes.flatMap((c) => gridCsvSection(`${c.className} (${c.hourLabel})`, c)),
+  ];
+
+  sendCsv(res, `${archive.day}-attendance-archive-${archive.id}.csv`, lines);
 });
 
 router.get('/roster/:tab/export.csv', requireAdmin, (req, res) => {
