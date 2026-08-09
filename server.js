@@ -4,6 +4,26 @@ const os = require('os');
 const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
+const { logError } = require('./utils/logger');
+
+// Belt-and-suspenders for anything that escapes Express's own error
+// handling entirely - a throw or rejection outside a request (a timer
+// callback, something at startup). Node already terminates the process
+// for both of these by default (and has since Node 15 for unhandled
+// rejections) - continuing to run after either is explicitly against
+// Node's own guidance, since the process may now be in an unknown state.
+// The only thing added here is making sure it's logged somewhere that
+// survives the terminal window being closed before someone notices.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  logError('uncaughtException', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+  logError('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
+  process.exit(1);
+});
 
 require('./db'); // initialize database + seed default admin
 
@@ -167,6 +187,7 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
+  logError(`${req.method} ${req.originalUrl}`, err);
   res.status(500).render('500', { title: 'Error' });
 });
 
