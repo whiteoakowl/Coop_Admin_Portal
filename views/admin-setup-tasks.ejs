@@ -60,7 +60,7 @@
                   <input type="hidden" name="direction" value="down" />
                   <button type="submit" class="icon-btn" aria-label="Move list down" title="Move down" <%= i === sections.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
                 </form>
-                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete list &quot;<%= s.title %>&quot;? This cannot be undone.');">
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" data-confirm="Delete list &quot;<%= s.title %>&quot;? This cannot be undone.">
                   <button type="submit" class="icon-btn" aria-label="Delete list" title="Delete List"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
@@ -99,7 +99,7 @@
                             <input type="hidden" name="direction" value="down" />
                             <button type="submit" class="icon-btn" aria-label="Move task down" title="Move down" <%= j === s.items.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
                           </form>
-                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form">
+                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete this task?">
                             <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>
                           </form>
                         </div>

@@ -70,7 +70,7 @@
               <tr>
                 <td><%= d.label %></td>
                 <td class="actions-cell">
-                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.');">
+                  <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>
                 </td>
