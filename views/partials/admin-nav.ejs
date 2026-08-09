@@ -1,5 +1,11 @@
 <%- include('icon-sprite') %>
 
+<%# Off-screen until focused - lets keyboard/screen-reader users jump past
+    the ~10-14 sidebar links (repeated on every admin page) straight to
+    the page's own content instead of tabbing through the whole sidebar
+    every time. Targets #main-content, set on every page's <main>. %>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
 <aside class="admin-sidebar">
   <a class="brand" href="/admin">
     <img src="/img/logo.png" alt="Sanford Homeschoolers" />
@@ -76,3 +82,4 @@
 <script src="/js/fullscreen-nav.js"></script>
 <script src="/js/confirm-dialog.js"></script>
 <script src="/js/fit-tabs.js"></script>
+<script src="/js/skip-link.js"></script>
