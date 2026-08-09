@@ -334,7 +334,18 @@ if (!existingScheduleCardTemplate) {
     currentIds.length === priorFieldDefaultIds.length &&
     priorFieldDefaultIds.slice().sort().every((id, i) => currentIds[i] === id);
 
-  if (stillOnPriorDefault || stillMissingPhoneField) {
+  // Third fingerprint: the pre-auto-fit default had the phone stacked in
+  // its own centered row below the name (rather than sharing the name's
+  // row, right-aligned) and un-shrunk table heights (66/68px, before the
+  // freed row let them grow to 82/79px). Anyone still on that exact prior
+  // default - name/phone with no autoFitText and the old table heights -
+  // gets migrated forward too.
+  const monTableEl = elements.find((el) => el.id === 'mon-table');
+  const wedTableEl = elements.find((el) => el.id === 'wed-table');
+  const stillOnPriorAutoFitDefault =
+    nameEl && nameEl.autoFitText !== true && monTableEl && monTableEl.height === 66 && wedTableEl && wedTableEl.height === 68;
+
+  if (stillOnPriorDefault || stillMissingPhoneField || stillOnPriorAutoFitDefault) {
     db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(
       JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT)
     );
