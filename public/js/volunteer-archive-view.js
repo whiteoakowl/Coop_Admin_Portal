@@ -1,8 +1,8 @@
 // Powers clicking a date on the Floater Archive log: fetches that date's
 // read-only assignment cards as an HTML fragment and shows it in a shared
-// dialog (mirrors public/js/member-view.js). No client framework here, so
-// the fetched fragment carries its own Print/Export links rather than
-// this script wiring anything beyond fetch-and-show.
+// dialog (mirrors public/js/class-schedule-view.js). No client framework
+// here, so the fetched fragment carries its own Print/Export links rather
+// than this script wiring anything beyond fetch-and-show.
 (function () {
   const dialog = document.getElementById('volunteer-archive-view-dialog');
   if (!dialog) return;

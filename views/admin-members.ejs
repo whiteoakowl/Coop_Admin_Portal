@@ -89,7 +89,7 @@
                   <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                 <% } %>
               </td>
-              <td>
+              <td class="members-col-name">
                 <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
                 <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>

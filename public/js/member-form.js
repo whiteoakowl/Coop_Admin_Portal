@@ -1,7 +1,4 @@
-// Shared by both the full Add/Edit Membership Form page (this script) and
-// the Members list's view/edit popup (public/js/member-view.js, which
-// inlines calls to these same functions since it has to re-run them every
-// time the dialog's fragment is swapped in).
+// Powers the full Add/Edit Membership Form page (views/admin-member-edit.ejs).
 const MEMBER_TYPE_META = {
   student: { icon: 'graduation-cap', title: 'Student Membership Form', subtitle: 'Create or update a student membership profile.', headerClass: 'member-form-header-student', boxClass: 'member-form-section-blue' },
   parent: { icon: 'users', title: 'Parent Membership Form', subtitle: 'Create or update a parent/guardian membership profile.', headerClass: 'member-form-header-parent', boxClass: 'member-form-section-green' },
