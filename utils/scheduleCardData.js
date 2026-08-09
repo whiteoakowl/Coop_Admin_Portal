@@ -17,8 +17,6 @@ function toTableRows(dayRows) {
 // The family's designated primary parent (see is_primary_parent on
 // members - Members page), falling back to whichever parent in the
 // family comes first alphabetically if nobody's been marked primary yet.
-// Mainly meaningful for a student's card; a parent's own card just shows
-// their family's primary contact same as anyone else's.
 function primaryParentFor(member) {
   const family = familyOf(member.id);
   const parents = family.filter((m) => m.member_type === 'parent');
@@ -27,9 +25,13 @@ function primaryParentFor(member) {
 }
 
 // The field values a Schedule Card template can place on a member's card.
+// The parent-phone contact line is only meaningful on a student's card -
+// a parent's own card leaves it blank rather than showing some other
+// parent in the family (or, for a single-parent family, nothing at all
+// since familyOf() excludes the card's own owner from the lookup).
 function scheduleCardDataForMember(member) {
   const { monday, wednesday } = getMemberSchedule(member.id);
-  const primaryParent = primaryParentFor(member);
+  const primaryParent = member.member_type === 'student' ? primaryParentFor(member) : null;
   return {
     name: member.name,
     primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
