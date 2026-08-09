@@ -56,36 +56,27 @@ Go to `/admin`, or click the small **Staff Login** link on the home page. Log in
 
 Then open **Settings** and change the password to something only you know. This matters most if this computer is ever reachable from outside your own wifi network.
 
-## Step 5 — Create your first roster
+## Step 5 — Add your members
 
-If you want to group rosters by category (e.g. "Youth", "Adults", "Sports"), add those categories first: **Settings** → type a name under **Categories** → **Add**. This is the only place categories are created.
+Go to **Members** and add your students and parents there first — attendance in this system always starts from the member list, not the other way around.
 
-Then click **Attendance** → **+ New Roster**. Fill in:
+- **Import a list** (fastest for a whole group) — a spreadsheet-exported `.csv`/`.txt`/`.xlsx` file. Click **Import from File** for the exact column format (name, type, address, birthday, and so on).
+- **Add one at a time** — the **+ Add Member** form, for filling in a full profile (contact info, birthday, medical/allergy notes) as you go.
 
-- **Title** — whatever you call the group (e.g. "Wednesday Youth", "Monday Adults").
-- **Category** — optional, pick from the categories you've already added.
-- **Session Dates** — click a date field and pick a date, then **+ Add another date** for each additional session. Pick as many or as few as you want up front; you can always add more later from the roster's Manage page.
+Barcode readers here read a person's name directly, so each member's barcode is just their name exactly as it appears on the Members page.
 
-A student in two different groups just gets added to both rosters — create each roster separately and add that member to both.
+## Step 6 — Set up Attendance
 
-## Step 6 — Add your members
+Attendance is built around four rosters that always exist — **Monday Parents**, **Monday Students**, **Wednesday Parents**, **Wednesday Students** — plus a **Class Rosters** tab for any individual classes you set up under **Schedules**. There's no separate "create a roster" step.
 
-Open the roster and click **Manage**. Two ways to add people:
+For each day/role tab you'll actually use:
 
-**Import a list** (fastest for a whole group) — a plain text or spreadsheet-exported `.csv`/`.txt` file with one name per line:
+1. Click **+ Add Dates** and pick your session dates for that tab. You can always add more later.
+2. Click **+ Add Member** to pick people from your existing Member list onto that roster.
 
-```
-Ava Thompson
-Noah Sanders
-Grace Kim
-Ella Martinez
-```
+If you also set up classes under **Schedules** (teacher, room, hour, and each student's enrollment), that's the faster path for a full class list — enrolling or staffing someone on a class automatically adds them to that class's own roster *and* to their day's Parent/Student roster above, with nothing to do here by hand.
 
-Upload it and the system creates a member record for each new name automatically — barcode readers here read a person's name directly, so each new member's barcode is just their name. A name that already exists elsewhere in the system just gets added to this roster too.
-
-**Add one at a time** — pick an existing member from the dropdown (handy when adding someone to a second roster).
-
-**Adding names without a roster yet?** Go to **Members** and use the name bar or **Import from File** to add people to the system before you've decided which roster they belong to. Note this does *not* put them on the Absence/Late form — see Step 9.
+A member showing up in more than one place (a second class, both a Monday and Wednesday roster) just works — there's no need to add them separately per group the way there used to be.
 
 ## Step 7 — Print name tags
 
@@ -108,11 +99,11 @@ For a clean walk-up screen with no browser bars, use full-screen mode: **F11** o
 
 A scan only works if today's date is one of that member's roster's session dates — if not, the kiosk says so and stays ready for the next person. After a successful check-in or check-out, the kiosk shows a quick confirmation and then returns to the home page automatically.
 
-## Step 9 — Set up and share the Absence/Late Form
+## Step 9 — Share the Absence/Late Form
 
-Only people you explicitly add can be selected on the Absence/Late form — it doesn't automatically include everyone from Members, the same way rosters work. Go to **Absence/Late** in the nav and add people using the name bar, the existing-member dropdown, or **Import from File**.
+Nothing extra to set up here — every active parent you've added under Members can already be picked on this form, along with their family members (anyone linked to them via **Choose a Family** on the member form).
 
-Once that's done, send families the link to `/absence` directly (no login needed, and it's not linked from the home page on purpose) — bookmark it or add it to your co-op's newsletter/group chat. It lets them pick their name, pick a class date from a calendar, and report an absence or a late arrival in advance. It writes straight into the roster grid you see in the admin dashboard: a red **A** for absent, a yellow **L** for late.
+Send families the link to `/absence` directly (no login needed, and it's not linked from the home page on purpose) — bookmark it or add it to your co-op's newsletter/group chat. A parent picks their own name, then which of their kids (or themselves), a class date from a calendar, and reports an absence or a late arrival in advance. It writes straight into the roster grid you see in the admin dashboard: a red **A** for absent, a yellow **L** for late.
 
 ---
 
@@ -132,14 +123,16 @@ Once it's set up, running a session day is just:
 
 ## Backing up your data
 
-Everything — every member, roster, check-in, and absence — lives in one file: `data/attendance.db`. Copy that file somewhere safe on a regular basis (a cloud drive, a USB stick, whatever's easy for you). If that file is ever lost, so is the history.
+Everything — every member, roster, check-in, and absence — lives in one file. The easiest way to back it up is the **Back Up Now** button on **Settings** (Username/Password tab) — it downloads a safe copy you can save anywhere (a cloud drive, a USB stick, whatever's easy for you). Do this on a regular basis; if that copy is ever lost, so is the history.
+
+If you ever need to restore one, use **Restore** right below it: upload the backup file, then close and reopen the app (Step 3) to finish.
 
 ## Troubleshooting
 
 | Problem | Try this |
 |---|---|
 | "Barcode not recognized" at the kiosk | Check that the member is listed under **Members**, and that their barcode matches what's shown there (barcodes are just each member's name). |
-| "Not scheduled for a roster today" at the kiosk | That member's roster(s) don't include today's date. Add today as a session date from the roster's Manage page if that's unexpected. |
+| "Not scheduled for a roster today" at the kiosk | That member's roster(s) don't include today's date. Add today as a session date from **Attendance** (or their class's **Schedules** hour, if that's how they're enrolled) if that's unexpected. |
 | Second kiosk can't reach the system | Make sure both devices are on the same wifi, and use the `http://192.168.x.x:3000` address printed in the terminal window, not `localhost`. |
 | Forgot the admin password | Close the server, delete the `data` folder (this erases all data — restore from a backup afterward), then start it again to get a fresh admin account from your `.env` file. |
 | Double-clicking the start file does nothing | On Mac, right-click it and choose **Open** the first time (see Step 3). On Windows, make sure the file ends in `.bat`, not `.txt`. |

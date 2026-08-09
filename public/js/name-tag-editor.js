@@ -1127,7 +1127,19 @@
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('/admin/name-tag/design-image', { method: 'POST', body: formData });
+      const res = await fetch('/admin/name-tag/design-image', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: formData,
+      });
+      // A session that expired mid-edit gets a redirect to the login page
+      // here, not a JSON body - res.json() below would throw on that and
+      // get misreported as a generic connection error, not what actually
+      // happened.
+      if (res.status === 401) {
+        alert('Your session has expired. Please refresh the page and log in again.');
+        return;
+      }
       const data = await res.json();
       if (data.ok) {
         const el = { id: newId('image'), type: 'image', src: data.url, x: 10, y: 10, width: 100, height: 100 };
@@ -1358,9 +1370,14 @@
       try {
         const res = await fetch('/admin/name-tag/template/' + currentType, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ layout: currentTemplate() }),
         });
+        // See uploadImage above for why this check exists.
+        if (res.status === 401) {
+          saveStatus.textContent = 'Session expired - please refresh and log in again.';
+          return;
+        }
         const data = await res.json();
         saveStatus.textContent = data.ok ? 'Saved!' : 'Could not save.';
       } catch (err) {
