@@ -87,7 +87,7 @@
               <tr>
                 <td><%= d.label %></td>
                 <td class="actions-cell">
-                  <form method="POST" action="/admin/rosters/<%= tab %>/dates/<%= d.date %>/remove" class="inline-block-form" onsubmit="return confirm('Remove <%= d.label %>? Any attendance recorded for this date will be deleted too.');">
+                  <form method="POST" action="/admin/rosters/<%= tab %>/dates/<%= d.date %>/remove" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any attendance recorded for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>
                 </td>
@@ -193,7 +193,7 @@
                   </td>
                 <% }); %>
                 <td class="actions-cell no-print">
-                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %>" class="inline-block-form" onsubmit="return confirm('Remove <%= row.member.name %> from this roster?');">
+                  <form method="POST" action="/admin/rosters/<%= tab %>/remove-member/<%= row.member.id %>" class="inline-block-form" data-confirm="Remove <%= row.member.name %> from this roster?">
                     <button type="submit" class="icon-btn roster-remove-btn" aria-label="Remove <%= row.member.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </form>
                 </td>

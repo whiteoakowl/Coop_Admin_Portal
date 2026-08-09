@@ -64,7 +64,7 @@
                         <% }); %>
                       </select>
                     </form>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" onsubmit="return confirm('Remove <%= m.name %> from <%= team.hourLabel %>?');">
+                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= m.name %> from <%= team.hourLabel %>?">
                       <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </form>
                   </div>

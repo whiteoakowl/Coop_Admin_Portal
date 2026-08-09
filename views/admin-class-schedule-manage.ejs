@@ -11,7 +11,7 @@
     <div class="roster-toolbar">
       <div><h1><%= cls.class_name %></h1></div>
       <div class="roster-btn-row no-print">
-        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/delete" onsubmit="return confirm('Delete &quot;<%= cls.class_name %>&quot;? This cannot be undone.');">
+        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/delete" data-confirm="Delete &quot;<%= cls.class_name %>&quot;? This cannot be undone.">
           <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Class</button>
         </form>
       </div>
@@ -90,7 +90,7 @@
                 <span class="roster-log-meta">
                   <span class="badge-pill"><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></span>
                 </span>
-                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/<%= s.id %>/remove" class="inline-block-form no-print">
+                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/<%= s.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= s.name %> from this class?">
                   <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>
@@ -114,7 +114,7 @@
                   <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
                   <% if (s.age !== null && s.age !== undefined) { %><span><%= s.age %> yrs</span><% } %>
                 </span>
-                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form no-print">
+                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= s.name %> from this class?">
                   <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </form>
               </div>

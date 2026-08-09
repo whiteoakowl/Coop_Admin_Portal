@@ -135,7 +135,7 @@
                   <button
                     type="button"
                     class="icon-btn"
-                    onclick="if (confirm('Permanently delete this member? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone.')) { document.getElementById('delete-form-<%= m.id %>').submit(); }"
+                    onclick="document.getElementById('delete-form-<%= m.id %>').requestSubmit();"
                     aria-label="Delete <%= m.name %>"
                     title="Delete"
                   ><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -191,7 +191,7 @@
                     <a class="primary-btn" href="/admin/schedule/print?memberId=<%= m.id %>" target="_blank">Print</a>
                   </div>
                 </dialog>
-                <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>"></form>
+                <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."></form>
               </td>
             </tr>
           <% }); %>

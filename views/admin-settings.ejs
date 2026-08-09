@@ -73,7 +73,7 @@
                     <td><%= d.title %></td>
                     <td><%= d.original_name %></td>
                     <td>
-                      <form method="POST" action="/admin/documents/<%= d.id %>/delete" onsubmit="return confirm('Delete this document?');">
+                      <form method="POST" action="/admin/documents/<%= d.id %>/delete" data-confirm="Delete &quot;<%= d.title %>&quot;?">
                         <button type="submit" class="icon-btn" aria-label="Delete <%= d.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                       </form>
                     </td>
