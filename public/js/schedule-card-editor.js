@@ -28,6 +28,7 @@
 
   const PLACEHOLDER_DATA = {
     name: 'Alex Student',
+    primaryParentPhone: 'Parent Phone: (555) 123-4567',
     mondaySchedule: [
       { time: '9:00 - 9:45 AM', className: 'Math', room: 'Room 12' },
       { time: '10:00 - 10:45 AM', className: 'Science', room: 'Room 8' },
