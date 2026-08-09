@@ -2879,6 +2879,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex: 1;
 }
 .team-members-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+
+/* A team's own numbered task list (linked via the Task List tab's
+   "Linked Team" field - item 31) rides along on its card, screen and
+   print alike. */
+.team-tasks-card { min-width: 0; padding: 0 0.75rem 0.85rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.team-tasks-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+.team-tasks-list { margin: 0; padding-left: 1.2rem; font-size: 0.82rem; }
+.team-tasks-list li { padding: 0.15rem 0; }
 .team-card-members { display: flex; flex-direction: column; }
 .team-member-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
 .team-member-row:first-child { border-top: none; }
@@ -3691,6 +3699,68 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .member-card-pair-row { gap: 0; margin-bottom: 0; }
   .member-card-pair-item .badge-canvas { box-shadow: none; margin: 0; }
 }
+
+/* ---------- Setup/Cleanup Task List tab (views/admin-setup-tasks.ejs) ----------
+   Section cards stacked vertically, each a colored header band over a
+   plain numbered task table - view-only until Edit is clicked (see
+   public/js/task-list-edit.js), which unlocks every title/description
+   input in place and reveals the reorder/delete controls. */
+.task-list-stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.task-list-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: #fff;
+}
+.task-list-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+.task-list-card-actions { display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0; }
+.task-list-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: inherit;
+  padding: 0.2rem 0;
+}
+.task-list-title-input:not([readonly]) {
+  background: rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+}
+.task-list-team-row { padding: 0 1rem 0.5rem; }
+.task-list-team-select { font-size: 0.85rem; }
+.task-list-team-badge { margin: 0; padding: 0 1rem 0.5rem; font-size: 0.8rem; }
+.task-list-table { margin: 0; }
+.task-list-num-col { width: 2.5rem; text-align: center !important; font-weight: 700; }
+.task-list-desc-input {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0.15rem 0;
+}
+.task-list-desc-input:not([readonly]) {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+}
+
+.task-list-accent-0 .task-list-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.task-list-accent-1 .task-list-card-header { background: var(--green-bg); color: var(--green); }
+.task-list-accent-2 .task-list-card-header { background: var(--purple-soft); color: var(--purple); }
+.task-list-accent-3 .task-list-card-header { background: var(--orange-bg); color: var(--orange); }
+.task-list-accent-4 .task-list-card-header { background: #d7f3f1; color: #1f7a72; }
 
 @page {
   size: landscape;

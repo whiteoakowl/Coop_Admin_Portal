@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= dayLabel %> Task List</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= dayLabel %> Task List</p>
+        </div>
+      </div>
+
+      <% if (sections.length === 0) { %>
+        <p class="roster-empty">No task lists yet.</p>
+      <% } %>
+      <div class="task-list-stack">
+        <% sections.forEach(function(s, i) { %>
+          <div class="task-list-card task-list-accent-<%= i % 5 %>">
+            <div class="task-list-card-header">
+              <span class="task-list-title-input"><%= s.title %></span>
+            </div>
+            <% if (s.teamTitle) { %><p class="task-list-team-badge hint">Team: <%= s.teamTitle %></p><% } %>
+            <table class="roster-table members-table condensed-table task-list-table">
+              <thead><tr><th class="task-list-num-col">#</th><th>Task</th></tr></thead>
+              <tbody>
+                <% if (s.items.length === 0) { %>
+                  <tr><td colspan="2" class="roster-empty">No tasks yet.</td></tr>
+                <% } %>
+                <% s.items.forEach(function(item) { %>
+                  <tr>
+                    <td class="task-list-num-col"><%= item.number %></td>
+                    <td><%= item.description %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

@@ -22,6 +22,7 @@
     <div class="view-tabs no-print">
       <a class="view-tab<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/manage">Monday Teams</a>
       <a class="view-tab<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/manage">Wednesday Teams</a>
+      <a class="view-tab" href="/admin/setup/<%= day %>/tasks">Task List</a>
     </div>
 
     <div class="view-tab-panel">
@@ -70,6 +71,16 @@
                 <% }); %>
               </div>
             </div>
+            <% if (t.taskSection && t.taskSection.items.length > 0) { %>
+              <div class="team-tasks-card">
+                <h4>Tasks</h4>
+                <ol class="team-tasks-list">
+                  <% t.taskSection.items.forEach(function(item) { %>
+                    <li><%= item.description %></li>
+                  <% }); %>
+                </ol>
+              </div>
+            <% } %>
           </div>
 
           <dialog id="edit-team-dialog-<%= t.id %>" class="class-view-dialog">

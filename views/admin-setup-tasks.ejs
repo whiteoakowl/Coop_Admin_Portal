@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Task List</p>
+      </div>
+    </div>
+
+    <h1>Setup/Cleanup</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="view-tabs no-print">
+      <a class="view-tab" href="/admin/setup/monday/manage">Monday Teams</a>
+      <a class="view-tab" href="/admin/setup/wednesday/manage">Wednesday Teams</a>
+      <a class="view-tab active" href="/admin/setup/<%= day %>/tasks">Task List</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="day-toggle">
+          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/tasks">Monday</a>
+          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/tasks">Wednesday</a>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-list-dialog').showModal()">+ Add New List</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-task-dialog').showModal()">+ Add New Task</button>
+          <button type="button" class="roster-action-btn" data-task-list-edit-btn>Edit</button>
+          <button type="submit" class="roster-action-btn" form="task-list-save-form" data-task-list-save-btn hidden>Save</button>
+          <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('task-import-dialog').showModal()">Import</button>
+          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/tasks/export.csv">Export</a>
+          <a class="roster-action-btn print-action-btn" href="/admin/setup/<%= day %>/tasks/print" target="_blank">Print</a>
+        </div>
+      </div>
+
+      <% if (sections.length === 0) { %>
+        <p class="roster-empty">No task lists yet &mdash; use + Add New List above.</p>
+      <% } %>
+
+      <form id="task-list-save-form" method="POST" action="/admin/setup/<%= day %>/tasks/save" class="task-list-stack" data-task-list-form>
+        <% sections.forEach(function(s, i) { %>
+          <div class="task-list-card task-list-accent-<%= i % 5 %>">
+            <div class="task-list-card-header">
+              <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly />
+              <div class="task-list-card-actions no-print" data-task-list-edit-only hidden>
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
+                  <input type="hidden" name="direction" value="up" />
+                  <button type="submit" class="icon-btn" aria-label="Move list up" title="Move up" <%= i === 0 ? 'disabled' : '' %>><svg class="icon" style="transform: rotate(180deg);"><use href="#icon-chevron-down"/></svg></button>
+                </form>
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
+                  <input type="hidden" name="direction" value="down" />
+                  <button type="submit" class="icon-btn" aria-label="Move list down" title="Move down" <%= i === sections.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+                </form>
+                <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete list &quot;<%= s.title %>&quot;? This cannot be undone.');">
+                  <button type="submit" class="icon-btn" aria-label="Delete list" title="Delete List"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+
+            <div class="task-list-team-row no-print" data-task-list-edit-only hidden>
+              <label class="task-list-team-select">Linked Team
+                <select name="sectionTeam_<%= s.id %>">
+                  <option value="">Not linked to a team</option>
+                  <% teams.forEach(function(t) { %>
+                    <option value="<%= t.id %>" <%= s.team_id === t.id ? 'selected' : '' %>><%= t.title %></option>
+                  <% }); %>
+                </select>
+              </label>
+            </div>
+            <% if (s.teamTitle) { %><p class="task-list-team-badge hint no-edit-hide">Linked to team: <%= s.teamTitle %></p><% } %>
+
+            <div class="roster-scroll">
+              <table class="roster-table members-table condensed-table task-list-table">
+                <thead><tr><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th></tr></thead>
+                <tbody>
+                  <% if (s.items.length === 0) { %>
+                    <tr><td colspan="3" class="roster-empty">No tasks yet.</td></tr>
+                  <% } %>
+                  <% s.items.forEach(function(item, j) { %>
+                    <tr>
+                      <td class="task-list-num-col"><%= item.number %></td>
+                      <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly /></td>
+                      <td class="no-print" data-task-list-edit-only hidden>
+                        <div class="actions-btn-row">
+                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/move" class="inline-block-form">
+                            <input type="hidden" name="direction" value="up" />
+                            <button type="submit" class="icon-btn" aria-label="Move task up" title="Move up" <%= j === 0 ? 'disabled' : '' %>><svg class="icon" style="transform: rotate(180deg);"><use href="#icon-chevron-down"/></svg></button>
+                          </form>
+                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/move" class="inline-block-form">
+                            <input type="hidden" name="direction" value="down" />
+                            <button type="submit" class="icon-btn" aria-label="Move task down" title="Move down" <%= j === s.items.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+                          </form>
+                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form">
+                            <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% }); %>
+      </form>
+    </div>
+
+    <dialog id="new-list-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/new">
+        <h3>Add New List</h3>
+        <input type="text" name="title" placeholder="List title (e.g. Chairs & Tables)" required />
+        <label>Link to a Team (optional)
+          <select name="teamId">
+            <option value="">Not linked to a team</option>
+            <% teams.forEach(function(t) { %><option value="<%= t.id %>"><%= t.title %></option><% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create List</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="new-task-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/add-item">
+        <h3>Add New Task</h3>
+        <% if (sections.length === 0) { %>
+          <p class="hint">Create a list above first.</p>
+        <% } else { %>
+          <label>List
+            <select name="sectionId" required>
+              <option value="" disabled selected>Choose which list&hellip;</option>
+              <% sections.forEach(function(s) { %><option value="<%= s.id %>"><%= s.title %></option><% }); %>
+            </select>
+          </label>
+          <label>Task
+            <input type="text" name="description" placeholder="Task description" required />
+          </label>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <% if (sections.length > 0) { %><button type="submit" class="primary-btn">Add</button><% } %>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="task-import-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/setup/<%= day %>/tasks/import" enctype="multipart/form-data">
+        <h3>Import Tasks</h3>
+        <p class="hint">Upload a .csv, .txt, or .xlsx file with List/Task columns. A list that doesn't exist yet is created automatically.</p>
+        <a class="btn-secondary import-sample-link" href="/admin/setup/<%= day %>/tasks/import-template.xlsx">Download Sample File</a>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+  <script src="/js/task-list-edit.js"></script>
+</body>
+</html>

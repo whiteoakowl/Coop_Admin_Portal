@@ -210,6 +210,30 @@ CREATE TABLE IF NOT EXISTS setup_team_members (
   PRIMARY KEY (team_id, member_id)
 );
 
+-- Setup/Cleanup Task List tab: a stack of numbered task lists (one
+-- section card per list), each optionally tied to a setup_teams row so
+-- its numbered tasks also print on that team's own card (see
+-- team_id) - a standalone list with no team_id just prints on its own.
+-- position controls both which order the section cards stack in and
+-- (via task_list_items.position) which order/number each row shows at.
+CREATE TABLE IF NOT EXISTS task_list_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  title TEXT NOT NULL,
+  team_id INTEGER REFERENCES setup_teams(id) ON DELETE SET NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_task_list_sections_day ON task_list_sections(day);
+
+CREATE TABLE IF NOT EXISTS task_list_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  section_id INTEGER NOT NULL REFERENCES task_list_sections(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_task_list_items_section ON task_list_items(section_id);
+
 -- Submissions from the public Name Tag form (lost tag / schedule change).
 CREATE TABLE IF NOT EXISTS name_tag_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
