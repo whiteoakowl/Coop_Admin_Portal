@@ -3473,27 +3473,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .btn-disabled { pointer-events: none; opacity: 0.45; }
 
 .schedule-print-select-all { margin: 0; }
-/* Live print preview at the bottom of the Print tab - every print form
-   targets this shared iframe instead of a new tab, so the result renders
-   right on the page as a normal sheet of paper. */
-.print-preview-wrap { margin-top: 1.75rem; }
-.print-preview-paper {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  max-width: 850px;
-  margin: 0 auto;
-  overflow: hidden;
-}
-.print-preview-paper iframe {
-  display: block;
-  width: 100%;
-  height: 70vh;
-  min-height: 500px;
-  border: 0;
-  background: #fff;
-}
 
 /* Print tab member picker (Schedule Cards/Name Tags/Barcodes selection) -
    the member log's own table styling with a checkbox column, capped to a

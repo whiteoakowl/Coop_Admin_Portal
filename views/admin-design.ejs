@@ -159,7 +159,7 @@
         </div>
 
         <div id="print-schedule-cards-section">
-          <form method="POST" action="/admin/schedule/print-cards" target="print-preview-frame" id="schedule-print-form">
+          <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form">
             <div class="roster-toolbar no-print">
               <div class="schedule-filters">
                 <div class="category-filter schedule-search">
@@ -172,7 +172,7 @@
                 </label>
               </div>
               <div class="roster-btn-row">
-                <button type="submit" class="primary-btn">Print Selected</button>
+                <button type="submit" class="primary-btn">Print</button>
               </div>
             </div>
             <div class="roster-scroll print-picker-scroll">
@@ -182,7 +182,7 @@
         </div>
 
         <div id="print-name-tags-section" hidden>
-          <form method="POST" action="/admin/name-tag/print" target="print-preview-frame" id="bulk-print-form">
+          <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
                 <option value="all">All</option>
@@ -202,13 +202,13 @@
               <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
             </div>
           </form>
         </div>
 
         <div id="print-cardsBoth-section" hidden>
-          <form method="POST" action="/admin/design/print-both" target="print-preview-frame" id="cards-both-print-form">
+          <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form">
             <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
@@ -229,13 +229,13 @@
               <%- include('partials/print-picker-table', { members: members, listId: 'cards-both-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
             </div>
           </form>
         </div>
 
         <div id="print-barcodes-section" hidden>
-          <form method="POST" action="/admin/name-tag/print-barcodes" target="print-preview-frame" id="barcodes-print-form">
+          <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form">
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
                 <option value="all">All</option>
@@ -255,7 +255,7 @@
               <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Barcodes</button>
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
             </div>
           </form>
         </div>
@@ -285,13 +285,6 @@
             <a class="admin-card" href="/admin/logs?tab=absence">Absence/Late Log</a>
             <a class="admin-card" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
             <a class="admin-card" href="/admin/logs?tab=nametag">Name Tag Request Log</a>
-          </div>
-        </div>
-
-        <div class="print-preview-wrap no-print">
-          <h2>Print Preview</h2>
-          <div class="print-preview-paper">
-            <iframe name="print-preview-frame" id="print-preview-frame" title="Print preview"></iframe>
           </div>
         </div>
 
