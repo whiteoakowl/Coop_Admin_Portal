@@ -49,7 +49,7 @@
 
         <div class="manage-section">
           <h2>Backup</h2>
-          <p class="hint">Download a complete, ready-to-restore copy of the database. Keep a recent copy somewhere safe (a cloud drive, a USB stick) in case this device is ever lost or damaged.</p>
+          <p class="hint">Download a complete, ready-to-restore copy of everything - the database plus every uploaded photo, document, and design image. Keep a recent copy somewhere safe (a cloud drive, a USB stick) in case this device is ever lost or damaged.</p>
           <a class="primary-btn" href="/admin/settings/backup" download>Back Up Now</a>
         </div>
 
@@ -69,8 +69,8 @@
               class="stack-form stack-form-narrow"
               data-confirm="This will replace ALL current data with the uploaded backup the next time the app restarts. Continue?"
             >
-              <label for="restoreFile">Backup file (.db)</label>
-              <input id="restoreFile" name="file" type="file" accept=".db" required />
+              <label for="restoreFile">Backup file</label>
+              <input id="restoreFile" name="file" type="file" accept=".shcbackup,.db" required />
 
               <button type="submit" class="primary-btn">Upload &amp; Stage Restore</button>
             </form>

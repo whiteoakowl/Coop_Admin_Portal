@@ -123,9 +123,9 @@ Once it's set up, running a session day is just:
 
 ## Backing up your data
 
-Everything — every member, roster, check-in, and absence — lives in one file. The easiest way to back it up is the **Back Up Now** button on **Settings** (Username/Password tab) — it downloads a safe copy you can save anywhere (a cloud drive, a USB stick, whatever's easy for you). Do this on a regular basis; if that copy is ever lost, so is the history.
+Every member, roster, check-in, absence — plus every photo, document, and design image you've uploaded — lives on this computer. The easiest way to back it all up is the **Back Up Now** button on **Settings** (Username/Password tab) — it downloads one file with everything in it, safe to save anywhere (a cloud drive, a USB stick, whatever's easy for you). Do this on a regular basis; if that file is ever lost, so is the history.
 
-If you ever need to restore one, use **Restore** right below it: upload the backup file, then close and reopen the app (Step 3) to finish.
+If you ever need to restore one, use **Restore** right below it: upload the backup file, then close and reopen the app (Step 3) to finish. This brings back everything exactly as it was at backup time — including uploaded photos and documents.
 
 ## Troubleshooting
 

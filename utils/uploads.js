@@ -48,11 +48,17 @@ function spreadsheetFileFilter(req, file, cb) {
 
 // Database restore upload (Admin > Settings > Restore). Extension-only,
 // same reasoning as spreadsheets above - it's read into a temp file and
-// validated as a real SQLite database by utils/backup.js before anything
-// is trusted, so the actual gatekeeping happens there, not here.
+// validated by utils/backup.js before anything is trusted, so the actual
+// gatekeeping happens there, not here. Accepts both .shcbackup (the
+// current format - the database plus every uploaded file, see
+// utils/backup.js's own comments) and the older bare .db (a backup taken
+// before uploaded files were included), so a file downloaded before this
+// changed still works with Restore today.
+const RESTORE_EXTENSIONS = new Set(['.shcbackup', '.db']);
+
 function databaseFileFilter(req, file, cb) {
   const ext = path.extname(file.originalname || '').toLowerCase();
-  cb(null, ext === '.db');
+  cb(null, RESTORE_EXTENSIONS.has(ext));
 }
 
 module.exports = {
