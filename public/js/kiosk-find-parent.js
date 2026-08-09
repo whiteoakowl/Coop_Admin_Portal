@@ -1,3 +1,4 @@
+/* global keepInputFocused */
 (function () {
   const form = document.getElementById('scan-form');
   if (!form) return;

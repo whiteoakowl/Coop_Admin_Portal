@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 
-const db = require('./db'); // initialize database + seed default admin
+require('./db'); // initialize database + seed default admin
 
 // The Monday/Wednesday Parent/Student rosters are normally created lazily
 // the first time a class enrolls/staffs someone that day - ensure all 4
@@ -131,6 +131,9 @@ app.use((req, res) => {
 // Catches anything an individual route didn't handle itself (a thrown
 // error, a rejected promise passed to next()) so a bug never surfaces a
 // raw stack trace to someone using the kiosk - it's logged here instead.
+// req/next are unused in the body but required in the signature - Express
+// identifies an error handler by checking fn.length === 4.
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).render('500', { title: 'Error' });

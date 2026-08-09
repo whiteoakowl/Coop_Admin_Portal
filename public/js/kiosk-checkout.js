@@ -1,3 +1,4 @@
+/* global keepInputFocused */
 (function () {
   const scanForm = document.getElementById('scan-form');
   if (!scanForm) return; // no session today

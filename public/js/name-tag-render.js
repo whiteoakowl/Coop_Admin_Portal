@@ -1,3 +1,4 @@
+/* global JsBarcode */
 (function () {
   if (typeof JsBarcode === 'undefined') return;
 

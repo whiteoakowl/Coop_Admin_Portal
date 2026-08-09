@@ -241,7 +241,7 @@
   // tableColumnWidths below.
   var TABLE_MIN_COLUMN_PCT = [5, 12, 30, 10]; // #, Time, Class Name, Room - floor so no column vanishes
 
-  function tableColumnWidths(headers, colValues, fontSize) {
+  function tableColumnWidths(headers, colValues) {
     var weights = headers.map(function (label, i) {
       var maxLen = label.length;
       colValues[i].forEach(function (v) { maxLen = Math.max(maxLen, String(v || '').length); });
@@ -285,7 +285,7 @@
       [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).className || '—'; }),
       [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).room || '—'; }),
     ];
-    var colWidths = tableColumnWidths(headers, colValues, fontSize);
+    var colWidths = tableColumnWidths(headers, colValues);
     function cellStyle(colIndex) {
       return 'width:' + colWidths[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
     }
