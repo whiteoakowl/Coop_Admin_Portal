@@ -4,17 +4,27 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
+const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { imageFileFilter } = require('../utils/uploads');
 const { GRADE_OPTIONS, VOLUNTEER_INTEREST_OPTIONS } = require('../utils/membership');
 const { isValidISODate } = require('../utils/dates');
-const { createRateLimiter } = require('../utils/rateLimit');
 
-// This form is the one place in the app a stranger can create a
-// database row with no login and no relationship check (every other
-// public form - absence, name-tag - requires picking a real, existing
-// parent/child pairing first). A generous but real cap keeps a script
-// from filling the Membership Requests review queue with junk.
-const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 5 });
+// Despite living outside the /admin URL prefix (unchanged here to avoid
+// disturbing anything that already links to /membership), this form is
+// admin-only, not public - an admin fills it out on a family's behalf
+// (from a paper form, a phone call, etc.), the same as adding a member
+// directly. It's not one of the app's genuine public forms (absence,
+// name-tag), which stay open with no login because a parent submits
+// those themselves.
+//
+// requireFullAdmin is applied per-route below, NOT as a router-level
+// `router.use(...)` here - this router is mounted at the site root ('/',
+// alongside the app's actually-public routers), not under '/admin' like
+// the other requireFullAdmin-gated routers (Documents, Library, Design,
+// Members, misc badges, Name Tag - see server.js's own mounting-order
+// comment). A path-less `router.use()` on a root-mounted router matches
+// every request the app receives, not just this router's own routes -
+// it would intercept /admin/login itself, along with everything else.
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'membership-children');
 if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
@@ -31,7 +41,7 @@ const upload = multer({
   fileFilter: imageFileFilter,
 });
 
-router.get('/membership', (req, res) => {
+router.get('/membership', requireFullAdmin, (req, res) => {
   res.render('membership', {
     title: 'Membership Form',
     gradeOptions: GRADE_OPTIONS,
@@ -53,12 +63,7 @@ function parseChildren(body) {
   return [];
 }
 
-router.post('/membership', upload.any(), (req, res) => {
-  if (submitLimiter.isLimited(req.ip)) {
-    return res.redirect('/membership?error=' + encodeURIComponent('Too many submissions from this device. Please wait a few minutes and try again.'));
-  }
-  submitLimiter.recordAttempt(req.ip);
-
+router.post('/membership', requireFullAdmin, upload.any(), (req, res) => {
   const body = req.body;
   const parent1FirstName = (body.parent1FirstName || '').trim();
   const parent1LastName = (body.parent1LastName || '').trim();
