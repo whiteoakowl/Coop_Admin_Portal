@@ -1,19 +1,28 @@
-// Sitewide "are you sure you want to delete?" popup, replacing the
-// browser's native confirm() everywhere. Any <form data-confirm="..."> is
-// intercepted on submit (event delegation - works for forms injected
-// later via fetch too, e.g. class-schedule-view-fragment.ejs) and shown
-// this dialog instead; "Yes, Delete" re-submits the same form (marking it
-// confirmed first so the listener doesn't just intercept it again),
-// Cancel closes without doing anything.
+// Sitewide "are you sure?" popup, replacing the browser's native confirm()
+// everywhere. Any <form data-confirm="..."> is intercepted on submit
+// (event delegation - works for forms injected later via fetch too, e.g.
+// class-schedule-view-fragment.ejs) and shown this dialog instead; the
+// Yes button re-submits the same form (marking it confirmed first so the
+// listener doesn't just intercept it again), Cancel closes without doing
+// anything.
 //
-// A form submitted purely from JS via form.submit() never fires a submit
-// event at all (a DOM quirk) - anywhere that used to do that now calls
-// form.requestSubmit() instead, specifically so this still catches it
-// (see admin-members.ejs's Delete member button).
+// Defaults to the original delete framing (trash icon, red "Yes, Delete"
+// button) so every existing data-confirm form (removals, deletions) needs
+// no changes. A form for a confirm that ISN'T a delete - e.g. the roster
+// Archive button, which is a safe, reversible-in-spirit save+reset, not a
+// destructive action - can opt into different wording/styling via
+// data-confirm-yes-label (button text), data-confirm-icon (icon symbol
+// id, e.g. "icon-save"), and data-confirm-safe (any truthy value swaps
+// the red danger button for the standard orange .primary-btn). Every
+// attribute resets to its default when a different form's confirm opens
+// next, so nothing leaks between an Archive click and a Delete click on
+// the same page.
 (function () {
   const dialog = document.getElementById('confirm-dialog');
   if (!dialog) return;
   const messageEl = document.getElementById('confirm-dialog-message');
+  const iconEl = dialog.querySelector('.confirm-dialog-icon');
+  const iconUse = iconEl.querySelector('use');
   const yesBtn = dialog.querySelector('[data-confirm-yes]');
   const cancelBtn = dialog.querySelector('[data-confirm-cancel]');
   let pendingForm = null;
@@ -25,6 +34,11 @@
     e.preventDefault();
     pendingForm = form;
     messageEl.textContent = form.dataset.confirm;
+    iconUse.setAttribute('href', `#${form.dataset.confirmIcon || 'icon-trash'}`);
+    iconEl.classList.toggle('confirm-icon-safe', !!form.dataset.confirmSafe);
+    yesBtn.textContent = form.dataset.confirmYesLabel || 'Yes, Delete';
+    yesBtn.classList.toggle('primary-btn', !!form.dataset.confirmSafe);
+    yesBtn.classList.toggle('roster-action-btn-danger', !form.dataset.confirmSafe);
     if (!dialog.open) dialog.showModal();
   });
 

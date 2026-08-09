@@ -3669,10 +3669,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   justify-content: center;
 }
 .confirm-dialog-icon .icon { width: 1.4rem; height: 1.4rem; }
+/* Applied by confirm-dialog.js for a data-confirm-safe form (e.g. the
+   roster Archive button) - the same red danger circle would misread as
+   "this is destructive" for an action that's actually a safe save+reset. */
+.confirm-dialog-icon.confirm-icon-safe { background: var(--orange-bg); color: var(--orange); }
 .confirm-dialog-message { margin: 0; font-size: 0.95rem; color: var(--ink); }
 .confirm-dialog .notes-dialog-actions { justify-content: center; margin-top: 1.25rem; }
 .confirm-dialog .notes-dialog-actions .btn-secondary,
-.confirm-dialog .notes-dialog-actions .roster-action-btn-danger {
+.confirm-dialog .notes-dialog-actions .roster-action-btn-danger,
+.confirm-dialog .notes-dialog-actions .primary-btn {
   margin-top: 0;
   padding: 0.55rem 1.1rem;
   font-size: 0.9rem;

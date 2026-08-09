@@ -120,7 +120,7 @@
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
         <% if (!classId) { %>
-          <form method="POST" action="/admin/rosters/<%= day %>/archive" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected.">
+          <form method="POST" action="/admin/rosters/<%= day %>/archive" class="inline-block-form" data-confirm="Archive all current session dates and attendance for <%= dayLabel %> Parent, Student, and every <%= dayLabel %> class into one permanent record? This clears the live roster's dates and attendance so it can start fresh for a new term &mdash; roster membership is not affected." data-confirm-yes-label="Yes, Archive" data-confirm-icon="icon-save" data-confirm-safe="1">
             <button type="submit" class="roster-action-btn">Archive</button>
           </form>
         <% } %>
