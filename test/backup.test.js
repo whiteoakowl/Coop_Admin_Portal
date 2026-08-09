@@ -17,6 +17,17 @@ const { DatabaseSync } = require('node:sqlite');
 // run already has.
 const testDbPath = path.join(os.tmpdir(), `backup-test-db-${process.pid}.db`);
 process.env.DB_PATH = testDbPath;
+
+// Also give this test file its own private os.tmpdir() (Node reads
+// TMPDIR fresh on every call, not just at startup). backupDatabaseBuffer
+// and test/restore.test.js's own calls to it both stage their working
+// file in the *real* shared tmpdir with an `attendance-backup-` prefix -
+// node's test runner runs test files concurrently, so without this, the
+// "leaves no temp file behind" check below can catch another test file's
+// in-flight file and fail on a false leftover that was never this file's.
+const privateTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-test-tmp-'));
+process.env.TMPDIR = privateTmpDir;
+
 const { backupDatabaseBuffer } = require('../utils/backup');
 
 test('backupDatabaseBuffer', async (t) => {
@@ -24,6 +35,7 @@ test('backupDatabaseBuffer', async (t) => {
     fs.rmSync(testDbPath, { force: true });
     fs.rmSync(`${testDbPath}-wal`, { force: true });
     fs.rmSync(`${testDbPath}-shm`, { force: true });
+    fs.rmSync(privateTmpDir, { recursive: true, force: true });
   });
 
   await t.test('returns a Buffer that opens as a valid, non-empty SQLite database', () => {
@@ -31,7 +43,7 @@ test('backupDatabaseBuffer', async (t) => {
     assert.ok(Buffer.isBuffer(buffer));
     assert.ok(buffer.length > 0);
 
-    const copyPath = path.join(os.tmpdir(), `backup-test-copy-${process.pid}.db`);
+    const copyPath = path.join(privateTmpDir, `backup-test-copy-${process.pid}.db`);
     fs.writeFileSync(copyPath, buffer);
     try {
       const copy = new DatabaseSync(copyPath);
@@ -44,9 +56,8 @@ test('backupDatabaseBuffer', async (t) => {
   });
 
   await t.test('leaves no temp file behind after a successful backup', () => {
-    const before = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('attendance-backup-'));
     backupDatabaseBuffer();
-    const after = fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('attendance-backup-'));
-    assert.deepEqual(after, before, 'no attendance-backup-*.db temp file should remain in os.tmpdir()');
+    const leftover = fs.readdirSync(privateTmpDir).filter((f) => f.startsWith('attendance-backup-'));
+    assert.deepEqual(leftover, [], 'no attendance-backup-*.db temp file should remain in the tmp dir');
   });
 });
