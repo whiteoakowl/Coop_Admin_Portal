@@ -23,14 +23,12 @@
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="category-filter" style="margin: 0;">
-          <select onchange="window.location = this.value">
-            <option value="/admin/volunteers/monday/teams" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-            <option value="/admin/volunteers/wednesday/teams" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-          </select>
+        <div class="day-toggle">
+          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/teams">Monday</a>
+          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/teams">Wednesday</a>
         </div>
         <div class="roster-btn-row">
-          <button type="button" class="btn-secondary" onclick="document.getElementById('add-team-member-dialog').showModal()">+ Add Member</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-team-member-dialog').showModal()">+ Add Member</button>
           <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('floater-import-dialog').showModal()">Import</button>
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/teams/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>

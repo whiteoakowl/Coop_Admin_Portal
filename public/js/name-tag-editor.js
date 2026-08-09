@@ -766,7 +766,6 @@
       markUnsaved();
       commitHistory();
     });
-    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
 
     const borderWidth = document.createElement('input');
     borderWidth.type = 'number';
@@ -781,6 +780,32 @@
       markUnsaved();
       commitHistory();
     });
+
+    // "No border" - a shape's outline (not a line element - a line's own
+    // "border" IS the visible line, so that toggle would just hide it).
+    // Mirrors "No fill" right next to it: sets width to 0 (transparent
+    // renders the same either way) and disables the color/width inputs
+    // until unchecked, restoring a sensible 2px default rather than
+    // leaving them at 0 with nothing to type over.
+    if (!isLine) {
+      const noBorder = document.createElement('input');
+      noBorder.type = 'checkbox';
+      noBorder.checked = !el.borderWidth || el.borderWidth === 0;
+      borderColor.disabled = noBorder.checked;
+      borderWidth.disabled = noBorder.checked;
+      noBorder.addEventListener('change', () => {
+        el.borderWidth = noBorder.checked ? 0 : (parseInt(borderWidth.value, 10) || 2);
+        borderWidth.value = el.borderWidth;
+        borderColor.disabled = noBorder.checked;
+        borderWidth.disabled = noBorder.checked;
+        renderCanvas();
+        markUnsaved();
+        commitHistory();
+      });
+      propsPanel.appendChild(propRow('No border', noBorder));
+    }
+
+    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
     propsPanel.appendChild(propRow(isLine ? 'Thickness' : 'Border width', borderWidth));
 
     if (shapeType === 'rectangle' || shapeType === 'roundedRect') {

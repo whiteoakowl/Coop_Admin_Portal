@@ -5,6 +5,7 @@
 // list, so what shows up in one always matches the other (see CONTEXT.md
 // item "All alert pop ups are triggered by what appears on the alert
 // log").
+const db = require('../db');
 const { DAYS, DAY_LABELS } = require('./days');
 const { todayISO, weekdayOf } = require('./dates');
 const { substituteBoard } = require('./substitutes');
@@ -16,6 +17,25 @@ const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 // real session for the other day, so there's nothing to alert on yet.
 function todaysSessionDays(date) {
   return DAYS.filter((day) => weekdayOf(date) === DAY_WEEKDAY[day]);
+}
+
+// Everyone who submitted an Absence/Late form for today, one row per
+// person (a parent submitting for two of their own kids' classes writes
+// two attendance rows, one per roster, but that's still one alert per
+// person) - the Alert Log's own signal that a form came in today, same
+// as the dedicated Absence/Late Log tab an admin would otherwise have to
+// go check manually.
+function absenceFormAlertsForDay(day, date) {
+  return db
+    .prepare(
+      `SELECT DISTINCT a.member_id AS memberId, m.name AS memberName, a.status
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.session_date = ? AND a.source = 'absence_form' AND r.schedule_day = ?
+       ORDER BY m.name COLLATE NOCASE`
+    )
+    .all(date, day);
 }
 
 function todaysAlerts() {
@@ -48,6 +68,18 @@ function todaysAlerts() {
             link: `/admin/volunteers/${day}/manage?date=${encodeURIComponent(date)}`,
           });
         }
+      });
+    });
+
+    absenceFormAlertsForDay(day, date).forEach((sub) => {
+      alerts.push({
+        type: sub.status === 'late' ? 'late_form' : 'absence_form',
+        severity: sub.status === 'late' ? 'warning' : 'danger',
+        day,
+        dayLabel,
+        date,
+        message: `${sub.memberName} submitted ${sub.status === 'late' ? 'a late notice' : 'an absence form'} for today.`,
+        link: `/admin/logs?tab=absence&date=${encodeURIComponent(date)}`,
       });
     });
 

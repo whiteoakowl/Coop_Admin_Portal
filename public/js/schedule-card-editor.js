@@ -692,7 +692,6 @@
       markUnsaved();
       commitHistory();
     });
-    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
 
     const borderWidth = document.createElement('input');
     borderWidth.type = 'number';
@@ -707,6 +706,28 @@
       markUnsaved();
       commitHistory();
     });
+
+    // "No border" - mirrors "No fill" right next to it. Not offered for a
+    // line element (its "border" is the visible line itself).
+    if (!isLine) {
+      const noBorder = document.createElement('input');
+      noBorder.type = 'checkbox';
+      noBorder.checked = !el.borderWidth || el.borderWidth === 0;
+      borderColor.disabled = noBorder.checked;
+      borderWidth.disabled = noBorder.checked;
+      noBorder.addEventListener('change', () => {
+        el.borderWidth = noBorder.checked ? 0 : (parseInt(borderWidth.value, 10) || 2);
+        borderWidth.value = el.borderWidth;
+        borderColor.disabled = noBorder.checked;
+        borderWidth.disabled = noBorder.checked;
+        renderCanvas();
+        markUnsaved();
+        commitHistory();
+      });
+      propsPanel.appendChild(propRow('No border', noBorder));
+    }
+
+    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
     propsPanel.appendChild(propRow(isLine ? 'Thickness' : 'Border width', borderWidth));
 
     if (shapeType === 'rectangle' || shapeType === 'roundedRect') {
