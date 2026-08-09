@@ -1,13 +1,13 @@
 name: Smoke test
 
-# There's still no test suite in this repo, so this is a floor, not real
-# coverage: catch the things that would otherwise only surface after a
-# manual click-through - lint errors (unused vars, undefined globals, a
-# few other real-bug classes - see eslint.config.js), a JS syntax error
-# anywhere in the app, and the server actually failing to boot/serve a
-# request. If real tests get added later, add a separate job for them
-# here rather than replacing this one - "does it even start" is worth
-# keeping even once there's more.
+# Still mostly a floor, not real coverage: lint errors (unused vars,
+# undefined globals - see eslint.config.js), a JS syntax error anywhere
+# in the app, the server actually failing to boot/serve a request, plus
+# now a small, real test/ suite (node's built-in test runner, no added
+# dependency) covering the security-sensitive logic added alongside it
+# (test/) - not the rest of the app's routes/business logic, which still
+# has zero test coverage. Add a proper dedicated test job here if/when
+# that grows rather than folding it further into this one.
 on:
   pull_request:
   push:
@@ -29,6 +29,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Run tests
+        run: npm test
 
       - name: Syntax-check every JS file
         run: |

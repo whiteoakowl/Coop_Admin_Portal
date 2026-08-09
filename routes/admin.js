@@ -8,6 +8,7 @@ const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
+const { backupDatabaseBuffer } = require('../utils/backup');
 
 // --- Auth ---
 
@@ -172,6 +173,18 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => 
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
   renderSettings(req, res, null, 'Password updated.', 'account');
+});
+
+// One-click database backup download - see utils/backup.js for how the
+// copy itself is made. Full-Admin-only, same as the rest of the Account
+// tab: a Co-op Admin (a member, not the master admin account) has no
+// business downloading the entire database.
+router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
+  const buffer = backupDatabaseBuffer();
+  const stamp = todayISO();
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="attendance-backup-${stamp}.db"`);
+  res.send(buffer);
 });
 
 module.exports = router;
