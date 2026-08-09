@@ -2,6 +2,22 @@ const db = require('../db');
 const { readRowsFromFile } = require('./spreadsheet');
 const { ageFromBirthday } = require('./dates');
 
+// Everywhere a member list sorts "alphabetically by last name" (the
+// Members page's family groups, every roster view) - names are stored as
+// a single "First Last" string, so the last name is just the final
+// whitespace-separated token. Good enough for this app's real member
+// names (no attempt at suffixes/multi-word surnames).
+function lastNameOf(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/);
+  return parts.length > 0 ? parts[parts.length - 1] : '';
+}
+function byLastName(a, b) {
+  return (
+    lastNameOf(a.name).localeCompare(lastNameOf(b.name), undefined, { sensitivity: 'base' }) ||
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+}
+
 // Names-only file (.csv/.txt), one name per line or name in the first column.
 function parseNamesFile(buffer) {
   const text = buffer.toString('utf8');
@@ -173,7 +189,7 @@ function rostersForMember(memberId) {
 // their old family's sort position around.
 function sortMembersByFamily(members) {
   const active = members.filter((m) => m.active);
-  const inactive = members.filter((m) => !m.active).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const inactive = members.filter((m) => !m.active).sort(byLastName);
 
   const groups = new Map();
   active.forEach((m) => {
@@ -187,9 +203,12 @@ function sortMembersByFamily(members) {
     group.sort((a, b) => {
       if (a === primary) return -1;
       if (b === primary) return 1;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return byLastName(a, b);
     });
-    const sortName = (primary || group[0]).name;
+    // Groups themselves sort by the primary parent's (or, lacking one,
+    // the alphabetically-first member's) last name - a family reads
+    // together as one block, filed under its own surname.
+    const sortName = lastNameOf((primary || group[0]).name);
     return { sortName, group };
   });
   orderedGroups.sort((a, b) => a.sortName.localeCompare(b.sortName, undefined, { sensitivity: 'base' }));
@@ -230,4 +249,6 @@ module.exports = {
   rostersForMember,
   sortMembersByFamily,
   membersWithDetails,
+  lastNameOf,
+  byLastName,
 };

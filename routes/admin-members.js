@@ -7,7 +7,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel, formatTime } = require('../utils/dates');
+const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
 const { imageFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
@@ -68,6 +68,7 @@ router.get('/members', requireAdmin, (req, res) => {
     const badgeData = badgeDataForMember(m);
     return {
       ...m,
+      age: ageFromBirthday(m.birthday),
       badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
       badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
       scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),

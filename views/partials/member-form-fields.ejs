@@ -147,7 +147,6 @@ const US_STATES = [
 <div class="member-form-boxes">
   <div class="manage-section member-form-section-box member-form-section-<%= isParent ? 'green' : 'blue' %>" data-family-box>
     <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
-    <p class="member-form-box-hint">Select the family this <%= isParent ? 'parent belongs' : 'student belongs' %> to.</p>
     <label class="member-form-full">Select Family
       <select name="familyId" data-family-select <%= disabled ? 'disabled' : '' %>>
         <option value="">Choose from available families</option>
@@ -173,7 +172,6 @@ const US_STATES = [
 
   <div class="manage-section member-form-section-box member-form-section-green" id="parent-only-fields" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
     <h2><svg class="icon"><use href="#icon-broom"/></svg> Setup / Cleanup Team</h2>
-    <p class="member-form-box-hint">Select the teams you are available to help with.</p>
     <% if (setupTeams.length === 0) { %>
       <p class="hint">No Setup/Cleanup teams exist yet.</p>
     <% } else { %>

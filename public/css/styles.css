@@ -685,6 +685,19 @@ textarea:focus-visible,
 
 .logout-form { margin: 0; }
 
+/* Full Screen toggle - fixed to the true top-right corner of the viewport
+   on every admin page (desktop), independent of whichever page/panel is
+   open, instead of living inside the sidebar or one page's own content.
+   Hidden below the mobile-topbar breakpoint, where its twin lives inline
+   in the topbar's own top-right icon row instead (see admin-nav.ejs). */
+.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; }
+
+/* Same fixed placement, but the corner button's plain white pill would sit
+   uncomfortably light against the (still fixed) sidebar's darker panel -
+   nudge it visually distinct without changing the shared .admin-corner-link
+   look used on the public landing page. */
+.admin-page-corner-actions .admin-corner-link { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+
 /* Settings + Log out live at the bottom of the sidebar on desktop, pinned
    there via margin-top:auto; folded into the mobile topbar's right side
    (a separate compact box) on small screens where there's no sidebar. */
@@ -745,6 +758,7 @@ textarea:focus-visible,
    squeezing every tab down to fit. */
 @media (max-width: 860px) {
   .admin-sidebar { display: none; }
+  .admin-page-corner-actions { display: none; }
 
   .admin-mobile-topbar {
     display: flex;
@@ -1481,6 +1495,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .members-table td { text-align: left; }
 .members-table th { text-align: left; }
+/* Plain grey header, not the same tinted blue as the primary-parent row
+   highlight below it (.row-primary-parent) - the two need to read as
+   distinct things, not blend together. */
+.members-table thead th,
+.members-table thead .roster-name-col { background: #f8fafc; }
 .members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
@@ -1533,6 +1552,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-decoration: none;
 }
 .member-name-link:hover { text-decoration: underline; }
+
+/* Grade level + age under a student's name on the Members list. */
+.member-row-subline { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
 
 .member-form-header {
   display: flex;

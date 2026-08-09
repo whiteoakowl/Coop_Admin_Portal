@@ -90,8 +90,13 @@
                 <% } %>
               </td>
               <td>
-                <button type="button" class="member-name-link" data-view-member="<%= m.id %>"><%= m.name %></button><%- include('partials/medical-flag', { member: m }) %>
+                <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+                <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>
+                  <span class="member-row-subline">
+                    <%= [m.grade_level || null, m.age !== null ? (m.age + (m.age === 1 ? ' year old' : ' years old')) : null].filter(Boolean).join(' · ') %>
+                  </span>
+                <% } %>
               </td>
               <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyName || '—' %></td>
@@ -221,11 +226,8 @@
         <% }); %>
       </tbody>
     </table>
-    <dialog id="member-view-dialog" class="class-view-dialog member-view-dialog"></dialog>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>
-  <script src="/js/member-form.js"></script>
-  <script src="/js/member-view.js"></script>
 </body>
 </html>

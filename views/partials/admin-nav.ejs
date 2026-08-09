@@ -19,16 +19,22 @@
     <% } %>
   </nav>
   <div class="admin-sidebar-bottom">
-    <button type="button" id="fullscreen-toggle-btn">
-      <svg class="icon"><use href="#icon-maximize"/></svg>
-      <span id="fullscreen-toggle-label">Full Screen View</span>
-    </button>
     <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
     </form>
   </div>
 </aside>
+
+<!-- Full Screen toggle - a fixed corner button in the top-right of every
+     admin page (desktop), not tied to any one page's own content, so it's
+     reachable no matter which section is open. -->
+<div class="admin-page-corner-actions no-print">
+  <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn" aria-label="Full Screen View">
+    <svg class="icon"><use href="#icon-maximize"/></svg>
+    <span id="fullscreen-toggle-label">Full Screen View</span>
+  </button>
+</div>
 
 <div class="admin-mobile-topbar">
   <div class="admin-mobile-topbar-row">
@@ -37,6 +43,7 @@
       Sanford Homeschoolers
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
+      <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
       <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-sliders"/></svg></a>
       <form method="POST" action="/admin/logout" class="logout-form">
         <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
@@ -66,3 +73,4 @@
 <script src="/js/alerts.js"></script>
 <script src="/js/fullscreen-toggle.js"></script>
 <script src="/js/fullscreen-nav.js"></script>
+<script src="/js/fit-tabs.js"></script>
