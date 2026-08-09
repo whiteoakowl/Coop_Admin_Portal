@@ -20,18 +20,16 @@ const {
   hoursForDay,
   roomGridForDay,
   roomsForDay,
-  renameRoom,
   GRADE_LEVELS,
   activeParentsForStaff,
   absentMemberIdsForDate,
   setEnrollment,
   addStaff,
 } = require('../utils/classSchedule');
-const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
+const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter } = require('../utils/uploads');
-const { jsonScriptSafe } = require('../utils/json');
 
 const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
