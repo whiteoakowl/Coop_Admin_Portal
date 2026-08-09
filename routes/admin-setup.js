@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { DAY_LABELS, defaultDay, requireDay } = require('../utils/days');
-const { teamsForDay, membersForTeam, setTeamLeader } = require('../utils/setup');
+const { teamsForDay, membersForTeam, setTeamLeader, updateTeam } = require('../utils/setup');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { activeParentOptions } = require('../utils/members');
 
@@ -51,6 +51,22 @@ router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, (req, 
   const leaderId = parseInt(req.body.leaderId, 10) || null;
   setTeamLeader(teamId, leaderId);
   res.redirect(`/admin/setup/${day}/manage`);
+});
+
+// Team cards are view-only until Edit is clicked - title/description/
+// leader all save together from that one popup, replacing the old
+// inline-editable card.
+router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const teamId = parseInt(req.params.teamId, 10);
+  const title = (req.body.title || '').trim();
+  const description = (req.body.description || '').trim();
+  const leaderId = parseInt(req.body.leaderId, 10) || null;
+  if (!title) {
+    return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
+  }
+  updateTeam(teamId, { title, description, leaderId });
+  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, (req, res) => {

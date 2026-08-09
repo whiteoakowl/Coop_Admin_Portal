@@ -2796,11 +2796,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: center;
   gap: 0.3rem;
 }
-.team-info-delete {
+/* Team cards are view-only - this small square button (in the corner the
+   trash icon used to sit) is the only way in, opening the Edit popup
+   (title/leader/description/members/delete all live there now). */
+.team-edit-btn {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
+.team-edit-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+.team-edit-btn .icon { width: 1rem; height: 1rem; }
 .team-info-icon {
   width: 3rem;
   height: 3rem;
