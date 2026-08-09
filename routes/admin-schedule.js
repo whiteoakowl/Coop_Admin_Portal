@@ -6,14 +6,14 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { formatTimestamp, isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
+const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
-  STATUS_LABELS,
   getMemberSchedule,
   scheduleList,
 } = require('../utils/schedule');
+const { byLastName } = require('../utils/members');
 const {
   DAY_LABELS: CLASS_DAY_LABELS,
   isValidDay,
@@ -54,12 +54,6 @@ const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 const PAGE_SIZE = 25;
 
-function summarizeDay(rows) {
-  const filled = rows.filter((r) => r.class_name || r.room || r.time || r.teacher);
-  if (filled.length === 0) return '—';
-  return filled.map((r) => r.class_name || r.room || r.time).filter(Boolean).join(', ');
-}
-
 // Only defaults the absence-highlight date picker to today when today
 // actually falls on the tab's day - otherwise there's nothing meaningful
 // to highlight yet (mirrors admin-class-schedule.js's defaultDateFor).
@@ -80,7 +74,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
   if (tab === 'monday' || tab === 'wednesday') {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
     return res.render('admin-schedule', {
-      title: 'Schedule',
+      title: 'Schedules',
       tab,
       day: tab,
       dayLabel: CLASS_DAY_LABELS[tab],
@@ -96,53 +90,48 @@ router.get('/schedule', requireAdmin, (req, res) => {
     });
   }
 
-  // Student Schedules / Parent Schedules: the same per-member schedule
-  // list, filtered to one member_type.
+  // Student Schedules / Parent Schedules: every active member of that
+  // type, shown as their actual Schedule Card (same design/rendering as
+  // the printable card - see partials/name-tag-badge.ejs), laid out side
+  // by side in alphabetical-by-last-name order. The old free-text search
+  // is now a dropdown of every name in this tab, jumping straight to one
+  // person's card via the memberId filter scheduleList already supports.
   const memberType = tab === 'parents' ? 'parent' : 'student';
-  const filters = { search: (req.query.search || '').trim(), memberType };
-
-  let sort = ['name', 'monday', 'wednesday', 'status', 'updated'].includes(req.query.sort) ? req.query.sort : 'name';
-  let dir = req.query.dir === 'desc' ? 'desc' : 'asc';
+  const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
+  const filters = { memberType, memberId: selectedMemberId || undefined };
 
   const rows = scheduleList(filters);
 
+  const scheduleCardTemplate = getScheduleCardTemplate();
+  const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
+
   const summarized = rows.map((r) => ({
     member: r.member,
-    mondaySummary: summarizeDay(r.monday),
-    wednesdaySummary: summarizeDay(r.wednesday),
-    status: r.status,
-    statusLabel: STATUS_LABELS[r.status],
-    lastUpdated: r.lastUpdated ? formatTimestamp(r.lastUpdated) : 'Never',
-    lastUpdatedRaw: r.lastUpdated || '',
+    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(r.member)),
   }));
+  summarized.sort((a, b) => byLastName(a.member, b.member));
 
-  const dirMul = dir === 'desc' ? -1 : 1;
-  summarized.sort((a, b) => {
-    let av, bv;
-    if (sort === 'name') { av = a.member.name.toLowerCase(); bv = b.member.name.toLowerCase(); }
-    else if (sort === 'monday') { av = a.mondaySummary; bv = b.mondaySummary; }
-    else if (sort === 'wednesday') { av = a.wednesdaySummary; bv = b.wednesdaySummary; }
-    else if (sort === 'status') { av = a.status; bv = b.status; }
-    else { av = a.lastUpdatedRaw; bv = b.lastUpdatedRaw; }
-    if (av < bv) return -1 * dirMul;
-    if (av > bv) return 1 * dirMul;
-    return 0;
-  });
+  const allNames = db
+    .prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?')
+    .all(memberType)
+    .sort(byLastName);
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
   const pageRows = summarized.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   res.render('admin-schedule', {
-    title: 'Schedule',
+    title: 'Schedules',
     tab,
     rows: pageRows,
     totalCount: summarized.length,
     page,
     totalPages,
-    sort,
-    dir,
-    filters,
+    scheduleCardBgCss,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
+    allNames,
+    selectedMemberId,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
