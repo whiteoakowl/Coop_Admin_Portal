@@ -1,0 +1,59 @@
+name: Smoke test
+
+# There's no test suite or linter in this repo yet, so this is a floor,
+# not real coverage: catch the two things that would otherwise only
+# surface after a manual click-through - a JS syntax error anywhere in
+# the app, and the server actually failing to boot/serve a request. If
+# real tests get added later, add a separate job for them here rather
+# than replacing this one - "does it even start" is worth keeping even
+# once there's more.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax-check every JS file
+        run: |
+          set -e
+          find . -name '*.js' \
+            -not -path './node_modules/*' \
+            -not -path './data/*' \
+            -print0 \
+          | xargs -0 -n1 node --check
+
+      - name: Boot the server and hit the home page
+        env:
+          PORT: 3010
+          SESSION_SECRET: ci-smoke-test-secret
+          ADMIN_USERNAME: admin
+          ADMIN_PASSWORD: ci-smoke-test-password
+        run: |
+          set -e
+          node --no-warnings server.js &
+          SERVER_PID=$!
+          # Give it a few seconds to bind the port and finish first-run DB setup.
+          for i in $(seq 1 20); do
+            if curl -sf "http://localhost:$PORT/" -o /dev/null; then
+              echo "Server responded, smoke test passed."
+              kill "$SERVER_PID"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server never responded on http://localhost:$PORT/ - see logs above."
+          kill "$SERVER_PID" 2>/dev/null || true
+          exit 1
