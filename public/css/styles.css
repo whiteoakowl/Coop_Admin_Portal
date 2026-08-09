@@ -1511,9 +1511,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* Mobile member list: keep it to Name, Type, and the action icons - Photo,
    Parent, and Rosters are useful on a wide screen but just add scroll on
-   a phone. */
+   a phone. Name itself switches from the table's usual nowrap to
+   wrapping, so a long name grows the row instead of getting clipped
+   past the screen edge with no ellipsis/affordance that it continues -
+   the row-scroll pattern that works fine for secondary columns doesn't
+   work for the one column mobile is actually built to show. */
 @media (max-width: 640px) {
   .members-col-photo, .members-col-parent, .members-col-rosters { display: none; }
+  /* Beats the base .roster-table td nowrap rule on specificity (two
+     classes vs. one) - see that rule's own comment for why nowrap is the
+     right default everywhere else. */
+  .members-table td.members-col-name { white-space: normal; }
 }
 
 .row-inactive { opacity: 0.5; }
