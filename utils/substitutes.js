@@ -1,5 +1,5 @@
 const db = require('../db');
-const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate, absenceFormMemberIdsForDate } = require('./classSchedule');
+const { HOUR_POSITIONS, hoursForDay, gridForDay, absentMemberIdsForDate, absenceFormMemberIdsForDate } = require('./classSchedule');
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
 const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
@@ -199,6 +199,7 @@ function substituteBoard(day, date) {
         slotType: 'class',
         slotId: cls.id,
         label: cls.class_name,
+        room: cls.room || '',
         detail: cls.room ? `Room ${cls.room}` : '',
         ageGroup: cls.age_group || '',
         reason: `Teacher${teachers.length > 1 ? 's' : ''} absent: ${teachers.map((t) => t.name).join(', ')}`,
@@ -261,6 +262,42 @@ function jobAssignmentGrid(day, dates) {
   })).filter((h) => h.jobs.length > 0);
 }
 
+// Single-date "Floater Assignment Dashboard" cards (the Chart tab's view,
+// and the Archive tab's popup/print record for a date that's passed) -
+// same permanent-job/substitute_assignments data as jobAssignmentGrid,
+// just reshaped for one date's cards instead of a multi-date table (each
+// job gets one `assigned` directly, not a one-element `cells` array).
+function dailyAssignmentCards(day, date) {
+  return jobAssignmentGrid(day, [date]).map((hour) => ({
+    position: hour.position,
+    jobs: hour.jobs.map((job) => ({ id: job.id, title: job.title, room: job.room, assigned: job.cells[0].assigned })),
+  }));
+}
+
+// dailyAssignmentCards with each hour's real label merged in - shared by
+// the Archive tab/print page and the public kiosk view
+// (partials/floater-assignment-cards.ejs needs `label` on every hour).
+function dailyAssignmentCardsWithLabels(day, date) {
+  const hourLabelByPosition = {};
+  hoursForDay(day).forEach((h) => { hourLabelByPosition[h.position] = h.label; });
+  return dailyAssignmentCards(day, date).map((hour) => ({ ...hour, label: hourLabelByPosition[hour.position] || `Hour ${hour.position}` }));
+}
+
+// Archive tab: one row per date that's already passed, with how many of
+// that day's permanent-job positions ended up with an approved floater -
+// same underlying data as dailyAssignmentCards, just counted instead of
+// rendered, for the log list before an admin opens one date's full record.
+function archivedDateSummaries(day, dates) {
+  const jobs = permanentJobsForDay(day);
+  return dates.map((date) => {
+    const assignedCount = jobs.filter((j) => {
+      const a = assignmentFor(date, 'job', j.id);
+      return a && a.status === 'approved';
+    }).length;
+    return { date, totalPositions: jobs.length, assignedCount };
+  });
+}
+
 // Auto-fills (see substituteBoard) and collects every slot left in
 // 'pending' status for today across both days - the source for the
 // sitewide "needs approval" popup on the admin portal. Scoped to today
@@ -309,5 +346,8 @@ module.exports = {
   clearAssignment,
   substituteBoard,
   jobAssignmentGrid,
+  dailyAssignmentCards,
+  dailyAssignmentCardsWithLabels,
+  archivedDateSummaries,
   pendingApprovalsForToday,
 };

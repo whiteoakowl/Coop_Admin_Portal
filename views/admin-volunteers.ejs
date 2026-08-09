@@ -23,70 +23,39 @@
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="category-filter" style="margin: 0;">
-          <select onchange="window.location = this.value">
-            <option value="/admin/volunteers/monday/manage" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-            <option value="/admin/volunteers/wednesday/manage" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-          </select>
-        </div>
-        <div class="roster-btn-row">
+        <div class="roster-btn-row" style="margin-left: auto;">
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         </div>
       </div>
 
-      <div class="manage-section">
-        <div class="grid-box-header">
-          <h2><%= dayLabel %> Floater Assignments Chart</h2>
-          <div class="roster-btn-row no-print">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-            <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Position</button>
-          </div>
+      <div class="grid-box-header">
+        <h2><%= dayLabel %> Floater Assignments</h2>
+        <div class="roster-btn-row no-print">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+          <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Position</button>
         </div>
-
-        <% if (dates.length === 0) { %>
-          <p class="roster-empty">Add session dates above first.</p>
-        <% } else if (grid.length === 0) { %>
-          <p class="roster-empty">Add a position above first (e.g. Front Desk, Hallway Monitor).</p>
-        <% } else { %>
-          <div class="roster-scroll">
-            <table class="job-grid-table">
-              <thead>
-                <tr>
-                  <th class="job-grid-position-col">Position</th>
-                  <th class="job-grid-room-col">Room</th>
-                  <% dateLabels.forEach(function(label) { %><th><%= label %></th><% }); %>
-                </tr>
-              </thead>
-              <tbody>
-                <% grid.forEach(function(hour) { %>
-                  <tr class="job-grid-hour-row"><td colspan="<%= dateLabels.length + 2 %>"><%= hour.label %></td></tr>
-                  <% hour.jobs.forEach(function(job) { %>
-                    <tr>
-                      <td class="job-grid-position-col"><%= job.title %></td>
-                      <td class="job-grid-room-col"><%= job.room || '—' %></td>
-                      <% job.cells.forEach(function(cell) { %>
-                        <td>
-                          <div
-                            class="job-assign-cell"
-                            data-hour="<%= hour.position %>"
-                            data-date="<%= cell.date %>"
-                            data-job-id="<%= job.id %>"
-                            data-member-id="<%= cell.assigned ? cell.assigned.id : '' %>"
-                          >
-                            <span class="job-assign-name<%= cell.assigned ? '' : ' job-assign-name-empty' %>"><%= cell.assigned ? cell.assigned.name + (cell.assigned.infant ? ' (infant)' : '') : 'Unassigned' %></span>
-                            <button type="button" class="btn-secondary job-assign-edit-btn no-print" data-mode="edit">Edit</button>
-                          </div>
-                        </td>
-                      <% }); %>
-                    </tr>
-                  <% }); %>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-        <% } %>
       </div>
+
+      <div class="roster-toolbar no-print">
+        <div class="category-filter" style="margin: 0;">
+          <label for="chart-date-select">Choose Date</label>
+          <select id="chart-date-select" onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')">
+            <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
+            <% upcomingDates.forEach(function(d) { %>
+              <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <% if (dates.length === 0) { %>
+        <p class="roster-empty">Add session dates above first.</p>
+      <% } else if (!selectedDate) { %>
+        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/volunteers/<%= day %>/archive">Archive</a> tab.</p>
+      <% } else { %>
+        <%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>
+      <% } %>
     </div>
 
     <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
@@ -144,137 +113,7 @@
     <% if (openDialog) { %>
       <script>document.getElementById('edit-<%= openDialog %>-dialog').showModal();</script>
     <% } %>
-
-    <h2 class="dashboard-section-title">Substitutes Needed</h2>
-    <div class="roster-toolbar no-print">
-      <div class="category-filter" style="margin: 0;">
-        <label for="sub-date-select">For Date</label>
-        <input
-          type="date"
-          id="sub-date-select"
-          value="<%= selectedDate %>"
-          onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')"
-        />
-      </div>
-    </div>
-
-    <% if (!selectedDate) { %>
-      <p class="roster-empty">Pick a date above to see who needs a substitute.</p>
-    <% } %>
-    <% var anySlots = board.some(function(h) { return h.slots.length > 0; }); %>
-    <% if (selectedDate && !anySlots) { %>
-      <p class="roster-empty">Nobody needs a substitute for <%= selectedDate %>.</p>
-    <% } %>
-    <% board.forEach(function(hour) { %>
-      <% if (hour.slots.length === 0) return; %>
-      <div class="sub-needed-grid">
-        <% hour.slots.forEach(function(slot) { %>
-          <div class="sub-needed-card">
-            <%
-              // One combined, de-duplicated candidate list for the assign
-              // dropdown: the ranked/available floater pool first (each
-              // annotated with their priority level and a child-2-or-
-              // younger note so an admin can choose accordingly), then
-              // every other active parent with no hour-specific data.
-              var usedIds = {};
-              var rankedCandidates = (hour.suggestedFloaters || []).map(function(p) {
-                usedIds[p.id] = true;
-                return { id: p.id, name: p.name, rankLabel: rankLabels[p.rank] || null, infant: !!infantByMemberId[p.id] };
-              });
-              var otherCandidates = allParents.filter(function(p) { return !usedIds[p.id]; }).map(function(p) {
-                return { id: p.id, name: p.name, rankLabel: null, infant: !!infantByMemberId[p.id] };
-              });
-            %>
-            <div class="sub-needed-header">
-              <svg class="icon"><use href="#icon-redo"/></svg>
-              <h3>Substitute Needed</h3>
-              <span class="badge-pill sub-needed-hour-pill"><svg class="icon"><use href="#icon-clock"/></svg> <%= hour.label %></span>
-            </div>
-            <div class="sub-needed-position">
-              <span class="sub-needed-position-icon"><svg class="icon"><use href="#<%= slot.slotType === 'job' ? 'icon-tag' : 'icon-book' %>"/></svg></span>
-              <div>
-                <strong><%= slot.label %><% if (slot.room) { %> &mdash; Room <%= slot.room %><% } else if (slot.detail && slot.slotType === 'class') { %> &mdash; <%= slot.detail %><% } %></strong>
-                <p><%= slot.slotType === 'job' ? 'Permanent Staff Position' : slot.ageGroup %></p>
-              </div>
-            </div>
-
-            <% if (slot.slotType === 'job') { %>
-              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Normally staffed each session</div>
-            <% } %>
-
-            <% if (slot.assigned && slot.assigned.status === 'approved' && !slot.overdue) { %>
-              <div class="sub-needed-banner sub-needed-banner-ok"><svg class="icon"><use href="#icon-check-circle"/></svg> Assigned: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (child &le;2)<% } %></div>
-              <div class="sub-needed-decision-row">
-                <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign">
-                  <input type="hidden" name="date" value="<%= selectedDate %>" />
-                  <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                  <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                  <button type="submit" class="btn-secondary">Unassign</button>
-                </form>
-              </div>
-            <% } else { %>
-              <% if (slot.assigned && slot.overdue) { %>
-                <div class="sub-needed-banner sub-needed-banner-warn"><svg class="icon"><use href="#icon-info-circle"/></svg> <%= slot.assigned.name %> hasn't checked in - this position needs a sub again.</div>
-              <% } else if (slot.assigned) { %>
-                <div class="sub-needed-banner sub-needed-banner-pending"><svg class="icon"><use href="#icon-info-circle"/></svg> Needs Approval: <%= slot.assigned.name %><% if (slot.assigned.infant) { %> (child &le;2)<% } %></div>
-                <div class="sub-needed-decision-row">
-                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/approve">
-                    <input type="hidden" name="date" value="<%= selectedDate %>" />
-                    <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                    <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                    <button type="submit" class="primary-btn">Approve</button>
-                  </form>
-                  <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/unassign">
-                    <input type="hidden" name="date" value="<%= selectedDate %>" />
-                    <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                    <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                    <button type="submit" class="btn-secondary">Unassign</button>
-                  </form>
-                </div>
-              <% } else { %>
-                <div class="sub-needed-banner sub-needed-banner-warn"><svg class="icon"><use href="#icon-info-circle"/></svg> No unassigned floaters are currently available for <%= hour.label %>.</div>
-              <% } %>
-
-              <div class="sub-needed-assign-box">
-                <label for="assign-select-<%= slot.slotType %>-<%= slot.slotId %>">Assign Available Substitute</label>
-                <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/assign">
-                  <input type="hidden" name="date" value="<%= selectedDate %>" />
-                  <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
-                  <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
-                  <input type="hidden" name="isOverride" value="1" />
-                  <div class="sub-needed-select-wrap">
-                    <svg class="icon"><use href="#icon-user"/></svg>
-                    <select name="memberId" id="assign-select-<%= slot.slotType %>-<%= slot.slotId %>" required>
-                      <option value="" disabled selected>Choose someone&hellip;</option>
-                      <% rankedCandidates.forEach(function(p) { %>
-                        <option value="<%= p.id %>"><%= p.name %><% if (p.infant) { %> &middot; child &le;2<% } %><% if (p.rankLabel) { %> &middot; <%= p.rankLabel %><% } %></option>
-                      <% }); %>
-                      <% if (rankedCandidates.length > 0 && otherCandidates.length > 0) { %><option disabled>&mdash;&mdash;&mdash;</option><% } %>
-                      <% otherCandidates.forEach(function(p) { %>
-                        <option value="<%= p.id %>"><%= p.name %><% if (p.infant) { %> &middot; child &le;2<% } %></option>
-                      <% }); %>
-                    </select>
-                  </div>
-                  <button type="submit" class="sub-needed-assign-btn"><svg class="icon"><use href="#icon-user-plus"/></svg> Assign Substitute</button>
-                </form>
-              </div>
-            <% } %>
-
-            <div class="sub-needed-footer">
-              <svg class="icon"><use href="#icon-clock"/></svg>
-              <% if (slot.assigned && slot.assigned.updatedLabel) { %>
-                Last updated: <%= slot.assigned.updatedLabel %>
-              <% } else { %>
-                Not yet assigned
-              <% } %>
-            </div>
-          </div>
-        <% }); %>
-      </div>
-    <% }); %>
   </main>
   <script src="/js/date-list.js"></script>
-  <script type="application/json" id="floaters-by-hour-data"><%- floatersByHourJson %></script>
-  <script src="/js/floater-grid.js"></script>
 </body>
 </html>

@@ -2549,23 +2549,155 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-chart-header h2 { margin: 0; }
 .volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
 
-/* Darker divider before each date's Position/Room column pair in the
-   Volunteer Chart, so one session's data is visually separated from the next. */
-.volunteer-chart-divider { border-left: 2px solid var(--brand-darker); }
+/* ---------- Floater Assignments cards (Chart tab's one selected date,
+   the Archive popup, and the Archive print page - same partial, same
+   look, everywhere: partials/floater-assignment-cards.ejs) ---------- */
 
-/* ---------- Floater Assignments planning grid (position/room/name per date) ---------- */
+.floater-cards-grid {
+  display: grid;
+  /* 200px (not the visually "roomier" 230px+ that first looked right) so
+     all 4 of a day's hour cards reliably fit one row at the container
+     widths this actually renders in (Chart tab, Archive popup, Archive
+     print) - at 230px the 4th card was tipping over to its own row. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.floater-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  break-inside: avoid;
+}
+.floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; }
+.floater-card-header h3 { margin: 0; font-size: 0.95rem; }
+.floater-card-icon { display: inline-flex; flex-shrink: 0; }
+.floater-card-icon .icon { width: 16px; height: 16px; }
 
-.job-grid-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
-.job-grid-table th, .job-grid-table td { border: 1px solid var(--border); padding: 0.5rem 0.6rem; text-align: left; vertical-align: middle; }
-.job-grid-table thead th { background: var(--brand-soft); white-space: nowrap; }
-.job-grid-hour-row td { background: var(--brand-soft); font-weight: 700; color: var(--brand-dark); }
-.job-grid-position-col { min-width: 160px; font-weight: 600; }
-.job-grid-room-col { min-width: 90px; color: var(--muted); white-space: nowrap; }
-.job-assign-cell { display: flex; align-items: center; gap: 0.5rem; min-width: 170px; }
-.job-assign-name { flex: 1; font-weight: 600; }
-.job-assign-name-empty { color: var(--muted); font-weight: 400; font-style: italic; }
-.job-assign-select { flex: 1; font-size: 0.82rem; padding: 0.3rem 0.4rem; }
-.job-assign-edit-btn { flex-shrink: 0; padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+.floater-card-blue .floater-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.floater-card-green .floater-card-header { background: var(--green-bg); color: var(--green); }
+.floater-card-orange .floater-card-header { background: var(--orange-bg); color: var(--orange); }
+.floater-card-purple .floater-card-header { background: var(--purple-soft); color: var(--purple); }
+
+/* Fixed layout + explicit column widths so a long floater name wraps
+   onto a second line instead of overflowing the card's fixed grid-track
+   width - .floater-card's overflow:hidden (for the rounded header
+   corners) would otherwise silently clip it instead of wrapping. */
+.floater-card-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
+.floater-card-table th:nth-child(1), .floater-card-table td:nth-child(1) { width: 40%; }
+.floater-card-table th:nth-child(2), .floater-card-table td:nth-child(2) { width: 24%; }
+.floater-card-table th:nth-child(3), .floater-card-table td:nth-child(3) { width: 36%; }
+.floater-card-table th {
+  text-align: left;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: break-word;
+  white-space: nowrap;
+}
+.floater-card-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: middle; overflow-wrap: break-word; }
+.floater-card-table tbody tr:last-child td { border-bottom: none; }
+.floater-card-position { font-weight: 600; }
+.floater-card-unassigned { color: var(--muted); font-style: italic; }
+
+.floater-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.floater-card-footer .icon { width: 14px; height: 14px; }
+
+/* Archive popup (fetched fragment shown in #volunteer-archive-view-dialog) -
+   wide enough for the card grid to lay out multiple columns instead of
+   stacking single-file like the narrower member-view-dialog. */
+.volunteer-archive-view-dialog { width: min(1100px, 96vw); border: none; border-radius: var(--radius); padding: var(--card-padding); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+.volunteer-archive-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.volunteer-archive-view-header { margin-bottom: 1rem; }
+.volunteer-archive-view-header h2 { margin: 0 0 0.2rem; }
+
+/* Archive print page: portrait, 2 cards per row (2 rows for a day's 4
+   hour cards) - the print page's own @page rule matches (see the view). */
+.volunteer-archive-print-page .floater-cards-grid { grid-template-columns: repeat(2, 1fr); }
+
+/* Archive popup (fetched fragment) - Export/Print sit top-right next to
+   the close button instead of a separate bottom action bar. */
+.volunteer-archive-actions-row { gap: 0.5rem; }
+.volunteer-archive-actions { display: flex; gap: 0.5rem; }
+
+/* Monday/Wednesday day switcher, pill-toggle style ("slide" between the
+   two) instead of a plain <select> - both are plain links (a real page
+   navigation either way), the pill is just how the choice reads. */
+.day-toggle { display: inline-flex; background: var(--brand-soft); border-radius: 999px; padding: 3px; gap: 2px; }
+.day-toggle-option {
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.day-toggle-option:hover:not(.active) { background: rgba(255,255,255,0.6); }
+.day-toggle-option.active { background: var(--brand-dark); color: #fff; }
+
+/* ---------- Floater Assignments Chart: live, editable version of the
+   read-only cards above - 2x2 (matching the Archive print layout), each
+   row's Floater column an assign dropdown + Accept/Unassign button
+   instead of plain text (partials/floater-chart-cards.ejs). ---------- */
+
+.floater-chart-cards-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 800px) {
+  .floater-chart-cards-grid { grid-template-columns: 1fr; }
+}
+
+.floater-chart-table th:nth-child(1) { width: 22%; }
+.floater-chart-table th:nth-child(2) { width: 12%; }
+.floater-chart-table th:nth-child(3) { width: 66%; }
+.floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
+
+/* A slot nobody at all is available for (not even an override pick) -
+   the row itself flags it, no dropdown to offer. */
+.floater-row-noavail { background: var(--red-bg); }
+.floater-noavail-text { color: var(--red); font-weight: 600; font-size: 0.8rem; }
+
+.floater-assign-form { display: flex; align-items: center; gap: 0.4rem; }
+.floater-assign-form select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  background: #fff;
+  color: var(--ink);
+}
+.floater-assign-form select:disabled { background: #f8fafc; color: var(--muted); }
+.floater-assign-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-dark);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.floater-assign-btn:hover { background: var(--brand-darker); }
+.floater-assign-btn-unassign { background: var(--red); }
+.floater-assign-btn-unassign:hover { background: #b91c1c; }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
 
@@ -2724,109 +2856,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
-/* ---------- Substitutes Needed cards ---------- */
-
-.sub-needed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-.sub-needed-card {
-  background: #fff;
-  border: 2px solid var(--btn-bg);
-  border-radius: var(--radius);
-  padding: var(--card-padding-compact);
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-.sub-needed-header { display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.6rem; }
-.sub-needed-header .icon { color: var(--btn-bg); width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
-.sub-needed-header h3 { margin: 0; font-size: 0.98rem; flex: 1; }
-.sub-needed-hour-pill { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--brand-soft); color: var(--brand-dark); white-space: nowrap; }
-.sub-needed-hour-pill .icon { width: 0.85rem; height: 0.85rem; }
-.sub-needed-position { display: flex; align-items: flex-start; gap: 0.65rem; }
-.sub-needed-position-icon {
-  width: 2.15rem;
-  height: 2.15rem;
-  border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.sub-needed-position-icon .icon { width: 1rem; height: 1rem; }
-.sub-needed-position strong { display: block; font-size: 0.94rem; }
-.sub-needed-position p { margin: 0.1rem 0 0; font-size: 0.78rem; color: var(--muted); }
-.sub-needed-banner { display: flex; align-items: center; gap: 0.5rem; border-radius: 10px; padding: 0.5rem 0.7rem; font-size: 0.8rem; font-weight: 600; }
-.sub-needed-banner .icon { width: 1rem; height: 1rem; flex-shrink: 0; }
-.sub-needed-banner-ok { background: var(--green-bg); color: var(--green); }
-.sub-needed-banner-warn { background: var(--red-bg); color: var(--red); }
-.sub-needed-banner-pending { background: var(--yellow-bg); color: var(--yellow); }
-/* Approve / Unassign are the two possible responses to the same pending
-   decision, so they sit side by side as equal-width twins instead of the
-   generic .primary-btn/.btn-secondary sizing (which made Approve read as
-   a large, offset block next to a small Unassign pill). A lone Unassign
-   (already-approved state) reuses the same row/sizing for consistency,
-   just without a partner to sit next to. */
-.sub-needed-decision-row { display: flex; gap: 0.5rem; }
-.sub-needed-decision-row form { flex: 1; display: flex; }
-.sub-needed-decision-row .primary-btn,
-.sub-needed-decision-row .btn-secondary {
-  flex: 1;
-  margin-top: 0;
-  padding: 0.55rem 0.6rem;
-  font-size: 0.82rem;
-  border-radius: 8px;
-  text-align: center;
-  white-space: nowrap;
-}
-.sub-needed-assign-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.sub-needed-assign-box label { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
-.sub-needed-select-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--control-radius);
-  padding: 0 0.7rem;
-  background: #fff;
-}
-.sub-needed-select-wrap .icon { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
-.sub-needed-select-wrap select {
-  flex: 1;
-  border: none;
-  outline: none;
-  padding: 0.6rem 0;
-  background: none;
-  font: inherit;
-  min-width: 0;
-}
-/* This one button is deliberately blue (not the site's usual orange
-   primary) to match the reference design - using the site's own brand
-   blue (--brand-dark/--brand-darker) rather than a one-off hex value, so
-   it's the same blue as the rest of the app. */
-.sub-needed-assign-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  width: 100%;
-  border: none;
-  border-radius: var(--control-radius);
-  padding: 0.7rem;
-  background: var(--brand-dark);
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.sub-needed-assign-btn:hover { background: var(--brand-darker); }
-.sub-needed-assign-btn .icon { width: 1rem; height: 1rem; }
-.sub-needed-footer { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.6rem; }
-.sub-needed-footer .icon { width: 0.85rem; height: 0.85rem; }
-.sub-needed-candidate-detail { font-size: 0.72rem; color: var(--muted); }
-
 .grid-box {
   min-width: 320px;
   background: var(--surface);
@@ -2861,71 +2890,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-view-page .roster-table-detailed tbody tr:nth-child(even) .roster-secondary-col { background: #fdfaf7; }
 .roster-view-page .roster-table-detailed tbody tr:hover .roster-secondary-col { background: var(--orange-bg); }
 
-/* Flexbox (not grid) so cards keep a fixed natural width and wrap onto
-   centered rows - a lone card, or a partial last row, stays centered
-   instead of stretching to fill the leftover space. */
-.volunteer-public-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.25rem;
-  width: 100%;
-  max-width: 1100px;
-  text-align: left;
-}
-.volunteer-open-slots { margin-top: 2rem; text-align: left; }
-.volunteer-open-slots .volunteer-public-table { max-width: 700px; margin-bottom: 1.25rem; }
-.volunteer-public-card {
-  flex: 0 1 460px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-}
-.volunteer-public-section {
-  color: var(--brand-dark);
-  font-size: 1.1rem;
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 2px solid var(--brand);
-}
-.volunteer-public-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.volunteer-public-table th,
-.volunteer-public-table td {
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--border);
-  text-align: left;
-  font-size: 1rem;
-  white-space: nowrap;
-}
-.volunteer-public-table thead th { background: var(--brand-soft); color: var(--brand-dark); font-size: 0.8rem; font-weight: 700; }
-.volunteer-public-table td:first-child { font-weight: 700; }
-/* Position/Location only ever hold a short bubble tag, so they shouldn't
-   stretch to a third of the table each - keep them narrow and give Name
-   the rest of the width. */
-.volunteer-public-table th:first-child,
-.volunteer-public-table td:first-child { width: 46%; }
-.volunteer-public-table th:not(:first-child),
-.volunteer-public-table td:not(:first-child) { width: 27%; text-align: center; }
-
-.volunteer-bubble {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: #fff;
-}
-.volunteer-bubble-position { background: var(--accent); }
-.volunteer-bubble-room { background: var(--brand-darker); }
+/* Public kiosk Floater Assignments view - same hour-card chart as the
+   admin Chart tab/Archive print page (partials/floater-assignment-
+   cards.ejs), just wider than the usual .kiosk-wrap so a kiosk-sized
+   screen can lay out all 4 hour cards in one row instead of wrapping. */
+.volunteer-public-wrap { max-width: 1400px; }
 
 /* ---------- Setup/Cleanup ---------- */
 

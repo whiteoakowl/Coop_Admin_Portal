@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, todayISO, weekdayOf } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatDateLong, todayISO } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
@@ -21,19 +21,11 @@ const {
   addMemberToSection,
 } = require('../utils/volunteers');
 const {
-  permanentJobsForDay,
-  floaterIdsForJob,
-  floaterMembersForHour,
   substituteBoard,
   jobAssignmentGrid,
+  dailyAssignmentCardsWithLabels,
+  archivedDateSummaries,
 } = require('../utils/substitutes');
-const { jsonScriptSafe } = require('../utils/json');
-
-const SUB_DAY_WEEKDAY = { monday: 1, wednesday: 3 };
-function defaultSubDateFor(day) {
-  const today = todayISO();
-  return weekdayOf(today) === SUB_DAY_WEEKDAY[day] ? today : '';
-}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
@@ -74,18 +66,52 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const hours = hoursForDay(day);
   const dates = datesForList(list.id);
   const dateLabels = dates.map(formatDateLabel);
+  const today = todayISO();
 
-  const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultSubDateFor(day);
-  const jobs = permanentJobsForDay(day).map((j) => ({ ...j, floaterIds: floaterIdsForJob(j.id) }));
+  // One date now drives the whole page - each hour's floater chart and
+  // its "needs a substitute" list are two columns of the same section,
+  // so they always describe the same session rather than two
+  // independently picked dates. Only today/future dates are offered,
+  // since anything that's already passed belongs on the read-only
+  // Archive tab instead. Defaults to the nearest upcoming date so the
+  // page isn't blank on first load.
+  const upcomingDates = dates.filter((d) => d >= today);
+  const selectedDate = upcomingDates.includes(req.query.date) ? req.query.date : upcomingDates[0] || null;
+
   const allParents = activeParentOptions();
   const infantByMemberId = {};
   allParents.forEach((p) => { infantByMemberId[p.id] = hasInfantChild(p.id); });
 
-  // Every hour's floater pool, embedded once for the client-side edit-in-
-  // place dropdown (public/js/floater-grid.js) - keyed by hour_position.
-  const floatersByHour = {};
-  hours.forEach((h) => {
-    floatersByHour[h.position] = floaterMembersForHour(day, h.position).map((m) => ({ id: m.id, name: m.name }));
+  // The chart itself is now the assign UI - every permanent job (whether
+  // filled or not) plus any class whose teacher(s) are absent, one row
+  // each, so there's a single list instead of a separate "needs a sub"
+  // section. substituteBoard already carries a suggested (or already-
+  // approved) candidate per slot, auto-picked by rank and filtered to
+  // whoever's actually available for this date (excludes anyone checked
+  // in absent or excluded via an absence/late form for that date - see
+  // absentMemberIdsForDate/absenceFormMemberIdsForDate in
+  // utils/classSchedule.js, both already scoped to `date`).
+  const hourSections = selectedDate ? substituteBoard(day, selectedDate) : [];
+  hourSections.forEach((hour) => {
+    hour.slots.forEach((slot) => {
+      const usedIds = {};
+      const rankedCandidates = (hour.suggestedFloaters || []).map((p) => {
+        usedIds[p.id] = true;
+        return { id: p.id, name: p.name, rankLabel: RANK_LABELS[p.rank] || null, infant: !!infantByMemberId[p.id] };
+      });
+      const otherCandidates = allParents
+        .filter((p) => !usedIds[p.id])
+        .map((p) => ({ id: p.id, name: p.name, rankLabel: null, infant: !!infantByMemberId[p.id] }));
+      const candidates = [...rankedCandidates, ...otherCandidates];
+      // The row's own current pick (approved or still-pending-suggested)
+      // always has to be a selectable <option>, even if resolving other
+      // rows in this hour already marked them "used" above.
+      if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
+        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: null, infant: slot.assigned.infant });
+      }
+      slot.candidates = candidates;
+      slot.noneAvailable = candidates.length === 0;
+    });
   });
 
   res.render('admin-volunteers', {
@@ -96,12 +122,10 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
     hours,
     dates: dates.map((d, i) => ({ date: d, label: dateLabels[i] })),
     dateLabels,
-    grid: jobAssignmentGrid(day, dates),
-    floatersByHourJson: jsonScriptSafe(floatersByHour),
-    openDialog: dialogParam(req),
+    upcomingDates: upcomingDates.map((d) => ({ date: d, label: formatDateLong(d) })),
     selectedDate,
-    board: substituteBoard(day, selectedDate),
-    jobs,
+    hourSections,
+    openDialog: dialogParam(req),
     allParents,
     infantByMemberId,
     rankLabels: RANK_LABELS,
@@ -150,6 +174,83 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, (req, res) =
   });
 
   sendCsv(res, `${day}-floater-assignments.csv`, lines);
+});
+
+// --- Floater Archive: past session dates' assignment cards, read-only ---
+
+// A date only counts as "archived" once it's actually passed and was one
+// of this day's real session dates - guards the three routes below from
+// a tampered/stale date in the URL surfacing an upcoming (still-editable-
+// via-Substitutes-Needed) date under the read-only Archive routes.
+function loadArchivedDate(day, date) {
+  if (!isValidISODate(date) || date >= todayISO()) return false;
+  const list = getListByDay(day);
+  return datesForList(list.id).includes(date);
+}
+
+router.get('/volunteers/:day/archive', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const list = getListByDay(day);
+  const allDates = datesForList(list.id);
+  const today = todayISO();
+  const pastDates = allDates.filter((d) => d < today).sort().reverse();
+
+  const dateFilter = pastDates.includes(req.query.date) ? req.query.date : null;
+  const rows = archivedDateSummaries(day, dateFilter ? [dateFilter] : pastDates);
+
+  res.render('admin-volunteer-archive', {
+    title: `${DAY_LABELS[day]} Floater Archive`,
+    tab: 'floater',
+    day,
+    dayLabel: DAY_LABELS[day],
+    dateOptions: pastDates.map((d) => ({ date: d, label: formatDateLong(d) })),
+    dateFilter,
+    rows: rows.map((r) => ({ ...r, label: formatDateLong(r.date) })),
+  });
+});
+
+router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+
+  res.render('volunteer-archive-view-fragment', {
+    day,
+    dayLabel: DAY_LABELS[day],
+    date,
+    dateLabel: formatDateLong(date),
+    cards: dailyAssignmentCardsWithLabels(day, date),
+  });
+});
+
+router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+
+  res.render('volunteer-archive-print', {
+    title: `${DAY_LABELS[day]} Floater Assignments — ${formatDateLong(date)}`,
+    dayLabel: DAY_LABELS[day],
+    date,
+    dateLabel: formatDateLong(date),
+    cards: dailyAssignmentCardsWithLabels(day, date),
+  });
+});
+
+router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+
+  const cards = dailyAssignmentCardsWithLabels(day, date);
+  const lines = [toCsvRow(['Hour', 'Position', 'Room', 'Floater Assigned'])];
+  cards.forEach((hour) => {
+    hour.jobs.forEach((job) => {
+      lines.push(toCsvRow([hour.label, job.title, job.room || '', job.assigned ? job.assigned.name : 'Unassigned']));
+    });
+  });
+
+  sendCsv(res, `${day}-floater-assignments-${date}.csv`, lines);
 });
 
 // --- Floater Teams: who's on the list for each hour, ranked ---
