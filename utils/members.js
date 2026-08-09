@@ -179,6 +179,30 @@ function rostersForMember(memberId) {
     .all(memberId);
 }
 
+// Same data as calling rostersForMember once per id, but as one query -
+// membersWithDetails (the Members list, every member on the page at
+// once) used to call rostersForMember in a .map(), one extra query per
+// row. Returns a Map so a caller iterating members can just
+// `.get(m.id) || []` instead of re-filtering a flat list per member.
+function rostersByMemberIds(memberIds) {
+  const byId = new Map();
+  if (memberIds.length === 0) return byId;
+  const placeholders = memberIds.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT rm.member_id AS memberId, r.* FROM rosters r
+       JOIN roster_members rm ON rm.roster_id = r.id
+       WHERE rm.member_id IN (${placeholders}) ORDER BY r.name COLLATE NOCASE`
+    )
+    .all(...memberIds);
+  for (const row of rows) {
+    const { memberId, ...roster } = row;
+    if (!byId.has(memberId)) byId.set(memberId, []);
+    byId.get(memberId).push(roster);
+  }
+  return byId;
+}
+
 // Groups members by family (family_id, or a solo "family of one" for
 // anyone without one), sorted alphabetically by the group's own sort
 // name - the primary parent's name if one's been designated, otherwise
@@ -227,9 +251,11 @@ function membersWithDetails(typeFilter) {
     .prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id')
     .all();
   const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
-  return sortMembersByFamily(members).map((m) => ({
+  const sorted = sortMembersByFamily(members);
+  const rostersById = rostersByMemberIds(sorted.map((m) => m.id));
+  return sorted.map((m) => ({
     ...m,
-    rosters: rostersForMember(m.id),
+    rosters: rostersById.get(m.id) || [],
     familyName: m.family_name || null,
   }));
 }
@@ -247,6 +273,7 @@ module.exports = {
   membersWithMedicalNotes,
   setPrimaryParent,
   rostersForMember,
+  rostersByMemberIds,
   sortMembersByFamily,
   membersWithDetails,
   lastNameOf,
