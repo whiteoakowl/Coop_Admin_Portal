@@ -3271,11 +3271,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-card-line { margin: 0; font-size: 0.78rem; color: var(--ink); }
 .class-card-line-label { font-weight: 700; color: var(--muted); margin-right: 0.25rem; }
 .class-card-absent-flag { color: var(--red); font-weight: 600; }
-/* Still used by the public kiosk Class Schedule page's own card markup
-   (views/class-schedule-public.ejs), which keeps the older full-roster
-   layout. */
-.class-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; margin: 0.25rem 0; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
-.class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.35rem 0 0; }
 .class-card-pill-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-right: 0.1rem; }
 .class-card .badge-pill { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
 .badge-pill-absent { background: var(--red-bg); color: var(--red); }
@@ -3440,18 +3435,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media print {
   .class-schedule-print-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
-
-/* ---------- Class Schedule (public kiosk page) ---------- */
-
-.class-schedule-public-daytabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.class-schedule-public-hint { max-width: 640px; text-align: center; color: var(--muted); font-weight: 600; margin: 0 0 1.25rem; }
-.class-schedule-public-notice { margin-bottom: 1rem; }
-.class-schedule-public-grid { width: 100%; max-width: 1200px; display: flex; flex-direction: column; gap: 1.5rem; }
-.class-schedule-public-hour .class-card-row { justify-content: center; }
-.class-card-public { max-width: 320px; }
-.class-schedule-signup-form { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
-.class-schedule-signup-form select { flex: 1 1 100px; font-size: 0.85rem; }
-.class-schedule-signup-form button { font-size: 0.85rem; padding: 0.4rem 0.7rem; }
 
 .member-profile-dialog {
   width: min(440px, 90vw);

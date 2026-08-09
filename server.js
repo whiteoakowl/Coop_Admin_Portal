@@ -43,7 +43,6 @@ const setupRouter = require('./routes/setup');
 const adminNameTagRouter = require('./routes/admin-name-tag');
 const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
-const classScheduleRouter = require('./routes/class-schedule');
 const contactAdminsRouter = require('./routes/contact-admins');
 const membershipRouter = require('./routes/membership');
 
@@ -99,7 +98,6 @@ app.use('/', absenceRouter);
 app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);
 app.use('/', setupRouter);
-app.use('/', classScheduleRouter);
 app.use('/', contactAdminsRouter);
 app.use('/', membershipRouter);
 // Order matters here: several of these routers gate themselves with a
