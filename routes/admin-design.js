@@ -9,6 +9,7 @@ const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_T
 const { getScheduleCardTemplate, scheduleCardDataForMember } = require('../utils/scheduleCardData');
 const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
+const { membersWithDetails } = require('../utils/members');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 router.use(requireFullAdmin);
@@ -27,9 +28,11 @@ router.get('/design', requireAdmin, (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'design';
   const initialType = DESIGN_TYPES.includes(req.query.type) ? req.query.type : 'student';
 
-  const members = db
-    .prepare('SELECT id, name, member_type FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all();
+  // Same photo/type/family/rosters shape as the Members page's own table -
+  // the Print tab's bulk picker lists are meant to look and read like that
+  // list (just with a selection checkbox instead of Actions), not a bare
+  // name-only table.
+  const members = membersWithDetails().filter((m) => m.active);
 
   res.render('admin-design', {
     title: 'Design / Print',

@@ -135,4 +135,61 @@
       });
     });
   });
+
+  // Live preview + "Print" goes straight to the OS dialog, for every bulk
+  // print form on this hub (member pickers and badge lists alike - same
+  // mechanism either way). Checking/unchecking any row (including via
+  // Select All/None, which still fires a real change event on the
+  // checkbox the admin clicked) re-submits the form so the iframe below
+  // always reflects the current selection - no separate "update preview"
+  // step. Clicking the button doesn't just refresh that preview: it arms
+  // a one-time listener that fires the iframe's own print() the moment
+  // *this* submission's freshly-rendered content finishes loading, then
+  // submits - one click goes straight to the print dialog, not a second
+  // click on the preview page's own Print button.
+  function wireLivePreviewForm(form) {
+    if (!form) return;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const frame = document.getElementById('print-preview-frame');
+
+    function hasSelection() {
+      return form.querySelectorAll('input[type="checkbox"][name]:checked').length > 0;
+    }
+    function submitForm() {
+      if (form.requestSubmit) form.requestSubmit();
+      else form.submit();
+    }
+
+    form.addEventListener('change', (e) => {
+      if (!e.target.matches || !e.target.matches('input[type="checkbox"]')) return;
+      if (hasSelection()) {
+        submitForm();
+      } else if (frame) {
+        frame.src = 'about:blank'; // nothing selected - clear the stale preview instead of showing a server error
+      }
+    });
+
+    if (submitBtn && frame) {
+      submitBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (hasSelection()) {
+          const onLoad = () => {
+            frame.removeEventListener('load', onLoad);
+            try { frame.contentWindow.print(); } catch (err) { /* same-origin, shouldn't throw */ }
+          };
+          frame.addEventListener('load', onLoad);
+        }
+        submitForm(); // still submits with nothing selected, so the server's "select at least one" message shows in the preview
+      });
+    }
+  }
+
+  [
+    'schedule-print-form',
+    'bulk-print-form',
+    'cards-both-print-form',
+    'barcodes-print-form',
+    'setupCleanup-badge-print-form',
+    'custom-badge-print-form',
+  ].forEach((id) => wireLivePreviewForm(document.getElementById(id)));
 })();

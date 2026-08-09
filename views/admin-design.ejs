@@ -176,20 +176,7 @@
               </div>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="schedule-print-list">
-                <thead><tr><th></th><th>Name</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="2" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-name="<%= m.name.toLowerCase() %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'schedule-print-list' }) %>
             </div>
           </form>
         </div>
@@ -212,21 +199,7 @@
               </label>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="name-tag-bulk-list">
-                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
@@ -253,21 +226,7 @@
               </label>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="cards-both-bulk-list">
-                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'cards-both-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
@@ -293,21 +252,7 @@
               </label>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="barcodes-bulk-list">
-                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print Barcodes</button>

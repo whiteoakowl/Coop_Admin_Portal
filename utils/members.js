@@ -153,6 +153,68 @@ function membersWithMedicalNotes() {
     .all();
 }
 
+function rostersForMember(memberId) {
+  return db
+    .prepare(
+      `SELECT r.* FROM rosters r
+       JOIN roster_members rm ON rm.roster_id = r.id
+       WHERE rm.member_id = ? ORDER BY r.name COLLATE NOCASE`
+    )
+    .all(memberId);
+}
+
+// Groups members by family (family_id, or a solo "family of one" for
+// anyone without one), sorted alphabetically by the group's own sort
+// name - the primary parent's name if one's been designated, otherwise
+// whichever member's name sorts first. Within a group, the primary
+// parent is always listed first, everyone else alphabetically after.
+// Inactive members are kept out of the family grouping entirely (sunk
+// to the bottom, plain alphabetical) so a former member doesn't drag
+// their old family's sort position around.
+function sortMembersByFamily(members) {
+  const active = members.filter((m) => m.active);
+  const inactive = members.filter((m) => !m.active).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const groups = new Map();
+  active.forEach((m) => {
+    const key = m.family_id != null ? `f${m.family_id}` : `solo${m.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  });
+
+  const orderedGroups = Array.from(groups.values()).map((group) => {
+    const primary = group.find((m) => m.is_primary_parent);
+    group.sort((a, b) => {
+      if (a === primary) return -1;
+      if (b === primary) return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    const sortName = (primary || group[0]).name;
+    return { sortName, group };
+  });
+  orderedGroups.sort((a, b) => a.sortName.localeCompare(b.sortName, undefined, { sensitivity: 'base' }));
+
+  return [...orderedGroups.flatMap((g) => g.group), ...inactive];
+}
+
+// Family is now a named entity (families.name, e.g. "Anderson") rather
+// than a list of everyone else sharing family_id - a plain left join gets
+// each member's family surname in one query instead of the old per-member
+// familyOf() lookup. Shared by the Members page and any other member list
+// that wants that same photo/type/family/rosters shape (e.g. the Design/
+// Print hub's bulk print picker lists).
+function membersWithDetails(typeFilter) {
+  const allMembers = db
+    .prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id')
+    .all();
+  const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
+  return sortMembersByFamily(members).map((m) => ({
+    ...m,
+    rosters: rostersForMember(m.id),
+    familyName: m.family_name || null,
+  }));
+}
+
 module.exports = {
   parseNamesFromUpload,
   findMemberByName,
@@ -165,4 +227,7 @@ module.exports = {
   setMemberFamily,
   membersWithMedicalNotes,
   setPrimaryParent,
+  rostersForMember,
+  sortMembersByFamily,
+  membersWithDetails,
 };
