@@ -2011,6 +2011,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .settings-account-grid h3 { margin-top: 0; }
 
+/* Settings > Install App: numbered per-platform steps read like a normal
+   instruction list, not the app's usual data tables/cards. */
+.pwa-steps { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.pwa-steps li { margin-bottom: 0.35rem; line-height: 1.5; }
+#pwa-install-status { margin: 0.75rem 0 0; }
+#pwa-install-btn { margin-top: 0.25rem; }
+
 .link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
 .inline-block-form { display: inline; }
