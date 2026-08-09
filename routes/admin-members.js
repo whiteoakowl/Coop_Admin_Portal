@@ -8,7 +8,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
-const { imageFileFilter } = require('../utils/uploads');
+const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -20,7 +20,7 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 
 router.use(requireFullAdmin);
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 const MEMBER_TYPES = ['student', 'parent'];
 
 // Member profile photos - stored on disk (not memory) since they're kept
