@@ -3540,6 +3540,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-print-table { margin-bottom: 0.5rem; }
 .schedule-print-table th, .schedule-print-table td { text-align: left; }
 
+/* Class Roster print: title/grade/room/time/teacher/assistants stacked
+   one per line instead of a title + meta line + separate staff table. */
+.class-roster-print-info { margin-bottom: 1.5rem; }
+.class-roster-print-info h2 { margin: 0 0 0.6rem; }
+.class-roster-print-info p { margin: 0.2rem 0; font-size: 0.95rem; }
+.class-roster-print-label { font-weight: 700; margin-right: 0.3rem; }
+
+/* Bulk "Name Tags + Schedule Cards" print - each member's two cards sit
+   side by side, one member row per line, so a shared physical card
+   design comparison (or just cutting both at once) doesn't require
+   flipping between two separate printouts. */
+.member-card-pair-row { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem; break-inside: avoid; }
+.member-card-pair-item h2 { margin: 0 0 0.4rem; font-size: 0.95rem; color: var(--muted); }
+
 /* Hidden on screen, shown only when printing - a consistent branded
    header (logo + co-op name + page title) at the top of every printout. */
 .print-header { display: none; }

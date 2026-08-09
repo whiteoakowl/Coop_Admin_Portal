@@ -149,6 +149,7 @@
           <select class="name-tag-type-select" id="print-type-select">
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
+            <option value="cardsBoth">Name Tags + Schedule Cards</option>
             <option value="barcodes">Barcodes Only</option>
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
@@ -212,6 +213,47 @@
             </div>
             <div class="roster-scroll print-picker-scroll">
               <table class="roster-table members-table condensed-table" id="name-tag-bulk-list">
+                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
+                <tbody>
+                  <% if (members.length === 0) { %>
+                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
+                  <% } %>
+                  <% members.forEach(function(m) { %>
+                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
+                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
+                      <td><%= m.name %></td>
+                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <div class="name-tag-bulk-submit-row">
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="print-cardsBoth-section" hidden>
+          <form method="POST" action="/admin/design/print-both" target="print-preview-frame" id="cards-both-print-form">
+            <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
+            <div class="name-tag-bulk-filter">
+              <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
+                <option value="all">All</option>
+                <option value="student">Students Only</option>
+                <option value="parent">Parents Only</option>
+              </select>
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="cards-both-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="cards-both-select-none-checkbox" />
+                Select None
+              </label>
+            </div>
+            <div class="roster-scroll print-picker-scroll">
+              <table class="roster-table members-table condensed-table" id="cards-both-bulk-list">
                 <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
                 <tbody>
                   <% if (members.length === 0) { %>
