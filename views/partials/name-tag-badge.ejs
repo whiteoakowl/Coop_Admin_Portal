@@ -1,0 +1,11 @@
+<%
+// locals: html (pre-rendered element markup string), bgCss (background css
+// value), badgeWidth, badgeHeight. Both html/bgCss are computed by the
+// route handler using public/js/name-tag-render-core.js - the exact same
+// module the design editor uses to draw its live canvas, so print always
+// matches design (one rendering implementation, not two hand-kept-in-sync
+// copies).
+%>
+<div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; background:<%= bgCss %>;">
+  <%- html %>
+</div>

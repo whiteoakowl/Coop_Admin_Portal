@@ -1,41 +1,156 @@
+/* ============================================================
+   DESIGN SYSTEM - every page in the app loads this one stylesheet
+   via views/partials/head.ejs, so the tokens below are the single
+   source of truth for the site's look. When adding a new page or
+   component:
+     - Colors: use the named color/button variables below, never a
+       new hex literal that happens to match one.
+     - Logo: use one of the --logo-* sizes with border-radius: 50%,
+       never a one-off pixel value.
+     - Shape/spacing: use --radius/--control-radius for corners,
+       --shadow-sm/--shadow-md/--shadow-lg for elevation, and the
+       --card-padding and --control-padding scales for spacing, so
+       every box and control lines up with the rest of the site.
+     - Buttons: reuse .roster-action-btn (primary toolbar action),
+       .file-action-btn (Import/Export/Print, green), .primary-btn
+       (form submit), .btn-secondary (cancel/secondary) instead of
+       inventing a new button class.
+   ============================================================ */
 :root {
   /* Sanford Homeschoolers brand palette */
-  --bg: #cfe7fb;
+  --bg: #4682B4;
   --surface: #ffffff;
   --ink: #1c2530;
   --muted: #64748b;
   --brand: #79baec;       /* logo blue - fills, borders, badges (pair with --ink or white) */
-  --brand-dark: #2e6da4;  /* accessible mid blue - links, button fills w/ white text */
+  --brand-dark: #2e6da4;  /* accessible mid blue - links, text (not button fills) */
   --brand-darker: #1f4e7a; /* hover state for brand-dark */
   --brand-soft: #eaf4fd;  /* tinted section backgrounds */
-  --accent: #e49b0f;      /* logo gold - highlights, focus, secondary accents */
-  --accent-dark: #b97a0a; /* hover state for accent */
+  --accent: #E7AA7B;      /* highlights, focus, secondary accents, admin sidebar */
+  --accent-dark: #C49068; /* hover state for accent */
+  --btn-bg: #E7AA7B;      /* filled button background, every page */
+  --btn-bg-hover: #C49068; /* hover state for --btn-bg */
   --green: #16a34a;
   --green-bg: #dcfce7;
+  --btn-green: #85BB65;    /* filled button background - file actions (Import/Export/Print) */
+  --btn-green-hover: #6fa350;
   --red: #dc2626;
   --red-bg: #fee2e2;
   --yellow: #a16207;
   --yellow-bg: #fef9c3;
+  --yellow-solid: #eab308;
+  --orange: #b25a17;
+  --orange-bg: #fde8d2;
+
+  /* Site-wide button/card color system: orange = primary (save/add/
+     submit, --btn-bg above), green = file actions (--btn-green above),
+     purple = secondary toolbar actions (edit/manage/view-toggle). Red is
+     kept as the one accepted exception, for destructive actions only. */
+  --purple: #6d4a99;       /* accessible text-on-tint variant */
+  --purple-dark: #55397a;  /* hover state for --purple text */
+  --purple-soft: #f1ecfb;  /* tinted section/badge backgrounds */
+  /* Same pastel purple as the kiosk homepage's purple card (#C38EC7) -
+     too light for white text, so purple buttons use dark text instead,
+     same as the homepage card's own label does. */
+  --btn-purple: #C38EC7;
+  --btn-purple-hover: #ad72b1;
   --border: #dbe8f5;
   --radius: 14px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
+  --shadow-md: 0 10px 22px rgba(15,23,42,0.1);
+  --shadow-lg: 0 14px 28px rgba(15,23,42,0.14);
+
+  /* Container padding scale: one value for a page-level card/panel/section,
+     one compact value for denser or smaller supporting cards. */
+  --card-padding: 1.25rem 1.5rem;
+  --card-padding-compact: 1rem 1.1rem;
+
+  /* Control (input/select/textarea/button) sizing scale. "Standard" is for
+     full-size, standalone form fields (public forms, member edit form);
+     "compact" is for inline/toolbar controls (admin action bars, table
+     row actions, dialog buttons). Every interactive control shares one
+     radius so buttons and fields always line up visually. */
+  --control-radius: 8px;
+  --control-padding: 0.65rem 0.85rem;
+  --control-font-size: 0.95rem;
+  --control-padding-compact: 0.55rem 0.8rem;
+  --control-font-size-compact: 0.9rem;
+
+  /* Logo sizing scale - every place the round logo appears (admin sidebar,
+     login, kiosk headers, public form headers, mobile top bar) picks one
+     of these named sizes instead of a one-off pixel value, so resizing
+     "the logo" in any context is a single-variable change. Always paired
+     with border-radius: 50% for the circular crop. */
+  --logo-xl: 160px;  /* admin sidebar */
+  --logo-lg: 120px;  /* login page */
+  --logo-md: 96px;   /* kiosk landing header */
+  --logo-sm: 84px;   /* kiosk check-in/check-out header */
+  --logo-xs: 72px;   /* public form header (absence, name tag, membership) */
+  --logo-2xs: 28px;  /* mobile top bar */
 }
 
 * { box-sizing: border-box; }
+
+/* The native `hidden` attribute is a low-priority user-agent style, so any
+   component rule setting `display` (e.g. .primary-btn) silently overrides
+   it regardless of specificity or source order. Force it to win. */
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 a { color: var(--brand-dark); text-decoration: none; }
 
 h1 { margin: 0 0 0.25rem; font-size: 2rem; }
-h2 { margin: 1.25rem 0 0.5rem; font-size: 1.15rem; }
+h2 { margin: 1rem 0 0.5rem; font-size: 1.15rem; }
+h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+
+h1, h2, h3,
+.landing-welcome,
+.landing-column-heading,
+.landing-label,
+.print-header-title,
+.admin-sidebar .brand,
+.admin-mobile-topbar .brand {
+  font-family: 'Montserrat', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 700;
+}
 
 button { font-family: inherit; cursor: pointer; }
+
+/* ---------- Icons ---------- */
+
+.icon {
+  width: 1em;
+  height: 1em;
+  stroke: currentColor;
+  fill: none;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+.icon-spin { animation: icon-spin 0.9s linear infinite; }
+
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Consistent, visible keyboard-focus ring across interactive elements. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.landing-card:focus-visible {
+  outline: 2px solid var(--btn-bg);
+  outline-offset: 2px;
+}
 
 /* ---------- Landing page ---------- */
 
@@ -47,41 +162,175 @@ button { font-family: inherit; cursor: pointer; }
   padding: 2rem;
 }
 
-.landing-wrap { text-align: center; max-width: 780px; }
+.landing-wrap { text-align: center; max-width: 900px; }
 
-.landing-logo { height: 140px; width: 140px; margin-bottom: 1rem; }
+.landing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.landing-logo-sm { height: var(--logo-md); width: var(--logo-md); flex-shrink: 0; border-radius: 50%; }
+
+.landing-welcome {
+  color: var(--ink);
+  font-size: 2.5rem;
+  font-weight: 800;
+}
 
 .landing .subtitle { color: var(--muted); margin-bottom: 2.5rem; font-size: 1.1rem; }
 
 .landing-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: repeat(3, 220px);
+  gap: 1.5rem;
+  justify-content: center;
 }
+
+.landing-grid-two { grid-template-columns: repeat(2, 220px); }
 
 .landing-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--brand);
   border-radius: var(--radius);
-  padding: 2.25rem 1rem;
+  padding: 1.75rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  gap: 0.75rem;
+  flex: 1;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-.landing-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-top-color: var(--accent); }
+.landing-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--brand); }
 
-.landing-icon { font-size: 2.5rem; }
-.landing-label { font-size: 1.15rem; font-weight: 600; color: var(--ink); }
-.landing-card-admin { opacity: 0.75; }
+.landing-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 1.5rem;
+}
+.landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); text-align: center; }
 
-@media (max-width: 480px) {
-  .landing-grid { grid-template-columns: 1fr; }
+/* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
+.landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
+.landing-card-orange:hover { border-color: var(--btn-bg-hover); }
+.landing-card-orange .landing-icon { background: rgba(255,255,255,0.6); color: #7a3d0a; }
+.landing-card-orange .landing-label { color: #000; }
+
+.landing-card-green { background: var(--btn-green); border-color: var(--btn-green); }
+.landing-card-green:hover { border-color: var(--btn-green-hover); }
+.landing-card-green .landing-icon { background: rgba(255,255,255,0.6); color: #2f4a20; }
+.landing-card-green .landing-label { color: #000; }
+
+.landing-card-purple { background: var(--btn-purple); border-color: var(--btn-purple); }
+.landing-card-purple:hover { border-color: var(--btn-purple-hover); }
+.landing-card-purple .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
+.landing-card-purple .landing-label { color: #000; }
+
+.home-login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: left;
+}
+.home-login-title { margin: 0; text-align: center; color: var(--brand-dark); font-size: 1.6rem; line-height: 1.25; }
+.home-login-subtitle { margin: 0.35rem 0 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
+.home-login-hint { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 1rem 0 0; }
+
+/* Visually hidden but still reachable by screen readers - used where a
+   field's placeholder alone communicates its purpose (matches a reference
+   design with no visible label), like the homepage sign-in card. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.home-staff-login {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.home-staff-login:hover { color: var(--brand-dark); }
+
+.documents-grid { justify-content: flex-start; }
+
+.library-checkout-section input[type="text"] {
+  width: 100%;
+  max-width: 420px;
+  font-size: 1.1rem;
+  padding: 0.6rem 0.8rem;
+}
+.library-current-member {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--green-bg);
+  color: var(--green);
+  border-radius: var(--radius);
+  font-weight: 700;
+  display: inline-block;
+}
+
+.document-view-main { max-width: 1000px; margin: 0 auto; }
+
+.document-view-frame-wrap {
+  width: 100%;
+  height: 80vh;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  background: var(--surface);
+}
+
+.document-view-frame { width: 100%; height: 100%; border: none; }
+
+.landing-corner-actions { position: fixed; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
+
+.admin-corner-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
+
+@media (max-width: 720px) {
+  .landing-grid { grid-template-columns: repeat(2, 220px); }
+  .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
+}
+
+@media (max-width: 500px) {
+  .landing-grid { grid-template-columns: 220px; }
 }
 
 /* ---------- Kiosk ---------- */
@@ -92,22 +341,55 @@ button { font-family: inherit; cursor: pointer; }
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 2.5rem 1.5rem;
+  padding: 4.5rem 1.5rem 2.5rem;
   text-align: center;
   background: linear-gradient(180deg, var(--brand-soft) 0%, var(--bg) 100%);
   user-select: none;
 }
 
+/* Pinned to the true top-left corner of the viewport, regardless of any
+   centered container it sits inside, so it's always reachable in the
+   same spot on every kiosk/form page. */
 .kiosk-home {
-  align-self: flex-start;
-  margin-bottom: 1rem;
-  font-size: 0.95rem;
-  color: var(--muted);
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+.kiosk-home:hover { border-color: var(--brand); background: var(--brand-soft); }
 
-.kiosk-logo { height: 84px; width: 84px; margin-bottom: 0.5rem; }
+.kiosk-logo { height: var(--logo-sm); width: var(--logo-sm); margin-bottom: 0.5rem; border-radius: 50%; }
 .kiosk h1 { font-size: 2.4rem; }
 .kiosk-date { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
+
+/* Logo + page title sit side by side and centered as one header block,
+   set off from the rest of the page the same way admin pages separate
+   their H1 from the content below (a rule line). */
+.kiosk-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+.kiosk-header .kiosk-logo,
+.kiosk-header .form-logo { margin-bottom: 0; flex-shrink: 0; }
+.kiosk-header h1 { margin: 0; }
 
 .kiosk-wrap { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; }
 
@@ -141,10 +423,10 @@ button { font-family: inherit; cursor: pointer; }
   background: #eef1f5;
 }
 
-.kiosk-status-loading { background: var(--brand-soft); transform: scale(1.05); }
-.kiosk-status-success { background: var(--green-bg); transform: scale(1.08); }
-.kiosk-status-info { background: var(--brand-soft); }
-.kiosk-status-error { background: var(--red-bg); transform: scale(1.08); }
+.kiosk-status-loading { background: var(--brand-soft); color: var(--brand-dark); transform: scale(1.05); }
+.kiosk-status-success { background: var(--green-bg); color: var(--green); transform: scale(1.08); }
+.kiosk-status-info { background: var(--brand-soft); color: var(--brand-dark); }
+.kiosk-status-error { background: var(--red-bg); color: var(--red); transform: scale(1.08); }
 
 #barcode-input {
   opacity: 0;
@@ -173,8 +455,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
 }
 
-.numpad-btn:active { background: var(--brand-dark); color: #fff; }
-.numpad-btn-selected { background: var(--brand-dark); color: #fff; border-color: var(--brand-dark); }
+.numpad-btn:active { background: var(--btn-bg); color: #fff; }
+.numpad-btn-selected { background: var(--btn-bg); color: #fff; border-color: var(--btn-bg); }
 
 .kiosk-cancel-btn {
   margin-top: 0.5rem;
@@ -186,55 +468,153 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 1rem;
 }
 
+/* Find a Parent - corner button (mirrors .admin-corner-link's pill shape
+   but filled orange, since this is a real kiosk feature, not a quiet
+   utility link) and the scan-result cards. */
+.landing-corner-actions-left { position: fixed; top: 1rem; left: 1rem; z-index: 10; }
+.find-parent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+/* Find a Parent results - each parent's actual Schedule Card
+   (.badge-canvas, same rendering as the Members "View Cards" dialog and
+   Design/Print), just centered in a scrollable stack instead of a
+   printable sheet. */
+.find-parent-results { max-width: 760px; text-align: center; }
+.find-parent-heading { margin: 0 0 1.25rem; font-size: 1.3rem; }
+.find-parent-parent-card { margin-bottom: 1.5rem; }
+.find-parent-parent-card:last-child { margin-bottom: 0; }
+.find-parent-parent-card h3 { margin: 0 0 0.6rem; font-size: 1.15rem; color: var(--brand-dark); }
+.find-parent-badge-canvas { margin: 0 auto; }
+.find-parent-scan-again { margin-top: 0.5rem; width: 100%; }
+
 @media (max-width: 640px) {
   .numpad { grid-template-columns: repeat(5, 1fr); }
 }
 
 /* ---------- Public forms (absence, login) ---------- */
 
-.public-page { min-height: 100vh; padding: 2.5rem 1.5rem; }
+.public-page { min-height: 100vh; padding: 4.5rem 1.5rem 2.5rem; }
 
 .form-wrap { max-width: 560px; margin: 0 auto; }
 .form-wrap-narrow { max-width: 400px; }
-.form-logo { height: 72px; width: 72px; margin-bottom: 0.75rem; }
+.form-logo { height: var(--logo-xs); width: var(--logo-xs); margin-bottom: 0.75rem; border-radius: 50%; }
 
 .login-wrap { text-align: center; }
-.login-wrap .kiosk-home { text-align: left; }
 .login-wrap .stack-form { text-align: left; }
-.login-logo { height: 120px; width: 120px; display: block; margin: 0 auto 1rem; }
+.login-logo { height: var(--logo-lg); width: var(--logo-lg); display: block; margin: 0 auto 1rem; border-radius: 50%; }
 
 .form-wrap .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
+
+/* Public forms otherwise float directly on the page's blue background -
+   this wraps the whole form in one more white panel behind its individual
+   .form-section cards, matching the boxes-within-boxes contrast used
+   everywhere else in the app. */
+.form-outer-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem;
+}
+@media (max-width: 640px) {
+  .form-outer-panel { padding: 1rem; }
+}
+
+/* Polished card per logical section of a public form (Absence/Late,
+   Name Tag), instead of one long undivided column of fields. */
+.form-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--card-padding);
+  margin-bottom: 1.25rem;
+}
+.form-section h2 { margin: 0 0 0.85rem; }
+
+/* ---------- Membership Form ---------- */
+
+.membership-add-parent2 { margin-top: 1rem; }
+.membership-child-block { margin-bottom: 1rem; }
+.membership-child-block:last-child { margin-bottom: 0; }
+.membership-child-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.membership-child-header h3 { margin: 0; }
+.membership-volunteer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem 1.25rem;
+}
+.membership-submit-btn { width: 100%; }
+@media (max-width: 640px) {
+  .membership-volunteer-grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 .stack-form { display: flex; flex-direction: column; gap: 0.35rem; }
 .stack-form-narrow { max-width: 360px; }
 
 .stack-form label { font-weight: 600; margin-top: 0.75rem; font-size: 0.9rem; }
 
+.stack-form input[type="date"] { width: 192px; }
+
 .stack-form input,
 .stack-form select,
-.stack-form textarea {
-  padding: 0.7rem 0.8rem;
+.stack-form textarea,
+.member-form-grid input,
+.member-form-grid select,
+.member-form-grid textarea,
+.notes-dialog textarea,
+.member-picker-dialog input[type="file"],
+.member-picker-dialog input[type="text"] {
+  padding: var(--control-padding);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 1rem;
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size);
   font-family: inherit;
   background: var(--surface);
 }
 
+.radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+.radio-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+.radio-option input[type="radio"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
+
+.cleanup-team-day-group { margin-top: 0.85rem; }
+.cleanup-team-day-group:first-child { margin-top: 0.5rem; }
+.cleanup-team-day-heading { margin: 0 0 0.15rem; font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
+.checkbox-option { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.95rem; cursor: pointer; }
+.checkbox-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+.absence-required-msg { color: var(--red); font-weight: 600; margin-top: 0.35rem; }
+
 .primary-btn {
   margin-top: 1.5rem;
-  background: var(--brand-dark);
+  background: var(--btn-bg);
   color: #fff;
   border: none;
   padding: 0.85rem 1.5rem;
-  border-radius: 10px;
+  border-radius: var(--control-radius);
   font-size: 1rem;
   font-weight: 600;
   display: inline-block;
   text-align: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
-.primary-btn:hover { background: var(--brand-darker); }
+.primary-btn:hover { background: var(--btn-bg-hover); box-shadow: 0 4px 12px rgba(238,154,77,0.35); }
+.primary-btn:active { transform: translateY(1px); }
 
 .alert {
   padding: 0.85rem 1rem;
@@ -248,41 +628,214 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- Admin ---------- */
 
-.admin-nav {
+/* Left-hand dashboard panel (desktop) - fixed for the full viewport height,
+   holds the brand + the primary section links. */
+.admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 220px;
   background: var(--accent);
-  color: var(--ink);
-  border-bottom: 3px solid var(--ink);
+  box-shadow: 2px 0 10px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.1rem 1rem;
+  overflow-y: auto;
+  z-index: 40;
 }
 
-.admin-nav .brand {
+.admin-sidebar .brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0 0.4rem;
+}
+.admin-mobile-topbar .brand {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: var(--ink);
+  font-weight: 700;
 }
+.admin-sidebar .brand img { height: var(--logo-xl); width: var(--logo-xl); border-radius: 50%; flex-shrink: 0; }
+.admin-mobile-topbar .brand img { height: var(--logo-2xs); width: var(--logo-2xs); border-radius: 50%; flex-shrink: 0; }
 
-.admin-nav .brand img { height: 28px; width: 28px; }
-
-.admin-nav-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0.85rem 1.5rem;
+.admin-sidebar nav { display: flex; flex-direction: column; gap: 0.15rem; }
+.admin-sidebar nav a {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  gap: 0.6rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
 }
-
-.admin-nav .brand { color: var(--ink); font-weight: 700; margin-right: 0.5rem; }
-
-.admin-nav nav { display: flex; gap: 1rem; flex-wrap: wrap; flex: 1; }
-.admin-nav nav a { color: var(--ink); font-size: 0.9rem; font-weight: 600; }
-.admin-nav nav a:hover { color: var(--brand-darker); }
+.admin-sidebar nav a .icon { opacity: 0.75; }
+.admin-sidebar nav a:hover { background: rgba(255,255,255,0.4); }
+.admin-sidebar nav a.active {
+  background: var(--surface);
+  color: var(--brand-darker);
+  box-shadow: var(--shadow-sm);
+}
+.admin-sidebar nav a.active .icon { opacity: 1; }
 
 .logout-form { margin: 0; }
-.admin-nav .link-btn { color: var(--ink); background: none; border: none; font-size: 0.9rem; font-weight: 600; }
-.admin-nav .link-btn:hover { color: var(--brand-darker); }
 
-.admin-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+/* Full Screen toggle - fixed to the true top-right corner of the viewport
+   on every admin page (desktop), independent of whichever page/panel is
+   open, instead of living inside the sidebar or one page's own content.
+   Hidden below the mobile-topbar breakpoint, where its twin lives inline
+   in the topbar's own top-right icon row instead (see admin-nav.ejs). */
+.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; }
+
+/* Same fixed placement, but the corner button's plain white pill would sit
+   uncomfortably light against the (still fixed) sidebar's darker panel -
+   nudge it visually distinct without changing the shared .admin-corner-link
+   look used on the public landing page. */
+.admin-page-corner-actions .admin-corner-link { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+
+/* Settings + Log out live at the bottom of the sidebar on desktop, pinned
+   there via margin-top:auto; folded into the mobile topbar's right side
+   (a separate compact box) on small screens where there's no sidebar. */
+.admin-sidebar-bottom {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(28, 37, 48, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.admin-sidebar-bottom a,
+.admin-sidebar-bottom button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  color: var(--ink);
+  background: rgba(28, 37, 48, 0.14);
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.admin-sidebar-bottom a:hover,
+.admin-sidebar-bottom button:hover { background: rgba(28, 37, 48, 0.24); }
+
+.admin-nav-right { display: flex; align-items: center; gap: 0.3rem; }
+.admin-nav-right-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--control-radius);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-mobile-topbar { display: none; }
+
+.admin-mobile-tabs { display: none; }
+
+/* Modern mobile nav: the sidebar collapses into a sticky top bar (brand +
+   compact Settings/Log out) and the section tabs move to a bar fixed to
+   the bottom of the screen. There are more tabs than fit one screen width,
+   so the bar scrolls horizontally ("slide to show all") instead of
+   squeezing every tab down to fit. */
+@media (max-width: 860px) {
+  .admin-sidebar { display: none; }
+  .admin-page-corner-actions { display: none; }
+
+  .admin-mobile-topbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    background: var(--accent);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    padding: 0.7rem 1.25rem;
+  }
+  .admin-mobile-topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+  .admin-nav-right-mobile { background: rgba(28, 37, 48, 0.08); border-radius: 10px; padding: 0.25rem; }
+  .admin-nav-right-mobile .admin-nav-right-link { padding: 0.4rem; }
+  .admin-nav-right-mobile .admin-nav-right-link:hover { background: rgba(255,255,255,0.6); color: var(--brand-darker); }
+
+  .admin-mobile-tabs {
+    display: flex;
+    gap: 0.2rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    background: var(--accent);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
+    padding: 0.4rem 0.6rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .admin-mobile-tabs::-webkit-scrollbar { display: none; }
+  .admin-mobile-tabs a {
+    flex: 0 0 auto;
+    min-width: 4.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+  }
+  .admin-mobile-tabs a .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
+  .admin-mobile-tabs a:hover { background: rgba(255,255,255,0.4); }
+  .admin-mobile-tabs a.active {
+    background: var(--surface);
+    color: var(--brand-darker);
+    box-shadow: var(--shadow-sm);
+  }
+  .admin-mobile-tabs a.active .icon { opacity: 1; }
+}
+
+.admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; }
+
+/* Every admin page's h1 is its page title - give it clean, consistent air
+   below it (a rule line) so it always stands apart from the h2 section
+   titles underneath, no matter how the rest of the page is laid out. */
+.admin-main h1 {
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+}
+
+@media (max-width: 860px) {
+  /* Bottom padding clears the fixed .admin-mobile-tabs bar so page content
+     never sits underneath it. */
+  .admin-main { margin-left: 0; padding: 1.5rem 1.5rem 4.75rem; }
+}
 
 .subtitle { color: var(--muted); }
 
@@ -292,35 +845,234 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: var(--card-padding-compact);
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-value { font-size: 2rem; font-weight: 700; }
 .stat-label { color: var(--muted); font-size: 0.85rem; }
 
-.admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-
-.admin-card {
+/* Total Students/Parents/Members - one card, three segments, so the
+   dashboard opens with a single glance-able headline instead of three
+   separate cards. */
+.totals-card {
+  display: flex;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
-  font-weight: 600;
-  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+.totals-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--border);
+}
+.totals-item:last-child { border-right: none; }
+
+@media (max-width: 720px) {
+  /* Mobile: all three totals stay on one line inside the single card. */
+  .totals-item { padding: 0.75rem 0.4rem; }
+  .totals-item .stat-value { font-size: 1.4rem; }
+  .totals-item .stat-label { font-size: 0.7rem; }
 }
 
-.admin-card:hover { border-color: var(--brand); }
+.dashboard-section-title { margin: 1.5rem 0 0.75rem; }
+
+/* Alert Log - a running feed of today's substitute-needed, pending-
+   approval, and class-cancellation-risk items. Same list backs the
+   sitewide alert popup (see public/js/alerts.js). */
+.alert-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.alert-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+}
+.alert-log-item-danger { border-left-color: var(--red); }
+.alert-log-item-warning { border-left-color: var(--yellow-solid); }
+.alert-log-icon { flex-shrink: 0; margin-top: 0.15rem; }
+.alert-log-item-danger .alert-log-icon { color: var(--red); }
+.alert-log-item-warning .alert-log-icon { color: var(--yellow-solid); }
+.alert-log-body { display: flex; flex-direction: column; gap: 0.1rem; }
+.alert-log-day { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); }
+.alert-log-message a { color: var(--ink); font-weight: 600; }
+.alert-log-message a:hover { color: var(--brand-dark); }
+
+.dashboard-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+@media (max-width: 720px) {
+  .dashboard-analytics-grid { grid-template-columns: 1fr; }
+}
+
+.dashboard-analytics-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: var(--shadow-sm);
+}
+.dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
+.dashboard-analytics-header h2 { margin: 0; }
+
+/* Checked In/Checked Out on the top row, Absent/Late on the bottom row. */
+.analytics-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+.analytics-stat {
+  background: #fff;
+  border-radius: 10px;
+  border-left: 4px solid var(--border);
+  padding: 0.7rem 0.9rem;
+}
+.analytics-stat-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.analytics-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--ink); }
+.analytics-stat-of { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+
+.analytics-stat-checkedin { border-left-color: var(--green); }
+.analytics-stat-checkedout { border-left-color: var(--brand-dark); }
+.analytics-stat-late { border-left-color: var(--yellow-solid); }
+.analytics-stat-absent { border-left-color: var(--red); }
+
+.admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+
+.admin-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding-compact);
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.admin-card:hover { border-color: var(--brand); box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .admin-card-sub { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
 .admin-card-muted { color: var(--muted); display: flex; align-items: center; justify-content: center; text-align: center; }
 
+/* ---------- Member portal (Parent/Student) ---------- */
+
+.portal-main { max-width: 1000px; margin: 0 auto; padding: 1.75rem 2rem 2rem; }
+.portal-header { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
+.portal-header h1 { margin-bottom: 0; }
+.portal-family-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
+.portal-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+
+/* Shared top bar (partials/portal-topbar) - identical on every portal
+   (Admin, Co-op Admin, Parent, Student): current-portal pill on the left,
+   Contact Admins + Profile on the right. Sits above .admin-main on the
+   admin layout (offset past the fixed sidebar) or at the top of the plain
+   member-portal page. Desktop only on the admin layout - mobile keeps its
+   existing compact topbar/switcher below instead of stacking a second bar. */
+.portal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 2rem;
+}
+.portal-topbar-admin { margin-left: 220px; }
+@media (max-width: 860px) {
+  .portal-topbar-admin { display: none; }
+}
+
+.portal-topbar-left { display: flex; align-items: center; gap: 0.6rem; }
+.portal-topbar-current-label { font-weight: 600; color: var(--ink); font-size: 0.9rem; }
+.portal-topbar-right { display: flex; align-items: center; gap: 1rem; }
+
+/* Portal switcher pill - a member granted more than one portal (e.g.
+   Co-op Admin + Parent) can jump between them without logging out; anyone
+   else (incl. the master Admin, who only ever has one) gets a static pill
+   with nothing to click. */
+.portal-switcher-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.portal-switcher-pill .icon { width: 1.05em; height: 1.05em; }
+.portal-switcher-pill-interactive select {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.portal-switcher-pill-interactive select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.admin-nav-right-mobile .portal-switcher-pill { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+
+.portal-topbar-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease;
+}
+.portal-topbar-contact:hover { background: var(--btn-bg-hover); }
+.portal-topbar-contact .icon { width: 1.05em; height: 1.05em; }
+
+.portal-topbar-profile { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--ink); font-weight: 600; font-size: 0.9rem; }
+.portal-topbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--brand-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
 .roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
-.roster-card-top { display: flex; justify-content: space-between; align-items: center; }
+.roster-card-top { display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem; }
+.roster-card-title-link { color: var(--ink); font-weight: 700; text-decoration: none; }
+.roster-card-title-link:hover { color: var(--brand-dark); text-decoration: underline; }
 .roster-card-meta { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
 
+.roster-btn-form-icon { display: flex; flex: none; }
+.icon-btn-danger:hover { border-color: var(--red); color: var(--red); background: rgba(220, 38, 38, 0.08); }
+
 .badge-pill {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background: var(--brand-soft);
   color: var(--brand-dark);
   font-size: 0.75rem;
@@ -329,6 +1081,25 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   margin: 0.1rem 0.25rem 0.1rem 0;
 }
+
+.badge-pill-x {
+  background: none;
+  border: none;
+  color: var(--brand-dark);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.6;
+}
+.badge-pill-x:hover { opacity: 1; color: var(--red); }
+
+.badge-pill-pending { background: var(--yellow-bg); color: var(--yellow); }
+.badge-pill-present { background: var(--green-bg); color: var(--green); }
+
+/* Floater lists: a parent with a child 2 or younger, and each name's
+   auto-sub ranking (set via .volunteer-rank-select in Edit Members). */
+.infant-tag { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; }
 
 .status-badge {
   display: inline-block;
@@ -339,9 +1110,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .status-badge-absent { background: var(--red-bg); color: var(--red); }
 .status-badge-late { background: var(--yellow-bg); color: var(--yellow); }
+.status-badge-present { background: var(--green-bg); color: var(--green); }
 
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1rem; }
-.roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; display: block; }
+.roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-top: 0.5rem; display: block; }
 
 .checkbox-pill {
   display: flex;
@@ -355,6 +1127,123 @@ button { font-family: inherit; cursor: pointer; }
   background: #f8fafc;
 }
 
+.member-edit-form { max-width: 720px; }
+.member-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 1.5rem;
+}
+.member-form-full { grid-column: 1 / -1; }
+.checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
+.select-all-btn { margin-bottom: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+
+/* ---------- Edit / Save Changes toggle (public/js/edit-toggle.js) ---------- */
+
+.edit-section-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.member-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.member-form-grid input,
+.member-form-grid select,
+.member-form-grid textarea {
+  color: var(--ink);
+  font-weight: 400;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.member-photo-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+}
+.member-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+.member-thumb-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-dark);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.badge-canvas {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.35);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
+  flex-shrink: 0;
+}
+.badge-el { position: absolute; box-sizing: border-box; }
+.badge-el-text { overflow: hidden; }
+.badge-el-text-inner { outline: none; }
+.badge-el-image { overflow: hidden; }
+.badge-el-image img { display: block; }
+.badge-el-barcode { background: #fff; }
+
+/* Connected tab strip for switching between views of the same page (e.g.
+   Active/Archived) - tabs sit on top of a card, the active tab merges
+   seamlessly into the panel below it, like a folder tab. */
+.view-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 1.25rem 0 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.view-tabs::-webkit-scrollbar { display: none; }
+.view-tab {
+  padding: 0.6rem 1.35rem;
+  /* Medium blue - the untabbed state, distinct from both the page's darker
+     --bg blue behind it and the white panel/active-tab it sits next to. */
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  position: relative;
+  top: 1px;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+.view-tab:hover { background: var(--brand-dark); color: #fff; }
+.view-tab.active { background: #eef2f6; border-color: var(--border); color: var(--ink); }
+.view-tab-panel {
+  /* White, like every other text/info box in the admin UI. */
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0 var(--radius) var(--radius) var(--radius);
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-sm);
+}
+.view-tab-panel .admin-card-grid:last-child,
+.view-tab-panel .roster-scroll:last-child { margin-bottom: 0; }
+
 .roster-toolbar {
   display: flex;
   justify-content: space-between;
@@ -367,17 +1256,20 @@ button { font-family: inherit; cursor: pointer; }
 .date-list-wrap { margin: 0.4rem 0 0.75rem; }
 .date-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.4rem; }
 .date-list-row { display: flex; align-items: center; gap: 0.5rem; }
-.date-list-row input[type="date"] { flex: 1; }
+.date-list-row input[type="date"] { width: 192px; flex: none; }
 .date-list-remove {
-  background: none; border: 1px solid var(--border); border-radius: 6px;
+  background: none; border: 1px solid var(--border); border-radius: var(--control-radius);
   width: 2.15rem; height: 2.15rem; font-size: 1.1rem; color: var(--muted); line-height: 1; flex-shrink: 0;
 }
 .date-list-remove:hover { border-color: var(--red); color: var(--red); }
-.date-add-form { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
-.date-add-form .date-list-wrap { margin: 0; flex: 1; min-width: 220px; }
 
 .category-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
-.category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
+.category-filter label { font-weight: 600; font-size: 0.85rem; color: var(--ink); }
+
+/* Two or more filter dropdowns that belong together (e.g. Day + Linked
+   Roster) sit on the same row instead of stacking. */
+.filter-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+.filter-row .category-filter { margin: 0; }
 
 .roster-summary-row td {
   font-weight: 700;
@@ -385,11 +1277,54 @@ button { font-family: inherit; cursor: pointer; }
   border-top: 2px solid var(--border);
 }
 .roster-summary-label { text-align: left !important; color: var(--muted); font-weight: 600 !important; }
-.summary-present { color: var(--green); }
-.summary-late { color: var(--yellow); }
-.summary-absent { color: var(--red); }
+
+/* Per-date summary counts get the same pastel pill treatment as the P/L/A
+   cell badges above them, instead of plain colored text, so the two read
+   as one consistent color language. */
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.summary-present { background: var(--green-bg); color: var(--green); }
+.summary-late { background: var(--yellow-bg); color: var(--yellow); }
+.summary-absent { background: var(--red-bg); color: var(--red); }
+
+.roster-empty-state { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 2.25rem 1rem; }
+.roster-empty-icon { width: 2.5rem; height: 2.5rem; color: var(--muted); opacity: 0.5; margin-bottom: 0.25rem; }
+.roster-empty-title { font-weight: 700; color: var(--ink); font-size: 1rem; margin: 0; }
+.roster-empty-subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.5rem; }
+.roster-empty-btn { flex: none; min-width: 0; }
 
 .link-btn-danger { color: var(--red); }
+
+/* Every native date picker in the app, styled identically to the
+   dropdowns next to it - same border/radius/padding/background - so a
+   date field and a <select> always read as one consistent control
+   system instead of the browser's unstyled default box. */
+input[type="date"] {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  line-height: 1.3;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+input[type="date"]:hover { border-color: var(--btn-purple); }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  opacity: 0.65;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; background: var(--purple-soft); }
 
 /* Shared sizing so inline buttons and their neighboring inputs/selects match. */
 .date-list-row input[type="date"],
@@ -400,18 +1335,26 @@ button { font-family: inherit; cursor: pointer; }
 .inline-form-flat select,
 .manage-header-row select,
 .quick-add-row select,
+.volunteer-sections-form input,
+.volunteer-date-add-form input[type="date"],
+.name-tag-bulk-filter-select,
+.name-tag-add-field select,
 .btn-secondary {
-  padding: 0.55rem 0.8rem;
+  padding: var(--control-padding-compact);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
   font-family: inherit;
   background: var(--surface);
   line-height: 1.3;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.btn-secondary { color: var(--ink); cursor: pointer; }
-.btn-secondary:hover { border-color: var(--brand); }
+/* Secondary actions (dialog Cancel, small standalone buttons) get a
+   purple outline - present but lower-emphasis next to a solid orange
+   .primary-btn or a solid purple .roster-action-btn. */
+.btn-secondary { color: var(--purple); border-color: var(--btn-purple); cursor: pointer; font-weight: 600; }
+.btn-secondary:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
 
 .legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
@@ -420,158 +1363,2446 @@ button { font-family: inherit; cursor: pointer; }
 
 .roster-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 
+/* Row-divider style (bottom border only, left-aligned, generous padding)
+   for plain record lists (Members, Logs, Documents, Schedules, etc.) -
+   .roster-table-detailed and .class-schedule-room-grid opt back into full
+   grid lines below since those really are spreadsheet-shaped charts
+   (rows=names, columns=dates/hours) where vertical dividers earn their
+   keep. */
 .roster-table th, .roster-table td {
-  padding: 0.55rem 0.7rem;
+  padding: 0.75rem 1rem;
+  border: none;
   border-bottom: 1px solid var(--border);
-  text-align: center;
+  text-align: left;
   white-space: nowrap;
 }
 
-.roster-table thead th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+.roster-table thead th { background: var(--brand-soft); color: var(--ink); font-weight: 700; }
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
-.roster-table thead .roster-name-col { background: #f8fafc; }
+.roster-table thead .roster-name-col { background: var(--brand-soft); }
 
 .roster-empty { color: var(--muted); padding: 2rem; }
 
+/* Softer, pill-shaped attendance badges - pastel background with an
+   accessible dark-shade text color, and the P/L/A letter still carries
+   the status so color alone was never the only signal. */
 .cell-tag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 6px;
+  min-width: 2.1rem;
+  height: 1.75rem;
+  padding: 0 0.6rem;
+  border-radius: 999px;
   font-weight: 700;
+  font-size: 0.85rem;
 }
+
+/* Library "Currently Checked Out" row whose due date has passed. */
+.library-overdue-row { background: var(--red-bg); }
 
 .cell-present { background: var(--green-bg); color: var(--green); }
 .cell-late { background: var(--yellow-bg); color: var(--yellow); }
 .cell-absent { background: var(--red-bg); color: var(--red); }
-.cell-blank { background: transparent; color: var(--border); }
+.cell-blank { background: #e7edf5; color: transparent; }
 
-.roster-table-detailed th, .roster-table-detailed td { padding: 0.4rem 0.4rem; }
+/* Attendance grid's editable status cell - a real <select> (clicking it
+   still opens the native P/L/A/— options, still auto-saves on change -
+   see attendance-grid.js), but its native chrome is stripped so the
+   closed/idle state reads as a plain colored bubble matching the legend
+   above, not a dropdown box. */
+.roster-cell-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  min-width: 0;
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+.roster-cell-select-present { background: var(--green-bg); color: var(--green); }
+.roster-cell-select-late { background: var(--yellow-bg); color: var(--yellow); }
+.roster-cell-select-absent { background: var(--red-bg); color: var(--red); }
+.roster-cell-select-blank { background: #e7edf5; color: var(--muted); }
+.print-only-tag { display: none; }
+
+.roster-table-detailed { width: auto; font-size: 0.8rem; }
+.roster-table-detailed th, .roster-table-detailed td {
+  padding: 0.25rem 0.3rem;
+  border: 1px solid var(--border);
+  text-align: center;
+}
 .roster-table-detailed td { white-space: nowrap; }
-.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
-.cell-time { font-size: 0.65rem; color: var(--muted); }
+.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; }
+.cell-time { font-size: 0.6rem; color: var(--muted); }
+
+/* ---------- View Roster page (P/L/A grid) modernization ----------
+   Scoped under .roster-view-page (set on <body> only in admin-roster.ejs)
+   so the sticky/hover/fade-in treatment below never bleeds into the other
+   pages that reuse the same .roster-table/.roster-scroll/.roster-table-
+   detailed classes (Attendance list, Manage roster, Volunteers, Members,
+   Name Tags). */
+.roster-view-page .roster-scroll { box-shadow: var(--shadow-sm); }
+
+.roster-view-page .roster-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--orange-bg);
+  color: var(--orange);
+  font-weight: 700;
+}
+.roster-view-page .roster-table thead th:first-child { border-top-left-radius: 10px; }
+.roster-view-page .roster-table thead th:last-child { border-top-right-radius: 10px; }
+.roster-view-page .roster-table thead .roster-name-col { background: var(--orange-bg); z-index: 2; }
+
+.roster-view-page .roster-table tbody td { transition: background-color 0.18s ease; }
+.roster-view-page .roster-table tbody tr:nth-child(even) td { background: #fdfaf7; }
+.roster-view-page .roster-table tbody tr:nth-child(even) .roster-name-col { background: #fdfaf7; }
+.roster-view-page .roster-table tbody tr:hover td { background: var(--orange-bg); }
+.roster-view-page .roster-table tbody tr:hover .roster-name-col { background: var(--orange-bg); }
+
+.roster-view-page .roster-secondary-col { color: var(--muted); font-size: 0.85rem; font-weight: 400; }
+.roster-view-page thead .roster-secondary-col { color: inherit; font-size: inherit; font-weight: inherit; }
+
+.roster-view-page .link-btn:focus-visible,
+.roster-view-page .roster-action-btn:focus-visible,
+.roster-view-page .btn-secondary:focus-visible {
+  outline: 2px solid var(--brand-dark);
+  outline-offset: 2px;
+}
+
+.roster-view-page .roster-scroll,
+.roster-view-page .legend,
+.roster-view-page .roster-toolbar {
+  animation: rosterFadeIn 0.35s ease both;
+}
+@keyframes rosterFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roster-view-page .roster-scroll,
+  .roster-view-page .legend,
+  .roster-view-page .roster-toolbar {
+    animation: none;
+  }
+}
 
 .field-warning { color: var(--red); font-size: 0.8rem; min-height: 1em; display: block; }
 
 .members-table td { text-align: left; }
 .members-table th { text-align: left; }
+/* Plain grey header, not the same tinted blue as the primary-parent row
+   highlight below it (.row-primary-parent) - the two need to read as
+   distinct things, not blend together. */
+.members-table thead th,
+.members-table thead .roster-name-col { background: #f8fafc; }
+.members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
+
+/* Mobile member list: keep it to Name, Type, and the action icons - Photo,
+   Parent, and Rosters are useful on a wide screen but just add scroll on
+   a phone. */
+@media (max-width: 640px) {
+  .members-col-photo, .members-col-parent, .members-col-rosters { display: none; }
+}
 
 .row-inactive { opacity: 0.5; }
 
-.add-member-details { margin-bottom: 1.5rem; }
-
-.btn-primary-summary {
-  cursor: pointer;
-  display: inline-block;
+/* Primary parent row on the Members list - a light highlight plus a
+   left accent bar so the family's main contact stands out at a glance
+   without looking like a status/warning color. */
+.row-primary-parent { background: var(--brand-soft); }
+.row-primary-parent td:first-child { box-shadow: inset 3px 0 0 var(--brand-dark); }
+.primary-parent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
   background: var(--brand-dark);
   color: #fff;
-  padding: 0.6rem 1.1rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.primary-parent-option { margin-top: 0.75rem; }
+
+/* ---------- Membership Form (Add/Edit member + Members list view popup) ---------- */
+/* Shared by views/partials/member-form-fields.ejs, used both on the full
+   Add/Edit page and inside the Members list's view/edit dialog - styled to
+   match the Parent/Student Membership Form reference design: an icon
+   header (blue for Student, green for Parent), a Parent/Student/Admin
+   toggle, a circular photo upload, and colored boxed sections for Family
+   and Setup/Cleanup Team. */
+.member-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brand-dark);
+  cursor: pointer;
+  text-decoration: none;
+}
+.member-name-link:hover { text-decoration: underline; }
+
+/* Grade level + age under a student's name on the Members list. */
+.member-row-subline { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+.member-form-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+/* .member-form-header-icon also carries .class-form-dialog-icon (the same
+   round icon badge used by the Create Class dialog header) - Student
+   keeps its own blue tint; Parent just uses that shared orange default
+   (no override needed) so every orange element on this form matches. */
+.member-form-header-icon .icon { width: 1.35rem; height: 1.35rem; }
+.member-form-header-student .member-form-header-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.member-form-header-text { flex: 1; min-width: 180px; }
+.member-form-header-text h3 { margin: 0; font-size: 1.25rem; }
+.member-form-header-text p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.member-type-toggle { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.member-type-toggle-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.member-type-toggle-btn .icon { width: 0.95rem; height: 0.95rem; }
+.member-type-toggle-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+/* Selected Parent/Student button is a plain solid grey - a neutral
+   "this one's picked" indicator, not another color competing with the
+   form's orange accents. */
+.member-type-toggle-btn:has(input:checked) { background: var(--muted); border-color: var(--muted); color: #fff; }
+.member-type-toggle-btn:has(input:disabled) { cursor: default; }
+.member-type-toggle-btn:has(input:disabled) input { cursor: default; }
+
+.member-form-parent-flag { margin: -0.5rem 0 1.25rem; }
+.primary-parent-top-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--orange-bg);
+  color: var(--orange);
+  border: 1px solid var(--btn-bg);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+}
+.primary-parent-top-option .icon { width: 1rem; height: 1rem; }
+.primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--btn-bg); }
+
+/* Photo sits in its own fixed-width left column, fields to the right -
+   matches the reference design's "photo | Full Name/Address/City-State-
+   Zip" side-by-side layout instead of a centered-on-top photo. */
+.member-form-card { display: flex; flex-direction: column; gap: 1.1rem; }
+.member-form-top-row { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
+.member-photo-col { flex: 0 0 108px; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; }
+.member-fields-col { flex: 1 1 320px; min-width: 0; }
+.member-photo-circle {
+  position: relative;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.member-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+.member-photo-placeholder-icon { width: 3rem; height: 3rem; color: #94a3b8; }
+.member-photo-camera {
+  position: absolute;
+  right: -0.1rem;
+  bottom: -0.1rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  background: var(--brand-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+}
+.member-photo-camera .icon { width: 1rem; height: 1rem; }
+.member-photo-upload-link { color: var(--brand-dark); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.member-photo-upload-link:hover { text-decoration: underline; }
+.member-photo-hint { font-size: 0.75rem; color: var(--muted); }
+.member-photo-col:has(input:disabled) .member-photo-circle { cursor: default; }
+.member-photo-col:has(input:disabled) .member-photo-camera { display: none; }
+
+@media (max-width: 640px) {
+  .member-form-top-row { flex-direction: column; align-items: center; }
+}
+
+.member-form-city-row { display: grid; grid-template-columns: 1.3fr 1.15fr 1fr; gap: 0.75rem 1rem; }
+.member-form-city-row select { padding-right: 0.4rem; font-size: 0.88rem; }
+@media (max-width: 640px) {
+  .member-form-city-row { grid-template-columns: 1fr; }
+}
+
+/* Required-looking field labels (cosmetic asterisk only - actual server
+   validation still just requires Full Name, so an admin can save a
+   partial profile and fill the rest in later). The asterisk goes on the
+   label-text span (not the label itself) since .member-form-grid label is
+   a column flexbox - appending ::after straight on the label would flow
+   it as its own line below the input instead of right after the text. */
+.required-label .field-label-text::after { content: " *"; color: var(--red); font-weight: 700; }
+
+.input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.65rem;
+  background: #fff;
+}
+.input-with-icon .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+.input-with-icon input { border: none; outline: none; padding: 0.65rem 0; flex: 1; min-width: 0; }
+.input-with-icon:has(input:disabled) { background: #f8fafc; }
+
+.member-form-lower-grid { margin-top: 0.25rem; }
+
+/* Family + Setup/Cleanup Team boxes sit side by side. auto-fit (not a
+   fixed 1fr 1fr) collapses the second track when there's no Team box
+   (Student form) so the lone Family box grows to fill the row instead of
+   leaving an empty blank column/panel next to it. */
+.member-form-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
+@media (max-width: 760px) {
+  .member-form-boxes { grid-template-columns: 1fr; }
+}
+
+.member-form-box-hint { margin: -0.4rem 0 0.75rem; color: var(--muted); font-size: 0.82rem; }
+
+.member-form-section-box { border-width: 2px; margin-bottom: 0; }
+.member-form-section-box h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; }
+.member-form-section-box h2 .icon { width: 1.1rem; height: 1.1rem; }
+.member-form-section-blue { border-color: var(--brand); background: var(--brand-soft); }
+.member-form-section-blue h2 { color: var(--brand-dark); }
+
+/* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
+   dropdown is a quick-pick that checks/selects the matching row below;
+   each row shows a member count, same as the reference design. */
+.member-form-checklist { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.member-form-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.member-form-checklist-box {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.member-form-checklist-box .icon { width: 0.8rem; height: 0.8rem; color: #fff; opacity: 0; }
+.member-form-checklist-row.is-checked .member-form-checklist-box { background: var(--btn-bg); border-color: var(--btn-bg); }
+.member-form-checklist-row.is-checked .member-form-checklist-box .icon { opacity: 1; }
+.member-form-checklist-name { flex: 1; font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.member-form-checklist-count { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
+.member-form-checklist-row:has(input:disabled) { cursor: default; }
+.member-form-checklist-row:disabled { cursor: default; }
+/* The real checkbox on the Team checklist rows is visually replaced by
+   .member-form-checklist-box above - hide the native control itself. */
+.member-form-checklist-checkbox { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.member-form-section-green { border-color: var(--btn-bg); background: var(--orange-bg); }
+.member-form-section-green h2 { color: var(--orange); }
+
+.member-form-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; min-width: 0; }
+.member-form-footer-view,
+.member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
+.member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+/* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
+   different padding/font-size scales elsewhere in the app - matched here
+   explicitly (same values as .notes-dialog-actions/.class-form-dialog-
+   footer, the same button pair everywhere else on the site) so every
+   popup's action row reads as the same size and shape. */
+.member-form-footer .btn-secondary,
+.member-form-footer .primary-btn {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  border-radius: var(--control-radius);
+  margin-top: 0;
+}
+.member-form-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.member-form-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+/* The whole Membership Form (header, fields, Family/Team boxes, footer)
+   sits in one white card - same shape/chrome as the Create Class dialog
+   (.class-form-dialog: white surface, rounded corners, this padding,
+   this shadow) - instead of separate pieces floating on the site's blue
+   page background. */
+.member-form-page-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-md);
+  /* Sized to its content (the 720px-capped form) instead of stretching to
+     fill the rest of .admin-main - otherwise a big blank strip of white
+     panel shows to the right of the actual form. */
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* Phone/Email (icon-wrapped) already get their box treatment from
+   .input-with-icon; Birthday and Medical/Allergy Notes are plain direct
+   children of .class-form-field, so they need the same input styling
+   Create Class's own text/select fields get (that rule only covers
+   type="text"/select, not date/textarea). */
+.class-form-field > input[type="date"],
+.class-form-field > textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.65rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+}
+.class-form-field > textarea::placeholder { color: var(--muted); }
+
+.member-form-section-box select { width: 100%; box-sizing: border-box; }
+
+.member-view-dialog { width: min(760px, 94vw); }
+.member-view-close-row { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+
+/* On a narrow phone screen, the dialog's own chrome padding (from the
+   shared .class-view-dialog, 1.75rem) plus the form panel's own padding
+   stack up and eat most of the ~350px-wide dialog. Shrink both paddings
+   and let the panel use the full width instead of fit-content, so the
+   actual fields get the room back. */
+@media (max-width: 520px) {
+  .member-view-dialog { padding: 1rem; }
+  .member-view-dialog .member-form-page-panel { padding: 1rem; width: 100%; }
+}
+.member-view-close-row .class-form-dialog-close { position: static; }
+
+.add-member-details { margin-bottom: 1.5rem; }
+
+/* Same size/padding/font as .roster-action-btn (the toolbar action
+   button used everywhere else) so a solid-orange "+X" entry point sitting
+   in the same row as purple/green toolbar buttons doesn't look like a
+   different button style, just a different color. */
+.btn-primary-summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  color: #fff;
+  padding: 0.5rem 0.6rem;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+.btn-primary-summary:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .inline-form { margin-top: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
 .inline-form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--muted); flex: 1; min-width: 180px; }
+.inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 180px; }
 .hint { font-weight: 400; }
 
-/* A simple, borderless row: input/select + button, no card wrapper. Used
-   for quick-add bars (Members, Absence/Late list, category filter). */
-.inline-form-flat, .quick-add-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.quick-add-row { margin: 0.75rem 0 1rem; }
+/* A seamless text-bar-and-button unit: input/select + button joined into
+   one control, no gap, connected corners. Used for quick-add bars
+   (Members, Absence/Late list, roster manage, Categories). */
+.quick-add-row { display: flex; align-items: stretch; gap: 0.75rem; flex-wrap: wrap; margin: 0.75rem 0 1rem; }
+
+.inline-form-flat { display: flex; align-items: stretch; gap: 0; }
+.inline-form-flat input[type="text"],
+.inline-form-flat input[type="file"],
+.inline-form-flat select {
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
 .inline-form-flat input[type="text"] { flex: 1; min-width: 180px; }
+.inline-form-flat button {
+  border-radius: 0 8px 8px 0;
+  background: var(--btn-bg);
+  color: #fff;
+  border: 1px solid var(--btn-bg);
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.inline-form-flat button:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
-.edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; width: 160px; }
+.edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); width: 160px; }
 .edit-name-form input:focus { border-color: var(--border); background: #f8fafc; }
 
 /* ---------- Attendance page & roster cards ---------- */
 
 .page-actions { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 
-.roster-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Class Rosters tab (Attendance page) - every class as a stacked, full-
+   width row button; clicking one switches to that class's own roster +
+   attendance grid. */
+.class-roster-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.class-roster-row-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.class-roster-row-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.class-roster-row-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+
+.roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
+/* Site-wide toolbar action button (New/Edit/Duplicate/view-toggle, etc.)
+   - solid purple fill by default. Import/Export/Print override to green
+   via .file-action-btn below, and destructive actions override to red
+   via .roster-action-btn-danger - those two are the only exceptions to
+   the orange/purple/green system, kept because "this deletes something"
+   is a near-universal red convention worth preserving. */
 .roster-action-btn {
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 5.5rem;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
   border-radius: 8px;
   padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ink);
+  color: #000;
   font-family: inherit;
   cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
-.roster-action-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
-.roster-action-btn-danger { color: var(--red); }
-.roster-action-btn-danger:hover { border-color: var(--red); color: var(--red); }
+.roster-action-btn:hover { border-color: var(--btn-bg-hover); background: var(--btn-bg-hover); }
+.roster-action-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.roster-action-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* View-toggle button (replaces a separate "Archived" tab on pages that
+   have one) - stays purple like any other toolbar action when off, and
+   switches to a filled dark state while the archived view is showing, so
+   it reads as a pressed toggle rather than a plain button. */
+.archived-toggle-btn.active,
+.archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
+
+/* Import CSV / Export CSV are the same "work with a file" action
+   everywhere in the app, and now share the same primary orange as
+   Print (.print-action-btn below) so all three file/print actions read
+   as one consistent "toolbar action" family. */
+.file-action-btn,
+.file-action-btn.btn-secondary,
+.file-action-btn.roster-action-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: #000;
+}
+.file-action-btn:hover,
+.file-action-btn.btn-secondary:hover,
+.file-action-btn.roster-action-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
+  color: #000;
+}
+
+.print-action-btn,
+.print-action-btn.btn-secondary,
+.print-action-btn.roster-action-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: #000;
+}
+.print-action-btn:hover,
+.print-action-btn.btn-secondary:hover,
+.print-action-btn.roster-action-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
+  color: #000;
+}
 
 /* ---------- Manage roster page ---------- */
 
-.manage-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.manage-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--card-padding);
+}
 .manage-title-form { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 220px; }
-.manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: 6px; }
+.manage-title-input { font-size: 1.4rem; font-weight: 700; flex: 1; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .manage-title-input:focus { border-color: var(--border); background: #f8fafc; }
+.manage-header-form { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; width: 100%; }
 
-.manage-section { margin-bottom: 1.75rem; }
+/* Every admin "manage" page section (Session Dates, Members, Teachers &
+   Assistants, etc.) gets its own boxed card instead of sitting directly on
+   the page background - matches .form-section's treatment of the public
+   forms. */
+.manage-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--card-padding);
+  margin-bottom: 1.25rem;
+}
 .manage-section h2 { margin-top: 0; }
 
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 
 /* ---------- Settings ---------- */
 
-.settings-box-row { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 1rem; }
-.settings-box {
-  flex: 1;
-  min-width: 260px;
-  background: var(--surface);
+.settings-account-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.settings-account-grid .stack-form-narrow {
+  flex: 1 1 260px;
+  background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-sm);
 }
-.settings-box h2 { margin-top: 0; }
-.settings-box .stack-form-narrow { max-width: none; }
+.settings-account-grid h3 { margin-top: 0; }
+
+/* Settings > Install App: numbered per-platform steps read like a normal
+   instruction list, not the app's usual data tables/cards. */
+.pwa-steps { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.pwa-steps li { margin-bottom: 0.35rem; line-height: 1.5; }
+#pwa-install-status { margin: 0.75rem 0 0; }
+#pwa-install-btn { margin-top: 0.25rem; }
 
 .link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
 .inline-block-form { display: inline; }
 .actions-cell { display: flex; gap: 0.75rem; align-items: center; }
 
-/* ---------- Badge / printable name tag ---------- */
+/* ---------- Name tags ---------- */
 
-.badge-page { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; padding: 3rem 1rem; }
+.actions-btn-row { display: flex; gap: 0.5rem; align-items: center; }
 
-.badge-card {
-  width: 340px;
-  border: 2px solid var(--brand);
-  border-top: 6px solid var(--accent);
-  border-radius: 16px;
-  padding: 2rem 1.5rem;
+.condensed-btn { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+.badge-preview-dialog {
+  width: min(420px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.badge-preview-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.badge-preview-dialog h3 { margin: 0 0 0.75rem; }
+.badge-preview-dialog .badge-canvas { margin: 0 auto 1rem; }
+
+/* Member profile "Schedule" popup: a read-only view of the member's
+   Monday/Wednesday class schedule, wider than the other member-row
+   dialogs since it holds two 4-column tables. */
+.schedule-preview-dialog {
+  width: min(560px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.schedule-preview-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.schedule-preview-dialog h3 { margin: 0 0 0.75rem; }
+.schedule-preview-dialog h4 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.schedule-preview-dialog table { width: 100%; margin-bottom: 0.5rem; }
+
+/* Public-form submission result, shown as a centered popup instead of an
+   inline banner so it can't be missed on a long form. */
+.alert-popup-dialog {
+  width: min(420px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   text-align: center;
+}
+.alert-popup-dialog::backdrop { background: rgba(28, 37, 48, 0.55); }
+.alert-popup-icon { width: 48px; height: 48px; margin-bottom: 0.75rem; }
+.alert-popup-success .alert-popup-icon { color: var(--green); }
+.alert-popup-error .alert-popup-icon { color: var(--red); }
+.alert-popup-message { font-size: 1.05rem; margin: 0 0 1.25rem; color: var(--ink); }
+.alert-popup-ok { margin-top: 0; }
+
+/* Member profile "Cards" dialog: Name Tag and (for students) Schedule
+   Card previews stacked, each with its own "print this one?" checkbox
+   directly above it. */
+.cards-preview-option { display: flex; flex-direction: column; align-items: center; }
+.cards-preview-option .checkbox-option { margin-bottom: 0.5rem; font-weight: 600; }
+
+.badge-print-main { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+.badge-print-main .badge-canvas { margin: 0 auto; }
+
+/* Member profile "Cards" print page: 1-2 cards (Name Tag and/or Schedule
+   Card) stacked, each with a small centered label so it's clear which
+   is which when both are printed together. */
+.member-card-print-block h2 { text-align: center; margin: 0 0 0.5rem; color: var(--muted); font-size: 1rem; font-weight: 700; }
+
+/* Print preview pages (Name Tag / Schedule Card / Class Schedule print
+   views): the Print button sits directly under the title instead of
+   beside it, and both are centered above the preview content below. */
+.print-preview-header { margin-bottom: 1.5rem; text-align: center; }
+.print-preview-header h1 { margin-bottom: 0.75rem; }
+
+/* Each .badge-sheet-page is sized and inset exactly like the physical US
+   Letter sheet it prints onto (see the matching @page rule in the two
+   views that use this), so the on-screen preview shows the same page
+   boundaries and margins the printout will have - not just badges/cards
+   floating with no sense of the paper they'll land on. The white-page-on-
+   a-shadow look is screen-only chrome, stripped in @media print below. */
+.badge-sheet-page {
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  padding: 0.4in;
+  margin: 0 auto;
   background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+}
+.badge-sheet-page:not(:last-child) { page-break-after: always; }
+
+/* Same physical-page look as .badge-sheet-page, for print previews whose
+   content isn't a fixed 8-per-sheet grid (a single badge, a member's
+   stacked cards, or a variable-length list of schedules) - min-height
+   instead of a locked height, so it starts at one letter page and only
+   grows if the content actually needs more than that, rather than either
+   clipping content or leaving a page-shaped box mostly empty. */
+.print-page {
+  width: 8.5in;
+  min-height: 11in;
+  box-sizing: border-box;
+  padding: 0.5in;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.badge-logo { height: 56px; width: 56px; margin-bottom: 0.75rem; }
-.badge-name { font-size: 1.6rem; font-weight: 700; margin-bottom: 1rem; }
-.badge-code { margin-top: 0.5rem; font-family: monospace; letter-spacing: 2px; color: var(--muted); }
+/* Zero gap so the 8 cards butt edge-to-edge - a straight guillotine cut
+   down each shared edge separates them cleanly, instead of the cutter
+   having to track a gap. Columns are pinned to the exact card width
+   (336px - same as BADGE_WIDTH/CARD_WIDTH) rather than "auto", and the
+   grid is shrink-wrapped + margin-centered, rather than leaning on
+   `justify-content: center` to keep "auto" tracks from stretching -
+   that interaction is inconsistently honored across browsers' print
+   engines and was still leaving visible daylight between the columns.
+   Square corners (overriding .badge-canvas's rounded ones) so the
+   touching edges are flush all the way to each corner. */
+.badge-sheet {
+  display: grid;
+  grid-template-columns: repeat(2, 336px);
+  grid-auto-rows: 216px;
+  gap: 0;
+  width: max-content;
+  margin: 0 auto;
+}
+/* Individually each .badge-canvas has a drop shadow (for the single-card
+   previews elsewhere in the app), but here that shadow blurs outward
+   past the touching edge and reads as a soft gap between cards even
+   though there's zero actual space between them - strip it. The 1px
+   border stays as a thin cut guide (doubled to ~2px where two cards
+   share an edge, which isn't visible as "space"). */
+.badge-sheet .badge-canvas { border-radius: 0; margin: 0; box-shadow: none; }
+
+/* Barcode-only print sheet: 3 columns x 8 rows (24 per page), filling the
+   full width/height of the .badge-sheet-page it's nested in - unlike
+   .badge-sheet's fixed-pixel badge grid, these columns are meant to
+   stretch and fill the sheet, so plain "fr" tracks on a definite-width
+   container divide evenly with no stretching ambiguity to work around. */
+.barcode-sheet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1.275in;
+  gap: 0;
+}
+.barcode-cell {
+  border: 1px solid rgba(28, 37, 48, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08in;
+  padding: 0.1in;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.barcode-cell-svg { width: 85%; height: 0.65in; }
+.barcode-cell-name { font-size: 0.8rem; font-weight: 600; text-align: center; color: var(--ink); line-height: 1.2; }
+
+/* ---------- Name tag design editor ---------- */
+
+/* Type dropdown, undo/redo, zoom/grid/snap, and Reset/Save all sit in one
+   toolbar row above the canvas, instead of the actions being stacked at
+   the bottom of the controls column. */
+.name-tag-design-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 0.75rem 0 1.1rem; }
+.name-tag-design-toolbar .name-tag-type-select { margin: 0; }
+.name-tag-design-toolbar .name-tag-editor-actions { margin-left: auto; }
+
+/* Unified Design/Print page (#design-type-select, #print-type-select):
+   the per-engine toolbar controls sit in their own flex row segment so
+   toggling one hidden/visible doesn't disturb the top-level toolbar's
+   flex layout. */
+.design-toolbar-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.design-toolbar-inline .name-tag-editor-actions { margin-left: auto; }
+.name-tag-toolbar-group { display: flex; align-items: center; gap: 0.4rem; }
+
+.name-tag-type-select {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--ink);
+  margin: 0.75rem 0;
+}
+
+.name-tag-zoom-select {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.name-tag-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-icon-btn:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-icon-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+.name-tag-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The badge canvas ("the name tag image") and the editing controls sit
+   side by side in two equal-width grid columns; the canvas is centered
+   within its column since it's a fixed print size, smaller than the
+   column itself. */
+.name-tag-editor-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+
+.name-tag-canvas-col { display: flex; justify-content: center; }
+
+/* Wraps the (possibly zoomed) canvas plus the grid/selection overlay
+   layers, which sit on top un-clipped so resize/rotate handles near the
+   badge's edge are never cut off by the canvas's own overflow:hidden. */
+.name-tag-canvas-zoom-wrap { position: relative; flex-shrink: 0; }
+
+.name-tag-editor-controls { display: flex; flex-direction: column; gap: 1.1rem; }
+
+.name-tag-tool-select { width: 100%; }
+
+/* Row of tool icons - clicking one reveals just that tool's controls in
+   the box below, instead of a dropdown or a permanent button row. */
+.name-tag-tool-icons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.name-tag-tool-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-tool-icon-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-tool-icon-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+
+/* One tool's controls at a time, revealed below the icon row once a tool
+   is chosen - a small bordered box instead of a permanent button row. */
+.name-tag-tool-panel:empty { display: none; }
+.name-tag-tool-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.name-tag-add-field { display: flex; gap: 0.4rem; }
+.name-tag-upload-label { cursor: pointer; }
+.name-tag-bg-tool { display: flex; flex-direction: column; gap: 0.75rem; }
+.name-tag-bg-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.name-tag-bg-label input[type="color"] {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.name-tag-canvas {
+  width: 336px;
+  height: 216px;
+  background-image:
+    linear-gradient(45deg, #f4f7fb 25%, transparent 25%), linear-gradient(-45deg, #f4f7fb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f4f7fb 75%), linear-gradient(-45deg, transparent 75%, #f4f7fb 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+.name-tag-canvas .badge-el { cursor: move; }
+.badge-el-locked { cursor: not-allowed; }
+
+/* Alignment grid overlay, toggled on via the toolbar - sits above the
+   canvas but below the selection layer, and never intercepts clicks. */
+.name-tag-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  display: none;
+  background-image: linear-gradient(to right, rgba(28, 37, 48, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(28, 37, 48, 0.12) 1px, transparent 1px);
+}
+
+/* Selection handles live in their own un-clipped, unscaled layer so they
+   stay a consistent screen size and are never cut off at the canvas edge -
+   only the box itself is positioned/sized/rotated to match the zoomed
+   element underneath it. */
+.name-tag-selection-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.name-tag-selection-box {
+  position: absolute;
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  transform-origin: center center;
+}
+.name-tag-selection-box.locked { outline-color: var(--ink-soft, #94a3b8); outline-style: dashed; }
+.name-tag-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--brand);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.name-tag-resize-handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.name-tag-resize-handle-n { top: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.name-tag-resize-handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.name-tag-resize-handle-e { top: 50%; right: -6px; margin-top: -6px; cursor: ew-resize; }
+.name-tag-resize-handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.name-tag-resize-handle-s { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.name-tag-resize-handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.name-tag-resize-handle-w { top: 50%; left: -6px; margin-top: -6px; cursor: ew-resize; }
+.name-tag-rotate-stem {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  background: var(--brand);
+  margin-left: -1px;
+  pointer-events: none;
+}
+.name-tag-rotate-handle {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #fff;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  cursor: grab;
+  pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.name-tag-properties:empty { display: none; }
+.name-tag-properties {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+.name-tag-properties h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.name-tag-prop-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+.name-tag-prop-row label { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.name-tag-prop-row input[type="number"] { width: 70px; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
+.name-tag-prop-row select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; }
+.name-tag-prop-row input[type="range"] { width: 130px; }
+.name-tag-text-area { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--control-radius); font-family: inherit; resize: vertical; margin-bottom: 0.6rem; }
+.name-tag-delete-btn { width: 100%; margin-top: 0.5rem; border-color: var(--red); color: var(--red); }
+.name-tag-prop-divider { border-top: 1px solid var(--border); margin: 0.75rem 0; }
+.name-tag-mini-label { font-size: 0.8rem; font-weight: 600; color: var(--ink); margin: 0 0 0.35rem; }
+.name-tag-mini-btn-row { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.name-tag-mini-btn {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 2.1rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-mini-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-mini-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+.name-tag-mini-btn .icon { width: 14px; height: 14px; }
+
+.name-tag-add-element { display: flex; flex-direction: column; gap: 0.6rem; }
+.name-tag-shape-picker { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.name-tag-shape-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.name-tag-shape-btn:hover { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+.name-tag-shape-btn.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+
+/* Toolbar placement (next to the type dropdown) needs Reset/Save as a
+   compact inline row instead of the full-width stacked buttons this class
+   used when it lived at the bottom of the controls column. */
+.name-tag-editor-actions { display: flex; align-items: center; gap: 0.6rem; }
+.name-tag-editor-actions .btn-secondary,
+.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+
+/* Crop tool - a fixed-aspect frame (locked to the image element's own
+   box ratio) the user pans by dragging and resizes via a zoom slider. */
+.name-tag-crop-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0 0 0.75rem;
+  cursor: move;
+  background: #f4f7fb;
+}
+.name-tag-crop-image { position: absolute; max-width: none; max-height: none; user-select: none; pointer-events: none; }
+.name-tag-crop-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.name-tag-crop-actions .btn-secondary,
+.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+
+.name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
+.name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.name-tag-bulk-submit { margin-top: 1rem; }
+
+@media (max-width: 720px) {
+  .name-tag-editor-body { grid-template-columns: 1fr; }
+}
+
+/* ---------- Volunteers ---------- */
+
+/* Hour Sections / Session Dates / Members used to sit as three
+   always-visible cards; they're now editors inside their own popup
+   dialogs, opened from the Edit Hours/Edit Dates/Edit Members toolbar
+   buttons, so the page itself just shows the toolbar and the chart. */
+.volunteer-edit-dialog {
+  width: min(560px, 92vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.volunteer-edit-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.volunteer-edit-dialog h3 { margin: 0 0 0.5rem; }
+.volunteer-edit-dialog .hint { margin: 0 0 0.75rem; }
+.volunteer-edit-dialog .roster-scroll { max-height: min(340px, 50vh); }
+
+.volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+
+.pending-approvals-list { list-style: none; margin: 0 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.pending-approvals-list li { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.75rem; }
+.pending-approvals-list a { font-weight: 600; }
+
+/* Hour labels only ever hold a short word ("Hour 1"), so they stay
+   compact instead of stretching to fill the dialog. */
+.volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
+.volunteer-sections-row input { width: 10ch; text-align: center; }
+
+.volunteer-date-add-form { margin-top: 0.5rem; }
+.volunteer-date-add-form input[type="date"] { width: 192px; }
+
+/* A member's name is plain display text (not editable here), capped to a
+   sane column width so the Hours/Actions columns stay put regardless of
+   how long a name runs. */
+.volunteer-member-name { max-width: 30ch; white-space: normal; }
+
+.volunteer-hour-checks { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.volunteer-hour-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.volunteer-hour-check input[type="checkbox"] { width: 0.95rem; height: 0.95rem; accent-color: var(--purple); flex-shrink: 0; }
+.volunteer-hour-check:has(input:checked) { background: var(--purple-soft); border-color: var(--purple); color: var(--purple-dark); }
+.volunteer-hour-edit-btn { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+
+.volunteer-section-row td {
+  text-align: left !important;
+  font-weight: 700;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  white-space: normal;
+}
+
+.volunteer-cell-input {
+  width: 4.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: var(--surface);
+}
+.volunteer-cell-input:focus { border-color: var(--brand); outline: none; }
+.volunteer-cell-input[data-field="position"] { width: 30ch; }
+.volunteer-cell-input[data-field="room"] { width: 15ch; }
+
+.volunteer-chart-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.volunteer-chart-header h2 { margin: 0; }
+.volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
+
+/* ---------- Floater Assignments cards (Chart tab's one selected date,
+   the Archive popup, and the Archive print page - same partial, same
+   look, everywhere: partials/floater-assignment-cards.ejs) ---------- */
+
+.floater-cards-grid {
+  display: grid;
+  /* 200px (not the visually "roomier" 230px+ that first looked right) so
+     all 4 of a day's hour cards reliably fit one row at the container
+     widths this actually renders in (Chart tab, Archive popup, Archive
+     print) - at 230px the 4th card was tipping over to its own row. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.floater-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  break-inside: avoid;
+}
+.floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; }
+.floater-card-header h3 { margin: 0; font-size: 0.95rem; }
+.floater-card-icon { display: inline-flex; flex-shrink: 0; }
+.floater-card-icon .icon { width: 16px; height: 16px; }
+
+.floater-card-blue .floater-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.floater-card-green .floater-card-header { background: var(--green-bg); color: var(--green); }
+.floater-card-orange .floater-card-header { background: var(--orange-bg); color: var(--orange); }
+.floater-card-purple .floater-card-header { background: var(--purple-soft); color: var(--purple); }
+
+/* Fixed layout + explicit column widths so a long floater name wraps
+   onto a second line instead of overflowing the card's fixed grid-track
+   width - .floater-card's overflow:hidden (for the rounded header
+   corners) would otherwise silently clip it instead of wrapping. */
+.floater-card-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
+.floater-card-table th:nth-child(1), .floater-card-table td:nth-child(1) { width: 40%; }
+.floater-card-table th:nth-child(2), .floater-card-table td:nth-child(2) { width: 24%; }
+.floater-card-table th:nth-child(3), .floater-card-table td:nth-child(3) { width: 36%; }
+.floater-card-table th {
+  text-align: left;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: break-word;
+  white-space: nowrap;
+}
+.floater-card-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: middle; overflow-wrap: break-word; }
+.floater-card-table tbody tr:last-child td { border-bottom: none; }
+.floater-card-position { font-weight: 600; }
+.floater-card-unassigned { color: var(--muted); font-style: italic; }
+
+.floater-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.floater-card-footer .icon { width: 14px; height: 14px; }
+
+/* Archive popup (fetched fragment shown in #volunteer-archive-view-dialog) -
+   wide enough for the card grid to lay out multiple columns instead of
+   stacking single-file like the narrower member-view-dialog. */
+.volunteer-archive-view-dialog { width: min(1100px, 96vw); border: none; border-radius: var(--radius); padding: var(--card-padding); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+.volunteer-archive-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.volunteer-archive-view-header { margin-bottom: 1rem; }
+.volunteer-archive-view-header h2 { margin: 0 0 0.2rem; }
+
+/* Archive print page: portrait, 2 cards per row (2 rows for a day's 4
+   hour cards) - the print page's own @page rule matches (see the view). */
+.volunteer-archive-print-page .floater-cards-grid { grid-template-columns: repeat(2, 1fr); }
+
+/* Archive popup (fetched fragment) - Export/Print sit top-right next to
+   the close button instead of a separate bottom action bar. */
+.volunteer-archive-actions-row { gap: 0.5rem; }
+.volunteer-archive-actions { display: flex; gap: 0.5rem; }
+
+/* Monday/Wednesday day switcher, pill-toggle style ("slide" between the
+   two) instead of a plain <select> - both are plain links (a real page
+   navigation either way), the pill is just how the choice reads. */
+.day-toggle { display: inline-flex; background: var(--brand-soft); border-radius: 999px; padding: 3px; gap: 2px; }
+.day-toggle-option {
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.day-toggle-option:hover:not(.active) { background: rgba(255,255,255,0.6); }
+.day-toggle-option.active { background: var(--brand-dark); color: #fff; }
+
+/* ---------- Floater Assignments Chart: live, editable version of the
+   read-only cards above - 2x2 (matching the Archive print layout), each
+   row's Floater column an assign dropdown + Accept/Unassign button
+   instead of plain text (partials/floater-chart-cards.ejs). ---------- */
+
+.floater-chart-cards-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 800px) {
+  .floater-chart-cards-grid { grid-template-columns: 1fr; }
+}
+
+.floater-chart-table th:nth-child(1) { width: 22%; }
+.floater-chart-table th:nth-child(2) { width: 12%; }
+.floater-chart-table th:nth-child(3) { width: 66%; }
+.floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
+
+/* A class can now list more than once (one row per missing teacher/
+   assistant) - this small line under the class name says who that
+   particular row is covering for, so duplicate rows stay tellable apart. */
+.floater-slot-reason { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+/* A slot nobody at all is available for (not even an override pick) -
+   the row itself flags it, no dropdown to offer. */
+.floater-row-noavail { background: var(--red-bg); }
+.floater-noavail-text { color: var(--red); font-weight: 600; font-size: 0.8rem; }
+
+.floater-assign-form { display: flex; align-items: center; gap: 0.4rem; }
+.floater-assign-form select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  background: #fff;
+  color: var(--ink);
+}
+.floater-assign-form select:disabled { background: #f8fafc; color: var(--muted); }
+.floater-assign-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-dark);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.floater-assign-btn:hover { background: var(--brand-darker); }
+.floater-assign-btn-unassign { background: var(--red); }
+.floater-assign-btn-unassign:hover { background: #b91c1c; }
+
+/* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
+
+.team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+
+/* Setup/Cleanup: exactly 5 cards per row on a full-width desktop screen,
+   stepping down smoothly as the viewport narrows instead of just wrapping
+   whatever fits at a fixed minimum width. Cards are kept compact (narrow
+   columns, smaller type) so all 5 sit comfortably inside the page instead
+   of crowding or spilling past its edge. */
+.setup-team-card-grid { grid-template-columns: repeat(5, 1fr); gap: 0.6rem; }
+@media (max-width: 1400px) { .setup-team-card-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Tablet and mobile: rather than wrapping into more (shorter, cramped)
+   rows, keep every card at a readable width and let the row scroll
+   horizontally - a gentle side-to-side "roll" through the cards instead
+   of a squeezed multi-row stack. */
+@media (max-width: 1100px) {
+  .setup-team-card-grid {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 0.6rem;
+    gap: 0.75rem;
+  }
+  .setup-team-card-grid .team-col {
+    flex: 0 0 200px;
+    scroll-snap-align: start;
+  }
+}
+/* Each team is a single connected card: an info section (icon, title,
+   leader, a colored detail pill) on top and a Members list section below
+   it, separated only by a hairline divider - not two separate floating
+   cards - matching the reference "Our Teams" design. .team-col is the
+   actual card (border/radius/shadow/background); the two sections inside
+   it are plain, edge-to-edge panels. min-width: 0 lets long titles/names
+   ellipsize instead of forcing the card (and the page) wider than it
+   should be. */
+.team-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.team-col:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+.team-info-card {
+  position: relative;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3rem;
+}
+/* Team cards are view-only - this small square button (in the corner the
+   trash icon used to sit) is the only way in, opening the Edit popup
+   (title/leader/description/members/delete all live there now). */
+.team-edit-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.team-edit-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+.team-edit-btn .icon { width: 1rem; height: 1rem; }
+.team-info-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.15rem;
+}
+.team-info-icon .icon { width: 1.4rem; height: 1.4rem; }
+/* A small color rotation so a row of cards reads as distinct teams at a
+   glance, cycling a 5-color set - purely decorative, no meaning attached
+   to which color lands where. */
+.team-accent-0 .team-info-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-0 .team-info-title { color: var(--brand-dark); }
+.team-accent-0 .team-info-pill { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-1 .team-info-icon { background: var(--green-bg); color: var(--green); }
+.team-accent-1 .team-info-title { color: var(--green); }
+.team-accent-1 .team-info-pill { background: var(--green-bg); color: var(--green); }
+.team-accent-2 .team-info-icon { background: var(--purple-soft); color: var(--purple); }
+.team-accent-2 .team-info-title { color: var(--purple); }
+.team-accent-2 .team-info-pill { background: var(--purple-soft); color: var(--purple); }
+.team-accent-3 .team-info-icon { background: var(--orange-bg); color: var(--orange); }
+.team-accent-3 .team-info-title { color: var(--orange); }
+.team-accent-3 .team-info-pill { background: var(--orange-bg); color: var(--orange); }
+.team-accent-4 .team-info-icon { background: #d7f3f1; color: #1f7a72; }
+.team-accent-4 .team-info-title { color: #1f7a72; }
+.team-accent-4 .team-info-pill { background: #d7f3f1; color: #1f7a72; }
+
+.team-info-title { margin: 0; font-size: 0.95rem; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-info-leader { display: flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; color: var(--muted); font-weight: 600; max-width: 100%; }
+.team-info-leader .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.team-info-leader-select {
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 8rem;
+}
+.team-info-pill {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  max-width: 100%;
+}
+.team-info-pill .icon { width: 0.75rem; height: 0.75rem; flex-shrink: 0; }
+.team-info-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.team-members-card {
+  min-width: 0;
+  padding: 0.75rem 0.75rem 0.85rem;
+  flex: 1;
+}
+.team-members-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+
+/* A team's own numbered task list (linked via the Task List tab's
+   "Linked Team" field - item 31) rides along on its card, screen and
+   print alike. */
+.team-tasks-card { min-width: 0; padding: 0 0.75rem 0.85rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.team-tasks-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+.team-tasks-list { margin: 0; padding-left: 1.2rem; font-size: 0.82rem; }
+.team-tasks-list li { padding: 0.15rem 0; }
+.team-card-members { display: flex; flex-direction: column; }
+.team-member-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
+.team-member-row:first-child { border-top: none; }
+.team-member-avatar {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.team-member-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-member-flag { font-size: 0.62rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+
+/* Small red medical-bag flag next to a member's name wherever one shows -
+   a same-glance heads-up that they have allergy/medical notes on file,
+   without having to open their profile. */
+.medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
+.medical-flag .icon { width: 0.95em; height: 0.95em; }
+.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
+.team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
+
+.grid-box {
+  min-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-md);
+  margin: 1rem 0;
+}
+.grid-box.roster-grid-col .roster-scroll { margin-top: 0.5rem; }
+.grid-box-header + .legend { margin-top: 0.5rem; margin-bottom: 0; }
+.grid-box-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.grid-box-header h2 { margin: 0; }
+.grid-box .btn-secondary { margin-top: 0.75rem; }
+.grid-box-expanded { flex: 1 1 100%; }
+
+/* The Name column is already sticky (see .roster-name-col above); these
+   fixed widths make Arrival/Departure sticky offsets predictable so only
+   the date columns actually scroll. */
+.roster-view-page .roster-table-detailed .roster-name-col { width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.roster-view-page .roster-table-detailed .roster-secondary-col {
+  position: sticky;
+  background: var(--surface);
+  z-index: 1;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+}
+.roster-view-page .roster-table-detailed thead .roster-secondary-col { background: var(--orange-bg); }
+.roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(2) { left: 150px; }
+.roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 240px; }
+.roster-view-page .roster-table-detailed tbody tr:nth-child(even) .roster-secondary-col { background: #fdfaf7; }
+.roster-view-page .roster-table-detailed tbody tr:hover .roster-secondary-col { background: var(--orange-bg); }
+
+/* Public kiosk Floater Assignments view - same hour-card chart as the
+   admin Chart tab/Archive print page (partials/floater-assignment-
+   cards.ejs), just wider than the usual .kiosk-wrap so a kiosk-sized
+   screen can lay out all 4 hour cards in one row instead of wrapping. */
+.volunteer-public-wrap { max-width: 1400px; }
+
+/* ---------- Setup/Cleanup ---------- */
+
+.setup-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.setup-team-card {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding-compact);
+  box-shadow: var(--shadow-sm);
+}
+
+.setup-team-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.setup-team-edit-form { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 220px; }
+.setup-team-title-input { font-size: 1.1rem; font-weight: 700; border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
+.setup-team-title-input:focus { border-color: var(--border); background: var(--surface); }
+.setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
+.setup-team-desc-input:focus { border-color: var(--border); background: var(--surface); }
+
+/* Public kiosk Setup/Cleanup view reuses the admin "Our Teams" two-part
+   card design (.team-info-card + .team-members-card) so the two screens
+   match exactly - this just widens the kiosk's normal ~900px content
+   column so all 5 cards fit side by side, and switches the text back to
+   left-aligned inside each card (the kiosk page itself is centered/text-
+   align:center for its headings). */
+.kiosk-team-card-grid {
+  width: 100%;
+  max-width: 1500px;
+  text-align: left;
+}
+
+/* ---------- Member notes dialog ---------- */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); }
+.icon-btn-active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+
+.notes-dialog {
+  width: min(420px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.notes-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.notes-dialog h3 { margin: 0 0 0.75rem; }
+.notes-dialog textarea {
+  width: 100%;
+  resize: vertical;
+}
+.notes-dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
+/* Every dialog on the site pairs a .primary-btn with a .btn-secondary in
+   this row - match their padding/size so neither looks bigger or sits
+   lower than the other. */
+.notes-dialog-actions .primary-btn,
+.notes-dialog-actions .btn-secondary {
+  margin-top: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.member-picker-dialog {
+  width: min(420px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.member-picker-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.member-picker-dialog h3 { margin: 0 0 0.75rem; }
+.member-picker-dialog .hint { margin: 0 0 0.5rem; }
+
+/* Create/Edit Class popup - wider than the default member-picker-dialog
+   since it carries a full field set (name/day/hour/room/color/times/
+   grades/staff/description), styled to a specific reference design: a
+   round icon badge + title + close button header, labeled fields with a
+   red required-asterisk, circular color swatches, and a 4-up teacher/
+   assistant row. */
+.class-form-dialog {
+  width: min(760px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.75rem 2rem;
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.class-form-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.class-form-dialog-header { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-form-dialog-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--orange-bg);
+  color: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.class-form-dialog-icon .icon { width: 1.35rem; height: 1.35rem; }
+.class-form-dialog-header h3 { margin: 0; font-size: 1.3rem; }
+.class-form-dialog-close {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0.4rem;
+  line-height: 0;
+  border-radius: 6px;
+}
+.class-form-dialog-close:hover { background: #f1f5f9; color: var(--ink); }
+.class-form-dialog-close .icon { width: 1.25rem; height: 1.25rem; }
+.class-form-dialog textarea { width: 100%; }
+
+/* Field rows - flexible instead of a fixed grid so a 3-up row (Title/Day/
+   Hour) and a 2-up row (Room/Color) can sit one after another, exactly
+   like the reference layout, without fighting column spans. */
+.class-form-row { display: flex; gap: 1.25rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.class-form-field { flex: 1 1 0; min-width: 150px; display: flex; flex-direction: column; gap: 0.4rem; }
+.class-form-field-label { font-weight: 700; font-size: 0.88rem; color: var(--ink); }
+.class-form-field-label .optional-tag { font-weight: 400; color: var(--muted); }
+.class-form-field-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
+.class-form-field input[type="text"],
+.class-form-field select {
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.65rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+}
+.class-form-field input[type="text"]::placeholder { color: var(--muted); }
+
+.class-form-section-label { margin: 0.2rem 0 0.9rem; font-weight: 700; font-size: 0.88rem; }
+.class-form-section-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
+.class-form-section-hint { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; }
+
+/* Circular color swatches, selected one ringed + checkmarked - replaces a
+   plain native color input. */
+/* flex-wrap + min-width: 0 so a full row of 12 swatches wraps onto more
+   lines instead of blowing out its container's width when there isn't
+   room for all of them in one row (e.g. the View/Edit popup's narrower
+   details column). */
+.class-color-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; min-width: 0; }
+.class-color-swatch {
+  position: relative;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s ease;
+}
+.class-color-swatch-fill { position: absolute; inset: 2px; border-radius: 50%; }
+.class-color-swatch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.class-color-swatch .icon { position: relative; width: 0.85rem; height: 0.85rem; color: #fff; opacity: 0; }
+.class-color-swatch:has(input:checked) { border-color: var(--btn-bg); }
+.class-color-swatch:has(input:checked) .icon { opacity: 1; }
+
+/* Start/End Time - a clock icon + free-text value + decorative chevron,
+   styled as one control even though it's a plain text input underneath
+   (existing time-string parsing elsewhere expects "9:00 AM" text, not a
+   native <input type=time>'s 24-hour value). */
+.class-time-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.75rem;
+  background: #fff;
+}
+.class-time-input-wrap .icon-clock { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
+.class-time-input-wrap input {
+  border: none;
+  outline: none;
+  padding: 0.65rem 0;
+  flex: 1;
+  font: inherit;
+  background: none;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.class-form-textarea-wrap { position: relative; }
+.class-form-textarea-wrap textarea { padding-bottom: 1.6rem; }
+.class-form-char-count { position: absolute; right: 0.75rem; bottom: 0.55rem; font-size: 0.75rem; color: var(--muted); pointer-events: none; }
+
+.class-form-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+/* Same normalization as .notes-dialog-actions - Cancel and the primary
+   action (Create Class) read as the same size/shape here too. */
+.class-form-dialog-footer .primary-btn,
+.class-form-dialog-footer .btn-secondary {
+  margin-top: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+}
+.class-form-dialog-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.class-form-dialog-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
+.import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
+.member-picker-dialog input[type="file"],
+.member-picker-dialog input[type="text"] {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+.member-picker-list {
+  max-height: min(340px, 50vh);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.35rem;
+}
+.member-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.member-picker-row:hover { background: var(--brand-soft); }
+.member-picker-row input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--brand); flex-shrink: 0; }
+
+.member-picker-dialog label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
+.member-picker-dialog select { width: 100%; margin-top: 0.25rem; }
+
+/* ---------- Class Schedule (admin grid + print) ---------- */
+
+.class-color-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
+.class-color-label input[type="color"] { width: 2.75rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+
+.class-schedule-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* Admin Class Schedule grid: classroom locations as rows, hour blocks as
+   columns, full grid lines - a class spanning two hour blocks gets one
+   cell with colspan="2" instead of two separate cards (see
+   roomGridForDay in utils/classSchedule.js). Sized compactly (smaller
+   padding/fonts than a typical .class-card) so a full day's schedule
+   fits on one screen with minimal scrolling. */
+.class-schedule-room-grid { border: 1px solid var(--border); }
+.class-schedule-room-grid th,
+.class-schedule-room-grid td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.4rem;
+  vertical-align: top;
+  min-width: 175px;
+}
+.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; font-size: 0.85rem; }
+/* Higher specificity than the generic th/td min-width above (two classes,
+   not one) - the room column shrinks to fit its own text ("width: 1%"
+   with nowrap is the standard auto-table shrink-to-fit trick) instead of
+   sharing the same wide min-width as every hour column. */
+.class-schedule-room-grid .class-schedule-room-col {
+  min-width: 0;
+  width: 1%;
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--brand-soft);
+  font-size: 0.85rem;
+}
+.class-schedule-cell { background: #fff; }
+.class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.4rem; }
+.class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
+.class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
+.class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
+.class-card {
+  flex: 1 1 220px;
+  max-width: 300px;
+  border-left: 4px solid var(--brand);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  box-shadow: var(--shadow-sm);
+}
+.class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.class-card-header h3 { margin: 0; font-size: 0.92rem; }
+/* Grade/Teacher/Assistant - each its own line, stacked cleanly, no
+   student roster (that's what View is for). */
+.class-card-info { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.3rem; }
+.class-card-line { margin: 0; font-size: 0.78rem; color: var(--ink); }
+.class-card-line-label { font-weight: 700; color: var(--muted); margin-right: 0.25rem; }
+.class-card-absent-flag { color: var(--red); font-weight: 600; }
+/* Still used by the public kiosk Class Schedule page's own card markup
+   (views/class-schedule-public.ejs), which keeps the older full-roster
+   layout. */
+.class-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; margin: 0.25rem 0; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.35rem 0 0; }
+.class-card-pill-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-right: 0.1rem; }
+.class-card .badge-pill { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
+.badge-pill-absent { background: var(--red-bg); color: var(--red); }
+
+/* Create/Edit Class form - the form itself takes 1/3 of the page, the
+   Teachers/Assistants + Student Roster "list log" panels take the other
+   2/3, side by side on desktop and stacked on narrower screens. */
+.class-manage-layout { display: flex; align-items: flex-start; gap: 1.5rem; }
+.class-manage-form-col { flex: 0 0 33%; max-width: 33%; min-width: 280px; }
+.class-manage-roster-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.class-manage-form-col .member-form-grid { min-width: 0; }
+@media (max-width: 900px) {
+  .class-manage-layout { flex-direction: column; }
+  .class-manage-form-col { max-width: 100%; flex-basis: auto; }
+}
+
+/* "View" button on each class card, and the popup it opens (fetched as
+   an HTML fragment - see public/js/class-schedule-view.js) - reuses the
+   Create Class dialog's header treatment, just wider to fit the details
+   form + roster side by side. */
+.class-card-view-btn { flex-shrink: 0; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+.class-view-dialog {
+  width: min(1100px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  border: none;
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.class-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.class-view-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-view-header h3 { margin: 0; font-size: 1.3rem; flex: 1; }
+.class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
+
+/* Edit/Delete (and, once editing, Cancel/Save) sit top-right of the popup
+   next to Close instead of at the bottom of the form - every button here
+   is the plain .roster-action-btn size/shape so Edit and Delete (and
+   Cancel/Save) all read as the same size. */
+.class-view-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.class-view-footer-view,
+.class-view-footer-edit { display: flex; align-items: center; gap: 0.5rem; }
+
+/* Fields start disabled (view-only) until "Edit Class" is clicked - keep
+   them legible instead of the browser's washed-out default disabled
+   look, so "view mode" still reads as real content, not a broken form. */
+.class-view-form input:disabled,
+.class-view-form select:disabled,
+.class-view-form textarea:disabled {
+  background: #f8fafc;
+  color: var(--ink);
+  opacity: 1;
+  border-color: var(--border);
+}
+.class-view-form .class-color-swatch:has(input:disabled) { cursor: default; }
+
+.class-view-roster-actions { margin-top: 0.25rem; }
+
+/* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
+   narrower, since it's just a header + a list, no two-column form. */
+.allergy-log-dialog { width: min(700px, 92vw); }
+.allergy-log-dialog .class-view-header .icon { width: 1.35rem; height: 1.35rem; color: var(--red); flex-shrink: 0; }
+.allergy-log-popup-actions { margin-bottom: 1rem; }
+
+/* Age Group checkboxes - pill-style buttons (checked = filled), grid of
+   every grade the co-op serves (see GRADE_LEVELS, utils/classSchedule.js). */
+.grade-pill-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.35rem 0 0.75rem; }
+.grade-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.grade-pill input[type="checkbox"] { accent-color: var(--btn-bg); width: 0.95rem; height: 0.95rem; }
+.grade-pill:has(input:checked) { background: var(--orange-bg); border-color: var(--btn-bg); color: var(--orange); }
+
+/* Roster/staff "list log" - a clean, scannable row per person (name,
+   grade, age, a medical/allergy flag when notes exist, remove button)
+   instead of the cramped inline badge-pill list used elsewhere. */
+.roster-log-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.roster-log-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+.roster-log-name { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.roster-log-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); }
+.medical-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--red-bg);
+  color: var(--red);
+  font-weight: 800;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  cursor: help;
+}
+.roster-log-empty { color: var(--muted); font-size: 0.9rem; padding: 0.5rem 0; }
+
+/* This page prints portrait (see the @page rule in the view), the same
+   shape .print-page already defaults to - overridden here only to swap
+   its usual min-height for a fixed height, giving .class-schedule-print-
+   fit below a hard boundary to shrink-to-fit against, with the same
+   0.4in margin the real @page rule uses so the on-screen preview matches
+   what actually prints. */
+.class-schedule-print-page .print-page {
+  width: 8.5in;
+  height: 11in;
+  min-height: 0;
+  padding: 0.4in;
+}
+/* Takes up whatever height is left under the header within that fixed
+   8.5x11in page - print-shrink-to-fit.js measures this box and zooms
+   .class-schedule-print-grid down (never up) to land inside it, so a
+   busy day's classes shrink to stay on one page instead of spilling onto
+   a second. */
+.class-schedule-print-fit { flex: 1; min-height: 0; overflow: hidden; }
+
+/* Room-by-hour grid, same cross-tab shape as the on-screen
+   .class-schedule-room-grid (roomGridForDay) - room stays its own grid
+   column on the printout instead of just a line of text inside each
+   card, and a class that spans two consecutive hour blocks in the same
+   room still gets one colspan="2" cell instead of two separate cards. */
+.class-schedule-print-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.class-schedule-print-grid th,
+.class-schedule-print-grid td {
+  border: 1px solid #999;
+  padding: 0.3rem;
+  vertical-align: top;
+  text-align: left;
+}
+.class-schedule-print-grid th { background: #eaf4fd; font-size: 0.8rem; }
+.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: nowrap; background: #eaf4fd; font-size: 0.8rem; }
+
+.class-schedule-print-card {
+  border-left: 5px solid var(--brand);
+  border-radius: 4px;
+  padding: 0.3rem 0.45rem;
+  margin-bottom: 0.35rem;
+  break-inside: avoid;
+}
+.class-schedule-print-card:last-child { margin-bottom: 0; }
+.class-schedule-print-card h3 { margin: 0; font-size: 0.85rem; }
+.class-schedule-print-grade { margin: 0.2rem 0 0; font-size: 0.7rem; color: #333; }
+.class-schedule-print-staff { margin: 0.15rem 0 0; font-size: 0.7rem; color: #333; }
+@media print {
+  .class-schedule-print-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ---------- Class Schedule (public kiosk page) ---------- */
+
+.class-schedule-public-daytabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.class-schedule-public-hint { max-width: 640px; text-align: center; color: var(--muted); font-weight: 600; margin: 0 0 1.25rem; }
+.class-schedule-public-notice { margin-bottom: 1rem; }
+.class-schedule-public-grid { width: 100%; max-width: 1200px; display: flex; flex-direction: column; gap: 1.5rem; }
+.class-schedule-public-hour .class-card-row { justify-content: center; }
+.class-card-public { max-width: 320px; }
+.class-schedule-signup-form { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.class-schedule-signup-form select { flex: 1 1 100px; font-size: 0.85rem; }
+.class-schedule-signup-form button { font-size: 0.85rem; padding: 0.4rem 0.7rem; }
+
+.member-profile-dialog {
+  width: min(440px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.member-profile-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.member-profile-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.member-profile-header h3 { margin: 0 0 0.35rem; }
+.member-profile-header .member-photo-preview { width: 64px; height: 64px; margin: 0; }
+.member-profile-list { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; margin: 0 0 0.75rem; }
+.member-profile-list dt { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+.member-profile-list dd { margin: 0; }
+
+/* ---------- Responsive: narrow phones ---------- */
+
+@media (max-width: 480px) {
+  /* Seamless input(s)+button bars can't stay side-by-side once a native
+     file picker or several fields are involved - stack them full-width
+     instead of overflowing the screen. */
+  .inline-form-flat {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .inline-form-flat input,
+  .inline-form-flat select,
+  .inline-form-flat button {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    margin-left: 0 !important;
+  }
+  .inline-form-flat button {
+    border-color: var(--btn-bg) !important;
+  }
+
+  .volunteer-sections-grid { grid-template-columns: 1fr; }
+
+  .admin-main { padding: 1rem 1rem 4.75rem; }
+  .notes-dialog,
+  .member-picker-dialog,
+  .member-profile-dialog { width: 92vw; padding: 1rem; }
+  .member-form-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Schedule module ---------- */
+
+.schedule-filters { display: flex; align-items: center; gap: 1rem 1.5rem; flex-wrap: wrap; }
+.schedule-filters .category-filter { margin: 0; }
+.schedule-search input[type="search"] {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 200px;
+}
+.schedule-search input[type="search"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.schedule-summary-cell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left !important;
+}
+
+.status-badge-none { background: #e2e8f0; color: var(--muted); }
+.status-badge-partial { background: var(--yellow-bg); color: var(--yellow); }
+.status-badge-complete { background: var(--green-bg); color: var(--green); }
+
+/* Student/Parent Schedules tab - every person's actual Schedule Card
+   (same design as the printable one), side by side in alphabetical-by-
+   last-name order instead of a table row per person. */
+.schedule-card-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.schedule-card-grid-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.schedule-card-grid-name { font-weight: 700; color: var(--brand-dark); text-decoration: none; }
+.schedule-card-grid-name:hover { text-decoration: underline; }
+
+.schedule-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
+.btn-disabled { pointer-events: none; opacity: 0.45; }
+
+.schedule-print-select-all { margin: 0; }
+
+/* Print tab member picker (Schedule Cards/Name Tags/Barcodes selection) -
+   the member log's own table styling with a checkbox column, capped to a
+   scrollable box instead of pushing the rest of the page down. */
+.print-picker-scroll { max-height: min(420px, 55vh); overflow-y: auto; }
+
+.schedule-placeholder { padding: 3rem 1rem; }
+
+/* Grid lines - schedule tables get borders on every cell (not just row
+   separators) so class/time/room/teacher columns are clearly delineated.
+   They're also sized to their content (not stretched to fill the page)
+   and set in a smaller, compact text size to match a real schedule sheet. */
+#schedule-table, .schedule-edit-table, .schedule-print-table { width: auto; font-size: 0.8rem; }
+.schedule-table-scroll, .schedule-print-card { width: fit-content; max-width: 100%; }
+
+#schedule-table th, #schedule-table td,
+.schedule-edit-table th, .schedule-edit-table td,
+.schedule-print-table th, .schedule-print-table td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.55rem;
+}
+
+.schedule-edit-table th, .schedule-edit-table td { text-align: left; white-space: normal; }
+.schedule-edit-label { font-weight: 600; color: var(--ink); white-space: nowrap !important; }
+.schedule-edit-table input[type="text"] {
+  width: 100%;
+  min-width: 110px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-family: inherit;
+  color: var(--ink);
+}
+.schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.schedule-day-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 900px) {
+  .schedule-day-columns { grid-template-columns: 1fr; }
+}
+
+.schedule-print-card {
+  break-inside: avoid;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: var(--shadow-sm);
+}
+.schedule-print-card h2 { margin: 0 0 0.5rem; }
+.schedule-print-card h3 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.schedule-print-table { margin-bottom: 0.5rem; }
+.schedule-print-table th, .schedule-print-table td { text-align: left; }
+
+/* Class Roster print: title/grade/room/time/teacher/assistants stacked
+   one per line instead of a title + meta line + separate staff table. */
+.class-roster-print-info { margin-bottom: 1.5rem; }
+.class-roster-print-info h2 { margin: 0 0 0.6rem; }
+.class-roster-print-info p { margin: 0.2rem 0; font-size: 0.95rem; }
+.class-roster-print-label { font-weight: 700; margin-right: 0.3rem; }
+
+/* Bulk "Name Tags + Schedule Cards" print - each member's two cards sit
+   side by side, one member row per line, so a shared physical card
+   design comparison (or just cutting both at once) doesn't require
+   flipping between two separate printouts. */
+.member-card-pair-row { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem; break-inside: avoid; }
+.member-card-pair-item h2 { margin: 0 0 0.4rem; font-size: 0.95rem; color: var(--muted); }
+
+/* Hidden on screen, shown only when printing - a consistent branded
+   header (logo + co-op name + page title) at the top of every printout. */
+.print-header { display: none; }
 
 @media print {
   .no-print { display: none !important; }
-  .admin-nav, .kiosk-home { display: none; }
-  body { background: #fff; }
-  .admin-main { max-width: none; padding: 0; }
+  .admin-sidebar, .admin-mobile-topbar, .admin-mobile-tabs, .kiosk-home { display: none; }
+  html, body { background: #fff; }
+  .admin-main { max-width: none; margin-left: 0; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
   .roster-name-col { position: static; }
+  .roster-secondary-col { position: static; width: auto; min-width: 0; max-width: none; }
+  .grid-box { box-shadow: none; border: none; }
+  .roster-view-page .roster-table thead th { position: static; }
+  .roster-view-page .roster-scroll,
+  .roster-view-page .legend,
+  .roster-view-page .roster-toolbar,
+  .roster-view-page .volunteer-box { animation: none; }
+
+  /* Attendance grid: the editable <select> can't render sensibly on
+     paper, so swap it for the plain colored cell-tag badge. */
+  .roster-cell-select { display: none !important; }
+  .print-only-tag { display: inline-flex; }
+
+  /* Roster (Attendance) page: printing "Attendance Spreadsheet" should
+     show just the grid, not the embedded Floater Assignments box. */
+  .volunteer-box { display: none !important; }
+
+  /* Members page: printing swaps the interactive table for a plain
+     Name/Type/Family/Roster/Grade/Birthday grid (.members-print-table,
+     hidden on screen below) instead of trying to print photo thumbnails
+     and icon buttons. */
+  .members-table { display: none; }
+  .members-print-table { display: table; }
+
+  /* Infant flag is an admin-only note for staffing decisions - never let
+     it end up on a physical printout that could be seen by members. Same
+     for the medical-notes flag - the dedicated Allergies/Medical log is
+     the intentional, admin-only place to print that information. */
+  .infant-tag { display: none !important; }
+  .medical-flag { display: none !important; }
+
+  .print-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid #000;
+  }
+  .print-header img { height: 48px; width: 48px; border-radius: 50%; }
+  .print-header-title { font-size: 1.25rem; font-weight: 800; margin: 0; color: #000; }
+  .print-header-sub { font-size: 0.95rem; margin: 0.1rem 0 0; color: #333; }
+
+  /* Data-bearing text inputs read as plain values, not editable boxes. */
+  .volunteer-cell-input,
+  .setup-team-title-input,
+  .setup-team-desc-input {
+    border: none !important;
+    background: none !important;
+    padding: 0.15rem 0.2rem !important;
+    color: #000 !important;
+  }
+  .setup-team-title-input { font-weight: 700; }
+  .setup-team-card { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+
+  /* The on-screen "sheet of paper" chrome (drop shadow, border, the gap
+     between pages) is there to preview the page, not to print onto it -
+     the physical page IS the boundary once this is actually printing. */
+  .badge-sheet-page,
+  .print-page {
+    width: auto;
+    height: auto;
+    min-height: 100vh;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Keep a hard, exactly-one-portrait-page box at actual print time too
+     (not the generic auto/100vh above) - print-shrink-to-fit.js's
+     beforeprint recalculation needs a real page-sized box to measure
+     against, or there'd be nothing to shrink the schedule to fit into. */
+  .class-schedule-print-page .print-page {
+    width: 8.5in;
+    height: 11in;
+    min-height: 0;
+    padding: 0.4in;
+  }
+
+  /* Bulk "Name Tags + Schedule Cards" print: on screen each pair/row has
+     breathing room and a label so the preview reads clearly, but the
+     printout is meant to be cut apart - zero the gaps so every card edge
+     (within a pair and between member rows) butts against its neighbor,
+     same guillotine-cut reasoning as .badge-sheet. .print-page's own
+     flex `gap: 1.5rem` (for its usual stacked-sections use elsewhere)
+     would otherwise still separate each row even with the row's own
+     margin zeroed, so it needs zeroing too on this specific page. */
+  .member-card-pair-page { gap: 0; }
+  .member-card-pair-row { gap: 0; margin-bottom: 0; }
+  .member-card-pair-item .badge-canvas { box-shadow: none; margin: 0; }
+}
+
+/* ---------- Setup/Cleanup Task List tab (views/admin-setup-tasks.ejs) ----------
+   Section cards stacked vertically, each a colored header band over a
+   plain numbered task table - view-only until Edit is clicked (see
+   public/js/task-list-edit.js), which unlocks every title/description
+   input in place and reveals the reorder/delete controls. */
+.task-list-stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.task-list-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: #fff;
+}
+.task-list-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+.task-list-card-actions { display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0; }
+.task-list-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: inherit;
+  padding: 0.2rem 0;
+}
+.task-list-title-input:not([readonly]) {
+  background: rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+}
+.task-list-team-row { padding: 0 1rem 0.5rem; }
+.task-list-team-select { font-size: 0.85rem; }
+.task-list-team-badge { margin: 0; padding: 0 1rem 0.5rem; font-size: 0.8rem; }
+.task-list-table { margin: 0; }
+.task-list-num-col { width: 2.5rem; text-align: center !important; font-weight: 700; }
+.task-list-desc-input {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0.15rem 0;
+}
+.task-list-desc-input:not([readonly]) {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+}
+
+.task-list-accent-0 .task-list-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.task-list-accent-1 .task-list-card-header { background: var(--green-bg); color: var(--green); }
+.task-list-accent-2 .task-list-card-header { background: var(--purple-soft); color: var(--purple); }
+.task-list-accent-3 .task-list-card-header { background: var(--orange-bg); color: var(--orange); }
+.task-list-accent-4 .task-list-card-header { background: #d7f3f1; color: #1f7a72; }
+
+/* ---------- Sitewide delete confirmation popup (partials/confirm-dialog.ejs) ---------- */
+.confirm-dialog {
+  width: min(360px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.confirm-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.confirm-dialog-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  background: var(--red-bg);
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-dialog-icon .icon { width: 1.4rem; height: 1.4rem; }
+.confirm-dialog-message { margin: 0; font-size: 0.95rem; color: var(--ink); }
+.confirm-dialog .notes-dialog-actions { justify-content: center; margin-top: 1.25rem; }
+.confirm-dialog .notes-dialog-actions .btn-secondary,
+.confirm-dialog .notes-dialog-actions .roster-action-btn-danger {
+  margin-top: 0;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  min-width: 0;
+  flex: 0 0 auto;
 }
 
 @page {

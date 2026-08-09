@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Confirm Import Merge</h1>
+    <p class="hint"><%= summary %></p>
+    <p class="hint">These names matched existing members in Members. Choose which ones should have the blank fields below filled in from the imported file - nothing that's already set on a profile will be overwritten.</p>
+
+    <form method="POST" action="/admin/members/import/confirm">
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th></th><th>Name</th><th>New Information</th></tr>
+          </thead>
+          <tbody>
+            <% candidates.forEach(function(c) { %>
+              <tr>
+                <td>
+                  <input type="checkbox" name="memberIds" value="<%= c.memberId %>" checked />
+                  <input type="hidden" name="allMemberIds" value="<%= c.memberId %>" />
+                  <input type="hidden" name="payloads" value='<%- c.payload.replace(/'/g, "&#39;") %>' />
+                </td>
+                <td><%= c.memberName %></td>
+                <td>
+                  <% c.fields.forEach(function(f) { %>
+                    <span class="badge-pill"><%= f.label %>: <%= f.value %></span>
+                  <% }); %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <div class="notes-dialog-actions">
+        <a class="btn-secondary" href="/admin/members">Skip All</a>
+        <button type="submit" class="primary-btn">Merge Selected</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

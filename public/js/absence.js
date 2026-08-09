@@ -2,77 +2,60 @@
   const form = document.getElementById('absence-form');
   if (!form) return;
 
-  const memberSelect = document.getElementById('memberId');
-  const dateSelect = document.getElementById('sessionDate');
-  const warning = document.getElementById('date-warning');
-
-  async function loadDatesForMember(memberId, preselect) {
-    dateSelect.innerHTML = '';
-    warning.textContent = '';
-
-    if (!memberId) {
-      dateSelect.disabled = true;
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Select your name first…';
-      dateSelect.appendChild(opt);
-      return;
-    }
-
-    const loadingOpt = document.createElement('option');
-    loadingOpt.value = '';
-    loadingOpt.textContent = 'Loading…';
-    dateSelect.appendChild(loadingOpt);
-    dateSelect.disabled = true;
-
-    try {
-      const res = await fetch('/absence/dates?memberId=' + encodeURIComponent(memberId));
-      const data = await res.json();
-      dateSelect.innerHTML = '';
-
-      if (!data.dates || data.dates.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'No upcoming class dates found';
-        dateSelect.appendChild(opt);
-        dateSelect.disabled = true;
-        warning.textContent = "This person isn't on any roster with upcoming dates.";
-        return;
+  const resultDialog = document.getElementById('result-dialog');
+  if (resultDialog) {
+    resultDialog.showModal();
+    const goHome = resultDialog.dataset.redirectHome === '1';
+    resultDialog.querySelector('.alert-popup-ok').addEventListener('click', () => {
+      if (goHome) {
+        window.location.href = '/kiosk';
+      } else {
+        resultDialog.close();
       }
-
-      const placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = 'Select a date…';
-      dateSelect.appendChild(placeholder);
-
-      data.dates.forEach((d) => {
-        const opt = document.createElement('option');
-        opt.value = d.date;
-        opt.textContent = d.label;
-        if (preselect && d.date === preselect) opt.selected = true;
-        dateSelect.appendChild(opt);
-      });
-      dateSelect.disabled = false;
-    } catch (err) {
-      dateSelect.innerHTML = '';
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Could not load dates';
-      dateSelect.appendChild(opt);
-      warning.textContent = 'Connection error loading dates. Please try again.';
+    });
+    if (goHome) {
+      setTimeout(() => { window.location.href = '/kiosk'; }, 4000);
     }
   }
 
-  memberSelect.addEventListener('change', () => loadDatesForMember(memberSelect.value, null));
+  const parentSelect = document.getElementById('parentId');
+  const groups = document.querySelectorAll('.absence-children-group');
+  const requiredMsg = document.getElementById('student-required-msg');
+  const selectAllBtn = document.getElementById('select-all-btn');
 
-  // Re-populate on load if the form is re-rendering after a failed submit.
-  if (memberSelect.value) {
-    loadDatesForMember(memberSelect.value, dateSelect.dataset.preselect || null);
+  function showGroupForParent() {
+    groups.forEach((g) => {
+      g.hidden = g.dataset.parentId !== parentSelect.value;
+    });
+    if (requiredMsg) requiredMsg.hidden = true;
+    if (selectAllBtn) {
+      selectAllBtn.hidden = !parentSelect.value;
+      selectAllBtn.textContent = 'Select All';
+    }
   }
 
-  if (form.dataset.redirectHome === '1') {
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 2000);
+  if (parentSelect) {
+    parentSelect.addEventListener('change', showGroupForParent);
   }
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', () => {
+      const visibleGroup = document.querySelector('.absence-children-group:not([hidden])');
+      if (!visibleGroup) return;
+      const boxes = visibleGroup.querySelectorAll('input[type="checkbox"]');
+      const allChecked = [...boxes].every((b) => b.checked);
+      boxes.forEach((b) => { b.checked = !allChecked; });
+      selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+      if (requiredMsg) requiredMsg.hidden = true;
+    });
+  }
+
+  form.addEventListener('submit', (e) => {
+    const visibleGroup = document.querySelector('.absence-children-group:not([hidden])');
+    const checked = visibleGroup ? visibleGroup.querySelectorAll('input[type="checkbox"]:checked') : [];
+    if (!visibleGroup || checked.length === 0) {
+      e.preventDefault();
+      if (requiredMsg) requiredMsg.hidden = false;
+    }
+  });
 })();

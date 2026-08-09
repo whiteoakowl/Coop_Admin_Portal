@@ -1,0 +1,12 @@
+<%# Sitewide "are you sure?" popup for every delete/remove action - any
+    <form data-confirm="message"> gets intercepted on submit and shown this
+    instead of the browser's native confirm(). Loaded once per page (see
+    admin-nav.ejs); public/js/confirm-dialog.js does the interception. %>
+<dialog id="confirm-dialog" class="confirm-dialog">
+  <div class="confirm-dialog-icon"><svg class="icon"><use href="#icon-trash"/></svg></div>
+  <p class="confirm-dialog-message" id="confirm-dialog-message"></p>
+  <div class="notes-dialog-actions">
+    <button type="button" class="btn-secondary" data-confirm-cancel>Cancel</button>
+    <button type="button" class="roster-action-btn roster-action-btn-danger" data-confirm-yes>Yes, Delete</button>
+  </div>
+</dialog>

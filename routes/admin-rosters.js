@@ -1,22 +1,126 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatTime } = require('../utils/dates');
-const { parseNamesFile, findOrCreateMemberByName } = require('../utils/members');
+const { isValidISODate, formatDateLabel, formatTime, todayISO, weekdayOf } = require('../utils/dates');
+const { familyOf, byLastName } = require('../utils/members');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { arrivalDepartureLabels } = require('../utils/schedule');
+const {
+  ensureDayRoster,
+  classesAtRiskForDay,
+  classesNeedingStaffForDay,
+  allClassesList,
+  addManualRosterMember,
+} = require('../utils/classSchedule');
+const { defaultDay, DAY_LABELS } = require('../utils/days');
+const { REASON_LABELS } = require('../utils/rosters');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+// The alert log below the grid only makes sense for today, and only when
+// today is actually a session day for this roster's day-of-week (mirrors
+// the Floater Assignments Substitutes board's same-shaped default).
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+function todayIfSessionDay(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
+}
 
+// Absence/Late form submissions on this roster for one date, split by
+// status - feeds the Attendance page's "Today's Alerts" log.
+function absenceFormSubmissionsForRoster(rosterId, date) {
+  if (!date) return { absences: [], lates: [] };
+  const rows = db
+    .prepare(
+      `SELECT m.name AS name, a.status, a.reason_category AS reasonCategory, a.reason_text AS reasonText
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form'`
+    )
+    .all(rosterId, date)
+    .sort(byLastName)
+    .map((r) => ({
+      memberName: r.name,
+      status: r.status,
+      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+      description: r.reasonText || '—',
+    }));
+  return {
+    absences: rows.filter((r) => r.status === 'absent'),
+    lates: rows.filter((r) => r.status === 'late'),
+  };
+}
+
+// Attendance is 4 always-existing, schedule-driven rosters (membership
+// fills in automatically from class enrollment/staffing - see
+// utils/classSchedule.js) plus a 5th "Class Rosters" tab that lets an
+// admin drill into any one class's own auto-maintained roster
+// (classes.roster_id). A class roster's tab key is "class-<id>" rather
+// than a fixed TABS entry - see classIdFromTab/rosterIdForTab below.
+const TABS = {
+  'monday-parent': { day: 'monday', role: 'parent', label: 'Monday Parents' },
+  'monday-student': { day: 'monday', role: 'student', label: 'Monday Students' },
+  'wednesday-parent': { day: 'wednesday', role: 'parent', label: 'Wednesday Parents' },
+  'wednesday-student': { day: 'wednesday', role: 'student', label: 'Wednesday Students' },
+};
+
+function classIdFromTab(tab) {
+  const m = /^class-(\d+)$/.exec(tab || '');
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function classRosterInfo(classId) {
+  return db
+    .prepare(
+      `SELECT c.*, h.label AS hourLabel FROM classes c
+       JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
+       WHERE c.id = ?`
+    )
+    .get(classId);
+}
+
+function rosterIdForTab(tab) {
+  const classId = classIdFromTab(tab);
+  if (classId) {
+    const cls = db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(classId);
+    return cls ? cls.roster_id : null;
+  }
+  const cfg = TABS[tab];
+  return cfg ? ensureDayRoster(cfg.day, cfg.role) : null;
+}
+
+// A class roster only ever holds students (see ensureClassRoster/
+// syncClassRosterMembers), so the Add Member picker offers students there
+// too - everywhere else it matches whichever role that tab tracks.
+function memberTypeForTab(tab) {
+  if (classIdFromTab(tab)) return 'student';
+  const cfg = TABS[tab];
+  return cfg ? cfg.role : null;
+}
+
+function availableMembersForRoster(rosterId, memberType) {
+  if (!memberType) return [];
+  return db
+    .prepare(
+      `SELECT id, name FROM members WHERE active = 1 AND member_type = ?
+       AND id NOT IN (SELECT member_id FROM roster_members WHERE roster_id = ?)`
+    )
+    .all(memberType, rosterId)
+    .sort(byLastName);
+}
+
+// Every roster (each weekday's Parent/Student roster, every class's own
+// roster) lists members alphabetically by last name, not first - see
+// byLastName in utils/members.js.
 function rosterMembers(rosterId) {
   return db
     .prepare(
-      `SELECT m.* FROM members m
+      `SELECT m.*
+       FROM members m
        JOIN roster_members rm ON rm.member_id = m.id
-       WHERE rm.roster_id = ? AND m.active = 1
-       ORDER BY m.name COLLATE NOCASE`
+       WHERE rm.roster_id = ? AND m.active = 1`
     )
-    .all(rosterId);
+    .all(rosterId)
+    .sort(byLastName);
 }
 
 function rosterDates(rosterId) {
@@ -26,32 +130,13 @@ function rosterDates(rosterId) {
     .map((r) => r.session_date);
 }
 
-function allCategories() {
-  return db.prepare('SELECT name FROM categories ORDER BY name COLLATE NOCASE').all().map((r) => r.name);
-}
-
-function isKnownCategory(name) {
-  if (!name) return false;
-  return !!db.prepare('SELECT 1 FROM categories WHERE name = ?').get(name);
-}
-
-function importNamesIntoRoster(rosterId, buffer) {
-  const names = parseNamesFile(buffer);
-  const linkMember = db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)');
-
-  let created = 0;
-  let linked = 0;
-  for (const name of names) {
-    const { member, created: wasCreated } = findOrCreateMemberByName(name);
-    if (wasCreated) created++;
-    const result = linkMember.run(rosterId, member.id);
-    if (result.changes > 0) linked++;
-  }
-  return { total: names.length, created, linked };
-}
-
-function buildRosterGridData(roster) {
-  const dates = rosterDates(roster.id);
+// datesOverride lets a class roster borrow its dates from the day's
+// Student roster instead of managing its own independent list (see the
+// /rosters GET handler below) - attendance itself still lives under the
+// class's own roster_id either way, only which dates count as real
+// columns changes.
+function buildRosterGridData(roster, datesOverride) {
+  const dates = datesOverride || rosterDates(roster.id);
   const placeholders = dates.map(() => '?').join(',');
   const members = rosterMembers(roster.id);
 
@@ -77,27 +162,35 @@ function buildRosterGridData(roster) {
   const checkoutByKey = {};
   for (const r of checkoutRows) checkoutByKey[`${r.member_id}|${r.session_date}`] = r;
 
-  const rows = members.map((m) => ({
-    member: m,
-    cells: dates.map((d) => {
-      const att = attendanceByKey[`${m.id}|${d}`];
-      const out = checkoutByKey[`${m.id}|${d}`];
-      if (!att) return null;
-      const tag = att.status === 'present' ? 'P' : att.status === 'late' ? 'L' : 'A';
-      return {
-        tag,
-        checkInTime: formatTime(att.check_in_time),
-        checkOutTime: out ? formatTime(out.check_out_time) : null,
-        number: out ? out.number : null,
-      };
-    }),
-  }));
+  const rows = members.map((m) => {
+    const { arrival, departure } = arrivalDepartureLabels(m.id, roster.schedule_day);
+    return {
+      member: m,
+      parentName: familyOf(m.id).map((p) => p.name).join(', ') || null,
+      arrivalLabel: arrival,
+      departureLabel: departure,
+      cells: dates.map((d) => {
+        const att = attendanceByKey[`${m.id}|${d}`];
+        const out = checkoutByKey[`${m.id}|${d}`];
+        if (!att) return { date: d, tag: null, checkInTime: null, checkOutTime: null, number: null };
+        const tag = att.status === 'present' ? 'P' : att.status === 'late' ? 'L' : 'A';
+        return {
+          date: d,
+          tag,
+          status: att.status,
+          checkInTime: formatTime(att.check_in_time),
+          checkOutTime: out ? formatTime(out.check_out_time) : null,
+          number: out ? out.number : null,
+        };
+      }),
+    };
+  });
 
   const summary = dates.map((d, i) => {
     let present = 0, late = 0, absent = 0;
     for (const row of rows) {
       const cell = row.cells[i];
-      if (!cell) continue;
+      if (!cell || !cell.tag) continue;
       if (cell.tag === 'P') present++;
       else if (cell.tag === 'L') late++;
       else if (cell.tag === 'A') absent++;
@@ -113,237 +206,182 @@ function buildRosterGridData(roster) {
   };
 }
 
-const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
-
-// Absence/Late form submissions recorded against this roster, optionally
-// narrowed to a single session date.
-function absenceSubmissionsForRoster(rosterId, dateFilter) {
-  let sql = `SELECT m.name AS memberName, a.session_date AS date, a.status,
-             a.reason_category AS reasonCategory, a.reason_text AS reasonText
-             FROM attendance a
-             JOIN members m ON m.id = a.member_id
-             WHERE a.roster_id = ? AND a.source = 'absence_form'`;
-  const params = [rosterId];
-  if (dateFilter) {
-    sql += ' AND a.session_date = ?';
-    params.push(dateFilter);
-  }
-  sql += ' ORDER BY a.session_date DESC, m.name COLLATE NOCASE';
-
-  return db
-    .prepare(sql)
-    .all(...params)
-    .map((r) => ({
-      memberName: r.memberName,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'late' ? 'Late' : 'Absent',
-      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
-      description: r.reasonText || '—',
-    }));
-}
-
-// --- Roster list & creation ---
-
 router.get('/rosters', requireAdmin, (req, res) => {
-  const category = (req.query.category || '').trim();
-  const archived = req.query.archived === '1';
-  let sql = `SELECT r.*, (SELECT COUNT(*) FROM roster_members rm WHERE rm.roster_id = r.id) AS memberCount,
-             (SELECT COUNT(*) FROM roster_dates rd WHERE rd.roster_id = r.id) AS dateCount
-             FROM rosters r WHERE r.active = ?`;
-  const params = [archived ? 0 : 1];
-  if (category) {
-    sql += ' AND r.category = ?';
-    params.push(category);
+  const requestedTab = req.query.tab || '';
+
+  if (requestedTab === 'classes') {
+    const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+    return res.render('admin-rosters', {
+      title: 'Attendance',
+      tabs: TABS,
+      tab: 'classes',
+      activeTab: 'classes',
+      view: 'classList',
+      classes: allClassesList(dayFilter || null),
+      dayFilter,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
   }
-  sql += ' ORDER BY r.name COLLATE NOCASE';
-  const rosters = db.prepare(sql).all(...params);
+
+  const classId = classIdFromTab(requestedTab);
+  let tab = requestedTab;
+  let day;
+  let tabLabel;
+
+  if (classId) {
+    const cls = classRosterInfo(classId);
+    if (!cls) return res.redirect('/admin/rosters?tab=classes');
+    day = cls.day;
+    tabLabel = `${cls.class_name} (${cls.hourLabel})`;
+  } else {
+    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-student`;
+    const cfg = TABS[tab];
+    day = cfg.day;
+    tabLabel = cfg.label;
+  }
+
+  const rosterId = rosterIdForTab(tab);
+  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
+  // A class roster has no dates of its own to manage - it always mirrors
+  // whichever day's Student roster it belongs to (a class only ever
+  // meets when that day's students do), so there's no separate Edit
+  // Dates step for it (see the view - Edit Dates/+ Add Member are hidden
+  // whenever classId is set).
+  const dates = classId ? rosterDates(ensureDayRoster(day, 'student')) : rosterDates(rosterId);
+  const alertDate = todayIfSessionDay(day);
 
   res.render('admin-rosters', {
-    title: archived ? 'Archived Rosters' : 'Attendance',
-    rosters,
-    categories: allCategories(),
-    selectedCategory: category,
-    archived,
+    title: 'Attendance',
+    tabs: TABS,
+    tab,
+    activeTab: classId ? 'classes' : tab,
+    view: 'grid',
+    classId,
+    tabLabel,
+    dayLabel: DAY_LABELS[day],
+    roster,
+    ...buildRosterGridData(roster, classId ? dates : undefined),
+    dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    alertDate,
+    alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
+    absenceAlerts: absenceFormSubmissionsForRoster(rosterId, alertDate),
+    classesAtRisk: classesAtRiskForDay(day, alertDate),
+    classesNeedingStaff: classesNeedingStaffForDay(day),
+    availableMembers: availableMembersForRoster(rosterId, memberTypeForTab(tab)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-router.post('/rosters/categories', requireAdmin, (req, res) => {
-  const name = (req.body.name || '').trim();
-  if (name) {
-    db.prepare('INSERT OR IGNORE INTO categories (name) VALUES (?)').run(name);
-  }
-  res.redirect('/admin/rosters?notice=' + encodeURIComponent(name ? `Category "${name}" added.` : 'Category name is required.'));
-});
+// --- Session dates ---
 
-router.post('/rosters', requireAdmin, upload.single('file'), (req, res) => {
-  const name = (req.body.name || '').trim();
-  const rawCategory = (req.body.category || '').trim();
-  const category = isKnownCategory(rawCategory) ? rawCategory : null;
-  const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))].sort();
+// Parents and students at the same co-op session meet on the same actual
+// calendar dates - there's no such thing as a Monday that students have
+// but parents don't. So a session date always applies to BOTH the
+// Parent and Student rosters for that day, not just whichever tab it was
+// added from. Without this, a date added only to "Monday Students" (the
+// common case, since that's what daily check-in cares about) left the
+// "Monday Parents" roster without that date - so a teaching parent
+// reporting their own absence via the public form would be told they
+// "aren't on any roster" for a date their own kids' roster had just fine.
+function siblingRosterId(tab) {
+  const info = TABS[tab];
+  if (!info) return null;
+  const otherRole = info.role === 'parent' ? 'student' : 'parent';
+  return ensureDayRoster(info.day, otherRole);
+}
 
-  if (!name) {
-    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Roster title is required.'));
-  }
-  if (dates.length === 0) {
-    return res.redirect('/admin/rosters?error=' + encodeURIComponent('Pick at least one date for the roster.'));
-  }
-
-  const info = db.prepare('INSERT INTO rosters (name, category) VALUES (?, ?)').run(name, category);
-  const rosterId = info.lastInsertRowid;
-
-  const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
-  for (const d of dates) insertDate.run(rosterId, d);
-
-  let notice = `Roster "${name}" created with ${dates.length} date${dates.length === 1 ? '' : 's'}.`;
-  if (req.file) {
-    const result = importNamesIntoRoster(rosterId, req.file.buffer);
-    notice += ` Imported ${result.total} name(s): ${result.created} new member(s), ${result.linked} added to the roster.`;
-  }
-
-  res.redirect(`/admin/rosters/${rosterId}/manage?notice=` + encodeURIComponent(notice));
-});
-
-router.post('/rosters/:id/rename', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const name = (req.body.name || '').trim();
-  if (!name) {
-    return res.redirect(`/admin/rosters/${id}/manage?error=` + encodeURIComponent('Roster title is required.'));
-  }
-  db.prepare('UPDATE rosters SET name = ? WHERE id = ?').run(name, id);
-  res.redirect(`/admin/rosters/${id}/manage`);
-});
-
-router.post('/rosters/:id/category', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const rawCategory = (req.body.category || '').trim();
-  const category = isKnownCategory(rawCategory) ? rawCategory : null;
-  db.prepare('UPDATE rosters SET category = ? WHERE id = ?').run(category, id);
-  res.redirect(`/admin/rosters/${id}/manage`);
-});
-
-router.post('/rosters/:id/toggle-active', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
-  if (roster) db.prepare('UPDATE rosters SET active = ? WHERE id = ?').run(roster.active ? 0 : 1, id);
-  res.redirect('/admin/rosters');
-});
-
-router.post('/rosters/:id/delete', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
-  db.prepare('DELETE FROM rosters WHERE id = ?').run(id);
-  res.redirect(
-    '/admin/rosters?notice=' + encodeURIComponent(roster ? `Deleted "${roster.name}" and its attendance history.` : 'Roster deleted.')
-  );
-});
-
-// --- Roster dates management ---
-
-router.post('/rosters/:id/dates/add', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
+router.post('/rosters/:tab/dates/add', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId) return res.status(404).send('Not found');
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
-  for (const d of dates) insertDate.run(id, d);
-  res.redirect(`/admin/rosters/${id}/manage?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
-});
-
-router.post('/rosters/:id/dates/:date/remove', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const date = req.params.date;
-  db.prepare('DELETE FROM roster_dates WHERE roster_id = ? AND session_date = ?').run(id, date);
-  db.prepare('DELETE FROM attendance WHERE roster_id = ? AND session_date = ?').run(id, date);
-  db.prepare('DELETE FROM checkouts WHERE roster_id = ? AND session_date = ?').run(id, date);
-  res.redirect(`/admin/rosters/${id}/manage?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
-});
-
-// --- Roster membership management ---
-
-router.get('/rosters/:id/manage', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
-  if (!roster) return res.status(404).send('Not found');
-
-  const members = rosterMembers(id);
-  const memberIds = members.map((m) => m.id);
-  const availableMembers = db
-    .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all()
-    .filter((m) => !memberIds.includes(m.id));
-
-  const dates = rosterDates(id);
-
-  res.render('admin-roster-manage', {
-    title: `Manage ${roster.name}`,
-    roster,
-    members,
-    availableMembers,
-    dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
-    categories: allCategories(),
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.post('/rosters/:id/add-member', requireAdmin, (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const memberId = parseInt(req.body.memberId, 10);
-  if (memberId) {
-    db.prepare('INSERT OR IGNORE INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
+  const siblingId = siblingRosterId(tab);
+  for (const d of dates) {
+    insertDate.run(rosterId, d);
+    if (siblingId) insertDate.run(siblingId, d);
   }
-  res.redirect(`/admin/rosters/${rosterId}/manage`);
+  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
 
-router.post('/rosters/:id/remove-member/:memberId', requireAdmin, (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
+router.post('/rosters/:tab/dates/:date/remove', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId) return res.status(404).send('Not found');
+  const date = req.params.date;
+  const rosterIds = [rosterId, siblingRosterId(tab)].filter(Boolean);
+  const placeholders = rosterIds.map(() => '?').join(',');
+  db.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  db.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  db.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
+});
+
+// --- Roster membership ---
+
+router.post('/rosters/:tab/add-member', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId) return res.status(404).send('Not found');
+  const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  memberIds.forEach((memberId) => addManualRosterMember(rosterId, memberId));
+  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${memberIds.length} member(s).`));
+});
+
+router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId) return res.status(404).send('Not found');
   const memberId = parseInt(req.params.memberId, 10);
   db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
-  res.redirect(`/admin/rosters/${rosterId}/manage`);
+  res.redirect(`/admin/rosters?tab=${tab}`);
 });
 
-// --- Bulk import (names-only file, one name per line) into an existing roster ---
+// --- Manual attendance entry ---
+// Cells auto-save one at a time on change (public/js/attendance-grid.js) -
+// each request carries a single status:<memberId>:<date> key, value is
+// 'present'/'late'/'absent'/'' (blank clears the cell). Entries made here
+// are tagged source='manual' so they're distinguishable from real kiosk
+// scans.
+router.post('/rosters/:tab/attendance', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId) return res.status(404).send('Not found');
 
-router.post('/rosters/:id/import', requireAdmin, upload.single('file'), (req, res) => {
-  const rosterId = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
-  if (!roster) return res.status(404).send('Not found');
+  const upsert = db.prepare(
+    `INSERT INTO attendance (member_id, roster_id, session_date, status, source)
+     VALUES (?, ?, ?, ?, 'manual')
+     ON CONFLICT(member_id, roster_id, session_date) DO UPDATE SET
+       status = excluded.status,
+       source = 'manual'`
+  );
+  const clear = db.prepare('DELETE FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?');
 
-  if (!req.file) {
-    return res.redirect(`/admin/rosters/${rosterId}/manage?error=` + encodeURIComponent('Please choose a file to import.'));
+  for (const key of Object.keys(req.body)) {
+    const match = /^status:(\d+):(\d{4}-\d{2}-\d{2})$/.exec(key);
+    if (!match) continue;
+    const [, memberId, date] = match;
+    const value = (req.body[key] || '').trim();
+    if (value === 'present' || value === 'late' || value === 'absent') {
+      upsert.run(parseInt(memberId, 10), rosterId, date, value);
+    } else {
+      clear.run(parseInt(memberId, 10), rosterId, date);
+    }
   }
 
-  const result = importNamesIntoRoster(rosterId, req.file.buffer);
-  res.redirect(
-    `/admin/rosters/${rosterId}/manage?notice=` +
-      encodeURIComponent(`Imported ${result.total} name(s): ${result.created} new member(s) created, ${result.linked} added to this roster.`)
-  );
+  if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
+  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent('Attendance saved.'));
 });
 
-// --- Combined roster grid + export ---
-
-router.get('/roster/:id', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
-  if (!roster) return res.status(404).send('Not found');
-
-  const data = buildRosterGridData(roster);
-  const absenceDateFilter = data.dates.includes(req.query.absenceDate) ? req.query.absenceDate : '';
-
-  res.render('admin-roster', {
-    title: `${roster.name} Roster`,
-    roster,
-    ...data,
-    absenceDateFilter,
-    absenceSubmissions: absenceSubmissionsForRoster(id, absenceDateFilter),
-  });
-});
-
-router.get('/roster/:id/export.csv', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(id);
-  if (!roster) return res.status(404).send('Not found');
-
+router.get('/roster/:tab/export.csv', requireAdmin, (req, res) => {
+  const tab = req.params.tab;
+  const classId = classIdFromTab(tab);
+  const label = classId ? (classRosterInfo(classId) || {}).class_name : (TABS[tab] || {}).label;
+  const rosterId = rosterIdForTab(tab);
+  if (!rosterId || !label) return res.status(404).send('Not found');
+  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   const data = buildRosterGridData(roster);
 
   const header = ['Name'];
@@ -351,27 +389,24 @@ router.get('/roster/:id/export.csv', requireAdmin, (req, res) => {
     header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`);
   }
 
-  const lines = data.rows.map((r) => {
-    const row = [`"${r.member.name.replace(/"/g, '""')}"`];
+  const rowLines = data.rows.map((r) => {
+    const row = [r.member.name];
     for (const cell of r.cells) {
-      row.push(cell ? cell.tag : '', cell?.checkInTime || '', cell?.checkOutTime || '', cell?.number ?? '');
+      row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '');
     }
-    return row.join(',');
+    return toCsvRow(row);
   });
 
-  const summaryRows = ['Present', 'Late', 'Absent'].map((label, idx) => {
+  const summaryRows = ['Present', 'Late', 'Absent'].map((label) => {
     const key = label.toLowerCase();
     const row = [label];
     for (const s of data.summary) {
       row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
     }
-    return row.join(',');
+    return toCsvRow(row);
   });
 
-  const csv = [header.join(','), ...lines, ...summaryRows].join('\n');
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${roster.name.replace(/[^a-z0-9]+/gi, '-')}-roster.csv"`);
-  res.send(csv);
+  sendCsv(res, `${label.replace(/[^a-z0-9]+/gi, '-')}-roster.csv`, [toCsvRow(header), ...rowLines, ...summaryRows]);
 });
 
 module.exports = router;

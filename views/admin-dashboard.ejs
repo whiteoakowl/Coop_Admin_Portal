@@ -7,32 +7,45 @@
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
     <h1>Dashboard</h1>
-    <p class="subtitle">Signed in as <%= username %> &middot; <%= today %></p>
 
-    <div class="stat-grid">
-      <div class="stat-card">
+    <div class="totals-card">
+      <div class="totals-item">
+        <span class="stat-value"><%= studentCount %></span>
+        <span class="stat-label">Total Students</span>
+      </div>
+      <div class="totals-item">
+        <span class="stat-value"><%= parentCount %></span>
+        <span class="stat-label">Total Parents</span>
+      </div>
+      <div class="totals-item">
         <span class="stat-value"><%= memberCount %></span>
-        <span class="stat-label">Active Members</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayPresent %></span>
-        <span class="stat-label">Checked In Today</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayLate %></span>
-        <span class="stat-label">Late Today</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value"><%= todayAbsent %></span>
-        <span class="stat-label">Absent Today</span>
+        <span class="stat-label">Total Members</span>
       </div>
     </div>
 
-    <h2>Kiosk Links</h2>
-    <div class="admin-card-grid">
-      <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
-      <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
-      <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
+    <h2 class="dashboard-section-title">Today's Attendance</h2>
+    <div class="dashboard-analytics-grid">
+      <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
+      <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
+    </div>
+
+    <h2 class="dashboard-section-title">Alert Log</h2>
+    <div class="alert-log">
+      <% if (alerts.length === 0) { %>
+        <p class="roster-empty">No active alerts today.</p>
+      <% } else { %>
+        <ul class="alert-log-list">
+          <% alerts.forEach(function(a) { %>
+            <li class="alert-log-item alert-log-item-<%= a.severity %>">
+              <svg class="icon alert-log-icon"><use href="#<%= a.severity === 'danger' ? 'icon-x-circle' : 'icon-info-circle' %>"/></svg>
+              <div class="alert-log-body">
+                <span class="alert-log-day"><%= a.dayLabel %></span>
+                <span class="alert-log-message"><a href="<%= a.link %>"><%= a.message %></a></span>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
     </div>
   </main>
 </body>

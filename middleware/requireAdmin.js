@@ -1,3 +1,4 @@
+// Gates every /admin/* route behind the single master Admin session.
 module.exports = function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) return next();
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');

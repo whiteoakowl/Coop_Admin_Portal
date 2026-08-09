@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Barcodes</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      // 3 across x 8 down fills a US Letter sheet with room for margins -
+      // 24 per page.
+      var pages = [];
+      for (var i = 0; i < members.length; i += 24) pages.push(members.slice(i, i + 24));
+    %>
+    <% pages.forEach(function(pageMembers) { %>
+      <div class="badge-sheet-page barcode-sheet">
+        <% pageMembers.forEach(function(m) { %>
+          <div class="barcode-cell">
+            <svg class="badge-el-barcode barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
+            <div class="barcode-cell-name"><%= m.name %></div>
+          </div>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

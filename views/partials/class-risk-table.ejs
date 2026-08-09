@@ -1,0 +1,25 @@
+<%
+// Shared by the Logs "Class Cancellation Risk" tab and the Floater
+// Assignments "Class Cancellation Risk" tab - same classesAtRiskForDay
+// data (utils/classSchedule.js), just two entry points to the same list.
+// Locals: classesAtRisk, dayLabel.
+%>
+<div class="roster-scroll">
+  <table class="roster-table members-table condensed-table">
+    <thead><tr><th>Hour</th><th>Class</th><th>Room</th><th>Expected</th><th>Enrolled</th></tr></thead>
+    <tbody>
+      <% if (classesAtRisk.length === 0) { %>
+        <tr><td colspan="5" class="roster-empty">No classes are at risk of low attendance on <%= dayLabel %>.</td></tr>
+      <% } %>
+      <% classesAtRisk.forEach(function(c) { %>
+        <tr>
+          <td><%= c.hourLabel %></td>
+          <td><%= c.className %></td>
+          <td><%= c.room || '—' %></td>
+          <td><span class="badge-pill badge-pill-absent"><%= c.expectedCount %></span></td>
+          <td><%= c.enrolledCount %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>

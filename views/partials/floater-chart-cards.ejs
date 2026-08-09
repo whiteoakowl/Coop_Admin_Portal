@@ -1,0 +1,67 @@
+<%
+// The live, editable Floater Assignments chart - one card per hour (2x2,
+// matching the Archive print layout), each card's rows drawn straight
+// from substituteBoard: every permanent job (filled or not) plus one row
+// per class's missing teacher/assistant - a class with two people out
+// that hour lists twice, each row tagged with who it's covering for (see
+// slot.reason below). The Floater column is the assign UI itself (no
+// separate "needs a substitute" section) - a dropdown of available
+// candidates (already rank-sorted and filtered to whoever's actually free
+// this date - see routes/admin-volunteers.js) plus an Accept/Unassign
+// button. Locals: day, selectedDate, hourSections.
+var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
+%>
+<% if (hourSections.length === 0) { %>
+  <p class="roster-empty">Add a position above first (e.g. Front Desk, Hallway Monitor).</p>
+<% } else { %>
+  <div class="floater-cards-grid floater-chart-cards-grid">
+    <% hourSections.forEach(function(hour, idx) { %>
+      <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <div class="floater-card floater-card-<%= accent %>">
+        <div class="floater-card-header">
+          <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
+          <h3><%= hour.label %></h3>
+        </div>
+        <table class="floater-card-table floater-chart-table">
+          <thead><tr><th>Position</th><th>Room</th><th>Floater</th></tr></thead>
+          <tbody>
+            <% hour.slots.forEach(function(slot) { %>
+              <% var isApproved = slot.assigned && slot.assigned.status === 'approved'; %>
+              <tr class="<%= slot.noneAvailable ? 'floater-row-noavail' : '' %>">
+                <td class="floater-card-position">
+                  <%= slot.label %>
+                  <% if (slot.slotType === 'class' && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
+                </td>
+                <td><%= slot.room || '—' %></td>
+                <td>
+                  <% if (slot.noneAvailable) { %>
+                    <span class="floater-noavail-text">No floaters available</span>
+                  <% } else { %>
+                    <form method="POST" class="floater-assign-form" action="/admin/volunteers/<%= day %>/substitutes/<%= isApproved ? 'unassign' : 'assign' %>">
+                      <input type="hidden" name="date" value="<%= selectedDate %>" />
+                      <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
+                      <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
+                      <input type="hidden" name="isOverride" value="1" />
+                      <select name="memberId" <%= isApproved ? 'disabled' : '' %>>
+                        <% slot.candidates.forEach(function(c) { %>
+                          <option value="<%= c.id %>" <%= slot.assigned && slot.assigned.id === c.id ? 'selected' : '' %>>
+                            <%= c.name %> (<%= c.rankLabel || 'Available' %><% if (c.infant) { %>, child &le;2<% } %>)
+                          </option>
+                        <% }); %>
+                      </select>
+                      <button type="submit" class="floater-assign-btn<%= isApproved ? ' floater-assign-btn-unassign' : '' %>"><%= isApproved ? 'Unassign' : 'Accept' %></button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <div class="floater-card-footer">
+          <svg class="icon"><use href="#icon-users"/></svg>
+          <%= hour.slots.length %> Position<%= hour.slots.length === 1 ? '' : 's' %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

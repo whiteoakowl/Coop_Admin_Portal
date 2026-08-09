@@ -6,49 +6,101 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Members</p>
+      </div>
+    </div>
     <h1>Members</h1>
-    <p class="subtitle">The full member list. Every member here is available on the Absence/Late form, and can be added to any roster.</p>
 
     <% if (error) { %>
-      <div class="alert alert-error"><%= error %></div>
+      <div class="alert alert-error no-print"><%= error %></div>
     <% } %>
     <% if (notice) { %>
-      <div class="alert alert-success"><%= notice %></div>
+      <div class="alert alert-success no-print"><%= notice %></div>
     <% } %>
 
-    <div class="quick-add-row">
-      <form method="POST" action="/admin/members" class="inline-form-flat">
-        <input type="text" name="name" placeholder="Member's name" required />
-        <button type="submit" class="btn-secondary">+ Add Member</button>
-      </form>
-      <form method="POST" action="/admin/members/import" enctype="multipart/form-data" class="inline-form-flat">
-        <input type="file" name="file" accept=".csv,.txt" required />
-        <button type="submit" class="btn-secondary">Import from File</button>
-      </form>
+    <div class="roster-toolbar no-print">
+      <div class="category-filter" style="margin: 0;">
+        <label for="type-select">Filter by type</label>
+        <select id="type-select" onchange="window.location = '/admin/members' + (this.value ? '?type=' + this.value : '')">
+          <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
+          <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+        </select>
+      </div>
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export</a>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+      </div>
     </div>
+
+    <dialog id="add-family-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/families/new">
+        <h3>Add Family</h3>
+        <p class="hint">A family must be added here before it shows up on a member's "Choose a Family" dropdown.</p>
+        <label>Family Last Name
+          <input type="text" name="name" placeholder="e.g. Anderson" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add Family</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="import-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
+        <h3>Import</h3>
+        <p class="hint">Upload a .csv, .txt, or .xlsx file with the columns below.</p>
+        <a class="btn-secondary import-sample-link" href="/admin/members/import-template.xlsx">Download Sample File</a>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="roster-scroll">
       <table class="roster-table members-table">
         <thead>
           <tr>
+            <th class="members-col-photo"></th>
             <th>Name</th>
-            <th>Barcode</th>
-            <th>Rosters</th>
-            <th>Status</th>
+            <th>Type</th>
+            <th class="members-col-parent">Family</th>
+            <th class="members-col-rosters">Rosters</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <% members.forEach(function(m) { %>
-            <tr class="<%= m.active ? '' : 'row-inactive' %>">
-              <td>
-                <form method="POST" action="/admin/members/<%= m.id %>/edit" class="edit-name-form">
-                  <input type="text" name="name" value="<%= m.name %>" />
-                  <button type="submit" class="link-btn">Save</button>
-                </form>
+            <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>">
+              <td class="members-col-photo">
+                <% if (m.photo_path) { %>
+                  <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
+                <% } else { %>
+                  <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
+                <% } %>
               </td>
-              <td class="mono"><%= m.barcode %></td>
               <td>
+                <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
+                <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+                <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>
+                  <span class="member-row-subline">
+                    <%= [m.grade_level || null, m.age !== null ? (m.age + (m.age === 1 ? ' year old' : ' years old')) : null].filter(Boolean).join(' · ') %>
+                  </span>
+                <% } %>
+              </td>
+              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+              <td class="members-col-parent"><%= m.familyName || '—' %></td>
+              <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>
                 <% } else { %>
@@ -56,20 +108,126 @@
                     <span class="badge-pill"><%= r.name %></span>
                   <% }); %>
                 <% } %>
-                <a class="link-btn" href="/admin/rosters">manage</a>
               </td>
-              <td><%= m.active ? 'Active' : 'Inactive' %></td>
               <td class="actions-cell">
-                <a class="link-btn" href="/admin/members/<%= m.id %>/badge" target="_blank">Print Badge</a>
-                <form method="POST" action="/admin/members/<%= m.id %>/toggle-active" class="inline-block-form">
-                  <button type="submit" class="link-btn"><%= m.active ? 'Deactivate' : 'Reactivate' %></button>
-                </form>
+                <div class="actions-btn-row">
+                  <button
+                    type="button"
+                    class="icon-btn<%= m.notes ? ' icon-btn-active' : '' %>"
+                    onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()"
+                    aria-label="Notes for <%= m.name %>"
+                    title="Notes"
+                  ><svg class="icon"><use href="#icon-edit"/></svg></button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    onclick="var d = document.getElementById('cards-dialog-<%= m.id %>'); d.showModal(); renderNameTagBarcodes(d);"
+                    aria-label="View cards for <%= m.name %>"
+                    title="View Cards"
+                  ><svg class="icon"><use href="#icon-badge"/></svg></button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    onclick="document.getElementById('schedule-dialog-<%= m.id %>').showModal()"
+                    aria-label="View schedule for <%= m.name %>"
+                    title="View Schedule"
+                  ><svg class="icon"><use href="#icon-clock"/></svg></button>
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    onclick="document.getElementById('delete-form-<%= m.id %>').requestSubmit();"
+                    aria-label="Delete <%= m.name %>"
+                    title="Delete"
+                  ><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </div>
+                <dialog id="notes-dialog-<%= m.id %>" class="notes-dialog">
+                  <form method="POST" action="/admin/members/<%= m.id %>/notes">
+                    <h3>Notes &mdash; <%= m.name %></h3>
+                    <textarea name="notes" rows="5" placeholder="Write a note about this member&hellip;"><%= m.notes || '' %></textarea>
+                    <div class="notes-dialog-actions">
+                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                      <button type="submit" class="primary-btn">Save</button>
+                    </div>
+                  </form>
+                </dialog>
+                <dialog id="cards-dialog-<%= m.id %>" class="badge-preview-dialog">
+                  <h3>Cards &mdash; <%= m.name %></h3>
+                  <form method="GET" action="/admin/members/<%= m.id %>/cards/print" target="_blank">
+                    <div class="cards-preview-option">
+                      <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
+                      <%- include('partials/name-tag-badge', { html: m.badgeHtml, bgCss: m.badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+                    </div>
+                    <div class="cards-preview-option">
+                      <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
+                      <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+                    </div>
+                    <div class="notes-dialog-actions">
+                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                      <button type="submit" class="primary-btn">Print</button>
+                    </div>
+                  </form>
+                </dialog>
+                <dialog id="schedule-dialog-<%= m.id %>" class="schedule-preview-dialog">
+                  <h3>Class Schedule &mdash; <%= m.name %></h3>
+                  <% [['Monday', m.schedule.monday], ['Wednesday', m.schedule.wednesday]].forEach(function(entry) { %>
+                    <% var dayLabel = entry[0], dayRows = entry[1]; %>
+                    <h4><%= dayLabel %></h4>
+                    <table class="roster-table schedule-print-table">
+                      <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                      <tbody>
+                        <% dayRows.forEach(function(c, i) { %>
+                          <tr>
+                            <td><%= i + 1 %></td>
+                            <td><%= c.time || '—' %></td>
+                            <td><%= c.class_name || '—' %></td>
+                            <td><%= c.room || '—' %></td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  <% }); %>
+                  <div class="notes-dialog-actions">
+                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                    <a class="primary-btn" href="/admin/schedule/print?memberId=<%= m.id %>" target="_blank">Print</a>
+                  </div>
+                </dialog>
+                <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."></form>
               </td>
             </tr>
           <% }); %>
         </tbody>
       </table>
     </div>
+
+    <%# Printing shows this plain grid instead of the interactive table
+        above (screen icons/dropdowns don't belong on paper) - see
+        .members-print-table in styles.css. %>
+    <table class="roster-table members-print-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Family</th>
+          <th>Roster</th>
+          <th>Grade</th>
+          <th>Birthday</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% members.forEach(function(m) { %>
+          <tr>
+            <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
+            <td><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+            <td><%= m.familyName || '—' %></td>
+            <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
+            <td><%= m.grade_level || '—' %></td>
+            <td><%= m.birthday || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
   </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
 </body>
 </html>

@@ -1,0 +1,255 @@
+<%
+// locals: day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds,
+// basePath (optional - where the date filter navigates back to; defaults
+// to the standalone class-schedule page), readOnly (optional - hides every
+// creation/edit control, leaving just the visual grid + Export/Print for
+// viewers who aren't a full Admin, e.g. Co-op Admin).
+const gridBasePath = typeof basePath !== 'undefined' && basePath ? basePath : `/admin/class-schedule/${day}`;
+const dateParamSep = gridBasePath.includes('?') ? '&' : '?';
+const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
+%>
+<% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+<% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+<div class="roster-toolbar no-print">
+  <div class="filter-row">
+    <div class="category-filter">
+      <label for="date-select-<%= day %>">Highlight Absences For</label>
+      <input
+        type="date"
+        id="date-select-<%= day %>"
+        value="<%= selectedDate %>"
+        onchange="window.location = '<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : '')"
+      />
+    </div>
+  </div>
+  <div class="roster-btn-row">
+    <% if (!gridReadOnly) { %>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit</button>
+      <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+    <% } %>
+    <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
+  </div>
+</div>
+
+<% if (!gridReadOnly) { %>
+<dialog id="add-class-dialog-<%= day %>" class="class-form-dialog">
+  <form method="POST" action="/admin/class-schedule/classes/new">
+    <div class="class-form-dialog-header">
+      <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+      <h3>Create New Class</h3>
+      <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+    </div>
+
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Title</span>
+        <input type="text" name="className" placeholder="Enter class title" required />
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Color</span>
+        <div class="class-color-swatches">
+          <% (typeof colorPalette !== 'undefined' ? colorPalette : ['#EE9A4D']).forEach(function(c, i) { %>
+            <label class="class-color-swatch">
+              <input type="radio" name="color" value="<%= c %>" <%= i === 0 ? 'checked' : '' %> />
+              <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
+              <svg class="icon"><use href="#icon-check"/></svg>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Day</span>
+        <select name="day" required>
+          <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
+          <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+        </select>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Hour</span>
+        <select name="hourPosition" required>
+          <option value="" disabled selected>Select class hour</option>
+          <% hours.forEach(function(h) { %>
+            <option value="<%= h.position %>"><%= h.label %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Class Room</span>
+        <input type="text" name="room" list="room-options-<%= day %>" placeholder="Select or type a room #" autocomplete="off" />
+        <datalist id="room-options-<%= day %>">
+          <% (typeof rooms !== 'undefined' ? rooms : []).forEach(function(r) { %><option value="<%= r %>"></option><% }); %>
+        </datalist>
+      </div>
+    </div>
+
+    <span class="class-form-section-label required">Grade Level <span class="optional-tag">(Select all that apply)</span></span>
+    <div class="grade-pill-grid">
+      <% gradeLevels.forEach(function(g) { %>
+        <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
+      <% }); %>
+    </div>
+
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Start Time</span>
+        <div class="class-time-input-wrap">
+          <svg class="icon icon-clock"><use href="#icon-clock"/></svg>
+          <input type="text" name="startTime" placeholder="9:00 AM" />
+        </div>
+      </div>
+      <div class="class-form-field">
+        <span class="class-form-field-label required">End Time</span>
+        <div class="class-time-input-wrap">
+          <svg class="icon icon-clock"><use href="#icon-clock"/></svg>
+          <input type="text" name="endTime" placeholder="10:00 AM" />
+        </div>
+      </div>
+    </div>
+
+    <span class="class-form-section-label">Teacher / Assistants</span>
+    <div class="class-form-row">
+      <div class="class-form-field">
+        <span class="class-form-field-label required">Teacher</span>
+        <select name="teacherId" required>
+          <option value="" disabled selected>Select teacher&hellip;</option>
+          <% availableStaff.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.name %></option>
+          <% }); %>
+        </select>
+      </div>
+      <% [1, 2, 3].forEach(function(n) { %>
+        <div class="class-form-field">
+          <span class="class-form-field-label">Assistant <%= n %> <span class="optional-tag">(optional)</span></span>
+          <select name="assistantIds">
+            <option value="">Select&hellip;</option>
+            <% availableStaff.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+        </div>
+      <% }); %>
+    </div>
+
+    <span class="class-form-section-label">Class Description</span>
+    <div class="class-form-textarea-wrap">
+      <textarea name="notes" rows="4" placeholder="Enter class description&hellip;" maxlength="500" oninput="this.nextElementSibling.textContent = this.value.length + '/500'"></textarea>
+      <span class="class-form-char-count">0/500</span>
+    </div>
+
+    <div class="class-form-dialog-footer">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-check"/></svg> Create Class</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="edit-schedule-dialog-<%= day %>" class="volunteer-edit-dialog">
+  <h3>Edit <%= dayLabel %> Schedule</h3>
+  <form method="POST" action="/admin/class-schedule/<%= day %>/edit">
+    <p class="hint">Rename the 4 hour blocks used to organize <%= dayLabel %>'s classes.</p>
+    <div class="volunteer-sections-row">
+      <% hours.forEach(function(h) { %>
+        <input type="text" name="labels" value="<%= h.label %>" maxlength="20" />
+      <% }); %>
+    </div>
+
+    <p class="hint">Renaming a room updates it across every <%= dayLabel %> class currently using it.</p>
+    <% if (!rooms || rooms.length === 0) { %>
+      <p class="hint">No rooms in use yet - set a room while adding or editing a class.</p>
+    <% } else { %>
+      <div class="volunteer-sections-row">
+        <% rooms.forEach(function(r) { %>
+          <input type="hidden" name="oldNames" value="<%= r %>" />
+          <input type="text" name="newNames" value="<%= r %>" />
+        <% }); %>
+      </div>
+    <% } %>
+
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="import-dialog-<%= day %>" class="member-picker-dialog">
+  <form method="POST" action="/admin/class-schedule/<%= day %>/import" enctype="multipart/form-data">
+    <h3>Import</h3>
+    <p class="hint">Adds new classes for <%= dayLabel %>. Doesn't touch enrollment or staff - add those on each class's Manage page after importing.</p>
+    <a class="btn-secondary import-sample-link" href="/admin/class-schedule/import-template.xlsx">Download Sample File</a>
+    <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Import</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+
+<div class="roster-scroll">
+  <table class="roster-table class-schedule-room-grid">
+    <thead>
+      <tr>
+        <th class="class-schedule-room-col">Room</th>
+        <% roomGrid.hours.forEach(function(h) { %>
+          <th><%= h.label %></th>
+        <% }); %>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (roomGrid.rows.length === 0) { %>
+        <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes yet.</td></tr>
+      <% } %>
+      <% roomGrid.rows.forEach(function(row) { %>
+        <tr>
+          <td class="class-schedule-room-col"><%= row.room %></td>
+          <% row.cells.forEach(function(cell) { %>
+            <td colspan="<%= cell.span %>" class="class-schedule-cell">
+              <% if (cell.classes.length === 0) { %>
+                &nbsp;
+              <% } else { %>
+                <% cell.classes.forEach(function(cls) { %>
+                  <% var cardAbsentCount = cls.students.filter(function(s) { return absentIds.has(s.id); }).length; %>
+                  <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
+                    <div class="class-card-header">
+                      <h3><%= cls.class_name %></h3>
+                      <% if (!gridReadOnly) { %>
+                        <button type="button" class="btn-secondary class-card-view-btn no-print" data-view-class="<%= cls.id %>">View</button>
+                      <% } %>
+                    </div>
+                    <%# Grade/teacher/assistant only - no student roster here;
+                        View opens the full roster (locals gradeLabel/
+                        teacherNames/assistantNames computed in
+                        utils/classSchedule.js roomGridForDay). %>
+                    <div class="class-card-info">
+                      <% if (cls.gradeLabel) { %><p class="class-card-line"><%= cls.gradeLabel %></p><% } %>
+                      <p class="class-card-line"><span class="class-card-line-label">Teacher:</span> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></p>
+                      <% if (cls.assistantNames.length > 0) { %>
+                        <p class="class-card-line"><span class="class-card-line-label">Assistant:</span> <%= cls.assistantNames.join(', ') %></p>
+                      <% } %>
+                      <% if (cardAbsentCount > 0) { %>
+                        <p class="class-card-line class-card-absent-flag"><%= cardAbsentCount %> student<%= cardAbsentCount === 1 ? '' : 's' %> absent</p>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              <% } %>
+            </td>
+          <% }); %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<% if (!gridReadOnly) { %>
+<dialog id="class-view-dialog" class="class-view-dialog"></dialog>
+<dialog id="allergy-log-dialog" class="class-view-dialog allergy-log-dialog"></dialog>
+<script src="/js/class-schedule-view.js"></script>
+<script src="/js/allergy-log-popup.js"></script>
+<% } %>

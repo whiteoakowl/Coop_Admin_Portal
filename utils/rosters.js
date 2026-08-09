@@ -1,5 +1,10 @@
 const db = require('../db');
 
+// Display labels for attendance.reason_category, shared by the admin
+// Absence/Late log (admin-members.js, admin-rosters.js) and anywhere else
+// that renders a submitted absence/late reason.
+const REASON_LABELS = { personal: 'Personal', medical: 'Medical' };
+
 // All active rosters an active member belongs to that include the given
 // calendar date as one of their session dates.
 function getMemberRostersForDate(memberId, dateISO) {
@@ -14,19 +19,4 @@ function getMemberRostersForDate(memberId, dateISO) {
     .all(dateISO, memberId);
 }
 
-// All distinct upcoming (>= fromISO) session dates across every active
-// roster the member belongs to, ascending, deduplicated.
-function getMemberUpcomingDates(memberId, fromISO) {
-  return db
-    .prepare(
-      `SELECT DISTINCT rd.session_date AS date FROM roster_dates rd
-       JOIN rosters r ON r.id = rd.roster_id AND r.active = 1
-       JOIN roster_members rm ON rm.roster_id = r.id
-       WHERE rm.member_id = ? AND rd.session_date >= ?
-       ORDER BY rd.session_date ASC`
-    )
-    .all(memberId, fromISO)
-    .map((row) => row.date);
-}
-
-module.exports = { getMemberRostersForDate, getMemberUpcomingDates };
+module.exports = { getMemberRostersForDate, REASON_LABELS };

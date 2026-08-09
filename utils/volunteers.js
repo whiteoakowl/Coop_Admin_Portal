@@ -1,0 +1,162 @@
+const db = require('../db');
+const { formatDateLabel } = require('./dates');
+const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+
+function getListByDay(day) {
+  return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
+}
+
+function sectionsForList(listId) {
+  return db.prepare('SELECT * FROM volunteer_sections WHERE volunteer_list_id = ? ORDER BY position').all(listId);
+}
+
+function datesForList(listId) {
+  return db
+    .prepare('SELECT session_date FROM volunteer_dates WHERE volunteer_list_id = ? ORDER BY session_date ASC')
+    .all(listId)
+    .map((r) => r.session_date);
+}
+
+const RANKS = ['first', 'sometimes', 'backup'];
+const RANK_LABELS = { first: 'Choose First', sometimes: 'Sometimes', backup: 'Backup Only' };
+// Lower sorts first - used to order candidate floaters when the automated
+// sub system picks who to auto-assign.
+const RANK_ORDER = { first: 0, sometimes: 1, backup: 2 };
+
+// One row per member on the list, each carrying the full set of section
+// IDs they're assigned to (a member can float across multiple hours) and
+// their rank (kept identical across all of that member's section rows).
+function membersForList(listId) {
+  const rows = db
+    .prepare(
+      `SELECT m.*, vm.section_id AS sectionId, vm.rank AS rank FROM members m
+       JOIN volunteer_members vm ON vm.member_id = m.id
+       WHERE vm.volunteer_list_id = ? AND m.active = 1
+       ORDER BY m.name COLLATE NOCASE`
+    )
+    .all(listId);
+
+  const byMemberId = {};
+  const order = [];
+  for (const row of rows) {
+    if (!byMemberId[row.id]) {
+      byMemberId[row.id] = { ...row, sectionIds: [] };
+      order.push(row.id);
+    }
+    byMemberId[row.id].sectionIds.push(row.sectionId);
+  }
+  return order.map((id) => byMemberId[id]);
+}
+
+// Writes rank to every one of memberId's section rows on this list, so a
+// member has exactly one rank regardless of which/how many hours they're
+// assigned to.
+function setMemberRank(listId, memberId, rank) {
+  if (!RANKS.includes(rank)) return;
+  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ?').run(rank, listId, memberId);
+}
+
+// Everyone on one specific hour section, each carrying just that section's
+// own rank - unlike setMemberRank above, a member's importance can now
+// differ hour to hour (Floater Teams tab), so this reads/writes exactly
+// one (list, member, section) row instead of every one of a member's rows.
+function membersForSection(listId, sectionId) {
+  return db
+    .prepare(
+      `SELECT m.*, vm.rank AS rank FROM members m
+       JOIN volunteer_members vm ON vm.member_id = m.id
+       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1
+       ORDER BY m.name COLLATE NOCASE`
+    )
+    .all(listId, sectionId);
+}
+
+function setSectionRank(listId, memberId, sectionId, rank) {
+  if (!RANKS.includes(rank)) return;
+  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+    rank,
+    listId,
+    memberId,
+    sectionId
+  );
+}
+
+// Removes a member from just one hour (Floater Teams card's trash can) -
+// unlike remove-member elsewhere, which drops them from the whole list.
+function removeMemberFromSection(listId, memberId, sectionId) {
+  db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+    listId,
+    memberId,
+    sectionId
+  );
+}
+
+// Adds a member to one hour section (Floater Teams "+ Add Member" popup) -
+// default rank 'sometimes', same as the day list's own quick-add.
+function addMemberToSection(listId, memberId, sectionId) {
+  db.prepare(
+    "INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, 'sometimes')"
+  ).run(listId, memberId, sectionId);
+}
+
+// Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
+// for a list, optionally narrowed to a single date. A member appears once
+// under every section they're assigned to, sharing the same per-date
+// position/room across all of their hours.
+function buildListGrid(listId, dateFilter) {
+  const sections = sectionsForList(listId);
+  const members = membersForList(listId);
+  const dates = dateFilter ? [dateFilter] : datesForList(listId);
+
+  let sql = 'SELECT member_id, session_date, position, room FROM volunteer_assignments WHERE volunteer_list_id = ?';
+  const params = [listId];
+  if (dateFilter) {
+    sql += ' AND session_date = ?';
+    params.push(dateFilter);
+  }
+  const assignmentRows = dates.length ? db.prepare(sql).all(...params) : [];
+  const byKey = {};
+  for (const a of assignmentRows) byKey[`${a.member_id}|${a.session_date}`] = a;
+
+  const sectionMap = {};
+  for (const s of sections) sectionMap[s.id] = { ...s, members: [] };
+  for (const m of members) {
+    const entry = {
+      member: m,
+      cells: dates.map((d) => {
+        const a = byKey[`${m.id}|${d}`];
+        return { date: d, position: a ? a.position || '' : '', room: a ? a.room || '' : '' };
+      }),
+    };
+    for (const sectionId of m.sectionIds) {
+      const bucket = sectionMap[sectionId];
+      if (bucket) bucket.members.push(entry);
+    }
+  }
+
+  return {
+    sections: Object.values(sectionMap),
+    dates,
+    dateLabels: dates.map(formatDateLabel),
+  };
+}
+
+module.exports = {
+  DAYS,
+  DAY_LABELS,
+  isValidDay,
+  defaultDay,
+  RANKS,
+  RANK_LABELS,
+  RANK_ORDER,
+  getListByDay,
+  sectionsForList,
+  datesForList,
+  membersForList,
+  setMemberRank,
+  membersForSection,
+  setSectionRank,
+  removeMemberFromSection,
+  addMemberToSection,
+  buildListGrid,
+};

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <p class="subtitle"><a href="/admin/members">&larr; Members</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="member-form-page-panel">
+      <form
+        method="POST"
+        action="<%= mode === 'create' ? '/admin/members/new' : '/admin/members/' + member.id + '/edit' %>"
+        enctype="multipart/form-data"
+        id="member-form"
+        class="member-edit-form member-edit-form-page"
+      >
+        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
+
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <a class="btn-secondary" href="/admin/members">Cancel</a>
+            <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> <%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+  </main>
+  <script src="/js/member-form.js"></script>
+</body>
+</html>

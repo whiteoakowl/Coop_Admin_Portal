@@ -4,15 +4,19 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body class="kiosk kiosk-checkout">
+  <%- include('partials/icon-sprite') %>
   <main class="kiosk-wrap">
-    <a href="/" class="kiosk-home">&larr; Home</a>
-    <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+    <div class="kiosk-header">
+      <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1><%= title %></h1>
+    </div>
     <p class="kiosk-date"><%= dateLabel %></p>
 
     <div id="step-scan" class="kiosk-panel">
       <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
       <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-        <span class="kiosk-status-icon">📷</span>
+        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
       </div>
       <form id="scan-form" autocomplete="off">
         <input
@@ -36,5 +40,6 @@
   </main>
   <script src="/js/kiosk-common.js"></script>
   <script src="/js/kiosk-checkout.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
 </body>
 </html>

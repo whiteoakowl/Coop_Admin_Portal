@@ -11,33 +11,120 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <div class="settings-box-row">
-      <div class="settings-box">
-        <h2>Username</h2>
-        <form method="POST" action="/admin/settings/username" class="stack-form stack-form-narrow">
-          <label>Current Username</label>
-          <input type="text" value="<%= username %>" disabled />
+    <div class="view-tabs">
+      <% if (isFullAdmin) { %>
+        <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
+      <% } %>
+      <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
+      <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
+      <% if (isFullAdmin) { %>
+        <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
+      <% } %>
+    </div>
+    <div class="view-tab-panel">
+      <% if (activeTab === 'account') { %>
+        <div class="settings-account-grid">
+          <form method="POST" action="/admin/settings/username" class="stack-form stack-form-narrow">
+            <h3>Username</h3>
+            <label>Current Username</label>
+            <input type="text" value="<%= username %>" disabled />
 
-          <label for="newUsername">New Username</label>
-          <input id="newUsername" name="newUsername" type="text" required />
+            <label for="newUsername">New Username</label>
+            <input id="newUsername" name="newUsername" type="text" required />
 
-          <button type="submit" class="primary-btn">Update</button>
-        </form>
-      </div>
+            <button type="submit" class="primary-btn">Update</button>
+          </form>
 
-      <div class="settings-box">
-        <h2>Password</h2>
-        <form method="POST" action="/admin/settings/password" class="stack-form stack-form-narrow">
-          <label for="currentPassword">Current Password</label>
-          <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
+          <form method="POST" action="/admin/settings/password" class="stack-form stack-form-narrow">
+            <h3>Password</h3>
+            <label for="currentPassword">Current Password</label>
+            <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
 
-          <label for="newPassword">New Password</label>
-          <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" required minlength="8" />
+            <label for="newPassword">New Password</label>
+            <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" required minlength="8" />
 
-          <button type="submit" class="primary-btn">Update</button>
-        </form>
-      </div>
+            <button type="submit" class="primary-btn">Update</button>
+          </form>
+        </div>
+      <% } else if (activeTab === 'documents') { %>
+        <div class="manage-section">
+          <h2>Upload Document</h2>
+          <p class="hint">Add a PDF or Word document to show as a button on the <a href="/admin/documents">Documents</a> page.</p>
+          <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
+            <label for="docTitle">Title</label>
+            <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
+
+            <label for="docFile">File (PDF or Word)</label>
+            <input id="docFile" name="file" type="file" accept=".pdf,.doc,.docx" required />
+
+            <button type="submit" class="primary-btn">Upload</button>
+          </form>
+        </div>
+        <div class="manage-section">
+          <h2>Uploaded Documents</h2>
+          <% if (documents.length === 0) { %>
+            <p class="hint">No documents uploaded yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Title</th><th>File</th><th></th></tr></thead>
+              <tbody>
+                <% documents.forEach(function(d) { %>
+                  <tr>
+                    <td><%= d.title %></td>
+                    <td><%= d.original_name %></td>
+                    <td>
+                      <form method="POST" action="/admin/documents/<%= d.id %>/delete" data-confirm="Delete &quot;<%= d.title %>&quot;?">
+                        <button type="submit" class="icon-btn" aria-label="Delete <%= d.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% } else if (activeTab === 'install') { %>
+        <div class="manage-section">
+          <h2>Install as an App</h2>
+          <p class="hint">Add Sanford Homeschoolers to this device's home screen or app list for quick, full-screen access - no browser address bar or tabs, just like a regular app.</p>
+          <button type="button" id="pwa-install-btn" class="primary-btn" hidden>Install App</button>
+          <p class="hint" id="pwa-install-status"></p>
+        </div>
+        <div class="manage-section">
+          <h2>Android (Chrome / Edge)</h2>
+          <ol class="pwa-steps">
+            <li>Tap <strong>Install App</strong> above, or open the browser menu (&#8942;) and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+            <li>Confirm by tapping <strong>Install</strong>.</li>
+          </ol>
+        </div>
+        <div class="manage-section">
+          <h2>iPhone / iPad (Safari)</h2>
+          <ol class="pwa-steps">
+            <li>Tap the <strong>Share</strong> icon in Safari's toolbar.</li>
+            <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+            <li>Tap <strong>Add</strong> in the top right.</li>
+          </ol>
+        </div>
+        <div class="manage-section">
+          <h2>Desktop (Chrome / Edge)</h2>
+          <ol class="pwa-steps">
+            <li>Click <strong>Install App</strong> above, or click the install icon in the address bar.</li>
+            <li>Confirm by clicking <strong>Install</strong>.</li>
+          </ol>
+        </div>
+      <% } else { %>
+        <p class="subtitle">Kiosk screens and public forms, opened in a new tab.</p>
+        <div class="admin-card-grid">
+          <a class="admin-card" href="/kiosk" target="_blank">Full Kiosk Screen</a>
+          <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
+          <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
+          <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
+          <a class="admin-card" href="/name-tag" target="_blank">Name Tag Form (public link)</a>
+          <a class="admin-card" href="/membership" target="_blank">Membership Form (public link)</a>
+        </div>
+      <% } %>
     </div>
   </main>
+  <script src="/js/edit-toggle.js"></script>
 </body>
 </html>

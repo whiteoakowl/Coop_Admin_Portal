@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main document-view-main">
+    <p class="subtitle"><a href="/admin/documents">&larr; All Documents</a></p>
+    <h1><%= doc.title %></h1>
+    <div class="document-view-frame-wrap">
+      <iframe class="document-view-frame" src="/admin/documents/<%= doc.id %>/file" title="<%= doc.title %>"></iframe>
+    </div>
+  </main>
+</body>
+</html>

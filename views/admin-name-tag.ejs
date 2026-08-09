@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Name Tag <%= tab === 'archived' ? 'Archived Requests' : 'Requests' %></p>
+      </div>
+    </div>
+    <h1>Name Tags</h1>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/name-tag?tab=design">Design</a>
+      <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/name-tag?tab=print">Print</a>
+      <a class="view-tab<%= tab === 'requests' || tab === 'archived' ? ' active' : '' %>" href="/admin/name-tag?tab=requests">Requests</a>
+    </div>
+    <div class="view-tab-panel">
+      <% if (tab === 'design') { %>
+        <div class="name-tag-design-toolbar">
+          <select class="name-tag-type-select" id="name-tag-type-select">
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+          </select>
+
+          <div class="name-tag-toolbar-group">
+            <button type="button" class="name-tag-icon-btn" id="undo-btn" aria-label="Undo" title="Undo"><svg class="icon"><use href="#icon-undo"/></svg></button>
+            <button type="button" class="name-tag-icon-btn" id="redo-btn" aria-label="Redo" title="Redo"><svg class="icon"><use href="#icon-redo"/></svg></button>
+          </div>
+
+          <div class="name-tag-toolbar-group">
+            <select class="name-tag-zoom-select" id="name-tag-zoom-select" aria-label="Zoom">
+              <option value="0.25">25%</option>
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+            </select>
+            <button type="button" class="name-tag-icon-btn" id="grid-toggle-btn" aria-label="Toggle Grid" title="Toggle Grid"><svg class="icon"><use href="#icon-grid"/></svg></button>
+            <button type="button" class="name-tag-icon-btn" id="snap-toggle-btn" aria-label="Toggle Snap to Grid" title="Toggle Snap to Grid"><svg class="icon"><use href="#icon-magnet"/></svg></button>
+          </div>
+
+          <div class="name-tag-editor-actions">
+            <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
+            <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
+            <span id="save-status" class="hint"></span>
+          </div>
+        </div>
+
+        <div class="name-tag-editor" id="name-tag-editor">
+          <div class="name-tag-editor-body">
+            <div class="name-tag-canvas-col">
+              <div class="name-tag-canvas-zoom-wrap" id="name-tag-canvas-zoom-wrap">
+                <div class="badge-canvas name-tag-canvas" id="name-tag-canvas"></div>
+                <div class="name-tag-grid-overlay" id="name-tag-grid-overlay"></div>
+                <div class="name-tag-selection-overlay" id="name-tag-selection-overlay"></div>
+              </div>
+            </div>
+
+            <div class="name-tag-editor-controls">
+              <div class="name-tag-tool-icons" id="name-tag-tool-icons">
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-field" aria-label="Add Text" title="Add Text"><svg class="icon"><use href="#icon-type"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-shape" aria-label="Add Element" title="Add Element"><svg class="icon"><use href="#icon-square"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-image" aria-label="Add Image" title="Add Image"><svg class="icon"><use href="#icon-image"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="add-barcode" aria-label="Add Barcode" title="Add Barcode"><svg class="icon"><use href="#icon-barcode"/></svg></button>
+                <button type="button" class="name-tag-tool-icon-btn" data-tool="background" aria-label="Change Background" title="Change Background"><svg class="icon"><use href="#icon-palette"/></svg></button>
+              </div>
+              <div class="name-tag-tool-panel" id="name-tag-tool-panel"></div>
+
+              <div class="name-tag-properties" id="name-tag-properties"></div>
+            </div>
+          </div>
+        </div>
+      <% } else if (tab === 'print') { %>
+        <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
+          <div class="name-tag-bulk-filter">
+            <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
+              <option value="all">All</option>
+              <option value="student">Students Only</option>
+              <option value="parent">Parents Only</option>
+            </select>
+            <label class="checkbox-option name-tag-select-all">
+              <input type="checkbox" id="name-tag-select-all-checkbox" />
+              Select All
+            </label>
+            <label class="checkbox-option name-tag-select-none">
+              <input type="checkbox" id="name-tag-select-none-checkbox" />
+              Select None
+            </label>
+          </div>
+          <div class="member-picker-list name-tag-bulk-list" id="name-tag-bulk-list">
+            <% if (members.length === 0) { %>
+              <p class="hint">No members yet.</p>
+            <% } %>
+            <% members.forEach(function(m) { %>
+              <label class="member-picker-row" data-type="<%= m.member_type %>">
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                <span><%= m.name %></span>
+                <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+              </label>
+            <% }); %>
+          </div>
+          <div class="name-tag-bulk-submit-row">
+            <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+            <button type="submit" formaction="/admin/name-tag/print-barcodes" class="btn-secondary name-tag-bulk-submit">Print Barcodes Only</button>
+          </div>
+        </form>
+      <% } else { %>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="date-select">Date</label>
+            <select id="date-select" onchange="window.location = '/admin/name-tag?tab=<%= tab %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+              <option value="">All dates</option>
+              <% dates.forEach(function(d) { %>
+                <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="roster-btn-row">
+            <a
+              class="roster-action-btn archived-toggle-btn<%= showArchived ? ' active' : '' %>"
+              href="/admin/name-tag?tab=<%= showArchived ? 'requests' : 'archived' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
+            >Archived</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/name-tag/requests/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          </div>
+        </div>
+
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% if (submissions.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+              <% } %>
+              <% submissions.forEach(function(s) { %>
+                <tr>
+                  <td><%= s.timestamp %></td>
+                  <td><%= s.memberName %></td>
+                  <td><%= s.requestTypeLabel %></td>
+                  <td><%= s.dayLabel %></td>
+                  <td><%= s.description %></td>
+                  <td class="no-print">
+                    <form method="POST" action="/admin/name-tag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
+                      <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+
+  <script id="name-tag-data" type="application/json"><%- nameTagDataJson %></script>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render-core.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/name-tag-editor.js"></script>
+</body>
+</html>

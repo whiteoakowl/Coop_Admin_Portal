@@ -1,0 +1,25 @@
+<%# Fragment (no <html>/<head>/<body>) - fetched by public/js/member-view.js and
+    injected into the Members list page's shared #member-view-dialog, so
+    viewing (and, once unlocked, editing) a member never leaves the list.
+    Starts in view-only mode (fields disabled); clicking Edit unlocks the
+    form in place, Save is a real POST back to the existing edit route -
+    the page reload that follows is what closes the dialog. %>
+<div class="member-view-close-row">
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+<div class="member-form-page-panel">
+  <form method="POST" action="/admin/members/<%= member.id %>/edit" enctype="multipart/form-data" class="member-edit-form" data-member-view-form>
+    <%- include('partials/member-form-fields', { member, mode: 'view', families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
+
+    <div class="member-form-footer">
+      <div class="member-form-footer-view">
+        <a class="btn-secondary" href="/admin/members/<%= member.id %>">Full Profile</a>
+        <button type="button" class="primary-btn" data-edit-member-btn>Edit</button>
+      </div>
+      <div class="member-form-footer-edit" hidden>
+        <button type="button" class="btn-secondary" data-cancel-member-edit>Cancel</button>
+        <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> Save Member</button>
+      </div>
+    </div>
+  </form>
+</div>

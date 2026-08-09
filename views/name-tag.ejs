@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main class="form-wrap">
+    <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+    <div class="kiosk-header">
+      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1>Name Tag Form</h1>
+    </div>
+
+    <% if (result) { %>
+      <div class="alert <%= result.ok ? 'alert-success' : 'alert-error' %>"><%= result.message %></div>
+    <% } %>
+
+    <form method="POST" action="/name-tag/submit" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+      <div class="form-section">
+        <h2>Parent Name</h2>
+        <div class="stack-form">
+          <select id="parentId" name="parentId" required>
+            <option value="">Select your name&hellip;</option>
+            <% parents.forEach(function(p) { %>
+              <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
+            <% }); %>
+          </select>
+        </div>
+
+        <button type="button" id="select-all-btn" class="btn-secondary select-all-btn" hidden>Select All</button>
+        <div id="name-tag-member-groups">
+          <% parents.forEach(function(p) { %>
+            <% var kids = childrenByParent[p.id] || []; %>
+            <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
+              <div class="checkbox-group">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= formValues.memberIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
+                  <%= p.name %> (Parent)
+                </label>
+                <% kids.forEach(function(k) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="memberIds" value="<%= k.id %>" <%= formValues.memberIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
+                    <%= k.name %>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <p id="member-required-msg" class="hint absence-required-msg" hidden>Please select at least one name.</p>
+      </div>
+
+      <div class="form-section">
+        <h2>What Do You Need?</h2>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="requestType" value="lost_tag" <%= formValues.requestType === 'lost_tag' ? 'checked' : '' %> required />
+            Lost Name Tag
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="requestType" value="schedule_change" <%= formValues.requestType === 'schedule_change' ? 'checked' : '' %> />
+            Schedule Change
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2>Day</h2>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="day" value="monday" <%= formValues.day === 'monday' ? 'checked' : '' %> required />
+            Monday
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="day" value="wednesday" <%= formValues.day === 'wednesday' ? 'checked' : '' %> />
+            Wednesday
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="day" value="both" <%= formValues.day === 'both' ? 'checked' : '' %> />
+            Both
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2>Description</h2>
+        <div class="stack-form">
+          <textarea id="description" name="description" rows="3" placeholder="Add any details (optional)"><%= formValues.description %></textarea>
+        </div>
+      </div>
+
+      <button type="submit" class="primary-btn">Submit</button>
+    </form>
+  </main>
+  <script src="/js/name-tag.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
+</body>
+</html>

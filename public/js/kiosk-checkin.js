@@ -11,16 +11,16 @@
 
   let resetTimer = null;
 
-  function setState(state, message, icon_) {
+  function setState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
-    icon.textContent = icon_;
+    icon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
     instructions.textContent = message;
   }
 
   function resetSoon() {
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      setState('idle', 'Scan your name tag barcode', '📷');
+      setState('idle', 'Scan your name tag barcode', 'camera');
     }, 2500);
   }
 
@@ -30,7 +30,7 @@
     input.value = '';
     if (!barcode) return;
 
-    setState('loading', 'Checking…', '⏳');
+    setState('loading', 'Checking…', 'loader');
 
     try {
       const res = await fetch('/kiosk/checkin/scan', {
@@ -40,13 +40,13 @@
       });
       const data = await res.json();
       if (data.ok) {
-        setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'ℹ️' : '✅');
-        setTimeout(() => { window.location.href = '/'; }, 1800);
+        setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'info-circle' : 'check-circle');
+        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
         return;
       }
-      setState('error', data.message, '❌');
+      setState('error', data.message, 'x-circle');
     } catch (err) {
-      setState('error', 'Connection error. Please try again.', '❌');
+      setState('error', 'Connection error. Please try again.', 'x-circle');
     }
     resetSoon();
   });

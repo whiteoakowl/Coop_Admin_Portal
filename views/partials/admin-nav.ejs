@@ -1,18 +1,78 @@
-<header class="admin-nav">
-  <div class="admin-nav-inner">
+<%- include('icon-sprite') %>
+
+<aside class="admin-sidebar">
+  <a class="brand" href="/admin">
+    <img src="/img/logo.png" alt="Sanford Homeschoolers" />
+  </a>
+  <nav id="admin-nav-links">
+    <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
+    <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
+    <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Floater Assignments</a>
+    <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg> Setup/Cleanup</a>
+    <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg> Schedules</a>
+    <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Logs</a>
+    <% if (isFullAdmin) { %>
+      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
+      <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg> Library</a>
+      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg> Documents</a>
+      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg> Design/Print</a>
+    <% } %>
+  </nav>
+  <div class="admin-sidebar-bottom">
+    <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
+    <form method="POST" action="/admin/logout" class="logout-form">
+      <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
+    </form>
+  </div>
+</aside>
+
+<!-- Full Screen toggle - a fixed corner button in the top-right of every
+     admin page (desktop), not tied to any one page's own content, so it's
+     reachable no matter which section is open. -->
+<div class="admin-page-corner-actions no-print">
+  <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn" aria-label="Full Screen View">
+    <svg class="icon"><use href="#icon-maximize"/></svg>
+    <span id="fullscreen-toggle-label">Full Screen View</span>
+  </button>
+</div>
+
+<div class="admin-mobile-topbar">
+  <div class="admin-mobile-topbar-row">
     <a class="brand" href="/admin">
       <img src="/img/logo.png" alt="" />
       Sanford Homeschoolers
     </a>
-    <nav>
-      <a href="/admin">Dashboard</a>
-      <a href="/admin/rosters">Attendance</a>
-      <a href="/admin/members">Members</a>
-      <a href="/admin/absence-list">Absence/Late</a>
-      <a href="/admin/settings">Settings</a>
-    </nav>
-    <form method="POST" action="/admin/logout" class="logout-form">
-      <button type="submit" class="link-btn">Log out</button>
-    </form>
+    <div class="admin-nav-right admin-nav-right-mobile">
+      <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
+      <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-sliders"/></svg></a>
+      <form method="POST" action="/admin/logout" class="logout-form">
+        <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
+      </form>
+    </div>
   </div>
-</header>
+</div>
+
+<nav class="admin-mobile-tabs" id="admin-mobile-tabs">
+  <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg><span>Home</span></a>
+  <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg><span>Attendance</span></a>
+  <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg><span>Floaters</span></a>
+  <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg><span>Setup/Cleanup</span></a>
+  <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg><span>Schedules</span></a>
+  <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Logs</span></a>
+  <% if (isFullAdmin) { %>
+    <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg><span>Members</span></a>
+    <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg><span>Library</span></a>
+    <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg><span>Documents</span></a>
+    <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg><span>Design/Print</span></a>
+  <% } %>
+</nav>
+
+<%- include('admin-alerts-dialog') %>
+<%- include('confirm-dialog') %>
+
+<script src="/js/admin-nav.js"></script>
+<script src="/js/alerts.js"></script>
+<script src="/js/fullscreen-toggle.js"></script>
+<script src="/js/fullscreen-nav.js"></script>
+<script src="/js/confirm-dialog.js"></script>
+<script src="/js/fit-tabs.js"></script>

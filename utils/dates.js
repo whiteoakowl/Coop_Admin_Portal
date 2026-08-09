@@ -53,6 +53,48 @@ function formatTime(epochMs) {
   return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+// Formats a plain "HH:MM" (24-hour, from an <input type="time">) as a
+// friendly 12-hour label, e.g. "08:30" -> "8:30 AM".
+function formatTimeOfDay(hhmm) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// Formats a SQLite `datetime('now')` string (UTC, "YYYY-MM-DD HH:MM:SS")
+// as a local timestamp label.
+function formatTimestamp(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  return d.toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Formats a SQLite `datetime('now')` string (UTC, "YYYY-MM-DD HH:MM:SS") as
+// "December 1, 2025 9:52am" - used for the library's scan timestamps.
+function formatFriendlyTimestamp(sqlTimestamp) {
+  if (!sqlTimestamp) return null;
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  let hours = d.getHours();
+  const minutes = pad(d.getMinutes());
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${hours}:${minutes}${ampm}`;
+}
+
+// Whole-years-old as of today, or null if the birthday isn't a valid date.
+function ageFromBirthday(iso) {
+  if (!isValidISODate(iso)) return null;
+  const birth = parseISO(iso);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear = today.getMonth() > birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age--;
+  return age >= 0 ? age : null;
+}
+
 module.exports = {
   todayISO,
   addDays,
@@ -61,4 +103,8 @@ module.exports = {
   formatDateLabel,
   formatDateLong,
   formatTime,
+  formatTimeOfDay,
+  formatTimestamp,
+  formatFriendlyTimestamp,
+  ageFromBirthday,
 };

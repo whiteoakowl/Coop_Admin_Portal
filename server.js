@@ -1,17 +1,51 @@
 require('dotenv').config();
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 
-require('./db'); // initialize database + seed default admin
+const db = require('./db'); // initialize database + seed default admin
+
+// The Monday/Wednesday Parent/Student rosters are normally created lazily
+// the first time a class enrolls/staffs someone that day - ensure all 4
+// always exist up front so they're visible on Attendance immediately, even
+// before any classes are set up. syncDayMemberRosters then backfills both
+// days' roster membership AND member_schedules (the derived Schedule Card
+// / profile Class Schedule data) from current enrollment/staffing, so
+// existing classes are reflected everywhere on every boot, not just after
+// their next edit.
+const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
+['monday', 'wednesday'].forEach((day) => {
+  ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
+  syncDayMemberRosters(day);
+});
+
+const { defaultDay } = require('./utils/days');
 
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
 const absenceRouter = require('./routes/absence');
+const nameTagRouter = require('./routes/name-tag');
 const adminRouter = require('./routes/admin');
 const adminRostersRouter = require('./routes/admin-rosters');
+const adminLogsRouter = require('./routes/admin-logs');
+const adminDocumentsRouter = require('./routes/admin-documents');
+const adminLibraryRouter = require('./routes/admin-library');
+const adminDesignRouter = require('./routes/admin-design');
+const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
 const adminMembersRouter = require('./routes/admin-members');
+const adminVolunteersRouter = require('./routes/admin-volunteers');
+const adminSubstitutesRouter = require('./routes/admin-substitutes');
+const volunteersRouter = require('./routes/volunteers');
+const adminSetupRouter = require('./routes/admin-setup');
+const setupRouter = require('./routes/setup');
+const adminNameTagRouter = require('./routes/admin-name-tag');
+const adminScheduleRouter = require('./routes/admin-schedule');
+const adminClassScheduleRouter = require('./routes/admin-class-schedule');
+const classScheduleRouter = require('./routes/class-schedule');
+const contactAdminsRouter = require('./routes/contact-admins');
+const membershipRouter = require('./routes/membership');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,9 +57,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Falling back to a fixed, source-controlled secret would let anyone who's
+// seen this repo forge a valid admin session cookie against any install
+// that forgot to set SESSION_SECRET. A random secret is generated instead
+// so a missed .env entry fails safe - admins just get logged out on
+// restart rather than the app running with a publicly-known secret.
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  sessionSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('\nSESSION_SECRET is not set in .env - using a random secret for this run.');
+  console.warn('Admins will be logged out every time the server restarts until you set SESSION_SECRET in .env.\n');
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'sh-check-in-out-dev-secret-change-me',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -36,19 +82,60 @@ app.use(
   })
 );
 
-app.get('/', (req, res) => {
-  res.render('index', { title: 'SH Check-In / Check-Out' });
+// Available in every EJS view (including partials/admin-nav) without each
+// route having to pass it explicitly. True only for the single master Admin
+// account.
+app.use((req, res, next) => {
+  res.locals.isFullAdmin = !!(req.session && req.session.adminId);
+  next();
 });
 
+app.get('/', (req, res) => {
+  res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
+});
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/', absenceRouter);
+app.use('/', nameTagRouter);
+app.use('/', volunteersRouter);
+app.use('/', setupRouter);
+app.use('/', classScheduleRouter);
+app.use('/', contactAdminsRouter);
+app.use('/', membershipRouter);
+// Order matters here: several of these routers gate themselves with a
+// blanket `router.use(requireFullAdmin)` (no path), which - because Express
+// matches on the shared '/admin' mount prefix, not on that router's own
+// route table - runs for ANY /admin/* request that reaches it, not just
+// requests one of its own routes would've matched. Mounting those routers
+// (Documents, Library, Design/Print, misc badges, Members, Name Tag) AFTER
+// every other /admin router ensures the latter's own requireAdmin routes
+// get first chance to handle the request, instead of being hijacked by an
+// unrelated router's blanket gate before they're ever reached.
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
+app.use('/admin', adminLogsRouter);
+app.use('/admin', adminVolunteersRouter);
+app.use('/admin', adminSubstitutesRouter);
+app.use('/admin', adminSetupRouter);
+app.use('/admin', adminScheduleRouter);
+app.use('/admin', adminClassScheduleRouter);
+app.use('/admin', adminDocumentsRouter);
+app.use('/admin', adminLibraryRouter);
+app.use('/admin', adminDesignRouter);
+app.use('/admin', adminMiscBadgesRouter);
 app.use('/admin', adminMembersRouter);
+app.use('/admin', adminNameTagRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });
+});
+
+// Catches anything an individual route didn't handle itself (a thrown
+// error, a rejected promise passed to next()) so a bug never surfaces a
+// raw stack trace to someone using the kiosk - it's logged here instead.
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).render('500', { title: 'Error' });
 });
 
 function lanAddresses() {

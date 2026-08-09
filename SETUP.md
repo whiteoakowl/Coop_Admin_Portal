@@ -49,7 +49,7 @@ npm start
 
 ## Step 4 — Log in and set a real password
 
-Go to `/admin` (click **Admin** on the home page). Log in with:
+Go to `/admin`, or click the small **Staff Login** link on the home page. Log in with:
 
 - Username: `admin`
 - Password: `changeme123`
@@ -58,18 +58,19 @@ Then open **Settings** and change the password to something only you know. This 
 
 ## Step 5 — Create your first roster
 
-Click **Rosters** → **+ New Roster**. Fill in:
+If you want to group rosters by category (e.g. "Youth", "Adults", "Sports"), add those categories first: **Settings** → type a name under **Categories** → **Add**. This is the only place categories are created.
+
+Then click **Attendance** → **+ New Roster**. Fill in:
 
 - **Title** — whatever you call the group (e.g. "Wednesday Youth", "Monday Adults").
-- **Category** — optional, lets you filter rosters later (e.g. "Youth", "Adults", "Sports").
+- **Category** — optional, pick from the categories you've already added.
 - **Session Dates** — click a date field and pick a date, then **+ Add another date** for each additional session. Pick as many or as few as you want up front; you can always add more later from the roster's Manage page.
-- **Import Member Names** — optional; upload a list right here to seed the roster's member list in the same step (see the file format below).
 
 A student in two different groups just gets added to both rosters — create each roster separately and add that member to both.
 
 ## Step 6 — Add your members
 
-If you didn't upload a list when creating the roster, open it and click **Manage**. Two ways to add people:
+Open the roster and click **Manage**. Two ways to add people:
 
 **Import a list** (fastest for a whole group) — a plain text or spreadsheet-exported `.csv`/`.txt` file with one name per line:
 
@@ -84,11 +85,11 @@ Upload it and the system creates a member record for each new name automatically
 
 **Add one at a time** — pick an existing member from the dropdown (handy when adding someone to a second roster).
 
-**Adding names without a roster yet?** Go to **Members → + Import Names from File** to add people to the system (and the Absence/Late form's dropdown) before you've decided which roster they belong to.
+**Adding names without a roster yet?** Go to **Members** and use the name bar or **Import from File** to add people to the system before you've decided which roster they belong to. Note this does *not* put them on the Absence/Late form — see Step 9.
 
 ## Step 7 — Print name tags
 
-Go to **Members**, and click **Print Badge** next to a name. It opens a printable tag with a scannable barcode on it — print it and attach it to a name tag or lanyard. Do this for everyone before your first session.
+Since barcodes are just each member's name, if your name tags/lanyards already have a scannable barcode with the person's name on them, they'll work as-is. Otherwise you'll need to produce your own barcode labels (Code128 format) with each member's exact name as it appears on the Members page.
 
 ## Step 8 — Set up the two kiosk screens
 
@@ -107,9 +108,11 @@ For a clean walk-up screen with no browser bars, use full-screen mode: **F11** o
 
 A scan only works if today's date is one of that member's roster's session dates — if not, the kiosk says so and stays ready for the next person. After a successful check-in or check-out, the kiosk shows a quick confirmation and then returns to the home page automatically.
 
-## Step 9 — Share the Absence/Late Form
+## Step 9 — Set up and share the Absence/Late Form
 
-Send families the link to `/absence` (no login needed). It lets them report an absence or a late arrival in advance — the date dropdown only shows dates from rosters that person is actually on — and it writes straight into the same roster you see in the admin dashboard: a red **A** for absent, a yellow **L** for late.
+Only people you explicitly add can be selected on the Absence/Late form — it doesn't automatically include everyone from Members, the same way rosters work. Go to **Absence/Late** in the nav and add people using the name bar, the existing-member dropdown, or **Import from File**.
+
+Once that's done, send families the link to `/absence` directly (no login needed, and it's not linked from the home page on purpose) — bookmark it or add it to your co-op's newsletter/group chat. It lets them pick their name, pick a class date from a calendar, and report an absence or a late arrival in advance. It writes straight into the roster grid you see in the admin dashboard: a red **A** for absent, a yellow **L** for late.
 
 ---
 
@@ -135,7 +138,7 @@ Everything — every member, roster, check-in, and absence — lives in one file
 
 | Problem | Try this |
 |---|---|
-| "Barcode not recognized" at the kiosk | Check that the member is listed under **Members** and marked Active, and that their badge's barcode matches what's shown there. |
+| "Barcode not recognized" at the kiosk | Check that the member is listed under **Members**, and that their barcode matches what's shown there (barcodes are just each member's name). |
 | "Not scheduled for a roster today" at the kiosk | That member's roster(s) don't include today's date. Add today as a session date from the roster's Manage page if that's unexpected. |
 | Second kiosk can't reach the system | Make sure both devices are on the same wifi, and use the `http://192.168.x.x:3000` address printed in the terminal window, not `localhost`. |
 | Forgot the admin password | Close the server, delete the `data` folder (this erases all data — restore from a backup afterward), then start it again to get a fresh admin account from your `.env` file. |

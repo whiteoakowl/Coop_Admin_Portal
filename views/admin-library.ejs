@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Library</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="view-tabs">
+      <a class="view-tab<%= tab === 'checkin' ? ' active' : '' %>" href="/admin/library?tab=checkin">Check In</a>
+      <a class="view-tab<%= tab === 'checkout' ? ' active' : '' %>" href="/admin/library?tab=checkout">Check Out</a>
+      <a class="view-tab<%= tab === 'members' ? ' active' : '' %>" href="/admin/library?tab=members">Members</a>
+      <a class="view-tab<%= tab === 'titles' ? ' active' : '' %>" href="/admin/library?tab=titles">Catalog</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'checkout') { %>
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Member</h2>
+          <p class="hint" id="library-member-hint">Scan the member's name tag barcode to start a checkout.</p>
+          <form id="library-member-form" autocomplete="off">
+            <input id="library-member-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type member barcode" />
+          </form>
+          <p id="library-member-display" class="library-current-member" hidden></p>
+        </div>
+
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Items</h2>
+          <p class="hint" id="library-item-hint">Scan a member first, then scan each item being checked out.</p>
+          <form id="library-item-form" autocomplete="off">
+            <input id="library-item-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" disabled />
+          </form>
+          <table class="roster-table" id="library-pending-table" hidden>
+            <thead><tr><th>Item</th><th></th></tr></thead>
+            <tbody id="library-pending-tbody"></tbody>
+          </table>
+          <p class="roster-empty" id="library-pending-empty">No items scanned yet.</p>
+          <label for="library-due-date-input" class="roster-checkbox-label">Due Date (optional)</label>
+          <input type="date" id="library-due-date-input" />
+          <div class="roster-btn-row">
+            <button type="button" id="library-clear-btn" class="roster-action-btn">Clear</button>
+            <button type="button" id="library-save-btn" class="roster-action-btn" disabled>Save All</button>
+          </div>
+        </div>
+
+        <form id="library-checkout-form" method="POST" action="/admin/library/checkout" hidden>
+          <input type="hidden" name="memberId" id="library-checkout-member-id" />
+          <input type="hidden" name="dueDate" id="library-checkout-due-date" />
+          <div id="library-checkout-item-inputs"></div>
+        </form>
+      <% } else if (tab === 'checkin') { %>
+        <div class="manage-section library-checkout-section">
+          <h2>Scan Items</h2>
+          <p class="hint" id="library-checkin-hint">Scan an item's barcode to check it back in.</p>
+          <form id="library-checkin-form" autocomplete="off">
+            <input id="library-checkin-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" autofocus />
+          </form>
+        </div>
+
+        <div class="manage-section">
+          <h2>Just Checked In</h2>
+          <table class="roster-table" id="library-checkin-table" hidden>
+            <thead><tr><th>Item</th><th>Returned By</th></tr></thead>
+            <tbody id="library-checkin-tbody"></tbody>
+          </table>
+          <p class="roster-empty" id="library-checkin-empty">No items checked in yet this session.</p>
+        </div>
+      <% } else if (tab === 'members') { %>
+        <div class="manage-section">
+          <h2>Currently Checked Out</h2>
+          <% if (membersWithCheckouts.length === 0) { %>
+            <p class="roster-empty">Nobody has any library items checked out right now.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Member</th><th>Item</th><th>Checked Out</th><th>Due Date</th><th></th></tr></thead>
+              <tbody>
+                <% membersWithCheckouts.forEach(function(m) { %>
+                  <% var memberOverdue = m.items.some(function(it) { return it.overdue; }); %>
+                  <% m.items.forEach(function(item, i) { %>
+                    <tr class="<%= item.overdue ? 'library-overdue-row' : '' %>">
+                      <% if (i === 0) { %><td rowspan="<%= m.items.length %>" class="roster-name-col<%= memberOverdue ? ' library-overdue-row' : '' %>"><%= m.memberName %></td><% } %>
+                      <td><%= item.title %></td>
+                      <td><%= item.checkedOutAt %></td>
+                      <td><%= item.dueDateLabel || '—' %><% if (item.overdue) { %> <span class="badge-pill badge-pill-absent">Overdue</span><% } %></td>
+                      <td>
+                        <form method="POST" action="/admin/library/checkouts/<%= item.checkoutId %>/return">
+                          <button type="submit" class="btn-secondary">Return</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                <% }); %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      <% } else { %>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="type-select">Filter by type</label>
+            <select id="type-select" onchange="window.location = '/admin/library?tab=titles' + (this.value ? '&type=' + encodeURIComponent(this.value) : '')">
+              <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
+              <% types.forEach(function(t) { %>
+                <option value="<%= t %>" <%= typeFilter === t ? 'selected' : '' %>><%= t %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-type-dialog').showModal()">+ Add Type</button>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-item-dialog').showModal()">+ Add Item</button>
+          </div>
+        </div>
+
+        <dialog id="add-type-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/library/types">
+            <h3>Add Type</h3>
+            <p class="hint">Used to organize library items &mdash; pick it from the dropdown when adding or editing an item.</p>
+            <input type="text" name="name" placeholder="e.g. Book, Curriculum Kit" required />
+            <div class="checkbox-row">
+              <% if (types.length === 0) { %><span class="hint">No types yet.</span><% } %>
+              <% types.forEach(function(t) { %><span class="badge-pill"><%= t %></span><% }); %>
+            </div>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="add-item-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/library/items/new">
+            <h3>Add Library Item</h3>
+            <label for="itemBarcode">Barcode</label>
+            <input id="itemBarcode" name="barcode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Scan or type item barcode" autofocus required />
+
+            <label for="itemTitle">Title</label>
+            <input id="itemTitle" name="title" type="text" required />
+
+            <label for="itemType">Type</label>
+            <select id="itemType" name="type">
+              <option value="">No type</option>
+              <% types.forEach(function(t) { %><option value="<%= t %>"><%= t %></option><% }); %>
+            </select>
+
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add Item</button>
+            </div>
+          </form>
+        </dialog>
+
+        <div class="manage-section">
+          <h2>All Titles</h2>
+          <% if (items.length === 0) { %>
+            <p class="roster-empty">No library items yet.</p>
+          <% } else { %>
+            <table class="roster-table">
+              <thead><tr><th>Title</th><th>Barcode</th><th>Type</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <% items.forEach(function(item) { %>
+                  <tr>
+                    <td><%= item.title %></td>
+                    <td><%= item.barcode %></td>
+                    <td>
+                      <select name="type" form="type-form-<%= item.id %>">
+                        <option value="">No type</option>
+                        <% types.forEach(function(t) { %><option value="<%= t %>" <%= item.type === t ? 'selected' : '' %>><%= t %></option><% }); %>
+                      </select>
+                    </td>
+                    <td><span class="badge-pill <%= item.checkedOut ? 'badge-pill-absent' : 'badge-pill-present' %>"><%= item.checkedOut ? 'Checked Out' : 'Checked In' %></span></td>
+                    <td class="actions-cell">
+                      <button type="submit" form="type-form-<%= item.id %>" class="icon-btn" aria-label="Save type for <%= item.title %>" title="Save"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      <form method="POST" action="/admin/library/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= item.title %>&quot;? This also removes its checkout history.">
+                        <button type="submit" class="icon-btn" aria-label="Delete <%= item.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+            <% items.forEach(function(item) { %>
+              <form id="type-form-<%= item.id %>" method="POST" action="/admin/library/items/<%= item.id %>/edit">
+                <input type="hidden" name="title" value="<%= item.title %>" />
+                <input type="hidden" name="barcode" value="<%= item.barcode %>" />
+              </form>
+            <% }); %>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <script src="/js/library-checkout.js"></script>
+</body>
+</html>

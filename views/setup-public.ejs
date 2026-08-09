@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk" data-idle-redirect="20000">
+  <%- include('partials/icon-sprite') %>
+  <a class="kiosk-home" href="/kiosk"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+  <div class="kiosk-header">
+    <img class="kiosk-logo" src="/img/logo.png" alt="" />
+    <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
+  </div>
+
+  <% if (teams.length === 0) { %>
+    <div class="kiosk-wrap">
+      <div class="kiosk-panel kiosk-panel-muted">
+        <p class="kiosk-message">No teams set up yet.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="team-card-grid setup-team-card-grid kiosk-team-card-grid">
+      <% teams.forEach(function(t, i) { %>
+        <div class="team-col">
+          <div class="team-info-card team-accent-<%= i % 5 %>">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+            <h3 class="team-info-title"><%= t.title %></h3>
+            <% if (t.leaderName) { %>
+              <div class="team-info-leader">
+                <svg class="icon"><use href="#icon-user"/></svg>
+                Leader: <span><%= t.leaderName %></span>
+              </div>
+            <% } %>
+            <% if (t.description) { %>
+              <span class="team-info-pill"><svg class="icon"><use href="#icon-tag"/></svg> <span><%= t.description %></span></span>
+            <% } %>
+          </div>
+          <div class="team-members-card">
+            <h4>Members</h4>
+            <div class="team-card-members">
+              <% if (t.members.length === 0) { %>
+                <p class="team-card-empty">No members on this team yet.</p>
+              <% } %>
+              <% t.members.forEach(function(m) { %>
+                <div class="team-member-row">
+                  <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+  <script src="/js/idle-redirect.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
+</body>
+</html>

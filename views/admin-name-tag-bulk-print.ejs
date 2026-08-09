@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Name Tags</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (badges.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      // Landscape 3.5x2.25in badges fit 2 across x 4 down on a US Letter
+      // sheet with room for margins - 8 per page.
+      var pages = [];
+      for (var i = 0; i < badges.length; i += 8) pages.push(badges.slice(i, i + 8));
+    %>
+    <% pages.forEach(function(pageBadges) { %>
+      <div class="badge-sheet-page badge-sheet">
+        <% pageBadges.forEach(function(b) { %>
+          <%- include('partials/name-tag-badge', { html: b.html, bgCss: b.bgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>
