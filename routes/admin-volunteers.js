@@ -3,11 +3,11 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { isValidISODate, formatDateLabel, formatDateLong, todayISO } = require('../utils/dates');
+const { isValidISODate, formatDateLabel, formatDateLong, todayISO, weekdayOf } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { defaultDay, requireDay } = require('../utils/days');
-const { hoursForDay, syncDayMemberRosters } = require('../utils/classSchedule');
+const { hoursForDay, syncDayMemberRosters, classesAtRiskForDay } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -251,6 +251,27 @@ router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireDay
   });
 
   sendCsv(res, `${day}-floater-assignments-${date}.csv`, lines);
+});
+
+// --- Class Cancellation Risk: same list as the Logs tab, surfaced right
+// on the Floater Assignments page too (a class at risk of low turnout is
+// exactly the kind of thing someone planning floaters wants to see
+// without leaving this page). ---
+
+const RISK_DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+
+router.get('/volunteers/:day/risk', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const today = todayISO();
+  const alertDate = weekdayOf(today) === RISK_DAY_WEEKDAY[day] ? today : null;
+
+  res.render('admin-volunteer-risk', {
+    title: `${DAY_LABELS[day]} Class Cancellation Risk`,
+    tab: 'floater',
+    day,
+    dayLabel: DAY_LABELS[day],
+    classesAtRisk: classesAtRiskForDay(day, alertDate),
+  });
 });
 
 // --- Floater Teams: who's on the list for each hour, ranked ---

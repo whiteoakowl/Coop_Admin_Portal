@@ -164,25 +164,7 @@
             <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead><tr><th>Hour</th><th>Class</th><th>Room</th><th>Expected</th><th>Enrolled</th></tr></thead>
-            <tbody>
-              <% if (classesAtRisk.length === 0) { %>
-                <tr><td colspan="5" class="roster-empty">No classes are at risk of low attendance on <%= dayLabel %>.</td></tr>
-              <% } %>
-              <% classesAtRisk.forEach(function(c) { %>
-                <tr>
-                  <td><%= c.hourLabel %></td>
-                  <td><%= c.className %></td>
-                  <td><%= c.room || '—' %></td>
-                  <td><span class="badge-pill badge-pill-absent"><%= c.expectedCount %></span></td>
-                  <td><%= c.enrolledCount %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <%- include('partials/class-risk-table', { classesAtRisk, dayLabel }) %>
       <% } else if (tab === 'substitutes') { %>
         <div class="roster-toolbar no-print">
           <div class="filter-row">

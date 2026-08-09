@@ -3124,7 +3124,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: #fff;
 }
 .class-time-input-wrap .icon-clock { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
-.class-time-input-wrap .icon-chevron-down { width: 0.85rem; height: 0.85rem; color: var(--muted); flex-shrink: 0; }
 .class-time-input-wrap input {
   border: none;
   outline: none;
@@ -3198,7 +3197,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   min-width: 175px;
 }
 .class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; font-size: 0.85rem; }
-.class-schedule-room-col { min-width: 100px; font-weight: 700; white-space: nowrap; background: var(--brand-soft); font-size: 0.85rem; }
+/* Higher specificity than the generic th/td min-width above (two classes,
+   not one) - the room column shrinks to fit its own text ("width: 1%"
+   with nowrap is the standard auto-table shrink-to-fit trick) instead of
+   sharing the same wide min-width as every hour column. */
+.class-schedule-room-grid .class-schedule-room-col {
+  min-width: 0;
+  width: 1%;
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--brand-soft);
+  font-size: 0.85rem;
+}
 .class-schedule-cell { background: #fff; }
 .class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.4rem; }
 .class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
@@ -3214,6 +3224,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .class-card-header h3 { margin: 0; font-size: 0.92rem; }
+/* Grade/Teacher/Assistant - each its own line, stacked cleanly, no
+   student roster (that's what View is for). */
+.class-card-info { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.3rem; }
+.class-card-line { margin: 0; font-size: 0.78rem; color: var(--ink); }
+.class-card-line-label { font-weight: 700; color: var(--muted); margin-right: 0.25rem; }
+.class-card-absent-flag { color: var(--red); font-weight: 600; }
+/* Still used by the public kiosk Class Schedule page's own card markup
+   (views/class-schedule-public.ejs), which keeps the older full-roster
+   layout. */
 .class-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; margin: 0.25rem 0; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
 .class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.35rem 0 0; }
 .class-card-pill-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-right: 0.1rem; }
@@ -3251,6 +3270,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-header h3 { margin: 0; font-size: 1.3rem; flex: 1; }
 .class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
 
+/* Edit/Delete (and, once editing, Cancel/Save) sit top-right of the popup
+   next to Close instead of at the bottom of the form - every button here
+   is the plain .roster-action-btn size/shape so Edit and Delete (and
+   Cancel/Save) all read as the same size. */
+.class-view-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.class-view-footer-view,
+.class-view-footer-edit { display: flex; align-items: center; gap: 0.5rem; }
+
 /* Fields start disabled (view-only) until "Edit Class" is clicked - keep
    them legible instead of the browser's washed-out default disabled
    look, so "view mode" still reads as real content, not a broken form. */
@@ -3264,12 +3291,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-view-form .class-color-swatch:has(input:disabled) { cursor: default; }
 
-.class-view-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; min-width: 0; }
-.class-view-footer-view,
-.class-view-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; }
-.class-view-footer-view { justify-content: space-between; }
-.class-view-footer-edit { justify-content: flex-end; }
-.class-view-footer .roster-action-btn-danger { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
 .class-view-roster-actions { margin-top: 0.25rem; }
 
 /* Allergies/Medical log popup - reuses .class-view-dialog's chrome but

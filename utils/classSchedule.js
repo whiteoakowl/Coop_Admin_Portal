@@ -35,6 +35,28 @@ function ageGroupList(ageGroup) {
     .filter(Boolean);
 }
 
+// "1st" -> "1", "3rd" -> "3" - the non-numeric grade labels (Infant,
+// Toddler, Preschool, PreK, Kindergarten) have no suffix to strip and
+// pass through unchanged.
+function stripOrdinal(label) {
+  return label.replace(/(st|nd|rd|th)$/i, '');
+}
+
+// A class card shows its grade(s) as a single compact line - "Grade 1"
+// for one grade, "Grades 1-3" for a contiguous run, or a plain comma list
+// for a non-contiguous selection (e.g. "1st" and "5th" but nothing
+// between) - instead of a badge per grade.
+function formatGradeRange(ageGroup) {
+  const labels = ageGroupList(ageGroup);
+  if (labels.length === 0) return '';
+  const indices = labels.map((l) => GRADE_LEVELS.indexOf(l)).filter((i) => i !== -1).sort((a, b) => a - b);
+  if (indices.length === 0) return labels.join(', ');
+  if (indices.length === 1) return `Grade ${stripOrdinal(GRADE_LEVELS[indices[0]])}`;
+  const isContiguous = indices.every((idx, i) => i === 0 || idx === indices[i - 1] + 1);
+  if (isContiguous) return `Grades ${stripOrdinal(GRADE_LEVELS[indices[0]])}-${stripOrdinal(GRADE_LEVELS[indices[indices.length - 1]])}`;
+  return `Grades ${indices.map((i) => stripOrdinal(GRADE_LEVELS[i])).join(', ')}`;
+}
+
 // Cycled through in order as new classes are created, so a freshly built
 // schedule is colorful without an admin having to pick a color every time.
 // 12 soft pastel tones spanning the hue wheel, so classes stay easy to
@@ -132,7 +154,17 @@ function roomGridForDay(day) {
   const classes = db
     .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, class_name COLLATE NOCASE')
     .all(day)
-    .map((cls) => ({ ...cls, students: studentsForClass(cls.id), staff: staffForClass(cls.id) }));
+    .map((cls) => {
+      const staff = staffForClass(cls.id);
+      return {
+        ...cls,
+        students: studentsForClass(cls.id),
+        staff,
+        gradeLabel: formatGradeRange(cls.age_group),
+        teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+        assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+      };
+    });
 
   const roomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : 'Unassigned')))].sort(
     (a, b) => {
@@ -650,6 +682,7 @@ module.exports = {
   COLOR_PALETTE,
   GRADE_LEVELS,
   ageGroupList,
+  formatGradeRange,
   hoursForDay,
   saveHourLabels,
   gridForDay,

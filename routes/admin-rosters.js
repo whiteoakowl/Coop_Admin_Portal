@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatTime, todayISO, weekdayOf } = require('../utils/dates');
-const { familyOf } = require('../utils/members');
+const { familyOf, byLastName } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { arrivalDepartureLabels } = require('../utils/schedule');
 const {
@@ -31,15 +31,15 @@ function absenceFormSubmissionsForRoster(rosterId, date) {
   if (!date) return { absences: [], lates: [] };
   const rows = db
     .prepare(
-      `SELECT m.name AS memberName, a.status, a.reason_category AS reasonCategory, a.reason_text AS reasonText
+      `SELECT m.name AS name, a.status, a.reason_category AS reasonCategory, a.reason_text AS reasonText
        FROM attendance a
        JOIN members m ON m.id = a.member_id
-       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form'
-       ORDER BY m.name COLLATE NOCASE`
+       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form'`
     )
     .all(rosterId, date)
+    .sort(byLastName)
     .map((r) => ({
-      memberName: r.memberName,
+      memberName: r.name,
       status: r.status,
       reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
       description: r.reasonText || '—',
@@ -102,22 +102,25 @@ function availableMembersForRoster(rosterId, memberType) {
   return db
     .prepare(
       `SELECT id, name FROM members WHERE active = 1 AND member_type = ?
-       AND id NOT IN (SELECT member_id FROM roster_members WHERE roster_id = ?)
-       ORDER BY name COLLATE NOCASE`
+       AND id NOT IN (SELECT member_id FROM roster_members WHERE roster_id = ?)`
     )
-    .all(memberType, rosterId);
+    .all(memberType, rosterId)
+    .sort(byLastName);
 }
 
+// Every roster (each weekday's Parent/Student roster, every class's own
+// roster) lists members alphabetically by last name, not first - see
+// byLastName in utils/members.js.
 function rosterMembers(rosterId) {
   return db
     .prepare(
       `SELECT m.*
        FROM members m
        JOIN roster_members rm ON rm.member_id = m.id
-       WHERE rm.roster_id = ? AND m.active = 1
-       ORDER BY m.name COLLATE NOCASE`
+       WHERE rm.roster_id = ? AND m.active = 1`
     )
-    .all(rosterId);
+    .all(rosterId)
+    .sort(byLastName);
 }
 
 function rosterDates(rosterId) {
