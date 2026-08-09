@@ -13,8 +13,8 @@ const {
   setAssignment,
   approveAssignment,
   clearAssignment,
-  pendingApprovalsForToday,
 } = require('../utils/substitutes');
+const { todaysAlerts } = require('../utils/alerts');
 
 // Substitutes is no longer its own tab - it's folded into the Floater
 // Assignments manage page (routes/admin-volunteers.js). Keep this as a
@@ -37,13 +37,14 @@ function subUrl(day, params) {
 router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
+  const room = (req.body.room || '').trim();
   const hourPositions = [].concat(req.body.hourPositions || [])
     .map((v) => parseInt(v, 10))
     .filter((p) => HOUR_POSITIONS.includes(p));
   if (!title || hourPositions.length === 0) {
     return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and at least one hour are required.' }));
   }
-  hourPositions.forEach((hourPosition) => createPermanentJob({ day, hourPosition, title }));
+  hourPositions.forEach((hourPosition) => createPermanentJob({ day, hourPosition, title, room }));
   const hourNote = hourPositions.length > 1 ? `Hours ${hourPositions.join(', ')}` : `Hour ${hourPositions[0]}`;
   res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).` }));
 });
@@ -52,9 +53,10 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin
   const day = req.params.day;
   const id = parseInt(req.params.id, 10);
   const title = (req.body.title || '').trim();
+  const room = (req.body.room || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
   if (title && HOUR_POSITIONS.includes(hourPosition)) {
-    updatePermanentJob(id, { title, hourPosition });
+    updatePermanentJob(id, { title, hourPosition, room });
   }
   res.redirect(subUrl(day, { date: req.body.date }));
 });
@@ -109,12 +111,15 @@ router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, (r
   res.redirect(subUrl(day, { date }));
 });
 
-// Polled from every admin page (see public/js/pending-approvals.js) to
-// power the sitewide "floater position needs approval" popup - also
-// where the automated sub system's today's-board auto-fill actually
-// happens for admins who never open the Substitutes tab themselves.
-router.get('/pending-approvals.json', requireAdmin, (req, res) => {
-  res.json(pendingApprovalsForToday());
+// Polled from every admin page (see public/js/alerts.js) to power the
+// sitewide alert popup - the same list rendered as the Home dashboard's
+// Alert Log (utils/alerts.js), so the popup only ever surfaces what an
+// admin could also find there. Also where the automated sub system's
+// today's-board auto-fill actually happens for admins who never open the
+// Floater Assignments manage page themselves.
+router.get('/alerts.json', requireAdmin, (req, res) => {
+  const items = todaysAlerts();
+  res.json({ count: items.length, items });
 });
 
 module.exports = router;

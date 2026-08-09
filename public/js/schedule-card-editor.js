@@ -28,6 +28,7 @@
 
   const PLACEHOLDER_DATA = {
     name: 'Alex Student',
+    primaryParentPhone: 'Parent Phone: (555) 123-4567',
     mondaySchedule: [
       { time: '9:00 - 9:45 AM', className: 'Math', room: 'Room 12' },
       { time: '10:00 - 10:45 AM', className: 'Science', room: 'Room 8' },
@@ -604,6 +605,19 @@
     });
     propsPanel.appendChild(propRow('Font size', fontSize));
 
+    // Auto-shrinks this field's font size (down to a floor) whenever its
+    // actual text is too long to fit on one line at the size above.
+    const autoFit = document.createElement('input');
+    autoFit.type = 'checkbox';
+    autoFit.checked = !!el.autoFitText;
+    autoFit.addEventListener('change', () => {
+      el.autoFitText = autoFit.checked;
+      renderCanvas();
+      markUnsaved();
+      commitHistory();
+    });
+    propsPanel.appendChild(propRow('Auto-fit text', autoFit));
+
     const color = document.createElement('input');
     color.type = 'color';
     color.value = el.color;
@@ -691,7 +705,6 @@
       markUnsaved();
       commitHistory();
     });
-    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
 
     const borderWidth = document.createElement('input');
     borderWidth.type = 'number';
@@ -706,6 +719,28 @@
       markUnsaved();
       commitHistory();
     });
+
+    // "No border" - mirrors "No fill" right next to it. Not offered for a
+    // line element (its "border" is the visible line itself).
+    if (!isLine) {
+      const noBorder = document.createElement('input');
+      noBorder.type = 'checkbox';
+      noBorder.checked = !el.borderWidth || el.borderWidth === 0;
+      borderColor.disabled = noBorder.checked;
+      borderWidth.disabled = noBorder.checked;
+      noBorder.addEventListener('change', () => {
+        el.borderWidth = noBorder.checked ? 0 : (parseInt(borderWidth.value, 10) || 2);
+        borderWidth.value = el.borderWidth;
+        borderColor.disabled = noBorder.checked;
+        borderWidth.disabled = noBorder.checked;
+        renderCanvas();
+        markUnsaved();
+        commitHistory();
+      });
+      propsPanel.appendChild(propRow('No border', noBorder));
+    }
+
+    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
     propsPanel.appendChild(propRow(isLine ? 'Thickness' : 'Border width', borderWidth));
 
     if (shapeType === 'rectangle' || shapeType === 'roundedRect') {

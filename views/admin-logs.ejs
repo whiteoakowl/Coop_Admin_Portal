@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -23,6 +23,8 @@
       <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
       <a class="view-tab<%= tab === 'classrisk' ? ' active' : '' %>" href="/admin/logs?tab=classrisk">Class Cancellation Risk</a>
+      <a class="view-tab<%= tab === 'substitutes' ? ' active' : '' %>" href="/admin/logs?tab=substitutes">Substitutes Needed</a>
+      <a class="view-tab<%= tab === 'allergies' ? ' active' : '' %>" href="/admin/logs?tab=allergies">Allergies/Medical</a>
     </div>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
@@ -38,7 +40,7 @@
           </div>
           <div class="roster-btn-row">
             <a class="roster-action-btn file-action-btn" href="/admin/logs/absence/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 
@@ -77,7 +79,7 @@
           </div>
           <div class="roster-btn-row">
             <a class="roster-action-btn file-action-btn" href="/admin/logs/checkinout/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 
@@ -120,7 +122,7 @@
               href="/admin/logs?tab=nametag<%= showArchived ? '' : '&archived=1' %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>"
             >Archived</a>
             <a class="roster-action-btn file-action-btn" href="/admin/logs/nametag/export.csv?archived=<%= showArchived ? 1 : 0 %><%= dateFilter ? '&date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
 
@@ -153,36 +155,84 @@
       <% } else if (tab === 'classrisk') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
-            <label for="day-select">Day</label>
             <select id="day-select" onchange="window.location = '/admin/logs?tab=classrisk&day=' + this.value">
-              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Monday</option>
-              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
+              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
             </select>
           </div>
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>
-        <p class="hint"><%= dayLabel %> classes whose expected attendance (enrolled minus confirmed absences<%= alertDateLabel ? ' for ' + alertDateLabel : '' %>) has dropped to 3 or fewer students.</p>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead><tr><th>Hour</th><th>Class</th><th>Room</th><th>Expected</th><th>Enrolled</th></tr></thead>
-            <tbody>
-              <% if (classesAtRisk.length === 0) { %>
-                <tr><td colspan="5" class="roster-empty">No classes are at risk of low attendance on <%= dayLabel %>.</td></tr>
-              <% } %>
-              <% classesAtRisk.forEach(function(c) { %>
-                <tr>
-                  <td><%= c.hourLabel %></td>
-                  <td><%= c.className %></td>
-                  <td><%= c.room || '—' %></td>
-                  <td><span class="badge-pill badge-pill-absent"><%= c.expectedCount %></span></td>
-                  <td><%= c.enrolledCount %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+        <%- include('partials/class-risk-table', { classesAtRisk, dayLabel }) %>
+      <% } else if (tab === 'substitutes') { %>
+        <div class="roster-toolbar no-print">
+          <div class="filter-row">
+            <div class="category-filter" style="margin: 0;">
+              <select onchange="window.location = '/admin/logs?tab=substitutes&day=' + this.value + (document.getElementById('sub-log-date').value ? '&date=' + document.getElementById('sub-log-date').value : '')">
+                <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
+                <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
+              </select>
+            </div>
+            <div class="category-filter">
+              <label for="sub-log-date">For Date</label>
+              <input
+                type="date"
+                id="sub-log-date"
+                value="<%= dateFilter %>"
+                onchange="window.location = '/admin/logs?tab=substitutes&day=<%= day %>' + (this.value ? '&date=' + this.value : '')"
+              />
+            </div>
+          </div>
+          <div class="roster-btn-row">
+            <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          </div>
         </div>
+
+        <% var anySlots = board.some(function(h) { return h.slots.length > 0; }); %>
+        <% if (!dateFilter) { %>
+          <p class="roster-empty">Pick a date above to see who needs a substitute.</p>
+        <% } else if (!anySlots) { %>
+          <p class="roster-empty">Nobody needed a substitute on <%= dayLabel %>, <%= dateFilter %>.</p>
+        <% } %>
+        <% board.forEach(function(hour) { %>
+          <% if (hour.slots.length === 0) return; %>
+          <h3 class="class-schedule-hour-label"><%= hour.label %></h3>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead><tr><th>Position</th><th>Reason</th><th>Status</th><th>Assigned</th></tr></thead>
+              <tbody>
+                <% hour.slots.forEach(function(slot) { %>
+                  <tr>
+                    <td><%= slot.label %><% if (slot.detail) { %> <span class="hint">(<%= slot.detail %>)</span><% } %></td>
+                    <td><%= slot.reason %></td>
+                    <td>
+                      <% if (!slot.assigned) { %>
+                        <span class="badge-pill badge-pill-absent">Needs Substitute</span>
+                      <% } else if (slot.overdue) { %>
+                        <span class="badge-pill badge-pill-absent">No-show &mdash; Needs Sub Again</span>
+                      <% } else if (slot.assigned.status === 'pending') { %>
+                        <span class="badge-pill badge-pill-pending">Awaiting Approval</span>
+                      <% } else { %>
+                        <span class="badge-pill badge-pill-present">Filled</span>
+                      <% } %>
+                    </td>
+                    <td><%= slot.assigned ? slot.assigned.name + (slot.assigned.infant ? ' (infant)' : '') : '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% }); %>
+      <% } else if (tab === 'allergies') { %>
+        <div class="roster-toolbar no-print">
+          <div></div>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/allergies/export.csv">Export</a>
+            <a class="roster-action-btn print-action-btn" href="/admin/logs/allergies/print" target="_blank">Print</a>
+          </div>
+        </div>
+        <%- include('partials/allergy-log-fragment', { medicalMembers }) %>
       <% } %>
     </div>
   </main>

@@ -1,15 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const requireAdmin = require('../middleware/requireAdmin');
 
-// Reachable from every portal's top bar (Admin, Co-op Admin, Parent,
-// Student) - anyone with an active session, admin or portal member alike.
-function requireAnySession(req, res, next) {
-  if (req.session && (req.session.adminId || req.session.portalMemberId)) return next();
-  res.redirect('/');
-}
-
-router.get('/contact-admins', requireAnySession, (req, res) => {
+router.get('/contact-admins', requireAdmin, (req, res) => {
   const contacts = db.prepare('SELECT * FROM leadership_contacts ORDER BY position, role COLLATE NOCASE').all();
   res.render('contact-admins', {
     title: 'Contact Admins',
@@ -19,7 +13,7 @@ router.get('/contact-admins', requireAnySession, (req, res) => {
   });
 });
 
-router.post('/contact-admins', requireAnySession, (req, res) => {
+router.post('/contact-admins', requireAdmin, (req, res) => {
   const leadershipTeam = (req.body.leadershipTeam || '').trim();
   const senderEmail = (req.body.senderEmail || '').trim();
   const title = (req.body.title || '').trim();

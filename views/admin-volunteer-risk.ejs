@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Class Cancellation Risk</p>
+      </div>
+    </div>
+
+    <h1>Floater Assignments</h1>
+
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'risk' }) %>
+
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="day-toggle">
+          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/risk">Monday</a>
+          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/risk">Wednesday</a>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        </div>
+      </div>
+
+      <%- include('partials/class-risk-table', { classesAtRisk, dayLabel }) %>
+    </div>
+  </main>
+</body>
+</html>

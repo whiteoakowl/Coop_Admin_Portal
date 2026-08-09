@@ -1,10 +1,30 @@
 const db = require('../db');
-const { HOUR_POSITIONS, gridForDay, absentMemberIdsForDate, absenceFormMemberIdsForDate } = require('./classSchedule');
-const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForList, RANK_ORDER } = require('./volunteers');
+const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate } = require('./classSchedule');
+const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
-const { todayISO, weekdayOf } = require('./dates');
+const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
+const { parseClockMinutes, splitTimeRange } = require('./schedule');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
+
+// True once it's more than 5 minutes past an hour's start time on today's
+// date and the person assigned to cover it still hasn't checked in
+// anywhere - the board re-flags the slot as still needing a substitute
+// instead of quietly trusting a no-show assignment. Only meaningful for
+// today (there's no "current time" to compare a future/past date against).
+function assignedIsOverdue(existing, date, hourLabel) {
+  if (!existing || existing.status !== 'approved') return false;
+  if (date !== todayISO()) return false;
+  const { startRaw } = splitTimeRange(hourLabel);
+  const startMin = parseClockMinutes(startRaw);
+  if (startMin === null) return false;
+  const now = new Date();
+  if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
+  const checkedIn = db
+    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
+    .get(existing.member_id, date);
+  return !checkedIn;
+}
 
 function permanentJobsForDay(day) {
   return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? ORDER BY hour_position, title COLLATE NOCASE').all(day);
@@ -20,13 +40,18 @@ function floaterIdsForJob(jobId) {
 
 function createPermanentJob(fields) {
   const info = db
-    .prepare('INSERT INTO permanent_jobs (day, hour_position, title) VALUES (?, ?, ?)')
-    .run(fields.day, fields.hourPosition, fields.title);
+    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES (?, ?, ?, ?)')
+    .run(fields.day, fields.hourPosition, fields.title, fields.room || null);
   return info.lastInsertRowid;
 }
 
 function updatePermanentJob(id, fields) {
-  db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ? WHERE id = ?').run(fields.hourPosition, fields.title, id);
+  db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ?, room = ? WHERE id = ?').run(
+    fields.hourPosition,
+    fields.title,
+    fields.room || null,
+    id
+  );
 }
 
 function deletePermanentJob(id) {
@@ -44,16 +69,30 @@ function rankSort(members) {
   return [...members].sort((a, b) => (RANK_ORDER[a.rank] ?? 1) - (RANK_ORDER[b.rank] ?? 1));
 }
 
+// substitute_assignments keys a slot by (session_date, slot_type, slot_id)
+// with slot_id a single INTEGER. A class can now generate more than one
+// floater slot - one per missing teacher/assistant - so each pairing needs
+// its own synthetic id distinct from the class's own id (rather than one
+// slot per class). Class ids and member ids are both small autoincrement
+// integers in this app, well under the multiplier, so this stays unique
+// and collision-free per class/staff pairing.
+function classStaffSlotId(classId, staffMemberId) {
+  return classId * 1000000 + staffMemberId;
+}
+
 // Everyone on the day's Floater Assignments list for a given hour block,
 // ranked (Choose First before Sometimes before Backup Only) - the pool
 // substitute suggestions are drawn from, best candidate first. Hour
-// positions line up 1-4 across both features by convention.
+// positions line up 1-4 across both features by convention. Reads each
+// member's rank for THIS specific hour (membersForSection), not a
+// single member-wide rank, since Floater Teams now lets rank vary hour
+// to hour.
 function floaterMembersForHour(day, hourPosition) {
   const list = getListByDay(day);
   if (!list) return [];
   const section = sectionsForList(list.id).find((s) => s.position === hourPosition);
   if (!section) return [];
-  return rankSort(membersForList(list.id).filter((m) => m.sectionIds.includes(section.id)));
+  return rankSort(membersForSection(list.id, section.id));
 }
 
 function assignmentFor(date, slotType, slotId) {
@@ -108,21 +147,23 @@ function assignedInfo(existing) {
     isOverride: !!existing.is_override,
     status: existing.status,
     infant: hasInfantChild(existing.member_id),
+    updatedLabel: formatTimestamp(existing.created_at),
   };
 }
 
 // The full "needs a substitute" board for a day, optionally scoped to a
 // specific date (no date = no absence data yet, so classes never need a
 // sub but permanent jobs still show since they need someone every
-// session). Each hour lists its slots - a class whose only/all teachers
-// are absent, or a permanent job. Any slot with no existing assignment
-// yet and an available candidate gets one auto-picked right here (best
-// rank first, preferring a job's own preferred-floater list) and
-// persisted as 'pending', so approving it is a one-click confirm instead
-// of a fresh choice every time the board is viewed.
+// session). Each hour lists its slots - one per class's missing teacher
+// or assistant (a class with two missing staff gets two slots, one per
+// person - see classStaffSlotId), plus one per permanent job. Any slot
+// with no existing assignment yet and an available candidate gets one
+// auto-picked right here (best rank first, preferring a job's own
+// preferred-floater list) and persisted as 'pending', so approving it is
+// a one-click confirm instead of a fresh choice every time the board is
+// viewed.
 function substituteBoard(day, date) {
-  const absentIds = date ? absentMemberIdsForDate(date) : new Set();
-  const formExcludedIds = date ? absenceFormMemberIdsForDate(date) : new Set();
+  const missingById = date ? missingMemberIdsForDate(date) : new Map();
   const grid = gridForDay(day);
   const jobs = permanentJobsForDay(day);
   const jobsByHour = {};
@@ -133,7 +174,7 @@ function substituteBoard(day, date) {
 
   return grid.map((hourGroup) => {
     const hourPosition = hourGroup.position;
-    const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !absentIds.has(m.id) && !formExcludedIds.has(m.id));
+    const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 
@@ -158,21 +199,34 @@ function substituteBoard(day, date) {
       return existing;
     }
 
+    // Every missing teacher or assistant on a class is its own slot - a
+    // class with two staff out that hour needs two floaters, so it shows
+    // up on the chart twice, once per person, each with its own
+    // assign/accept flow. A "late" status counts the same as "absent"
+    // here (see missingMemberIdsForDate) - either way that staff member
+    // isn't going to be covering their spot.
     hourGroup.classes.forEach((cls) => {
-      const teachers = cls.staff.filter((s) => s.role === 'teacher');
-      if (teachers.length === 0) return;
-      const allAbsent = teachers.every((t) => absentIds.has(t.id));
-      if (!allAbsent) return;
+      cls.staff.forEach((person) => {
+        if (person.role !== 'teacher' && person.role !== 'assistant') return;
+        const status = missingById.get(person.id);
+        if (!status) return;
 
-      const existing = resolveSlot('class', cls.id, null);
+        const slotId = classStaffSlotId(cls.id, person.id);
+        const existing = resolveSlot('class', slotId, null);
+        const roleLabel = person.role === 'teacher' ? 'Teacher' : 'Assistant';
+        const statusLabel = status === 'late' ? 'running late' : 'absent';
 
-      slots.push({
-        slotType: 'class',
-        slotId: cls.id,
-        label: cls.class_name,
-        detail: cls.room ? `Room ${cls.room}` : '',
-        reason: `Teacher${teachers.length > 1 ? 's' : ''} absent: ${teachers.map((t) => t.name).join(', ')}`,
-        assigned: assignedInfo(existing),
+        slots.push({
+          slotType: 'class',
+          slotId,
+          label: cls.class_name,
+          room: cls.room || '',
+          detail: cls.room ? `Room ${cls.room}` : '',
+          ageGroup: cls.age_group || '',
+          reason: `${roleLabel} ${statusLabel}: ${person.name}`,
+          assigned: assignedInfo(existing),
+          overdue: assignedIsOverdue(existing, date, hourGroup.label),
+        });
       });
     });
 
@@ -180,16 +234,89 @@ function substituteBoard(day, date) {
       const existing = resolveSlot('job', job.id, floaterIdsForJob(job.id));
 
       slots.push({
+        overdue: assignedIsOverdue(existing, date, hourGroup.label),
         slotType: 'job',
         slotId: job.id,
         label: job.title,
+        room: job.room || '',
         detail: 'Permanent Job',
         reason: 'Staffed every session',
         assigned: assignedInfo(existing),
       });
     });
 
-    return { position: hourPosition, label: hourGroup.label, slots };
+    // Ranked, still-available candidates for this hour (best/"Choose
+    // First" ranked members first) - the Substitutes Needed card's assign
+    // dropdown lists these ahead of everyone else so the best-fit floater
+    // is the top suggestion, while still allowing an admin to pick anyone.
+    const suggestedFloaters = rankSort(floaterPool.filter((m) => !usedThisHour.has(m.id)));
+
+    return { position: hourPosition, label: hourGroup.label, slots, suggestedFloaters };
+  });
+}
+
+// Multi-date planning grid for the Monday/Wednesday Floater Assignments
+// tab: every permanent job, grouped by hour, with one assigned-member
+// column per session date - the forward-planning counterpart to
+// substituteBoard's single-date "who needs a sub today" view. Both read
+// the same substitute_assignments table (setAssignment/assignmentFor), so
+// assigning someone here is exactly the same action as approving a
+// substitute - there's only one "who's covering this slot" system,
+// whether it's being planned weeks ahead or filled last-minute.
+function jobAssignmentGrid(day, dates) {
+  const jobs = permanentJobsForDay(day);
+  const byHour = {};
+  jobs.forEach((j) => {
+    if (!byHour[j.hour_position]) byHour[j.hour_position] = [];
+    byHour[j.hour_position].push(j);
+  });
+  return HOUR_POSITIONS.map((hourPosition) => ({
+    position: hourPosition,
+    jobs: (byHour[hourPosition] || []).map((job) => ({
+      id: job.id,
+      title: job.title,
+      room: job.room || '',
+      cells: dates.map((date) => ({
+        date,
+        assigned: assignedInfo(assignmentFor(date, 'job', job.id)),
+      })),
+    })),
+  })).filter((h) => h.jobs.length > 0);
+}
+
+// Single-date "Floater Assignment Dashboard" cards (the Chart tab's view,
+// and the Archive tab's popup/print record for a date that's passed) -
+// same permanent-job/substitute_assignments data as jobAssignmentGrid,
+// just reshaped for one date's cards instead of a multi-date table (each
+// job gets one `assigned` directly, not a one-element `cells` array).
+function dailyAssignmentCards(day, date) {
+  return jobAssignmentGrid(day, [date]).map((hour) => ({
+    position: hour.position,
+    jobs: hour.jobs.map((job) => ({ id: job.id, title: job.title, room: job.room, assigned: job.cells[0].assigned })),
+  }));
+}
+
+// dailyAssignmentCards with each hour's real label merged in - shared by
+// the Archive tab/print page and the public kiosk view
+// (partials/floater-assignment-cards.ejs needs `label` on every hour).
+function dailyAssignmentCardsWithLabels(day, date) {
+  const hourLabelByPosition = {};
+  hoursForDay(day).forEach((h) => { hourLabelByPosition[h.position] = h.label; });
+  return dailyAssignmentCards(day, date).map((hour) => ({ ...hour, label: hourLabelByPosition[hour.position] || `Hour ${hour.position}` }));
+}
+
+// Archive tab: one row per date that's already passed, with how many of
+// that day's permanent-job positions ended up with an approved floater -
+// same underlying data as dailyAssignmentCards, just counted instead of
+// rendered, for the log list before an admin opens one date's full record.
+function archivedDateSummaries(day, dates) {
+  const jobs = permanentJobsForDay(day);
+  return dates.map((date) => {
+    const assignedCount = jobs.filter((j) => {
+      const a = assignmentFor(date, 'job', j.id);
+      return a && a.status === 'approved';
+    }).length;
+    return { date, totalPositions: jobs.length, assignedCount };
   });
 }
 
@@ -240,5 +367,9 @@ module.exports = {
   approveAssignment,
   clearAssignment,
   substituteBoard,
+  jobAssignmentGrid,
+  dailyAssignmentCards,
+  dailyAssignmentCardsWithLabels,
+  archivedDateSummaries,
   pendingApprovalsForToday,
 };

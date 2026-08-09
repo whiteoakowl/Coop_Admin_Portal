@@ -1,0 +1,175 @@
+<%# Fragment (no <html>/<head>/<body>) - fetched by class-schedule-nav.js and
+    injected into the shared #class-view-dialog on the schedule grid page, so
+    "View" never leaves the grid. Starts in view-only mode (fields disabled,
+    just an "Edit Class" button); clicking it unlocks the form in place. %>
+<div class="class-view-header">
+  <span class="class-view-swatch" style="background: <%= cls.color %>;"></span>
+  <h3><%= cls.class_name %></h3>
+  <div class="class-view-header-actions">
+    <div class="class-view-footer-view">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete &quot;<%= cls.class_name %>&quot;? This cannot be undone.');">
+        <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+      </form>
+      <button type="button" class="roster-action-btn" data-edit-class-btn>Edit</button>
+    </div>
+    <div class="class-view-footer-edit" hidden>
+      <button type="button" class="roster-action-btn" data-cancel-edit-btn>Cancel</button>
+      <button type="submit" class="roster-action-btn" form="class-view-form-<%= cls.id %>">Save</button>
+    </div>
+  </div>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+
+<div class="class-manage-layout">
+  <div class="class-manage-form-col">
+    <div class="manage-section">
+      <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>" id="class-view-form-<%= cls.id %>" class="member-form-grid class-view-form" data-view-form>
+        <label class="member-form-full">Class Name
+          <input type="text" name="className" value="<%= cls.class_name %>" required disabled />
+        </label>
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Color</label>
+          <div class="class-color-swatches">
+            <% colorPalette.forEach(function(c) { %>
+              <label class="class-color-swatch">
+                <input type="radio" name="color" value="<%= c %>" <%= (cls.color || '').toLowerCase() === c.toLowerCase() ? 'checked' : '' %> disabled />
+                <span class="class-color-swatch-fill" style="background: <%= c %>;"></span>
+                <svg class="icon"><use href="#icon-check"/></svg>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+        <label>Class Hour
+          <select name="hourPosition" required disabled>
+            <% hours.forEach(function(h) { %>
+              <option value="<%= h.position %>" <%= cls.hour_position === h.position ? 'selected' : '' %>><%= h.label %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Room
+          <input type="text" name="room" value="<%= cls.room || '' %>" disabled />
+        </label>
+        <label>Start Time
+          <input type="text" name="startTime" value="<%= cls.start_time || '' %>" placeholder="9:00 AM" disabled />
+        </label>
+        <label>End Time
+          <input type="text" name="endTime" value="<%= cls.end_time || '' %>" placeholder="10:00 AM" disabled />
+        </label>
+
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
+          <div class="grade-pill-grid">
+            <% gradeLevels.forEach(function(g) { %>
+              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" <%= selectedGrades.includes(g) ? 'checked' : '' %> disabled /> <%= g %></label>
+            <% }); %>
+          </div>
+        </div>
+
+        <label class="member-form-full">Class Description
+          <textarea name="notes" rows="4" disabled><%= cls.notes || '' %></textarea>
+        </label>
+      </form>
+    </div>
+  </div>
+
+  <div class="class-manage-roster-col">
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Teachers &amp; Assistants (<%= cls.staff.length %>)</h2>
+      </div>
+      <div class="roster-log-list">
+        <% if (cls.staff.length === 0) { %>
+          <p class="roster-log-empty">No teachers/assistants yet.</p>
+        <% } %>
+        <% cls.staff.forEach(function(s) { %>
+          <div class="roster-log-row">
+            <span class="roster-log-name"><%= s.name %></span>
+            <span class="roster-log-meta">
+              <span class="badge-pill"><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></span>
+            </span>
+            <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/<%= s.id %>/remove" class="inline-block-form">
+              <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Student Roster (<%= enrolledStudents.length %>)</h2>
+      </div>
+      <div class="roster-log-list">
+        <% if (enrolledStudents.length === 0) { %>
+          <p class="roster-log-empty">No students enrolled yet.</p>
+        <% } %>
+        <% enrolledStudents.forEach(function(s) { %>
+          <div class="roster-log-row">
+            <span class="roster-log-name"><%= s.name %><%- include('partials/medical-flag', { member: s }) %></span>
+            <span class="roster-log-meta">
+              <% if (s.family_name) { %><span>The <%= s.family_name %> Family</span><% } %>
+              <% if (s.age !== null && s.age !== undefined) { %><span><%= s.age %> yrs</span><% } %>
+              <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
+              <% if (s.birthday) { %><span><%= s.birthday %></span><% } %>
+            </span>
+            <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form">
+              <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="roster-btn-row class-view-roster-actions">
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-roster-member-dialog-<%= cls.id %>').showModal()">+ Add Member</button>
+      <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('roster-import-dialog-<%= cls.id %>').showModal()">Import</button>
+      <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/export.csv">Export</a>
+      <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/classes/<%= cls.id %>/roster/print" target="_blank">Print</a>
+      <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="add-roster-member-dialog-<%= cls.id %>" class="member-picker-dialog">
+  <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/roster/add">
+    <h3>Add Member &mdash; <%= cls.class_name %></h3>
+    <div class="radio-group">
+      <label class="radio-option"><input type="radio" name="role" value="student" checked onchange="document.getElementById('roster-add-student-<%= cls.id %>').hidden = false; document.getElementById('roster-add-staff-<%= cls.id %>').hidden = true;" /> Student</label>
+      <label class="radio-option"><input type="radio" name="role" value="teacher" onchange="document.getElementById('roster-add-student-<%= cls.id %>').hidden = true; document.getElementById('roster-add-staff-<%= cls.id %>').hidden = false;" /> Teacher</label>
+      <label class="radio-option"><input type="radio" name="role" value="assistant" onchange="document.getElementById('roster-add-student-<%= cls.id %>').hidden = true; document.getElementById('roster-add-staff-<%= cls.id %>').hidden = false;" /> Assistant</label>
+    </div>
+    <label id="roster-add-student-<%= cls.id %>">Student
+      <select name="studentId">
+        <option value="" disabled selected>Select student&hellip;</option>
+        <% availableStudents.forEach(function(s) { %>
+          <option value="<%= s.id %>"><%= s.name %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label id="roster-add-staff-<%= cls.id %>" hidden>Parent
+      <select name="staffId">
+        <option value="" disabled selected>Select parent&hellip;</option>
+        <% availableStaff.forEach(function(p) { %>
+          <option value="<%= p.id %>"><%= p.name %></option>
+        <% }); %>
+      </select>
+    </label>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Add</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="roster-import-dialog-<%= cls.id %>" class="member-picker-dialog">
+  <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/roster/import" enctype="multipart/form-data">
+    <h3>Import Students &mdash; <%= cls.class_name %></h3>
+    <p class="hint">Adds active students to this class's roster by name.</p>
+    <a class="btn-secondary import-sample-link" href="/admin/class-schedule/classes/<%= cls.id %>/roster/import-template.xlsx">Download Sample File</a>
+    <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="primary-btn">Import</button>
+    </div>
+  </form>
+</dialog>

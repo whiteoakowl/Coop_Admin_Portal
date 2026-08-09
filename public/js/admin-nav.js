@@ -25,10 +25,10 @@
   }
 
   // Highlight whichever link best matches the current page (longest prefix
-  // match wins). A link can also claim extra paths via data-match (e.g.
-  // Volunteers also covers /admin/setup/*). Desktop sidebar and mobile icon
-  // tabs are two separate DOM trees (only one visible at a time depending on
-  // viewport width), so each is highlighted independently.
+  // match wins). A link can also claim extra paths via data-match. Desktop
+  // sidebar and mobile icon tabs are two separate DOM trees (only one
+  // visible at a time depending on viewport width), so each is highlighted
+  // independently.
   function highlightNav(containerSelector) {
     const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a'));
     const activeLink = bestMatch(links, (a) => matchPrefixes(a, a.getAttribute('href')));

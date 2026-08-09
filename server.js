@@ -10,17 +10,21 @@ const db = require('./db'); // initialize database + seed default admin
 // The Monday/Wednesday Parent/Student rosters are normally created lazily
 // the first time a class enrolls/staffs someone that day - ensure all 4
 // always exist up front so they're visible on Attendance immediately, even
-// before any classes are set up.
-const { ensureDayRoster } = require('./utils/classSchedule');
+// before any classes are set up. syncDayMemberRosters then backfills both
+// days' roster membership AND member_schedules (the derived Schedule Card
+// / profile Class Schedule data) from current enrollment/staffing, so
+// existing classes are reflected everywhere on every boot, not just after
+// their next edit.
+const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
 ['monday', 'wednesday'].forEach((day) => {
   ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
+  syncDayMemberRosters(day);
 });
 
 const { defaultDay } = require('./utils/days');
 
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
-const portalRouter = require('./routes/portal');
 const absenceRouter = require('./routes/absence');
 const nameTagRouter = require('./routes/name-tag');
 const adminRouter = require('./routes/admin');
@@ -80,44 +84,15 @@ app.use(
 
 // Available in every EJS view (including partials/admin-nav) without each
 // route having to pass it explicitly. True only for the single master Admin
-// account - a Co-op Admin is a member with portal_coop_admin access, let
-// into /admin/* by requireAdmin but not treated as a full Admin.
-const PORTAL_LABELS = { coop_admin: 'Co-op Admin', parent: 'Parent Portal', student: 'Student Portal' };
-
+// account.
 app.use((req, res, next) => {
   res.locals.isFullAdmin = !!(req.session && req.session.adminId);
-  // A logged-in member's current portal and every portal they're granted -
-  // powers the portal switcher when a member holds more than one (e.g. a
-  // Co-op Admin who's also a Parent).
-  res.locals.portalRole = (req.session && req.session.portalRole) || null;
-  res.locals.portalRoles = (req.session && req.session.portalRoles) || [];
-
-  // Drives the shared top bar (partials/portal-topbar) on every portal -
-  // who's logged in, what to call their current portal, and where their
-  // Profile button goes.
-  if (res.locals.isFullAdmin) {
-    res.locals.currentPortalLabel = 'Admin Portal';
-    res.locals.profileHref = '/admin/settings';
-    res.locals.profileInitial = ((req.session.username || 'A')[0] || 'A').toUpperCase();
-  } else if (req.session && req.session.portalMemberId && res.locals.portalRole) {
-    res.locals.currentPortalLabel = PORTAL_LABELS[res.locals.portalRole] || res.locals.portalRole;
-    res.locals.profileHref = '/portal/profile';
-    const member = db.prepare('SELECT name FROM members WHERE id = ?').get(req.session.portalMemberId);
-    res.locals.profileInitial = member ? member.name[0].toUpperCase() : '?';
-  } else {
-    res.locals.currentPortalLabel = null;
-    res.locals.profileHref = null;
-    res.locals.profileInitial = null;
-  }
   next();
 });
 
 app.get('/', (req, res) => {
-  if (req.session && req.session.portalMemberId) return res.redirect('/portal');
   res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
 });
-
-app.use('/', portalRouter);
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/', absenceRouter);
@@ -131,13 +106,11 @@ app.use('/', membershipRouter);
 // blanket `router.use(requireFullAdmin)` (no path), which - because Express
 // matches on the shared '/admin' mount prefix, not on that router's own
 // route table - runs for ANY /admin/* request that reaches it, not just
-// requests one of its own routes would've matched. Mounting those
-// full-admin-only routers (Documents, Library, Design/Print, misc badges,
-// Members, Name Tag) AFTER every router a Co-op Admin needs (Rosters, Logs,
-// Volunteers, Substitutes, Setup, Schedule, Class Schedule) ensures the
-// latter's own (permissive) requireAdmin routes get first chance to handle
-// the request, instead of being hijacked by an unrelated router's
-// full-admin gate before they're ever reached.
+// requests one of its own routes would've matched. Mounting those routers
+// (Documents, Library, Design/Print, misc badges, Members, Name Tag) AFTER
+// every other /admin router ensures the latter's own requireAdmin routes
+// get first chance to handle the request, instead of being hijacked by an
+// unrelated router's blanket gate before they're ever reached.
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
 app.use('/admin', adminLogsRouter);

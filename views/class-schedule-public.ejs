@@ -25,7 +25,7 @@
         <% } else { %>
           <div class="class-card-row">
             <% hour.classes.forEach(function(cls) { %>
-              <div class="class-card class-card-public" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 12%, white);">
+              <div class="class-card class-card-public" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                 <h3><%= cls.class_name %></h3>
                 <p class="class-card-meta">
                   <% if (cls.room) { %><span>Room <%= cls.room %></span><% } %>
@@ -58,5 +58,6 @@
     <% }); %>
   </div>
   <script src="/js/idle-redirect.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
 </body>
 </html>

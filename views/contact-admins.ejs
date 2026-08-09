@@ -3,17 +3,11 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="admin-page portal-page">
-  <%- include('partials/icon-sprite') %>
-  <%- include('partials/portal-topbar') %>
-  <main class="portal-main">
-    <div class="portal-header">
-      <div>
-        <p class="subtitle"><a href="<%= isFullAdmin || portalRole === 'coop_admin' ? '/admin' : (portalRole ? '/portal' : '/') %>">&larr; Back</a></p>
-        <h1>Contact Admins</h1>
-        <p class="subtitle">Contact leadership teams for support with classes, finances, events, volunteer positions, attendance, yearbook, and general co-op questions.</p>
-      </div>
-    </div>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <h1>Contact Admins</h1>
+    <p class="subtitle">Contact leadership teams for support with classes, finances, events, volunteer positions, attendance, yearbook, and general co-op questions.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

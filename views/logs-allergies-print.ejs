@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Allergies/Medical Log</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub">Allergies/Medical Log</p>
+        </div>
+      </div>
+
+      <%- include('partials/allergy-log-fragment', { medicalMembers }) %>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

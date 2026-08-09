@@ -3,12 +3,11 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel } = require('../utils/dates');
+const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
 const { imageFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
@@ -16,12 +15,13 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { familyOf, setFamilyMembers } = require('../utils/members');
+const { familyOf, allFamilies, setMemberFamily, setPrimaryParent, rostersForMember, membersWithDetails } = require('../utils/members');
+const { GRADE_LEVELS } = require('../utils/classSchedule');
 
 router.use(requireFullAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
-const MEMBER_TYPES = ['student', 'parent', 'admin'];
+const MEMBER_TYPES = ['student', 'parent'];
 
 // Member profile photos - stored on disk (not memory) since they're kept
 // long-term and served back out, unlike the CSV imports above.
@@ -40,40 +40,27 @@ const uploadPhoto = multer({
   fileFilter: imageFileFilter,
 });
 
-function rostersForMember(memberId) {
+// Every attendance record for this member across every roster they're on,
+// newest first - the Members profile page's Attendance tab.
+function attendanceHistoryForMember(memberId) {
   return db
     .prepare(
-      `SELECT r.* FROM rosters r
-       JOIN roster_members rm ON rm.roster_id = r.id
-       WHERE rm.member_id = ? ORDER BY r.name COLLATE NOCASE`
+      `SELECT r.name AS rosterName, a.session_date AS date, a.status,
+              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+       FROM attendance a
+       JOIN rosters r ON r.id = a.roster_id
+       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+       WHERE a.member_id = ?
+       ORDER BY a.session_date DESC`
     )
     .all(memberId);
 }
 
 // --- Members page (the full member list) ---
 
-// Every other active member, any type - the picker for "who's in this
-// person's family" on the edit form (family connections aren't
-// restricted to parent/student anymore).
-function activeMembersExcluding(excludeId) {
-  return db
-    .prepare('SELECT id, name, member_type AS memberType FROM members WHERE active = 1 AND id != ? ORDER BY name COLLATE NOCASE')
-    .all(excludeId || 0);
-}
-
-function membersWithDetails(typeFilter) {
-  const allMembers = db.prepare('SELECT * FROM members ORDER BY active DESC, name COLLATE NOCASE').all();
-  const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
-  return members.map((m) => ({
-    ...m,
-    rosters: rostersForMember(m.id),
-    familyNames: familyOf(m.id).map((p) => p.name),
-  }));
-}
-
 router.get('/members', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent'), admin: getTemplate('admin') };
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
   const scheduleCardTemplate = getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
   const withRosters = membersWithDetails(typeFilter).map((m) => {
@@ -81,6 +68,7 @@ router.get('/members', requireAdmin, (req, res) => {
     const badgeData = badgeDataForMember(m);
     return {
       ...m,
+      age: ageFromBirthday(m.birthday),
       badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
       badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
       scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),
@@ -101,15 +89,53 @@ router.get('/members', requireAdmin, (req, res) => {
   });
 });
 
+// Exports every field a member's profile can hold - the same information
+// originally collected about them (contact info, address, birthday/grade,
+// medical notes, family, rosters) - not just the Name/Type/Family/Rosters
+// subset shown in the on-screen table.
 router.get('/members/export.csv', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const members = membersWithDetails(typeFilter);
 
-  const typeLabel = (t) => (t === 'parent' ? 'Parent' : t === 'admin' ? 'Admin' : 'Student');
+  const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [
-    toCsvRow(['Name', 'Type', 'Family', 'Rosters']),
+    toCsvRow([
+      'Name',
+      'Type',
+      'Active',
+      'Address',
+      'City',
+      'State',
+      'Zip',
+      'Phone',
+      'Email',
+      'Birthday',
+      'Grade Level',
+      'Medical Notes',
+      'Family',
+      'Primary Parent',
+      'Rosters',
+      'Notes',
+    ]),
     ...members.map((m) =>
-      toCsvRow([m.name, typeLabel(m.member_type), m.familyNames.join('; '), m.rosters.map((r) => r.name).join('; ')])
+      toCsvRow([
+        m.name,
+        typeLabel(m.member_type),
+        m.active ? 'Yes' : 'No',
+        m.address || '',
+        m.city || '',
+        m.state || '',
+        m.zip || '',
+        m.phone || '',
+        m.email || '',
+        m.birthday || '',
+        m.grade_level || '',
+        m.medical_notes || '',
+        m.familyName || '',
+        m.is_primary_parent ? 'Yes' : '',
+        m.rosters.map((r) => r.name).join('; '),
+        m.notes || '',
+      ])
     ),
   ];
 
@@ -118,6 +144,7 @@ router.get('/members/export.csv', requireAdmin, (req, res) => {
 
 function memberFormFields(req) {
   const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
+  const familyIdRaw = parseInt(req.body.familyId, 10);
   return {
     name: (req.body.name || '').trim(),
     memberType,
@@ -129,8 +156,12 @@ function memberFormFields(req) {
     email: (req.body.email || '').trim() || null,
     birthday: memberType === 'student' ? (req.body.birthday || '').trim() || null : null,
     gradeLevel: memberType === 'student' ? (req.body.gradeLevel || '').trim() || null : null,
-    medicalNotes: memberType === 'student' ? (req.body.medicalNotes || '').trim() || null : null,
-    familyMemberIds: [].concat(req.body.familyMemberIds || []).map((id) => parseInt(id, 10)).filter(Boolean),
+    // Medical/Allergy Notes is on both the Parent and Student Membership
+    // Forms (not student-only anymore - see the mockup), so it's captured
+    // regardless of member type.
+    medicalNotes: (req.body.medicalNotes || '').trim() || null,
+    familyId: Number.isInteger(familyIdRaw) ? familyIdRaw : null,
+    isPrimaryParent: req.body.isPrimaryParent === '1',
     cleanupTeamIds:
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
@@ -161,13 +192,59 @@ function clearVolunteerMembershipIfNotParent(memberId, memberType) {
   db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
 }
 
+// Full-profile import (below) links an imported student to its "Parent
+// Name" column by family, same as before - but a family has to actually
+// exist now, so if the matched parent doesn't have one yet, one is
+// invented from their surname (mirrors the migration in db/index.js) so
+// the import's existing "link student to parent" behavior keeps working.
+function ensureFamilyForParent(parentId) {
+  const parent = db.prepare('SELECT id, name, family_id FROM members WHERE id = ?').get(parentId);
+  if (!parent) return null;
+  if (parent.family_id != null) return parent.family_id;
+  const lastName = parent.name.trim().split(/\s+/).pop() || parent.name;
+  let name = lastName;
+  let suffix = 1;
+  while (db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name)) {
+    suffix++;
+    name = `${lastName} ${suffix}`;
+  }
+  const familyId = db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
+  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
+  return familyId;
+}
+
+// memberCount included for the form's "Setup Team - 2 members" checklist
+// display, same idea as allFamilies() in utils/members.js.
 function allSetupTeams() {
-  return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, title COLLATE NOCASE').all();
+  return db
+    .prepare(
+      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS memberCount
+       FROM setup_teams t
+       LEFT JOIN setup_team_members stm ON stm.team_id = t.id
+       GROUP BY t.id
+       ORDER BY t.day, t.title COLLATE NOCASE`
+    )
+    .all();
 }
 
 function cleanupTeamIdsForMember(memberId) {
   return db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId).map((r) => r.team_id);
 }
+
+// A family only shows up on the "Choose a Family" dropdown once it's been
+// added here - the Members page's "+ Add Family" button.
+router.post('/members/families/new', requireAdmin, (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Family name is required.'));
+  }
+  const exists = db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name);
+  if (exists) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent(`"${name}" family already exists.`));
+  }
+  db.prepare('INSERT INTO families (name) VALUES (?)').run(name);
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
+});
 
 router.get('/members/new', requireAdmin, (req, res) => {
   res.render('admin-member-edit', {
@@ -187,9 +264,11 @@ router.get('/members/new', requireAdmin, (req, res) => {
       birthday: '',
       grade_level: '',
       medical_notes: '',
+      is_primary_parent: 0,
     },
-    familyOptions: activeMembersExcluding(),
-    familyMemberIds: [],
+    families: allFamilies(),
+    memberFamilyId: null,
+    gradeLevels: GRADE_LEVELS,
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: [],
     error: req.query.error || null,
@@ -232,9 +311,65 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
       f.medicalNotes
     );
   syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
-  setFamilyMembers(info.lastInsertRowid, f.familyMemberIds);
+  setMemberFamily(info.lastInsertRowid, f.familyId);
+  setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
+});
+
+// Full-profile bulk import - the Members page is the only place a CSV/XLSX
+// upload can create brand-new member records, so unlike every other import
+// popup in the app, this one reads the full set of profile columns.
+// Registered here (before the /members/:id routes below) so its literal
+// path never gets shadowed by the :id param.
+router.get('/members/import-template.xlsx', requireAdmin, (req, res) => {
+  const buffer = buildTemplateWorkbook(
+    ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
+    [
+      ['Jane Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', ''],
+      ['Alice Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane Smith'],
+    ]
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
+  res.send(buffer);
+});
+
+const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
+
+// Clicking a member's name anywhere lands here - a read-only profile with
+// Profile / Class Schedule / Attendance tabs. Class Schedule reflects
+// class enrollment/staffing automatically (see syncMemberSchedulesForDay
+// in utils/classSchedule.js); actually editing the profile itself is
+// still the dedicated Edit page, linked from the Profile tab.
+router.get('/members/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+  const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
+
+  const family = db
+    .prepare('SELECT f.name AS familyName FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
+    .get(id);
+
+  res.render('admin-member-profile', {
+    title: member.name,
+    member,
+    tab,
+    familyName: family ? family.familyName : null,
+    familyMembers: familyOf(id).map((m) => m.name),
+    rosters: rostersForMember(id),
+    schedule: getMemberSchedule(id),
+    history: attendanceHistoryForMember(id).map((r) => ({
+      rosterName: r.rosterName,
+      dateLabel: formatDateLabel(r.date),
+      statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+      status: r.status,
+      checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+      checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+      number: r.number,
+    })),
+  });
 });
 
 router.get('/members/:id/edit', requireAdmin, (req, res) => {
@@ -246,11 +381,32 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
     title: `Edit ${member.name}`,
     mode: 'edit',
     member,
-    familyOptions: activeMembersExcluding(id),
-    familyMemberIds: familyOf(id).map((m) => m.id),
+    families: allFamilies(),
+    memberFamilyId: member.family_id,
+    gradeLevels: GRADE_LEVELS,
     setupTeams: allSetupTeams(),
     memberCleanupTeamIds: cleanupTeamIdsForMember(id),
     error: req.query.error || null,
+  });
+});
+
+// Fetched by public/js/member-view.js and injected into the Members list
+// page's shared dialog - a view-only Membership Form (fields disabled) with
+// an Edit button that unlocks them in place. Same field partial as the
+// full Add/Edit page (views/partials/member-form-fields.ejs), just started
+// in 'view' mode instead of 'create'/'edit'.
+router.get('/members/:id/view-fragment', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return res.status(404).send('Not found');
+
+  res.render('member-view-fragment', {
+    member,
+    families: allFamilies(),
+    memberFamilyId: member.family_id,
+    gradeLevels: GRADE_LEVELS,
+    setupTeams: allSetupTeams(),
+    memberCleanupTeamIds: cleanupTeamIdsForMember(id),
   });
 });
 
@@ -292,67 +448,10 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   );
   syncCleanupTeams(id, f.cleanupTeamIds);
   clearVolunteerMembershipIfNotParent(id, f.memberType);
-  setFamilyMembers(id, f.familyMemberIds);
+  setMemberFamily(id, f.familyId);
+  setPrimaryParent(id, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
-});
-
-// Grants/updates a member's own login for the Parent/Student/Co-op Admin
-// portals - separate from the main profile form so an admin can flip
-// access on/off without touching the rest of the profile. Password is
-// only changed when a new one is actually typed in, so re-saving the
-// checkboxes doesn't force a reset every time.
-router.post('/members/:id/portal-access', requireAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (!member) return res.status(404).send('Not found');
-
-  const username = (req.body.username || '').trim();
-  const password = req.body.password || '';
-  const portalParent = req.body.portalParent === '1' ? 1 : 0;
-  const portalStudent = req.body.portalStudent === '1' ? 1 : 0;
-  const portalCoopAdmin = req.body.portalCoopAdmin === '1' ? 1 : 0;
-  const anyAccessGranted = portalParent || portalStudent || portalCoopAdmin;
-
-  if (anyAccessGranted && !username) {
-    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('A username is required to grant portal access.'));
-  }
-  if (username) {
-    const taken = db.prepare('SELECT id FROM members WHERE username = ? AND id != ?').get(username, id);
-    if (taken) return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('That username is already in use.'));
-  }
-  if (!member.password_hash && anyAccessGranted && !password) {
-    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('Set a password to grant portal access for the first time.'));
-  }
-
-  if (password) {
-    const hash = bcrypt.hashSync(password, 10);
-    db.prepare(
-      'UPDATE members SET username = ?, password_hash = ?, portal_parent = ?, portal_student = ?, portal_coop_admin = ? WHERE id = ?'
-    ).run(username || null, hash, portalParent, portalStudent, portalCoopAdmin, id);
-  } else {
-    db.prepare(
-      'UPDATE members SET username = ?, portal_parent = ?, portal_student = ?, portal_coop_admin = ? WHERE id = ?'
-    ).run(username || null, portalParent, portalStudent, portalCoopAdmin, id);
-  }
-
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Portal access updated for ${member.name}.`));
-});
-
-// Full-profile bulk import - the Members page is the only place a CSV/XLSX
-// upload can create brand-new member records, so unlike every other import
-// popup in the app, this one reads the full set of profile columns.
-router.get('/members/import-template.xlsx', requireAdmin, (req, res) => {
-  const buffer = buildTemplateWorkbook(
-    ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
-    [
-      ['Jane Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', ''],
-      ['Alice Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane Smith'],
-    ]
-  );
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
-  res.send(buffer);
 });
 
 const MEMBER_IMPORT_HEADER_ALIASES = {
@@ -477,7 +576,7 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
         r.email || null,
         memberType === 'student' ? r.birthday || null : null,
         memberType === 'student' ? r.gradeLevel || null : null,
-        memberType === 'student' ? r.medicalNotes || null : null
+        r.medicalNotes || null
       );
     nameToId[r.name.toLowerCase()] = info.lastInsertRowid;
     created++;
@@ -492,8 +591,11 @@ router.post('/members/import', requireAdmin, upload.single('file'), (req, res) =
       .get(r.parentName);
     const parentId = nameToId[r.parentName.toLowerCase()] || (parentRow ? parentRow.id : null);
     if (studentId && parentId && studentId !== parentId) {
-      setFamilyMembers(studentId, [parentId]);
-      linkedParents++;
+      const familyId = ensureFamilyForParent(parentId);
+      if (familyId != null) {
+        db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, studentId);
+        linkedParents++;
+      }
     }
   }
 

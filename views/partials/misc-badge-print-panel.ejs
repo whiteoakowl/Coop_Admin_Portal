@@ -4,7 +4,7 @@
 // Print with nothing checked prints every badge, checking rows prints just
 // those (see routes/admin-misc-badges.js).
 %>
-<form method="POST" action="/admin/design/badges/<%= type %>/print" target="print-preview-frame" id="<%= type %>-badge-print-form">
+<form method="POST" action="/admin/design/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form">
   <div class="roster-toolbar no-print">
     <div class="schedule-filters">
       <label class="checkbox-option schedule-print-select-all">
@@ -15,7 +15,7 @@
     <div class="roster-btn-row">
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('<%= type %>-badge-import-dialog').showModal()">Import</button>
       <a class="roster-action-btn file-action-btn" href="/admin/design/badges/<%= type %>/import-template.xlsx">Sample File</a>
-      <button type="submit" class="primary-btn"><%= badges.length === 0 ? 'Print' : 'Print Selected / All' %></button>
+      <button type="submit" class="primary-btn">Print</button>
     </div>
   </div>
 

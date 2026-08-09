@@ -6,21 +6,26 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { formatTimestamp, isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
-const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
+const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
-  DAYS,
   DAY_LABELS,
-  STATUS_LABELS,
   getMemberSchedule,
-  saveMemberSchedule,
   scheduleList,
 } = require('../utils/schedule');
+const { byLastName } = require('../utils/members');
 const {
   DAY_LABELS: CLASS_DAY_LABELS,
+  isValidDay,
   hoursForDay,
   roomGridForDay,
+  roomsForDay,
+  renameRoom,
+  GRADE_LEVELS,
+  activeParentsForStaff,
   absentMemberIdsForDate,
+  setEnrollment,
+  addStaff,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
@@ -28,7 +33,7 @@ const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter } = require('../utils/uploads');
 const { jsonScriptSafe } = require('../utils/json');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'schedule-cards');
 if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
@@ -48,12 +53,6 @@ const uploadDesignImage = multer({
 const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 const PAGE_SIZE = 25;
-
-function summarizeDay(rows) {
-  const filled = rows.filter((r) => r.class_name || r.room || r.time || r.teacher);
-  if (filled.length === 0) return '—';
-  return filled.map((r) => r.class_name || r.room || r.time).filter(Boolean).join(', ');
-}
 
 // Only defaults the absence-highlight date picker to today when today
 // actually falls on the tab's day - otherwise there's nothing meaningful
@@ -75,12 +74,15 @@ router.get('/schedule', requireAdmin, (req, res) => {
   if (tab === 'monday' || tab === 'wednesday') {
     const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(tab);
     return res.render('admin-schedule', {
-      title: 'Schedule',
+      title: 'Schedules',
       tab,
       day: tab,
       dayLabel: CLASS_DAY_LABELS[tab],
       hours: hoursForDay(tab),
       roomGrid: roomGridForDay(tab),
+      rooms: roomsForDay(tab),
+      gradeLevels: GRADE_LEVELS,
+      availableStaff: activeParentsForStaff(),
       selectedDate,
       absentIds: absentMemberIdsForDate(selectedDate),
       error: req.query.error || null,
@@ -88,56 +90,158 @@ router.get('/schedule', requireAdmin, (req, res) => {
     });
   }
 
-  // Student Schedules / Parent Schedules: the same per-member schedule
-  // list, filtered to one member_type.
+  // Student Schedules / Parent Schedules: every active member of that
+  // type, shown as their actual Schedule Card (same design/rendering as
+  // the printable card - see partials/name-tag-badge.ejs), laid out side
+  // by side in alphabetical-by-last-name order. The old free-text search
+  // is now a dropdown of every name in this tab, jumping straight to one
+  // person's card via the memberId filter scheduleList already supports.
   const memberType = tab === 'parents' ? 'parent' : 'student';
-  const filters = { search: (req.query.search || '').trim(), memberType };
-
-  let sort = ['name', 'monday', 'wednesday', 'status', 'updated'].includes(req.query.sort) ? req.query.sort : 'name';
-  let dir = req.query.dir === 'desc' ? 'desc' : 'asc';
+  const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
+  const filters = { memberType, memberId: selectedMemberId || undefined };
 
   const rows = scheduleList(filters);
 
+  const scheduleCardTemplate = getScheduleCardTemplate();
+  const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
+
   const summarized = rows.map((r) => ({
     member: r.member,
-    mondaySummary: summarizeDay(r.monday),
-    wednesdaySummary: summarizeDay(r.wednesday),
-    status: r.status,
-    statusLabel: STATUS_LABELS[r.status],
-    lastUpdated: r.lastUpdated ? formatTimestamp(r.lastUpdated) : 'Never',
-    lastUpdatedRaw: r.lastUpdated || '',
+    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(r.member)),
   }));
+  summarized.sort((a, b) => byLastName(a.member, b.member));
 
-  const dirMul = dir === 'desc' ? -1 : 1;
-  summarized.sort((a, b) => {
-    let av, bv;
-    if (sort === 'name') { av = a.member.name.toLowerCase(); bv = b.member.name.toLowerCase(); }
-    else if (sort === 'monday') { av = a.mondaySummary; bv = b.mondaySummary; }
-    else if (sort === 'wednesday') { av = a.wednesdaySummary; bv = b.wednesdaySummary; }
-    else if (sort === 'status') { av = a.status; bv = b.status; }
-    else { av = a.lastUpdatedRaw; bv = b.lastUpdatedRaw; }
-    if (av < bv) return -1 * dirMul;
-    if (av > bv) return 1 * dirMul;
-    return 0;
-  });
+  const allNames = db
+    .prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?')
+    .all(memberType)
+    .sort(byLastName);
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
   const pageRows = summarized.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   res.render('admin-schedule', {
-    title: 'Schedule',
+    title: 'Schedules',
     tab,
     rows: pageRows,
     totalCount: summarized.length,
     page,
     totalPages,
-    sort,
-    dir,
-    filters,
+    scheduleCardBgCss,
+    cardWidth: CARD_WIDTH,
+    cardHeight: CARD_HEIGHT,
+    allNames,
+    selectedMemberId,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// --- Student/Parent Schedules: bulk import ---
+//
+// Matches each row to an existing class by day + class name + start time
+// (the class has to already exist on the Class Schedule - this only ever
+// enrolls/staffs someone onto one, it never creates classes) and adds the
+// member to that class's roster: a student row enrolls them as a
+// student, a parent row adds them as that class's teacher. No Teacher or
+// End Time columns - a schedule row is just "this person, this class,
+// starting at this time".
+const SCHEDULE_IMPORT_TABS = { students: 'student', parents: 'parent' };
+
+function normalizeMatchText(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) => {
+  const tab = req.params.tab;
+  if (!SCHEDULE_IMPORT_TABS[tab]) return res.status(404).send('Not found');
+  const buffer = buildTemplateWorkbook(
+    ['Member Name', 'Day', 'Class Name', 'Start Time'],
+    [
+      ['Jane Smith', 'Monday', 'Art Adventures', '9:00 AM'],
+      ['John Smith', 'Wednesday', 'PE', '10:00 AM'],
+    ]
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${tab}-schedule-import-template.xlsx"`);
+  res.send(buffer);
+});
+
+const SCHEDULE_IMPORT_ALIASES = {
+  name: ['member name', 'name'],
+  day: ['day'],
+  className: ['class name', 'class', 'subject'],
+  startTime: ['start time', 'time'],
+};
+
+function normalizeScheduleImportRow(row) {
+  const lowerMap = {};
+  for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
+  const out = {};
+  for (const [field, aliases] of Object.entries(SCHEDULE_IMPORT_ALIASES)) {
+    for (const alias of aliases) {
+      if (lowerMap[alias] !== undefined && String(lowerMap[alias]).trim() !== '') {
+        out[field] = String(lowerMap[alias]).trim();
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.single('file'), (req, res) => {
+  const tab = req.params.tab;
+  const memberType = SCHEDULE_IMPORT_TABS[tab];
+  if (!memberType) return res.status(404).send('Not found');
+  const redirectBase = `/admin/schedule?tab=${tab}`;
+
+  if (!req.file) {
+    return res.redirect(`${redirectBase}&error=` + encodeURIComponent('Please choose a file to import.'));
+  }
+
+  let rows;
+  try {
+    rows = readRowsFromFile(req.file.buffer).map(normalizeScheduleImportRow).filter((r) => r.name && r.day && r.className);
+  } catch (err) {
+    return res.redirect(`${redirectBase}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
+
+  let matched = 0;
+  let skipped = 0;
+
+  for (const r of rows) {
+    const day = r.day.toLowerCase();
+    if (!isValidDay(day)) { skipped++; continue; }
+
+    const member = db
+      .prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE AND member_type = ? AND active = 1')
+      .get(r.name, memberType);
+    if (!member) { skipped++; continue; }
+
+    const candidates = db
+      .prepare('SELECT * FROM classes WHERE day = ? AND class_name = ? COLLATE NOCASE')
+      .all(day, r.className);
+    let cls = candidates[0];
+    if (candidates.length > 1) {
+      cls = candidates.find((c) => normalizeMatchText(c.start_time) === normalizeMatchText(r.startTime)) || null;
+    } else if (candidates.length === 1 && r.startTime && candidates[0].start_time) {
+      cls = normalizeMatchText(candidates[0].start_time) === normalizeMatchText(r.startTime) ? candidates[0] : null;
+    }
+    if (!cls) { skipped++; continue; }
+
+    if (memberType === 'student') {
+      const existingIds = db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id).map((e) => e.student_id);
+      if (!existingIds.includes(member.id)) setEnrollment(cls.id, [...existingIds, member.id]);
+    } else {
+      addStaff(cls.id, member.id, 'teacher');
+    }
+    matched++;
+  }
+
+  res.redirect(
+    `${redirectBase}&notice=` +
+      encodeURIComponent(`Matched ${matched} schedule row(s)` + (skipped ? `, ${skipped} skipped (no matching class or member).` : '.'))
+  );
 });
 
 router.post('/schedule/print-cards', requireFullAdmin, (req, res) => {
@@ -190,6 +294,10 @@ router.post('/schedule/design-image', requireFullAdmin, uploadDesignImage.single
   res.json({ ok: true, url: `/uploads/schedule-cards/${req.file.filename}` });
 });
 
+// Read-only - member_schedules is entirely derived from the master Class
+// Schedule now (see syncMemberSchedulesForDay in utils/classSchedule.js),
+// so there's nothing to hand-edit here anymore. Enroll/staff the member on
+// the Schedules page to change what shows up.
 router.get('/schedule/member/:id/manage', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
@@ -202,146 +310,7 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, (req, res) => {
     wednesday,
     dayLabels: DAY_LABELS,
     returnTab: member.member_type === 'parent' ? 'parents' : 'students',
-    notice: req.query.notice || null,
   });
-});
-
-router.post('/schedule/member/:id', requireFullAdmin, (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT id FROM members WHERE id = ?').get(id);
-  if (!member) return res.status(404).send('Not found');
-
-  const dayRows = {};
-  DAYS.forEach((day) => {
-    dayRows[day] = [1, 2, 3, 4].map((n) => ({
-      time: req.body[`time:${day}:${n}`] || '',
-      className: req.body[`className:${day}:${n}`] || '',
-      room: req.body[`room:${day}:${n}`] || '',
-      teacher: req.body[`teacher:${day}:${n}`] || '',
-    }));
-  });
-  saveMemberSchedule(id, dayRows);
-  res.redirect(`/admin/schedule/member/${id}/manage?notice=` + encodeURIComponent('Schedule saved.'));
-});
-
-router.get('/schedule/import-template.xlsx', requireFullAdmin, (req, res) => {
-  const buffer = buildTemplateWorkbook(
-    ['Full Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'],
-    [
-      ['Alice Smith', 'Monday', '1', '9:00 AM - 9:45 AM', 'Math', 'Room 12', 'Mrs. Jones'],
-      ['Alice Smith', 'Monday', '2', '10:00 AM - 10:45 AM', 'Science', 'Room 8', 'Mr. Lee'],
-      ['Alice Smith', 'Wednesday', '1', '9:00 AM - 9:45 AM', 'Art', 'Room 3', 'Ms. Diaz'],
-    ]
-  );
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="schedule-import-template.xlsx"');
-  res.send(buffer);
-});
-
-const SCHEDULE_IMPORT_ALIASES = {
-  name: ['full name', 'name', 'member name'],
-  day: ['day'],
-  classNumber: ['class number', 'class #', 'period', 'class'],
-  time: ['time'],
-  className: ['class name', 'subject'],
-  room: ['room'],
-  teacher: ['teacher'],
-};
-
-function normalizeScheduleRow(row) {
-  const lowerMap = {};
-  for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
-  const out = {};
-  for (const [field, aliases] of Object.entries(SCHEDULE_IMPORT_ALIASES)) {
-    for (const alias of aliases) {
-      if (lowerMap[alias] !== undefined && String(lowerMap[alias]).trim() !== '') {
-        out[field] = String(lowerMap[alias]).trim();
-        break;
-      }
-    }
-  }
-  return out;
-}
-
-router.post('/schedule/import', requireFullAdmin, upload.single('file'), (req, res) => {
-  const returnTab = SCHEDULE_TABS.includes(req.body.tab) ? req.body.tab : 'students';
-
-  if (!req.file) return res.redirect(`/admin/schedule?tab=${returnTab}&error=` + encodeURIComponent('Please choose a file to import.'));
-
-  let rawRows;
-  try {
-    rawRows = readRowsFromFile(req.file.buffer).map(normalizeScheduleRow);
-  } catch (err) {
-    return res.redirect(`/admin/schedule?tab=${returnTab}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
-  }
-
-  const summary = { imported: 0, updated: 0, created: 0, duplicate: 0, unmatched: 0, errors: 0, warnings: 0 };
-  const byMember = {}; // memberId -> { monday: {classNumber: row}, wednesday: {...} }
-  const seenKeys = new Set();
-
-  rawRows.forEach((r) => {
-    if (!r.name || !r.day || !r.classNumber) {
-      summary.errors++;
-      return;
-    }
-    const day = r.day.trim().toLowerCase();
-    if (day !== 'monday' && day !== 'wednesday') {
-      summary.errors++;
-      return;
-    }
-    const classNumber = parseInt(r.classNumber, 10);
-    if (!classNumber || classNumber < 1 || classNumber > 4) {
-      summary.errors++;
-      return;
-    }
-    const member = db.prepare('SELECT id FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(r.name);
-    if (!member) {
-      summary.unmatched++;
-      return;
-    }
-
-    const key = `${member.id}|${day}|${classNumber}`;
-    if (seenKeys.has(key)) {
-      summary.duplicate++;
-      return;
-    }
-    seenKeys.add(key);
-    if (!r.time && !r.className && !r.room && !r.teacher) summary.warnings++;
-
-    if (!byMember[member.id]) byMember[member.id] = { monday: {}, wednesday: {} };
-    byMember[member.id][day][classNumber] = { time: r.time || '', className: r.className || '', room: r.room || '', teacher: r.teacher || '' };
-    summary.imported++;
-  });
-
-  Object.entries(byMember).forEach(([memberId, days]) => {
-    const existing = getMemberSchedule(parseInt(memberId, 10));
-    const hadExisting = existing.monday.some((r) => r.class_name || r.room || r.time || r.teacher) || existing.wednesday.some((r) => r.class_name || r.room || r.time || r.teacher);
-
-    const dayRows = {};
-    DAYS.forEach((day) => {
-      dayRows[day] = [1, 2, 3, 4].map((n) => {
-        const incoming = days[day][n];
-        if (incoming) return incoming;
-        const existingRow = existing[day][n - 1];
-        return { time: existingRow.time, className: existingRow.class_name, room: existingRow.room, teacher: existingRow.teacher };
-      });
-    });
-    saveMemberSchedule(parseInt(memberId, 10), dayRows);
-    if (hadExisting) summary.updated++;
-    else summary.created++;
-  });
-
-  const parts = [
-    `${summary.imported} row(s) imported`,
-    `${summary.created} new schedule(s) created`,
-    `${summary.updated} schedule(s) updated`,
-  ];
-  if (summary.duplicate) parts.push(`${summary.duplicate} duplicate row(s) skipped`);
-  if (summary.unmatched) parts.push(`${summary.unmatched} unmatched name(s)`);
-  if (summary.errors) parts.push(`${summary.errors} error(s)`);
-  if (summary.warnings) parts.push(`${summary.warnings} warning(s) (blank rows)`);
-
-  res.redirect(`/admin/schedule?tab=${returnTab}&notice=` + encodeURIComponent(parts.join(', ') + '.'));
 });
 
 router.get('/schedule/export.csv', requireFullAdmin, (req, res) => {

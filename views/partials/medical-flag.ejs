@@ -1,0 +1,5 @@
+<%# Small medical-bag icon shown next to a member's name whenever they have
+    anything written in Allergies and Medical Notes - a same-glance heads-up
+    for anyone scanning a roster or list, not just admins who open the
+    profile. Pass member: m. %>
+<% if (locals.member && member.medical_notes) { %><span class="medical-flag" title="Allergies/medical notes on file"><svg class="icon"><use href="#icon-medical-bag"/></svg></span><% } %>

@@ -9,7 +9,7 @@
   <main class="admin-main badge-print-main">
     <div class="print-preview-header no-print">
       <h1>Print Schedule Cards</h1>
-      <button type="button" class="roster-action-btn file-action-btn" onclick="window.print()">Print</button>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
     <% if (cards.length === 0) { %>
@@ -30,5 +30,6 @@
       </div>
     <% }); %>
   </main>
+  <script src="/js/print-auto.js"></script>
 </body>
 </html>

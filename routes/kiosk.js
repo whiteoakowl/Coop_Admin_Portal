@@ -4,6 +4,10 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { defaultDay } = require('../utils/days');
+const { familyOf } = require('../utils/members');
+const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
+const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 // Full kiosk landing screen (Check In/Out, Floater Assignments, forms) -
 // not the site's homepage anymore (that's now the member/staff login),
@@ -67,6 +71,51 @@ router.post('/checkin/scan', (req, res) => {
   }
 
   res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
+});
+
+// --- Find a Parent ---
+//
+// A child (or anyone at the kiosk) scans a student's name tag, and the
+// screen shows where each of that student's parents is scheduled today
+// (their teaching/assistant assignments) - so they can be found in
+// person. Read-only: doesn't touch attendance at all.
+
+router.get('/find-parent', (req, res) => {
+  res.render('kiosk-find-parent', { title: 'Find a Parent' });
+});
+
+router.post('/find-parent/scan', (req, res) => {
+  const barcode = (req.body.barcode || '').trim();
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const student = db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
+  if (!student) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+  if (student.member_type !== 'student') {
+    return res.json({ ok: false, message: `${student.name} isn't a student - scan a student's name tag.` });
+  }
+
+  const parents = familyOf(student.id).filter((m) => m.member_type === 'parent');
+  if (parents.length === 0) {
+    return res.json({ ok: true, studentName: student.name, parents: [], cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
+  }
+
+  // Same rendering pipeline as the Members "View Cards" dialog and the
+  // Design/Print Schedule Card print run - the parent's schedule here
+  // looks exactly like their printed Schedule Card because it IS that
+  // card, not a separate hand-built view.
+  const template = getScheduleCardTemplate();
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const parentData = parents.map((p) => ({
+    name: p.name,
+    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(p)),
+    bgCss,
+  }));
+
+  res.json({ ok: true, studentName: student.name, parents: parentData, cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
 });
 
 module.exports = router;

@@ -1,11 +1,81 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+const { getListByDay, sectionsForList, membersForList } = require('./volunteers');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
+// Every grade a class's Age Group can be checked for (create/edit class
+// form) - classes.age_group stores whichever of these are checked as a
+// comma-joined string (e.g. "Infant, Toddler"), same pattern as any other
+// multi-select-into-one-TEXT-column field in this app.
+const GRADE_LEVELS = [
+  'Infant',
+  'Toddler',
+  'Preschool',
+  'PreK',
+  'Kindergarten',
+  '1st',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  '6th',
+  '7th',
+  '8th',
+  '9th',
+  '10th',
+  '11th',
+  '12th',
+];
+
+function ageGroupList(ageGroup) {
+  return (ageGroup || '')
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
+}
+
+// "1st" -> "1", "3rd" -> "3" - the non-numeric grade labels (Infant,
+// Toddler, Preschool, PreK, Kindergarten) have no suffix to strip and
+// pass through unchanged.
+function stripOrdinal(label) {
+  return label.replace(/(st|nd|rd|th)$/i, '');
+}
+
+// A class card shows its grade(s) as a single compact line - "Grade 1"
+// for one grade, "Grades 1-3" for a contiguous run, or a plain comma list
+// for a non-contiguous selection (e.g. "1st" and "5th" but nothing
+// between) - instead of a badge per grade.
+function formatGradeRange(ageGroup) {
+  const labels = ageGroupList(ageGroup);
+  if (labels.length === 0) return '';
+  const indices = labels.map((l) => GRADE_LEVELS.indexOf(l)).filter((i) => i !== -1).sort((a, b) => a - b);
+  if (indices.length === 0) return labels.join(', ');
+  if (indices.length === 1) return `Grade ${stripOrdinal(GRADE_LEVELS[indices[0]])}`;
+  const isContiguous = indices.every((idx, i) => i === 0 || idx === indices[i - 1] + 1);
+  if (isContiguous) return `Grades ${stripOrdinal(GRADE_LEVELS[indices[0]])}-${stripOrdinal(GRADE_LEVELS[indices[indices.length - 1]])}`;
+  return `Grades ${indices.map((i) => stripOrdinal(GRADE_LEVELS[i])).join(', ')}`;
+}
+
 // Cycled through in order as new classes are created, so a freshly built
 // schedule is colorful without an admin having to pick a color every time.
-const COLOR_PALETTE = ['#EE9A4D', '#5B9BD5', '#70AD47', '#9B6BC7', '#E06666', '#4EB8B0', '#D6A429', '#C77BA6'];
+// 12 pastel tones spanning the hue wheel, deep/saturated enough to stand
+// out on the grid at a glance (not the washed-out, barely-there pastels
+// this palette started as) while still reading as "pastel", not neon.
+const COLOR_PALETTE = [
+  '#F5B67D', // peach
+  '#F0DB6E', // yellow
+  '#B8DE7A', // lime
+  '#86D1A3', // mint
+  '#7BD2C6', // teal
+  '#7CBBF0', // sky blue
+  '#93A4F0', // periwinkle
+  '#B79BEA', // lavender
+  '#DE93E0', // orchid
+  '#F291BE', // pink
+  '#F29A8E', // coral
+  '#CBAE8B', // sand
+];
 
 function nextPaletteColor() {
   const count = db.prepare('SELECT COUNT(*) AS c FROM classes').get().c;
@@ -30,8 +100,9 @@ function saveHourLabels(day, labels) {
 function studentsForClass(classId) {
   return db
     .prepare(
-      `SELECT m.* FROM class_enrollments ce
+      `SELECT m.*, f.name AS family_name FROM class_enrollments ce
        JOIN members m ON m.id = ce.student_id
+       LEFT JOIN families f ON f.id = m.family_id
        WHERE ce.class_id = ? AND m.active = 1
        ORDER BY m.name COLLATE NOCASE`
     )
@@ -84,7 +155,17 @@ function roomGridForDay(day) {
   const classes = db
     .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, class_name COLLATE NOCASE')
     .all(day)
-    .map((cls) => ({ ...cls, students: studentsForClass(cls.id), staff: staffForClass(cls.id) }));
+    .map((cls) => {
+      const staff = staffForClass(cls.id);
+      return {
+        ...cls,
+        students: studentsForClass(cls.id),
+        staff,
+        gradeLabel: formatGradeRange(cls.age_group),
+        teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+        assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+      };
+    });
 
   const roomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : 'Unassigned')))].sort(
     (a, b) => {
@@ -127,11 +208,29 @@ function roomGridForDay(day) {
   return { hours, rows };
 }
 
+// Every distinct room name in use on a day - rooms aren't their own
+// managed entity (just whatever string is typed into each class's room
+// field), so "Edit Room Numbers" works off whatever's actually in use,
+// same idea as Edit Hours but derived instead of a fixed table.
+function roomsForDay(day) {
+  return db
+    .prepare("SELECT DISTINCT room FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY room COLLATE NOCASE")
+    .all(day)
+    .map((r) => r.room);
+}
+
+// Renames a room across every class on a day that currently uses it - the
+// bulk-edit half of "Edit Room Numbers".
+function renameRoom(day, oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return;
+  db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
+}
+
 function createClass(fields) {
   const info = db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -140,7 +239,9 @@ function createClass(fields) {
       fields.room || null,
       fields.ageGroup || null,
       fields.color || nextPaletteColor(),
-      fields.notes || null
+      fields.notes || null,
+      fields.startTime || null,
+      fields.endTime || null
     );
   const id = info.lastInsertRowid;
   ensureClassRoster(id);
@@ -148,9 +249,9 @@ function createClass(fields) {
 }
 
 function updateClass(id, fields) {
-  const before = db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(id);
+  const before = db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ? WHERE id = ?`
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ? WHERE id = ?`
   ).run(
     fields.day,
     fields.hourPosition,
@@ -159,12 +260,19 @@ function updateClass(id, fields) {
     fields.ageGroup || null,
     fields.color || '#EE9A4D',
     fields.notes || null,
+    fields.startTime || null,
+    fields.endTime || null,
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.
   if (before && before.roster_id) {
     db.prepare('UPDATE rosters SET name = ?, schedule_day = ? WHERE id = ?').run(fields.className, fields.day, before.roster_id);
   }
+  // Re-derive roster membership + member_schedules for whichever day(s)
+  // are affected - both the old day (in case this class just moved off
+  // it) and the new one.
+  syncDayMemberRosters(fields.day);
+  if (before && before.day && before.day !== fields.day) syncDayMemberRosters(before.day);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing
@@ -312,6 +420,26 @@ function absenceFormMemberIdsForDate(date) {
   );
 }
 
+// Everyone marked absent OR late for a given date, any source (checked in
+// that way on a roster, or via an Absence/Late form) - the single "won't
+// be where they're expected today" signal the floater-assignment board
+// uses, both to keep someone out of the substitute pool and to decide
+// whether a class needs a floater covering for one of its own teachers or
+// assistants. Maps member id -> whichever status was recorded ('absent'
+// wins if a member somehow has mixed statuses across rosters for the same
+// date).
+function missingMemberIdsForDate(date) {
+  if (!date) return new Map();
+  const rows = db
+    .prepare(`SELECT member_id, status FROM attendance WHERE session_date = ? AND status IN ('absent', 'late')`)
+    .all(date);
+  const map = new Map();
+  rows.forEach((r) => {
+    if (r.status === 'absent' || !map.has(r.member_id)) map.set(r.member_id, r.status);
+  });
+  return map;
+}
+
 // --- Rosters auto-created from class registration ------------------------
 //
 // Every class gets its own students-only roster, and each day gets one
@@ -321,23 +449,64 @@ function absenceFormMemberIdsForDate(date) {
 // roster_dates, exactly like a manually-created roster; nothing here ever
 // touches roster_dates.
 
-// Adds/removes roster_members rows so a roster's membership matches
+// Adds/removes roster_members rows so a roster's 'auto' membership matches
 // memberIdSet exactly, without touching anyone's scheduled_arrival/
-// departure or the roster's dates.
+// departure or the roster's dates. Rows an admin added by hand (source =
+// 'manual', via the Attendance page's Add Member popup) are never touched
+// here, so they survive every resync instead of getting silently dropped
+// the next time class enrollment/staffing changes.
 function setRosterMembership(rosterId, memberIdSet) {
   const existingIds = db
-    .prepare('SELECT member_id FROM roster_members WHERE roster_id = ?')
+    .prepare("SELECT member_id FROM roster_members WHERE roster_id = ? AND source = 'auto'")
     .all(rosterId)
     .map((r) => r.member_id);
   const existing = new Set(existingIds);
-  const insert = db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)');
-  const remove = db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?');
+  const insert = db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')");
+  const remove = db.prepare("DELETE FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'");
   for (const memberId of memberIdSet) {
     if (!existing.has(memberId)) insert.run(rosterId, memberId);
   }
   for (const memberId of existingIds) {
     if (!memberIdSet.has(memberId)) remove.run(rosterId, memberId);
   }
+}
+
+// Every class across both days, for the Attendance page's Class Rosters
+// tab - each row links to that class's own auto-maintained roster (see
+// ensureClassRoster) via its roster_id.
+// The Attendance page's Class Rosters log list - every class (optionally
+// filtered to one day), alphabetical by title, each with the grade(s)/
+// day/time/teacher/assistants needed for that one-line summary.
+function allClassesList(day) {
+  const rows = db
+    .prepare(
+      `SELECT c.*, h.label AS hourLabel,
+              (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS studentCount
+       FROM classes c
+       JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
+       WHERE (@day IS NULL OR c.day = @day)
+       ORDER BY c.class_name COLLATE NOCASE`
+    )
+    .all({ day: day || null });
+  return rows.map((r) => {
+    const staff = staffForClass(r.id);
+    return {
+      ...r,
+      dayLabel: DAY_LABELS[r.day],
+      gradeLabel: formatGradeRange(r.age_group),
+      timeLabel: timeRangeForClass(r),
+      teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+      assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+    };
+  });
+}
+
+// Adds someone to a roster by hand (Attendance page's Add Member popup) -
+// tagged source = 'manual' so setRosterMembership's auto-resync never
+// removes them again. INSERT OR IGNORE so re-adding an existing auto
+// member is a harmless no-op rather than an error.
+function addManualRosterMember(rosterId, memberId) {
+  db.prepare("INSERT OR IGNORE INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(rosterId, memberId);
 }
 
 // Creates (once) the students-only roster for a single class, or returns
@@ -400,8 +569,19 @@ function ensureDayMemberRosters() {
   return ids;
 }
 
+// Everyone floating any hour on a day's Floater Assignments list - a
+// parent only needs to be assigned to ONE hour to count as floating that
+// day, same "day-level" granularity as teaching/assisting a class.
+function floaterMemberIdsForDay(day) {
+  const list = getListByDay(day);
+  if (!list) return [];
+  return membersForList(list.id).map((m) => m.id);
+}
+
 // Rebuilds a day's Parent and Student roster membership from everyone
-// enrolled in (students) or staffing (parents) any class on that day.
+// enrolled in (students) or staffing/floating (parents) that day - a
+// class's teacher/assistants, or anyone on the Floater Assignments list
+// for any hour that day.
 function syncDayMemberRosters(day) {
   const classIds = db.prepare('SELECT id FROM classes WHERE day = ?').all(day).map((r) => r.id);
   const studentIds = new Set();
@@ -415,8 +595,85 @@ function syncDayMemberRosters(day) {
       .all(...classIds)
       .forEach((r) => parentIds.add(r.member_id));
   }
+  floaterMemberIdsForDay(day).forEach((id) => parentIds.add(id));
   setRosterMembership(ensureDayRoster(day, 'student'), studentIds);
   setRosterMembership(ensureDayRoster(day, 'parent'), parentIds);
+  syncMemberSchedulesForDay(day);
+}
+
+// A class's display time range: its own start_time/end_time if an admin
+// set them, otherwise its hour block's shared label (e.g. "Hour 1" or
+// whatever an admin renamed it to via Edit Hours).
+function timeRangeForClass(cls) {
+  if (cls.start_time && cls.end_time) return `${cls.start_time} - ${cls.end_time}`;
+  const hour = db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
+  return (hour && hour.label) || '';
+}
+
+// member_schedules (the per-member "Schedule Card" / profile Class
+// Schedule tab data) is entirely derived from the master Class Schedule
+// and the Floater Assignments list - there's no separate hand-typed
+// version anymore, so this fully rebuilds one day's rows every time
+// either changes (called from syncDayMemberRosters, which already runs
+// on every enrollment/staff/class/floater edit). A person shows up once
+// per class they're either enrolled in (student) or staffing (teacher/
+// assistant); "teacher" on their row lists that class's teacher(s),
+// themselves included if that's their own class. A floater then fills in
+// any of THEIR hours that aren't already a real class slot on their own
+// schedule, labeled "Floater" - matched purely by hour position (the
+// Floater Assignments chart's "Hour N" against the class grid's own
+// "Hour N", the same position class_schedule_hours already keys both by),
+// not to any specific class, so it never overwrites a real one.
+function syncMemberSchedulesForDay(day) {
+  const classes = db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
+  const upsert = db.prepare(
+    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(member_id, day, class_number) DO UPDATE SET
+       time = excluded.time, class_name = excluded.class_name, room = excluded.room,
+       teacher = excluded.teacher, updated_at = datetime('now')`
+  );
+
+  classes.forEach((cls) => {
+    const time = timeRangeForClass(cls);
+    const staff = staffForClass(cls.id);
+    const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
+    const people = [...studentsForClass(cls.id), ...staff];
+    people.forEach((person) => {
+      upsert.run(person.id, day, cls.hour_position, time, cls.class_name, cls.room || '', teacherNames);
+    });
+  });
+
+  const insertIfEmpty = db.prepare(
+    `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
+     VALUES (?, ?, ?, ?, 'Floater', '', '', datetime('now'))
+     ON CONFLICT(member_id, day, class_number) DO NOTHING`
+  );
+  const list = getListByDay(day);
+  if (list) {
+    const hourLabels = {};
+    hoursForDay(day).forEach((h) => { hourLabels[h.position] = h.label; });
+    sectionsForList(list.id).forEach((section) => {
+      membersForSectionRaw(list.id, section.id).forEach((memberId) => {
+        insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
+      });
+    });
+  }
+}
+
+// Bare member ids on one floater hour section - a lightweight variant of
+// utils/volunteers.js's membersForSection (which joins in rank/other
+// display fields this sync doesn't need).
+function membersForSectionRaw(listId, sectionId) {
+  return db
+    .prepare(
+      `SELECT m.id FROM members m
+       JOIN volunteer_members vm ON vm.member_id = m.id
+       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1`
+    )
+    .all(listId, sectionId)
+    .map((r) => r.id);
 }
 
 function appSetting(key, fallback) {
@@ -438,10 +695,15 @@ module.exports = {
   defaultDay,
   HOUR_POSITIONS,
   COLOR_PALETTE,
+  GRADE_LEVELS,
+  ageGroupList,
+  formatGradeRange,
   hoursForDay,
   saveHourLabels,
   gridForDay,
   roomGridForDay,
+  roomsForDay,
+  renameRoom,
   getClass,
   createClass,
   updateClass,
@@ -456,6 +718,7 @@ module.exports = {
   classesAtRiskForDay,
   absentMemberIdsForDate,
   absenceFormMemberIdsForDate,
+  missingMemberIdsForDate,
   appSetting,
   setAppSetting,
   ensureClassRoster,
@@ -463,4 +726,7 @@ module.exports = {
   ensureDayRoster,
   ensureDayMemberRosters,
   syncDayMemberRosters,
+  syncMemberSchedulesForDay,
+  addManualRosterMember,
+  allClassesList,
 };

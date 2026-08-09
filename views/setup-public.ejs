@@ -18,22 +18,41 @@
       </div>
     </div>
   <% } else { %>
-    <div class="setup-public-grid">
-      <% teams.forEach(function(t) { %>
-        <div class="setup-public-card">
-          <h2><%= t.title %></h2>
-          <% if (t.description) { %><p class="setup-public-desc"><%= t.description %></p><% } %>
-          <% if (t.members.length === 0) { %>
-            <p class="setup-public-desc">No members on this team yet.</p>
-          <% } else { %>
-            <ul class="setup-public-member-list">
-              <% t.members.forEach(function(m) { %><li><%= m.name %></li><% }); %>
-            </ul>
-          <% } %>
+    <div class="team-card-grid setup-team-card-grid kiosk-team-card-grid">
+      <% teams.forEach(function(t, i) { %>
+        <div class="team-col">
+          <div class="team-info-card team-accent-<%= i % 5 %>">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+            <h3 class="team-info-title"><%= t.title %></h3>
+            <% if (t.leaderName) { %>
+              <div class="team-info-leader">
+                <svg class="icon"><use href="#icon-user"/></svg>
+                Leader: <span><%= t.leaderName %></span>
+              </div>
+            <% } %>
+            <% if (t.description) { %>
+              <span class="team-info-pill"><svg class="icon"><use href="#icon-tag"/></svg> <span><%= t.description %></span></span>
+            <% } %>
+          </div>
+          <div class="team-members-card">
+            <h4>Members</h4>
+            <div class="team-card-members">
+              <% if (t.members.length === 0) { %>
+                <p class="team-card-empty">No members on this team yet.</p>
+              <% } %>
+              <% t.members.forEach(function(m) { %>
+                <div class="team-member-row">
+                  <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                </div>
+              <% }); %>
+            </div>
+          </div>
         </div>
       <% }); %>
     </div>
   <% } %>
   <script src="/js/idle-redirect.js"></script>
+  <script src="/js/fullscreen-nav.js"></script>
 </body>
 </html>

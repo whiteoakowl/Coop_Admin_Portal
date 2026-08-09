@@ -1,13 +1,24 @@
 -- SH Check-in/out schema
 
+-- A family is a named group (just a surname/label) that an admin creates
+-- explicitly - the Members page's "+ Add Family" button - before it can be
+-- chosen on any member's profile ("Choose a Family" dropdown). Replaces the
+-- old free-form "pick your other family members" checkbox list.
+CREATE TABLE IF NOT EXISTS families (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- member_type distinguishes a Student (attends co-op, can be checked in/out
 -- and marked absent/late) from a Parent (submits forms and volunteers, but
 -- is never checked in) from an Admin (co-op staff/leaders who mainly just
 -- need a printable badge). Every member is its own profile regardless of
--- type; family_id is a simple, symmetric grouping - any members sharing
--- the same family_id are "family" (used to group names on the public
--- Absence/Late and Name Tag forms). NULL means the member isn't
--- connected to anyone.
+-- type; family_id points at a families row - any members sharing the same
+-- family_id are "family" (used to group names on the public Absence/Late
+-- and Name Tag forms, and to fill each family's roster on the Membership
+-- Form's "Choose a Family" dropdown). NULL means the member isn't
+-- connected to a family yet.
 CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -25,7 +36,12 @@ CREATE TABLE IF NOT EXISTS members (
   birthday TEXT,
   grade_level TEXT,
   medical_notes TEXT,
-  family_id INTEGER,
+  family_id INTEGER REFERENCES families(id) ON DELETE SET NULL,
+  -- Marks the one member per family who's the primary contact - listed
+  -- first within their family group on the Members page and highlighted
+  -- there. Purely a display/organization flag, not tied to any
+  -- permission - set from a member's edit page.
+  is_primary_parent INTEGER NOT NULL DEFAULT 0,
   -- Portal login credentials, set by an admin on the member's profile - NULL
   -- until an admin grants that member portal access. Which portal(s) they
   -- can reach with those credentials is controlled by the portal_* flags
@@ -78,6 +94,12 @@ CREATE TABLE IF NOT EXISTS roster_members (
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   scheduled_arrival TEXT,
   scheduled_departure TEXT,
+  -- 'auto' rows are kept in lockstep with class enrollment/staffing by
+  -- setRosterMembership (utils/classSchedule.js) - it only ever adds/
+  -- removes 'auto' rows, so a 'manual' row (added by an admin on the
+  -- Attendance page's Add Member popup, for someone not on any class)
+  -- survives every resync untouched.
+  source TEXT NOT NULL DEFAULT 'auto' CHECK(source IN ('auto','manual')),
   PRIMARY KEY (roster_id, member_id)
 );
 
@@ -176,6 +198,9 @@ CREATE TABLE IF NOT EXISTS setup_teams (
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
   title TEXT NOT NULL,
   description TEXT,
+  -- The team's leader, picked from active parent members - shown on the
+  -- team card and settable/changeable there via a dropdown.
+  leader_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -184,6 +209,30 @@ CREATE TABLE IF NOT EXISTS setup_team_members (
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   PRIMARY KEY (team_id, member_id)
 );
+
+-- Setup/Cleanup Task List tab: a stack of numbered task lists (one
+-- section card per list), each optionally tied to a setup_teams row so
+-- its numbered tasks also print on that team's own card (see
+-- team_id) - a standalone list with no team_id just prints on its own.
+-- position controls both which order the section cards stack in and
+-- (via task_list_items.position) which order/number each row shows at.
+CREATE TABLE IF NOT EXISTS task_list_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
+  title TEXT NOT NULL,
+  team_id INTEGER REFERENCES setup_teams(id) ON DELETE SET NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_task_list_sections_day ON task_list_sections(day);
+
+CREATE TABLE IF NOT EXISTS task_list_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  section_id INTEGER NOT NULL REFERENCES task_list_sections(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_task_list_items_section ON task_list_items(section_id);
 
 -- Submissions from the public Name Tag form (lost tag / schedule change).
 CREATE TABLE IF NOT EXISTS name_tag_requests (
@@ -276,6 +325,12 @@ CREATE TABLE IF NOT EXISTS classes (
   age_group TEXT,
   color TEXT NOT NULL DEFAULT '#EE9A4D',
   notes TEXT,
+  -- Per-class start/end time, e.g. "9:00 AM"/"9:45 AM" - two classes can
+  -- share the same hour_position slot but still run at slightly different
+  -- times. Falls back to the hour block's own label (class_schedule_hours)
+  -- when blank - see timeRangeForClass in utils/classSchedule.js.
+  start_time TEXT,
+  end_time TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   -- Auto-created/maintained class roster (students only) that mirrors this
   -- class's enrollment - see ensureClassRoster/syncClassRosterMembers in
@@ -388,6 +443,7 @@ CREATE TABLE IF NOT EXISTS permanent_jobs (
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
   hour_position INTEGER NOT NULL CHECK(hour_position BETWEEN 1 AND 4),
   title TEXT NOT NULL,
+  room TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

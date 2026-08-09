@@ -1,0 +1,49 @@
+<%
+// One card per hour block, each listing every position for that hour -
+// Position, Room, Floater Assigned - read-only (reassigning happens on
+// the live Chart tab's own cards, not here). Shared by the Archive
+// popup and the Archive print page (a past date) - same partial, same
+// look, everywhere this data is shown. Locals: cards
+// (utils/substitutes.js dailyAssignmentCards, each hour's `label`
+// merged in by the route).
+var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
+%>
+<% if (cards.length === 0) { %>
+  <p class="roster-empty">No positions configured for this day yet.</p>
+<% } else { %>
+  <div class="floater-cards-grid">
+    <% cards.forEach(function(hour, idx) { %>
+      <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <div class="floater-card floater-card-<%= accent %>">
+        <div class="floater-card-header">
+          <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
+          <h3><%= hour.label %></h3>
+        </div>
+        <table class="floater-card-table">
+          <thead>
+            <tr><th>Position</th><th>Room</th><th>Floater</th></tr>
+          </thead>
+          <tbody>
+            <% hour.jobs.forEach(function(job) { %>
+              <tr>
+                <td class="floater-card-position"><%= job.title %></td>
+                <td><%= job.room || '—' %></td>
+                <td>
+                  <% if (job.assigned) { %>
+                    <%= job.assigned.name %>
+                  <% } else { %>
+                    <span class="floater-card-unassigned">Unassigned</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <div class="floater-card-footer">
+          <svg class="icon"><use href="#icon-users"/></svg>
+          <%= hour.jobs.length %> Assignment<%= hour.jobs.length === 1 ? '' : 's' %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

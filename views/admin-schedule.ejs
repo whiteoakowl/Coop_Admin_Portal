@@ -13,7 +13,7 @@
         <p class="print-header-sub">Schedule</p>
       </div>
     </div>
-    <h1>Schedule</h1>
+    <h1>Schedules</h1>
 
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday Schedule</a>
@@ -26,15 +26,13 @@
 
     <div class="view-tab-panel">
       <% if (tab === 'monday' || tab === 'wednesday') { %>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, availableStaff, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else { %>
         <%
           function buildQuery(overrides) {
             const params = new URLSearchParams();
             params.set('tab', tab);
-            if (filters.search) params.set('search', filters.search);
-            if (sort) params.set('sort', sort);
-            if (dir) params.set('dir', dir);
+            if (selectedMemberId) params.set('memberId', selectedMemberId);
             Object.keys(overrides || {}).forEach(function (k) {
               if (overrides[k] === null || overrides[k] === undefined) params.delete(k);
               else params.set(k, overrides[k]);
@@ -48,24 +46,28 @@
         <div class="roster-toolbar no-print">
           <div class="schedule-filters">
             <div class="category-filter schedule-search">
-              <label for="schedule-search-input">Search</label>
-              <input type="search" id="schedule-search-input" placeholder="Search by member name&hellip;" value="<%= filters.search %>" />
+              <label for="schedule-name-select"><%= tab === 'parents' ? 'Parent' : 'Student' %> Name</label>
+              <select id="schedule-name-select" onchange="window.location = '/admin/schedule?tab=<%= tab %>' + (this.value ? '&memberId=' + this.value : '')">
+                <option value="">All <%= tab === 'parents' ? 'parents' : 'students' %></option>
+                <% allNames.forEach(function(n) { %>
+                  <option value="<%= n.id %>" <%= selectedMemberId === n.id ? 'selected' : '' %>><%= n.name %></option>
+                <% }); %>
+              </select>
             </div>
           </div>
 
           <div class="roster-btn-row">
-            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+            <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('schedule-import-dialog').showModal()">Import</button>
             <a class="roster-action-btn file-action-btn" href="/admin/schedule/export.csv<%= buildQuery({}) %>">Export</a>
-            <a class="roster-action-btn file-action-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank">Print</a>
+            <a class="roster-action-btn print-action-btn" href="/admin/schedule/print<%= buildQuery({}) %>" target="_blank">Print</a>
           </div>
         </div>
 
-        <dialog id="import-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/schedule/import" enctype="multipart/form-data">
-            <h3>Import</h3>
-            <p class="hint">Matches rows to existing Members by full name. New people must be added on the <a href="/admin/members">Members page</a> first.</p>
-            <a class="btn-secondary import-sample-link" href="/admin/schedule/import-template.xlsx">Download Sample File</a>
-            <input type="hidden" name="tab" value="<%= tab %>" />
+        <dialog id="schedule-import-dialog" class="member-picker-dialog">
+          <form method="POST" action="/admin/schedule/<%= tab %>/import" enctype="multipart/form-data">
+            <h3>Import <%= tab === 'parents' ? 'Parent' : 'Student' %> Schedules</h3>
+            <p class="hint">Matches each row to an existing class by day, class name, and start time, then adds that person to its roster <%= tab === 'parents' ? 'as teacher' : 'as a student' %>. Doesn't create classes - set those up on the Class Schedule first.</p>
+            <a class="btn-secondary import-sample-link" href="/admin/schedule/<%= tab %>/import-template.xlsx">Download Sample File</a>
             <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
             <div class="notes-dialog-actions">
               <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
@@ -74,41 +76,21 @@
           </form>
         </dialog>
 
-        <div class="roster-scroll schedule-table-scroll">
-          <table class="roster-table members-table" id="schedule-table">
-            <thead>
-              <tr>
-                <th><a href="<%= buildQuery({ sort: 'name', dir: sort === 'name' && dir === 'asc' ? 'desc' : 'asc' }) %>">Member Name</a></th>
-                <th><a href="<%= buildQuery({ sort: 'monday', dir: sort === 'monday' && dir === 'asc' ? 'desc' : 'asc' }) %>">Monday Schedule</a></th>
-                <th><a href="<%= buildQuery({ sort: 'wednesday', dir: sort === 'wednesday' && dir === 'asc' ? 'desc' : 'asc' }) %>">Wednesday Schedule</a></th>
-                <th><a href="<%= buildQuery({ sort: 'status', dir: sort === 'status' && dir === 'asc' ? 'desc' : 'asc' }) %>">Status</a></th>
-                <th><a href="<%= buildQuery({ sort: 'updated', dir: sort === 'updated' && dir === 'asc' ? 'desc' : 'asc' }) %>">Last Updated</a></th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (rows.length === 0) { %>
-                <tr>
-                  <td colspan="5" class="roster-empty">
-                    <div class="roster-empty-state">
-                      <svg class="icon roster-empty-icon"><use href="#icon-clock"/></svg>
-                      <p class="roster-empty-title">No schedules found</p>
-                      <p class="roster-empty-subtitle">Adjust your search and try again.</p>
-                    </div>
-                  </td>
-                </tr>
-              <% } %>
-              <% rows.forEach(function(r) { %>
-                <tr>
-                  <td class="roster-name-col"><a href="/admin/schedule/member/<%= r.member.id %>/manage"><%= r.member.name %></a></td>
-                  <td class="schedule-summary-cell" title="<%= r.mondaySummary %>"><%= r.mondaySummary %></td>
-                  <td class="schedule-summary-cell" title="<%= r.wednesdaySummary %>"><%= r.wednesdaySummary %></td>
-                  <td><span class="status-badge status-badge-<%= r.status %>"><%= r.statusLabel %></span></td>
-                  <td><%= r.lastUpdated %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <% if (rows.length === 0) { %>
+          <div class="roster-empty-state">
+            <svg class="icon roster-empty-icon"><use href="#icon-clock"/></svg>
+            <p class="roster-empty-title">No schedules found</p>
+          </div>
+        <% } else { %>
+          <div class="schedule-card-grid">
+            <% rows.forEach(function(r) { %>
+              <div class="schedule-card-grid-item">
+                <a class="schedule-card-grid-name" href="/admin/schedule/member/<%= r.member.id %>/manage"><%= r.member.name %></a>
+                <%- include('partials/name-tag-badge', { html: r.scheduleCardHtml, bgCss: scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
 
         <% if (totalPages > 1) { %>
           <div class="schedule-pagination no-print">

@@ -2,6 +2,22 @@ const db = require('../db');
 const { readRowsFromFile } = require('./spreadsheet');
 const { ageFromBirthday } = require('./dates');
 
+// Everywhere a member list sorts "alphabetically by last name" (the
+// Members page's family groups, every roster view) - names are stored as
+// a single "First Last" string, so the last name is just the final
+// whitespace-separated token. Good enough for this app's real member
+// names (no attempt at suffixes/multi-word surnames).
+function lastNameOf(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/);
+  return parts.length > 0 ? parts[parts.length - 1] : '';
+}
+function byLastName(a, b) {
+  return (
+    lastNameOf(a.name).localeCompare(lastNameOf(b.name), undefined, { sensitivity: 'base' }) ||
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+}
+
 // Names-only file (.csv/.txt), one name per line or name in the first column.
 function parseNamesFile(buffer) {
   const text = buffer.toString('utf8');
@@ -94,55 +110,128 @@ function loadFamilyMember(memberId, parentId) {
   return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, parent.family_id);
 }
 
-function nextFamilyId() {
-  return db.prepare('SELECT COALESCE(MAX(family_id), 0) + 1 AS next FROM members').get().next;
+// Every family an admin has created ("+ Add Family" on the Members page) -
+// the full list backing the "Choose a Family" dropdown on the member form.
+// A family only ever appears there once it's been added here first.
+// memberCount (active members currently in that family) is included for
+// the form's "The Anderson Family - 2 members" checklist display.
+function allFamilies() {
+  return db
+    .prepare(
+      `SELECT f.id, f.name, COUNT(m.id) AS memberCount
+       FROM families f
+       LEFT JOIN members m ON m.family_id = f.id AND m.active = 1
+       GROUP BY f.id
+       ORDER BY f.name COLLATE NOCASE`
+    )
+    .all();
 }
 
-// Rebuilds memberId's family group to be exactly {memberId} + otherIds -
-// this is a direct "here's who's in my family now" action, not a merge:
-// anyone previously grouped with memberId but not in otherIds is dropped
-// from the group (and if that leaves their old group down to one person,
-// that person is cleared too, since a family of one isn't a family).
-// Reuses an existing family_id found among the new group's members if
-// there is one (preferring memberId's own), so connecting into an
-// existing family doesn't fragment it.
-function setFamilyMembers(memberId, otherIds) {
-  const uniqueOtherIds = [...new Set(otherIds)].filter((id) => id !== memberId);
-  const oldFamilyId = (db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId) || {}).family_id;
-
-  // Detach anyone who was in memberId's old group but isn't in the new
-  // list *before* touching memberId's own family_id - the new group often
-  // reuses the same family_id number (nothing new, just re-saving), so
-  // doing this after would make a dropped member indistinguishable from
-  // one who's staying.
-  if (oldFamilyId != null) {
-    const stayingIds = new Set([memberId, ...uniqueOtherIds]);
-    const oldGroupIds = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId).map((r) => r.id);
-    const droppedIds = oldGroupIds.filter((id) => !stayingIds.has(id));
-    if (droppedIds.length > 0) {
-      const placeholders = droppedIds.map(() => '?').join(',');
-      db.prepare(`UPDATE members SET family_id = NULL WHERE id IN (${placeholders})`).run(...droppedIds);
-    }
-  }
-
-  if (uniqueOtherIds.length === 0) {
+// Directly assigns memberId to an existing family (or clears it with a
+// null/blank familyId) - the single "Choose a Family" dropdown replaces
+// the old "pick your other family members" checkbox list, so this is a
+// plain assignment rather than a group-rebuild. Silently no-ops (leaves
+// family_id untouched) if familyId doesn't match a real family, so a
+// tampered/stale form value can't attach a member to a bogus id.
+function setMemberFamily(memberId, familyId) {
+  if (familyId == null) {
     db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(memberId);
-  } else {
-    const groupIds = [memberId, ...uniqueOtherIds];
-    const placeholders = groupIds.map(() => '?').join(',');
-    const rows = db.prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders})`).all(...groupIds);
-    const selfFamilyId = (rows.find((r) => r.id === memberId) || {}).family_id;
-    const anyFamilyId = (rows.find((r) => r.family_id != null) || {}).family_id;
-    const familyId = selfFamilyId != null ? selfFamilyId : anyFamilyId != null ? anyFamilyId : nextFamilyId();
-    db.prepare(`UPDATE members SET family_id = ? WHERE id IN (${placeholders})`).run(familyId, ...groupIds);
+    return;
   }
+  const exists = db.prepare('SELECT id FROM families WHERE id = ?').get(familyId);
+  if (!exists) return;
+  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, memberId);
+}
 
-  // If dropping members left the old group down to just one person left,
-  // that person isn't meaningfully "family" anymore either.
-  if (oldFamilyId != null) {
-    const remaining = db.prepare('SELECT id FROM members WHERE family_id = ?').all(oldFamilyId);
-    if (remaining.length === 1) db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(remaining[0].id);
+// Only one member per family can be "primary" - marking a new one clears
+// the flag off anyone else sharing the same family_id first. A member
+// with no family yet can still be marked (harmless - they just sort as
+// their own one-person "family" either way).
+function setPrimaryParent(memberId, isPrimary) {
+  const member = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!member) return;
+  if (isPrimary && member.family_id != null) {
+    db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(member.family_id);
   }
+  db.prepare('UPDATE members SET is_primary_parent = ? WHERE id = ?').run(isPrimary ? 1 : 0, memberId);
+}
+
+// Every active member (any type) with something written in Allergies &
+// Medical Notes - the Allergies/Medical log's one data source, shared by
+// the Logs tab and the popup button on roster/class view pages.
+function membersWithMedicalNotes() {
+  return db
+    .prepare(
+      `SELECT id, name, member_type, grade_level, medical_notes FROM members
+       WHERE active = 1 AND medical_notes IS NOT NULL AND TRIM(medical_notes) != ''
+       ORDER BY name COLLATE NOCASE`
+    )
+    .all();
+}
+
+function rostersForMember(memberId) {
+  return db
+    .prepare(
+      `SELECT r.* FROM rosters r
+       JOIN roster_members rm ON rm.roster_id = r.id
+       WHERE rm.member_id = ? ORDER BY r.name COLLATE NOCASE`
+    )
+    .all(memberId);
+}
+
+// Groups members by family (family_id, or a solo "family of one" for
+// anyone without one), sorted alphabetically by the group's own sort
+// name - the primary parent's name if one's been designated, otherwise
+// whichever member's name sorts first. Within a group, the primary
+// parent is always listed first, everyone else alphabetically after.
+// Inactive members are kept out of the family grouping entirely (sunk
+// to the bottom, plain alphabetical) so a former member doesn't drag
+// their old family's sort position around.
+function sortMembersByFamily(members) {
+  const active = members.filter((m) => m.active);
+  const inactive = members.filter((m) => !m.active).sort(byLastName);
+
+  const groups = new Map();
+  active.forEach((m) => {
+    const key = m.family_id != null ? `f${m.family_id}` : `solo${m.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  });
+
+  const orderedGroups = Array.from(groups.values()).map((group) => {
+    const primary = group.find((m) => m.is_primary_parent);
+    group.sort((a, b) => {
+      if (a === primary) return -1;
+      if (b === primary) return 1;
+      return byLastName(a, b);
+    });
+    // Groups themselves sort by the primary parent's (or, lacking one,
+    // the alphabetically-first member's) last name - a family reads
+    // together as one block, filed under its own surname.
+    const sortName = lastNameOf((primary || group[0]).name);
+    return { sortName, group };
+  });
+  orderedGroups.sort((a, b) => a.sortName.localeCompare(b.sortName, undefined, { sensitivity: 'base' }));
+
+  return [...orderedGroups.flatMap((g) => g.group), ...inactive];
+}
+
+// Family is now a named entity (families.name, e.g. "Anderson") rather
+// than a list of everyone else sharing family_id - a plain left join gets
+// each member's family surname in one query instead of the old per-member
+// familyOf() lookup. Shared by the Members page and any other member list
+// that wants that same photo/type/family/rosters shape (e.g. the Design/
+// Print hub's bulk print picker lists).
+function membersWithDetails(typeFilter) {
+  const allMembers = db
+    .prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id')
+    .all();
+  const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
+  return sortMembersByFamily(members).map((m) => ({
+    ...m,
+    rosters: rostersForMember(m.id),
+    familyName: m.family_name || null,
+  }));
 }
 
 module.exports = {
@@ -153,5 +242,13 @@ module.exports = {
   loadFamilyMember,
   familyOf,
   hasInfantChild,
-  setFamilyMembers,
+  allFamilies,
+  setMemberFamily,
+  membersWithMedicalNotes,
+  setPrimaryParent,
+  rostersForMember,
+  sortMembersByFamily,
+  membersWithDetails,
+  lastNameOf,
+  byLastName,
 };

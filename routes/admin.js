@@ -6,6 +6,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
+const { todaysAlerts } = require('../utils/alerts');
 
 // --- Auth ---
 
@@ -92,6 +93,7 @@ router.get('/', requireAdmin, (req, res) => {
     parentCount,
     studentStats: todayStatsForType('student', today),
     parentStats: todayStatsForType('parent', today),
+    alerts: todaysAlerts(),
   });
 });
 
@@ -107,15 +109,16 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks', 'documents'];
+const SETTINGS_TABS = ['account', 'quicklinks', 'install', 'documents'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
-  // Quick Links here - Username/Password manages the single master admin
-  // account, and Documents is full-Admin-only.
+  // Quick Links and Install App here - Username/Password manages the
+  // single master admin account, and Documents is full-Admin-only.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
-  if (!isFullAdmin) tab = 'quicklinks';
+  if (FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
     title: 'Settings',
     username: req.session.username,

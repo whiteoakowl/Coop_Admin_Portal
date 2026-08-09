@@ -6,3 +6,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/styles.css" />
+
+<!-- PWA: installable app shell (see Settings > Install App for the
+     install button/steps and public/sw.js for what the service worker
+     actually does - static-asset caching only, nothing session-gated). -->
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#4682B4" />
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+<script src="/js/pwa.js" defer></script>

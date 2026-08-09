@@ -1,0 +1,52 @@
+<%
+// Bulk print picker row shape, shared by every member-based print
+// section on the Design/Print hub (Schedule Cards, Name Tags, Name Tags
+// + Schedule Cards, Barcodes Only) - same photo/name/type/family/rosters
+// columns as the Members page's own table, but a selection checkbox in
+// the first column instead of Actions, since this list is for choosing
+// who to print, not managing records. Locals: members, listId.
+%>
+<table class="roster-table members-table condensed-table" id="<%= listId %>">
+  <thead>
+    <tr>
+      <th></th>
+      <th class="members-col-photo"></th>
+      <th>Name</th>
+      <th>Type</th>
+      <th class="members-col-parent">Family</th>
+      <th class="members-col-rosters">Rosters</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (members.length === 0) { %>
+      <tr><td colspan="6" class="roster-empty">No members yet.</td></tr>
+    <% } %>
+    <% members.forEach(function(m) { %>
+      <tr class="print-picker-row" data-type="<%= m.member_type %>" data-name="<%= m.name.toLowerCase() %>">
+        <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
+        <td class="members-col-photo">
+          <% if (m.photo_path) { %>
+            <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
+          <% } else { %>
+            <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
+          <% } %>
+        </td>
+        <td>
+          <%= m.name %><%- include('medical-flag', { member: m }) %>
+          <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+        </td>
+        <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+        <td class="members-col-parent"><%= m.familyName || '—' %></td>
+        <td class="members-col-rosters">
+          <% if (m.rosters.length === 0) { %>
+            <span class="hint">none</span>
+          <% } else { %>
+            <% m.rosters.forEach(function(r) { %>
+              <span class="badge-pill"><%= r.name %></span>
+            <% }); %>
+          <% } %>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>

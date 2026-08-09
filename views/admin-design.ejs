@@ -22,19 +22,17 @@
           <select class="name-tag-type-select" id="design-type-select">
             <option value="student" <%= initialType === 'student' ? 'selected' : '' %>>Student Name Tag</option>
             <option value="parent" <%= initialType === 'parent' ? 'selected' : '' %>>Parent Name Tag</option>
-            <option value="admin" <%= initialType === 'admin' ? 'selected' : '' %>>Admin Name Tag</option>
             <option value="scheduleCard" <%= initialType === 'scheduleCard' ? 'selected' : '' %>>Schedule Card</option>
             <option value="setupCleanup" <%= initialType === 'setupCleanup' ? 'selected' : '' %>>Setup/Cleanup Badge</option>
             <option value="custom" <%= initialType === 'custom' ? 'selected' : '' %>>Custom Badge</option>
           </select>
           <!-- name-tag-editor.js reads/drives this select directly; the
                visible control above delegates into it (see design-print-hub.js)
-               so switching among Student/Parent/Admin/Setup-Cleanup/Custom
+               so switching among Student/Parent/Setup-Cleanup/Custom
                still uses the editor's own type-switch logic unmodified. -->
           <select id="name-tag-type-select" hidden>
             <option value="student">Student</option>
             <option value="parent">Parent</option>
-            <option value="admin">Admin</option>
             <option value="setupCleanup">Setup/Cleanup</option>
             <option value="custom">Custom</option>
           </select>
@@ -151,6 +149,7 @@
           <select class="name-tag-type-select" id="print-type-select">
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
+            <option value="cardsBoth">Name Tags + Schedule Cards</option>
             <option value="barcodes">Barcodes Only</option>
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
@@ -160,7 +159,7 @@
         </div>
 
         <div id="print-schedule-cards-section">
-          <form method="POST" action="/admin/schedule/print-cards" target="print-preview-frame" id="schedule-print-form">
+          <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form">
             <div class="roster-toolbar no-print">
               <div class="schedule-filters">
                 <div class="category-filter schedule-search">
@@ -173,36 +172,22 @@
                 </label>
               </div>
               <div class="roster-btn-row">
-                <button type="submit" class="primary-btn">Print Selected</button>
+                <button type="submit" class="primary-btn">Print</button>
               </div>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="schedule-print-list">
-                <thead><tr><th></th><th>Name</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="2" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-name="<%= m.name.toLowerCase() %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'schedule-print-list' }) %>
             </div>
           </form>
         </div>
 
         <div id="print-name-tags-section" hidden>
-          <form method="POST" action="/admin/name-tag/print" target="print-preview-frame" id="bulk-print-form">
+          <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="name-tag-select-all-checkbox" />
@@ -214,36 +199,48 @@
               </label>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="name-tag-bulk-list">
-                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="print-cardsBoth-section" hidden>
+          <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form">
+            <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
+            <div class="name-tag-bulk-filter">
+              <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
+                <option value="all">All</option>
+                <option value="student">Students Only</option>
+                <option value="parent">Parents Only</option>
+              </select>
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="cards-both-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="cards-both-select-none-checkbox" />
+                Select None
+              </label>
+            </div>
+            <div class="roster-scroll print-picker-scroll">
+              <%- include('partials/print-picker-table', { members: members, listId: 'cards-both-bulk-list' }) %>
+            </div>
+            <div class="name-tag-bulk-submit-row">
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
             </div>
           </form>
         </div>
 
         <div id="print-barcodes-section" hidden>
-          <form method="POST" action="/admin/name-tag/print-barcodes" target="print-preview-frame" id="barcodes-print-form">
+          <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form">
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcodes-select-all-checkbox" />
@@ -255,24 +252,10 @@
               </label>
             </div>
             <div class="roster-scroll print-picker-scroll">
-              <table class="roster-table members-table condensed-table" id="barcodes-bulk-list">
-                <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
-                <tbody>
-                  <% if (members.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
-                  <% } %>
-                  <% members.forEach(function(m) { %>
-                    <tr class="print-picker-row" data-type="<%= m.member_type %>">
-                      <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
-                      <td><%= m.name %></td>
-                      <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
+              <%- include('partials/print-picker-table', { members: members, listId: 'barcodes-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print Barcodes</button>
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
             </div>
           </form>
         </div>
@@ -302,13 +285,6 @@
             <a class="admin-card" href="/admin/logs?tab=absence">Absence/Late Log</a>
             <a class="admin-card" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
             <a class="admin-card" href="/admin/logs?tab=nametag">Name Tag Request Log</a>
-          </div>
-        </div>
-
-        <div class="print-preview-wrap no-print">
-          <h2>Print Preview</h2>
-          <div class="print-preview-paper">
-            <iframe name="print-preview-frame" id="print-preview-frame" title="Print preview"></iframe>
           </div>
         </div>
 

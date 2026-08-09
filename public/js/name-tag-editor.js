@@ -18,13 +18,12 @@
   }
 
   // Working copy - edits happen here until "Save Template" persists them.
-  // student/parent/admin are per-member name tags; setupCleanup/custom are
-  // the two non-member "misc badge" types (see utils/miscBadgeData.js) -
-  // same editor, own save table server-side.
+  // student/parent are per-member name tags; setupCleanup/custom are the
+  // two non-member "misc badge" types (see utils/miscBadgeData.js) - same
+  // editor, own save table server-side.
   const layouts = {
     student: cloneLayout(seed.templates.student),
     parent: cloneLayout(seed.templates.parent),
-    admin: cloneLayout(seed.templates.admin),
     setupCleanup: cloneLayout(seed.templates.setupCleanup),
     custom: cloneLayout(seed.templates.custom),
   };
@@ -32,7 +31,6 @@
   const PLACEHOLDER_DATA = {
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', barcodeValue: '0123456789' },
     parent: { name: 'Jordan Parent', cleanupTeam: 'Chairs & Tables', barcodeValue: '0123456789' },
-    admin: { name: 'Sam Admin', barcodeValue: '0123456789' },
     setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
@@ -633,6 +631,20 @@
     });
     propsPanel.appendChild(propRow('Font size', fontSize));
 
+    // Auto-shrinks this field's font size (down to a floor) whenever its
+    // actual text is too long to fit on one line at the size above - a
+    // long name doesn't get to overflow/wrap and throw off the layout.
+    const autoFit = document.createElement('input');
+    autoFit.type = 'checkbox';
+    autoFit.checked = !!el.autoFitText;
+    autoFit.addEventListener('change', () => {
+      el.autoFitText = autoFit.checked;
+      renderCanvas();
+      markUnsaved();
+      commitHistory();
+    });
+    propsPanel.appendChild(propRow('Auto-fit text', autoFit));
+
     const color = document.createElement('input');
     color.type = 'color';
     color.value = el.color;
@@ -768,7 +780,6 @@
       markUnsaved();
       commitHistory();
     });
-    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
 
     const borderWidth = document.createElement('input');
     borderWidth.type = 'number';
@@ -783,6 +794,32 @@
       markUnsaved();
       commitHistory();
     });
+
+    // "No border" - a shape's outline (not a line element - a line's own
+    // "border" IS the visible line, so that toggle would just hide it).
+    // Mirrors "No fill" right next to it: sets width to 0 (transparent
+    // renders the same either way) and disables the color/width inputs
+    // until unchecked, restoring a sensible 2px default rather than
+    // leaving them at 0 with nothing to type over.
+    if (!isLine) {
+      const noBorder = document.createElement('input');
+      noBorder.type = 'checkbox';
+      noBorder.checked = !el.borderWidth || el.borderWidth === 0;
+      borderColor.disabled = noBorder.checked;
+      borderWidth.disabled = noBorder.checked;
+      noBorder.addEventListener('change', () => {
+        el.borderWidth = noBorder.checked ? 0 : (parseInt(borderWidth.value, 10) || 2);
+        borderWidth.value = el.borderWidth;
+        borderColor.disabled = noBorder.checked;
+        borderWidth.disabled = noBorder.checked;
+        renderCanvas();
+        markUnsaved();
+        commitHistory();
+      });
+      propsPanel.appendChild(propRow('No border', noBorder));
+    }
+
+    propsPanel.appendChild(propRow(isLine ? 'Line color' : 'Border color', borderColor));
     propsPanel.appendChild(propRow(isLine ? 'Thickness' : 'Border width', borderWidth));
 
     if (shapeType === 'rectangle' || shapeType === 'roundedRect') {

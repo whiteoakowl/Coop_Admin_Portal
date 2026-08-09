@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= cls.class_name %> Roster</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <%
+      var teachers = cls.staff.filter(function(s) { return s.role !== 'assistant'; }).map(function(s) { return s.name; });
+      var assistants = cls.staff.filter(function(s) { return s.role === 'assistant'; }).map(function(s) { return s.name; });
+    %>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= dayLabel %> &mdash; <%= cls.class_name %> Roster</p>
+        </div>
+      </div>
+
+      <div class="class-roster-print-info">
+        <h2><%= cls.class_name %></h2>
+        <p><span class="class-roster-print-label">Grade:</span> <%= cls.age_group || '—' %></p>
+        <p><span class="class-roster-print-label">Room:</span> <%= cls.room || '—' %></p>
+        <p>
+          <span class="class-roster-print-label">Time:</span>
+          <%= dayLabel %><% if (cls.start_time) { %>, <%= cls.start_time %><% if (cls.end_time) { %>&ndash;<%= cls.end_time %><% } %><% } %>
+        </p>
+        <p><span class="class-roster-print-label">Teacher:</span> <%= teachers.length ? teachers.join(', ') : '—' %></p>
+        <p><span class="class-roster-print-label">Assistants:</span> <%= assistants.length ? assistants.join(', ') : '—' %></p>
+      </div>
+
+      <h3>Student Roster</h3>
+      <table class="roster-table">
+        <thead><tr><th>Name</th><th>Family</th><th>Age</th><th>Grade</th><th>Birthday</th><th>Medical/Allergy Notes</th></tr></thead>
+        <tbody>
+          <% if (cls.students.length === 0) { %>
+            <tr><td colspan="6" class="roster-empty">No students enrolled yet.</td></tr>
+          <% } %>
+          <% cls.students.forEach(function(s) { %>
+            <tr>
+              <td><%= s.name %></td>
+              <td><%= s.family_name || '—' %></td>
+              <td><%= s.age !== null && s.age !== undefined ? s.age : '—' %></td>
+              <td><%= s.grade_level || '—' %></td>
+              <td><%= s.birthday || '—' %></td>
+              <td><%= s.medical_notes || '—' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

@@ -468,6 +468,38 @@ textarea:focus-visible,
   font-size: 1rem;
 }
 
+/* Find a Parent - corner button (mirrors .admin-corner-link's pill shape
+   but filled orange, since this is a real kiosk feature, not a quiet
+   utility link) and the scan-result cards. */
+.landing-corner-actions-left { position: fixed; top: 1rem; left: 1rem; z-index: 10; }
+.find-parent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+/* Find a Parent results - each parent's actual Schedule Card
+   (.badge-canvas, same rendering as the Members "View Cards" dialog and
+   Design/Print), just centered in a scrollable stack instead of a
+   printable sheet. */
+.find-parent-results { max-width: 760px; text-align: center; }
+.find-parent-heading { margin: 0 0 1.25rem; font-size: 1.3rem; }
+.find-parent-parent-card { margin-bottom: 1.5rem; }
+.find-parent-parent-card:last-child { margin-bottom: 0; }
+.find-parent-parent-card h3 { margin: 0 0 0.6rem; font-size: 1.15rem; color: var(--brand-dark); }
+.find-parent-badge-canvas { margin: 0 auto; }
+.find-parent-scan-again { margin-top: 0.5rem; width: 100%; }
+
 @media (max-width: 640px) {
   .numpad { grid-template-columns: repeat(5, 1fr); }
 }
@@ -653,6 +685,19 @@ textarea:focus-visible,
 
 .logout-form { margin: 0; }
 
+/* Full Screen toggle - fixed to the true top-right corner of the viewport
+   on every admin page (desktop), independent of whichever page/panel is
+   open, instead of living inside the sidebar or one page's own content.
+   Hidden below the mobile-topbar breakpoint, where its twin lives inline
+   in the topbar's own top-right icon row instead (see admin-nav.ejs). */
+.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; }
+
+/* Same fixed placement, but the corner button's plain white pill would sit
+   uncomfortably light against the (still fixed) sidebar's darker panel -
+   nudge it visually distinct without changing the shared .admin-corner-link
+   look used on the public landing page. */
+.admin-page-corner-actions .admin-corner-link { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+
 /* Settings + Log out live at the bottom of the sidebar on desktop, pinned
    there via margin-top:auto; folded into the mobile topbar's right side
    (a separate compact box) on small screens where there's no sidebar. */
@@ -713,6 +758,7 @@ textarea:focus-visible,
    squeezing every tab down to fit. */
 @media (max-width: 860px) {
   .admin-sidebar { display: none; }
+  .admin-page-corner-actions { display: none; }
 
   .admin-mobile-topbar {
     display: flex;
@@ -808,7 +854,61 @@ textarea:focus-visible,
 .stat-value { font-size: 2rem; font-weight: 700; }
 .stat-label { color: var(--muted); font-size: 0.85rem; }
 
+/* Total Students/Parents/Members - one card, three segments, so the
+   dashboard opens with a single glance-able headline instead of three
+   separate cards. */
+.totals-card {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+.totals-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--border);
+}
+.totals-item:last-child { border-right: none; }
+
+@media (max-width: 720px) {
+  /* Mobile: all three totals stay on one line inside the single card. */
+  .totals-item { padding: 0.75rem 0.4rem; }
+  .totals-item .stat-value { font-size: 1.4rem; }
+  .totals-item .stat-label { font-size: 0.7rem; }
+}
+
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
+
+/* Alert Log - a running feed of today's substitute-needed, pending-
+   approval, and class-cancellation-risk items. Same list backs the
+   sitewide alert popup (see public/js/alerts.js). */
+.alert-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.alert-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+}
+.alert-log-item-danger { border-left-color: var(--red); }
+.alert-log-item-warning { border-left-color: var(--yellow-solid); }
+.alert-log-icon { flex-shrink: 0; margin-top: 0.15rem; }
+.alert-log-item-danger .alert-log-icon { color: var(--red); }
+.alert-log-item-warning .alert-log-icon { color: var(--yellow-solid); }
+.alert-log-body { display: flex; flex-direction: column; gap: 0.1rem; }
+.alert-log-day { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); }
+.alert-log-message a { color: var(--ink); font-weight: 600; }
+.alert-log-message a:hover { color: var(--brand-dark); }
 
 .dashboard-analytics-grid {
   display: grid;
@@ -836,7 +936,7 @@ textarea:focus-visible,
   gap: 0.75rem;
 }
 .analytics-stat {
-  background: #f8fafc;
+  background: #fff;
   border-radius: 10px;
   border-left: 4px solid var(--border);
   padding: 0.7rem 0.9rem;
@@ -853,7 +953,7 @@ textarea:focus-visible,
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
 .admin-card {
-  background: #f8fafc;
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding-compact);
@@ -1010,6 +1110,7 @@ textarea:focus-visible,
 }
 .status-badge-absent { background: var(--red-bg); color: var(--red); }
 .status-badge-late { background: var(--yellow-bg); color: var(--yellow); }
+.status-badge-present { background: var(--green-bg); color: var(--green); }
 
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1rem; }
 .roster-checkbox-label { font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-top: 0.5rem; display: block; }
@@ -1052,6 +1153,9 @@ textarea:focus-visible,
 .member-form-grid textarea {
   color: var(--ink);
   font-weight: 400;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .member-photo-preview {
   width: 96px;
@@ -1113,8 +1217,10 @@ textarea:focus-visible,
 .view-tabs::-webkit-scrollbar { display: none; }
 .view-tab {
   padding: 0.6rem 1.35rem;
-  background: rgba(255,255,255,0.5);
-  border: 1px solid var(--border);
+  /* Medium blue - the untabbed state, distinct from both the page's darker
+     --bg blue behind it and the white panel/active-tab it sits next to. */
+  background: var(--brand);
+  border: 1px solid var(--brand);
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   font-weight: 700;
@@ -1125,14 +1231,11 @@ textarea:focus-visible,
   flex-shrink: 0;
   transition: background-color 0.15s ease;
 }
-.view-tab:hover { background: rgba(255,255,255,0.75); }
-.view-tab.active { background: #eef2f6; border-bottom: 1px solid #eef2f6; }
+.view-tab:hover { background: var(--brand-dark); color: #fff; }
+.view-tab.active { background: #eef2f6; border-color: var(--border); color: var(--ink); }
 .view-tab-panel {
-  /* Deliberately a shade off-white - and distinct from #f8fafc, which
-     .admin-card also uses - so nested .manage-section/.grid-box/
-     .admin-card boxes actually read as cards sitting on top of this
-     panel instead of blending into one flat area. */
-  background: #eef2f6;
+  /* White, like every other text/info box in the admin UI. */
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: 0 var(--radius) var(--radius) var(--radius);
   padding: var(--card-padding-compact);
@@ -1304,21 +1407,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .cell-absent { background: var(--red-bg); color: var(--red); }
 .cell-blank { background: #e7edf5; color: transparent; }
 
-/* Attendance grid's editable status cell - a plain select styled to read
-   like the colored cell-tag badge above when locked (disabled), so the
-   page looks the same whether or not Edit has been clicked. Its printed
-   twin, .print-only-tag, is the actual .cell-tag badge (a <select> can't
-   render sensibly on paper). */
+/* Attendance grid's editable status cell - a real <select> (clicking it
+   still opens the native P/L/A/— options, still auto-saves on change -
+   see attendance-grid.js), but its native chrome is stripped so the
+   closed/idle state reads as a plain colored bubble matching the legend
+   above, not a dropdown box. */
 .roster-cell-select {
-  min-width: 4.5rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  min-width: 0;
+  border: none;
   border-radius: 999px;
-  border: 1px solid transparent;
   font-weight: 700;
-  font-size: 0.8rem;
-  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+  padding: 0;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
 }
-.roster-cell-select:disabled { opacity: 1; -webkit-appearance: none; appearance: none; }
-.roster-cell-select:not(:disabled) { border-color: var(--border); background-color: #fff; }
 .roster-cell-select-present { background: var(--green-bg); color: var(--green); }
 .roster-cell-select-late { background: var(--yellow-bg); color: var(--yellow); }
 .roster-cell-select-absent { background: var(--red-bg); color: var(--red); }
@@ -1392,6 +1501,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .members-table td { text-align: left; }
 .members-table th { text-align: left; }
+/* Plain grey header, not the same tinted blue as the primary-parent row
+   highlight below it (.row-primary-parent) - the two need to read as
+   distinct things, not blend together. */
+.members-table thead th,
+.members-table thead .roster-name-col { background: #f8fafc; }
+.members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
 /* Mobile member list: keep it to Name, Type, and the action icons - Photo,
@@ -1402,6 +1517,322 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .row-inactive { opacity: 0.5; }
+
+/* Primary parent row on the Members list - a light highlight plus a
+   left accent bar so the family's main contact stands out at a glance
+   without looking like a status/warning color. */
+.row-primary-parent { background: var(--brand-soft); }
+.row-primary-parent td:first-child { box-shadow: inset 3px 0 0 var(--brand-dark); }
+.primary-parent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--brand-dark);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.primary-parent-option { margin-top: 0.75rem; }
+
+/* ---------- Membership Form (Add/Edit member + Members list view popup) ---------- */
+/* Shared by views/partials/member-form-fields.ejs, used both on the full
+   Add/Edit page and inside the Members list's view/edit dialog - styled to
+   match the Parent/Student Membership Form reference design: an icon
+   header (blue for Student, green for Parent), a Parent/Student/Admin
+   toggle, a circular photo upload, and colored boxed sections for Family
+   and Setup/Cleanup Team. */
+.member-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brand-dark);
+  cursor: pointer;
+  text-decoration: none;
+}
+.member-name-link:hover { text-decoration: underline; }
+
+/* Grade level + age under a student's name on the Members list. */
+.member-row-subline { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+.member-form-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+/* .member-form-header-icon also carries .class-form-dialog-icon (the same
+   round icon badge used by the Create Class dialog header) - Student
+   keeps its own blue tint; Parent just uses that shared orange default
+   (no override needed) so every orange element on this form matches. */
+.member-form-header-icon .icon { width: 1.35rem; height: 1.35rem; }
+.member-form-header-student .member-form-header-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.member-form-header-text { flex: 1; min-width: 180px; }
+.member-form-header-text h3 { margin: 0; font-size: 1.25rem; }
+.member-form-header-text p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.member-type-toggle { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.member-type-toggle-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.member-type-toggle-btn .icon { width: 0.95rem; height: 0.95rem; }
+.member-type-toggle-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+/* Selected Parent/Student button is a plain solid grey - a neutral
+   "this one's picked" indicator, not another color competing with the
+   form's orange accents. */
+.member-type-toggle-btn:has(input:checked) { background: var(--muted); border-color: var(--muted); color: #fff; }
+.member-type-toggle-btn:has(input:disabled) { cursor: default; }
+.member-type-toggle-btn:has(input:disabled) input { cursor: default; }
+
+.member-form-parent-flag { margin: -0.5rem 0 1.25rem; }
+.primary-parent-top-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--orange-bg);
+  color: var(--orange);
+  border: 1px solid var(--btn-bg);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+}
+.primary-parent-top-option .icon { width: 1rem; height: 1rem; }
+.primary-parent-top-option input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--btn-bg); }
+
+/* Photo sits in its own fixed-width left column, fields to the right -
+   matches the reference design's "photo | Full Name/Address/City-State-
+   Zip" side-by-side layout instead of a centered-on-top photo. */
+.member-form-card { display: flex; flex-direction: column; gap: 1.1rem; }
+.member-form-top-row { display: flex; gap: 1.25rem; align-items: flex-start; flex-wrap: wrap; }
+.member-photo-col { flex: 0 0 108px; display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; }
+.member-fields-col { flex: 1 1 320px; min-width: 0; }
+.member-photo-circle {
+  position: relative;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.member-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+.member-photo-placeholder-icon { width: 3rem; height: 3rem; color: #94a3b8; }
+.member-photo-camera {
+  position: absolute;
+  right: -0.1rem;
+  bottom: -0.1rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  background: var(--brand-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+}
+.member-photo-camera .icon { width: 1rem; height: 1rem; }
+.member-photo-upload-link { color: var(--brand-dark); font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.member-photo-upload-link:hover { text-decoration: underline; }
+.member-photo-hint { font-size: 0.75rem; color: var(--muted); }
+.member-photo-col:has(input:disabled) .member-photo-circle { cursor: default; }
+.member-photo-col:has(input:disabled) .member-photo-camera { display: none; }
+
+@media (max-width: 640px) {
+  .member-form-top-row { flex-direction: column; align-items: center; }
+}
+
+.member-form-city-row { display: grid; grid-template-columns: 1.3fr 1.15fr 1fr; gap: 0.75rem 1rem; }
+.member-form-city-row select { padding-right: 0.4rem; font-size: 0.88rem; }
+@media (max-width: 640px) {
+  .member-form-city-row { grid-template-columns: 1fr; }
+}
+
+/* Required-looking field labels (cosmetic asterisk only - actual server
+   validation still just requires Full Name, so an admin can save a
+   partial profile and fill the rest in later). The asterisk goes on the
+   label-text span (not the label itself) since .member-form-grid label is
+   a column flexbox - appending ::after straight on the label would flow
+   it as its own line below the input instead of right after the text. */
+.required-label .field-label-text::after { content: " *"; color: var(--red); font-weight: 700; }
+
+.input-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.65rem;
+  background: #fff;
+}
+.input-with-icon .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+.input-with-icon input { border: none; outline: none; padding: 0.65rem 0; flex: 1; min-width: 0; }
+.input-with-icon:has(input:disabled) { background: #f8fafc; }
+
+.member-form-lower-grid { margin-top: 0.25rem; }
+
+/* Family + Setup/Cleanup Team boxes sit side by side. auto-fit (not a
+   fixed 1fr 1fr) collapses the second track when there's no Team box
+   (Student form) so the lone Family box grows to fill the row instead of
+   leaving an empty blank column/panel next to it. */
+.member-form-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
+@media (max-width: 760px) {
+  .member-form-boxes { grid-template-columns: 1fr; }
+}
+
+.member-form-box-hint { margin: -0.4rem 0 0.75rem; color: var(--muted); font-size: 0.82rem; }
+
+.member-form-section-box { border-width: 2px; margin-bottom: 0; }
+.member-form-section-box h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; }
+.member-form-section-box h2 .icon { width: 1.1rem; height: 1.1rem; }
+.member-form-section-blue { border-color: var(--brand); background: var(--brand-soft); }
+.member-form-section-blue h2 { color: var(--brand-dark); }
+
+/* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
+   dropdown is a quick-pick that checks/selects the matching row below;
+   each row shows a member count, same as the reference design. */
+.member-form-checklist { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.member-form-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.member-form-checklist-box {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.member-form-checklist-box .icon { width: 0.8rem; height: 0.8rem; color: #fff; opacity: 0; }
+.member-form-checklist-row.is-checked .member-form-checklist-box { background: var(--btn-bg); border-color: var(--btn-bg); }
+.member-form-checklist-row.is-checked .member-form-checklist-box .icon { opacity: 1; }
+.member-form-checklist-name { flex: 1; font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.member-form-checklist-count { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
+.member-form-checklist-row:has(input:disabled) { cursor: default; }
+.member-form-checklist-row:disabled { cursor: default; }
+/* The real checkbox on the Team checklist rows is visually replaced by
+   .member-form-checklist-box above - hide the native control itself. */
+.member-form-checklist-checkbox { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.member-form-section-green { border-color: var(--btn-bg); background: var(--orange-bg); }
+.member-form-section-green h2 { color: var(--orange); }
+
+.member-form-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; min-width: 0; }
+.member-form-footer-view,
+.member-form-footer-edit { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; min-width: 0; justify-content: space-between; }
+.member-edit-form-page .member-form-footer-edit { justify-content: flex-end; }
+
+/* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
+   different padding/font-size scales elsewhere in the app - matched here
+   explicitly (same values as .notes-dialog-actions/.class-form-dialog-
+   footer, the same button pair everywhere else on the site) so every
+   popup's action row reads as the same size and shape. */
+.member-form-footer .btn-secondary,
+.member-form-footer .primary-btn {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  border-radius: var(--control-radius);
+  margin-top: 0;
+}
+.member-form-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.member-form-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+/* The whole Membership Form (header, fields, Family/Team boxes, footer)
+   sits in one white card - same shape/chrome as the Create Class dialog
+   (.class-form-dialog: white surface, rounded corners, this padding,
+   this shadow) - instead of separate pieces floating on the site's blue
+   page background. */
+.member-form-page-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-md);
+  /* Sized to its content (the 720px-capped form) instead of stretching to
+     fill the rest of .admin-main - otherwise a big blank strip of white
+     panel shows to the right of the actual form. */
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* Phone/Email (icon-wrapped) already get their box treatment from
+   .input-with-icon; Birthday and Medical/Allergy Notes are plain direct
+   children of .class-form-field, so they need the same input styling
+   Create Class's own text/select fields get (that rule only covers
+   type="text"/select, not date/textarea). */
+.class-form-field > input[type="date"],
+.class-form-field > textarea {
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.65rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+}
+.class-form-field > textarea::placeholder { color: var(--muted); }
+
+.member-form-section-box select { width: 100%; box-sizing: border-box; }
+
+.member-view-dialog { width: min(760px, 94vw); }
+.member-view-close-row { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+
+/* On a narrow phone screen, the dialog's own chrome padding (from the
+   shared .class-view-dialog, 1.75rem) plus the form panel's own padding
+   stack up and eat most of the ~350px-wide dialog. Shrink both paddings
+   and let the panel use the full width instead of fit-content, so the
+   actual fields get the room back. */
+@media (max-width: 520px) {
+  .member-view-dialog { padding: 1rem; }
+  .member-view-dialog .member-form-page-panel { padding: 1rem; width: 100%; }
+}
+.member-view-close-row .class-form-dialog-close { position: static; }
 
 .add-member-details { margin-bottom: 1.5rem; }
 
@@ -1464,6 +1895,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .page-actions { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 
+/* Class Rosters tab (Attendance page) - every class as a stacked, full-
+   width row button; clicking one switches to that class's own roster +
+   attendance grid. */
+.class-roster-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.class-roster-row-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.class-roster-row-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.class-roster-row-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }
 
@@ -1481,6 +1936,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   background: var(--btn-bg);
   border: 1px solid var(--btn-bg);
   border-radius: 8px;
@@ -1503,22 +1959,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .archived-toggle-btn.active,
 .archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
 
-/* Import CSV / Export CSV / Print are the same "work with a file" action
-   everywhere in the app, so they always get the same green treatment
-   regardless of which button component (.btn-secondary or
-   .roster-action-btn) they're built from. */
+/* Import CSV / Export CSV are the same "work with a file" action
+   everywhere in the app, and now share the same primary orange as
+   Print (.print-action-btn below) so all three file/print actions read
+   as one consistent "toolbar action" family. */
 .file-action-btn,
 .file-action-btn.btn-secondary,
 .file-action-btn.roster-action-btn {
-  background: var(--btn-green);
-  border-color: var(--btn-green);
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
   color: #000;
 }
 .file-action-btn:hover,
 .file-action-btn.btn-secondary:hover,
 .file-action-btn.roster-action-btn:hover {
-  background: var(--btn-green-hover);
-  border-color: var(--btn-green-hover);
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
+  color: #000;
+}
+
+.print-action-btn,
+.print-action-btn.btn-secondary,
+.print-action-btn.roster-action-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+  color: #000;
+}
+.print-action-btn:hover,
+.print-action-btn.btn-secondary:hover,
+.print-action-btn.roster-action-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
   color: #000;
 }
 
@@ -1569,6 +2040,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-shadow: var(--shadow-sm);
 }
 .settings-account-grid h3 { margin-top: 0; }
+
+/* Settings > Install App: numbered per-platform steps read like a normal
+   instruction list, not the app's usual data tables/cards. */
+.pwa-steps { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.pwa-steps li { margin-bottom: 0.35rem; line-height: 1.5; }
+#pwa-install-status { margin: 0.75rem 0 0; }
+#pwa-install-btn { margin-top: 0.25rem; }
 
 .link-btn { background: none; border: none; color: var(--brand-dark); font-size: 0.85rem; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
@@ -1997,7 +2475,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    used when it lived at the bottom of the controls column. */
 .name-tag-editor-actions { display: flex; align-items: center; gap: 0.6rem; }
 .name-tag-editor-actions .btn-secondary,
-.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; }
+.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
 /* Crop tool - a fixed-aspect frame (locked to the image element's own
    box ratio) the user pans by dragging and resizes via a zoom slider. */
@@ -2013,7 +2491,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-crop-image { position: absolute; max-width: none; max-height: none; user-select: none; pointer-events: none; }
 .name-tag-crop-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .name-tag-crop-actions .btn-secondary,
-.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; }
+.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
 .name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -2101,9 +2579,342 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-chart-header h2 { margin: 0; }
 .volunteer-save-status { font-size: 0.85rem; color: var(--muted); }
 
-/* Darker divider before each date's Position/Room column pair in the
-   Volunteer Chart, so one session's data is visually separated from the next. */
-.volunteer-chart-divider { border-left: 2px solid var(--brand-darker); }
+/* ---------- Floater Assignments cards (Chart tab's one selected date,
+   the Archive popup, and the Archive print page - same partial, same
+   look, everywhere: partials/floater-assignment-cards.ejs) ---------- */
+
+.floater-cards-grid {
+  display: grid;
+  /* 200px (not the visually "roomier" 230px+ that first looked right) so
+     all 4 of a day's hour cards reliably fit one row at the container
+     widths this actually renders in (Chart tab, Archive popup, Archive
+     print) - at 230px the 4th card was tipping over to its own row. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.floater-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  break-inside: avoid;
+}
+.floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; }
+.floater-card-header h3 { margin: 0; font-size: 0.95rem; }
+.floater-card-icon { display: inline-flex; flex-shrink: 0; }
+.floater-card-icon .icon { width: 16px; height: 16px; }
+
+.floater-card-blue .floater-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.floater-card-green .floater-card-header { background: var(--green-bg); color: var(--green); }
+.floater-card-orange .floater-card-header { background: var(--orange-bg); color: var(--orange); }
+.floater-card-purple .floater-card-header { background: var(--purple-soft); color: var(--purple); }
+
+/* Fixed layout + explicit column widths so a long floater name wraps
+   onto a second line instead of overflowing the card's fixed grid-track
+   width - .floater-card's overflow:hidden (for the rounded header
+   corners) would otherwise silently clip it instead of wrapping. */
+.floater-card-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
+.floater-card-table th:nth-child(1), .floater-card-table td:nth-child(1) { width: 40%; }
+.floater-card-table th:nth-child(2), .floater-card-table td:nth-child(2) { width: 24%; }
+.floater-card-table th:nth-child(3), .floater-card-table td:nth-child(3) { width: 36%; }
+.floater-card-table th {
+  text-align: left;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: break-word;
+  white-space: nowrap;
+}
+.floater-card-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: middle; overflow-wrap: break-word; }
+.floater-card-table tbody tr:last-child td { border-bottom: none; }
+.floater-card-position { font-weight: 600; }
+.floater-card-unassigned { color: var(--muted); font-style: italic; }
+
+.floater-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.floater-card-footer .icon { width: 14px; height: 14px; }
+
+/* Archive popup (fetched fragment shown in #volunteer-archive-view-dialog) -
+   wide enough for the card grid to lay out multiple columns instead of
+   stacking single-file like the narrower member-view-dialog. */
+.volunteer-archive-view-dialog { width: min(1100px, 96vw); border: none; border-radius: var(--radius); padding: var(--card-padding); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+.volunteer-archive-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.volunteer-archive-view-header { margin-bottom: 1rem; }
+.volunteer-archive-view-header h2 { margin: 0 0 0.2rem; }
+
+/* Archive print page: portrait, 2 cards per row (2 rows for a day's 4
+   hour cards) - the print page's own @page rule matches (see the view). */
+.volunteer-archive-print-page .floater-cards-grid { grid-template-columns: repeat(2, 1fr); }
+
+/* Archive popup (fetched fragment) - Export/Print sit top-right next to
+   the close button instead of a separate bottom action bar. */
+.volunteer-archive-actions-row { gap: 0.5rem; }
+.volunteer-archive-actions { display: flex; gap: 0.5rem; }
+
+/* Monday/Wednesday day switcher, pill-toggle style ("slide" between the
+   two) instead of a plain <select> - both are plain links (a real page
+   navigation either way), the pill is just how the choice reads. */
+.day-toggle { display: inline-flex; background: var(--brand-soft); border-radius: 999px; padding: 3px; gap: 2px; }
+.day-toggle-option {
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.day-toggle-option:hover:not(.active) { background: rgba(255,255,255,0.6); }
+.day-toggle-option.active { background: var(--brand-dark); color: #fff; }
+
+/* ---------- Floater Assignments Chart: live, editable version of the
+   read-only cards above - 2x2 (matching the Archive print layout), each
+   row's Floater column an assign dropdown + Accept/Unassign button
+   instead of plain text (partials/floater-chart-cards.ejs). ---------- */
+
+.floater-chart-cards-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 800px) {
+  .floater-chart-cards-grid { grid-template-columns: 1fr; }
+}
+
+.floater-chart-table th:nth-child(1) { width: 22%; }
+.floater-chart-table th:nth-child(2) { width: 12%; }
+.floater-chart-table th:nth-child(3) { width: 66%; }
+.floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
+
+/* A class can now list more than once (one row per missing teacher/
+   assistant) - this small line under the class name says who that
+   particular row is covering for, so duplicate rows stay tellable apart. */
+.floater-slot-reason { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+/* A slot nobody at all is available for (not even an override pick) -
+   the row itself flags it, no dropdown to offer. */
+.floater-row-noavail { background: var(--red-bg); }
+.floater-noavail-text { color: var(--red); font-weight: 600; font-size: 0.8rem; }
+
+.floater-assign-form { display: flex; align-items: center; gap: 0.4rem; }
+.floater-assign-form select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  background: #fff;
+  color: var(--ink);
+}
+.floater-assign-form select:disabled { background: #f8fafc; color: var(--muted); }
+.floater-assign-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-dark);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.floater-assign-btn:hover { background: var(--brand-darker); }
+.floater-assign-btn-unassign { background: var(--red); }
+.floater-assign-btn-unassign:hover { background: #b91c1c; }
+
+/* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
+
+.team-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+
+/* Setup/Cleanup: exactly 5 cards per row on a full-width desktop screen,
+   stepping down smoothly as the viewport narrows instead of just wrapping
+   whatever fits at a fixed minimum width. Cards are kept compact (narrow
+   columns, smaller type) so all 5 sit comfortably inside the page instead
+   of crowding or spilling past its edge. */
+.setup-team-card-grid { grid-template-columns: repeat(5, 1fr); gap: 0.6rem; }
+@media (max-width: 1400px) { .setup-team-card-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Tablet and mobile: rather than wrapping into more (shorter, cramped)
+   rows, keep every card at a readable width and let the row scroll
+   horizontally - a gentle side-to-side "roll" through the cards instead
+   of a squeezed multi-row stack. */
+@media (max-width: 1100px) {
+  .setup-team-card-grid {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 0.6rem;
+    gap: 0.75rem;
+  }
+  .setup-team-card-grid .team-col {
+    flex: 0 0 200px;
+    scroll-snap-align: start;
+  }
+}
+/* Each team is a single connected card: an info section (icon, title,
+   leader, a colored detail pill) on top and a Members list section below
+   it, separated only by a hairline divider - not two separate floating
+   cards - matching the reference "Our Teams" design. .team-col is the
+   actual card (border/radius/shadow/background); the two sections inside
+   it are plain, edge-to-edge panels. min-width: 0 lets long titles/names
+   ellipsize instead of forcing the card (and the page) wider than it
+   should be. */
+.team-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.team-col:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+.team-info-card {
+  position: relative;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3rem;
+}
+/* Team cards are view-only - this small square button (in the corner the
+   trash icon used to sit) is the only way in, opening the Edit popup
+   (title/leader/description/members/delete all live there now). */
+.team-edit-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.team-edit-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+.team-edit-btn .icon { width: 1rem; height: 1rem; }
+.team-info-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.15rem;
+}
+.team-info-icon .icon { width: 1.4rem; height: 1.4rem; }
+/* A small color rotation so a row of cards reads as distinct teams at a
+   glance, cycling a 5-color set - purely decorative, no meaning attached
+   to which color lands where. */
+.team-accent-0 .team-info-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-0 .team-info-title { color: var(--brand-dark); }
+.team-accent-0 .team-info-pill { background: var(--brand-soft); color: var(--brand-dark); }
+.team-accent-1 .team-info-icon { background: var(--green-bg); color: var(--green); }
+.team-accent-1 .team-info-title { color: var(--green); }
+.team-accent-1 .team-info-pill { background: var(--green-bg); color: var(--green); }
+.team-accent-2 .team-info-icon { background: var(--purple-soft); color: var(--purple); }
+.team-accent-2 .team-info-title { color: var(--purple); }
+.team-accent-2 .team-info-pill { background: var(--purple-soft); color: var(--purple); }
+.team-accent-3 .team-info-icon { background: var(--orange-bg); color: var(--orange); }
+.team-accent-3 .team-info-title { color: var(--orange); }
+.team-accent-3 .team-info-pill { background: var(--orange-bg); color: var(--orange); }
+.team-accent-4 .team-info-icon { background: #d7f3f1; color: #1f7a72; }
+.team-accent-4 .team-info-title { color: #1f7a72; }
+.team-accent-4 .team-info-pill { background: #d7f3f1; color: #1f7a72; }
+
+.team-info-title { margin: 0; font-size: 0.95rem; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-info-leader { display: flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; color: var(--muted); font-weight: 600; max-width: 100%; }
+.team-info-leader .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.team-info-leader-select {
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 8rem;
+}
+.team-info-pill {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  max-width: 100%;
+}
+.team-info-pill .icon { width: 0.75rem; height: 0.75rem; flex-shrink: 0; }
+.team-info-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.team-members-card {
+  min-width: 0;
+  padding: 0.75rem 0.75rem 0.85rem;
+  flex: 1;
+}
+.team-members-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+
+/* A team's own numbered task list (linked via the Task List tab's
+   "Linked Team" field - item 31) rides along on its card, screen and
+   print alike. */
+.team-tasks-card { min-width: 0; padding: 0 0.75rem 0.85rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.team-tasks-card h4 { margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 800; }
+.team-tasks-list { margin: 0; padding-left: 1.2rem; font-size: 0.82rem; }
+.team-tasks-list li { padding: 0.15rem 0; }
+.team-card-members { display: flex; flex-direction: column; }
+.team-member-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
+.team-member-row:first-child { border-top: none; }
+.team-member-avatar {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.team-member-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-member-flag { font-size: 0.62rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+
+/* Small red medical-bag flag next to a member's name wherever one shows -
+   a same-glance heads-up that they have allergy/medical notes on file,
+   without having to open their profile. */
+.medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
+.medical-flag .icon { width: 0.95em; height: 0.95em; }
+.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
+.team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
 .grid-box {
   min-width: 320px;
@@ -2139,71 +2950,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-view-page .roster-table-detailed tbody tr:nth-child(even) .roster-secondary-col { background: #fdfaf7; }
 .roster-view-page .roster-table-detailed tbody tr:hover .roster-secondary-col { background: var(--orange-bg); }
 
-/* Flexbox (not grid) so cards keep a fixed natural width and wrap onto
-   centered rows - a lone card, or a partial last row, stays centered
-   instead of stretching to fill the leftover space. */
-.volunteer-public-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.25rem;
-  width: 100%;
-  max-width: 1100px;
-  text-align: left;
-}
-.volunteer-open-slots { margin-top: 2rem; text-align: left; }
-.volunteer-open-slots .volunteer-public-table { max-width: 700px; margin-bottom: 1.25rem; }
-.volunteer-public-card {
-  flex: 0 1 460px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-}
-.volunteer-public-section {
-  color: var(--brand-dark);
-  font-size: 1.1rem;
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 2px solid var(--brand);
-}
-.volunteer-public-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.volunteer-public-table th,
-.volunteer-public-table td {
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--border);
-  text-align: left;
-  font-size: 1rem;
-  white-space: nowrap;
-}
-.volunteer-public-table thead th { background: var(--brand-soft); color: var(--brand-dark); font-size: 0.8rem; font-weight: 700; }
-.volunteer-public-table td:first-child { font-weight: 700; }
-/* Position/Location only ever hold a short bubble tag, so they shouldn't
-   stretch to a third of the table each - keep them narrow and give Name
-   the rest of the width. */
-.volunteer-public-table th:first-child,
-.volunteer-public-table td:first-child { width: 46%; }
-.volunteer-public-table th:not(:first-child),
-.volunteer-public-table td:not(:first-child) { width: 27%; text-align: center; }
-
-.volunteer-bubble {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: #fff;
-}
-.volunteer-bubble-position { background: var(--accent); }
-.volunteer-bubble-room { background: var(--brand-darker); }
+/* Public kiosk Floater Assignments view - same hour-card chart as the
+   admin Chart tab/Archive print page (partials/floater-assignment-
+   cards.ejs), just wider than the usual .kiosk-wrap so a kiosk-sized
+   screen can lay out all 4 hour cards in one row instead of wrapping. */
+.volunteer-public-wrap { max-width: 1400px; }
 
 /* ---------- Setup/Cleanup ---------- */
 
@@ -2228,31 +2979,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .setup-team-desc-input { font-size: 0.85rem; color: var(--muted); border: 1px solid transparent; background: none; font-family: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); }
 .setup-team-desc-input:focus { border-color: var(--border); background: var(--surface); }
 
-.setup-public-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+/* Public kiosk Setup/Cleanup view reuses the admin "Our Teams" two-part
+   card design (.team-info-card + .team-members-card) so the two screens
+   match exactly - this just widens the kiosk's normal ~900px content
+   column so all 5 cards fit side by side, and switches the text back to
+   left-aligned inside each card (the kiosk page itself is centered/text-
+   align:center for its headings). */
+.kiosk-team-card-grid {
   width: 100%;
-  max-width: 900px;
+  max-width: 1500px;
   text-align: left;
 }
-.setup-public-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--card-padding);
-  box-shadow: var(--shadow-sm);
-}
-.setup-public-card h2 { margin: 0 0 0.4rem; font-size: 1.15rem; color: var(--brand-dark); }
-.setup-public-desc { color: var(--muted); margin: 0 0 0.5rem; }
-.setup-public-member-list { list-style: none; margin: 0; padding: 0; }
-.setup-public-member-list li {
-  padding: 0.5rem 0.15rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1rem;
-  font-weight: 600;
-}
-.setup-public-member-list li:last-child { border-bottom: none; }
 
 /* ---------- Member notes dialog ---------- */
 
@@ -2308,6 +3045,149 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-picker-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .member-picker-dialog h3 { margin: 0 0 0.75rem; }
 .member-picker-dialog .hint { margin: 0 0 0.5rem; }
+
+/* Create/Edit Class popup - wider than the default member-picker-dialog
+   since it carries a full field set (name/day/hour/room/color/times/
+   grades/staff/description), styled to a specific reference design: a
+   round icon badge + title + close button header, labeled fields with a
+   red required-asterisk, circular color swatches, and a 4-up teacher/
+   assistant row. */
+.class-form-dialog {
+  width: min(760px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.75rem 2rem;
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.class-form-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.class-form-dialog-header { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-form-dialog-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--orange-bg);
+  color: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.class-form-dialog-icon .icon { width: 1.35rem; height: 1.35rem; }
+.class-form-dialog-header h3 { margin: 0; font-size: 1.3rem; }
+.class-form-dialog-close {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0.4rem;
+  line-height: 0;
+  border-radius: 6px;
+}
+.class-form-dialog-close:hover { background: #f1f5f9; color: var(--ink); }
+.class-form-dialog-close .icon { width: 1.25rem; height: 1.25rem; }
+.class-form-dialog textarea { width: 100%; }
+
+/* Field rows - flexible instead of a fixed grid so a 3-up row (Title/Day/
+   Hour) and a 2-up row (Room/Color) can sit one after another, exactly
+   like the reference layout, without fighting column spans. */
+.class-form-row { display: flex; gap: 1.25rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.class-form-field { flex: 1 1 0; min-width: 150px; display: flex; flex-direction: column; gap: 0.4rem; }
+.class-form-field-label { font-weight: 700; font-size: 0.88rem; color: var(--ink); }
+.class-form-field-label .optional-tag { font-weight: 400; color: var(--muted); }
+.class-form-field-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
+.class-form-field input[type="text"],
+.class-form-field select {
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0.65rem 0.6rem;
+  font: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  color: var(--ink);
+}
+.class-form-field input[type="text"]::placeholder { color: var(--muted); }
+
+.class-form-section-label { margin: 0.2rem 0 0.9rem; font-weight: 700; font-size: 0.88rem; }
+.class-form-section-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
+.class-form-section-hint { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; }
+
+/* Circular color swatches, selected one ringed + checkmarked - replaces a
+   plain native color input. */
+/* flex-wrap + min-width: 0 so a full row of 12 swatches wraps onto more
+   lines instead of blowing out its container's width when there isn't
+   room for all of them in one row (e.g. the View/Edit popup's narrower
+   details column). */
+.class-color-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; min-width: 0; }
+.class-color-swatch {
+  position: relative;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s ease;
+}
+.class-color-swatch-fill { position: absolute; inset: 2px; border-radius: 50%; }
+.class-color-swatch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.class-color-swatch .icon { position: relative; width: 0.85rem; height: 0.85rem; color: #fff; opacity: 0; }
+.class-color-swatch:has(input:checked) { border-color: var(--btn-bg); }
+.class-color-swatch:has(input:checked) .icon { opacity: 1; }
+
+/* Start/End Time - a clock icon + free-text value + decorative chevron,
+   styled as one control even though it's a plain text input underneath
+   (existing time-string parsing elsewhere expects "9:00 AM" text, not a
+   native <input type=time>'s 24-hour value). */
+.class-time-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  padding: 0 0.75rem;
+  background: #fff;
+}
+.class-time-input-wrap .icon-clock { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
+.class-time-input-wrap input {
+  border: none;
+  outline: none;
+  padding: 0.65rem 0;
+  flex: 1;
+  font: inherit;
+  background: none;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.class-form-textarea-wrap { position: relative; }
+.class-form-textarea-wrap textarea { padding-bottom: 1.6rem; }
+.class-form-char-count { position: absolute; right: 0.75rem; bottom: 0.55rem; font-size: 0.75rem; color: var(--muted); pointer-events: none; }
+
+.class-form-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+/* Same normalization as .notes-dialog-actions - Cancel and the primary
+   action (Create Class) read as the same size/shape here too. */
+.class-form-dialog-footer .primary-btn,
+.class-form-dialog-footer .btn-secondary {
+  margin-top: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+}
+.class-form-dialog-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.class-form-dialog-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
 .import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"] {
@@ -2346,53 +3226,219 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Admin Class Schedule grid: classroom locations as rows, hour blocks as
    columns, full grid lines - a class spanning two hour blocks gets one
    cell with colspan="2" instead of two separate cards (see
-   roomGridForDay in utils/classSchedule.js). */
+   roomGridForDay in utils/classSchedule.js). Sized compactly (smaller
+   padding/fonts than a typical .class-card) so a full day's schedule
+   fits on one screen with minimal scrolling. */
 .class-schedule-room-grid { border: 1px solid var(--border); }
 .class-schedule-room-grid th,
 .class-schedule-room-grid td {
   border: 1px solid var(--border);
-  padding: 0.5rem;
+  padding: 0.35rem 0.4rem;
   vertical-align: top;
-  min-width: 220px;
+  min-width: 175px;
 }
-.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; }
-.class-schedule-room-col { min-width: 140px; font-weight: 700; white-space: nowrap; background: var(--brand-soft); }
+.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; font-size: 0.85rem; }
+/* Higher specificity than the generic th/td min-width above (two classes,
+   not one) - the room column shrinks to fit its own text ("width: 1%"
+   with nowrap is the standard auto-table shrink-to-fit trick) instead of
+   sharing the same wide min-width as every hour column. */
+.class-schedule-room-grid .class-schedule-room-col {
+  min-width: 0;
+  width: 1%;
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--brand-soft);
+  font-size: 0.85rem;
+}
 .class-schedule-cell { background: #fff; }
-.class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.5rem; }
+.class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.4rem; }
 .class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
 .class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
 .class-card-row { display: flex; flex-wrap: wrap; gap: 1rem; }
 .class-card {
-  flex: 1 1 260px;
-  max-width: 340px;
-  border-left: 6px solid var(--brand);
-  border-radius: var(--radius);
-  padding: var(--card-padding-compact);
+  flex: 1 1 220px;
+  max-width: 300px;
+  border-left: 4px solid var(--brand);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
   box-shadow: var(--shadow-sm);
 }
 .class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.class-card-header h3 { margin: 0; font-size: 1.05rem; }
-.class-card-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin: 0.35rem 0; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
-.class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.5rem 0 0; }
-.class-card-pill-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); margin-right: 0.15rem; }
+.class-card-header h3 { margin: 0; font-size: 0.92rem; }
+/* Grade/Teacher/Assistant - each its own line, stacked cleanly, no
+   student roster (that's what View is for). */
+.class-card-info { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.3rem; }
+.class-card-line { margin: 0; font-size: 0.78rem; color: var(--ink); }
+.class-card-line-label { font-weight: 700; color: var(--muted); margin-right: 0.25rem; }
+.class-card-absent-flag { color: var(--red); font-weight: 600; }
+/* Still used by the public kiosk Class Schedule page's own card markup
+   (views/class-schedule-public.ejs), which keeps the older full-roster
+   layout. */
+.class-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; margin: 0.25rem 0; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.class-card-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.35rem 0 0; }
+.class-card-pill-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-right: 0.1rem; }
+.class-card .badge-pill { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
 .badge-pill-absent { background: var(--red-bg); color: var(--red); }
 
-.class-schedule-print-page .print-page { padding: 0; }
-.class-schedule-print-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
-.class-schedule-print-hour h2 { font-size: 0.95rem; margin: 0 0 0.4rem; border-bottom: 2px solid #000; padding-bottom: 0.2rem; }
-.class-schedule-print-empty { font-size: 0.8rem; color: #666; margin: 0; }
+/* Create/Edit Class form - the form itself takes 1/3 of the page, the
+   Teachers/Assistants + Student Roster "list log" panels take the other
+   2/3, side by side on desktop and stacked on narrower screens. */
+.class-manage-layout { display: flex; align-items: flex-start; gap: 1.5rem; }
+.class-manage-form-col { flex: 0 0 33%; max-width: 33%; min-width: 280px; }
+.class-manage-roster-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.25rem; }
+.class-manage-form-col .member-form-grid { min-width: 0; }
+@media (max-width: 900px) {
+  .class-manage-layout { flex-direction: column; }
+  .class-manage-form-col { max-width: 100%; flex-basis: auto; }
+}
+
+/* "View" button on each class card, and the popup it opens (fetched as
+   an HTML fragment - see public/js/class-schedule-view.js) - reuses the
+   Create Class dialog's header treatment, just wider to fit the details
+   form + roster side by side. */
+.class-card-view-btn { flex-shrink: 0; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+.class-view-dialog {
+  width: min(1100px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  border: none;
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.class-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.class-view-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-view-header h3 { margin: 0; font-size: 1.3rem; flex: 1; }
+.class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
+
+/* Edit/Delete (and, once editing, Cancel/Save) sit top-right of the popup
+   next to Close instead of at the bottom of the form - every button here
+   is the plain .roster-action-btn size/shape so Edit and Delete (and
+   Cancel/Save) all read as the same size. */
+.class-view-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.class-view-footer-view,
+.class-view-footer-edit { display: flex; align-items: center; gap: 0.5rem; }
+
+/* Fields start disabled (view-only) until "Edit Class" is clicked - keep
+   them legible instead of the browser's washed-out default disabled
+   look, so "view mode" still reads as real content, not a broken form. */
+.class-view-form input:disabled,
+.class-view-form select:disabled,
+.class-view-form textarea:disabled {
+  background: #f8fafc;
+  color: var(--ink);
+  opacity: 1;
+  border-color: var(--border);
+}
+.class-view-form .class-color-swatch:has(input:disabled) { cursor: default; }
+
+.class-view-roster-actions { margin-top: 0.25rem; }
+
+/* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
+   narrower, since it's just a header + a list, no two-column form. */
+.allergy-log-dialog { width: min(700px, 92vw); }
+.allergy-log-dialog .class-view-header .icon { width: 1.35rem; height: 1.35rem; color: var(--red); flex-shrink: 0; }
+.allergy-log-popup-actions { margin-bottom: 1rem; }
+
+/* Age Group checkboxes - pill-style buttons (checked = filled), grid of
+   every grade the co-op serves (see GRADE_LEVELS, utils/classSchedule.js). */
+.grade-pill-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.35rem 0 0.75rem; }
+.grade-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.grade-pill input[type="checkbox"] { accent-color: var(--btn-bg); width: 0.95rem; height: 0.95rem; }
+.grade-pill:has(input:checked) { background: var(--orange-bg); border-color: var(--btn-bg); color: var(--orange); }
+
+/* Roster/staff "list log" - a clean, scannable row per person (name,
+   grade, age, a medical/allergy flag when notes exist, remove button)
+   instead of the cramped inline badge-pill list used elsewhere. */
+.roster-log-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.roster-log-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+.roster-log-name { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.roster-log-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); }
+.medical-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--red-bg);
+  color: var(--red);
+  font-weight: 800;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  cursor: help;
+}
+.roster-log-empty { color: var(--muted); font-size: 0.9rem; padding: 0.5rem 0; }
+
+/* This page prints portrait (see the @page rule in the view), the same
+   shape .print-page already defaults to - overridden here only to swap
+   its usual min-height for a fixed height, giving .class-schedule-print-
+   fit below a hard boundary to shrink-to-fit against, with the same
+   0.4in margin the real @page rule uses so the on-screen preview matches
+   what actually prints. */
+.class-schedule-print-page .print-page {
+  width: 8.5in;
+  height: 11in;
+  min-height: 0;
+  padding: 0.4in;
+}
+/* Takes up whatever height is left under the header within that fixed
+   8.5x11in page - print-shrink-to-fit.js measures this box and zooms
+   .class-schedule-print-grid down (never up) to land inside it, so a
+   busy day's classes shrink to stay on one page instead of spilling onto
+   a second. */
+.class-schedule-print-fit { flex: 1; min-height: 0; overflow: hidden; }
+
+/* Room-by-hour grid, same cross-tab shape as the on-screen
+   .class-schedule-room-grid (roomGridForDay) - room stays its own grid
+   column on the printout instead of just a line of text inside each
+   card, and a class that spans two consecutive hour blocks in the same
+   room still gets one colspan="2" cell instead of two separate cards. */
+.class-schedule-print-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.class-schedule-print-grid th,
+.class-schedule-print-grid td {
+  border: 1px solid #999;
+  padding: 0.3rem;
+  vertical-align: top;
+  text-align: left;
+}
+.class-schedule-print-grid th { background: #eaf4fd; font-size: 0.8rem; }
+.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: nowrap; background: #eaf4fd; font-size: 0.8rem; }
+
 .class-schedule-print-card {
   border-left: 5px solid var(--brand);
-  border-radius: 8px;
-  padding: 0.5rem 0.6rem;
-  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  padding: 0.3rem 0.45rem;
+  margin-bottom: 0.35rem;
   break-inside: avoid;
 }
+.class-schedule-print-card:last-child { margin-bottom: 0; }
 .class-schedule-print-card h3 { margin: 0; font-size: 0.85rem; }
-.class-schedule-print-staff { margin: 0.25rem 0 0; font-size: 0.7rem; color: #333; }
+.class-schedule-print-grade { margin: 0.2rem 0 0; font-size: 0.7rem; color: #333; }
+.class-schedule-print-staff { margin: 0.15rem 0 0; font-size: 0.7rem; color: #333; }
 @media print {
-  .class-schedule-print-card, .class-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .class-schedule-print-grid { grid-template-columns: repeat(4, 1fr); }
+  .class-schedule-print-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* ---------- Class Schedule (public kiosk page) ---------- */
@@ -2481,31 +3527,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .status-badge-partial { background: var(--yellow-bg); color: var(--yellow); }
 .status-badge-complete { background: var(--green-bg); color: var(--green); }
 
+/* Student/Parent Schedules tab - every person's actual Schedule Card
+   (same design as the printable one), side by side in alphabetical-by-
+   last-name order instead of a table row per person. */
+.schedule-card-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.schedule-card-grid-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.schedule-card-grid-name { font-weight: 700; color: var(--brand-dark); text-decoration: none; }
+.schedule-card-grid-name:hover { text-decoration: underline; }
+
 .schedule-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
 .btn-disabled { pointer-events: none; opacity: 0.45; }
 
 .schedule-print-select-all { margin: 0; }
-/* Live print preview at the bottom of the Print tab - every print form
-   targets this shared iframe instead of a new tab, so the result renders
-   right on the page as a normal sheet of paper. */
-.print-preview-wrap { margin-top: 1.75rem; }
-.print-preview-paper {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  max-width: 850px;
-  margin: 0 auto;
-  overflow: hidden;
-}
-.print-preview-paper iframe {
-  display: block;
-  width: 100%;
-  height: 70vh;
-  min-height: 500px;
-  border: 0;
-  background: #fff;
-}
 
 /* Print tab member picker (Schedule Cards/Name Tags/Barcodes selection) -
    the member log's own table styling with a checkbox column, capped to a
@@ -2559,6 +3592,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-print-table { margin-bottom: 0.5rem; }
 .schedule-print-table th, .schedule-print-table td { text-align: left; }
 
+/* Class Roster print: title/grade/room/time/teacher/assistants stacked
+   one per line instead of a title + meta line + separate staff table. */
+.class-roster-print-info { margin-bottom: 1.5rem; }
+.class-roster-print-info h2 { margin: 0 0 0.6rem; }
+.class-roster-print-info p { margin: 0.2rem 0; font-size: 0.95rem; }
+.class-roster-print-label { font-weight: 700; margin-right: 0.3rem; }
+
+/* Bulk "Name Tags + Schedule Cards" print - each member's two cards sit
+   side by side, one member row per line, so a shared physical card
+   design comparison (or just cutting both at once) doesn't require
+   flipping between two separate printouts. */
+.member-card-pair-row { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem; break-inside: avoid; }
+.member-card-pair-item h2 { margin: 0 0 0.4rem; font-size: 0.95rem; color: var(--muted); }
+
 /* Hidden on screen, shown only when printing - a consistent branded
    header (logo + co-op name + page title) at the top of every printout. */
 .print-header { display: none; }
@@ -2588,13 +3635,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      show just the grid, not the embedded Floater Assignments box. */
   .volunteer-box { display: none !important; }
 
-  /* Members page: printed roster is a name/type/parent/rosters list, not
-     an interactive table - hide the action icon buttons column. */
-  .members-table .actions-cell { display: none; }
+  /* Members page: printing swaps the interactive table for a plain
+     Name/Type/Family/Roster/Grade/Birthday grid (.members-print-table,
+     hidden on screen below) instead of trying to print photo thumbnails
+     and icon buttons. */
+  .members-table { display: none; }
+  .members-print-table { display: table; }
 
   /* Infant flag is an admin-only note for staffing decisions - never let
-     it end up on a physical printout that could be seen by members. */
+     it end up on a physical printout that could be seen by members. Same
+     for the medical-notes flag - the dedicated Allergies/Medical log is
+     the intentional, admin-only place to print that information. */
   .infant-tag { display: none !important; }
+  .medical-flag { display: none !important; }
 
   .print-header {
     display: flex;
@@ -2632,7 +3685,92 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     border: none;
     box-shadow: none;
   }
+
+  /* Keep a hard, exactly-one-portrait-page box at actual print time too
+     (not the generic auto/100vh above) - print-shrink-to-fit.js's
+     beforeprint recalculation needs a real page-sized box to measure
+     against, or there'd be nothing to shrink the schedule to fit into. */
+  .class-schedule-print-page .print-page {
+    width: 8.5in;
+    height: 11in;
+    min-height: 0;
+    padding: 0.4in;
+  }
+
+  /* Bulk "Name Tags + Schedule Cards" print: on screen each pair/row has
+     breathing room and a label so the preview reads clearly, but the
+     printout is meant to be cut apart - zero the gaps so every card edge
+     (within a pair and between member rows) butts against its neighbor,
+     same guillotine-cut reasoning as .badge-sheet. .print-page's own
+     flex `gap: 1.5rem` (for its usual stacked-sections use elsewhere)
+     would otherwise still separate each row even with the row's own
+     margin zeroed, so it needs zeroing too on this specific page. */
+  .member-card-pair-page { gap: 0; }
+  .member-card-pair-row { gap: 0; margin-bottom: 0; }
+  .member-card-pair-item .badge-canvas { box-shadow: none; margin: 0; }
 }
+
+/* ---------- Setup/Cleanup Task List tab (views/admin-setup-tasks.ejs) ----------
+   Section cards stacked vertically, each a colored header band over a
+   plain numbered task table - view-only until Edit is clicked (see
+   public/js/task-list-edit.js), which unlocks every title/description
+   input in place and reveals the reorder/delete controls. */
+.task-list-stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.task-list-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: #fff;
+}
+.task-list-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+.task-list-card-actions { display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0; }
+.task-list-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: inherit;
+  padding: 0.2rem 0;
+}
+.task-list-title-input:not([readonly]) {
+  background: rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+}
+.task-list-team-row { padding: 0 1rem 0.5rem; }
+.task-list-team-select { font-size: 0.85rem; }
+.task-list-team-badge { margin: 0; padding: 0 1rem 0.5rem; font-size: 0.8rem; }
+.task-list-table { margin: 0; }
+.task-list-num-col { width: 2.5rem; text-align: center !important; font-weight: 700; }
+.task-list-desc-input {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0.15rem 0;
+}
+.task-list-desc-input:not([readonly]) {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+}
+
+.task-list-accent-0 .task-list-card-header { background: var(--brand-soft); color: var(--brand-dark); }
+.task-list-accent-1 .task-list-card-header { background: var(--green-bg); color: var(--green); }
+.task-list-accent-2 .task-list-card-header { background: var(--purple-soft); color: var(--purple); }
+.task-list-accent-3 .task-list-card-header { background: var(--orange-bg); color: var(--orange); }
+.task-list-accent-4 .task-list-card-header { background: #d7f3f1; color: #1f7a72; }
 
 @page {
   size: landscape;

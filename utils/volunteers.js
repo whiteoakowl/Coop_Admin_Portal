@@ -56,6 +56,49 @@ function setMemberRank(listId, memberId, rank) {
   db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ?').run(rank, listId, memberId);
 }
 
+// Everyone on one specific hour section, each carrying just that section's
+// own rank - unlike setMemberRank above, a member's importance can now
+// differ hour to hour (Floater Teams tab), so this reads/writes exactly
+// one (list, member, section) row instead of every one of a member's rows.
+function membersForSection(listId, sectionId) {
+  return db
+    .prepare(
+      `SELECT m.*, vm.rank AS rank FROM members m
+       JOIN volunteer_members vm ON vm.member_id = m.id
+       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1
+       ORDER BY m.name COLLATE NOCASE`
+    )
+    .all(listId, sectionId);
+}
+
+function setSectionRank(listId, memberId, sectionId, rank) {
+  if (!RANKS.includes(rank)) return;
+  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+    rank,
+    listId,
+    memberId,
+    sectionId
+  );
+}
+
+// Removes a member from just one hour (Floater Teams card's trash can) -
+// unlike remove-member elsewhere, which drops them from the whole list.
+function removeMemberFromSection(listId, memberId, sectionId) {
+  db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+    listId,
+    memberId,
+    sectionId
+  );
+}
+
+// Adds a member to one hour section (Floater Teams "+ Add Member" popup) -
+// default rank 'sometimes', same as the day list's own quick-add.
+function addMemberToSection(listId, memberId, sectionId) {
+  db.prepare(
+    "INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, 'sometimes')"
+  ).run(listId, memberId, sectionId);
+}
+
 // Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
 // for a list, optionally narrowed to a single date. A member appears once
 // under every section they're assigned to, sharing the same per-date
@@ -111,5 +154,9 @@ module.exports = {
   datesForList,
   membersForList,
   setMemberRank,
+  membersForSection,
+  setSectionRank,
+  removeMemberFromSection,
+  addMemberToSection,
   buildListGrid,
 };
