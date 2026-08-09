@@ -40,6 +40,19 @@ const uploadPhoto = multer({
   fileFilter: imageFileFilter,
 });
 
+// Removes a member's photo file from disk given the web path stored in
+// photo_path (e.g. "/uploads/members/172...-4821.jpg") - called whenever
+// a photo is replaced or the member itself is deleted, so an old photo of
+// a real child or parent doesn't sit on disk forever with no way to
+// remove it once it's no longer referenced anywhere. Silently no-ops for
+// null/already-missing files (deleting a member who never had a photo is
+// the common case, not an error).
+function deletePhotoFile(photoPath) {
+  if (!photoPath) return;
+  const filePath = path.join(PHOTO_DIR, path.basename(photoPath));
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+}
+
 // Every attendance record for this member across every roster they're on,
 // newest first - the Members profile page's Attendance tab.
 function attendanceHistoryForMember(memberId) {
@@ -404,6 +417,10 @@ router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req
   }
   const existing = db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : existing ? existing.photo_path : null;
+  // A newly uploaded photo replaces the old one in photo_path below - the
+  // old file itself isn't referenced anywhere else once that happens, so
+  // clean it up now rather than leaving it orphaned on disk indefinitely.
+  if (req.file && existing && existing.photo_path) deletePhotoFile(existing.photo_path);
 
   db.prepare(
     `UPDATE members SET
@@ -687,6 +704,11 @@ router.post('/members/:id/delete', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   db.prepare('DELETE FROM members WHERE id = ?').run(id);
+  // ON DELETE CASCADE handles every other table referencing this member,
+  // but a photo file on disk isn't a foreign key SQLite can clean up on
+  // its own - without this, "Delete" leaves an actual photo of a real
+  // person behind indefinitely, with no way to remove it from the app.
+  if (member) deletePhotoFile(member.photo_path);
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
   );
