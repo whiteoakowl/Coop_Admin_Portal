@@ -17,7 +17,11 @@
       <button type="submit" class="roster-action-btn" form="class-view-form-<%= cls.id %>">Save</button>
     </div>
   </div>
-  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+  <%# autofocus, not the Delete button that happens to come first in DOM
+      order above - a view dialog opening with keyboard focus already on
+      its most destructive action is one accidental Enter press away from
+      a delete confirmation. %>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close" autofocus><svg class="icon"><use href="#icon-x-circle"/></svg></button>
 </div>
 
 <div class="class-manage-layout">

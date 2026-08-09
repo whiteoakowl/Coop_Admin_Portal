@@ -93,7 +93,10 @@
                 </form>
                 <button type="submit" class="roster-action-btn" form="edit-team-form-<%= t.id %>">Save</button>
               </div>
-              <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+              <%# autofocus, not the Delete button that happens to come
+                  first in DOM order above - see class-schedule-view-
+                  fragment.ejs's own version of this same fix. %>
+              <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close" autofocus><svg class="icon"><use href="#icon-x-circle"/></svg></button>
             </div>
 
             <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" id="edit-team-form-<%= t.id %>" class="member-form-grid">
