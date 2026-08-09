@@ -27,6 +27,14 @@ process.on('unhandledRejection', (reason) => {
 
 require('./db'); // initialize database + seed default admin
 
+// Swaps in any staged Restore's uploaded files (member photos, documents,
+// design images) - see utils/backup.js's own comments for the full
+// design. Must run before anything below (or any route file, once
+// required) can create/touch public/uploads/, same reasoning as
+// db/index.js's own database swap running before anything opens the
+// database.
+require('./utils/backup').applyPendingUploadsRestore();
+
 // The Monday/Wednesday Parent/Student rosters are normally created lazily
 // the first time a class enrolls/staffs someone that day - ensure all 4
 // always exist up front so they're visible on Attendance immediately, even

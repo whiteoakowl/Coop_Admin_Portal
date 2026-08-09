@@ -9,13 +9,14 @@ const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
-const { backupDatabaseBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
+const { backupPackageBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
 const { databaseFileFilter } = require('../utils/uploads');
 
 // Restore uploads never touch disk (memoryStorage) - the whole file needs
-// to be in hand before it can be validated as a real SQLite database. 200MB
-// is generous headroom over any realistic co-op-scale database (the seed
-// data used in this app's own testing lands in the hundreds of KB).
+// to be in hand before it can be validated/unpacked. 200MB is generous
+// headroom over any realistic co-op-scale backup - the database alone is
+// typically hundreds of KB, and even a large collection of member photos
+// and documents comfortably fits well under this.
 const restoreUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 }, fileFilter: databaseFileFilter });
 
 // --- Auth ---
@@ -184,28 +185,30 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => 
   renderSettings(req, res, null, 'Password updated.', 'account');
 });
 
-// One-click database backup download - see utils/backup.js for how the
-// copy itself is made. Full-Admin-only, same as the rest of the Account
-// tab: a Co-op Admin (a member, not the master admin account) has no
-// business downloading the entire database.
+// One-click backup download: the database plus every uploaded file
+// (member photos, documents, design images) - see utils/backup.js for
+// how the package itself is built. Full-Admin-only, same as the rest of
+// the Account tab: a Co-op Admin (a member, not the master admin
+// account) has no business downloading the entire database.
 router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
-  const buffer = backupDatabaseBuffer();
+  const buffer = backupPackageBuffer();
   const stamp = todayISO();
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="attendance-backup-${stamp}.db"`);
+  res.setHeader('Content-Disposition', `attachment; filename="attendance-backup-${stamp}.shcbackup"`);
   res.send(buffer);
 });
 
 // Uploads a backup file and, once it passes validation (see
-// utils/backup.js), stages it to replace the live database on the app's
-// next startup - there's no in-app "restart now" button because a bare
-// `node server.js` process (this app's typical deployment, see SETUP.md)
-// has nothing to restart it if it stopped itself. The staged file only
-// takes effect once an admin closes and reopens the app, same as they
-// already do to stop/start it day to day.
+// utils/backup.js), stages it to replace the live database - and, for a
+// current-format backup, every uploaded file too - on the app's next
+// startup. There's no in-app "restart now" button because a bare `node
+// server.js` process (this app's typical deployment, see SETUP.md) has
+// nothing to restart it if it stopped itself. The staged file only takes
+// effect once an admin closes and reopens the app, same as they already
+// do to stop/start it day to day.
 router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), (req, res) => {
   if (!req.file) {
-    return renderSettings(req, res, 'Please choose a .db backup file to restore.', null, 'account');
+    return renderSettings(req, res, 'Please choose a backup file to restore.', null, 'account');
   }
   try {
     stageRestore(req.file.buffer);
