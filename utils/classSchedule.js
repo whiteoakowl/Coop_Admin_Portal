@@ -387,6 +387,26 @@ function absenceFormMemberIdsForDate(date) {
   );
 }
 
+// Everyone marked absent OR late for a given date, any source (checked in
+// that way on a roster, or via an Absence/Late form) - the single "won't
+// be where they're expected today" signal the floater-assignment board
+// uses, both to keep someone out of the substitute pool and to decide
+// whether a class needs a floater covering for one of its own teachers or
+// assistants. Maps member id -> whichever status was recorded ('absent'
+// wins if a member somehow has mixed statuses across rosters for the same
+// date).
+function missingMemberIdsForDate(date) {
+  if (!date) return new Map();
+  const rows = db
+    .prepare(`SELECT member_id, status FROM attendance WHERE session_date = ? AND status IN ('absent', 'late')`)
+    .all(date);
+  const map = new Map();
+  rows.forEach((r) => {
+    if (r.status === 'absent' || !map.has(r.member_id)) map.set(r.member_id, r.status);
+  });
+  return map;
+}
+
 // --- Rosters auto-created from class registration ------------------------
 //
 // Every class gets its own students-only roster, and each day gets one
@@ -650,6 +670,7 @@ module.exports = {
   classesAtRiskForDay,
   absentMemberIdsForDate,
   absenceFormMemberIdsForDate,
+  missingMemberIdsForDate,
   appSetting,
   setAppSetting,
   ensureClassRoster,

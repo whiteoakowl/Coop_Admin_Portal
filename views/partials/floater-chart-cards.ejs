@@ -1,12 +1,14 @@
 <%
 // The live, editable Floater Assignments chart - one card per hour (2x2,
 // matching the Archive print layout), each card's rows drawn straight
-// from substituteBoard: every permanent job (filled or not) plus any
-// class whose teacher(s) are absent. The Floater column is the assign UI
-// itself (no separate "needs a substitute" section) - a dropdown of
-// available candidates (already rank-sorted and filtered to whoever's
-// actually free this date - see routes/admin-volunteers.js) plus an
-// Accept/Unassign button. Locals: day, selectedDate, hourSections.
+// from substituteBoard: every permanent job (filled or not) plus one row
+// per class's missing teacher/assistant - a class with two people out
+// that hour lists twice, each row tagged with who it's covering for (see
+// slot.reason below). The Floater column is the assign UI itself (no
+// separate "needs a substitute" section) - a dropdown of available
+// candidates (already rank-sorted and filtered to whoever's actually free
+// this date - see routes/admin-volunteers.js) plus an Accept/Unassign
+// button. Locals: day, selectedDate, hourSections.
 var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
 %>
 <% if (hourSections.length === 0) { %>
@@ -26,7 +28,10 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
             <% hour.slots.forEach(function(slot) { %>
               <% var isApproved = slot.assigned && slot.assigned.status === 'approved'; %>
               <tr class="<%= slot.noneAvailable ? 'floater-row-noavail' : '' %>">
-                <td class="floater-card-position"><%= slot.label %></td>
+                <td class="floater-card-position">
+                  <%= slot.label %>
+                  <% if (slot.slotType === 'class' && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
+                </td>
                 <td><%= slot.room || '—' %></td>
                 <td>
                   <% if (slot.noneAvailable) { %>

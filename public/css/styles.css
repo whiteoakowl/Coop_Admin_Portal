@@ -2666,6 +2666,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-chart-table th:nth-child(3) { width: 66%; }
 .floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
 
+/* A class can now list more than once (one row per missing teacher/
+   assistant) - this small line under the class name says who that
+   particular row is covering for, so duplicate rows stay tellable apart. */
+.floater-slot-reason { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
 /* A slot nobody at all is available for (not even an override pick) -
    the row itself flags it, no dropdown to offer. */
 .floater-row-noavail { background: var(--red-bg); }
