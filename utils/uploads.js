@@ -46,4 +46,19 @@ function spreadsheetFileFilter(req, file, cb) {
   cb(null, SPREADSHEET_EXTENSIONS.has(ext));
 }
 
-module.exports = { imageFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT, spreadsheetFileFilter };
+// Database restore upload (Admin > Settings > Restore). Extension-only,
+// same reasoning as spreadsheets above - it's read into a temp file and
+// validated as a real SQLite database by utils/backup.js before anything
+// is trusted, so the actual gatekeeping happens there, not here.
+function databaseFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  cb(null, ext === '.db');
+}
+
+module.exports = {
+  imageFileFilter,
+  documentFileFilter,
+  DOCUMENT_MIME_BY_EXT,
+  spreadsheetFileFilter,
+  databaseFileFilter,
+};

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
@@ -8,7 +9,14 @@ const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
-const { backupDatabaseBuffer } = require('../utils/backup');
+const { backupDatabaseBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
+const { databaseFileFilter } = require('../utils/uploads');
+
+// Restore uploads never touch disk (memoryStorage) - the whole file needs
+// to be in hand before it can be validated as a real SQLite database. 200MB
+// is generous headroom over any realistic co-op-scale database (the seed
+// data used in this app's own testing lands in the hundreds of KB).
+const restoreUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 }, fileFilter: databaseFileFilter });
 
 // --- Auth ---
 
@@ -137,6 +145,7 @@ function renderSettings(req, res, error, success, activeTab) {
     isFullAdmin,
     activeTab: tab,
     documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
+    restoreStaged: isRestoreStaged(),
     error,
     success,
   });
@@ -185,6 +194,36 @@ router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
   res.setHeader('Content-Type', 'application/octet-stream');
   res.setHeader('Content-Disposition', `attachment; filename="attendance-backup-${stamp}.db"`);
   res.send(buffer);
+});
+
+// Uploads a backup file and, once it passes validation (see
+// utils/backup.js), stages it to replace the live database on the app's
+// next startup - there's no in-app "restart now" button because a bare
+// `node server.js` process (this app's typical deployment, see SETUP.md)
+// has nothing to restart it if it stopped itself. The staged file only
+// takes effect once an admin closes and reopens the app, same as they
+// already do to stop/start it day to day.
+router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return renderSettings(req, res, 'Please choose a .db backup file to restore.', null, 'account');
+  }
+  try {
+    stageRestore(req.file.buffer);
+  } catch (err) {
+    return renderSettings(req, res, err.message, null, 'account');
+  }
+  renderSettings(
+    req,
+    res,
+    null,
+    'Backup validated and staged. Close and reopen the app to finish restoring - this will replace all current data.',
+    'account'
+  );
+});
+
+router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, (req, res) => {
+  cancelStagedRestore();
+  renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'account');
 });
 
 module.exports = router;

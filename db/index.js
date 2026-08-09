@@ -9,7 +9,25 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'attendance.db');
+
+// If an admin staged a restore (Admin > Settings > Restore, see
+// utils/backup.js) before this app was last started, swap it in now,
+// before anything opens the live database - this is the one point in the
+// app's lifecycle where it's safe to replace the file wholesale, since no
+// connection is holding it open yet. Any leftover WAL/SHM sidecar files
+// from the database being replaced are dropped too, since they belong to
+// that old file's transaction log and have no business being replayed
+// against the database just swapped in.
+const RESTORE_PENDING_PATH = `${DB_PATH}.restore-pending`;
+if (fs.existsSync(RESTORE_PENDING_PATH)) {
+  fs.rmSync(`${DB_PATH}-wal`, { force: true });
+  fs.rmSync(`${DB_PATH}-shm`, { force: true });
+  fs.renameSync(RESTORE_PENDING_PATH, DB_PATH);
+  console.log('Restored the database from a staged backup.');
+}
+
 const db = new DatabaseSync(DB_PATH);
+db.DB_PATH = DB_PATH; // exposed for utils/backup.js - see there for why
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
