@@ -3492,8 +3492,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   /* Members page: printing swaps the interactive table for a plain
      Name/Type/Family/Roster/Grade/Birthday grid (.members-print-table,
      hidden on screen below) instead of trying to print photo thumbnails
-     and icon buttons. */
-  .members-table { display: none; }
+     and icon buttons. Scoped to .members-list-table specifically (a
+     second, page-only class added alongside the shared .members-table
+     styling class) - .members-table itself is reused sitewide wherever a
+     table wants that same look (the Allergies/Medical Log, the Setup/
+     Cleanup task list print view, and others), and a bare rule targeting
+     it directly here used to silently blank out every one of those on
+     print - a real bug, since none of them have their own
+     .members-print-table counterpart to swap in like this page does. */
+  .members-list-table { display: none; }
   .members-print-table { display: table; }
 
   /* Infant flag is an admin-only note for staffing decisions - never let
