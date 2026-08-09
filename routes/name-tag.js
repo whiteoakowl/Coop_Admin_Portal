@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { activeParentOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
+const { createRateLimiter } = require('../utils/rateLimit');
 
 const REQUEST_TYPES = ['lost_tag', 'schedule_change'];
 const DAYS = ['monday', 'wednesday', 'both'];
+
+// Same reasoning as absence.js's own limiter - generous for real use,
+// still a real cap on this public, no-login endpoint.
+const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
 router.get('/name-tag', (req, res) => {
   res.render('name-tag', {
@@ -17,6 +22,17 @@ router.get('/name-tag', (req, res) => {
 });
 
 router.post('/name-tag/submit', (req, res) => {
+  if (submitLimiter.isLimited(req.ip)) {
+    return res.render('name-tag', {
+      title: 'Name Tag Form',
+      parents: activeParentOptions(),
+      childrenByParent: familyGroupsByParent(),
+      formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
+      result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
+    });
+  }
+  submitLimiter.recordAttempt(req.ip);
+
   const parentId = parseInt(req.body.parentId, 10);
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const requestType = REQUEST_TYPES.includes(req.body.requestType) ? req.body.requestType : null;

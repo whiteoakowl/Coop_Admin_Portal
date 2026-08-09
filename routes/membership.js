@@ -6,6 +6,15 @@ const fs = require('fs');
 const db = require('../db');
 const { imageFileFilter } = require('../utils/uploads');
 const { GRADE_OPTIONS, VOLUNTEER_INTEREST_OPTIONS } = require('../utils/membership');
+const { isValidISODate } = require('../utils/dates');
+const { createRateLimiter } = require('../utils/rateLimit');
+
+// This form is the one place in the app a stranger can create a
+// database row with no login and no relationship check (every other
+// public form - absence, name-tag - requires picking a real, existing
+// parent/child pairing first). A generous but real cap keeps a script
+// from filling the Membership Requests review queue with junk.
+const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 5 });
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'membership-children');
 if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
@@ -45,6 +54,11 @@ function parseChildren(body) {
 }
 
 router.post('/membership', upload.any(), (req, res) => {
+  if (submitLimiter.isLimited(req.ip)) {
+    return res.redirect('/membership?error=' + encodeURIComponent('Too many submissions from this device. Please wait a few minutes and try again.'));
+  }
+  submitLimiter.recordAttempt(req.ip);
+
   const body = req.body;
   const parent1FirstName = (body.parent1FirstName || '').trim();
   const parent1LastName = (body.parent1LastName || '').trim();
@@ -100,7 +114,13 @@ router.post('/membership', upload.any(), (req, res) => {
       requestId,
       c.firstName.trim(),
       c.lastName.trim(),
-      c.birthdate || null,
+      // Silently dropped rather than rejecting the whole submission - a
+      // malformed birthdate here isn't fatal, it just leaves this one
+      // field blank for the admin to fill in when approving the request
+      // (see ageFromBirthday's own isValidISODate guard for why this
+      // needs to already be a real date by the time it becomes a
+      // member's birthday, not just by the time it's displayed).
+      isValidISODate((c.birthdate || '').trim()) ? c.birthdate.trim() : null,
       GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
       (c.medicalNotes || '').trim() || null,
       photoFile ? `/uploads/membership-children/${photoFile.filename}` : null

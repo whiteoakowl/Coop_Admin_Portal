@@ -4,6 +4,12 @@ const db = require('../db');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { activeParentOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
+const { createRateLimiter } = require('../utils/rateLimit');
+
+// Generous cap for real use (a parent reporting for several kids, or
+// retrying after a typo) that still stops a script from hammering this
+// public, no-login endpoint with repeated attendance-record writes.
+const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
 router.get('/absence', (req, res) => {
   res.render('absence', {
@@ -16,6 +22,17 @@ router.get('/absence', (req, res) => {
 });
 
 router.post('/absence/submit', (req, res) => {
+  if (submitLimiter.isLimited(req.ip)) {
+    return res.render('absence', {
+      title: 'Absence/Late Form',
+      parents: activeParentOptions(),
+      childrenByParent: familyGroupsByParent(),
+      formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
+      result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
+    });
+  }
+  submitLimiter.recordAttempt(req.ip);
+
   const type = req.body.type === 'late' ? 'late' : 'absence';
   const parentId = parseInt(req.body.parentId, 10);
   const studentIds = [].concat(req.body.studentIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
