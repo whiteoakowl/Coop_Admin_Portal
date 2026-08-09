@@ -78,9 +78,19 @@
     try {
       const res = await fetch('/admin/library/scan-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
+      // A session that expired mid-use gets a redirect to the login page
+      // here, not a JSON body - res.json() below would throw on that and
+      // get misreported as a generic connection error, not what actually
+      // happened.
+      if (res.status === 401) {
+        memberHint.hidden = false;
+        memberHint.textContent = 'Your session has expired. Please refresh the page and log in again.';
+        renderPending();
+        return;
+      }
       const data = await res.json();
       if (data.ok) {
         currentMember = data.member;
@@ -110,9 +120,16 @@
     try {
       const res = await fetch('/admin/library/scan-item', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
+      // See the scan-member handler above for why this check exists.
+      if (res.status === 401) {
+        itemHint.textContent = 'Your session has expired. Please refresh the page and log in again.';
+        renderPending();
+        itemInput.focus();
+        return;
+      }
       const data = await res.json();
       if (data.ok) {
         if (!pendingItems.some((i) => i.id === data.item.id)) {
@@ -192,9 +209,15 @@
     try {
       const res = await fetch('/admin/library/scan-checkin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
+      // See the scan-member handler above for why this check exists.
+      if (res.status === 401) {
+        checkinHint.textContent = 'Your session has expired. Please refresh the page and log in again.';
+        checkinInput.focus();
+        return;
+      }
       const data = await res.json();
       if (data.ok) {
         checkedIn.unshift({ title: data.item.title, memberName: data.memberName });
