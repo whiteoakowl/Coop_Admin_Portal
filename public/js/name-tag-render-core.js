@@ -145,8 +145,31 @@
     }
   }
 
+  // Rough "does this text fit on one line at this font size" estimate -
+  // there's no real text-measurement API available in both the browser
+  // editor AND the Node print route this same module runs in, so this
+  // approximates each character as a fraction of the font size (wider
+  // for bold) rather than laying it out for real. Good enough to catch
+  // "Alexandria Montgomery-Whitfield" overflowing a name tag sized for
+  // "Sam Lee" and scale it back down; exact kerning isn't the point.
+  var AVG_CHAR_WIDTH_RATIO = { regular: 0.56, bold: 0.62 };
+  var MIN_FONT_SIZE_RATIO = 0.55;
+
+  function fitFontSize(text, el) {
+    var baseFontSize = num(el.fontSize, 14);
+    if (!text) return baseFontSize;
+    var ratio = el.bold ? AVG_CHAR_WIDTH_RATIO.bold : AVG_CHAR_WIDTH_RATIO.regular;
+    var available = Math.max(10, num(el.width, 100) - 6);
+    var estimated = text.length * baseFontSize * ratio + text.length * num(el.letterSpacing, 0);
+    if (estimated <= available) return baseFontSize;
+    var scaled = baseFontSize * (available / estimated);
+    var minFontSize = Math.max(7, baseFontSize * MIN_FONT_SIZE_RATIO);
+    return Math.max(minFontSize, Math.round(scaled * 10) / 10);
+  }
+
   function renderTextEl(el, data) {
-    var value = el.field === 'custom' ? esc(el.text || '') : esc((data && data[el.field]) || '');
+    var raw = el.field === 'custom' ? (el.text || '') : ((data && data[el.field]) || '');
+    var value = esc(raw);
     var valign = VALIGN_FLEX[el.valign] || 'center';
     var align = el.align || 'center';
     var deco = [];
@@ -154,8 +177,13 @@
     if (el.strikethrough) deco.push('line-through');
     var fontFamily = el.fontFamily ? "'" + String(el.fontFamily).replace(/'/g, '') + "', sans-serif" : 'inherit';
     var style = elementBaseStyle(el) + ' display:flex; align-items:' + valign + '; font-family:' + fontFamily + ';';
+    // Auto-shrink is opt-in per element (autoFitText) - a name/phone
+    // field wants a single balanced line that always fits the template's
+    // box; a longer free-text field (Class Description, etc.) still
+    // wraps normally instead of shrinking down to near-nothing.
+    var fontSize = el.autoFitText ? fitFontSize(raw, el) : num(el.fontSize, 14);
     var spanStyle =
-      'display:block; width:100%; font-size:' + num(el.fontSize, 14) + 'px; color:' + (el.color || '#1c2530') + ';' +
+      'display:block; width:100%; font-size:' + fontSize + 'px; color:' + (el.color || '#1c2530') + ';' +
       ' font-weight:' + (el.bold ? 700 : 400) + ';' +
       ' font-style:' + (el.italic ? 'italic' : 'normal') + ';' +
       ' text-decoration:' + (deco.length ? deco.join(' ') : 'none') + ';' +
@@ -204,12 +232,45 @@
   // table, bound (via el.field) to an array of up to 4 {time, className,
   // room} rows - always renders exactly 4 rows, blank ones show an em
   // dash, matching the schedule editor's "always 4 rows" convention.
-  // Column widths: Class just fits its single digit (header shortened to
-  // "#" to match, since the full word "Class" wouldn't fit that width),
-  // Time just fits a start-time-only value ("9:00 AM"), Room is a short
-  // word, and Class Name - the longest, most-typed-into field - gets
-  // whatever's left.
-  var TABLE_COLUMN_WIDTHS = ['6%', '16%', '58%', '20%'];
+  // The table itself is always exactly the card's own fixed box (never
+  // changes size - width:100%/height:100% of el.width/el.height,
+  // overflow:hidden as a last-resort guard), but the 4 columns split
+  // that fixed width by how much room their actual content needs this
+  // time (a short room number doesn't need as many px as a long class
+  // name) rather than a one-size-fits-all percentage - see
+  // tableColumnWidths below.
+  var TABLE_MIN_COLUMN_PCT = [5, 12, 30, 10]; // #, Time, Class Name, Room - floor so no column vanishes
+
+  function tableColumnWidths(headers, colValues, fontSize) {
+    var weights = headers.map(function (label, i) {
+      var maxLen = label.length;
+      colValues[i].forEach(function (v) { maxLen = Math.max(maxLen, String(v || '').length); });
+      return Math.max(1, maxLen);
+    });
+    var total = weights.reduce(function (a, b) { return a + b; }, 0);
+    var pct = weights.map(function (w) { return (w / total) * 100; });
+    // Apply floors, then renormalize so everything still sums to 100 -
+    // whatever a floor bump takes is pulled back proportionally from the
+    // columns that were already above their floor.
+    var floors = TABLE_MIN_COLUMN_PCT;
+    var deficit = 0;
+    pct = pct.map(function (p, i) {
+      if (p < floors[i]) { deficit += floors[i] - p; return floors[i]; }
+      return p;
+    });
+    if (deficit > 0) {
+      var aboveFloorTotal = 0;
+      pct.forEach(function (p, i) { if (p > floors[i]) aboveFloorTotal += p - floors[i]; });
+      if (aboveFloorTotal > 0) {
+        pct = pct.map(function (p, i) {
+          if (p <= floors[i]) return p;
+          return p - deficit * ((p - floors[i]) / aboveFloorTotal);
+        });
+      }
+    }
+    var sum = pct.reduce(function (a, b) { return a + b; }, 0);
+    return pct.map(function (p) { return (p / sum) * 100 + '%'; });
+  }
 
   function renderTableEl(el, data) {
     var style = elementBaseStyle(el) + ' overflow:hidden;';
@@ -217,11 +278,19 @@
     var fontSize = num(el.fontSize, 8);
     var borderColor = el.borderColor || '#dbe8f5';
     var headerBg = el.headerColor || '#eaf4fd';
+    var headers = ['#', 'Time', 'Class Name', 'Room'];
+    var colValues = [
+      [1, 2, 3, 4],
+      [0, 1, 2, 3].map(function (i) { return startTimeOnly((rows[i] || {}).time) || '—'; }),
+      [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).className || '—'; }),
+      [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).room || '—'; }),
+    ];
+    var colWidths = tableColumnWidths(headers, colValues, fontSize);
     function cellStyle(colIndex) {
-      return 'width:' + TABLE_COLUMN_WIDTHS[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+      return 'width:' + colWidths[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
     }
     var html = '<table style="width:100%; height:100%; border-collapse:collapse; table-layout:fixed; font-family:inherit;"><thead><tr style="background:' + esc(headerBg) + ';">';
-    ['#', 'Time', 'Class Name', 'Room'].forEach(function (label, colIndex) {
+    headers.forEach(function (label, colIndex) {
       html += '<th style="' + cellStyle(colIndex) + '">' + esc(label) + '</th>';
     });
     html += '</tr></thead><tbody>';
