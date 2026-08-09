@@ -1769,11 +1769,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* Cancel (.btn-secondary) and Save/Add Member (.primary-btn) normally use
    different padding/font-size scales elsewhere in the app - matched here
-   explicitly so the two footer buttons read as the same size and shape. */
+   explicitly (same values as .notes-dialog-actions/.class-form-dialog-
+   footer, the same button pair everywhere else on the site) so every
+   popup's action row reads as the same size and shape. */
 .member-form-footer .btn-secondary,
 .member-form-footer .primary-btn {
-  padding: 0.7rem 1.4rem;
-  font-size: 0.92rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
   border-radius: var(--control-radius);
   margin-top: 0;
 }
@@ -2473,7 +2475,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    used when it lived at the bottom of the controls column. */
 .name-tag-editor-actions { display: flex; align-items: center; gap: 0.6rem; }
 .name-tag-editor-actions .btn-secondary,
-.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; }
+.name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
 /* Crop tool - a fixed-aspect frame (locked to the image element's own
    box ratio) the user pans by dragging and resizes via a zoom slider. */
@@ -2489,7 +2491,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-crop-image { position: absolute; max-width: none; max-height: none; user-select: none; pointer-events: none; }
 .name-tag-crop-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .name-tag-crop-actions .btn-secondary,
-.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; }
+.name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
 .name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -3175,6 +3177,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   justify-content: space-between;
   align-items: center;
   margin-top: 1.5rem;
+}
+/* Same normalization as .notes-dialog-actions - Cancel and the primary
+   action (Create Class) read as the same size/shape here too. */
+.class-form-dialog-footer .primary-btn,
+.class-form-dialog-footer .btn-secondary {
+  margin-top: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
 }
 .class-form-dialog-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
 .class-form-dialog-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
