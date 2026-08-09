@@ -20,8 +20,9 @@ const {
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { activeParentOptions } = require('../utils/members');
+const { spreadsheetFileFilter } = require('../utils/uploads');
 
-const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 // The landing page now lives on the combined Volunteers page, tabbed
 // between Floater Assignments and Setup/Cleanup Teams.

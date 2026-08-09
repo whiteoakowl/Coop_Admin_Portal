@@ -3,13 +3,14 @@ const router = express.Router();
 const multer = require('multer');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { spreadsheetFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { isMiscBadgeType, getMiscTemplate, listMiscBadges, replaceMiscBadges, deleteMiscBadge, miscBadgeRowData } = require('../utils/miscBadgeData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 router.use(requireFullAdmin);
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 const BADGE_TYPE_LABELS = { setupCleanup: 'Setup/Cleanup', custom: 'Custom' };
 

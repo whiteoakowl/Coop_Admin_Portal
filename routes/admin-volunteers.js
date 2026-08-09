@@ -6,6 +6,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatDateLong, todayISO, weekdayOf } = require('../utils/dates');
 const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { spreadsheetFileFilter } = require('../utils/uploads');
 const { defaultDay, requireDay } = require('../utils/days');
 const { hoursForDay, syncDayMemberRosters, classesAtRiskForDay } = require('../utils/classSchedule');
 const {
@@ -27,7 +28,7 @@ const {
   archivedDateSummaries,
 } = require('../utils/substitutes');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 const EDIT_DIALOGS = ['dates', 'job'];
 

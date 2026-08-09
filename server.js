@@ -54,6 +54,19 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+// Stops a browser from ever re-guessing a served file's type from its
+// content instead of the Content-Type header we/express.static actually
+// sent - relevant because express.static derives that header from a
+// file's extension, and every upload in this app (member photos, design
+// images, documents) already gets its extension checked against its
+// declared mimetype before being saved (see utils/uploads.js) specifically
+// so nothing ever gets served as a type it wasn't validated as.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Falling back to a fixed, source-controlled secret would let anyone who's
@@ -68,6 +81,23 @@ if (!sessionSecret) {
   console.warn('Admins will be logged out every time the server restarts until you set SESSION_SECRET in .env.\n');
 }
 
+// Most real deployments of this app are a bare `node server.js` on a
+// co-op's own LAN, reached over plain http:// by kiosk devices (see
+// lanAddresses() below) - hardcoding `secure: true` would silently break
+// every login on that setup (browsers refuse to send a Secure cookie
+// back over http://). `secure: 'auto'` covers the case that matters
+// without that risk: it marks the cookie Secure only when the request
+// Express itself sees is actually HTTPS, and leaves plain HTTP alone.
+//
+// That still won't mark it Secure if you put a TLS-terminating reverse
+// proxy (nginx, Caddy, a tunnel) in front - Express sees the proxy's
+// plain-HTTP connection, not the client's real HTTPS one - unless the
+// proxy's X-Forwarded-Proto header is trusted, which TRUST_PROXY opts
+// into explicitly (never on by default: trusting that header from an
+// app reachable directly, with no real proxy in front, lets anyone set
+// it themselves and downgrade their own connection's cookie security).
+if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
+
 app.use(
   session({
     secret: sessionSecret,
@@ -77,6 +107,7 @@ app.use(
       maxAge: 1000 * 60 * 60 * 8, // 8 hours
       httpOnly: true,
       sameSite: 'lax',
+      secure: 'auto',
     },
   })
 );

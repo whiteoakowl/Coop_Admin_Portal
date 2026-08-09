@@ -7,6 +7,7 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay } = require('../utils/days');
 const { isValidISODate, todayISO, weekdayOf, ageFromBirthday } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
+const { spreadsheetFileFilter } = require('../utils/uploads');
 const {
   DAY_LABELS,
   HOUR_POSITIONS,
@@ -42,7 +43,7 @@ function defaultDateFor(day) {
   return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
 }
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/class-schedule/${defaultDay()}`));
 

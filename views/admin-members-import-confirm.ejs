@@ -22,7 +22,7 @@
                 <td>
                   <input type="checkbox" name="memberIds" value="<%= c.memberId %>" checked />
                   <input type="hidden" name="allMemberIds" value="<%= c.memberId %>" />
-                  <input type="hidden" name="payloads" value='<%- c.payload.replace(/'/g, "&#39;") %>' />
+                  <input type="hidden" name="payloads" value="<%= c.payload %>" />
                 </td>
                 <td><%= c.memberName %></td>
                 <td>

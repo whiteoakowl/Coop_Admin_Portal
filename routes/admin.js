@@ -7,6 +7,7 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
+const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 
 // --- Auth ---
 
@@ -24,12 +25,22 @@ router.get('/login', (req, res) => {
 });
 
 router.post('/login', (req, res) => {
-  const { username, password } = req.body;
   const next = safeNext(req.body.next);
+  if (isRateLimited(req.ip)) {
+    return res.render('admin-login', {
+      title: 'Admin Login',
+      error: 'Too many login attempts. Please wait a few minutes and try again.',
+      next,
+    });
+  }
+
+  const { username, password } = req.body;
   const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get((username || '').trim());
   if (!admin || !bcrypt.compareSync(password || '', admin.password_hash)) {
+    recordFailure(req.ip);
     return res.render('admin-login', { title: 'Admin Login', error: 'Invalid username or password.', next });
   }
+  recordSuccess(req.ip);
   req.session.adminId = admin.id;
   req.session.username = admin.username;
   res.redirect(next);

@@ -28,4 +28,22 @@ function documentFileFilter(req, file, cb) {
   cb(null, Boolean(expectedType) && file.mimetype === expectedType);
 }
 
-module.exports = { imageFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT };
+// Spreadsheet-import uploads (Members, Class Schedule, Task List,
+// Floater Teams, roster/schedule imports - every "Import" button in the
+// app that reads a .csv/.txt/.xlsx via utils/spreadsheet.js's
+// readRowsFromFile). These never touch disk (memoryStorage, parsed and
+// discarded) or get served back out, so extension-only filtering is
+// enough here - the mimetype-plus-extension pairing used above for
+// images/documents exists specifically to stop a served-back file being
+// mistaken for something it isn't, which doesn't apply to a file that's
+// never written or served. Browsers are also inconsistent about what
+// mimetype they even send for .csv/.txt across OS/browser combinations,
+// so requiring a mimetype match here would reject real, legitimate files.
+const SPREADSHEET_EXTENSIONS = new Set(['.csv', '.txt', '.xlsx']);
+
+function spreadsheetFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  cb(null, SPREADSHEET_EXTENSIONS.has(ext));
+}
+
+module.exports = { imageFileFilter, documentFileFilter, DOCUMENT_MIME_BY_EXT, spreadsheetFileFilter };
