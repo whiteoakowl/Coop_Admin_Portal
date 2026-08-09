@@ -601,7 +601,10 @@ textarea:focus-visible,
 .primary-btn {
   margin-top: 1.5rem;
   background: var(--btn-bg);
-  color: #fff;
+  /* White on this orange is only 2:1 contrast (fails WCAG's 4.5:1 for
+     normal text) - same dark-on-orange convention .roster-action-btn
+     already uses elsewhere gets 10:1+, so this isn't a one-off exception. */
+  color: var(--ink);
   border: none;
   padding: 0.85rem 1.5rem;
   border-radius: var(--control-radius);
@@ -627,6 +630,25 @@ textarea:focus-visible,
 .alert-error { background: var(--red-bg); color: #7f1d1d; }
 
 /* ---------- Admin ---------- */
+
+/* Skip-to-content link (partials/admin-nav.ejs) - off-screen by default,
+   snaps into view at the top-left the moment it receives keyboard focus
+   (Tab from the top of the page), so it never affects sighted mouse
+   users but gives keyboard/screen-reader users a way past the sidebar. */
+.skip-link {
+  position: absolute;
+  top: -3rem;
+  left: 0.5rem;
+  z-index: 100;
+  background: var(--ink);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: var(--control-radius);
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 0.5rem; }
 
 /* Left-hand dashboard panel (desktop) - fixed for the full viewport height,
    holds the brand + the primary section links. */
@@ -967,99 +989,6 @@ textarea:focus-visible,
 .admin-card-sub { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
 .admin-card-muted { color: var(--muted); display: flex; align-items: center; justify-content: center; text-align: center; }
 
-/* ---------- Member portal (Parent/Student) ---------- */
-
-.portal-main { max-width: 1000px; margin: 0 auto; padding: 1.75rem 2rem 2rem; }
-.portal-header { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; }
-.portal-header h1 { margin-bottom: 0; }
-.portal-family-card { display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-start; }
-.portal-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
-
-/* Shared top bar (partials/portal-topbar) - identical on every portal
-   (Admin, Co-op Admin, Parent, Student): current-portal pill on the left,
-   Contact Admins + Profile on the right. Sits above .admin-main on the
-   admin layout (offset past the fixed sidebar) or at the top of the plain
-   member-portal page. Desktop only on the admin layout - mobile keeps its
-   existing compact topbar/switcher below instead of stacking a second bar. */
-.portal-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 0.85rem 2rem;
-}
-.portal-topbar-admin { margin-left: 220px; }
-@media (max-width: 860px) {
-  .portal-topbar-admin { display: none; }
-}
-
-.portal-topbar-left { display: flex; align-items: center; gap: 0.6rem; }
-.portal-topbar-current-label { font-weight: 600; color: var(--ink); font-size: 0.9rem; }
-.portal-topbar-right { display: flex; align-items: center; gap: 1rem; }
-
-/* Portal switcher pill - a member granted more than one portal (e.g.
-   Co-op Admin + Parent) can jump between them without logging out; anyone
-   else (incl. the master Admin, who only ever has one) gets a static pill
-   with nothing to click. */
-.portal-switcher-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  border: none;
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-.portal-switcher-pill .icon { width: 1.05em; height: 1.05em; }
-.portal-switcher-pill-interactive select {
-  appearance: none;
-  background: none;
-  border: none;
-  font: inherit;
-  font-weight: 700;
-  color: inherit;
-  padding: 0;
-  cursor: pointer;
-}
-.portal-switcher-pill-interactive select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-
-.admin-nav-right-mobile .portal-switcher-pill { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
-
-.portal-topbar-contact {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--btn-bg);
-  color: #fff;
-  border-radius: 999px;
-  padding: 0.5rem 1.1rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  transition: background-color 0.15s ease;
-}
-.portal-topbar-contact:hover { background: var(--btn-bg-hover); }
-.portal-topbar-contact .icon { width: 1.05em; height: 1.05em; }
-
-.portal-topbar-profile { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--ink); font-weight: 600; font-size: 0.9rem; }
-.portal-topbar-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 50%;
-  background: var(--brand-dark);
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-
 .roster-card { display: flex; flex-direction: column; gap: 0.5rem; }
 .roster-card-top { display: flex; justify-content: flex-start; align-items: center; gap: 0.5rem; }
 .roster-card-title-link { color: var(--ink); font-weight: 700; text-decoration: none; }
@@ -1331,8 +1260,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .category-filter select,
 .inline-form-row input,
 .inline-form-row select,
-.inline-form-flat input,
-.inline-form-flat select,
 .manage-header-row select,
 .quick-add-row select,
 .volunteer-sections-form input,
@@ -1709,6 +1636,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .input-with-icon .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
 .input-with-icon input { border: none; outline: none; padding: 0.65rem 0; flex: 1; min-width: 0; }
 .input-with-icon:has(input:disabled) { background: #f8fafc; }
+/* The inner input's own outline is suppressed above (its focus ring would
+   clip against the wrapper's border) - put a real, visible one on the
+   wrapper instead when that input is focused, same brand-outline
+   treatment other bordered inputs use (e.g. .schedule-search input). */
+.input-with-icon:has(input:focus) { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
 .member-form-lower-grid { margin-top: 0.25rem; }
 
@@ -1833,27 +1765,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .add-member-details { margin-bottom: 1.5rem; }
 
-/* Same size/padding/font as .roster-action-btn (the toolbar action
-   button used everywhere else) so a solid-orange "+X" entry point sitting
-   in the same row as purple/green toolbar buttons doesn't look like a
-   different button style, just a different color. */
-.btn-primary-summary {
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--btn-bg);
-  border: 1px solid var(--btn-bg);
-  color: #fff;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  font-family: inherit;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-.btn-primary-summary:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
-
 .inline-form { margin-top: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem; }
 .inline-form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .inline-form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); flex: 1; min-width: 180px; }
@@ -1863,26 +1774,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    one control, no gap, connected corners. Used for quick-add bars
    (Members, Absence/Late list, roster manage, Categories). */
 .quick-add-row { display: flex; align-items: stretch; gap: 0.75rem; flex-wrap: wrap; margin: 0.75rem 0 1rem; }
-
-.inline-form-flat { display: flex; align-items: stretch; gap: 0; }
-.inline-form-flat input[type="text"],
-.inline-form-flat input[type="file"],
-.inline-form-flat select {
-  border-radius: 8px 0 0 8px;
-  border-right: none;
-}
-.inline-form-flat input[type="text"] { flex: 1; min-width: 180px; }
-.inline-form-flat button {
-  border-radius: 0 8px 8px 0;
-  background: var(--btn-bg);
-  color: #fff;
-  border: 1px solid var(--btn-bg);
-  padding: 0.55rem 1rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-.inline-form-flat button:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .edit-name-form { display: flex; gap: 0.4rem; align-items: center; }
 .edit-name-form input { border: 1px solid transparent; background: none; font: inherit; padding: 0.2rem 0.3rem; border-radius: var(--control-radius); width: 160px; }
@@ -2362,7 +2253,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-selection-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 .name-tag-selection-box {
   position: absolute;
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--brand-dark);
   outline-offset: 1px;
   transform-origin: center center;
 }
@@ -3164,6 +3055,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   min-width: 0;
   color: var(--ink);
 }
+/* Same reasoning as .input-with-icon just above - the inner input's own
+   outline is suppressed, so the wrapper needs its own visible one. */
+.class-time-input-wrap:has(input:focus) { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
 .class-form-textarea-wrap { position: relative; }
 .class-form-textarea-wrap textarea { padding-bottom: 1.6rem; }
@@ -3451,26 +3345,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* ---------- Responsive: narrow phones ---------- */
 
 @media (max-width: 480px) {
-  /* Seamless input(s)+button bars can't stay side-by-side once a native
-     file picker or several fields are involved - stack them full-width
-     instead of overflowing the screen. */
-  .inline-form-flat {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .inline-form-flat input,
-  .inline-form-flat select,
-  .inline-form-flat button {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 8px !important;
-    border: 1px solid var(--border) !important;
-    margin-left: 0 !important;
-  }
-  .inline-form-flat button {
-    border-color: var(--btn-bg) !important;
-  }
-
   .volunteer-sections-grid { grid-template-columns: 1fr; }
 
   .admin-main { padding: 1rem 1rem 4.75rem; }
@@ -3494,7 +3368,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: var(--ink);
   min-width: 200px;
 }
-.schedule-search input[type="search"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.schedule-search input[type="search"]:focus { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
 .schedule-summary-cell {
   max-width: 220px;
@@ -3552,7 +3426,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-family: inherit;
   color: var(--ink);
 }
-.schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+.schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
 .schedule-day-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 @media (max-width: 900px) {
