@@ -130,8 +130,13 @@ function rosterDates(rosterId) {
     .map((r) => r.session_date);
 }
 
-function buildRosterGridData(roster) {
-  const dates = rosterDates(roster.id);
+// datesOverride lets a class roster borrow its dates from the day's
+// Student roster instead of managing its own independent list (see the
+// /rosters GET handler below) - attendance itself still lives under the
+// class's own roster_id either way, only which dates count as real
+// columns changes.
+function buildRosterGridData(roster, datesOverride) {
+  const dates = datesOverride || rosterDates(roster.id);
   const placeholders = dates.map(() => '?').join(',');
   const members = rosterMembers(roster.id);
 
@@ -205,13 +210,15 @@ router.get('/rosters', requireAdmin, (req, res) => {
   const requestedTab = req.query.tab || '';
 
   if (requestedTab === 'classes') {
+    const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
     return res.render('admin-rosters', {
       title: 'Attendance',
       tabs: TABS,
       tab: 'classes',
       activeTab: 'classes',
       view: 'classList',
-      classes: allClassesList(),
+      classes: allClassesList(dayFilter || null),
+      dayFilter,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -236,7 +243,12 @@ router.get('/rosters', requireAdmin, (req, res) => {
 
   const rosterId = rosterIdForTab(tab);
   const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
-  const dates = rosterDates(rosterId);
+  // A class roster has no dates of its own to manage - it always mirrors
+  // whichever day's Student roster it belongs to (a class only ever
+  // meets when that day's students do), so there's no separate Edit
+  // Dates step for it (see the view - Edit Dates/+ Add Member are hidden
+  // whenever classId is set).
+  const dates = classId ? rosterDates(ensureDayRoster(day, 'student')) : rosterDates(rosterId);
   const alertDate = todayIfSessionDay(day);
 
   res.render('admin-rosters', {
@@ -249,7 +261,7 @@ router.get('/rosters', requireAdmin, (req, res) => {
     tabLabel,
     dayLabel: DAY_LABELS[day],
     roster,
-    ...buildRosterGridData(roster),
+    ...buildRosterGridData(roster, classId ? dates : undefined),
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     alertDate,
     alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,

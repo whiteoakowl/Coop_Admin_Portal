@@ -1915,7 +1915,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 .class-roster-row-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
-.class-roster-row-meta { display: flex; gap: 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+.class-roster-row-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
 
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }

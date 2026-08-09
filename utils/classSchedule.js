@@ -474,17 +474,31 @@ function setRosterMembership(rosterId, memberIdSet) {
 // Every class across both days, for the Attendance page's Class Rosters
 // tab - each row links to that class's own auto-maintained roster (see
 // ensureClassRoster) via its roster_id.
-function allClassesList() {
+// The Attendance page's Class Rosters log list - every class (optionally
+// filtered to one day), alphabetical by title, each with the grade(s)/
+// day/time/teacher/assistants needed for that one-line summary.
+function allClassesList(day) {
   const rows = db
     .prepare(
       `SELECT c.*, h.label AS hourLabel,
               (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS studentCount
        FROM classes c
        JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
-       ORDER BY c.day, c.hour_position, c.class_name COLLATE NOCASE`
+       WHERE (@day IS NULL OR c.day = @day)
+       ORDER BY c.class_name COLLATE NOCASE`
     )
-    .all();
-  return rows.map((r) => ({ ...r, dayLabel: DAY_LABELS[r.day] }));
+    .all({ day: day || null });
+  return rows.map((r) => {
+    const staff = staffForClass(r.id);
+    return {
+      ...r,
+      dayLabel: DAY_LABELS[r.day],
+      gradeLabel: formatGradeRange(r.age_group),
+      timeLabel: timeRangeForClass(r),
+      teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+      assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+    };
+  });
 }
 
 // Adds someone to a roster by hand (Attendance page's Add Member popup) -

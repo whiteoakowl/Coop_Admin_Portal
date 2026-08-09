@@ -27,6 +27,16 @@
 
     <% if (view === 'classList') { %>
       <div class="view-tab-panel">
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="class-roster-day-select">Day</label>
+            <select id="class-roster-day-select" onchange="window.location = '/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '')">
+              <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
+              <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
+              <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
+        </div>
         <% if (classes.length === 0) { %>
           <p class="roster-empty">No classes yet &mdash; add one on the <a href="/admin/schedule">Schedules</a> page.</p>
         <% } else { %>
@@ -35,10 +45,11 @@
               <a class="class-roster-row-btn" href="/admin/rosters?tab=class-<%= c.id %>" style="border-left: 5px solid <%= c.color %>;">
                 <span class="class-roster-row-name"><%= c.class_name %></span>
                 <span class="class-roster-row-meta">
+                  <% if (c.gradeLabel) { %><span><%= c.gradeLabel %></span><% } %>
                   <span><%= c.dayLabel %></span>
-                  <span><%= c.hourLabel %></span>
-                  <% if (c.room) { %><span>Room <%= c.room %></span><% } %>
-                  <span><%= c.studentCount %> student<%= c.studentCount === 1 ? '' : 's' %></span>
+                  <span><%= c.timeLabel %></span>
+                  <span>Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></span>
+                  <% if (c.assistantNames.length > 0) { %><span>Assistant: <%= c.assistantNames.join(', ') %></span><% } %>
                 </span>
               </a>
             <% }); %>
@@ -53,8 +64,10 @@
         <span id="roster-save-status" class="volunteer-save-status"></span>
       </div>
       <div class="roster-btn-row">
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+        <% if (!classId) { %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+        <% } %>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
       </div>
