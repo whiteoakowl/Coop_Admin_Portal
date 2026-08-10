@@ -2583,6 +2583,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .day-toggle-option:hover:not(.active) { background: rgba(255,255,255,0.6); }
 .day-toggle-option.active { background: var(--brand-dark); color: #fff; }
 
+/* A standalone day-toggle sitting above a section's own toolbar (Class
+   Schedules) rather than sharing a .roster-toolbar row with something
+   else (Attendance's Parent/Student toggle, Floater Assignments'
+   Monday/Wednesday toggle both live inside .roster-toolbar-left instead
+   and don't need this). */
+.schedule-day-toggle { margin-bottom: 1rem; }
+
 /* ---------- Floater Assignments Chart: live, editable version of the
    read-only cards above - 2x2 (matching the Archive print layout), each
    row's Floater column an assign dropdown + Accept/Unassign button

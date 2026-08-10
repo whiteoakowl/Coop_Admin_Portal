@@ -19,13 +19,20 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <%- include('partials/floater-tabs', { day, activeFloaterTab: day }) %>
+    <%- include('partials/floater-tabs', { day, activeFloaterTab: 'assignments' }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div class="roster-btn-row" style="margin-left: auto;">
+        <div class="roster-toolbar-left">
+          <div class="day-toggle">
+            <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/manage">Monday</a>
+            <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/manage">Wednesday</a>
+          </div>
+        </div>
+        <div class="roster-btn-row">
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="roster-action-btn" href="/admin/volunteers/<%= day %>/archive">Archive</a>
         </div>
       </div>
 

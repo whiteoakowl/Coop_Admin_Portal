@@ -16,16 +16,19 @@
     <h1>Schedules</h1>
 
     <div class="view-tabs no-print">
-      <a class="view-tab<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday Schedule</a>
-      <a class="view-tab<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday Schedule</a>
+      <a class="view-tab<%= topTab === 'schedules' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Class Schedules</a>
       <% if (isFullAdmin) { %>
-        <a class="view-tab<%= tab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
-        <a class="view-tab<%= tab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
+        <a class="view-tab<%= topTab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
+        <a class="view-tab<%= topTab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
       <% } %>
     </div>
 
     <div class="view-tab-panel">
       <% if (tab === 'monday' || tab === 'wednesday') { %>
+        <div class="day-toggle no-print schedule-day-toggle">
+          <a class="day-toggle-option<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday</a>
+          <a class="day-toggle-option<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday</a>
+        </div>
         <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, availableStaff, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else { %>
         <%
