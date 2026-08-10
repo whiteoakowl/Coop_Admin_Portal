@@ -35,7 +35,9 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
                 <td><%= slot.room || '—' %></td>
                 <td>
                   <% if (slot.noneAvailable) { %>
-                    <span class="floater-noavail-text">No floaters available</span>
+                    <select disabled class="floater-select-noavail" aria-label="No available floaters for <%= slot.label %>">
+                      <option>No available floaters</option>
+                    </select>
                   <% } else { %>
                     <form method="POST" class="floater-assign-form" action="/admin/volunteers/<%= day %>/substitutes/<%= isApproved ? 'unassign' : 'assign' %>">
                       <input type="hidden" name="date" value="<%= selectedDate %>" />

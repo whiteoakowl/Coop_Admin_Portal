@@ -2635,9 +2635,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-slot-reason { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
 
 /* A slot nobody at all is available for (not even an override pick) -
-   the row itself flags it, no dropdown to offer. */
+   the row itself flags it, and its select is swapped for a disabled,
+   red-highlighted one whose only option says so (still a <select>, just
+   like every other row's, so the column keeps reading as "who's here"
+   consistently, rather than becoming a differently-shaped plain-text
+   cell for this one case). */
 .floater-row-noavail { background: var(--red-bg); }
-.floater-noavail-text { color: var(--red); font-weight: 600; font-size: 0.8rem; }
+.floater-select-noavail {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--red-bg);
+  color: var(--red);
+}
 
 .floater-assign-form { display: flex; align-items: center; gap: 0.4rem; }
 .floater-assign-form select {
