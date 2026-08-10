@@ -9,6 +9,7 @@ const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { classesAtRiskForDay } = require('../utils/classSchedule');
 const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes } = require('../utils/members');
+const { paginate, parsePage } = require('../utils/pagination');
 
 const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
 
@@ -102,7 +103,7 @@ router.get('/logs', requireAdmin, (req, res) => {
   const dateFilter = req.query.date || '';
 
   if (tab === 'checkinout') {
-    const rows = checkinoutLogRows(dateFilter).map((r) => ({
+    const allRows = checkinoutLogRows(dateFilter).map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),
@@ -110,10 +111,14 @@ router.get('/logs', requireAdmin, (req, res) => {
       checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
       number: r.number ?? '—',
     }));
+    const pagination = paginate(allRows, parsePage(req.query.page));
     return res.render('admin-logs', {
       title: 'Check In/Out Log',
       tab,
-      rows,
+      rows: pagination.items,
+      allRows,
+      pagination,
+      baseHref: `/admin/logs?tab=checkinout${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
       dates: checkinoutLogDates(),
       dateFilter,
       error: req.query.error || null,
@@ -123,7 +128,7 @@ router.get('/logs', requireAdmin, (req, res) => {
 
   if (tab === 'nametag') {
     const showArchived = req.query.archived === '1';
-    const submissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+    const allSubmissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
       id: r.id,
       timestamp: formatTimestamp(r.createdAt),
       memberName: r.memberName,
@@ -135,10 +140,14 @@ router.get('/logs', requireAdmin, (req, res) => {
       .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
       .all(showArchived ? 1 : 0)
       .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
+    const pagination = paginate(allSubmissions, parsePage(req.query.page));
     return res.render('admin-logs', {
       title: 'Name Tag Requests',
       tab,
-      submissions,
+      submissions: pagination.items,
+      allSubmissions,
+      pagination,
+      baseHref: `/admin/logs?tab=nametag${showArchived ? '&archived=1' : ''}${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
       dates,
       dateFilter,
       showArchived,
@@ -187,10 +196,15 @@ router.get('/logs', requireAdmin, (req, res) => {
     });
   }
 
+  const allSubmissions = allAbsenceSubmissions(dateFilter);
+  const pagination = paginate(allSubmissions, parsePage(req.query.page));
   res.render('admin-logs', {
     title: 'Absence/Late Log',
     tab,
-    submissions: allAbsenceSubmissions(dateFilter),
+    submissions: pagination.items,
+    allSubmissions,
+    pagination,
+    baseHref: `/admin/logs?tab=absence${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
     dates: absenceSubmissionDates(),
     dateFilter,
     error: req.query.error || null,
