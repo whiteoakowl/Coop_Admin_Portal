@@ -1,13 +1,17 @@
 name: Smoke test
 
-# Still mostly a floor, not real coverage: lint errors (unused vars,
-# undefined globals - see eslint.config.js), a JS syntax error anywhere
-# in the app, the server actually failing to boot/serve a request, plus
-# now a small, real test/ suite (node's built-in test runner, no added
-# dependency) covering the security-sensitive logic added alongside it
-# (test/) - not the rest of the app's routes/business logic, which still
-# has zero test coverage. Add a proper dedicated test job here if/when
-# that grows rather than folding it further into this one.
+# Still mostly a floor, not full coverage: lint errors (unused vars,
+# undefined globals - see eslint.config.js; plus a couple of Stylelint
+# rules mechanically enforcing conventions public/css/styles.css's own
+# header comment documents - see .stylelintrc.js), a JS syntax error
+# anywhere in the app, the server actually failing to boot/serve a
+# request, plus a real test/ suite (node's built-in test runner, no
+# added dependency) covering both security-sensitive logic and
+# route-level HTTP behavior for the app's highest-consequence workflows
+# (login, kiosk check-in, roster archive, member deletion) - most of the
+# app's routes/business logic still has no test coverage beyond that.
+# Add a proper dedicated test job here if/when that grows rather than
+# folding it further into this one.
 on:
   pull_request:
   push:
@@ -29,6 +33,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Lint CSS
+        run: npm run lint:css
 
       - name: Run tests
         run: npm test

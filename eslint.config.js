@@ -23,7 +23,9 @@ module.exports = [
   {
     // Server-side: server.js, db/, middleware/, routes/, utils/, and this
     // config file itself - plain CommonJS Node, no bundler/transpiler.
-    files: ['server.js', 'eslint.config.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js'],
+    // .stylelintrc.js belongs here too, for the same reason: it's a
+    // CommonJS config file Node loads directly, not browser code.
+    files: ['server.js', 'eslint.config.js', '.stylelintrc.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',

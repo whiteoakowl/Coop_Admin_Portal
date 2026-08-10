@@ -15,7 +15,30 @@
        .file-action-btn (Import/Export/Print, green), .primary-btn
        (form submit), .btn-secondary (cancel/secondary) instead of
        inventing a new button class.
+     - Breakpoints: new responsive rules should land on one of the 4
+       values below, not a new one-off. CSS custom properties can't be
+       used inside an @media condition (the spec doesn't allow it), so
+       these are documented here rather than as :root variables -
+       .stylelintrc.json's media-feature-name-value-allowed-list rule
+       enforces this list mechanically (new values outside it fail
+       `npm run lint:css`).
+         - 640px  - mobile (single-column layouts, stacked nav)
+         - 860px  - tablet (2-column grids collapse to 1, sidebars stack)
+         - 1100px - narrow desktop (dense grids drop a column)
+         - 1400px - wide desktop (widest grids drop their last column)
+       The values below that predate this scale (480/500/720/760/800/900)
+       are grandfathered into the lint rule's allow-list rather than
+       migrated all at once here - each is used in only one or two
+       places, and re-pointing one to its nearest neighbor changes
+       exactly where that component's layout shifts on a real device,
+       which deserves a visual check at the time, not a bulk edit made
+       for its own sake. Move a value onto the scale above (or drop it
+       if it turns out to be redundant with a neighbor) whenever you're
+       already touching that component for another reason.
    ============================================================ */
+/* stylelint-disable declaration-property-value-disallowed-list -- this is
+   the token block itself; the rule exists to stop these exact hex values
+   from being re-typed as literals anywhere else in the file. */
 :root {
   /* Sanford Homeschoolers brand palette */
   --bg: #4682B4;
@@ -88,6 +111,7 @@
   --logo-xs: 72px;   /* public form header (absence, name tag, membership) */
   --logo-2xs: 28px;  /* mobile top bar */
 }
+/* stylelint-enable declaration-property-value-disallowed-list */
 
 * { box-sizing: border-box; }
 
@@ -3330,8 +3354,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   vertical-align: top;
   text-align: left;
 }
-.class-schedule-print-grid th { background: #eaf4fd; font-size: 0.8rem; }
-.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: nowrap; background: #eaf4fd; font-size: 0.8rem; }
+.class-schedule-print-grid th { background: var(--brand-soft); font-size: 0.8rem; }
+.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: nowrap; background: var(--brand-soft); font-size: 0.8rem; }
 
 .class-schedule-print-card {
   border-left: 5px solid var(--brand);
