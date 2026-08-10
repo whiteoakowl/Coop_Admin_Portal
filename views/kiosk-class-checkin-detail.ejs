@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow">
+    <a href="/kiosk/class-checkin/classes" class="kiosk-home">&larr; Back to Classes</a>
+    <h1><%= cls.class_name %></h1>
+    <p class="subtitle">
+      <%= cls.dayLabel %> &middot; <%= cls.timeLabel %>
+      <% if (cls.room) { %> &middot; Room <%= cls.room %><% } %>
+      <% if (cls.gradeLabel) { %> &middot; <%= cls.gradeLabel %><% } %>
+    </p>
+    <p class="hint">Teacher: <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %>
+      <% if (cls.assistantNames.length > 0) { %><br />Assistant: <%= cls.assistantNames.join(', ') %><% } %>
+    </p>
+
+    <div class="landing-grid" style="grid-template-columns: repeat(2, 220px); margin-top: 1.5rem;">
+      <a class="landing-card landing-card-orange" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+        <span class="landing-label">Check In</span>
+      </a>
+      <a class="landing-card landing-card-green" href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+        <span class="landing-label">View Class Attendance</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

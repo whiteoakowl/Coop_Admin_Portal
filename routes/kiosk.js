@@ -57,7 +57,15 @@ router.post('/checkin/scan', (req, res) => {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
-  const rosters = getMemberRostersForDate(member.id, today);
+  // Excludes class rosters (rosters.category === 'Class Roster', see
+  // ensureClassRoster in utils/classSchedule.js) - this main portal only
+  // ever marks someone present on the day's own Parent/Student roster.
+  // A specific class's attendance is recorded only by scanning in
+  // through that class's own Check-In screen (routes/kiosk-class-
+  // checkin.js) - two independent presence signals by design, not two
+  // paths to the same one, so "checked in at the front door" and
+  // "actually sat in this specific classroom" stay distinguishable.
+  const rosters = getMemberRostersForDate(member.id, today).filter((r) => r.category !== 'Class Roster');
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }

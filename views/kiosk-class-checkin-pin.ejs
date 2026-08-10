@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow login-wrap">
+    <a href="/kiosk" class="kiosk-home">&larr; Home</a>
+    <img class="login-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <h1>Class Check-In</h1>
+    <p class="subtitle">Enter the shared staff PIN to check students into a specific class.</p>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/kiosk/class-checkin/unlock" class="stack-form">
+      <label for="pin">PIN</label>
+      <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required />
+
+      <button type="submit" class="primary-btn">Unlock</button>
+    </form>
+  </main>
+</body>
+</html>
