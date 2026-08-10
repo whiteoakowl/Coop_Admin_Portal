@@ -164,9 +164,14 @@
       </table>
     </div>
 
+    <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
     <%# Printing shows this plain grid instead of the interactive table
         above (screen icons/dropdowns don't belong on paper) - see
-        .members-print-table in styles.css. %>
+        .members-print-table in styles.css. Uses allMembersForPrint (every
+        filtered member), not the paginated `members` the on-screen table
+        above uses, so a printed roster always shows the whole list
+        regardless of which page happened to be open on screen. %>
     <table class="roster-table members-print-table">
       <thead>
         <tr>
@@ -179,7 +184,7 @@
         </tr>
       </thead>
       <tbody>
-        <% members.forEach(function(m) { %>
+        <% allMembersForPrint.forEach(function(m) { %>
           <tr>
             <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
             <td><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></td>

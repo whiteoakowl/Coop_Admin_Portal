@@ -1253,6 +1253,29 @@ textarea:focus-visible,
 .roster-empty-subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.5rem; }
 .roster-empty-btn { flex: none; min-width: 0; }
 
+/* Pagination controls (views/partials/pagination-controls.ejs) - shared
+   across every paginated admin list (Members, Logs, Library). Sits right
+   under the list's own scroll container, spaced and sized like the
+   .roster-toolbar it usually follows. */
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 0.85rem; }
+.pagination-summary { color: var(--muted); font-size: 0.85rem; }
+.pagination-nav { display: flex; align-items: center; gap: 0.75rem; }
+.pagination-page-label { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.pagination-btn {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--btn-purple);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-weight: 600;
+  color: var(--purple);
+  background: var(--surface);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.pagination-btn:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
+.pagination-btn-disabled { color: var(--muted); border-color: var(--border); cursor: default; pointer-events: none; opacity: 0.6; }
+
 .link-btn-danger { color: var(--red); }
 
 /* Every native date picker in the app, styled identically to the
