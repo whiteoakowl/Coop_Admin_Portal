@@ -12,6 +12,12 @@ name: Smoke test
 # app's routes/business logic still has no test coverage beyond that.
 # Add a proper dedicated test job here if/when that grows rather than
 # folding it further into this one.
+#
+# The a11y step is separate from "Run tests" on purpose - it needs a real
+# Chromium (Playwright + axe-core), which the plain node:test suite
+# doesn't, and a11y/accessibility-check.js is deliberately kept out of
+# node's default test-file discovery (see that file's own header comment)
+# so it only ever runs here, explicitly, not on every local `npm test`.
 on:
   pull_request:
   push:
@@ -39,6 +45,12 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Install Chromium for the accessibility check
+        run: npx playwright install --with-deps chromium
+
+      - name: Accessibility check (axe-core)
+        run: npm run test:a11y
 
       - name: Syntax-check every JS file
         run: |

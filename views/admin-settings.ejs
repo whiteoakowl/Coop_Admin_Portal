@@ -27,9 +27,9 @@
       <% if (activeTab === 'account') { %>
         <div class="settings-account-grid">
           <form method="POST" action="/admin/settings/username" class="stack-form stack-form-narrow">
-            <h3>Username</h3>
-            <label>Current Username</label>
-            <input type="text" value="<%= username %>" disabled />
+            <h2>Username</h2>
+            <label for="currentUsernameDisplay">Current Username</label>
+            <input id="currentUsernameDisplay" type="text" value="<%= username %>" disabled />
 
             <label for="newUsername">New Username</label>
             <input id="newUsername" name="newUsername" type="text" required />
@@ -38,7 +38,7 @@
           </form>
 
           <form method="POST" action="/admin/settings/password" class="stack-form stack-form-narrow">
-            <h3>Password</h3>
+            <h2>Password</h2>
             <label for="currentPassword">Current Password</label>
             <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required />
 

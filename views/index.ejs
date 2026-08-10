@@ -5,20 +5,22 @@
 </head>
 <body class="landing">
   <%- include('partials/icon-sprite') %>
-  <div class="landing-corner-actions-left">
-    <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
-  </div>
-  <div class="landing-corner-actions">
-    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
-      <svg class="icon"><use href="#icon-maximize"/></svg>
-      <span id="fullscreen-toggle-label">Full Screen View</span>
-    </button>
-    <a class="admin-corner-link" href="/admin">Admin</a>
-  </div>
+  <header>
+    <div class="landing-corner-actions-left">
+      <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+    </div>
+    <div class="landing-corner-actions">
+      <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
+        <svg class="icon"><use href="#icon-maximize"/></svg>
+        <span id="fullscreen-toggle-label">Full Screen View</span>
+      </button>
+      <a class="admin-corner-link" href="/admin">Admin</a>
+    </div>
+  </header>
   <main id="main-content" tabindex="-1" class="landing-wrap">
     <div class="landing-banner">
       <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
-      <div class="landing-welcome">Welcome to Co-op!</div>
+      <h1 class="landing-welcome">Welcome to Co-op!</h1>
     </div>
 
     <div class="landing-grid">

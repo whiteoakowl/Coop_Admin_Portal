@@ -200,6 +200,7 @@ textarea:focus-visible,
 .landing-logo-sm { height: var(--logo-md); width: var(--logo-md); flex-shrink: 0; border-radius: 50%; }
 
 .landing-welcome {
+  margin: 0;
   color: var(--ink);
   font-size: 2.5rem;
   font-weight: 800;
@@ -616,6 +617,27 @@ textarea:focus-visible,
 
 .form-wrap .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
 
+/* Pages under .public-page (login, the Class Check-In PIN/day/class-list
+   pages, etc.) that don't wrap their content in .form-outer-panel or
+   .kiosk-panel put labels/subtitles directly on the page's blue --bg
+   backdrop - where the normal --ink/--muted text colors (tuned for a
+   light background) fall well under the 4.5:1 contrast minimum (axe-core
+   caught this: --ink read as low as 3.76:1, --muted as low as 1.15:1).
+   Scoped here rather than changing --ink/--muted themselves, which are
+   used everywhere else against light/white backgrounds where the
+   originals are fine. The extra `body` in the selector isn't for
+   specificity theater - it deliberately outranks other same-specificity
+   `.some-class label` rules (e.g. .category-filter label) that would
+   otherwise win on source order alone and silently re-introduce the
+   low-contrast color on a public page that happens to reuse that
+   component. */
+body.public-page label,
+body.public-page .subtitle,
+body.public-page .legend,
+body.public-page .roster-empty {
+  color: #000;
+}
+
 /* Public forms otherwise float directly on the page's blue background -
    this wraps the whole form in one more white panel behind its individual
    .form-section cards, matching the boxes-within-boxes contrast used
@@ -940,7 +962,13 @@ textarea:focus-visible,
   .admin-mobile-tabs a.active .icon { opacity: 1; }
 }
 
-.admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; }
+/* Opaque so the page body's blue background (--bg) never shows through
+   behind admin content - without this, text and empty-state copy that
+   isn't already sitting inside its own white card (a section heading, a
+   "No active alerts today." message, a filter label) renders directly on
+   --bg and fails color-contrast (axe-core caught this: --ink and --muted
+   text both fall well under the 4.5:1 minimum against --bg). */
+.admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; min-height: 100vh; background: var(--surface); }
 
 /* Every admin page's h1 is its page title - give it clean, consistent air
    below it (a rule line) so it always stands apart from the h2 section
@@ -2134,7 +2162,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: var(--card-padding-compact);
   box-shadow: var(--shadow-sm);
 }
-.settings-account-grid h3 { margin-top: 0; }
+.settings-account-grid h2 { margin-top: 0; }
 
 /* Settings > Install App: numbered per-platform steps read like a normal
    instruction list, not the app's usual data tables/cards. */

@@ -38,7 +38,7 @@
      only, same as the Members/Library nav links (see
      routes/admin-search.js for why); Full Screen has no such
      restriction. -->
-<div class="admin-page-corner-actions no-print">
+<header class="admin-page-corner-actions no-print">
   <% if (isFullAdmin) { %>
     <form method="GET" action="/admin/search" class="admin-corner-search">
       <label for="admin-corner-search-input" class="sr-only">Search members and library items</label>
@@ -50,7 +50,7 @@
     <svg class="icon"><use href="#icon-maximize"/></svg>
     <span id="fullscreen-toggle-label">Full Screen View</span>
   </button>
-</div>
+</header>
 
 <div class="admin-mobile-topbar">
   <div class="admin-mobile-topbar-row">

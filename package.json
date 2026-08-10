@@ -8,7 +8,8 @@
     "dev": "node --no-warnings --watch server.js",
     "lint": "eslint .",
     "lint:css": "stylelint \"public/css/**/*.css\"",
-    "test": "node --test"
+    "test": "node --test",
+    "test:a11y": "node --test a11y/accessibility-check.js"
   },
   "repository": {
     "type": "git",
@@ -27,9 +28,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "globals": "^17.9.0",
+    "playwright": "^1.62.1",
     "stylelint": "^17.14.1",
     "supertest": "^7.2.2"
   }
