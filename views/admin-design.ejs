@@ -150,6 +150,7 @@
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
             <option value="cardsBoth">Name Tags + Schedule Cards</option>
+            <option value="cardsDuplex">Name Tags + Schedule Cards (Front &amp; Back)</option>
             <option value="barcodes">Barcodes Only</option>
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
@@ -227,6 +228,33 @@
             </div>
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'cards-both-bulk-list' }) %>
+            </div>
+            <div class="name-tag-bulk-submit-row">
+              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="print-cardsDuplex-section" hidden>
+          <form method="POST" action="/admin/design/print-duplex" target="_blank" id="cards-duplex-print-form">
+            <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the short edge) and cut apart for two-sided cards.</p>
+            <div class="name-tag-bulk-filter">
+              <select class="name-tag-bulk-filter-select" id="cards-duplex-bulk-filter-select">
+                <option value="all">All</option>
+                <option value="student">Students Only</option>
+                <option value="parent">Parents Only</option>
+              </select>
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="cards-duplex-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="cards-duplex-select-none-checkbox" />
+                Select None
+              </label>
+            </div>
+            <div class="roster-scroll print-picker-scroll">
+              <%- include('partials/print-picker-table', { members: members, listId: 'cards-duplex-bulk-list' }) %>
             </div>
             <div class="name-tag-bulk-submit-row">
               <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
