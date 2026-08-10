@@ -75,6 +75,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
+      topTab: 'schedules',
       day: tab,
       dayLabel: CLASS_DAY_LABELS[tab],
       hours: hoursForDay(tab),
@@ -122,6 +123,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
   res.render('admin-schedule', {
     title: 'Schedules',
     tab,
+    topTab: tab,
     rows: pageRows,
     totalCount: summarized.length,
     page,

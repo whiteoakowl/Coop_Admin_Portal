@@ -1,9 +1,16 @@
 <%
-// locals: day, activeFloaterTab ('monday' | 'wednesday' | 'teams' | 'archive')
+// locals: day, activeFloaterTab ('assignments' | 'teams' | 'risk' | 'archive')
+// Monday/Wednesday used to be two separate top-level tabs here - now
+// they're one "Floater Assignments" tab, with the Monday/Wednesday
+// choice made via the day-toggle on the manage page itself (mirrors the
+// Attendance page's Monday/Wednesday consolidation). The link below
+// carries whichever day is currently in context (passed in as `day` by
+// every one of this partial's 4 callers) so switching from, say,
+// Wednesday Teams back to Floater Assignments lands on Wednesday, not a
+// hardcoded default.
 %>
 <div class="view-tabs no-print">
-  <a class="view-tab<%= activeFloaterTab === 'monday' ? ' active' : '' %>" href="/admin/volunteers/monday/manage">Monday Floaters</a>
-  <a class="view-tab<%= activeFloaterTab === 'wednesday' ? ' active' : '' %>" href="/admin/volunteers/wednesday/manage">Wednesday Floaters</a>
+  <a class="view-tab<%= activeFloaterTab === 'assignments' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/manage">Floater Assignments</a>
   <a class="view-tab<%= activeFloaterTab === 'teams' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/teams">Floater Teams</a>
   <a class="view-tab<%= activeFloaterTab === 'risk' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/risk">Class Cancellation Risk</a>
   <a class="view-tab<%= activeFloaterTab === 'archive' ? ' active' : '' %>" href="/admin/volunteers/<%= day %>/archive">Archive</a>
