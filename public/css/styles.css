@@ -2985,28 +2985,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: center;
   gap: 0.3rem;
 }
-/* Team cards are view-only - this small square button (in the corner the
-   trash icon used to sit) is the only way in, opening the Edit popup
-   (title/leader/description/members/delete all live there now). */
-.team-edit-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 1.9rem;
-  height: 1.9rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fff;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 0;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.team-edit-btn:hover { border-color: var(--brand); color: var(--brand-dark); }
-.team-edit-btn .icon { width: 1rem; height: 1rem; }
+/* Team cards start frozen (view-only) - clicking the pencil unfreezes the
+   card in place (see .edit-section/data-edit-toggle-* in public/js/
+   edit-toggle.js) instead of opening a popup: Save/Cancel swap in next to
+   it, and the delete-team trash icon (data-edit-toggle-reveal) appears
+   alongside them. */
+.team-card-corner-actions { position: absolute; top: 0.5rem; right: 0.5rem; display: flex; gap: 0.3rem; }
+.team-card-corner-actions .icon-btn { width: 1.9rem; height: 1.9rem; background: #fff; }
+.team-card-corner-actions .icon-btn .icon { width: 1rem; height: 1rem; }
 .team-info-icon {
   width: 3rem;
   height: 3rem;
@@ -3061,6 +3047,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-info-pill .icon { width: 0.75rem; height: 0.75rem; flex-shrink: 0; }
 .team-info-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* admin-setup.ejs's inline-editable card - .team-info-title/-pill above
+   are plain <h3>/<span> text used by the read-only setup-public.ejs and
+   admin-volunteer-teams.ejs cards; this one is a <form> of disabled
+   inputs instead (see the .edit-section markup in admin-setup.ejs), so it
+   needs its own border-less/background-less treatment to still read as
+   plain title/description text while frozen. */
+.team-info-edit-form { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; max-width: 100%; }
+.team-info-title-input,
+.team-info-desc-input {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  width: 100%;
+  padding: 0;
+}
+.team-info-title-input { font-size: 0.95rem; font-weight: 800; }
+.team-info-desc-input { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+/* Once unfrozen, give the three fields just enough of a visual edge that
+   they read as editable, without losing the card's compact centered
+   look - same "legible, not washed-out" idea as .class-view-form's
+   disabled-field treatment, just inverted (undisabled gets the
+   highlight here, since disabled is this card's default resting state). */
+.team-info-title-input:not(:disabled),
+.team-info-desc-input:not(:disabled) {
+  border-bottom: 1px dashed var(--border);
+  cursor: text;
+}
+.team-info-leader:has(.team-info-leader-select:not(:disabled)) { color: var(--ink); }
 
 .team-members-card {
   min-width: 0;
