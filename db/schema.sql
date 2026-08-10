@@ -122,7 +122,11 @@ CREATE TABLE IF NOT EXISTS checkouts (
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   roster_id INTEGER NOT NULL REFERENCES rosters(id) ON DELETE CASCADE,
   session_date TEXT NOT NULL,
-  number INTEGER NOT NULL CHECK(number BETWEEN 1 AND 80),
+  -- NULL for a class-level checkout (routes/kiosk-class-checkin.js) - that
+  -- flow has no pickup-number coordination step, unlike the main portal's
+  -- numbered checkout kiosk (routes/checkout.js), which always supplies a
+  -- real 1-80 value. A real number is still required whenever one is given.
+  number INTEGER CHECK(number IS NULL OR number BETWEEN 1 AND 80),
   check_out_time INTEGER NOT NULL, -- epoch ms
   recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(member_id, roster_id, session_date)

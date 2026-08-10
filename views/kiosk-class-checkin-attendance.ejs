@@ -6,7 +6,17 @@
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap">
-    <a href="/kiosk/class-checkin/classes/<%= cls.id %>" class="kiosk-home">&larr; Back to <%= cls.class_name %></a>
+    <div class="class-checkin-attendance-header">
+      <a href="/kiosk/class-checkin/classes/<%= cls.day %>" class="kiosk-home kiosk-home-inline">&larr; Back to <%= cls.dayLabel %> Classes</a>
+      <div class="class-checkin-actions">
+        <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkin">
+          <svg class="icon"><use href="#icon-check"/></svg> Check In
+        </a>
+        <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkout">
+          <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
+        </a>
+      </div>
+    </div>
     <h1><%= cls.class_name %> Attendance</h1>
     <p class="subtitle"><%= dateLabel %></p>
 
@@ -25,6 +35,7 @@
               <th class="roster-name-col">Name</th>
               <th>Status</th>
               <th>Checked In</th>
+              <th>Checked Out</th>
             </tr>
           </thead>
           <tbody>
@@ -34,6 +45,7 @@
                 <td class="roster-name-col"><%= row.member.name %></td>
                 <td><span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '—' %></span></td>
                 <td><%= cell.checkInTime || '—' %></td>
+                <td><%= cell.checkOutTime || '—' %></td>
               </tr>
             <% }); %>
           </tbody>
@@ -42,15 +54,18 @@
               <td class="roster-summary-label">Present</td>
               <td><span class="summary-badge summary-present"><%= summary.present %></span></td>
               <td></td>
+              <td></td>
             </tr>
             <tr class="roster-summary-row">
               <td class="roster-summary-label">Late</td>
               <td><span class="summary-badge summary-late"><%= summary.late %></span></td>
               <td></td>
+              <td></td>
             </tr>
             <tr class="roster-summary-row">
               <td class="roster-summary-label">Absent</td>
               <td><span class="summary-badge summary-absent"><%= summary.absent %></span></td>
+              <td></td>
               <td></td>
             </tr>
           </tfoot>

@@ -3,31 +3,34 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="kiosk kiosk-checkin" data-class-id="<%= cls.id %>">
+<body class="kiosk kiosk-checkin" data-class-id="<%= cls.id %>" data-mode="<%= mode %>">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="kiosk-wrap">
-    <a href="/kiosk/class-checkin/classes/<%= cls.id %>" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Back to <%= cls.class_name %></a>
+    <a href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Back to <%= cls.class_name %></a>
     <div class="kiosk-header">
       <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
-      <h1><%= cls.class_name %></h1>
+      <h1><%= cls.class_name %> &middot; <%= mode === 'checkout' ? 'Check Out' : 'Check In' %></h1>
     </div>
     <p class="kiosk-date"><%= dateLabel %></p>
 
     <div class="kiosk-panel">
-      <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan a barcode or type a name</p>
       <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
         <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
       </div>
-      <form id="scan-form" autocomplete="off">
+      <p class="hint">Use a phone's barcode-scanning camera app, an external barcode scanner, or type a member's name below.</p>
+      <form id="scan-form" class="class-scan-form" autocomplete="off">
         <input
           id="barcode-input"
+          class="class-scan-input"
           name="barcode"
           type="text"
+          placeholder="Scan a barcode or type a name"
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
-          inputmode="none"
         />
+        <button type="submit" class="primary-btn">Submit</button>
       </form>
     </div>
   </main>

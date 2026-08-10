@@ -422,6 +422,24 @@ textarea:focus-visible,
 }
 .kiosk-home:hover { border-color: var(--brand); background: var(--brand-soft); }
 
+/* Modifier for the Class Check-In flow's day/class-list/attendance pages
+   (views/kiosk-class-checkin-*.ejs): same look as .kiosk-home, but laid
+   out as a normal flex child instead of pinned to the viewport corner, so
+   it can sit next to a Done button or the purple Check In/Check Out
+   actions and reflow correctly on narrow screens. */
+.kiosk-home-inline { position: static; }
+
+/* Shared Back-link + Done-button row for the day picker and per-day class
+   list pages. */
+.kiosk-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
 .kiosk-logo { height: var(--logo-sm); width: var(--logo-sm); margin-bottom: 0.5rem; border-radius: 50%; }
 .kiosk h1 { font-size: 2.4rem; }
 .kiosk-date { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
@@ -487,6 +505,34 @@ textarea:focus-visible,
   height: 1px;
   width: 1px;
 }
+
+/* Class Check-In's own scan page (views/kiosk-class-checkin-scan.ejs) is
+   the one kiosk scan screen where the barcode input must actually be
+   visible and typeable - "typing in the name manually" is one of its
+   three supported input methods (utils/memberLookup.js), unlike the main
+   portal's scan pages where #barcode-input above is purely a hidden
+   target for a hardware scanner's keystrokes. The combined ID+class
+   selector out-specifies the hidden rule above without needing !important. */
+#barcode-input.class-scan-input {
+  opacity: 1;
+  position: static;
+  pointer-events: auto;
+  height: auto;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 1rem;
+  display: block;
+  padding: 0.85rem 1rem;
+  font-size: 1.3rem;
+  text-align: center;
+  border: 2px solid var(--border);
+  border-radius: var(--control-radius);
+  font-family: inherit;
+  color: var(--ink);
+}
+#barcode-input.class-scan-input:focus { outline: none; border-color: var(--btn-purple); }
+
+.class-scan-form { display: flex; flex-direction: column; align-items: center; }
 
 .kiosk-hidden { display: none !important; }
 
@@ -1910,6 +1956,48 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-roster-row-btn:hover { border-color: var(--brand); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .class-roster-row-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+
+/* Class Check-In attendance page (views/kiosk-class-checkin-attendance.ejs)
+   header: Back link on the left, Check In/Check Out on the right -
+   `.kiosk-home-inline` first in DOM, actions second, so the mobile
+   `column-reverse` flip below puts Check In/Check Out first on the page
+   without duplicating any markup. */
+.class-checkin-attendance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.class-checkin-actions { display: flex; gap: 0.6rem; }
+
+/* Purple to match .landing-card-purple on the kiosk home page - Check
+   In/Check Out are the one pair of actions on this whole flow important
+   enough to get their own brand color instead of the usual orange
+   .roster-action-btn. */
+.class-checkin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  background: var(--btn-purple);
+  border: 1px solid var(--btn-purple);
+  color: #000;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.class-checkin-btn:hover { background: var(--btn-purple-hover); border-color: var(--btn-purple-hover); }
+
+@media (max-width: 640px) {
+  .class-checkin-attendance-header { flex-direction: column-reverse; align-items: stretch; }
+  .class-checkin-actions { justify-content: stretch; }
+  .class-checkin-btn { flex: 1; justify-content: center; }
+}
 
 .roster-btn-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .roster-btn-form { display: flex; flex: 1; min-width: 5.5rem; }

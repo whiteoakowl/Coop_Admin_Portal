@@ -265,6 +265,35 @@ if (!libraryCheckoutColumns.includes('due_date')) {
   db.exec('ALTER TABLE library_checkouts ADD COLUMN due_date TEXT');
 }
 
+// checkouts.number used to be NOT NULL (every checkout required a real
+// 1-80 pickup number). The Class Check-In flow's own Check Out button
+// (routes/kiosk-class-checkin.js) has no such number - it isn't tied to
+// the numbered building-pickup coordination the main portal's checkout
+// kiosk uses - so the column needs to accept NULL. SQLite can't ALTER a
+// column's NOT NULL/CHECK constraints directly, so rebuild the table in
+// place for anyone who already has the old shape (same technique as the
+// volunteer_members migration above).
+const checkoutColumns = db.prepare('PRAGMA table_info(checkouts)').all();
+const checkoutNumberColumn = checkoutColumns.find((c) => c.name === 'number');
+if (checkoutNumberColumn && checkoutNumberColumn.notnull === 1) {
+  db.exec(`
+    ALTER TABLE checkouts RENAME TO checkouts_old;
+    CREATE TABLE checkouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      roster_id INTEGER NOT NULL REFERENCES rosters(id) ON DELETE CASCADE,
+      session_date TEXT NOT NULL,
+      number INTEGER CHECK(number IS NULL OR number BETWEEN 1 AND 80),
+      check_out_time INTEGER NOT NULL,
+      recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(member_id, roster_id, session_date)
+    );
+    INSERT INTO checkouts (id, member_id, roster_id, session_date, number, check_out_time, recorded_at)
+      SELECT id, member_id, roster_id, session_date, number, check_out_time, recorded_at FROM checkouts_old;
+    DROP TABLE checkouts_old;
+  `);
+}
+
 // Seed a default admin account on first run so the dashboard is reachable.
 const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admins').get().c;
 if (adminCount === 0) {

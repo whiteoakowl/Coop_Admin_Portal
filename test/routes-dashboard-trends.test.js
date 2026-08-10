@@ -38,6 +38,14 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Pulls the numeric "Checked In" value shown under the named stats card
+// (e.g. "Students") from the rendered dashboard HTML.
+function checkedInCountFor(html, cardLabel) {
+  const afterHeading = html.slice(html.indexOf(`<h2>${cardLabel}</h2>`));
+  const match = /analytics-stat-checkedin">[\s\S]*?analytics-stat-value">(\d+)/.exec(afterHeading);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 test('dashboard KPI trend indicators', async (t) => {
   const cookie = await loginAsAdmin();
 
@@ -71,5 +79,31 @@ test('dashboard KPI trend indicators', async (t) => {
     assert.match(res.text, /trend-badge trend-badge-up[^>]*>[\s\S]*?\+2/, 'checked-in should show up +2');
     assert.match(res.text, /trend-badge trend-badge-down[^>]*>[\s\S]*?-1/, 'late should show down -1');
     assert.match(res.text, /vs last session \(Mon 1\/6\)/, 'previous session date shown in the tooltip');
+  });
+
+  await t.test('a member present or checked out only on a class roster does not inflate the day-level count', async () => {
+    const today = todayISO();
+    const before = await request(app).get('/admin').set('Cookie', cookie);
+    const checkedInBefore = checkedInCountFor(before.text, 'Students');
+
+    const classRosterId = db.prepare("INSERT INTO rosters (name, category) VALUES ('Isolation Test Class Roster', 'Class Roster')").run().lastInsertRowid;
+    const memberId = db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Class Only Dashboard Kid', 'class-only-dashboard-kid', 'student')")
+      .run().lastInsertRowid;
+    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'kiosk_class_checkin')").run(
+      memberId,
+      classRosterId,
+      today
+    );
+    db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, NULL, ?)').run(
+      memberId,
+      classRosterId,
+      today,
+      Date.now()
+    );
+
+    const after = await request(app).get('/admin').set('Cookie', cookie);
+    const checkedInAfter = checkedInCountFor(after.text, 'Students');
+    assert.equal(checkedInAfter, checkedInBefore, 'a class-roster-only present status must not change the day-level Checked In count');
   });
 });
