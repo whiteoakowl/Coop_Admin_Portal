@@ -15,6 +15,7 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
         <a class="view-tab<%= activeTab === 'backup' ? ' active' : '' %>" href="/admin/settings?tab=backup">Backup/Restore</a>
+        <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
@@ -76,6 +77,17 @@
               <button type="submit" class="primary-btn">Upload &amp; Stage Restore</button>
             </form>
           <% } %>
+        </div>
+      <% } else if (activeTab === 'classcheckin') { %>
+        <div class="manage-section">
+          <h2>Class Check-In PIN</h2>
+          <p class="hint">A shared 4-digit PIN staff enter at the kiosk's Class Check-In screen to check students into individual classes and view class attendance. Anyone with this PIN can use it - change it if it's ever shared beyond who should have ongoing access.</p>
+          <form method="POST" action="/admin/settings/class-checkin-pin" class="stack-form stack-form-narrow">
+            <label for="newPin">New PIN</label>
+            <input id="newPin" name="newPin" type="text" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="4 digits" required autocomplete="off" />
+
+            <button type="submit" class="primary-btn">Update PIN</button>
+          </form>
         </div>
       <% } else if (activeTab === 'documents') { %>
         <div class="manage-section">

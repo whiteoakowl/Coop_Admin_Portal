@@ -11,6 +11,7 @@ const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { backupPackageBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
 const { databaseFileFilter } = require('../utils/uploads');
+const { setClassCheckinPin } = require('../utils/classCheckinPin');
 
 // Restore uploads never touch disk (memoryStorage) - the whole file needs
 // to be in hand before it can be validated/unpacked. 200MB is generous
@@ -130,8 +131,8 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'backup', 'quicklinks', 'install', 'documents'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'backup', 'documents'];
+const SETTINGS_TABS = ['account', 'backup', 'classcheckin', 'quicklinks', 'install', 'documents'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'backup', 'classcheckin', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
@@ -227,6 +228,25 @@ router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.s
 router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, (req, res) => {
   cancelStagedRestore();
   renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'backup');
+});
+
+// One shared 4-digit PIN for the kiosk's Class Check-In flow (routes/
+// kiosk-class-checkin.js) - not tied to any admin account, same as
+// there's exactly one admin login rather than per-admin ones. Stored
+// hashed in app_settings (utils/classSchedule.js's appSetting/
+// setAppSetting), seeded with a default on first boot (db/index.js).
+// No "current PIN" confirmation required to change it, unlike the admin
+// password above - reaching this form at all already requires being
+// logged in as full Admin, and the PIN itself is a lower-stakes secondary
+// check (kiosk class check-in access), not the credential that gates
+// everything else the way the admin password does.
+router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, (req, res) => {
+  const newPin = (req.body.newPin || '').trim();
+  if (!/^\d{4}$/.test(newPin)) {
+    return renderSettings(req, res, 'PIN must be exactly 4 digits.', null, 'classcheckin');
+  }
+  setClassCheckinPin(newPin);
+  renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
 });
 
 module.exports = router;
