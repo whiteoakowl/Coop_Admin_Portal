@@ -535,3 +535,17 @@ CREATE INDEX IF NOT EXISTS idx_roster_dates_date ON roster_dates(session_date);
 CREATE INDEX IF NOT EXISTS idx_volunteer_members_section ON volunteer_members(section_id);
 CREATE INDEX IF NOT EXISTS idx_volunteer_dates_date ON volunteer_dates(session_date);
 CREATE INDEX IF NOT EXISTS idx_setup_teams_day ON setup_teams(day);
+
+-- Backs utils/sqliteSessionStore.js, server.js's express-session store -
+-- replaces the default in-memory MemoryStore (which loses every admin
+-- session on restart/deploy, and has no eviction of its own, so its
+-- memory use only ever grows for the life of the process) with rows in
+-- the same SQLite file everything else already lives in. data_json is
+-- express-session's own serialized session object (cookie, adminId,
+-- csrfToken, ...) - opaque to this table, just persisted as-is.
+CREATE TABLE IF NOT EXISTS sessions (
+  sid TEXT PRIMARY KEY,
+  data_json TEXT NOT NULL,
+  expires_at INTEGER NOT NULL -- epoch ms; see sqliteSessionStore.js's sweep
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);

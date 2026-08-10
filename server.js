@@ -25,7 +25,7 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-require('./db'); // initialize database + seed default admin
+const db = require('./db'); // initialize database + seed default admin
 
 // Swaps in any staged Restore's uploaded files (member photos, documents,
 // design images) - see utils/backup.js's own comments for the full
@@ -126,8 +126,20 @@ if (!sessionSecret) {
 // it themselves and downgrade their own connection's cookie security).
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
+// Without an explicit `store`, express-session falls back to its own
+// MemoryStore - fine for local development, but wrong for anything this
+// app actually deploys as: every admin gets logged out on every restart/
+// deploy, and MemoryStore never evicts anything on its own, so its memory
+// footprint only ever grows for the life of the process (this app's own
+// earlier audit flagged both). SqliteSessionStore persists sessions in
+// the same SQLite file everything else already lives in - see its own
+// header comment for why that's a hand-written ~80 lines rather than a
+// third-party package.
+const SqliteSessionStore = require('./utils/sqliteSessionStore');
+
 app.use(
   session({
+    store: new SqliteSessionStore(db),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
