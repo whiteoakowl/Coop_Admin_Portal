@@ -17,6 +17,8 @@ const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { familyOf, allFamilies, setMemberFamily, setPrimaryParent, rostersForMember, membersWithDetails } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
+const { buildCardPairs } = require('../utils/cardPairs');
+const { buildDuplexPages } = require('../utils/duplexPrint');
 
 router.use(requireFullAdmin);
 
@@ -677,28 +679,60 @@ router.post('/members/:id/notes', requireAdmin, (req, res) => {
   res.redirect('/admin/members');
 });
 
-// Member profile "Cards" dialog: prints whichever of Name Tag / Schedule
-// Card the admin checked, on one preview page. Every member type can have
-// a class schedule, so Schedule Card is available regardless of type.
+const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'sideBySide', 'frontBack'];
+
+// Member profile "Cards" dialog: prints exactly the layout the admin chose
+// from the dropdown (member-cards-fragment.ejs) - a single card, or both
+// cards together (side by side for a quick look, or front-and-back for a
+// double-sided cut-out card - see utils/duplexPrint.js). Every member type
+// can have a class schedule, so Schedule Card is available regardless of
+// type. "Side by side" and "front and back" reuse the exact same
+// buildCardPairs/buildDuplexPages helpers and views the bulk Design/Print
+// flows use (routes/admin-design.js), just with a single-member list, so a
+// member's cards always print identically whether they were printed one
+// at a time here or in a bulk batch there.
 router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
-  const wanted = [].concat(req.query.cards || []);
-  const cards = [];
+  const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
 
-  if (wanted.includes('nameTag')) {
-    const layout = getTemplate(member.member_type);
+  if (layout === 'sideBySide') {
+    return res.render('admin-name-tag-both-print', {
+      title: `Cards - ${member.name}`,
+      pairs: buildCardPairs([member]),
+      badgeWidth: BADGE_WIDTH,
+      badgeHeight: BADGE_HEIGHT,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
+    });
+  }
+
+  if (layout === 'frontBack') {
+    const { frontPages, backPages } = buildDuplexPages(buildCardPairs([member]));
+    return res.render('admin-cards-duplex-print', {
+      title: `Cards - ${member.name}`,
+      frontPages,
+      backPages,
+      badgeWidth: BADGE_WIDTH,
+      badgeHeight: BADGE_HEIGHT,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
+    });
+  }
+
+  const cards = [];
+  if (layout === 'nameTag') {
+    const badgeLayout = getTemplate(member.member_type);
     cards.push({
       heading: 'Name Tag',
-      html: NameTagRenderCore.renderBadgeElements(layout.elements, badgeDataForMember(member)),
-      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+      html: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeDataForMember(member)),
+      bgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
       width: BADGE_WIDTH,
       height: BADGE_HEIGHT,
     });
-  }
-  if (wanted.includes('scheduleCard')) {
+  } else {
     const template = getScheduleCardTemplate();
     cards.push({
       heading: 'Schedule Card',
@@ -707,10 +741,6 @@ router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
     });
-  }
-
-  if (cards.length === 0) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one card to print.'));
   }
 
   res.render('admin-member-cards-print', {
