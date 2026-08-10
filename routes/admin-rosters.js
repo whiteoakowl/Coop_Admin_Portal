@@ -12,6 +12,7 @@ const {
   classesNeedingStaffForDay,
   allClassesList,
   addManualRosterMember,
+  HOUR_POSITIONS,
 } = require('../utils/classSchedule');
 const { defaultDay, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
 const { REASON_LABELS } = require('../utils/rosters');
@@ -352,13 +353,25 @@ router.get('/rosters', requireAdmin, (req, res) => {
 
   if (requestedTab === 'classes') {
     const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+    const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
+    let classes = allClassesList(dayFilter || null);
+    // Filtered here rather than in allClassesList() itself (its two other
+    // callers - buildDaySnapshot and clearDayRosterData's own roster-id
+    // lookup - have no concept of "hour" to filter by) - by hour_position
+    // (the 1-4 slot number), not hourLabel's display text, since that
+    // text is per-day-configurable (class_schedule_hours) and can differ
+    // between Monday's and Wednesday's own "Hour 1", while this filter
+    // needs to mean the same hour regardless of which day(s) are shown.
+    if (hourFilter) classes = classes.filter((c) => c.hour_position === hourFilter);
     return res.render('admin-rosters', {
       title: 'Attendance',
       tab: 'classes',
       topTab: 'classes',
       view: 'classList',
-      classes: allClassesList(dayFilter || null),
+      classes,
       dayFilter,
+      hourFilter,
+      hourPositions: HOUR_POSITIONS,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });

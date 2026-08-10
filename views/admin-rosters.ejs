@@ -30,10 +30,23 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="class-roster-day-select">Day</label>
-            <select id="class-roster-day-select" onchange="window.location = '/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '')">
+            <%# Each filter's onchange rebuilds the URL from BOTH selects'
+                current values, not just its own - so picking an Hour
+                keeps whatever Day is already chosen, and vice versa
+                (either filter, or both together). %>
+            <select id="class-roster-day-select" onchange="window.location = '/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '')">
               <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
               <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
               <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+            </select>
+          </div>
+          <div class="category-filter" style="margin: 0;">
+            <label for="class-roster-hour-select">Hour</label>
+            <select id="class-roster-hour-select" onchange="window.location = '/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (this.value ? '&hour=' + this.value : '')">
+              <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
+              <% hourPositions.forEach(function(h) { %>
+                <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>
+              <% }); %>
             </select>
           </div>
         </div>
