@@ -239,6 +239,9 @@ CREATE TABLE IF NOT EXISTS task_list_items (
 CREATE INDEX IF NOT EXISTS idx_task_list_items_section ON task_list_items(section_id);
 
 -- Submissions from the public Name Tag form (lost tag / schedule change).
+-- `archived` is the "in-place flag" archiving pattern (flip 0/1, nothing
+-- moves) - see README.md's "Archiving" section for how this differs from
+-- roster_archives' snapshot-and-clear pattern below.
 CREATE TABLE IF NOT EXISTS name_tag_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -522,7 +525,10 @@ CREATE INDEX IF NOT EXISTS idx_library_checkouts_item ON library_checkouts(item_
 -- later deleted from the system - see routes/admin-rosters.js's
 -- archiveDay() for the exact shape. Archiving also clears the live
 -- roster_dates/attendance/checkouts it snapshotted, so the live
--- Attendance grid starts fresh for the next term.
+-- Attendance grid starts fresh for the next term. This is the
+-- "snapshot-and-clear" archiving pattern - see README.md's "Archiving"
+-- section for how this differs from name_tag_requests' in-place flag
+-- above.
 CREATE TABLE IF NOT EXISTS roster_archives (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
