@@ -121,14 +121,14 @@
                   <button
                     type="button"
                     class="icon-btn"
-                    onclick="var d = document.getElementById('cards-dialog-<%= m.id %>'); d.showModal(); renderNameTagBarcodes(d);"
+                    data-view-cards="<%= m.id %>"
                     aria-label="View cards for <%= m.name %>"
                     title="View Cards"
                   ><svg class="icon"><use href="#icon-badge"/></svg></button>
                   <button
                     type="button"
                     class="icon-btn"
-                    onclick="document.getElementById('schedule-dialog-<%= m.id %>').showModal()"
+                    data-view-schedule="<%= m.id %>"
                     aria-label="View schedule for <%= m.name %>"
                     title="View Schedule"
                   ><svg class="icon"><use href="#icon-clock"/></svg></button>
@@ -150,47 +150,12 @@
                     </div>
                   </form>
                 </dialog>
-                <dialog id="cards-dialog-<%= m.id %>" class="badge-preview-dialog">
-                  <h3>Cards &mdash; <%= m.name %></h3>
-                  <form method="GET" action="/admin/members/<%= m.id %>/cards/print" target="_blank">
-                    <div class="cards-preview-option">
-                      <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
-                      <%- include('partials/name-tag-badge', { html: m.badgeHtml, bgCss: m.badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
-                    </div>
-                    <div class="cards-preview-option">
-                      <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
-                      <%- include('partials/name-tag-badge', { html: m.scheduleCardHtml, bgCss: m.scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
-                    </div>
-                    <div class="notes-dialog-actions">
-                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-                      <button type="submit" class="primary-btn">Print</button>
-                    </div>
-                  </form>
-                </dialog>
-                <dialog id="schedule-dialog-<%= m.id %>" class="schedule-preview-dialog">
-                  <h3>Class Schedule &mdash; <%= m.name %></h3>
-                  <% [['Monday', m.schedule.monday], ['Wednesday', m.schedule.wednesday]].forEach(function(entry) { %>
-                    <% var dayLabel = entry[0], dayRows = entry[1]; %>
-                    <h4><%= dayLabel %></h4>
-                    <table class="roster-table schedule-print-table">
-                      <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
-                      <tbody>
-                        <% dayRows.forEach(function(c, i) { %>
-                          <tr>
-                            <td><%= i + 1 %></td>
-                            <td><%= c.time || '—' %></td>
-                            <td><%= c.class_name || '—' %></td>
-                            <td><%= c.room || '—' %></td>
-                          </tr>
-                        <% }); %>
-                      </tbody>
-                    </table>
-                  <% }); %>
-                  <div class="notes-dialog-actions">
-                    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-                    <a class="primary-btn" href="/admin/schedule/print?memberId=<%= m.id %>" target="_blank">Print</a>
-                  </div>
-                </dialog>
+                <%# Cards/Schedule content is fetched on open (see
+                    public/js/members-dialogs.js + routes/admin-members.js)
+                    rather than rendered here for every row - these start
+                    empty and get their innerHTML swapped in on demand. %>
+                <dialog id="cards-dialog-<%= m.id %>" class="badge-preview-dialog"></dialog>
+                <dialog id="schedule-dialog-<%= m.id %>" class="schedule-preview-dialog"></dialog>
                 <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."></form>
               </td>
             </tr>
@@ -229,5 +194,7 @@
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>
+  <script src="/js/fragment-dialog.js"></script>
+  <script src="/js/members-dialogs.js"></script>
 </body>
 </html>

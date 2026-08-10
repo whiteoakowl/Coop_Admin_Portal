@@ -1,26 +1,21 @@
 // Powers the "View" button on each Class Schedule card: fetches that
 // class's info + roster as an HTML fragment and shows it in a shared
-// dialog, so viewing (and, once unlocked, editing) a class never
-// navigates away from the grid. Saving/deleting/roster changes are still
-// real form submissions (this app has no client framework), so those do
-// leave the popup - they land back on this same grid page.
+// dialog, via the shared public/js/fragment-dialog.js helper, so viewing
+// (and, once unlocked, editing) a class never navigates away from the
+// grid. Saving/deleting/roster changes are still real form submissions
+// (this app has no client framework), so those do leave the popup - they
+// land back on this same grid page.
 (function () {
   const dialog = document.getElementById('class-view-dialog');
-  if (!dialog) return;
+  if (!dialog || !window.loadFragmentIntoDialog) return;
 
   let currentClassId = null;
 
   function loadClass(id) {
     currentClassId = id;
-    fetch(`/admin/class-schedule/classes/${id}/view-fragment`, { credentials: 'same-origin' })
-      .then((res) => (res.ok ? res.text() : Promise.reject(res.status)))
-      .then((html) => {
-        dialog.innerHTML = html;
-        if (!dialog.open) dialog.showModal();
-      })
-      .catch(() => {
-        window.location.href = `/admin/class-schedule/classes/${id}/manage`;
-      });
+    window.loadFragmentIntoDialog(dialog, `/admin/class-schedule/classes/${id}/view-fragment`).catch(() => {
+      window.location.href = `/admin/class-schedule/classes/${id}/manage`;
+    });
   }
 
   document.addEventListener('click', (e) => {

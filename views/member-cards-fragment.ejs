@@ -1,0 +1,25 @@
+<%# Injected into #cards-dialog-<id> by public/js/members-dialogs.js, via
+    the shared public/js/fragment-dialog.js helper - fetched only when the
+    Cards button is actually clicked, not server-rendered for every row on
+    the Members page (see admin-members.ejs and routes/admin-members.js's
+    /members/:id/cards-fragment for why: the badge/schedule-card HTML this
+    needs is expensive to render and was previously computed for every
+    member on every page load, whether or not anyone ever opened it).
+    After injection, the caller still needs to call
+    window.renderNameTagBarcodes(dialog) itself - barcodes are drawn by JS
+    against the DOM, so they can only run once this markup actually exists. %>
+<h3>Cards &mdash; <%= member.name %></h3>
+<form method="GET" action="/admin/members/<%= member.id %>/cards/print" target="_blank">
+  <div class="cards-preview-option">
+    <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
+    <%- include('partials/name-tag-badge', { html: badgeHtml, bgCss: badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+  </div>
+  <div class="cards-preview-option">
+    <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
+    <%- include('partials/name-tag-badge', { html: scheduleCardHtml, bgCss: scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+  </div>
+  <div class="notes-dialog-actions">
+    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+    <button type="submit" class="primary-btn">Print</button>
+  </div>
+</form>
