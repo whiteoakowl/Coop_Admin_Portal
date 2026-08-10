@@ -729,6 +729,31 @@ textarea:focus-visible,
 }
 .admin-sidebar nav a.active .icon { opacity: 1; }
 
+/* Sidebar global search (views/admin-search.ejs, routes/admin-search.js) -
+   sits between the brand logo and the nav links, same width as the
+   sidebar's other controls. Full-admin only, like the Members/Library
+   nav links it's grouped near - see routes/admin-search.js for why. */
+.admin-sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  margin-bottom: 0.25rem;
+}
+.admin-sidebar-search .icon { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
+.admin-sidebar-search input {
+  border: none;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  width: 100%;
+  min-width: 0;
+}
+
 .logout-form { margin: 0; }
 
 /* Full Screen toggle - fixed to the true top-right corner of the viewport
@@ -1970,6 +1995,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   margin-bottom: 1.25rem;
 }
 .manage-section h2 { margin-top: 0; }
+
+/* Search results page (views/admin-search.ejs) - the query box itself,
+   full width up to a comfortable line length, input + button inline. */
+.search-page-form { display: flex; gap: 0.6rem; max-width: 480px; margin-bottom: 1.5rem; }
+.search-page-form input {
+  flex: 1;
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+.search-found-in-cell { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.search-found-in-cell a.badge-pill { text-decoration: none; }
+.search-found-in-cell a.badge-pill:hover { filter: brightness(0.95); }
 
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 

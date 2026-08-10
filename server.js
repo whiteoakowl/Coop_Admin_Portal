@@ -64,6 +64,7 @@ const adminLibraryRouter = require('./routes/admin-library');
 const adminDesignRouter = require('./routes/admin-design');
 const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
 const adminMembersRouter = require('./routes/admin-members');
+const adminSearchRouter = require('./routes/admin-search');
 const adminVolunteersRouter = require('./routes/admin-volunteers');
 const adminSubstitutesRouter = require('./routes/admin-substitutes');
 const volunteersRouter = require('./routes/volunteers');
@@ -215,6 +216,7 @@ app.use('/admin', adminLibraryRouter);
 app.use('/admin', adminDesignRouter);
 app.use('/admin', adminMiscBadgesRouter);
 app.use('/admin', adminMembersRouter);
+app.use('/admin', adminSearchRouter);
 app.use('/admin', adminNameTagRouter);
 
 app.use((req, res) => {
