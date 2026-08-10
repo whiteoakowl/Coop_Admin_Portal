@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Name Tags + Schedule Cards (Front &amp; Back)</h1>
+      <p class="hint">Print double-sided, flipping on the short edge. Cut along the grid lines - each card's name tag side will match its schedule card on the back.</p>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (frontPages.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <% frontPages.forEach(function(pageBadges, i) { %>
+      <div class="badge-sheet-page badge-sheet">
+        <% pageBadges.forEach(function(b) { %>
+          <%- include('partials/name-tag-badge', { html: b.html, bgCss: b.bgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+        <% }); %>
+      </div>
+      <div class="badge-sheet-page badge-sheet">
+        <% backPages[i].forEach(function(c) { %>
+          <% if (c) { %>
+            <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+          <% } else { %>
+            <div class="badge-canvas badge-canvas-blank" style="width: <%= cardWidth %>px; height: <%= cardHeight %>px;"></div>
+          <% } %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

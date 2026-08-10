@@ -2098,6 +2098,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    share an edge, which isn't visible as "space"). */
 .badge-sheet .badge-canvas { border-radius: 0; margin: 0; box-shadow: none; }
 
+/* Front-and-back duplex print (admin-cards-duplex-print.ejs): a back
+   page's slot that has nothing mirrored into it (a page whose front
+   didn't fill all 8 cards - see utils/duplexPrint.js) still needs to
+   occupy its grid cell so every other card's column position stays
+   correct, but there's no card to cut there - fully blank, no cut-guide
+   border, unlike a real .badge-canvas. */
+.badge-canvas-blank { background: none; border: none; box-shadow: none; }
+
 /* Barcode-only print sheet: 3 columns x 8 rows (24 per page), filling the
    full width/height of the .badge-sheet-page it's nested in - unlike
    .badge-sheet's fixed-pixel badge grid, these columns are meant to
