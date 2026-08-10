@@ -10,13 +10,6 @@
   <a class="brand" href="/admin">
     <img src="/img/logo.png" alt="Sanford Homeschoolers" />
   </a>
-  <% if (isFullAdmin) { %>
-    <form method="GET" action="/admin/search" class="admin-sidebar-search no-print">
-      <label for="admin-sidebar-search-input" class="sr-only">Search members and library items</label>
-      <svg class="icon"><use href="#icon-search"/></svg>
-      <input id="admin-sidebar-search-input" type="search" name="q" placeholder="Search&hellip;" />
-    </form>
-  <% } %>
   <nav id="admin-nav-links">
     <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
     <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
@@ -39,10 +32,20 @@
   </div>
 </aside>
 
-<!-- Full Screen toggle - a fixed corner button in the top-right of every
-     admin page (desktop), not tied to any one page's own content, so it's
-     reachable no matter which section is open. -->
+<!-- Top-right corner controls (desktop) - global search next to the Full
+     Screen toggle, neither tied to any one page's own content, so both
+     are reachable no matter which section is open. Search is full-admin
+     only, same as the Members/Library nav links (see
+     routes/admin-search.js for why); Full Screen has no such
+     restriction. -->
 <div class="admin-page-corner-actions no-print">
+  <% if (isFullAdmin) { %>
+    <form method="GET" action="/admin/search" class="admin-corner-search">
+      <label for="admin-corner-search-input" class="sr-only">Search members and library items</label>
+      <svg class="icon"><use href="#icon-search"/></svg>
+      <input id="admin-corner-search-input" type="search" name="q" placeholder="Search&hellip;" />
+    </form>
+  <% } %>
   <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn" aria-label="Full Screen View">
     <svg class="icon"><use href="#icon-maximize"/></svg>
     <span id="fullscreen-toggle-label">Full Screen View</span>

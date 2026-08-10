@@ -348,6 +348,34 @@ textarea:focus-visible,
 }
 .admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
 
+/* Global admin search (views/admin-search.ejs, routes/admin-search.js) -
+   same pill shape as .admin-corner-link so it reads as one matched set of
+   top-right controls, not two different UI languages. Lives in
+   .admin-page-corner-actions next to the Full Screen toggle - see that
+   rule for the flex layout holding the two side by side. */
+.admin-corner-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-search:focus-within { border-color: var(--brand); }
+.admin-corner-search .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+.admin-corner-search input {
+  border: none;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  width: 9rem;
+}
+
 @media (max-width: 720px) {
   .landing-grid { grid-template-columns: repeat(2, 220px); }
   .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
@@ -729,31 +757,6 @@ textarea:focus-visible,
 }
 .admin-sidebar nav a.active .icon { opacity: 1; }
 
-/* Sidebar global search (views/admin-search.ejs, routes/admin-search.js) -
-   sits between the brand logo and the nav links, same width as the
-   sidebar's other controls. Full-admin only, like the Members/Library
-   nav links it's grouped near - see routes/admin-search.js for why. */
-.admin-sidebar-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 0.45rem 0.65rem;
-  margin-bottom: 0.25rem;
-}
-.admin-sidebar-search .icon { width: 1rem; height: 1rem; color: var(--muted); flex-shrink: 0; }
-.admin-sidebar-search input {
-  border: none;
-  outline: none;
-  background: none;
-  font-family: inherit;
-  font-size: 0.85rem;
-  color: var(--ink);
-  width: 100%;
-  min-width: 0;
-}
-
 .logout-form { margin: 0; }
 
 /* Full Screen toggle - fixed to the true top-right corner of the viewport
@@ -761,7 +764,7 @@ textarea:focus-visible,
    open, instead of living inside the sidebar or one page's own content.
    Hidden below the mobile-topbar breakpoint, where its twin lives inline
    in the topbar's own top-right icon row instead (see admin-nav.ejs). */
-.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; }
+.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; display: flex; align-items: center; gap: 0.6rem; }
 
 /* Same fixed placement, but the corner button's plain white pill would sit
    uncomfortably light against the (still fixed) sidebar's darker panel -
