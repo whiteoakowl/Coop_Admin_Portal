@@ -1483,6 +1483,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
+/* Logs page (Absence/Late, Check In/Out, Name Tag Requests tabs): same
+   screen/print table split as Members' .members-list-table/
+   .members-print-table above - the on-screen table is paginated
+   (utils/pagination.js), the print-only counterpart always renders every
+   filtered row so a printed log is never silently missing whichever page
+   wasn't open on screen. Shared across all three tabs rather than one
+   pair of classes per tab since only one tab's markup is ever in the DOM
+   at once (admin-logs.ejs is tab-conditional). */
+.logs-print-table { display: none; }
+
 /* Mobile member list: keep it to Name, Type, and the action icons - Photo,
    Parent, and Rosters are useful on a wide screen but just add scroll on
    a phone. Name itself switches from the table's usual nowrap to
@@ -3596,6 +3606,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      .members-print-table counterpart to swap in like this page does. */
   .members-list-table { display: none; }
   .members-print-table { display: table; }
+
+  /* Logs page: same swap, for the Absence/Late, Check In/Out, and Name
+     Tag Requests tabs' paginated screen table vs. their always-full print
+     counterpart - see the .logs-print-table rule above. */
+  .logs-screen-table { display: none; }
+  .logs-print-table { display: table; }
 
   /* Infant flag is an admin-only note for staffing decisions - never let
      it end up on a physical printout that could be seen by members. Same

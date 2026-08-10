@@ -45,7 +45,7 @@
         </div>
 
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table logs-screen-table">
             <thead>
               <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
             </thead>
@@ -66,6 +66,33 @@
             </tbody>
           </table>
         </div>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <%# Print always shows every filtered submission, not just whichever
+            page is open on screen - see .logs-screen-table/.logs-print-table
+            in styles.css (same reasoning/pattern as Members' own
+            .members-list-table/.members-print-table split). %>
+        <table class="roster-table members-table condensed-table logs-print-table">
+          <thead>
+            <tr><th>Name</th><th>Roster</th><th>Date</th><th>Status</th><th>Reason</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <% if (allSubmissions.length === 0) { %>
+              <tr><td colspan="6" class="roster-empty">No absence or late submissions<%= dateFilter ? ' for this date' : ' yet' %>.</td></tr>
+            <% } %>
+            <% allSubmissions.forEach(function(s) { %>
+              <tr>
+                <td><%= s.memberName %></td>
+                <td><%= s.rosterName %></td>
+                <td><%= s.dateLabel %></td>
+                <td><span class="status-badge <%= s.statusLabel === 'Late' ? 'status-badge-late' : 'status-badge-absent' %>"><%= s.statusLabel %></span></td>
+                <td><%= s.reasonLabel %></td>
+                <td><%= s.description %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       <% } else if (tab === 'checkinout') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
@@ -84,7 +111,7 @@
         </div>
 
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table logs-screen-table">
             <thead>
               <tr><th>Name</th><th>Roster</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Number</th></tr>
             </thead>
@@ -105,6 +132,29 @@
             </tbody>
           </table>
         </div>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <table class="roster-table members-table condensed-table logs-print-table">
+          <thead>
+            <tr><th>Name</th><th>Roster</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Number</th></tr>
+          </thead>
+          <tbody>
+            <% if (allRows.length === 0) { %>
+              <tr><td colspan="6" class="roster-empty">No check-ins recorded yet.</td></tr>
+            <% } %>
+            <% allRows.forEach(function(r) { %>
+              <tr>
+                <td><%= r.memberName %></td>
+                <td><%= r.rosterName %></td>
+                <td><%= r.dateLabel %></td>
+                <td><%= r.checkInTime %></td>
+                <td><%= r.checkOutTime %></td>
+                <td><%= r.number %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       <% } else if (tab === 'nametag') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
@@ -127,7 +177,7 @@
         </div>
 
         <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
+          <table class="roster-table members-table condensed-table logs-screen-table">
             <thead>
               <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th></th></tr>
             </thead>
@@ -152,6 +202,32 @@
             </tbody>
           </table>
         </div>
+
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+
+        <%# No Archive/Unarchive column here - it's an on-screen-only action,
+            already .no-print'd out of the screen table above, so the
+            print-only table simply never has that column in the first
+            place. %>
+        <table class="roster-table members-table condensed-table logs-print-table">
+          <thead>
+            <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <% if (allSubmissions.length === 0) { %>
+              <tr><td colspan="5" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+            <% } %>
+            <% allSubmissions.forEach(function(s) { %>
+              <tr>
+                <td><%= s.timestamp %></td>
+                <td><%= s.memberName %></td>
+                <td><%= s.requestTypeLabel %></td>
+                <td><%= s.dayLabel %></td>
+                <td><%= s.description %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       <% } else if (tab === 'classrisk') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
