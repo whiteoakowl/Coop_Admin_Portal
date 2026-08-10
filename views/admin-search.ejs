@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Search</h1>
+
+    <form method="GET" action="/admin/search" class="search-page-form no-print">
+      <label for="search-q" class="sr-only">Search members and library items</label>
+      <input id="search-q" type="search" name="q" value="<%= q %>" placeholder="Search by member name, barcode, or library item&hellip;" autofocus />
+      <button type="submit" class="roster-action-btn"><svg class="icon"><use href="#icon-search"/></svg> Search</button>
+    </form>
+
+    <% if (!searched || !q) { %>
+      <p class="roster-empty">Search for a member by name or barcode, or a library item by title or barcode.</p>
+    <% } else if (members.length === 0 && libraryItems.length === 0) { %>
+      <p class="roster-empty">No matches for &ldquo;<%= q %>&rdquo;.</p>
+    <% } else { %>
+      <% if (members.length > 0) { %>
+        <div class="manage-section">
+          <h2>Members</h2>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Name</th><th>Type</th><th>Found In</th><th></th></tr>
+              </thead>
+              <tbody>
+                <% members.forEach(function(m) { %>
+                  <tr>
+                    <td><%= m.name %></td>
+                    <td><span class="badge-pill"><%= m.memberType === 'parent' ? 'Parent' : 'Student' %></span></td>
+                    <td class="search-found-in-cell">
+                      <% if (m.hasAttendance) { %>
+                        <a class="badge-pill badge-pill-present" href="/admin/members/<%= m.id %>?tab=attendance">Attendance</a>
+                      <% } %>
+                      <% if (m.isFloater) { %>
+                        <a class="badge-pill badge-pill-pending" href="/admin/volunteers">Floater</a>
+                      <% } %>
+                      <% if (m.activeLibraryCheckouts > 0) { %>
+                        <a class="badge-pill badge-pill-absent" href="/admin/library?tab=members">Library (<%= m.activeLibraryCheckouts %>)</a>
+                      <% } %>
+                      <% if (!m.hasAttendance && !m.isFloater && m.activeLibraryCheckouts === 0) { %>
+                        <span class="hint">none yet</span>
+                      <% } %>
+                    </td>
+                    <td><a class="btn-secondary condensed-btn" href="/admin/members/<%= m.id %>">View Profile</a></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (libraryItems.length > 0) { %>
+        <div class="manage-section">
+          <h2>Library Items</h2>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Title</th><th>Barcode</th><th>Type</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                <% libraryItems.forEach(function(item) { %>
+                  <tr>
+                    <td><%= item.title %></td>
+                    <td><%= item.barcode %></td>
+                    <td><%= item.type || '—' %></td>
+                    <td><span class="badge-pill <%= item.checkedOut ? 'badge-pill-absent' : 'badge-pill-present' %>"><%= item.checkedOut ? 'Checked Out' : 'Checked In' %></span></td>
+                    <td><a class="btn-secondary condensed-btn" href="/admin/library?tab=titles">View in Catalog</a></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+    <% } %>
+  </main>
+</body>
+</html>

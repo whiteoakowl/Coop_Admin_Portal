@@ -348,6 +348,34 @@ textarea:focus-visible,
 }
 .admin-corner-link:hover { color: var(--brand-dark); border-color: var(--brand); }
 
+/* Global admin search (views/admin-search.ejs, routes/admin-search.js) -
+   same pill shape as .admin-corner-link so it reads as one matched set of
+   top-right controls, not two different UI languages. Lives in
+   .admin-page-corner-actions next to the Full Screen toggle - see that
+   rule for the flex layout holding the two side by side. */
+.admin-corner-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-search:focus-within { border-color: var(--brand); }
+.admin-corner-search .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+.admin-corner-search input {
+  border: none;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  width: 9rem;
+}
+
 @media (max-width: 720px) {
   .landing-grid { grid-template-columns: repeat(2, 220px); }
   .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
@@ -736,7 +764,7 @@ textarea:focus-visible,
    open, instead of living inside the sidebar or one page's own content.
    Hidden below the mobile-topbar breakpoint, where its twin lives inline
    in the topbar's own top-right icon row instead (see admin-nav.ejs). */
-.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; }
+.admin-page-corner-actions { position: fixed; top: 1rem; right: 1.25rem; z-index: 55; display: flex; align-items: center; gap: 0.6rem; }
 
 /* Same fixed placement, but the corner button's plain white pill would sit
    uncomfortably light against the (still fixed) sidebar's darker panel -
@@ -1970,6 +1998,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   margin-bottom: 1.25rem;
 }
 .manage-section h2 { margin-top: 0; }
+
+/* Search results page (views/admin-search.ejs) - the query box itself,
+   full width up to a comfortable line length, input + button inline. */
+.search-page-form { display: flex; gap: 0.6rem; max-width: 480px; margin-bottom: 1.5rem; }
+.search-page-form input {
+  flex: 1;
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+.search-found-in-cell { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.search-found-in-cell a.badge-pill { text-decoration: none; }
+.search-found-in-cell a.badge-pill:hover { filter: brightness(0.95); }
 
 .condensed-table th, .condensed-table td { padding: 0.4rem 0.6rem; }
 
