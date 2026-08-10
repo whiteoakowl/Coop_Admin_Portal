@@ -275,6 +275,20 @@ if (adminCount === 0) {
   console.log(`Seeded default admin account "${username}". Change the password after first login.`);
 }
 
+// Seed a default Class Check-In PIN the same way - one shared 4-digit PIN
+// any staff member uses at the kiosk's Class Check-In flow (see
+// routes/kiosk-class-checkin.js), stored hashed in app_settings like
+// everything else there, changeable afterward via Settings > Class
+// Check-In PIN (routes/admin.js). Not tied to any one admin account -
+// there's exactly one PIN for the whole app, same as there's exactly one
+// admin login.
+if (!db.prepare("SELECT 1 FROM app_settings WHERE key = 'class_checkin_pin_hash'").get()) {
+  const pin = process.env.CLASS_CHECKIN_PIN || '0000';
+  const pinHash = bcrypt.hashSync(pin, 10);
+  db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?)').run('class_checkin_pin_hash', pinHash);
+  console.log(`Seeded default Class Check-In PIN "${pin}". Change it under Settings after first login.`);
+}
+
 // Seed the two fixed volunteer lists (Monday/Wednesday) with 4 default
 // hour sections each, so the Volunteers admin page always has both to show.
 for (const day of ['monday', 'wednesday']) {
