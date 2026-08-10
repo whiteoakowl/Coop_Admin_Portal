@@ -130,8 +130,8 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'quicklinks', 'install', 'documents'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'documents'];
+const SETTINGS_TABS = ['account', 'backup', 'quicklinks', 'install', 'documents'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'backup', 'documents'];
 
 function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
@@ -208,25 +208,25 @@ router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
 // do to stop/start it day to day.
 router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), (req, res) => {
   if (!req.file) {
-    return renderSettings(req, res, 'Please choose a backup file to restore.', null, 'account');
+    return renderSettings(req, res, 'Please choose a backup file to restore.', null, 'backup');
   }
   try {
     stageRestore(req.file.buffer);
   } catch (err) {
-    return renderSettings(req, res, err.message, null, 'account');
+    return renderSettings(req, res, err.message, null, 'backup');
   }
   renderSettings(
     req,
     res,
     null,
     'Backup validated and staged. Close and reopen the app to finish restoring - this will replace all current data.',
-    'account'
+    'backup'
   );
 });
 
 router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, (req, res) => {
   cancelStagedRestore();
-  renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'account');
+  renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'backup');
 });
 
 module.exports = router;

@@ -14,6 +14,7 @@
     <div class="view-tabs">
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
+        <a class="view-tab<%= activeTab === 'backup' ? ' active' : '' %>" href="/admin/settings?tab=backup">Backup/Restore</a>
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
@@ -46,7 +47,7 @@
             <button type="submit" class="primary-btn">Update</button>
           </form>
         </div>
-
+      <% } else if (activeTab === 'backup') { %>
         <div class="manage-section">
           <h2>Backup</h2>
           <p class="hint">Download a complete, ready-to-restore copy of everything - the database plus every uploaded photo, document, and design image. Keep a recent copy somewhere safe (a cloud drive, a USB stick) in case this device is ever lost or damaged.</p>
