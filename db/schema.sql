@@ -42,12 +42,22 @@ CREATE TABLE IF NOT EXISTS members (
   -- there. Purely a display/organization flag, not tied to any
   -- permission - set from a member's edit page.
   is_primary_parent INTEGER NOT NULL DEFAULT 0,
-  -- Portal login credentials, set by an admin on the member's profile - NULL
-  -- until an admin grants that member portal access. Which portal(s) they
-  -- can reach with those credentials is controlled by the portal_* flags
-  -- below, checked by an admin on the member's profile - independent of
-  -- member_type, so e.g. a Parent-type member can also be granted Co-op
-  -- Admin access.
+  -- Vestigial: these five columns supported a member-facing "Portal
+  -- Access" login feature (each member could get their own username/
+  -- password and a portal_* flag for which section they could reach)
+  -- that was later removed sitewide - no route, view, or query in this
+  -- codebase reads or writes any of them anymore (grep for
+  -- "portal_parent"/"portal_student"/"portal_coop_admin" turns up
+  -- nothing outside this file and db/index.js's own migration for them
+  -- below). Left in place rather than dropped because an ALTER TABLE
+  -- DROP COLUMN on `members` - the single most-referenced table in the
+  -- app - carries real risk for a handful of bytes' worth of benefit,
+  -- and any already-deployed database restored from an old backup could
+  -- still have real values sitting in them from before the removal;
+  -- silently discarding that historical data on every fresh boot isn't
+  -- worth it just to tidy the schema. Safe to ignore. (The single master
+  -- Admin login is a completely separate, still-very-much-alive
+  -- mechanism - see the `admins` table below, not this one.)
   username TEXT UNIQUE,
   password_hash TEXT,
   portal_parent INTEGER NOT NULL DEFAULT 0,
