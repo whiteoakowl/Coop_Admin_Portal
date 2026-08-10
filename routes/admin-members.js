@@ -275,17 +275,27 @@ function cleanupTeamIdsForMember(memberId) {
 }
 
 // A family only shows up on the "Choose a Family" dropdown once it's been
-// added here - the Members page's "+ Add Family" button.
+// added here - the Members page's "+ Add Family" button, and (via fetch,
+// see the wantsJson branch below) the "+ Add New Family" dialog on the
+// Add/Edit Member form itself, so a new family can be created without
+// leaving that form and losing whatever else was already typed in.
 router.post('/members/families/new', (req, res) => {
   const name = (req.body.name || '').trim();
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
+
   if (!name) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Family name is required.'));
+    const message = 'Family name is required.';
+    if (wantsJson) return res.status(400).json({ error: message });
+    return res.redirect('/admin/members?error=' + encodeURIComponent(message));
   }
   const exists = db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name);
   if (exists) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent(`"${name}" family already exists.`));
+    const message = `"${name}" family already exists.`;
+    if (wantsJson) return res.status(409).json({ error: message });
+    return res.redirect('/admin/members?error=' + encodeURIComponent(message));
   }
-  db.prepare('INSERT INTO families (name) VALUES (?)').run(name);
+  const familyId = db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
+  if (wantsJson) return res.json({ id: familyId, name });
   res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 

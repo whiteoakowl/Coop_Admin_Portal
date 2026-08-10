@@ -34,30 +34,63 @@ function updateMemberFormForType(form) {
   }
 }
 
-// Family is a single choice (a member belongs to one family) but styled as
-// a "dropdown + checklist" like the reference design - the <select> is the
-// real form field; the checklist rows underneath are just a friendlier way
-// to pick the same value, kept in sync with it in both directions.
-function initFamilyChecklist(form) {
+// Family is a single choice (a member belongs to one family), so the
+// <select> is the only control for it - no redundant checkbox/checklist
+// duplicating the same choice underneath. "+ Add New Family" opens a small
+// dialog (mirrors the one on the Members page) that posts via fetch instead
+// of a plain form submission, so a brand-new family can be created and
+// selected without losing whatever else has already been typed into this
+// page's Add/Edit Member form.
+//
+// The dialog itself lives outside #member-form in the markup (views/
+// admin-member-edit.ejs) - a <form> can't nest inside another <form> (the
+// browser silently drops the inner tag) - so it's looked up from the
+// document, not scoped to the passed-in form.
+function initAddFamilyDialog(form) {
   const select = form.querySelector('[data-family-select]');
-  const checklist = form.querySelector('[data-family-checklist]');
-  if (!select || !checklist) return;
+  const openBtn = form.querySelector('[data-add-family-open]');
+  const dialog = document.querySelector('[data-add-family-dialog]');
+  if (!select || !openBtn || !dialog) return;
+  const addForm = dialog.querySelector('[data-add-family-form]');
+  const errorEl = dialog.querySelector('[data-add-family-error]');
 
-  function syncFromSelect() {
-    const value = select.value;
-    checklist.querySelectorAll('[data-family-option]').forEach((btn) => {
-      btn.classList.toggle('is-checked', btn.getAttribute('data-family-option') === value);
-    });
-  }
+  openBtn.addEventListener('click', () => {
+    if (errorEl) errorEl.hidden = true;
+    addForm.reset();
+    dialog.showModal();
+  });
 
-  select.addEventListener('change', syncFromSelect);
-  checklist.querySelectorAll('[data-family-option]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (btn.disabled) return;
-      const value = btn.getAttribute('data-family-option');
-      select.value = select.value === value ? '' : value; // click again to clear
-      syncFromSelect();
-    });
+  addForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = (new FormData(addForm).get('name') || '').toString().trim();
+    if (errorEl) errorEl.hidden = true;
+
+    fetch('/admin/members/families/new', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-Token': window.CSRF_TOKEN || '',
+      },
+      body: new URLSearchParams({ name }),
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data && data.error ? data.error : 'Could not add family.');
+        const option = document.createElement('option');
+        option.value = data.id;
+        option.textContent = `The ${data.name} Family`;
+        option.selected = true;
+        select.appendChild(option);
+        dialog.close();
+      })
+      .catch((err) => {
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Could not add family.';
+          errorEl.hidden = false;
+        }
+      });
   });
 }
 
@@ -88,7 +121,7 @@ function initTeamPicker(form) {
 }
 
 function initMemberFormInteractions(form) {
-  initFamilyChecklist(form);
+  initAddFamilyDialog(form);
   initTeamPicker(form);
 }
 

@@ -1839,6 +1839,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-form-section-blue { border-color: var(--brand); background: var(--brand-soft); }
 .member-form-section-blue h2 { color: var(--brand-dark); }
 
+/* "+ Add New Family" - a family is a single choice, so the <select> above
+   is the only control for picking one; this just offers a way to create a
+   new one without leaving the Add/Edit Member form (see data-add-family-*
+   in public/js/member-form.js). */
+.member-form-add-family-btn { margin-top: 0.6rem; }
+
 /* Dropdown + checklist rows (Choose a Family, Setup/Cleanup Team) - the
    dropdown is a quick-pick that checks/selects the matching row below;
    each row shows a member count, same as the reference design. */
