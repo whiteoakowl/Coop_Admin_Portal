@@ -73,33 +73,53 @@ function attendanceHistoryForMember(memberId) {
 
 router.get('/members', requireAdmin, (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
-  const scheduleCardTemplate = getScheduleCardTemplate();
-  const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
-  const withRosters = membersWithDetails(typeFilter).map((m) => {
-    const badgeLayout = templates[m.member_type] || templates.student;
-    const badgeData = badgeDataForMember(m);
-    return {
-      ...m,
-      age: ageFromBirthday(m.birthday),
-      badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeData),
-      badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
-      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),
-      scheduleCardBgCss: scheduleCardBgCss,
-      schedule: getMemberSchedule(m.id),
-    };
-  });
+  // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
+  // getMemberSchedule()) used to be computed here for every member on
+  // every page load - two renderBadgeElements() calls and a DB query
+  // each, whether or not their row's dialog was ever opened. Now fetched
+  // on demand instead - see /members/:id/cards-fragment and
+  // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
+  const withRosters = membersWithDetails(typeFilter).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
   res.render('admin-members', {
     title: 'Members',
     members: withRosters,
     typeFilter,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+// Powers the Members page's per-row Cards button (fetch-on-open - see
+// public/js/members-dialogs.js). The same badge/schedule-card rendering
+// the /members list route used to do for every row up front, done here
+// for exactly the one member whose dialog was actually opened.
+router.get('/members/:id/cards-fragment', requireAdmin, (req, res) => {
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
+  if (!member) return res.status(404).send('Not found');
+  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
+  const badgeLayout = templates[member.member_type] || templates.student;
+  const scheduleCardTemplate = getScheduleCardTemplate();
+  res.render('member-cards-fragment', {
+    member,
+    badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeDataForMember(member)),
+    badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
+    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(member)),
+    scheduleCardBgCss: NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity),
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
     cardWidth: CARD_WIDTH,
     cardHeight: CARD_HEIGHT,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
   });
+});
+
+// Powers the Members page's per-row Schedule button (fetch-on-open - see
+// public/js/members-dialogs.js). This is the getMemberSchedule() query
+// the /members list route used to run for every row up front, done here
+// for exactly the one member whose dialog was actually opened.
+router.get('/members/:id/schedule-fragment', requireAdmin, (req, res) => {
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
+  if (!member) return res.status(404).send('Not found');
+  res.render('member-schedule-fragment', { member, schedule: getMemberSchedule(member.id) });
 });
 
 // Exports every field a member's profile can hold - the same information

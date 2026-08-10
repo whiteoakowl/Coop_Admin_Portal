@@ -1,0 +1,29 @@
+<%# Injected into #schedule-dialog-<id> by public/js/members-dialogs.js, via
+    the shared public/js/fragment-dialog.js helper - fetched only when the
+    Schedule button is actually clicked, not server-rendered for every row
+    on the Members page (see admin-members.ejs and
+    routes/admin-members.js's /members/:id/schedule-fragment for why: this
+    was one getMemberSchedule() query per member, on every page load,
+    whether or not anyone ever opened it). %>
+<h3>Class Schedule &mdash; <%= member.name %></h3>
+<% [['Monday', schedule.monday], ['Wednesday', schedule.wednesday]].forEach(function(entry) { %>
+  <% var dayLabel = entry[0], dayRows = entry[1]; %>
+  <h4><%= dayLabel %></h4>
+  <table class="roster-table schedule-print-table">
+    <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+    <tbody>
+      <% dayRows.forEach(function(c, i) { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= c.time || '—' %></td>
+          <td><%= c.class_name || '—' %></td>
+          <td><%= c.room || '—' %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% }); %>
+<div class="notes-dialog-actions">
+  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+  <a class="primary-btn" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print</a>
+</div>
