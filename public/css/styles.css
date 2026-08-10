@@ -2953,6 +2953,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     scroll-snap-align: start;
   }
 }
+
+/* Floater Teams: one card per hour (HOUR_POSITIONS is a fixed 4), so - 2
+   cards, then 2 more below - instead of Setup/Cleanup's many-teams 5-wide
+   layout. Wider columns than that one too: member names were getting
+   truncated in the narrower setup-team-card-grid columns this page used
+   to share. */
+.floater-team-card-grid { grid-template-columns: repeat(2, minmax(280px, 420px)); gap: 1rem; }
+@media (max-width: 640px) {
+  .floater-team-card-grid { grid-template-columns: 1fr; max-width: 420px; }
+}
 /* Each team is a single connected card: an info section (icon, title,
    leader, a colored detail pill) on top and a Members list section below
    it, separated only by a hairline divider - not two separate floating
