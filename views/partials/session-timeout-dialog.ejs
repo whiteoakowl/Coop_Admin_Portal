@@ -1,0 +1,12 @@
+<%# data-expires-at is an absolute ISO timestamp (server.js, alongside the
+    CSRF token) - public/js/session-timeout-warning.js counts down to it
+    and no-ops entirely when it's blank, same pattern public/js/csrf.js
+    uses for its own admin-only meta tag. %>
+<dialog id="session-timeout-dialog" class="volunteer-edit-dialog" data-expires-at="<%= typeof sessionExpiresAt !== 'undefined' && sessionExpiresAt ? sessionExpiresAt : '' %>">
+  <h3>Your session is about to expire</h3>
+  <p class="hint">You'll be logged out in <span id="session-timeout-countdown">5:00</span>. Save any unsaved work, then log back in to keep going.</p>
+  <div class="notes-dialog-actions">
+    <a href="/admin/login" id="session-timeout-login-link" class="btn-primary">Log in again</a>
+    <button type="button" class="btn-secondary" id="session-timeout-dismiss">Dismiss</button>
+  </div>
+</dialog>

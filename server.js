@@ -153,8 +153,16 @@ app.use((req, res, next) => {
   if (isAdmin) {
     if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
     res.locals.csrfToken = req.session.csrfToken;
+    // A fixed point in time, not a sliding window - this app's session
+    // isn't `rolling`, so cookie.expires is set once at login and stays
+    // put across every later request (see the Cookie source itself:
+    // setting `maxAge` sets `expires` as a side effect, once, at
+    // creation). That's exactly what public/js/session-timeout-warning.js
+    // needs: an absolute deadline to count down to, not an estimate.
+    res.locals.sessionExpiresAt = req.session.cookie.expires ? req.session.cookie.expires.toISOString() : null;
   } else {
     res.locals.csrfToken = null;
+    res.locals.sessionExpiresAt = null;
   }
   next();
 });
