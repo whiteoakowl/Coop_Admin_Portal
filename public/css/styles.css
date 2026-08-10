@@ -217,6 +217,17 @@ textarea:focus-visible,
 
 .landing-grid-two { grid-template-columns: repeat(2, 220px); }
 
+/* Class Check In is the 7th card in a 3-column grid, so it's alone on its
+   own row - park it under the middle column instead of letting grid
+   auto-flow leave it stranded on the left. */
+.landing-card-centered-last { grid-column: 2; }
+@media (max-width: 760px) {
+  /* .landing-grid drops to 2 columns here - centering under column 2 no
+     longer makes sense with only 2 tracks, so let it fall back to normal
+     auto-flow (2nd card of that final row). */
+  .landing-card-centered-last { grid-column: auto; }
+}
+
 .landing-card {
   background: var(--surface);
   border: 1px solid var(--border);
