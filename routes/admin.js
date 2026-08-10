@@ -67,6 +67,16 @@ router.post('/logout', (req, res) => {
 // Today's checked-in/out/late/absent counts for one member type, each as
 // "X of Y" against every active member of that type (not just those on a
 // roster today, so the denominator reads as a stable roster size).
+//
+// Every query here excludes rosters.category = 'Class Roster' - a member
+// showing up as present, late, absent, or checked out of one specific
+// CLASS (routes/kiosk-class-checkin.js) doesn't mean they showed up at
+// the co-op at all today; only their day-level Parent/Student roster
+// reflects that. Without this filter, checking into or out of a single
+// class would inflate this whole-day dashboard the same as actually
+// checking in/out at the front door - the exact "two independent
+// presence signals" isolation the class check-in flow was built to keep
+// (see routes/kiosk.js's own comment), just extended to this aggregate.
 function todayStatsForType(memberType, today) {
   const total = db
     .prepare(`SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?`)
@@ -75,41 +85,53 @@ function todayStatsForType(memberType, today) {
     .prepare(
       `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
        JOIN members m ON m.id = a.member_id
-       WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ?`
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ? AND r.category != 'Class Roster'`
     )
     .get(today, memberType).c;
   const checkedOut = db
     .prepare(
       `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
        JOIN members m ON m.id = c.member_id
-       WHERE c.session_date = ? AND m.member_type = ?`
+       JOIN rosters r ON r.id = c.roster_id
+       WHERE c.session_date = ? AND m.member_type = ? AND r.category != 'Class Roster'`
     )
     .get(today, memberType).c;
   const late = db
     .prepare(
       `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
        JOIN members m ON m.id = a.member_id
-       WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ?`
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ? AND r.category != 'Class Roster'`
     )
     .get(today, memberType).c;
   const absent = db
     .prepare(
       `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
        JOIN members m ON m.id = a.member_id
-       WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ?`
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ? AND r.category != 'Class Roster'`
     )
     .get(today, memberType).c;
 
   return { total, checkedIn, checkedOut, late, absent };
 }
 
-// The most recent session date with any recorded attendance strictly
-// before `today` - i.e. "last time this ran", whichever weekday that
-// happened to be. Doesn't need its own same-weekday filter: attendance
-// rows only ever exist for actual class days in the first place, so the
-// most recent prior one already IS the last comparable session.
+// The most recent day-level (non-class-roster) session date with any
+// recorded attendance strictly before `today` - i.e. "last time this ran",
+// whichever weekday that happened to be. Excludes class rosters for the
+// same reason todayStatsForType() does: a day where a class was checked
+// into but the day-level roster never ran isn't a real prior session to
+// trend against.
 function previousSessionDate(today) {
-  const row = db.prepare('SELECT DISTINCT session_date FROM attendance WHERE session_date < ? ORDER BY session_date DESC LIMIT 1').get(today);
+  const row = db
+    .prepare(
+      `SELECT DISTINCT a.session_date FROM attendance a
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.session_date < ? AND r.category != 'Class Roster'
+       ORDER BY a.session_date DESC LIMIT 1`
+    )
+    .get(today);
   return row ? row.session_date : null;
 }
 

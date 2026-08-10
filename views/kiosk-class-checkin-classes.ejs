@@ -6,27 +6,19 @@
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap">
-    <div class="print-header-sub" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <a href="/kiosk" class="kiosk-home">&larr; Home</a>
+    <div class="kiosk-inline-header">
+      <a href="/kiosk/class-checkin/classes" class="kiosk-home kiosk-home-inline">&larr; Back to Days</a>
       <form method="POST" action="/kiosk/class-checkin/lock">
         <button type="submit" class="btn-secondary">Done</button>
       </form>
     </div>
-    <h1>Class Check-In</h1>
+    <h1><%= dayLabel %> Classes</h1>
     <p class="subtitle">Choose a class to check students in or view its attendance.</p>
 
     <div class="roster-toolbar no-print">
       <div class="category-filter" style="margin: 0;">
-        <label for="kiosk-class-day-select">Day</label>
-        <select id="kiosk-class-day-select" onchange="window.location = '/kiosk/class-checkin/classes' + (this.value ? '?day=' + this.value : '') + (document.getElementById('kiosk-class-hour-select').value ? (this.value ? '&' : '?') + 'hour=' + document.getElementById('kiosk-class-hour-select').value : '')">
-          <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
-          <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-          <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-        </select>
-      </div>
-      <div class="category-filter" style="margin: 0;">
         <label for="kiosk-class-hour-select">Hour</label>
-        <select id="kiosk-class-hour-select" onchange="window.location = '/kiosk/class-checkin/classes' + (document.getElementById('kiosk-class-day-select').value ? '?day=' + document.getElementById('kiosk-class-day-select').value : '') + (this.value ? (document.getElementById('kiosk-class-day-select').value ? '&' : '?') + 'hour=' + this.value : '')">
+        <select id="kiosk-class-hour-select" onchange="window.location = '/kiosk/class-checkin/classes/<%= day %>' + (this.value ? '?hour=' + this.value : '')">
           <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
           <% hourPositions.forEach(function(h) { %>
             <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>
@@ -40,11 +32,10 @@
     <% } else { %>
       <div class="class-roster-list">
         <% classes.forEach(function(c) { %>
-          <a class="class-roster-row-btn" href="/kiosk/class-checkin/classes/<%= c.id %>" style="border-left: 5px solid <%= c.color %>;">
+          <a class="class-roster-row-btn" href="/kiosk/class-checkin/classes/<%= c.id %>/attendance" style="border-left: 5px solid <%= c.color %>;">
             <span class="class-roster-row-name"><%= c.class_name %></span>
             <span class="class-roster-row-meta">
               <% if (c.gradeLabel) { %><span><%= c.gradeLabel %></span><% } %>
-              <span><%= c.dayLabel %></span>
               <span><%= c.timeLabel %></span>
               <% if (c.room) { %><span>Room <%= c.room %></span><% } %>
               <span>Teacher: <%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></span>
