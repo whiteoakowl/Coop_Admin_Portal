@@ -142,9 +142,20 @@ app.use(
 
 // Available in every EJS view (including partials/admin-nav) without each
 // route having to pass it explicitly. True only for the single master Admin
-// account.
+// account. Also generates (once per session) and exposes the CSRF
+// synchronizer token every admin page needs to embed - see
+// middleware/csrfProtection.js for how it's checked. Only ever generated
+// for a session that already has adminId set, so an anonymous visitor to
+// a public page never gets a session created just to hold this.
 app.use((req, res, next) => {
-  res.locals.isFullAdmin = !!(req.session && req.session.adminId);
+  const isAdmin = !!(req.session && req.session.adminId);
+  res.locals.isFullAdmin = isAdmin;
+  if (isAdmin) {
+    if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
+    res.locals.csrfToken = req.session.csrfToken;
+  } else {
+    res.locals.csrfToken = null;
+  }
   next();
 });
 
@@ -168,6 +179,7 @@ app.use('/', membershipRouter);
 // every other /admin router ensures the latter's own requireAdmin routes
 // get first chance to handle the request, instead of being hijacked by an
 // unrelated router's blanket gate before they're ever reached.
+app.use('/admin', require('./middleware/csrfProtection'));
 app.use('/admin', adminRouter);
 app.use('/admin', adminRostersRouter);
 app.use('/admin', adminLogsRouter);

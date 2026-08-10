@@ -1,5 +1,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<%# Empty (not omitted) on every public/kiosk page - there's no admin
+    session to hold a token for there, and none of those routes are
+    CSRF-checked (see middleware/csrfProtection.js). public/js/csrf.js
+    just no-ops when this is blank. %>
+<meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' && csrfToken ? csrfToken : '' %>" />
 <title><%= title %> · Sanford Homeschoolers</title>
 <link rel="icon" type="image/png" href="/img/logo.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,3 +19,4 @@
 <meta name="theme-color" content="#4682B4" />
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
 <script src="/js/pwa.js" defer></script>
+<script src="/js/csrf.js" defer></script>

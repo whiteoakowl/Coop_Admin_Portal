@@ -1100,7 +1100,7 @@
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('/admin/schedule/design-image', { method: 'POST', body: formData });
+      const res = await fetch('/admin/schedule/design-image', { method: 'POST', headers: { 'X-CSRF-Token': window.CSRF_TOKEN || '' }, body: formData });
       const data = await res.json();
       if (data.ok) {
         const el = { id: newId('image'), type: 'image', src: data.url, x: 10, y: 10, width: 100, height: 100 };
@@ -1323,7 +1323,7 @@
       try {
         const res = await fetch('/admin/schedule/design/template', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
           body: JSON.stringify({ layout }),
         });
         const data = await res.json();

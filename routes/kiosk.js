@@ -8,6 +8,20 @@ const { familyOf } = require('../utils/members');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
+const { createRateLimiter } = require('../utils/rateLimit');
+
+// Both scan endpoints are unauthenticated by design - a member's barcode
+// is their own name specifically so it can be typed at the kiosk as well
+// as scanned, with no login of any kind (members never get portal
+// accounts; the kiosk is the entire member-facing surface). That's
+// intentional and not something this limiter changes. What it guards
+// against is a *script* driving either endpoint at a volume no person
+// physically standing at one kiosk ever would - the caps below are set
+// well above a genuinely busy drop-off (many families scanning in quick
+// succession) and only bite something sending requests far faster than a
+// human walking up, scanning, and stepping aside possibly could.
+const checkinLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 40 });
+const findParentLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 40 });
 
 // Full kiosk landing screen (Check In/Out, Floater Assignments, forms) -
 // not the site's homepage anymore (that's now the member/staff login),
@@ -26,6 +40,11 @@ router.get('/checkin', (req, res) => {
 });
 
 router.post('/checkin/scan', (req, res) => {
+  if (checkinLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  checkinLimiter.recordAttempt(req.ip);
+
   const barcode = (req.body.barcode || '').trim();
   const today = todayISO();
 
@@ -85,6 +104,11 @@ router.get('/find-parent', (req, res) => {
 });
 
 router.post('/find-parent/scan', (req, res) => {
+  if (findParentLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many lookups from this device right now. Please wait a moment and try again.' });
+  }
+  findParentLimiter.recordAttempt(req.ip);
+
   const barcode = (req.body.barcode || '').trim();
   if (!barcode) {
     return res.json({ ok: false, message: 'No barcode scanned.' });

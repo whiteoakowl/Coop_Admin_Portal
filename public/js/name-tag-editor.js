@@ -1129,7 +1129,7 @@
     try {
       const res = await fetch('/admin/name-tag/design-image', {
         method: 'POST',
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: formData,
       });
       // A session that expired mid-edit gets a redirect to the login page
@@ -1370,7 +1370,7 @@
       try {
         const res = await fetch('/admin/name-tag/template/' + currentType, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
           body: JSON.stringify({ layout: currentTemplate() }),
         });
         // See uploadImage above for why this check exists.

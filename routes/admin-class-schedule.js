@@ -331,7 +331,7 @@ router.get('/class-schedule/classes/:id/roster/import-template.xlsx', requireFul
   res.send(buffer);
 });
 
-router.post('/class-schedule/classes/:id/roster/import', requireFullAdmin, upload.single('file'), (req, res) => {
+router.post('/class-schedule/classes/:id/roster/import', requireFullAdmin, upload.single('file'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -341,7 +341,7 @@ router.post('/class-schedule/classes/:id/roster/import', requireFullAdmin, uploa
 
   let rows;
   try {
-    rows = readRowsFromFile(req.file.buffer);
+    rows = await readRowsFromFile(req.file.buffer);
   } catch (err) {
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
@@ -392,7 +392,7 @@ function normalizeImportRow(row) {
   return out;
 }
 
-router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.single('file'), (req, res) => {
+router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Please choose a file to import.'));
@@ -400,7 +400,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
 
   let rows;
   try {
-    rows = readRowsFromFile(req.file.buffer).map(normalizeImportRow).filter((r) => r.className && r.hour);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.className && r.hour);
   } catch (err) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }

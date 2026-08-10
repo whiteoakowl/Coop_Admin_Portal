@@ -18,7 +18,7 @@
       try {
         await fetch(`/admin/rosters/${sel.dataset.tab}/attendance`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch' },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'fetch', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
           body: body.toString(),
         });
         if (status) status.textContent = 'Saved';

@@ -282,17 +282,21 @@ function updateClass(id, fields) {
 function deleteClass(id) {
   const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
   if (!cls) return;
-  if (cls.roster_id) {
-    db.prepare('UPDATE rosters SET active = 0 WHERE id = ?').run(cls.roster_id);
-  }
-  db.prepare('DELETE FROM classes WHERE id = ?').run(id);
+  db.withTransaction(() => {
+    if (cls.roster_id) {
+      db.prepare('UPDATE rosters SET active = 0 WHERE id = ?').run(cls.roster_id);
+    }
+    db.prepare('DELETE FROM classes WHERE id = ?').run(id);
+  });
   syncDayMemberRosters(cls.day);
 }
 
 function setEnrollment(classId, studentIds) {
-  db.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
-  const link = db.prepare('INSERT OR IGNORE INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
-  for (const studentId of studentIds) link.run(classId, studentId);
+  db.withTransaction(() => {
+    db.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
+    const link = db.prepare('INSERT OR IGNORE INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
+    for (const studentId of studentIds) link.run(classId, studentId);
+  });
   syncClassRosterMembers(classId);
   const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) syncDayMemberRosters(cls.day);

@@ -6,7 +6,7 @@
 <body class="public-page">
   <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow">
     <h1>403</h1>
-    <p>Your account doesn't have access to this section.</p>
+    <p><%= typeof message !== 'undefined' && message ? message : "Your account doesn't have access to this section." %></p>
     <a href="/admin" class="primary-btn">Back to Dashboard</a>
   </main>
 </body>

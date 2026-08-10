@@ -148,8 +148,10 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, (re
   const day = req.params.day;
   const list = getListByDay(day);
   const date = req.params.date;
-  db.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
-  db.prepare("DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = 'job'").run(date);
+  db.withTransaction(() => {
+    db.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
+    db.prepare("DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = 'job'").run(date);
+  });
   res.redirect(manageUrl(day, { notice: `Removed ${formatDateLabel(date)}.`, dialog: dialogParam(req) }));
 });
 
@@ -352,7 +354,7 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, (req, 
   sendCsv(res, `${day}-floater-teams.csv`, lines);
 });
 
-router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), (req, res) => {
+router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const firstSection = sectionsForList(list.id)[0];
@@ -362,7 +364,12 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   if (!firstSection) {
     return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('No hour sections exist yet.'));
   }
-  const names = parseNamesFromUpload(req.file.buffer, req.file.originalname);
+  let names;
+  try {
+    names = await parseNamesFromUpload(req.file.buffer, req.file.originalname);
+  } catch (err) {
+    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
   let added = 0;
   let notFound = 0;
   for (const name of names) {
