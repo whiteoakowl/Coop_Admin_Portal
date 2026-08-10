@@ -4,6 +4,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { isValidISODate } = require('../utils/dates');
+const { paginate, parsePage } = require('../utils/pagination');
 
 router.use(requireFullAdmin);
 
@@ -28,10 +29,20 @@ const TABS = ['checkin', 'checkout', 'members', 'titles'];
 router.get('/library', requireAdmin, (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'checkin';
   const typeFilter = (req.query.type || '').trim();
+  // Only the Catalog (titles) tab's table actually grows unbounded over
+  // the years - pagination only matters there, but paginate() is cheap
+  // enough to just always compute alongside the other tabs' unrelated
+  // data below. Unlike Members/Logs, the Catalog tab has no Print button
+  // at all (grep views/admin-library.ejs) - nothing to duplicate into a
+  // separate always-full print table, so a plain paginated `items` is
+  // the whole change.
+  const pagination = paginate(allItems(typeFilter), parsePage(req.query.page));
   res.render('admin-library', {
     title: 'Library',
     tab,
-    items: allItems(typeFilter),
+    items: pagination.items,
+    pagination,
+    baseHref: `/admin/library?tab=titles${typeFilter ? `&type=${encodeURIComponent(typeFilter)}` : ''}&`,
     types: allLibraryTypes(),
     typeFilter,
     membersWithCheckouts: membersWithActiveCheckouts(),
