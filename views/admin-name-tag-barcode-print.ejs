@@ -35,6 +35,10 @@
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <script src="/js/name-tag-render.js"></script>
-  <script src="/js/print-auto.js"></script>
+  <%# Not public/js/print-auto.js like every other print-preview page -
+      this one triggers window.print() itself, only once the name-shrink
+      pass has actually finished (see that script's own comment on why a
+      plain 'load' listener can't guarantee that ordering). %>
+  <script src="/js/barcode-print-shrink-name.js"></script>
 </body>
 </html>
