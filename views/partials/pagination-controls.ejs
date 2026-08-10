@@ -1,0 +1,29 @@
+<%
+// Locals: pagination (the object utils/pagination.js's paginate() returns),
+// baseHref (a URL up through and including its trailing "?" or "&", e.g.
+// "/admin/members?type=student&" - this partial appends "page=N" to it).
+// Renders nothing when everything fits on one page, so a small co-op with
+// a short list never sees pagination chrome at all. no-print like every
+// other on-screen-only control (roster-toolbar, view-tabs) - the printed
+// page shows the full unpaginated list, not just whichever page happened
+// to be open (see the print-only table each paginated view renders
+// alongside its on-screen one).
+%>
+<% if (pagination.totalPages > 1) { %>
+  <nav class="pagination-bar no-print" aria-label="Pagination">
+    <span class="pagination-summary">Showing <%= pagination.startIndex %>&ndash;<%= pagination.endIndex %> of <%= pagination.totalItems %></span>
+    <div class="pagination-nav">
+      <% if (pagination.hasPrev) { %>
+        <a class="pagination-btn" href="<%= baseHref %>page=<%= pagination.currentPage - 1 %>">&larr; Prev</a>
+      <% } else { %>
+        <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">&larr; Prev</span>
+      <% } %>
+      <span class="pagination-page-label">Page <%= pagination.currentPage %> of <%= pagination.totalPages %></span>
+      <% if (pagination.hasNext) { %>
+        <a class="pagination-btn" href="<%= baseHref %>page=<%= pagination.currentPage + 1 %>">Next &rarr;</a>
+      <% } else { %>
+        <span class="pagination-btn pagination-btn-disabled" aria-disabled="true">Next &rarr;</span>
+      <% } %>
+    </div>
+  </nav>
+<% } %>

@@ -19,6 +19,7 @@ const { familyOf, allFamilies, setMemberFamily, setPrimaryParent, rostersForMemb
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages } = require('../utils/duplexPrint');
+const { paginate, parsePage } = require('../utils/pagination');
 
 router.use(requireFullAdmin);
 
@@ -82,9 +83,17 @@ router.get('/members', requireAdmin, (req, res) => {
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
   const withRosters = membersWithDetails(typeFilter).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
+  // The on-screen table only gets the current page's slice - the print
+  // table (admin-members.ejs's separate .members-print-table) still gets
+  // every filtered member, since a printed roster is meant to show the
+  // whole list regardless of which page happened to be open on screen.
+  const pagination = paginate(withRosters, parsePage(req.query.page));
   res.render('admin-members', {
     title: 'Members',
-    members: withRosters,
+    members: pagination.items,
+    allMembersForPrint: withRosters,
+    pagination,
+    baseHref: '/admin/members?' + (typeFilter ? `type=${typeFilter}&` : ''),
     typeFilter,
     error: req.query.error || null,
     notice: req.query.notice || null,
