@@ -218,6 +218,13 @@ if (!substituteAssignmentColumns.includes('status')) {
   db.exec("ALTER TABLE substitute_assignments ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
 }
 
+// Backfills the members table's own vestigial Portal Access columns (see
+// db/schema.sql's comment on them) for a database old enough to predate
+// those columns entirely. Dead code migrating a database into a shape
+// that's ALSO dead - kept for the same reason the columns themselves
+// are: schema consistency across every existing database out there,
+// however old, isn't worth the risk of an ALTER TABLE DROP COLUMN on
+// this specific table just to stop adding five unused columns.
 const memberPortalColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
 if (!memberPortalColumns.includes('username')) {
   db.exec('ALTER TABLE members ADD COLUMN username TEXT UNIQUE');
