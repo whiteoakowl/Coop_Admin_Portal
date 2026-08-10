@@ -1,26 +1,33 @@
 <%
-// locals: label (string), stats ({ total, checkedIn, checkedOut, late, absent })
+// locals: label (string), stats ({ total, checkedIn, checkedOut, late,
+// absent, trends, previousDateLabel }). trends is null when there's no
+// previous session yet to compare against (see routes/admin.js's
+// statsWithTrends) - in that case no trend badges render at all, rather
+// than a misleading comparison against a session that never happened.
+var trendSymbols = { up: '&#9650;', down: '&#9660;', flat: '&#9679;' };
 %>
 <div class="dashboard-analytics-card">
   <div class="dashboard-analytics-header">
     <h2><%= label %></h2>
   </div>
   <div class="analytics-stat-grid">
-    <div class="analytics-stat analytics-stat-checkedin">
-      <span class="analytics-stat-label">Checked In</span>
-      <span class="analytics-stat-value"><%= stats.checkedIn %><span class="analytics-stat-of"> of <%= stats.total %></span></span>
-    </div>
-    <div class="analytics-stat analytics-stat-checkedout">
-      <span class="analytics-stat-label">Checked Out</span>
-      <span class="analytics-stat-value"><%= stats.checkedOut %><span class="analytics-stat-of"> of <%= stats.total %></span></span>
-    </div>
-    <div class="analytics-stat analytics-stat-absent">
-      <span class="analytics-stat-label">Absent</span>
-      <span class="analytics-stat-value"><%= stats.absent %><span class="analytics-stat-of"> of <%= stats.total %></span></span>
-    </div>
-    <div class="analytics-stat analytics-stat-late">
-      <span class="analytics-stat-label">Late</span>
-      <span class="analytics-stat-value"><%= stats.late %><span class="analytics-stat-of"> of <%= stats.total %></span></span>
-    </div>
+    <% [
+      { key: 'checkedIn', label: 'Checked In', cellClass: 'analytics-stat-checkedin' },
+      { key: 'checkedOut', label: 'Checked Out', cellClass: 'analytics-stat-checkedout' },
+      { key: 'absent', label: 'Absent', cellClass: 'analytics-stat-absent' },
+      { key: 'late', label: 'Late', cellClass: 'analytics-stat-late' },
+    ].forEach(function(row) {
+      var trend = stats.trends && stats.trends[row.key];
+    %>
+      <div class="analytics-stat <%= row.cellClass %>">
+        <span class="analytics-stat-label"><%= row.label %></span>
+        <span class="analytics-stat-value"><%= stats[row.key] %><span class="analytics-stat-of"> of <%= stats.total %></span></span>
+        <% if (trend) { %>
+          <span class="trend-badge trend-badge-<%= trend.direction %>" title="vs last session (<%= stats.previousDateLabel %>)">
+            <%- trendSymbols[trend.direction] %> <%= trend.delta > 0 ? '+' + trend.delta : trend.delta %>
+          </span>
+        <% } %>
+      </div>
+    <% }); %>
   </div>
 </div>

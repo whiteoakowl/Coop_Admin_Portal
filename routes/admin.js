@@ -5,13 +5,14 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { todayISO } = require('../utils/dates');
+const { todayISO, formatDateLabel } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { backupPackageBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
 const { databaseFileFilter } = require('../utils/uploads');
 const { setClassCheckinPin } = require('../utils/classCheckinPin');
+const { computeTrend } = require('../utils/dashboardTrends');
 
 // Restore uploads never touch disk (memoryStorage) - the whole file needs
 // to be in hand before it can be validated/unpacked. 200MB is generous
@@ -102,8 +103,40 @@ function todayStatsForType(memberType, today) {
   return { total, checkedIn, checkedOut, late, absent };
 }
 
+// The most recent session date with any recorded attendance strictly
+// before `today` - i.e. "last time this ran", whichever weekday that
+// happened to be. Doesn't need its own same-weekday filter: attendance
+// rows only ever exist for actual class days in the first place, so the
+// most recent prior one already IS the last comparable session.
+function previousSessionDate(today) {
+  const row = db.prepare('SELECT DISTINCT session_date FROM attendance WHERE session_date < ? ORDER BY session_date DESC LIMIT 1').get(today);
+  return row ? row.session_date : null;
+}
+
+// Attaches a trends object (see utils/dashboardTrends.js) to a
+// todayStatsForType() result, comparing each of the four counts against
+// the same stat from the previous session - null (no trends rendered at
+// all) when there isn't a previous session yet, rather than a misleading
+// comparison against a session that never happened.
+function statsWithTrends(memberType, today, previousDate) {
+  const current = todayStatsForType(memberType, today);
+  if (!previousDate) return { ...current, trends: null, previousDateLabel: null };
+  const previous = todayStatsForType(memberType, previousDate);
+  return {
+    ...current,
+    trends: {
+      checkedIn: computeTrend(current.checkedIn, previous.checkedIn),
+      checkedOut: computeTrend(current.checkedOut, previous.checkedOut),
+      absent: computeTrend(current.absent, previous.absent),
+      late: computeTrend(current.late, previous.late),
+    },
+    previousDateLabel: formatDateLabel(previousDate),
+  };
+}
+
 router.get('/', requireAdmin, (req, res) => {
   const today = todayISO();
+  const previousDate = previousSessionDate(today);
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
   const studentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get().c;
   const parentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get().c;
@@ -113,8 +146,8 @@ router.get('/', requireAdmin, (req, res) => {
     memberCount,
     studentCount,
     parentCount,
-    studentStats: todayStatsForType('student', today),
-    parentStats: todayStatsForType('parent', today),
+    studentStats: statsWithTrends('student', today, previousDate),
+    parentStats: statsWithTrends('parent', today, previousDate),
     alerts: todaysAlerts(),
   });
 });

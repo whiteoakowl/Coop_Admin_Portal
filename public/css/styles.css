@@ -1024,6 +1024,25 @@ textarea:focus-visible,
 .analytics-stat-late { border-left-color: var(--yellow-solid); }
 .analytics-stat-absent { border-left-color: var(--red); }
 
+/* Trend badges (views/partials/dashboard-type-stats.ejs) - a stat's
+   count this session vs. the same stat last session. Neutral gray for
+   "flat" always; up/down get a color, but the same one regardless of
+   which stat it's on (green for up, amber for down) - this only
+   describes the direction of movement, not whether it's good or bad for
+   that particular metric (see utils/dashboardTrends.js's own comment). */
+.trend-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-top: 0.2rem;
+  cursor: default;
+}
+.trend-badge-up { color: var(--green); }
+.trend-badge-down { color: var(--yellow-solid); }
+.trend-badge-flat { color: var(--muted); }
+
 .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
 
 .admin-card {
