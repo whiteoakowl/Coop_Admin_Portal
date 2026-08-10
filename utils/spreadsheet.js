@@ -1,4 +1,6 @@
 const XLSX = require('xlsx');
+const path = require('path');
+const { Worker } = require('worker_threads');
 
 // Builds an .xlsx file (as a Buffer) with a header row followed by a few
 // example rows, so admins have a ready-made template for CSV/XLSX imports.
@@ -10,33 +12,65 @@ function buildTemplateWorkbook(headers, exampleRows) {
 }
 
 // The installed xlsx version (0.18.5, the last one SheetJS published to
-// npm - newer fixes only ship from their own CDN now) has a known
-// prototype-pollution advisory in exactly this parse path: a crafted
-// header/cell name like "__proto__" can inject a key that, once merged
-// onto a plain object, reaches up to Object.prototype and corrupts every
-// object in the process, not just this one row. Rebuilding each row as a
-// fresh plain object and dropping any such key closes that off at the
-// one place every import route in the app funnels through, independent
-// of whether/when the underlying library gets a real fix. A legitimate
-// import file has no business having a column literally named
-// "__proto__" anyway, so this can't reject anything genuine.
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-function sanitizeRow(row) {
-  const clean = {};
-  for (const key of Object.keys(row)) {
-    if (DANGEROUS_KEYS.has(key)) continue;
-    clean[key] = row[key];
-  }
-  return clean;
-}
+// npm - newer fixes only ship from their own CDN now) has two known
+// advisories in exactly this parse path: a prototype-pollution issue (a
+// crafted header/cell name like "__proto__" can inject a key that, once
+// merged onto a plain object, reaches up to Object.prototype and
+// corrupts every object in the process) and a separate ReDoS. The
+// prototype-pollution guard (dropping __proto__/constructor/prototype
+// keys from every row) now lives in utils/spreadsheetWorker.js alongside
+// the parse itself - see readRowsFromFile below for why the parse moved
+// off this thread entirely, which is also what closes off the ReDoS: a
+// hung worker gets terminated by the timeout instead of hanging the
+// whole app.
 
-// Reads an uploaded .csv/.txt/.xlsx file into an array of row objects keyed
-// by the header row. SheetJS auto-detects the format from the buffer.
-function readRowsFromFile(buffer) {
-  const wb = XLSX.read(buffer, { type: 'buffer' });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  if (!sheet) return [];
-  return XLSX.utils.sheet_to_json(sheet, { defval: '' }).map(sanitizeRow);
+const DEFAULT_PARSE_TIMEOUT_MS = 10 * 1000;
+
+// Reads an uploaded .csv/.txt/.xlsx file into an array of row objects
+// keyed by the header row. SheetJS auto-detects the format from the
+// buffer. Runs in a separate worker thread with a hard wall-clock
+// timeout rather than calling XLSX.read() directly on this (the main)
+// thread - that parse is synchronous CPU-bound work, so a pathological
+// file exploiting xlsx's unpatched ReDoS advisory would otherwise hang
+// the entire single-threaded server, including live kiosk check-ins,
+// for as long as it ran. Every call site already awaits/handles a
+// rejection the same way it always handled a thrown parse error (see
+// e.g. routes/admin-members.js's import route), so this only changes
+// *how* a bad file fails, not what the caller does about it.
+//
+// timeoutMs is an optional override (tests use a tiny one to prove the
+// termination path actually fires, rather than trusting it untested -
+// no real caller needs anything but the default).
+function readRowsFromFile(buffer, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'spreadsheetWorker.js'));
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      settled = true;
+      worker.terminate();
+      reject(new Error('That file took too long to read - it may be corrupted or too complex to import.'));
+    }, timeoutMs || DEFAULT_PARSE_TIMEOUT_MS);
+
+    worker.once('message', (msg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.terminate();
+      if (msg.ok) resolve(msg.rows);
+      else reject(new Error(msg.error));
+    });
+
+    worker.once('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.terminate();
+      reject(err);
+    });
+
+    worker.postMessage(buffer);
+  });
 }
 
 // Quotes a CSV field and escapes embedded quotes. Every export route in

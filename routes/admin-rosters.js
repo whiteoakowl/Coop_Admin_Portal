@@ -301,15 +301,10 @@ function archiveDay(day) {
   const studentRosterId = ensureDayRoster(day, 'student');
   const classRosterIds = allClassesList(day).map((c) => c.roster_id).filter(Boolean);
 
-  db.exec('BEGIN');
-  try {
+  db.withTransaction(() => {
     db.prepare('INSERT INTO roster_archives (day, data_json) VALUES (?, ?)').run(day, JSON.stringify(snapshot));
     for (const rosterId of [parentRosterId, studentRosterId, ...classRosterIds]) clearDayRosterData(rosterId);
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 
   return { ok: true, message: `Archived ${DAY_LABELS[day]} attendance. The live roster has been cleared for a fresh start.` };
 }
@@ -458,9 +453,11 @@ router.post('/rosters/:tab/dates/:date/remove', requireAdmin, (req, res) => {
   const date = req.params.date;
   const rosterIds = [rosterId, siblingRosterId(tab)].filter(Boolean);
   const placeholders = rosterIds.map(() => '?').join(',');
-  db.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
-  db.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
-  db.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  db.withTransaction(() => {
+    db.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+    db.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+    db.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  });
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
 });
 

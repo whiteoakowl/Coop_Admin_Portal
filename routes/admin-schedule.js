@@ -190,7 +190,7 @@ function normalizeScheduleImportRow(row) {
   return out;
 }
 
-router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.single('file'), (req, res) => {
+router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.single('file'), async (req, res) => {
   const tab = req.params.tab;
   const memberType = SCHEDULE_IMPORT_TABS[tab];
   if (!memberType) return res.status(404).send('Not found');
@@ -202,7 +202,7 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
 
   let rows;
   try {
-    rows = readRowsFromFile(req.file.buffer).map(normalizeScheduleImportRow).filter((r) => r.name && r.day && r.className);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeScheduleImportRow).filter((r) => r.name && r.day && r.className);
   } catch (err) {
     return res.redirect(`${redirectBase}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }

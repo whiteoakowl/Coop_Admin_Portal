@@ -247,12 +247,17 @@ router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireDay, (
 // creating the list (unlinked to any team) if it doesn't exist yet, then
 // appends that row's task to the end of that list - Number is never
 // imported, it's always just that row's position (see itemsForSection).
-router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.single('file'), (req, res) => {
+router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Please choose a file to import.'));
   }
-  const rows = readRowsFromFile(req.file.buffer);
+  let rows;
+  try {
+    rows = await readRowsFromFile(req.file.buffer);
+  } catch (err) {
+    return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
   const sectionIdByTitle = new Map();
   taskListSectionsForDay(day).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
 

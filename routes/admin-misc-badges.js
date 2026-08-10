@@ -55,7 +55,7 @@ function normalizeImportRow(row) {
 
 // An import defines the full deck for this badge type - it replaces
 // whatever list was there before rather than appending to it.
-router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('file'), (req, res) => {
+router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('file'), async (req, res) => {
   const type = req.params.type;
   if (!req.file) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Please choose a file to import.'));
@@ -63,7 +63,7 @@ router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('
 
   let rows;
   try {
-    rows = readRowsFromFile(req.file.buffer).map(normalizeImportRow).filter((r) => r.title || r.badgeNumber);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.title || r.badgeNumber);
   } catch (err) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }

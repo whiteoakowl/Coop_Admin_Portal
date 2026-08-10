@@ -28,12 +28,13 @@ function parseNamesFile(buffer) {
 }
 
 // Same names-only import, but also accepts .xlsx (SheetJS can't be pointed
-// at raw text the way parseNamesFile is, so route by extension).
-function parseNamesFromUpload(buffer, filename) {
+// at raw text the way parseNamesFile is, so route by extension). Async
+// because readRowsFromFile is - see utils/spreadsheet.js for why.
+async function parseNamesFromUpload(buffer, filename) {
   const ext = (filename || '').split('.').pop().toLowerCase();
   if (ext !== 'xlsx') return parseNamesFile(buffer);
 
-  return readRowsFromFile(buffer)
+  return (await readRowsFromFile(buffer))
     .map((row) => {
       const firstKey = Object.keys(row)[0];
       return firstKey ? String(row[firstKey]).trim() : '';

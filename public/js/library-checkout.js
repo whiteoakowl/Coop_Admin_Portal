@@ -78,7 +78,7 @@
     try {
       const res = await fetch('/admin/library/scan-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
       // A session that expired mid-use gets a redirect to the login page
@@ -120,7 +120,7 @@
     try {
       const res = await fetch('/admin/library/scan-item', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
       // See the scan-member handler above for why this check exists.
@@ -209,7 +209,7 @@
     try {
       const res = await fetch('/admin/library/scan-checkin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: 'barcode=' + encodeURIComponent(barcode),
       });
       // See the scan-member handler above for why this check exists.

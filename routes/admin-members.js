@@ -522,14 +522,14 @@ function mergeableFieldsFor(existingMember, row) {
   return updates;
 }
 
-router.post('/members/import', requireAdmin, upload.single('file'), (req, res) => {
+router.post('/members/import', requireAdmin, upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
   }
 
   let rows;
   try {
-    rows = readRowsFromFile(req.file.buffer).map(normalizeImportRow).filter((r) => r.name);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.name);
   } catch (err) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }

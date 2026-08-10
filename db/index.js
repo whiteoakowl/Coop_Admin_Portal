@@ -416,4 +416,29 @@ if (leadershipCount === 0) {
   );
 }
 
+// Runs fn() inside an explicit transaction, rolling back on any throw. Most
+// multi-statement writes elsewhere in the app run as several independent,
+// unwrapped statements - fine for a single interleaved request (node:sqlite
+// is synchronous and Node is single-threaded, so one request's statements
+// always finish before the next request's can start - see the app's own
+// audit notes on why that rules out classic interleaved-request races) but
+// not safe against the process dying between two statements (a kiosk
+// machine losing power mid-request is not hypothetical for this
+// deployment). Anywhere removing a date/member/record touches more than
+// one table that has to stay consistent with each other should use this
+// instead of running bare statements in a row - see routes/admin-rosters.js's
+// archiveDay() for the original hand-written version this generalizes.
+function withTransaction(fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+db.withTransaction = withTransaction;
+
 module.exports = db;
