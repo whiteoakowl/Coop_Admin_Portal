@@ -6,7 +6,6 @@ const zlib = require('zlib');
 const { DatabaseSync } = require('node:sqlite');
 const db = require('../db');
 
-const DATA_DIR = path.dirname(db.DB_PATH);
 // Overridable the same way db/index.js's DB_PATH is, so tests can point
 // this at a throwaway directory instead of the real public/uploads/.
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'public', 'uploads');
@@ -134,7 +133,21 @@ function backupPackageBuffer() {
 const REQUIRED_TABLES = ['admins', 'members', 'rosters'];
 
 const RESTORE_PENDING_PATH = `${db.DB_PATH}.restore-pending`;
-const UPLOADS_RESTORE_PENDING_DIR = path.join(DATA_DIR, 'uploads-restore-pending');
+// A sibling of UPLOADS_DIR (not a path derived from db.DB_PATH's own
+// directory) so it's scoped the same way UPLOADS_DIR itself already is -
+// this used to live under path.dirname(db.DB_PATH) instead, which only
+// coincidentally worked in production (DB_PATH and the real
+// public/uploads/ both happen to live under the repo root) and actively
+// broke under test: every test file's throwaway DB_PATH sits directly in
+// os.tmpdir(), so path.dirname(db.DB_PATH) collapsed to the exact same
+// bare os.tmpdir() for every one of them regardless of which test's own
+// pid-scoped UPLOADS_DIR was in play, and this staging directory's name
+// was a fixed 'uploads-restore-pending' with no pid/test scoping at all
+// - a flaky cross-test collision on a shared, unscoped path
+// (test/backupPackage.test.js's own restore assertions would
+// intermittently fail under `npm test`'s parallel test-file execution,
+// never in isolation, which is exactly this class of bug's signature).
+const UPLOADS_RESTORE_PENDING_DIR = `${UPLOADS_DIR}-restore-pending`;
 
 // Marks an error message as already safe/specific enough to show an admin
 // directly, so the catch-all in stageRestore below knows not to paper over

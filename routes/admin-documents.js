@@ -4,7 +4,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { documentFileFilter, DOCUMENT_MIME_BY_EXT } = require('../utils/uploads');
 
@@ -25,7 +24,7 @@ const upload = multer({
   fileFilter: documentFileFilter,
 });
 
-router.get('/documents', requireAdmin, (req, res) => {
+router.get('/documents', (req, res) => {
   const documents = db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all();
   res.render('admin-documents', {
     title: 'Documents',
@@ -35,13 +34,13 @@ router.get('/documents', requireAdmin, (req, res) => {
   });
 });
 
-router.get('/documents/:id/view', requireAdmin, (req, res) => {
+router.get('/documents/:id/view', (req, res) => {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!doc) return res.status(404).render('404', { title: 'Not Found' });
   res.render('admin-document-view', { title: doc.title, doc });
 });
 
-router.get('/documents/:id/file', requireAdmin, (req, res) => {
+router.get('/documents/:id/file', (req, res) => {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!doc) return res.status(404).send('Not found');
   const filePath = path.join(DOCUMENT_DIR, doc.file_path);
@@ -51,7 +50,7 @@ router.get('/documents/:id/file', requireAdmin, (req, res) => {
   res.sendFile(filePath);
 });
 
-router.post('/documents/upload', requireAdmin, upload.single('file'), (req, res) => {
+router.post('/documents/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.redirect(
       '/admin/settings?tab=documents&error=' +
@@ -68,7 +67,7 @@ router.post('/documents/upload', requireAdmin, upload.single('file'), (req, res)
   res.redirect('/admin/settings?tab=documents&notice=' + encodeURIComponent(`"${title}" uploaded.`));
 });
 
-router.post('/documents/:id/delete', requireAdmin, (req, res) => {
+router.post('/documents/:id/delete', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (doc) {

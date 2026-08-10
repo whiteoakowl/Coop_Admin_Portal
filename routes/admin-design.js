@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { getTemplate } = require('../utils/nameTagData');
@@ -25,7 +24,7 @@ const TABS = ['design', 'print'];
 // (name-tag-editor.js / schedule-card-editor.js), so switching types never
 // reloads the page. Print has a dropdown of what to print (schedule cards,
 // name tags, schedules, logs), reusing the existing print flows for each.
-router.get('/design', requireAdmin, (req, res) => {
+router.get('/design', (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'design';
   const initialType = DESIGN_TYPES.includes(req.query.type) ? req.query.type : 'student';
 
@@ -76,7 +75,7 @@ router.get('/design', requireAdmin, (req, res) => {
 // cards side by side, one row per member - unlike the separate bulk Name
 // Tag / Schedule Card sheets (8-per-page grids of one card type), this is
 // a comparison/cut-together layout, so it isn't pinned to that grid.
-router.post('/design/print-both', requireFullAdmin, (req, res) => {
+router.post('/design/print-both', (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
@@ -100,7 +99,7 @@ router.post('/design/print-both', requireFullAdmin, (req, res) => {
 // (see utils/duplexPrint.js), so printing double-sided and cutting along
 // the grid lines gives each member a single two-sided card instead of
 // two separate ones.
-router.post('/design/print-duplex', requireFullAdmin, (req, res) => {
+router.post('/design/print-duplex', (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));

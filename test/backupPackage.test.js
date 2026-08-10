@@ -35,7 +35,7 @@ test('backupPackageBuffer / restore, including uploaded files', async (t) => {
       fs.rmSync(`${testDbPath}${suffix}`, { force: true });
     }
     fs.rmSync(testUploadsDir, { recursive: true, force: true });
-    fs.rmSync(path.join(path.dirname(testDbPath), 'uploads-restore-pending'), { recursive: true, force: true });
+    fs.rmSync(`${testUploadsDir}-restore-pending`, { recursive: true, force: true });
   });
 
   await t.test('the package includes both the database and every uploaded file', () => {
@@ -111,7 +111,7 @@ test('backupPackageBuffer / restore, including uploaded files', async (t) => {
     writeTestUpload('members/whatever.jpg', Buffer.from('whatever'));
     stageRestore(backupPackageBuffer());
     assert.equal(isRestoreStaged(), true);
-    const pendingUploadsDir = path.join(path.dirname(testDbPath), 'uploads-restore-pending');
+    const pendingUploadsDir = `${testUploadsDir}-restore-pending`;
     assert.equal(fs.existsSync(pendingUploadsDir), true);
 
     cancelStagedRestore();

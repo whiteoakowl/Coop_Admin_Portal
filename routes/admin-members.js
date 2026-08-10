@@ -4,7 +4,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
@@ -74,7 +73,7 @@ function attendanceHistoryForMember(memberId) {
 
 // --- Members page (the full member list) ---
 
-router.get('/members', requireAdmin, (req, res) => {
+router.get('/members', (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
   // getMemberSchedule()) used to be computed here for every member on
@@ -104,7 +103,7 @@ router.get('/members', requireAdmin, (req, res) => {
 // public/js/members-dialogs.js). The same badge/schedule-card rendering
 // the /members list route used to do for every row up front, done here
 // for exactly the one member whose dialog was actually opened.
-router.get('/members/:id/cards-fragment', requireAdmin, (req, res) => {
+router.get('/members/:id/cards-fragment', (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
   const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
@@ -127,7 +126,7 @@ router.get('/members/:id/cards-fragment', requireAdmin, (req, res) => {
 // public/js/members-dialogs.js). This is the getMemberSchedule() query
 // the /members list route used to run for every row up front, done here
 // for exactly the one member whose dialog was actually opened.
-router.get('/members/:id/schedule-fragment', requireAdmin, (req, res) => {
+router.get('/members/:id/schedule-fragment', (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
   res.render('member-schedule-fragment', { member, schedule: getMemberSchedule(member.id) });
@@ -137,7 +136,7 @@ router.get('/members/:id/schedule-fragment', requireAdmin, (req, res) => {
 // originally collected about them (contact info, address, birthday/grade,
 // medical notes, family, rosters) - not just the Name/Type/Family/Rosters
 // subset shown in the on-screen table.
-router.get('/members/export.csv', requireAdmin, (req, res) => {
+router.get('/members/export.csv', (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const members = membersWithDetails(typeFilter);
 
@@ -277,7 +276,7 @@ function cleanupTeamIdsForMember(memberId) {
 
 // A family only shows up on the "Choose a Family" dropdown once it's been
 // added here - the Members page's "+ Add Family" button.
-router.post('/members/families/new', requireAdmin, (req, res) => {
+router.post('/members/families/new', (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Family name is required.'));
@@ -290,7 +289,7 @@ router.post('/members/families/new', requireAdmin, (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 
-router.get('/members/new', requireAdmin, (req, res) => {
+router.get('/members/new', (req, res) => {
   res.render('admin-member-edit', {
     title: 'Add Member',
     mode: 'create',
@@ -319,7 +318,7 @@ router.get('/members/new', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res) => {
+router.post('/members/new', uploadPhoto.single('photo'), (req, res) => {
   const f = memberFormFields(req);
 
   if (!f.name) {
@@ -366,7 +365,7 @@ router.post('/members/new', requireAdmin, uploadPhoto.single('photo'), (req, res
 // popup in the app, this one reads the full set of profile columns.
 // Registered here (before the /members/:id routes below) so its literal
 // path never gets shadowed by the :id param.
-router.get('/members/import-template.xlsx', requireAdmin, (req, res) => {
+router.get('/members/import-template.xlsx', (req, res) => {
   const buffer = buildTemplateWorkbook(
     ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
     [
@@ -386,7 +385,7 @@ const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 // class enrollment/staffing automatically (see syncMemberSchedulesForDay
 // in utils/classSchedule.js); actually editing the profile itself is
 // still the dedicated Edit page, linked from the Profile tab.
-router.get('/members/:id', requireAdmin, (req, res) => {
+router.get('/members/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
@@ -416,7 +415,7 @@ router.get('/members/:id', requireAdmin, (req, res) => {
   });
 });
 
-router.get('/members/:id/edit', requireAdmin, (req, res) => {
+router.get('/members/:id/edit', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
@@ -434,7 +433,7 @@ router.get('/members/:id/edit', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/members/:id/edit', requireAdmin, uploadPhoto.single('photo'), (req, res) => {
+router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const f = memberFormFields(req);
 
@@ -553,7 +552,7 @@ function mergeableFieldsFor(existingMember, row) {
   return updates;
 }
 
-router.post('/members/import', requireAdmin, upload.single('file'), async (req, res) => {
+router.post('/members/import', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
   }
@@ -650,7 +649,7 @@ router.post('/members/import', requireAdmin, upload.single('file'), async (req, 
   });
 });
 
-router.post('/members/import/confirm', requireAdmin, (req, res) => {
+router.post('/members/import/confirm', (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const payloads = [].concat(req.body.payloads || []);
   const ids = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
@@ -681,7 +680,7 @@ router.post('/members/import/confirm', requireAdmin, (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
 });
 
-router.post('/members/:id/notes', requireAdmin, (req, res) => {
+router.post('/members/:id/notes', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const notes = (req.body.notes || '').trim();
   db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
@@ -700,7 +699,7 @@ const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'sideBySide', 'frontBack'
 // flows use (routes/admin-design.js), just with a single-member list, so a
 // member's cards always print identically whether they were printed one
 // at a time here or in a bulk batch there.
-router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
+router.get('/members/:id/cards/print', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
@@ -759,7 +758,7 @@ router.get('/members/:id/cards/print', requireAdmin, (req, res) => {
   });
 });
 
-router.post('/members/:id/delete', requireAdmin, (req, res) => {
+router.post('/members/:id/delete', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   db.prepare('DELETE FROM members WHERE id = ?').run(id);

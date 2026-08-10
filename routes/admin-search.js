@@ -12,13 +12,12 @@
 // individual result a lesser admin role might one day be allowed to see.
 const express = require('express');
 const router = express.Router();
-const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { globalSearch } = require('../utils/search');
 
 router.use(requireFullAdmin);
 
-router.get('/search', requireAdmin, (req, res) => {
+router.get('/search', (req, res) => {
   const results = globalSearch(req.query.q);
   res.render('admin-search', {
     title: 'Search',
