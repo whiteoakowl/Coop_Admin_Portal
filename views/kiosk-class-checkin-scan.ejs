@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="kiosk kiosk-checkin" data-class-id="<%= cls.id %>">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="kiosk-wrap">
+    <a href="/kiosk/class-checkin/classes/<%= cls.id %>" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Back to <%= cls.class_name %></a>
+    <div class="kiosk-header">
+      <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1><%= cls.class_name %></h1>
+    </div>
+    <p class="kiosk-date"><%= dateLabel %></p>
+
+    <div class="kiosk-panel">
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
+      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+      </div>
+      <form id="scan-form" autocomplete="off">
+        <input
+          id="barcode-input"
+          name="barcode"
+          type="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="none"
+        />
+      </form>
+    </div>
+  </main>
+  <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-class-checkin-scan.js"></script>
+</body>
+</html>

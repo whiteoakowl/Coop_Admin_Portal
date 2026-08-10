@@ -53,6 +53,7 @@ const { defaultDay } = require('./utils/days');
 
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
+const kioskClassCheckinRouter = require('./routes/kiosk-class-checkin');
 const absenceRouter = require('./routes/absence');
 const nameTagRouter = require('./routes/name-tag');
 const adminRouter = require('./routes/admin');
@@ -184,6 +185,7 @@ app.get('/', (req, res) => {
 });
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
+app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
 app.use('/', absenceRouter);
 app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);
