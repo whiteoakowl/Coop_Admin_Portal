@@ -2361,7 +2361,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-sizing: border-box;
   overflow: hidden;
 }
-.barcode-cell-svg { width: 85%; height: 0.65in; }
+/* Not a fixed width - public/js/barcode-print-shrink-name.js renders each
+   barcode with a fixed bar width instead, so bar thickness is consistent
+   sheet-wide regardless of how long a name (= that member's barcode
+   value, routes/admin-members.js) is; the total rendered width is then
+   left to vary with content, same as any real-world barcode does, capped
+   here so a very long name's barcode can't overflow its cell. */
+.barcode-cell-svg { max-width: 85%; height: 0.65in; }
 /* Meant to be read at a glance across a table, not squinted at up close -
    bumped well past body-text size (0.8rem was barely legible on the
    printed sheet). Still comfortably clears the cell's remaining vertical

@@ -1,15 +1,25 @@
-// Real HTTP-level coverage for a bug report this session: barcode-only
-// print sheet (POST /admin/name-tag/print-barcodes) names were too small,
-// and long names could overflow/truncate their cell. Fixed with public/js/
-// barcode-print-shrink-name.js, which shrinks only the name text (never
-// the barcode itself - see that script's own comment on why) down to fit,
-// then triggers window.print() itself once shrinking is done - this page
-// intentionally does NOT use the generic public/js/print-auto.js every
-// other print-preview page uses, since a plain 'load'-based auto-print
-// can't guarantee it fires after shrinking has actually finished. This
-// suite locks in that markup contract; the shrink/measurement behavior
-// itself was verified live via Playwright (real DOM layout, not something
-// a jsdom-free route test can meaningfully assert on).
+// Real HTTP-level coverage for two bug reports this session on the
+// barcode-only print sheet (POST /admin/name-tag/print-barcodes):
+// - Names were too small, and a long one could overflow/get cut off by
+//   its cell.
+// - Every barcode's outer box was forced to the same fixed width via CSS
+//   regardless of how long the encoded value (= that member's name) was,
+//   which squashed a long name's barcode (more bars) into visibly
+//   thinner bars than a short name's - "different sized" barcodes even
+//   though the boxes themselves matched.
+// Both fixed by public/js/barcode-print-shrink-name.js: it shrinks only
+// the name text (never the barcode) down to fit, and renders each
+// barcode itself with a fixed bar width instead of using the shared
+// public/js/name-tag-render.js renderer (which is exactly right for the
+// name-tag designer's manually-sized elements, but wrong for a sheet that
+// wants every bar the same thickness) - then triggers window.print()
+// itself once both are done, since this page intentionally skips the
+// generic public/js/print-auto.js (a plain 'load'-based auto-print can't
+// guarantee it fires after rendering/shrinking have actually finished).
+// This suite locks in that markup contract; the actual rendered
+// bar-width/shrink behavior was verified live via Playwright (real DOM
+// layout, not something a jsdom-free route test can meaningfully assert
+// on).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -52,12 +62,18 @@ test('barcode-only print sheet loads the shrink-to-fit script, not the generic a
     .send({ memberIds: memberId, _csrf: csrfToken });
   assert.equal(res.status, 200);
 
-  await t.test('the shrink-to-fit script is included', () => {
+  await t.test('the barcode+shrink script is included', () => {
     assert.match(res.text, /<script src="\/js\/barcode-print-shrink-name\.js">/);
   });
 
-  await t.test('the generic sitewide print-auto.js is deliberately not included here', () => {
+  await t.test('the generic sitewide print-auto.js and shared name-tag-render.js are deliberately not included here', () => {
     assert.doesNotMatch(res.text, /<script src="\/js\/print-auto\.js">/);
+    assert.doesNotMatch(res.text, /<script src="\/js\/name-tag-render\.js">/);
+  });
+
+  await t.test('the barcode svg is not badge-el-barcode (the shared renderer\'s selector) - this page renders its own', () => {
+    assert.match(res.text, /<svg class="barcode-cell-svg" data-barcode-value="Jordan Fitzgerald-Montgomery">/);
+    assert.doesNotMatch(res.text, /class="badge-el-barcode/);
   });
 
   await t.test('the member name still renders in its cell for the script to act on', () => {
