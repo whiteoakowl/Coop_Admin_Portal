@@ -135,7 +135,7 @@
 </div>
 
 <dialog id="add-roster-member-dialog-<%= cls.id %>" class="member-picker-dialog">
-  <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/roster/add">
+  <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/roster/add" data-roster-add-form>
     <h3>Add Member &mdash; <%= cls.class_name %></h3>
     <div class="radio-group">
       <label class="radio-option"><input type="radio" name="role" value="student" checked onchange="document.getElementById('roster-add-student-<%= cls.id %>').hidden = false; document.getElementById('roster-add-staff-<%= cls.id %>').hidden = true;" /> Student</label>

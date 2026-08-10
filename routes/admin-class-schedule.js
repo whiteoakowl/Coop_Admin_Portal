@@ -5,7 +5,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay } = require('../utils/days');
-const { isValidISODate, todayISO, weekdayOf, ageFromBirthday } = require('../utils/dates');
+const { ageFromBirthday } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const {
@@ -20,7 +20,6 @@ const {
   syncMemberSchedulesForDay,
   gridForDay,
   roomGridForDay,
-  roomsForDay,
   renameRoom,
   getClass,
   createClass,
@@ -31,17 +30,7 @@ const {
   removeStaff,
   activeStudents,
   activeParentsForStaff,
-  absentMemberIdsForDate,
 } = require('../utils/classSchedule');
-
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
-
-// Only defaults the date picker to today when today actually falls on the
-// tab's day - otherwise there's nothing meaningful to highlight yet.
-function defaultDateFor(day) {
-  const today = todayISO();
-  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
-}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
@@ -64,24 +53,25 @@ router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) 
   res.send(buffer);
 });
 
+// This used to be its own standalone page (views/admin-class-schedule.ejs,
+// now deleted) - a second, near-identical rendering of the exact same day
+// grid partials/class-schedule-grid.ejs shows on the *real* Class
+// Schedules tab (/admin/schedule?tab=monday|wednesday, routes/
+// admin-schedule.js), minus that page's Class/Student/Parent Schedules
+// tab bar and its Monday/Wednesday pill toggle - just a bare Day
+// <select>. Nothing ever linked to this route directly, but every
+// create/edit/delete/import action elsewhere in this file redirects back
+// to it (`/admin/class-schedule/${day}...`), which meant every single one
+// of those actions bounced the admin onto the tab-less, toggle-less
+// duplicate page instead of back to where they started. Simplest fix:
+// keep this route as the thing every one of those redirects already
+// targets (so none of them need to change), but have it immediately
+// redirect again to the real tabbed page - carrying every existing query
+// param (date/error/notice) through unchanged.
 router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
-  const day = req.params.day;
-  const selectedDate = isValidISODate(req.query.date) ? req.query.date : defaultDateFor(day);
-  res.render('admin-class-schedule', {
-    title: 'Class Schedule',
-    day,
-    dayLabel: DAY_LABELS[day],
-    hours: hoursForDay(day),
-    roomGrid: roomGridForDay(day),
-    rooms: roomsForDay(day),
-    gradeLevels: GRADE_LEVELS,
-    colorPalette: COLOR_PALETTE,
-    availableStaff: activeParentsForStaff(),
-    selectedDate,
-    absentIds: absentMemberIdsForDate(selectedDate),
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
+  const params = new URLSearchParams(req.query);
+  params.set('tab', req.params.day);
+  res.redirect(`/admin/schedule?${params.toString()}`);
 });
 
 // Single "Edit" dialog covers both hour labels and room renames in one
@@ -270,6 +260,14 @@ router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdm
 
 // Combined "+ Add Member" dialog on the View popup's roster - one form,
 // role picks whether it enrolls a student or staffs a teacher/assistant.
+// Also reachable via fetch() from the class-view-dialog popup itself
+// (public/js/class-schedule-view.js) - adding a roster member is
+// something an admin does repeatedly in a row while building out a
+// class, so that JS submits with Accept: application/json and refreshes
+// the popup's own content in place afterward instead of following a
+// redirect, which would otherwise bounce back to the bare grid and close
+// the popup on every single add. A plain (non-fetch) form submission
+// still gets the original redirect - no JS, no problem.
 router.post('/class-schedule/classes/:id/roster/add', requireFullAdmin, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = getClass(id);
@@ -286,6 +284,8 @@ router.post('/class-schedule/classes/:id/roster/add', requireFullAdmin, (req, re
     const staffId = parseInt(req.body.staffId, 10);
     if (staffId) addStaff(id, staffId, role);
   }
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
+  if (wantsJson) return res.json({ ok: true });
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 

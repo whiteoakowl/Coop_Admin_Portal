@@ -87,7 +87,7 @@
         </table>
       </div>
       <form method="POST" action="/admin/volunteers/<%= day %>/dates/add?dialog=dates" class="volunteer-date-add-form">
-        <input type="date" name="dates" onchange="if (this.value) this.form.submit();" />
+        <input type="date" name="dates" onchange="if (this.value) this.form.requestSubmit();" />
       </form>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>

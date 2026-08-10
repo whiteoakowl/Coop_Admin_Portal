@@ -3487,6 +3487,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-footer-view,
 .class-view-footer-edit { display: flex; align-items: center; gap: 0.5rem; }
 
+/* .class-form-dialog-close normally pins itself to its positioned
+   ancestor's top-right corner (position: absolute) - fine for the plain
+   Create Class dialog, where nothing else shares that corner, but here
+   .class-view-header-actions (Edit/Delete or Cancel/Save) already sits
+   there via the header's own flex layout. Overriding back to a normal
+   flow item (last in DOM, after .class-view-header-actions) lets it take
+   its place in that same flex row instead of stacking on top of those
+   buttons - same fix as .member-view-close-row uses for the same reason. */
+.class-view-header .class-form-dialog-close { position: static; }
+
 /* Fields start disabled (view-only) until "Edit Class" is clicked - keep
    them legible instead of the browser's washed-out default disabled
    look, so "view mode" still reads as real content, not a broken form. */
@@ -3749,6 +3759,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media print {
   .no-print { display: none !important; }
   .admin-sidebar, .admin-mobile-topbar, .admin-mobile-tabs, .kiosk-home { display: none; }
+  /* The skip-to-content link (partials/admin-nav.ejs) hides itself
+     off-screen with a negative `top` offset - reliable on screen, but
+     print engines don't always respect an off-canvas absolute position
+     the same way a scrollable viewport does, so it could render right at
+     the top of a printed page. Meaningless on paper anyway (keyboard
+     skip-navigation is purely a screen/interaction concept), so just
+     hide it outright here like every other screen-only nav element. */
+  .skip-link { display: none !important; }
   html, body { background: #fff; }
   .admin-main { max-width: none; margin-left: 0; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }

@@ -6,7 +6,7 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle no-print"><a href="/admin/class-schedule/<%= cls.day %>">&larr; <%= dayLabel %> Class Schedule</a></p>
+    <p class="subtitle no-print"><a href="/admin/schedule?tab=<%= cls.day %>">&larr; <%= dayLabel %> Class Schedule</a></p>
 
     <div class="roster-toolbar">
       <div><h1><%= cls.class_name %></h1></div>
