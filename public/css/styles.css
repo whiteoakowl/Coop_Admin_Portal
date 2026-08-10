@@ -2362,7 +2362,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   overflow: hidden;
 }
 .barcode-cell-svg { width: 85%; height: 0.65in; }
-.barcode-cell-name { font-size: 0.8rem; font-weight: 600; text-align: center; color: var(--ink); line-height: 1.2; }
+/* Meant to be read at a glance across a table, not squinted at up close -
+   bumped well past body-text size (0.8rem was barely legible on the
+   printed sheet). Still comfortably clears the cell's remaining vertical
+   space: 1.275in row - 0.65in barcode - 0.2in padding - 0.08in gap =
+   ~0.345in left, and 1.4rem at line-height 1.2 is ~0.28in. */
+.barcode-cell-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  line-height: 1.2;
+  /* .barcode-cell centers its children (align-items: center), which sizes
+     them to content instead of stretching - width: 100% (not max-width)
+     forces this back to the cell's actual rendered width so a too-long
+     name ellipsizes instead of silently overflowing past its cell border. */
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ---------- Name tag design editor ---------- */
 
