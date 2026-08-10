@@ -10,12 +10,21 @@
     against the DOM, so they can only run once this markup actually exists. %>
 <h3>Cards &mdash; <%= member.name %></h3>
 <form method="GET" action="/admin/members/<%= member.id %>/cards/print" target="_blank">
+  <div class="cards-layout-picker">
+    <label for="cards-layout-select-<%= member.id %>">Print</label>
+    <select name="layout" id="cards-layout-select-<%= member.id %>">
+      <option value="nameTag">Name Tag</option>
+      <option value="scheduleCard">Schedule Card</option>
+      <option value="sideBySide">Name Tag &amp; Schedule Card (Side by Side)</option>
+      <option value="frontBack">Name Tag &amp; Schedule Card (Front &amp; Back)</option>
+    </select>
+  </div>
   <div class="cards-preview-option">
-    <label class="checkbox-option"><input type="checkbox" name="cards" value="nameTag" checked /> Name Tag</label>
+    <span class="checkbox-option">Name Tag</span>
     <%- include('partials/name-tag-badge', { html: badgeHtml, bgCss: badgeBgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
   </div>
   <div class="cards-preview-option">
-    <label class="checkbox-option"><input type="checkbox" name="cards" value="scheduleCard" checked /> Schedule Card</label>
+    <span class="checkbox-option">Schedule Card</span>
     <%- include('partials/name-tag-badge', { html: scheduleCardHtml, bgCss: scheduleCardBgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
   </div>
   <div class="notes-dialog-actions">
