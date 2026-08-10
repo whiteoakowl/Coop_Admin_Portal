@@ -222,21 +222,31 @@ function lanAddresses() {
   return addresses;
 }
 
-const server = app.listen(PORT, () => {
-  console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
-  const addresses = lanAddresses();
-  if (addresses.length > 0) {
-    console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
-    for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
-  }
-});
+// Only binds a port when this file is run directly (`node server.js` /
+// `npm start`) - not when something else requires() it. That's what lets
+// the route-level tests (test/routes-*.test.js) `require('../server')`
+// and get the fully-wired `app` (every router, session/CSRF middleware,
+// db init) to drive with supertest, without a real port ever being
+// opened or two test files racing over the same one.
+if (require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
+    const addresses = lanAddresses();
+    if (addresses.length > 0) {
+      console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
+      for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
+    }
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`\nSomething else on this computer is already using port ${PORT}, so the server can't start.`);
-    console.error(`Close that other program, or open the .env file and change PORT to a different number (e.g. 3001), then try again.\n`);
-  } else {
-    console.error('\nThe server failed to start:', err.message, '\n');
-  }
-  process.exitCode = 1;
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\nSomething else on this computer is already using port ${PORT}, so the server can't start.`);
+      console.error(`Close that other program, or open the .env file and change PORT to a different number (e.g. 3001), then try again.\n`);
+    } else {
+      console.error('\nThe server failed to start:', err.message, '\n');
+    }
+    process.exitCode = 1;
+  });
+}
+
+module.exports = app;
