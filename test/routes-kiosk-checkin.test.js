@@ -90,4 +90,53 @@ test('kiosk check-in scan', async (t) => {
     assert.equal(res.body.ok, false);
     assert.match(res.body.message, /No barcode scanned/);
   });
+
+  // A scan overriding a prior absent/late status - the behavior a late-
+  // arriving family or a floater who was marked absent/late (e.g. via the
+  // public absence form, or an admin editing the grid) depends on: showing
+  // up and scanning in should always win, not leave them stuck showing as
+  // absent/late for the rest of the day. Covers both a regular student
+  // AND a floater (a parent on the day's Parent roster - floaters/
+  // teachers/assistants are added there, so their presence is tracked
+  // through this same roster/attendance mechanism, not a separate one).
+  await t.test('checking in overrides an existing "absent" status to "present"', async () => {
+    const { lastInsertRowid: memberId } = db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Was Absent Kid', 'Was Absent Kid', 'student')")
+      .run();
+    const rosterId = scheduleMemberToday(memberId);
+    db.prepare(
+      "INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'absence_form')"
+    ).run(memberId, rosterId, todayISO());
+
+    const res = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'Was Absent Kid' });
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.alreadyChecked, undefined, 'a prior absent status should not be treated as "already checked in"');
+
+    const attendance = db
+      .prepare('SELECT status, source FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+      .get(memberId, rosterId, todayISO());
+    assert.equal(attendance.status, 'present');
+    assert.equal(attendance.source, 'kiosk');
+  });
+
+  await t.test('checking in overrides an existing "late" status to "present" for a floater on the Parent roster', async () => {
+    const parentRoster = db.prepare("SELECT id FROM rosters WHERE name = 'Monday Parents'").get();
+    const { lastInsertRowid: memberId } = db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Was Late Floater', 'Was Late Floater', 'parent')")
+      .run();
+    db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(parentRoster.id, todayISO());
+    db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')").run(parentRoster.id, memberId);
+    db.prepare(
+      "INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'late', 'absence_form')"
+    ).run(memberId, parentRoster.id, todayISO());
+
+    const res = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'Was Late Floater' });
+    assert.equal(res.body.ok, true);
+
+    const attendance = db
+      .prepare('SELECT status, source FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+      .get(memberId, parentRoster.id, todayISO());
+    assert.equal(attendance.status, 'present');
+    assert.equal(attendance.source, 'kiosk');
+  });
 });
