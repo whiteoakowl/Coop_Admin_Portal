@@ -69,6 +69,18 @@ A SQLite database is created automatically at `data/attendance.db` on first run,
 | Design/Print | Name tag and schedule card design, badge printing |
 | Settings | Username/password, Quick Links, Install App, Documents, and Backup/Restore |
 
+## Admin access model
+
+There's currently only **one** admin account/role - the single master Admin created on first run (or via `ADMIN_USERNAME`/`ADMIN_PASSWORD` at setup). Despite that, the codebase uses three differently-named touchpoints for the exact same check (whether `req.session.adminId` is set):
+
+- `middleware/requireAdmin.js` - the baseline route gate.
+- `middleware/requireFullAdmin.js` - functionally identical today, mounted via a blanket `router.use(requireFullAdmin)` on the routers for Members, Library, Design/Print, Documents, Name Tag, and global Search.
+- `res.locals.isFullAdmin` (set once per request in `server.js`) - the same check again, exposed to every EJS view for conditional nav/UI (e.g. hiding the Members tab from the sidebar).
+
+They're kept separate on purpose, not by oversight: if a lesser/restricted admin role is ever introduced, each of these three touchpoints can diverge independently (a route moves from `requireAdmin` to `requireFullAdmin`, a nav link's `isFullAdmin` check tightens) without a site-wide audit of every route to work out which ones were "supposed" to already be more restrictive. Until that day, treat them as one identical check with three names, not three access tiers - a route gated only by `requireAdmin` isn't any more open to a "regular" admin than one gated by `requireFullAdmin`, because there is no other kind of admin yet.
+
+One consequence worth knowing before adding a new route: a handful of routers (`admin-design.js`, `admin-documents.js`, `admin-library.js`, `admin-members.js`, `admin-name-tag.js`, `admin-search.js`) gate their *entire* router with a single `router.use(requireFullAdmin)` at the top, rather than per-route middleware - every route in those files is already full-admin-gated before it's ever reached, so there's no need to also list `requireAdmin`/`requireFullAdmin` on individual routes within them. Routers without that blanket `.use()` (e.g. `admin-schedule.js`, `admin-class-schedule.js`) mix `requireAdmin` and `requireFullAdmin` per-route deliberately, matching each route's actual restriction level.
+
 ## Volunteers
 
 There are two fixed volunteer lists, Monday and Wednesday, managed from the **Floater Assignments** tab. Each list can optionally be linked to a roster so it shows on that roster's view page next to the attendance grid.

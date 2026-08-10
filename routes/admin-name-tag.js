@@ -4,7 +4,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { formatTimestamp, formatDateLabel } = require('../utils/dates');
 
@@ -58,7 +57,7 @@ function nameTagSubmissions(showArchived, dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
-router.get('/name-tag', requireAdmin, (req, res) => {
+router.get('/name-tag', (req, res) => {
   const tab = NAME_TAG_TABS.includes(req.query.tab) ? req.query.tab : 'design';
   const showArchived = tab === 'archived';
   const dateFilter = req.query.date || '';
@@ -101,7 +100,7 @@ router.get('/name-tag', requireAdmin, (req, res) => {
   });
 });
 
-router.get('/name-tag/requests/export.csv', requireAdmin, (req, res) => {
+router.get('/name-tag/requests/export.csv', (req, res) => {
   const showArchived = req.query.archived === '1';
   const dateFilter = req.query.date || '';
   const submissions = nameTagSubmissions(showArchived, dateFilter);
@@ -122,13 +121,13 @@ router.get('/name-tag/requests/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
-router.post('/name-tag/:id/archive', requireAdmin, (req, res) => {
+router.post('/name-tag/:id/archive', (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
   res.redirect('/admin/name-tag?tab=requests');
 });
 
-router.post('/name-tag/:id/unarchive', requireAdmin, (req, res) => {
+router.post('/name-tag/:id/unarchive', (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
   res.redirect('/admin/name-tag?tab=archived');
@@ -140,7 +139,7 @@ const NAME_TAG_TYPES = ['student', 'parent'];
 // types (they use the same editor - see public/js/name-tag-editor.js) -
 // member-type name tags persist to name_tag_templates, misc badge types to
 // their own misc_badge_templates table (see utils/miscBadgeData.js).
-router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
+router.post('/name-tag/template/:type', (req, res) => {
   const type = req.params.type;
   if (!NAME_TAG_TYPES.includes(type) && !isMiscBadgeType(type)) return res.status(404).json({ ok: false });
 
@@ -176,12 +175,12 @@ router.post('/name-tag/template/:type', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/name-tag/design-image', requireAdmin, uploadDesignImage.single('image'), (req, res) => {
+router.post('/name-tag/design-image', uploadDesignImage.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, message: 'No image uploaded.' });
   res.json({ ok: true, url: `/uploads/name-tags/${req.file.filename}` });
 });
 
-router.post('/name-tag/print', requireAdmin, (req, res) => {
+router.post('/name-tag/print', (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
@@ -210,7 +209,7 @@ router.post('/name-tag/print', requireAdmin, (req, res) => {
 
 // Barcode-only sheet: just the scan code and name, no name tag design -
 // for a cheap, fast-to-print stack of scan cards.
-router.post('/name-tag/print-barcodes', requireAdmin, (req, res) => {
+router.post('/name-tag/print-barcodes', (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
