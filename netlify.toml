@@ -1,0 +1,53 @@
+# Netlify deployment config - see MIGRATION.md for the full story.
+#
+# This wraps the whole Express app (server.js) in one Netlify Function
+# (netlify/functions/app.js) via serverless-http, so every existing route
+# keeps its exact same URL. Static files actually present in `public/` at
+# build time (CSS, client JS, name-tag-render-core.js, favicon, etc.) are
+# served directly by Netlify's CDN - Netlify serves a matching file from
+# the publish directory before falling through to a redirect, so those
+# never touch the function at all. Everything else (every page render,
+# every /admin/* and /kiosk/* route, form POSTs) falls through the
+# catch-all redirect below into the one function, which is Express's own
+# router from there - Netlify doesn't need to know this app has more than
+# one route.
+#
+# NOT yet a complete deployment - see netlify/functions/app.js's own
+# header comment and MIGRATION.md: the database backend (db/postgres.js)
+# and file storage (utils/storage.js, Supabase Storage) both have to be
+# cut over from their current SQLite/local-disk versions in the same
+# deploy as this config, or the function boots against a database/upload
+# directory that doesn't persist between invocations.
+
+[build]
+  command = "npm install"
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+  # Node built-ins (fs, path, crypto) plus this app's own deps (express,
+  # ejs, pg, bcryptjs, multer, xlsx, @supabase/supabase-js) all bundle
+  # cleanly with esbuild - no native addons in the dependency tree once
+  # db/postgres.js (pure-JS `pg` driver) replaces node:sqlite as the DB
+  # layer at cutover.
+  node_bundler = "esbuild"
+
+# Every path not matched by an actual file in `public/` falls through to
+# the one function - this has to be the last/only redirect rule (a 200
+# status here means "rewrite", not "redirect": the browser's URL bar
+# never changes, so /admin/members keeps looking like /admin/members).
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/app"
+  status = 200
+
+# Security headers Netlify's CDN adds to every response, static or
+# function-served alike - belt-and-suspenders alongside whatever the
+# Express app itself already sets per-response (see server.js's own
+# X-Content-Type-Options header and middleware/csrfProtection.js).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

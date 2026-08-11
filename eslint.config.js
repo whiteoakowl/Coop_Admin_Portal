@@ -21,11 +21,14 @@ module.exports = [
   },
   js.configs.recommended,
   {
-    // Server-side: server.js, db/, middleware/, routes/, utils/, and this
-    // config file itself - plain CommonJS Node, no bundler/transpiler.
-    // .stylelintrc.js belongs here too, for the same reason: it's a
-    // CommonJS config file Node loads directly, not browser code.
-    files: ['server.js', 'eslint.config.js', '.stylelintrc.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js', 'a11y/**/*.js'],
+    // Server-side: server.js, db/, middleware/, routes/, utils/, netlify/
+    // (the Netlify Functions wrapper - same plain CommonJS Node code,
+    // just invoked by Netlify's runtime instead of `node server.js`
+    // directly), and this config file itself - plain CommonJS Node, no
+    // bundler/transpiler. .stylelintrc.js belongs here too, for the same
+    // reason: it's a CommonJS config file Node loads directly, not
+    // browser code.
+    files: ['server.js', 'eslint.config.js', '.stylelintrc.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js', 'a11y/**/*.js', 'netlify/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',
