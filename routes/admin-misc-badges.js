@@ -68,26 +68,26 @@ router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
 
-  replaceMiscBadges(type, rows);
+  await replaceMiscBadges(type, rows);
   res.redirect(`/admin/design?tab=print&print=${type}Badges&notice=` + encodeURIComponent(`Imported ${rows.length} ${BADGE_TYPE_LABELS[type]} badge(s).`));
 });
 
-router.post('/design/badges/:type/delete/:id', requireMiscBadgeType, (req, res) => {
-  deleteMiscBadge(parseInt(req.params.id, 10));
+router.post('/design/badges/:type/delete/:id', requireMiscBadgeType, async (req, res) => {
+  await deleteMiscBadge(parseInt(req.params.id, 10));
   res.redirect(`/admin/design?tab=print&print=${req.params.type}Badges`);
 });
 
-router.post('/design/badges/:type/print', requireMiscBadgeType, (req, res) => {
+router.post('/design/badges/:type/print', requireMiscBadgeType, async (req, res) => {
   const type = req.params.type;
   const requestedIds = [].concat(req.body.badgeIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  const all = listMiscBadges(type);
+  const all = await listMiscBadges(type);
   const rows = requestedIds.length > 0 ? all.filter((r) => requestedIds.includes(r.id)) : all;
 
   if (rows.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one badge to print.'));
   }
 
-  const template = getMiscTemplate(type);
+  const template = await getMiscTemplate(type);
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
   const cards = rows.map((row) => ({
     html: NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(row)),

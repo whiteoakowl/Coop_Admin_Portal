@@ -281,6 +281,15 @@ requests to Supabase both fail/reset). This means:
    `getScheduleCardTemplate()` calls already awaited there). Both are now
    done, but this is the shape to expect from any similarly central file.
 
+   `utils/miscBadgeData.js` — **fully** converted (`getMiscTemplate`,
+   `saveMiscTemplate`, `listMiscBadges`, `getMiscBadge`,
+   `replaceMiscBadges`, `deleteMiscBadge`; 1 `COLLATE NOCASE` fixed;
+   `saveMiscTemplate`'s `datetime('now')` deliberately left untouched).
+   Forced follow-on awaits in `routes/admin-misc-badges.js` (fully
+   converted), `routes/admin-design.js` (2 more awaits in `GET /design`),
+   and `routes/admin-name-tag.js` (1 more await in the shared
+   `/name-tag/template/:type` save route).
+
    **Not yet started** (direct `db.prepare(` call counts as of this
    writing - re-grep, these drift, and some of these earlier counts were
    undercounted due to the codebase's `db\n  .prepare(...)` line-break
@@ -296,13 +305,12 @@ requests to Supabase both fail/reset). This means:
    depended on by `admin-schedule.js`, `admin-rosters.js`,
    `admin-volunteers.js`, `kiosk-class-checkin.js`, `admin-logs.js` and
    others, so converting it means re-touching all of those call sites
-   too), `utils/miscBadgeData.js`, `utils/substitutes.js` (has
-   `INSERT OR`, plus the `hasInfantChildSync` duplication above to clean
-   up when it's converted), `utils/volunteers.js` (has `INSERT OR`).
+   too), `utils/substitutes.js` (has `INSERT OR`, plus the
+   `hasInfantChildSync` duplication above to clean up when it's
+   converted), `utils/volunteers.js` (has `INSERT OR`).
 
-   Suggested order for whoever picks this up: `utils/miscBadgeData.js`
-   next (small, low-risk, unblocks the rest of `admin-design.js`), then
-   the two `withTransaction`-bearing giants (`classSchedule.js`, then
+   Suggested order for whoever picks this up: the two
+   `withTransaction`-bearing giants next (`classSchedule.js`, then
    whatever routes still use it - this will finish off the remaining
    pieces of `admin-schedule.js`, `admin-rosters.js`,
    `admin-volunteers.js`, `admin-logs.js`, `kiosk-class-checkin.js` along

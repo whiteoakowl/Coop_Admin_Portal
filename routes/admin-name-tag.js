@@ -151,7 +151,7 @@ router.post('/name-tag/template/:type', async (req, res) => {
   }
 
   if (isMiscBadgeType(type)) {
-    saveMiscTemplate(type, layout);
+    await saveMiscTemplate(type, layout);
     await sweepNameTagImages();
     return res.json({ ok: true });
   }
