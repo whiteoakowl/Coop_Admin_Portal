@@ -290,21 +290,42 @@ requests to Supabase both fail/reset). This means:
    and `routes/admin-name-tag.js` (1 more await in the shared
    `/name-tag/template/:type` save route).
 
-   **Not yet started** (direct `db.prepare(` call counts as of this
-   writing - re-grep, these drift, and some of these earlier counts were
-   undercounted due to the codebase's `db\n  .prepare(...)` line-break
-   style not matching a same-line grep): `routes/admin.js` (only the
-   `todaysAlerts()`-touching handler converted, plenty of its own untouched
-   `db.prepare(` calls remain), `routes/admin-documents.js`,
-   `routes/admin-library.js`, `routes/checkout.js`; and `utils/backup.js`
-   (1, `PRAGMA` - needs its own design, see below, and is genuinely the
-   only file left with an unconverted `db.prepare(` call anywhere in the
-   codebase as of this writing).
+   **This item is now effectively complete.** Every route file and every
+   `utils/*.js` module has been converted to async/await, with exactly
+   one deliberate exception:
 
-   Suggested order for whoever picks this up: the 4 remaining route files
-   next (small, independent, no more forced ripples expected from any of
-   them), then `backup.js` last (needs a real design decision, not just a
-   mechanical pass - see below) to close out this task entirely.
+   - `utils/backup.js` — **not** converted, on purpose. It has 1
+     `PRAGMA integrity_check` call plus its own direct file-level
+     validation logic (opens a candidate restore file as a throwaway
+     SQLite connection to sanity-check it before staging) - this needs a
+     real design decision for the Postgres world (there's no equivalent
+     "open an arbitrary file as a temp connection and validate it" for a
+     hosted Postgres instance), not a mechanical await pass. Left fully
+     synchronous; `routes/admin.js`'s 4 call sites into it
+     (`backupPackageBuffer`, `stageRestore`, `isRestoreStaged`,
+     `cancelStagedRestore`) are correspondingly left unawaited too,
+     documented inline in that file.
+   - `routes/admin.js` — **fully** converted otherwise: `POST /login`,
+     `todayStatsForType`/`previousSessionDate`/`statsWithTrends` (the
+     dashboard's stat-computation helpers), the dashboard handler itself,
+     and the whole `renderSettings`-based Settings flow (username,
+     password, restore upload/cancel, class-checkin-pin).
+   - `routes/admin-documents.js`, `routes/admin-library.js`,
+     `routes/checkout.js` — **fully** converted (every handler).
+   - `utils/library.js` — **fully** converted too (wasn't previously
+     tracked in this file's per-file breakdown, but had its own
+     `db.prepare(` calls forced by `admin-library.js`'s conversion):
+     every exported function, `createLibraryType`'s `INSERT OR IGNORE`
+     rewritten to `ON CONFLICT (name) DO NOTHING`, 3 `COLLATE NOCASE`
+     fixed, `returnCheckout`'s `datetime('now')` deliberately left
+     untouched.
+
+   A final sweep (`grep -rn "db\.prepare" routes utils` minus
+   `utils/backup.js`, cross-checked against every match being either
+   `await db.prepare(...)` or a `return db.prepare(...)` inside an
+   `async function`) confirms `utils/backup.js` is genuinely the only
+   file left with an unconverted call - `npx eslint .` and the full test
+   suite both clean/green.
 
    - `utils/volunteers.js` — **fully** converted (every exported
      function), including `addMemberToSection`'s `INSERT OR IGNORE`

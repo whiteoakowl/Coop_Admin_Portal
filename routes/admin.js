@@ -36,7 +36,7 @@ router.get('/login', (req, res) => {
   res.render('admin-login', { title: 'Admin Login', error: null, next: safeNext(req.query.next) });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const next = safeNext(req.body.next);
   if (isRateLimited(req.ip)) {
     return res.render('admin-login', {
@@ -47,7 +47,7 @@ router.post('/login', (req, res) => {
   }
 
   const { username, password } = req.body;
-  const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get((username || '').trim());
+  const admin = await db.prepare('SELECT * FROM admins WHERE username = ?').get((username || '').trim());
   if (!admin || !bcrypt.compareSync(password || '', admin.password_hash)) {
     recordFailure(req.ip);
     return res.render('admin-login', { title: 'Admin Login', error: 'Invalid username or password.', next });
@@ -77,42 +77,50 @@ router.post('/logout', (req, res) => {
 // checking in/out at the front door - the exact "two independent
 // presence signals" isolation the class check-in flow was built to keep
 // (see routes/kiosk.js's own comment), just extended to this aggregate.
-function todayStatsForType(memberType, today) {
-  const total = db
-    .prepare(`SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?`)
-    .get(memberType).c;
-  const checkedIn = db
-    .prepare(
-      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
-       JOIN members m ON m.id = a.member_id
-       JOIN rosters r ON r.id = a.roster_id
-       WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ? AND r.category != 'Class Roster'`
-    )
-    .get(today, memberType).c;
-  const checkedOut = db
-    .prepare(
-      `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
-       JOIN members m ON m.id = c.member_id
-       JOIN rosters r ON r.id = c.roster_id
-       WHERE c.session_date = ? AND m.member_type = ? AND r.category != 'Class Roster'`
-    )
-    .get(today, memberType).c;
-  const late = db
-    .prepare(
-      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
-       JOIN members m ON m.id = a.member_id
-       JOIN rosters r ON r.id = a.roster_id
-       WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ? AND r.category != 'Class Roster'`
-    )
-    .get(today, memberType).c;
-  const absent = db
-    .prepare(
-      `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
-       JOIN members m ON m.id = a.member_id
-       JOIN rosters r ON r.id = a.roster_id
-       WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ? AND r.category != 'Class Roster'`
-    )
-    .get(today, memberType).c;
+async function todayStatsForType(memberType, today) {
+  const total = (
+    await db.prepare(`SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?`).get(memberType)
+  ).c;
+  const checkedIn = (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+         JOIN members m ON m.id = a.member_id
+         JOIN rosters r ON r.id = a.roster_id
+         WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ? AND r.category != 'Class Roster'`
+      )
+      .get(today, memberType)
+  ).c;
+  const checkedOut = (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
+         JOIN members m ON m.id = c.member_id
+         JOIN rosters r ON r.id = c.roster_id
+         WHERE c.session_date = ? AND m.member_type = ? AND r.category != 'Class Roster'`
+      )
+      .get(today, memberType)
+  ).c;
+  const late = (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+         JOIN members m ON m.id = a.member_id
+         JOIN rosters r ON r.id = a.roster_id
+         WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ? AND r.category != 'Class Roster'`
+      )
+      .get(today, memberType)
+  ).c;
+  const absent = (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+         JOIN members m ON m.id = a.member_id
+         JOIN rosters r ON r.id = a.roster_id
+         WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ? AND r.category != 'Class Roster'`
+      )
+      .get(today, memberType)
+  ).c;
 
   return { total, checkedIn, checkedOut, late, absent };
 }
@@ -123,8 +131,8 @@ function todayStatsForType(memberType, today) {
 // same reason todayStatsForType() does: a day where a class was checked
 // into but the day-level roster never ran isn't a real prior session to
 // trend against.
-function previousSessionDate(today) {
-  const row = db
+async function previousSessionDate(today) {
+  const row = await db
     .prepare(
       `SELECT DISTINCT a.session_date FROM attendance a
        JOIN rosters r ON r.id = a.roster_id
@@ -140,10 +148,10 @@ function previousSessionDate(today) {
 // the same stat from the previous session - null (no trends rendered at
 // all) when there isn't a previous session yet, rather than a misleading
 // comparison against a session that never happened.
-function statsWithTrends(memberType, today, previousDate) {
-  const current = todayStatsForType(memberType, today);
+async function statsWithTrends(memberType, today, previousDate) {
+  const current = await todayStatsForType(memberType, today);
   if (!previousDate) return { ...current, trends: null, previousDateLabel: null };
-  const previous = todayStatsForType(memberType, previousDate);
+  const previous = await todayStatsForType(memberType, previousDate);
   return {
     ...current,
     trends: {
@@ -158,18 +166,18 @@ function statsWithTrends(memberType, today, previousDate) {
 
 router.get('/', requireAdmin, async (req, res) => {
   const today = todayISO();
-  const previousDate = previousSessionDate(today);
-  const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
-  const studentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get().c;
-  const parentCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get().c;
+  const previousDate = await previousSessionDate(today);
+  const memberCount = (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get()).c;
+  const studentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c;
+  const parentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c;
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     memberCount,
     studentCount,
     parentCount,
-    studentStats: statsWithTrends('student', today, previousDate),
-    parentStats: statsWithTrends('parent', today, previousDate),
+    studentStats: await statsWithTrends('student', today, previousDate),
+    parentStats: await statsWithTrends('parent', today, previousDate),
     alerts: await todaysAlerts(),
   });
 });
@@ -189,7 +197,7 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 const SETTINGS_TABS = ['account', 'backup', 'classcheckin', 'quicklinks', 'install', 'documents'];
 const FULL_ADMIN_ONLY_TABS = ['account', 'backup', 'classcheckin', 'documents'];
 
-function renderSettings(req, res, error, success, activeTab) {
+async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links and Install App here - Username/Password manages the
@@ -201,33 +209,33 @@ function renderSettings(req, res, error, success, activeTab) {
     username: req.session.username,
     isFullAdmin,
     activeTab: tab,
-    documents: db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all(),
+    documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
     restoreStaged: isRestoreStaged(),
     error,
     success,
   });
 }
 
-router.get('/settings', requireAdmin, (req, res) => {
-  renderSettings(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
+router.get('/settings', requireAdmin, async (req, res) => {
+  await renderSettings(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
 });
 
-router.post('/settings/username', requireAdmin, requireFullAdmin, (req, res) => {
+router.post('/settings/username', requireAdmin, requireFullAdmin, async (req, res) => {
   const newUsername = (req.body.newUsername || '').trim();
 
   if (!newUsername) return renderSettings(req, res, 'New username is required.', null, 'account');
 
-  const taken = db.prepare('SELECT id FROM admins WHERE username = ? AND id != ?').get(newUsername, req.session.adminId);
+  const taken = await db.prepare('SELECT id FROM admins WHERE username = ? AND id != ?').get(newUsername, req.session.adminId);
   if (taken) return renderSettings(req, res, 'That username is already in use.', null, 'account');
 
-  db.prepare('UPDATE admins SET username = ? WHERE id = ?').run(newUsername, req.session.adminId);
+  await db.prepare('UPDATE admins SET username = ? WHERE id = ?').run(newUsername, req.session.adminId);
   req.session.username = newUsername;
-  renderSettings(req, res, null, 'Username updated.', 'account');
+  await renderSettings(req, res, null, 'Username updated.', 'account');
 });
 
-router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => {
+router.post('/settings/password', requireAdmin, requireFullAdmin, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.session.adminId);
+  const admin = await db.prepare('SELECT * FROM admins WHERE id = ?').get(req.session.adminId);
 
   if (!admin || !bcrypt.compareSync(currentPassword || '', admin.password_hash)) {
     return renderSettings(req, res, 'Current password is incorrect.', null, 'account');
@@ -237,8 +245,8 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => 
   }
 
   const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
-  renderSettings(req, res, null, 'Password updated.', 'account');
+  await db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, admin.id);
+  await renderSettings(req, res, null, 'Password updated.', 'account');
 });
 
 // One-click backup download: the database plus every uploaded file
@@ -247,6 +255,11 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, (req, res) => 
 // the Account tab: a Co-op Admin (a member, not the master admin
 // account) has no business downloading the entire database.
 router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
+  // backupPackageBuffer/stageRestore/isRestoreStaged/cancelStagedRestore
+  // (utils/backup.js) are still fully synchronous, deliberately - see
+  // MIGRATION.md's own note on that file needing a real design decision
+  // (PRAGMA integrity_check, temp-file validation) rather than a routine
+  // async/await pass.
   const buffer = backupPackageBuffer();
   const stamp = todayISO();
   res.setHeader('Content-Type', 'application/octet-stream');
@@ -262,7 +275,7 @@ router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
 // nothing to restart it if it stopped itself. The staged file only takes
 // effect once an admin closes and reopens the app, same as they already
 // do to stop/start it day to day.
-router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), (req, res) => {
+router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), async (req, res) => {
   if (!req.file) {
     return renderSettings(req, res, 'Please choose a backup file to restore.', null, 'backup');
   }
@@ -271,7 +284,7 @@ router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.s
   } catch (err) {
     return renderSettings(req, res, err.message, null, 'backup');
   }
-  renderSettings(
+  await renderSettings(
     req,
     res,
     null,
@@ -280,9 +293,9 @@ router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.s
   );
 });
 
-router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, (req, res) => {
+router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, async (req, res) => {
   cancelStagedRestore();
-  renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'backup');
+  await renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'backup');
 });
 
 // One shared 4-digit PIN for the kiosk's Class Check-In flow (routes/
@@ -301,7 +314,7 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
     return renderSettings(req, res, 'PIN must be exactly 4 digits.', null, 'classcheckin');
   }
   await setClassCheckinPin(newPin);
-  renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
+  await renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
 });
 
 module.exports = router;

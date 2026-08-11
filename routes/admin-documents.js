@@ -24,8 +24,8 @@ const upload = multer({
   fileFilter: documentFileFilter,
 });
 
-router.get('/documents', (req, res) => {
-  const documents = db.prepare('SELECT * FROM documents ORDER BY title COLLATE NOCASE').all();
+router.get('/documents', async (req, res) => {
+  const documents = await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all();
   res.render('admin-documents', {
     title: 'Documents',
     documents,
@@ -34,14 +34,14 @@ router.get('/documents', (req, res) => {
   });
 });
 
-router.get('/documents/:id/view', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
+router.get('/documents/:id/view', async (req, res) => {
+  const doc = await db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!doc) return res.status(404).render('404', { title: 'Not Found' });
   res.render('admin-document-view', { title: doc.title, doc });
 });
 
-router.get('/documents/:id/file', (req, res) => {
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
+router.get('/documents/:id/file', async (req, res) => {
+  const doc = await db.prepare('SELECT * FROM documents WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!doc) return res.status(404).send('Not found');
   const filePath = path.join(DOCUMENT_DIR, doc.file_path);
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
@@ -50,7 +50,7 @@ router.get('/documents/:id/file', (req, res) => {
   res.sendFile(filePath);
 });
 
-router.post('/documents/upload', upload.single('file'), (req, res) => {
+router.post('/documents/upload', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.redirect(
       '/admin/settings?tab=documents&error=' +
@@ -60,20 +60,20 @@ router.post('/documents/upload', upload.single('file'), (req, res) => {
   const title = (req.body.title || '').trim() || req.file.originalname.replace(/\.[^.]+$/, '');
   const ext = path.extname(req.file.originalname).toLowerCase();
 
-  db.prepare(
+  await db.prepare(
     `INSERT INTO documents (title, file_path, original_name, mime_type) VALUES (?, ?, ?, ?)`
   ).run(title, req.file.filename, req.file.originalname, DOCUMENT_MIME_BY_EXT[ext] || req.file.mimetype);
 
   res.redirect('/admin/settings?tab=documents&notice=' + encodeURIComponent(`"${title}" uploaded.`));
 });
 
-router.post('/documents/:id/delete', (req, res) => {
+router.post('/documents/:id/delete', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
+  const doc = await db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (doc) {
     const filePath = path.join(DOCUMENT_DIR, doc.file_path);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    db.prepare('DELETE FROM documents WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM documents WHERE id = ?').run(id);
   }
   res.redirect('/admin/settings?tab=documents&notice=' + encodeURIComponent('Document deleted.'));
 });

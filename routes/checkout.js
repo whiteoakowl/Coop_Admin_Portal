@@ -12,7 +12,7 @@ router.get('/checkout', (req, res) => {
 });
 
 // Step 1: scan barcode, look up member.
-router.post('/checkout/scan', (req, res) => {
+router.post('/checkout/scan', async (req, res) => {
   const barcode = (req.body.barcode || '').trim();
   const today = todayISO();
 
@@ -20,7 +20,7 @@ router.post('/checkout/scan', (req, res) => {
     return res.json({ ok: false, message: 'No barcode scanned.' });
   }
 
-  const member = db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
+  const member = await db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
   if (!member) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
@@ -32,7 +32,7 @@ router.post('/checkout/scan', (req, res) => {
 
   // A member on multiple rosters today checks out of all of them at once
   // with the same pickup number, so any existing number (they'll all match) works here.
-  const existing = db
+  const existing = await db
     .prepare('SELECT number FROM checkouts WHERE member_id = ? AND session_date = ?')
     .get(member.id, today);
 
@@ -46,7 +46,7 @@ router.post('/checkout/scan', (req, res) => {
 
 // Step 2: submit the chosen pickup number (1-80) - recorded across every
 // roster the member is scheduled on today.
-router.post('/checkout/submit', (req, res) => {
+router.post('/checkout/submit', async (req, res) => {
   const memberId = parseInt(req.body.memberId, 10);
   const number = parseInt(req.body.number, 10);
   const today = todayISO();
@@ -55,7 +55,7 @@ router.post('/checkout/submit', (req, res) => {
     return res.json({ ok: false, message: 'Please select a valid number between 1 and 80.' });
   }
 
-  const member = db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
   if (!member) {
     return res.json({ ok: false, message: 'Member not found.' });
   }
@@ -65,6 +65,9 @@ router.post('/checkout/submit', (req, res) => {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
 
+  // datetime('now') - SQLite-only, deliberately left as-is (see
+  // MIGRATION.md's special-cases list); not touched by this routine
+  // async/await pass.
   const upsert = db.prepare(
     `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
      VALUES (?, ?, ?, ?, ?)
@@ -73,7 +76,7 @@ router.post('/checkout/submit', (req, res) => {
   );
   const now = Date.now();
   for (const roster of rosters) {
-    upsert.run(member.id, roster.id, today, number, now);
+    await upsert.run(member.id, roster.id, today, number, now);
   }
 
   res.json({ ok: true, name: member.name, number, message: `${member.name} checked out with #${number}.` });
