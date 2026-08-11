@@ -96,7 +96,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
 
   const rows = scheduleList(filters);
 
-  const scheduleCardTemplate = getScheduleCardTemplate();
+  const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
   const summarized = rows.map((r) => ({
@@ -245,7 +245,7 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
     .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`)
     .all(...memberIds);
 
-  const template = getScheduleCardTemplate();
+  const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
   const cards = members.map((m) => ({
     html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(m)),

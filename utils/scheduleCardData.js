@@ -40,8 +40,8 @@ function scheduleCardDataForMember(member) {
   };
 }
 
-function getScheduleCardTemplate() {
-  const row = db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+async function getScheduleCardTemplate() {
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
   if (!row) return DEFAULT_LAYOUT;
   try {
     return JSON.parse(row.layout_json);

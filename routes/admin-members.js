@@ -112,12 +112,12 @@ router.get('/members', (req, res) => {
 // public/js/members-dialogs.js). The same badge/schedule-card rendering
 // the /members list route used to do for every row up front, done here
 // for exactly the one member whose dialog was actually opened.
-router.get('/members/:id/cards-fragment', (req, res) => {
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
+router.get('/members/:id/cards-fragment', async (req, res) => {
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
   const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
   const badgeLayout = templates[member.member_type] || templates.student;
-  const scheduleCardTemplate = getScheduleCardTemplate();
+  const scheduleCardTemplate = await getScheduleCardTemplate();
   res.render('member-cards-fragment', {
     member,
     badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeDataForMember(member)),
@@ -908,9 +908,9 @@ const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'sideBySide', 'frontBack'
 // flows use (routes/admin-design.js), just with a single-member list, so a
 // member's cards always print identically whether they were printed one
 // at a time here or in a bulk batch there.
-router.get('/members/:id/cards/print', (req, res) => {
+router.get('/members/:id/cards/print', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
   const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
@@ -950,7 +950,7 @@ router.get('/members/:id/cards/print', (req, res) => {
       height: BADGE_HEIGHT,
     });
   } else {
-    const template = getScheduleCardTemplate();
+    const template = await getScheduleCardTemplate();
     cards.push({
       heading: 'Schedule Card',
       html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(member)),

@@ -55,7 +55,7 @@ function nameTagSubmissions(showArchived, dateFilter) {
 // (name-tag-editor.js / schedule-card-editor.js), so switching types never
 // reloads the page. Print has a dropdown of what to print (schedule cards,
 // name tags, schedules, logs), reusing the existing print flows for each.
-router.get('/design', (req, res) => {
+router.get('/design', async (req, res) => {
   const tab = TABS.includes(req.query.tab) ? req.query.tab : 'design';
   const initialType = DESIGN_TYPES.includes(req.query.type) ? req.query.type : 'student';
 
@@ -116,7 +116,7 @@ router.get('/design', (req, res) => {
       badgeHeight: BADGE_HEIGHT,
     }),
     scheduleCardDataJson: jsonScriptSafe({
-      template: getScheduleCardTemplate(),
+      template: await getScheduleCardTemplate(),
       defaultLayout: DEFAULT_LAYOUT,
       fields: FIELDS,
       tableFields: TABLE_FIELDS,

@@ -39,7 +39,7 @@ router.get('/checkin', (req, res) => {
   });
 });
 
-router.post('/checkin/scan', (req, res) => {
+router.post('/checkin/scan', async (req, res) => {
   if (checkinLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
   }
@@ -52,7 +52,7 @@ router.post('/checkin/scan', (req, res) => {
     return res.json({ ok: false, message: 'No barcode scanned.' });
   }
 
-  const member = db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
+  const member = await db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
   if (!member) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
@@ -71,12 +71,13 @@ router.post('/checkin/scan', (req, res) => {
   }
 
   const now = Date.now();
-  const alreadyPresent = rosters.every((r) => {
-    const existing = db
+  let alreadyPresent = true;
+  for (const r of rosters) {
+    const existing = await db
       .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
       .get(member.id, r.id, today);
-    return existing && existing.status === 'present';
-  });
+    if (!existing || existing.status !== 'present') alreadyPresent = false;
+  }
 
   if (alreadyPresent) {
     return res.json({
@@ -87,6 +88,9 @@ router.post('/checkin/scan', (req, res) => {
     });
   }
 
+  // datetime('now') - SQLite-only, deliberately left as-is (see
+  // MIGRATION.md's special-cases list); not touched by this routine
+  // async/await pass.
   const upsert = db.prepare(
     `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
      VALUES (?, ?, ?, 'present', ?, 'kiosk')
@@ -94,7 +98,7 @@ router.post('/checkin/scan', (req, res) => {
      DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = datetime('now')`
   );
   for (const r of rosters) {
-    upsert.run(member.id, r.id, today, now);
+    await upsert.run(member.id, r.id, today, now);
   }
 
   res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
@@ -111,7 +115,7 @@ router.get('/find-parent', (req, res) => {
   res.render('kiosk-find-parent', { title: 'Find a Parent' });
 });
 
-router.post('/find-parent/scan', (req, res) => {
+router.post('/find-parent/scan', async (req, res) => {
   if (findParentLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many lookups from this device right now. Please wait a moment and try again.' });
   }
@@ -122,7 +126,7 @@ router.post('/find-parent/scan', (req, res) => {
     return res.json({ ok: false, message: 'No barcode scanned.' });
   }
 
-  const student = db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
+  const student = await db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
   if (!student) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
@@ -139,7 +143,7 @@ router.post('/find-parent/scan', (req, res) => {
   // Design/Print Schedule Card print run - the parent's schedule here
   // looks exactly like their printed Schedule Card because it IS that
   // card, not a separate hand-built view.
-  const template = getScheduleCardTemplate();
+  const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
   const parentData = parents.map((p) => ({
     name: p.name,
