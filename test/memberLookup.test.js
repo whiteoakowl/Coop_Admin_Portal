@@ -31,47 +31,47 @@ test.before(() => {
 });
 
 test('findMemberByBarcodeOrName', async (t) => {
-  await t.test('matches an exact barcode', () => {
-    const { member, ambiguous } = findMemberByBarcodeOrName('lookup-test-barcode');
+  await t.test('matches an exact barcode', async () => {
+    const { member, ambiguous } = await findMemberByBarcodeOrName('lookup-test-barcode');
     assert.equal(member.name, 'Lookup Test Kid');
     assert.equal(ambiguous, false);
   });
 
-  await t.test('falls back to an exact, case-insensitive name match when the barcode lookup fails', () => {
-    const { member, ambiguous } = findMemberByBarcodeOrName('lookup test kid');
+  await t.test('falls back to an exact, case-insensitive name match when the barcode lookup fails', async () => {
+    const { member, ambiguous } = await findMemberByBarcodeOrName('lookup test kid');
     assert.equal(member.name, 'Lookup Test Kid');
     assert.equal(ambiguous, false);
   });
 
-  await t.test('trims surrounding whitespace before matching', () => {
-    const { member } = findMemberByBarcodeOrName('  Lookup Test Kid  ');
+  await t.test('trims surrounding whitespace before matching', async () => {
+    const { member } = await findMemberByBarcodeOrName('  Lookup Test Kid  ');
     assert.equal(member.name, 'Lookup Test Kid');
   });
 
-  await t.test('an inactive member never matches, by barcode or name', () => {
-    assert.equal(findMemberByBarcodeOrName('inactive-lookup-barcode').member, null);
-    assert.equal(findMemberByBarcodeOrName('Inactive Lookup Kid').member, null);
+  await t.test('an inactive member never matches, by barcode or name', async () => {
+    assert.equal((await findMemberByBarcodeOrName('inactive-lookup-barcode')).member, null);
+    assert.equal((await findMemberByBarcodeOrName('Inactive Lookup Kid')).member, null);
   });
 
-  await t.test('two active members sharing an exact name is reported as ambiguous, not silently resolved', () => {
-    const { member, ambiguous } = findMemberByBarcodeOrName('Duplicate Name Kid');
+  await t.test('two active members sharing an exact name is reported as ambiguous, not silently resolved', async () => {
+    const { member, ambiguous } = await findMemberByBarcodeOrName('Duplicate Name Kid');
     assert.equal(member, null);
     assert.equal(ambiguous, true);
   });
 
-  await t.test('a partial/substring name does not match - exact name match only', () => {
-    const { member } = findMemberByBarcodeOrName('Lookup Test');
+  await t.test('a partial/substring name does not match - exact name match only', async () => {
+    const { member } = await findMemberByBarcodeOrName('Lookup Test');
     assert.equal(member, null);
   });
 
-  await t.test('empty or whitespace-only input matches nothing', () => {
-    assert.equal(findMemberByBarcodeOrName('').member, null);
-    assert.equal(findMemberByBarcodeOrName('   ').member, null);
-    assert.equal(findMemberByBarcodeOrName(undefined).member, null);
+  await t.test('empty or whitespace-only input matches nothing', async () => {
+    assert.equal((await findMemberByBarcodeOrName('')).member, null);
+    assert.equal((await findMemberByBarcodeOrName('   ')).member, null);
+    assert.equal((await findMemberByBarcodeOrName(undefined)).member, null);
   });
 
-  await t.test('unrecognized input matches nothing', () => {
-    const { member, ambiguous } = findMemberByBarcodeOrName('totally-unknown-xyz');
+  await t.test('unrecognized input matches nothing', async () => {
+    const { member, ambiguous } = await findMemberByBarcodeOrName('totally-unknown-xyz');
     assert.equal(member, null);
     assert.equal(ambiguous, false);
   });

@@ -231,6 +231,37 @@ requests to Supabase both fail/reset). This means:
      a behavior change). Fix this in the same pass as each file's
      async/await conversion, not as a separate sweep - you're already
      touching every one of that file's queries anyway.
+   - **`datetime('now')` used inline in application SQL** (17 occurrences
+     across 10 files as of this writing - `grep -rn "datetime('now')"
+     routes utils`; NOT the same as `db/schema.sql`'s column `DEFAULT
+     (datetime('now'))` clauses, which the Postgres migration already
+     handles via `now_text()` - see the schema file's own header comment).
+     **Do not swap these to `now_text()` during the routine async/await
+     pass** - I made this mistake converting `routes/kiosk-class-
+     checkin.js` and caught it before committing: `now_text()` only
+     exists in the Postgres schema, so writing it into a query that still
+     runs against live SQLite (which is every file until the final
+     cutover) throws "no such function: now_text" immediately, breaking
+     the route outright - unlike the `await`-on-non-Promise trick, this
+     one has no safe no-op form on the still-SQLite-backed app. Leave
+     `datetime('now')` exactly as-is when doing a file's routine
+     conversion pass; fix all 17 at once in a dedicated commit right
+     before/during the actual `db/index.js` → `db/postgres.js` cutover,
+     verified against pglite first. (An even more portable option worth
+     considering then: compute the timestamp in JS - e.g. `new
+     Date().toISOString().slice(0,19).replace('T',' ')` matches
+     `now_text()`'s exact output format - and pass it as a bound
+     parameter instead of relying on either engine's own "now" SQL
+     function at all.)
+   - **Converting a util function to `async` means grepping `test/` too,
+     not just `routes/`/`utils/`.** Caught this converting
+     `utils/memberLookup.js`: `test/memberLookup.test.js` calls
+     `findMemberByBarcodeOrName` directly (not through an HTTP request),
+     so making it `async` turned its return value into a Promise and every
+     assertion in that test file broke, even though every real route
+     call site was already fixed correctly. `npm test`'s full run is the
+     only thing that actually catches this - running just the route-level
+     test file for whatever you're converting isn't enough by itself.
 
 2. **Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
    app** (`server.js`'s `session()` config, and each of the 5 route files

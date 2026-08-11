@@ -48,8 +48,8 @@ function requireUnlocked(req, res, next) {
 // gradeLabel, dayLabel, teacherNames/assistantNames) the admin Classes
 // tab and this router's own class list use, so a class looks identical
 // wherever it's shown - see allClassesList in utils/classSchedule.js.
-function findClassWithLabels(id) {
-  const raw = db.prepare('SELECT day FROM classes WHERE id = ?').get(id);
+async function findClassWithLabels(id) {
+  const raw = await db.prepare('SELECT day FROM classes WHERE id = ?').get(id);
   if (!raw) return null;
   return allClassesList(raw.day).find((c) => c.id === id) || null;
 }
@@ -115,10 +115,10 @@ router.get('/classes/:day', requireUnlocked, (req, res) => {
 // anyone with the shared PIN, not just a logged-in admin, so it only
 // ever shows the one day that matters for "who's checked into this class
 // right now" rather than a term's worth of history.
-router.get('/classes/:id/attendance', requireUnlocked, (req, res) => {
-  const cls = findClassWithLabels(parseInt(req.params.id, 10));
+router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
+  const cls = await findClassWithLabels(parseInt(req.params.id, 10));
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
   const today = todayISO();
   const grid = buildRosterGridData(roster, [today]);
   res.render('kiosk-class-checkin-attendance', {
@@ -130,8 +130,8 @@ router.get('/classes/:id/attendance', requireUnlocked, (req, res) => {
   });
 });
 
-router.get('/classes/:id/scan', requireUnlocked, (req, res) => {
-  const cls = findClassWithLabels(parseInt(req.params.id, 10));
+router.get('/classes/:id/scan', requireUnlocked, async (req, res) => {
+  const cls = await findClassWithLabels(parseInt(req.params.id, 10));
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
   const mode = SCAN_MODES.includes(req.query.mode) ? req.query.mode : 'checkin';
   res.render('kiosk-class-checkin-scan', {
@@ -146,16 +146,16 @@ router.get('/classes/:id/scan', requireUnlocked, (req, res) => {
 // barcode or, failing that, by exact name - see utils/memberLookup.js),
 // the class, and whether the class is even in session today. Returns
 // null (having already sent a JSON error response) if any of that fails,
-// so each route just does `const ctx = resolveScan(...); if (!ctx) return;`.
-function resolveScan(req, res) {
+// so each route just does `const ctx = await resolveScan(...); if (!ctx) return;`.
+async function resolveScan(req, res) {
   const classId = parseInt(req.params.id, 10);
-  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.roster_id) {
     res.json({ ok: false, message: 'Class not found.' });
     return null;
   }
 
-  const { member, ambiguous } = findMemberByBarcodeOrName(req.body.barcode);
+  const { member, ambiguous } = await findMemberByBarcodeOrName(req.body.barcode);
   if (ambiguous) {
     res.json({ ok: false, message: 'More than one member has that name - please scan a barcode instead.' });
     return null;
@@ -172,7 +172,7 @@ function resolveScan(req, res) {
   // "does the Student roster have today as a session date", not
   // anything tracked against the class's own roster_id.
   const studentRosterId = ensureDayRoster(cls.day, 'student');
-  const inSessionToday = db
+  const inSessionToday = await db
     .prepare('SELECT 1 FROM roster_dates WHERE roster_id = ? AND session_date = ?')
     .get(studentRosterId, today);
   if (!inSessionToday) {
@@ -180,7 +180,7 @@ function resolveScan(req, res) {
     return null;
   }
 
-  const enrolled = db.prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?').get(cls.roster_id, member.id);
+  const enrolled = await db.prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?').get(cls.roster_id, member.id);
   if (!enrolled) {
     res.json({ ok: false, message: `${member.name} is not enrolled in ${cls.class_name}.` });
     return null;
@@ -189,17 +189,17 @@ function resolveScan(req, res) {
   return { cls, member, today };
 }
 
-router.post('/classes/:id/scan/checkin', requireUnlocked, (req, res) => {
+router.post('/classes/:id/scan/checkin', requireUnlocked, async (req, res) => {
   if (classScanLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
   }
   classScanLimiter.recordAttempt(req.ip);
 
-  const ctx = resolveScan(req, res);
+  const ctx = await resolveScan(req, res);
   if (!ctx) return;
   const { cls, member, today } = ctx;
 
-  const existing = db
+  const existing = await db
     .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
     .get(member.id, cls.roster_id, today);
   if (existing && existing.status === 'present') {
@@ -215,12 +215,14 @@ router.post('/classes/:id/scan/checkin', requireUnlocked, (req, res) => {
   // marked absent or late on this class's attendance sheet earlier,
   // actually checking in should override that, the same way the main
   // portal's own check-in already does (routes/kiosk.js).
-  db.prepare(
-    `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
-     VALUES (?, ?, ?, 'present', ?, 'kiosk_class_checkin')
-     ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk_class_checkin', recorded_at = datetime('now')`
-  ).run(member.id, cls.roster_id, today, Date.now());
+  await db
+    .prepare(
+      `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
+       VALUES (?, ?, ?, 'present', ?, 'kiosk_class_checkin')
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk_class_checkin', recorded_at = datetime('now')`
+    )
+    .run(member.id, cls.roster_id, today, Date.now());
 
   res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
 });
@@ -232,17 +234,17 @@ router.post('/classes/:id/scan/checkin', requireUnlocked, (req, res) => {
 // Doesn't require a prior check-in: staff may need to check a member out
 // even if their check-in was missed or done elsewhere, the same
 // leniency the main portal's own checkout already has.
-router.post('/classes/:id/scan/checkout', requireUnlocked, (req, res) => {
+router.post('/classes/:id/scan/checkout', requireUnlocked, async (req, res) => {
   if (classScanLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
   }
   classScanLimiter.recordAttempt(req.ip);
 
-  const ctx = resolveScan(req, res);
+  const ctx = await resolveScan(req, res);
   if (!ctx) return;
   const { cls, member, today } = ctx;
 
-  const existing = db
+  const existing = await db
     .prepare('SELECT check_out_time FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')
     .get(member.id, cls.roster_id, today);
   if (existing) {
@@ -254,12 +256,14 @@ router.post('/classes/:id/scan/checkout', requireUnlocked, (req, res) => {
     });
   }
 
-  db.prepare(
-    `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
-     VALUES (?, ?, ?, NULL, ?)
-     ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = datetime('now')`
-  ).run(member.id, cls.roster_id, today, Date.now());
+  await db
+    .prepare(
+      `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
+       VALUES (?, ?, ?, NULL, ?)
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = datetime('now')`
+    )
+    .run(member.id, cls.roster_id, today, Date.now());
 
   res.json({ ok: true, name: member.name, message: `${member.name} checked out of ${cls.class_name}.` });
 });

@@ -17,14 +17,14 @@ const db = require('../db');
 // if the name matched more than one active member - `ambiguous` is true
 // in that case so the caller can show a specific, actionable error rather
 // than silently guessing which one was meant).
-function findMemberByBarcodeOrName(input) {
+async function findMemberByBarcodeOrName(input) {
   const trimmed = (input || '').trim();
   if (!trimmed) return { member: null, ambiguous: false };
 
-  const byBarcode = db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(trimmed);
+  const byBarcode = await db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(trimmed);
   if (byBarcode) return { member: byBarcode, ambiguous: false };
 
-  const byName = db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').all(trimmed);
+  const byName = await db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').all(trimmed);
   if (byName.length === 1) return { member: byName[0], ambiguous: false };
   if (byName.length > 1) return { member: null, ambiguous: true };
 
