@@ -43,6 +43,7 @@
     cardsBoth: document.getElementById('print-cardsBoth-section'),
     cardsDuplex: document.getElementById('print-cardsDuplex-section'),
     barcodes: document.getElementById('print-barcodes-section'),
+    barcodeLabels: document.getElementById('print-barcodeLabels-section'),
     setupCleanupBadges: document.getElementById('print-setupCleanupBadges-section'),
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
@@ -92,7 +93,12 @@
       filterSelect.addEventListener('change', () => {
         const filter = filterSelect.value;
         bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
-          row.style.display = filter === 'all' || row.dataset.type === filter ? '' : 'none';
+          // "Teachers" is its own dataset (data-teacher) rather than a
+          // fourth member_type value - a teacher is still a parent-type
+          // member underneath (utils/members.js's teacherMemberIds), so
+          // it has to layer on top of, not replace, the type filter.
+          const matches = filter === 'all' || (filter === 'teacher' ? row.dataset.teacher === '1' : row.dataset.type === filter);
+          row.style.display = matches ? '' : 'none';
         });
       });
     }
@@ -122,6 +128,7 @@
   wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
   wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
   wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
+  wireBulkMemberList('barcode-labels-bulk-list', 'barcode-labels-bulk-filter-select', 'barcode-labels-select-all-checkbox', 'barcode-labels-select-none-checkbox');
 
   // Setup/Cleanup + Custom badge lists (partials/misc-badge-print-panel):
   // one Select All checkbox per form, wired the same way as the schedule

@@ -11,11 +11,42 @@ const { jsonScriptSafe } = require('../utils/json');
 const { membersWithDetails } = require('../utils/members');
 const { buildDuplexPages } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
+const { formatDateLabel, formatTimestamp } = require('../utils/dates');
+const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { paginate, parsePage } = require('../utils/pagination');
 
 router.use(requireFullAdmin);
 
 const DESIGN_TYPES = ['student', 'parent', 'scheduleCard', 'setupCleanup', 'custom'];
-const TABS = ['design', 'print'];
+const TABS = ['design', 'print', 'requests'];
+
+const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
+const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
+
+// Name Tag Requests: every public Name Tag Request form submission (lost
+// tag / schedule change) - also surfaced here on its own Requests tab
+// alongside Design and Print, since a request usually means printing a
+// new name tag, not just reviewing an activity record. This duplicates
+// routes/admin-logs.js's own nameTagSubmissions/REQUEST_TYPE_LABELS/
+// NAME_TAG_DAY_LABELS and export/archive/unarchive routes deliberately -
+// the Logs tab (/admin/logs?tab=nametag) keeps working exactly as before,
+// this is a second, independent way to reach the same underlying
+// name_tag_requests data, not a replacement for it.
+function nameTagSubmissions(showArchived, dateFilter) {
+  let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
+             n.description AS description, n.created_at AS createdAt
+             FROM name_tag_requests n
+             JOIN members m ON m.id = n.member_id
+             WHERE n.archived = ?`;
+  const params = [showArchived ? 1 : 0];
+  if (dateFilter) {
+    sql += ' AND date(n.created_at) = ?';
+    params.push(dateFilter);
+  }
+  sql += ' ORDER BY n.created_at DESC';
+
+  return db.prepare(sql).all(...params);
+}
 
 // Unified Design/Print page: Design has one dropdown (Student/Parent/Admin
 // Name Tag, or Schedule Card) instead of separate Name Tag and Schedule
@@ -34,6 +65,25 @@ router.get('/design', (req, res) => {
   // name-only table.
   const members = membersWithDetails().filter((m) => m.active);
 
+  // Requests tab data - only meaningful when tab === 'requests', but
+  // computed unconditionally (same eager-compute style as members/badges
+  // above) rather than branching the render call in two.
+  const dateFilter = req.query.date || '';
+  const showArchived = req.query.archived === '1';
+  const allSubmissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+    id: r.id,
+    timestamp: formatTimestamp(r.createdAt),
+    memberName: r.memberName,
+    requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+    dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
+    description: r.description || '—',
+  }));
+  const requestDates = db
+    .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
+    .all(showArchived ? 1 : 0)
+    .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
+  const requestsPagination = paginate(allSubmissions, parsePage(req.query.page));
+
   res.render('admin-design', {
     title: 'Design / Print',
     tab,
@@ -44,6 +94,13 @@ router.get('/design', (req, res) => {
     notice: req.query.notice || null,
     setupCleanupBadges: listMiscBadges('setupCleanup'),
     customBadges: listMiscBadges('custom'),
+    submissions: requestsPagination.items,
+    allSubmissions,
+    pagination: requestsPagination,
+    baseHref: `/admin/design?tab=requests${showArchived ? '&archived=1' : ''}${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
+    dates: requestDates,
+    dateFilter,
+    showArchived,
     nameTagDataJson: jsonScriptSafe({
       templates: {
         student: getTemplate('student'),
@@ -69,6 +126,37 @@ router.get('/design', (req, res) => {
       cardHeight: CARD_HEIGHT,
     }),
   });
+});
+
+router.get('/design/requests/export.csv', (req, res) => {
+  const showArchived = req.query.archived === '1';
+  const dateFilter = req.query.date || '';
+  const submissions = nameTagSubmissions(showArchived, dateFilter);
+  const lines = [
+    toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
+    ...submissions.map((r) =>
+      toCsvRow([
+        formatTimestamp(r.createdAt),
+        r.memberName,
+        REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+        NAME_TAG_DAY_LABELS[r.day] || r.day,
+        r.description || '',
+      ])
+    ),
+  ];
+  sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
+});
+
+router.post('/design/requests/:id/archive', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
+  res.redirect('/admin/design?tab=requests');
+});
+
+router.post('/design/requests/:id/unarchive', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
+  res.redirect('/admin/design?tab=requests&archived=1');
 });
 
 // Bulk "Name Tags + Schedule Cards" print: each selected member's two

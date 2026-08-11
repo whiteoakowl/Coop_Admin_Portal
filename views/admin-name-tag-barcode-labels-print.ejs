@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Barcode Mailing Labels</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      // Sized for Avery 08160-style address label sheets: 3 across x 10
+      // down of 2-5/8in x 1in labels = 30 per sheet. See
+      // .avery-label-sheet-page/.avery-label-grid in styles.css for the
+      // exact measurements.
+      var pages = [];
+      for (var i = 0; i < members.length; i += 30) pages.push(members.slice(i, i + 30));
+    %>
+    <% pages.forEach(function(pageMembers) { %>
+      <div class="avery-label-sheet-page">
+        <div class="avery-label-grid">
+          <% pageMembers.forEach(function(m) { %>
+            <div class="avery-label-cell">
+              <%# Same shrink-to-fit script as the barcode-only sheet
+                  (barcode-cell-svg/barcode-cell-name), just laid out much
+                  smaller here - see the .avery-label-cell overrides in
+                  styles.css. %>
+              <svg class="barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
+              <div class="barcode-cell-name"><%= m.name %></div>
+              <div class="barcode-cell-id">ID: <%= m.member_code || m.barcode %></div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/barcode-print-shrink-name.js"></script>
+</body>
+</html>

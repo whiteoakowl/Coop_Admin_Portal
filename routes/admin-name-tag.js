@@ -224,4 +224,26 @@ router.post('/name-tag/print-barcodes', (req, res) => {
   });
 });
 
+// Barcode + name + ID mailing-label sheet: for printing directly onto
+// Avery 08160-style address label sheets - unlike print-barcodes above
+// (fixed 3in x 1.75in cards meant to be cut into a scan-card stack), this
+// fits an off-the-shelf label sheet and adds each member's permanent ID
+// number as plain text alongside the barcode.
+router.post('/name-tag/print-barcode-labels', (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = db
+    .prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`)
+    .all(...memberIds);
+
+  res.render('admin-name-tag-barcode-labels-print', {
+    title: 'Print Barcode Labels',
+    members,
+  });
+});
+
 module.exports = router;

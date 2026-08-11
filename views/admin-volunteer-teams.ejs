@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
+  <%# Explicit portrait, not left to whatever orientation the browser/
+      printer last remembered - see .floater-team-card-grid's own @media
+      print override in styles.css, which is what actually gives two
+      cards on top and two on the bottom (this page's 4 fixed hour teams)
+      matching the on-screen layout. %>
+  <style>@page { size: letter portrait; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
