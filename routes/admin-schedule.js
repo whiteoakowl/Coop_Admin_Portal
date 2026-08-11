@@ -283,7 +283,7 @@ router.post('/schedule/design/template', requireFullAdmin, async (req, res) => {
   // elements with no simple "this upload replaces that one" moment to
   // hook cleanup onto, so this re-derives what's still referenced and
   // sweeps anything left over instead.
-  sweepScheduleCardImages();
+  await sweepScheduleCardImages();
 
   res.json({ ok: true });
 });

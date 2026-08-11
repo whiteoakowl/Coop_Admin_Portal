@@ -69,14 +69,14 @@ const SCHEDULE_CARD_DIR = path.join(UPLOADS_DIR, 'schedule-cards');
 // need scanning together before sweeping it, or an image still used by
 // one type would look unreferenced and get deleted because only the
 // other type's templates were checked.
-function sweepNameTagImages() {
-  const nameTagRows = db.prepare('SELECT layout_json FROM name_tag_templates').all().map((r) => r.layout_json);
-  const miscBadgeRows = db.prepare('SELECT layout_json FROM misc_badge_templates').all().map((r) => r.layout_json);
+async function sweepNameTagImages() {
+  const nameTagRows = (await db.prepare('SELECT layout_json FROM name_tag_templates').all()).map((r) => r.layout_json);
+  const miscBadgeRows = (await db.prepare('SELECT layout_json FROM misc_badge_templates').all()).map((r) => r.layout_json);
   sweepUnreferencedImages(NAME_TAG_DIR, '/uploads/name-tags', referencedImagePaths([...nameTagRows, ...miscBadgeRows]));
 }
 
-function sweepScheduleCardImages() {
-  const rows = db.prepare('SELECT layout_json FROM schedule_card_templates').all().map((r) => r.layout_json);
+async function sweepScheduleCardImages() {
+  const rows = (await db.prepare('SELECT layout_json FROM schedule_card_templates').all()).map((r) => r.layout_json);
   sweepUnreferencedImages(SCHEDULE_CARD_DIR, '/uploads/schedule-cards', referencedImagePaths(rows));
 }
 

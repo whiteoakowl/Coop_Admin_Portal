@@ -139,7 +139,7 @@ const NAME_TAG_TYPES = ['student', 'parent'];
 // types (they use the same editor - see public/js/name-tag-editor.js) -
 // member-type name tags persist to name_tag_templates, misc badge types to
 // their own misc_badge_templates table (see utils/miscBadgeData.js).
-router.post('/name-tag/template/:type', (req, res) => {
+router.post('/name-tag/template/:type', async (req, res) => {
   const type = req.params.type;
   if (!NAME_TAG_TYPES.includes(type) && !isMiscBadgeType(type)) return res.status(404).json({ ok: false });
 
@@ -155,14 +155,19 @@ router.post('/name-tag/template/:type', (req, res) => {
 
   if (isMiscBadgeType(type)) {
     saveMiscTemplate(type, layout);
-    sweepNameTagImages();
+    await sweepNameTagImages();
     return res.json({ ok: true });
   }
 
-  db.prepare(
-    `INSERT INTO name_tag_templates (member_type, layout_json, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
-  ).run(type, JSON.stringify(layout));
+  // datetime('now') - SQLite-only, deliberately left as-is (see
+  // MIGRATION.md's special-cases list); not touched by this routine
+  // async/await pass.
+  await db
+    .prepare(
+      `INSERT INTO name_tag_templates (member_type, layout_json, updated_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+    )
+    .run(type, JSON.stringify(layout));
 
   // Removing/replacing an image element in the editor doesn't delete the
   // old upload on its own (a layout can add/remove any number of images,
@@ -170,7 +175,7 @@ router.post('/name-tag/template/:type', (req, res) => {
   // replaces that one" moment to hook cleanup onto). Re-derive what's
   // still referenced across every name tag/misc badge template - they
   // share this upload directory - and sweep anything left over.
-  sweepNameTagImages();
+  await sweepNameTagImages();
 
   res.json({ ok: true });
 });

@@ -71,7 +71,7 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
     for (const suffix of ['', '-wal', '-shm']) fs.rmSync(`${testDbPath}${suffix}`, { force: true });
   });
 
-  await t.test('keeps a referenced image and removes an unreferenced one (name tags + misc badges share this directory)', () => {
+  await t.test('keeps a referenced image and removes an unreferenced one (name tags + misc badges share this directory)', async () => {
     writeUpload(nameTagDir, 'kept.jpg', 'kept');
     writeUpload(nameTagDir, 'orphan.jpg', 'orphan');
 
@@ -85,24 +85,24 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
       "INSERT INTO misc_badge_templates (badge_type, layout_json) VALUES ('setupCleanup', ?) ON CONFLICT(badge_type) DO UPDATE SET layout_json = excluded.layout_json"
     ).run(JSON.stringify({ elements: [] }));
 
-    sweepNameTagImages();
+    await sweepNameTagImages();
 
     assert.equal(fs.existsSync(path.join(nameTagDir, 'kept.jpg')), true);
     assert.equal(fs.existsSync(path.join(nameTagDir, 'orphan.jpg')), false);
   });
 
-  await t.test('an image referenced by a misc badge template (not a name tag one) still survives', () => {
+  await t.test('an image referenced by a misc badge template (not a name tag one) still survives', async () => {
     writeUpload(nameTagDir, 'badge-image.jpg', 'badge image');
     db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(
       JSON.stringify({ elements: [{ type: 'image', src: '/uploads/name-tags/badge-image.jpg' }] })
     );
 
-    sweepNameTagImages();
+    await sweepNameTagImages();
 
     assert.equal(fs.existsSync(path.join(nameTagDir, 'badge-image.jpg')), true);
   });
 
-  await t.test('schedule card images are swept independently of the name tag directory', () => {
+  await t.test('schedule card images are swept independently of the name tag directory', async () => {
     writeUpload(scheduleCardDir, 'kept.jpg', 'kept');
     writeUpload(scheduleCardDir, 'orphan.jpg', 'orphan');
 
@@ -110,7 +110,7 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
       "INSERT INTO schedule_card_templates (id, layout_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json"
     ).run(JSON.stringify({ elements: [{ type: 'image', src: '/uploads/schedule-cards/kept.jpg' }] }));
 
-    sweepScheduleCardImages();
+    await sweepScheduleCardImages();
 
     assert.equal(fs.existsSync(path.join(scheduleCardDir, 'kept.jpg')), true);
     assert.equal(fs.existsSync(path.join(scheduleCardDir, 'orphan.jpg')), false);
