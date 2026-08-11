@@ -31,45 +31,49 @@ function matches(haystack, q) {
   return (haystack || '').toLowerCase().includes(q);
 }
 
-function searchMembers(q) {
-  const all = db.prepare('SELECT id, name, member_type, barcode FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE').all();
-  return all
-    .filter((m) => matches(m.name, q) || matches(m.barcode, q))
-    .slice(0, MAX_RESULTS)
-    .map((m) => ({
+async function searchMembers(q) {
+  const all = await db.prepare('SELECT id, name, member_type, barcode FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  const matched = all.filter((m) => matches(m.name, q) || matches(m.barcode, q)).slice(0, MAX_RESULTS);
+  const results = [];
+  for (const m of matched) {
+    results.push({
       id: m.id,
       name: m.name,
       memberType: m.member_type,
-      hasAttendance: !!db.prepare('SELECT 1 FROM attendance WHERE member_id = ? LIMIT 1').get(m.id),
-      isFloater: !!db.prepare('SELECT 1 FROM volunteer_members WHERE member_id = ? LIMIT 1').get(m.id),
-      activeLibraryCheckouts: db
-        .prepare('SELECT COUNT(*) AS c FROM library_checkouts WHERE member_id = ? AND checked_in_at IS NULL')
-        .get(m.id).c,
-    }));
+      hasAttendance: !!(await db.prepare('SELECT 1 FROM attendance WHERE member_id = ? LIMIT 1').get(m.id)),
+      isFloater: !!(await db.prepare('SELECT 1 FROM volunteer_members WHERE member_id = ? LIMIT 1').get(m.id)),
+      activeLibraryCheckouts: (
+        await db.prepare('SELECT COUNT(*) AS c FROM library_checkouts WHERE member_id = ? AND checked_in_at IS NULL').get(m.id)
+      ).c,
+    });
+  }
+  return results;
 }
 
-function searchLibraryItems(q) {
-  const all = db.prepare('SELECT id, title, barcode, type FROM library_items ORDER BY title COLLATE NOCASE').all();
-  return all
-    .filter((i) => matches(i.title, q) || matches(i.barcode, q))
-    .slice(0, MAX_RESULTS)
-    .map((i) => ({
+async function searchLibraryItems(q) {
+  const all = await db.prepare('SELECT id, title, barcode, type FROM library_items ORDER BY LOWER(title)').all();
+  const matched = all.filter((i) => matches(i.title, q) || matches(i.barcode, q)).slice(0, MAX_RESULTS);
+  const results = [];
+  for (const i of matched) {
+    results.push({
       id: i.id,
       title: i.title,
       barcode: i.barcode,
       type: i.type,
-      checkedOut: !!db.prepare('SELECT 1 FROM library_checkouts WHERE item_id = ? AND checked_in_at IS NULL').get(i.id),
-    }));
+      checkedOut: !!(await db.prepare('SELECT 1 FROM library_checkouts WHERE item_id = ? AND checked_in_at IS NULL').get(i.id)),
+    });
+  }
+  return results;
 }
 
-function globalSearch(query) {
+async function globalSearch(query) {
   const trimmed = (query || '').trim();
   if (!trimmed) return { query: '', members: [], libraryItems: [] };
   const q = trimmed.toLowerCase();
   return {
     query: trimmed, // original casing, for display (e.g. "Results for 'Smith'")
-    members: searchMembers(q),
-    libraryItems: searchLibraryItems(q),
+    members: await searchMembers(q),
+    libraryItems: await searchLibraryItems(q),
   };
 }
 

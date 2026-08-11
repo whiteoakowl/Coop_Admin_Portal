@@ -17,8 +17,8 @@ const { globalSearch } = require('../utils/search');
 
 router.use(requireFullAdmin);
 
-router.get('/search', (req, res) => {
-  const results = globalSearch(req.query.q);
+router.get('/search', async (req, res) => {
+  const results = await globalSearch(req.query.q);
   res.render('admin-search', {
     title: 'Search',
     q: results.query,

@@ -26,41 +26,41 @@ test.after(() => {
 });
 
 test('globalSearch', async (t) => {
-  await t.test('an empty or whitespace-only query returns no results at all, without touching the DB search paths', () => {
-    assert.deepEqual(globalSearch(''), { query: '', members: [], libraryItems: [] });
-    assert.deepEqual(globalSearch('   '), { query: '', members: [], libraryItems: [] });
-    assert.deepEqual(globalSearch(undefined), { query: '', members: [], libraryItems: [] });
+  await t.test('an empty or whitespace-only query returns no results at all, without touching the DB search paths', async () => {
+    assert.deepEqual(await globalSearch(''), { query: '', members: [], libraryItems: [] });
+    assert.deepEqual(await globalSearch('   '), { query: '', members: [], libraryItems: [] });
+    assert.deepEqual(await globalSearch(undefined), { query: '', members: [], libraryItems: [] });
   });
 
-  await t.test('preserves the original casing of the query for display, while matching case-insensitively', () => {
+  await t.test('preserves the original casing of the query for display, while matching case-insensitively', async () => {
     db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Case Insensitive Kid', 'case-insensitive-kid', 'student')").run();
-    const result = globalSearch('  CASE insensitive  ');
+    const result = await globalSearch('  CASE insensitive  ');
     assert.equal(result.query, 'CASE insensitive');
     assert.equal(result.members.length, 1);
     assert.equal(result.members[0].name, 'Case Insensitive Kid');
   });
 
-  await t.test('caps member results at MAX_RESULTS even when more match', () => {
+  await t.test('caps member results at MAX_RESULTS even when more match', async () => {
     const insert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
     for (let i = 0; i < MAX_RESULTS + 5; i++) {
       insert.run(`Capacity Test Kid ${i}`, `capacity-test-kid-${i}`);
     }
-    const result = globalSearch('Capacity Test Kid');
+    const result = await globalSearch('Capacity Test Kid');
     assert.equal(result.members.length, MAX_RESULTS);
   });
 
-  await t.test('caps library item results at MAX_RESULTS even when more match', () => {
+  await t.test('caps library item results at MAX_RESULTS even when more match', async () => {
     const insert = db.prepare("INSERT INTO library_items (title, barcode) VALUES (?, ?)");
     for (let i = 0; i < MAX_RESULTS + 5; i++) {
       insert.run(`Capacity Test Book ${i}`, `capacity-test-book-${i}`);
     }
-    const result = globalSearch('Capacity Test Book');
+    const result = await globalSearch('Capacity Test Book');
     assert.equal(result.libraryItems.length, MAX_RESULTS);
   });
 
-  await t.test('an inactive member is never returned', () => {
+  await t.test('an inactive member is never returned', async () => {
     const id = db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Inactive Search Kid', 'inactive-search-kid', 'student', 0)").run().lastInsertRowid;
-    const result = globalSearch('Inactive Search Kid');
+    const result = await globalSearch('Inactive Search Kid');
     assert.equal(result.members.some((m) => m.id === id), false);
   });
 });
