@@ -38,7 +38,7 @@ async function teamsWithMembers(day) {
   const teams = await teamsForDay(day);
   const result = [];
   for (const t of teams) {
-    result.push({ ...t, members: await membersForTeam(t.id), taskSection: taskSectionForTeam(t.id) });
+    result.push({ ...t, members: await membersForTeam(t.id), taskSection: await taskSectionForTeam(t.id) });
   }
   return result;
 }
@@ -155,65 +155,65 @@ router.get('/setup/:day/tasks', requireAdmin, requireDay, async (req, res) => {
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
-    sections: taskListSectionsForDay(day),
+    sections: await taskListSectionsForDay(day),
     teams: await teamsForDay(day),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-router.post('/setup/:day/tasks/new', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/new', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const teamId = parseInt(req.body.teamId, 10) || null;
   if (!title) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('List title is required.'));
   }
-  createSection(day, title, teamId);
+  await createSection(day, title, teamId);
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`"${title}" created.`));
 });
 
-router.post('/setup/:day/tasks/:sectionId/delete', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/delete', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  deleteSection(parseInt(req.params.sectionId, 10));
+  await deleteSection(parseInt(req.params.sectionId, 10));
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('List deleted.'));
 });
 
-router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.params.sectionId, 10);
   const direction = req.body.direction === 'up' ? 'up' : 'down';
-  swapSectionPosition(day, sectionId, direction);
+  await swapSectionPosition(day, sectionId, direction);
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
 // Single "+ Add Task" popup (toolbar, not per-card) - description +
 // which list dropdown, same pattern as Teams' "+ Add Member" popup.
-router.post('/setup/:day/tasks/add-item', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/add-item', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.body.sectionId, 10);
   const description = (req.body.description || '').trim();
   if (!sectionId || !description) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Choose a list and enter a task.'));
   }
-  const section = getSection(sectionId);
+  const section = await getSection(sectionId);
   if (!section || section.day !== day) return res.redirect(`/admin/setup/${day}/tasks`);
-  addItem(sectionId, description);
+  await addItem(sectionId, description);
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task added.'));
 });
 
-router.post('/setup/:day/tasks/:sectionId/items/:itemId/delete', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/items/:itemId/delete', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  deleteItem(parseInt(req.params.itemId, 10));
+  await deleteItem(parseInt(req.params.itemId, 10));
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
-router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const sectionId = parseInt(req.params.sectionId, 10);
   const itemId = parseInt(req.params.itemId, 10);
   const direction = req.body.direction === 'up' ? 'up' : 'down';
-  swapItemPosition(sectionId, itemId, direction);
+  await swapItemPosition(sectionId, itemId, direction);
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
@@ -221,26 +221,26 @@ router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, req
 // every item's description, all in one POST (see admin-setup-tasks.ejs).
 // Reordering/deleting are their own immediate actions above, not part of
 // this form.
-router.post('/setup/:day/tasks/save', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/tasks/save', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  Object.keys(req.body).forEach((key) => {
+  for (const key of Object.keys(req.body)) {
     const sectionMatch = /^sectionTitle_(\d+)$/.exec(key);
     if (sectionMatch) {
       const id = parseInt(sectionMatch[1], 10);
-      const section = getSection(id);
-      if (!section || section.day !== day) return;
+      const section = await getSection(id);
+      if (!section || section.day !== day) continue;
       const title = (req.body[key] || '').trim();
       const teamId = parseInt(req.body[`sectionTeam_${id}`], 10) || null;
-      if (title) updateSection(id, { title, teamId });
-      return;
+      if (title) await updateSection(id, { title, teamId });
+      continue;
     }
     const itemMatch = /^itemDesc_(\d+)$/.exec(key);
     if (itemMatch) {
       const id = parseInt(itemMatch[1], 10);
       const description = (req.body[key] || '').trim();
-      if (description) updateItem(id, description);
+      if (description) await updateItem(id, description);
     }
-  });
+  }
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent('Task list updated.'));
 });
 
@@ -273,7 +273,7 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.si
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
   const sectionIdByTitle = new Map();
-  taskListSectionsForDay(day).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
+  (await taskListSectionsForDay(day)).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
 
   let added = 0;
   for (const row of rows) {
@@ -286,19 +286,19 @@ router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.si
 
     let sectionId = sectionIdByTitle.get(listTitle.toLowerCase());
     if (!sectionId) {
-      sectionId = createSection(day, listTitle, null);
+      sectionId = await createSection(day, listTitle, null);
       sectionIdByTitle.set(listTitle.toLowerCase(), sectionId);
     }
-    addItem(sectionId, taskText);
+    await addItem(sectionId, taskText);
     added++;
   }
 
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`Imported ${added} task(s).`));
 });
 
-router.get('/setup/:day/tasks/export.csv', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/tasks/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const sections = taskListSectionsForDay(day);
+  const sections = await taskListSectionsForDay(day);
   const lines = [toCsvRow(['List', 'Number', 'Task'])];
   sections.forEach((s) => {
     if (s.items.length === 0) {
@@ -310,13 +310,13 @@ router.get('/setup/:day/tasks/export.csv', requireAdmin, requireDay, (req, res) 
   sendCsv(res, `${day}-task-list.csv`, lines);
 });
 
-router.get('/setup/:day/tasks/print', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/tasks/print', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-setup-tasks-print', {
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
-    sections: taskListSectionsForDay(day),
+    sections: await taskListSectionsForDay(day),
   });
 });
 
