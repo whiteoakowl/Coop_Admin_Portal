@@ -138,57 +138,84 @@ requests to Supabase both fail/reset). This means:
 7. **Route files/utils converted to async/await so far** (item 1 under
    "What's NOT done yet" below - keep this list updated as more get done,
    so nobody has to re-grep the whole repo to find where this left off):
-   - `routes/contact-admins.js`
-   - `routes/admin-schedule.js` (also fixed 3 `COLLATE NOCASE` → `LOWER()`)
-     — fully converted
-   - `routes/membership.js` (also: per-child insert loop changed
-     `forEach` → `for...of` so each insert can be awaited)
-   - `routes/name-tag.js`
+   - `routes/contact-admins.js` — fully converted
+   - `routes/admin-schedule.js` — fully converted (also fixed 3
+     `COLLATE NOCASE` → `LOWER()`)
+   - `routes/membership.js` — fully converted (per-child insert loop
+     changed `forEach` → `for...of` so each insert can be awaited)
+   - `routes/name-tag.js` — fully converted
    - `utils/memberLookup.js` + `routes/kiosk-class-checkin.js` — fully
      converted (see the `datetime('now')` and test-file special-case
      writeups above, both discovered while converting these)
    - `utils/search.js` + `routes/admin-search.js` — fully converted, 2
      `COLLATE NOCASE` fixed
-   - `utils/setup.js` + `routes/admin-setup.js` (Teams handlers) +
-     `routes/setup.js` (public/kiosk view) — fully converted, 1
-     `COLLATE NOCASE` fixed
-   - `utils/taskList.js` + `routes/admin-setup.js` (Task List handlers,
-     completing that file) — fully converted, added test coverage that
-     didn't exist before (`test/routes-admin-setup-tasks.test.js`)
-   - `utils/designImageGC.js` — fully converted; its two call sites
-     (`routes/admin-schedule.js`, `routes/admin-name-tag.js`) updated,
-     the second of those two handlers now `async` (rest of
-     `admin-name-tag.js` is still not converted - see below)
+   - `utils/setup.js` + `routes/admin-setup.js` + `routes/setup.js` —
+     fully converted, 1 `COLLATE NOCASE` fixed
+   - `utils/taskList.js` — fully converted, completing
+     `routes/admin-setup.js`; added test coverage that didn't exist
+     before (`test/routes-admin-setup-tasks.test.js`)
+   - `utils/designImageGC.js` — fully converted (both call sites)
+   - `utils/scheduleCardData.js` — `getScheduleCardTemplate()` converted
+     (the only function in it that touches the db directly -
+     `scheduleCardDataForMember` stays sync, see the coupling note below)
+   - `routes/kiosk.js` — fully converted (both scan endpoints; its own
+     `datetime('now')` upsert left untouched, deferred per the
+     special-cases list)
+   - `utils/nameTagData.js` — fully converted (`cleanupTeamsForParent`,
+     `badgeDataForMember`, `getTemplate`)
+   - `routes/admin-name-tag.js` — fully converted (last 4
+     `COLLATE NOCASE` in the file fixed too)
+   - `routes/admin-design.js`, `routes/admin-members.js` — **partially**
+     converted: only the specific handlers that call
+     `getScheduleCardTemplate`/`getTemplate`/`badgeDataForMember` were
+     touched (2 handlers in `admin-members.js`, the `GET /design`
+     handler in `admin-design.js`). Both files still have plenty of
+     their own untouched `db.prepare(` calls - don't assume "no longer
+     in the not-yet-started list" means "fully converted" for these two.
+
+   **Important coupling discovered doing the above, relevant to whoever
+   converts `utils/schedule.js` next**: `utils/schedule.js`'s
+   `getMemberSchedule()` is called by `utils/scheduleCardData.js`'s
+   `scheduleCardDataForMember()`, which in turn is called (still
+   synchronously, deliberately left that way so far) from
+   `routes/admin-schedule.js`, `routes/admin-members.js` (x2), and
+   `routes/kiosk.js` - all already fully/partially converted this
+   session. Converting `schedule.js` means making `getMemberSchedule`
+   async, which cascades into making `scheduleCardDataForMember` async
+   too, which then means re-touching every one of those call sites
+   *again* to add an `await` in front of `scheduleCardDataForMember(...)`
+   specifically (not just the `getScheduleCardTemplate()` calls already
+   awaited there). Budget for that ripple, don't do `schedule.js` as a
+   quick "just this one small file" pass.
 
    **Not yet started** (direct `db.prepare(` call counts as of this
-   writing - re-grep, these drift): `routes/admin.js` (9),
-   `routes/admin-design.js` (touched for this session's print features,
-   still sync), `routes/admin-documents.js` (6), `routes/admin-library.js`
-   (3), `routes/admin-logs.js` (4), `routes/admin-members.js` (29, the
-   biggest route file), `routes/admin-name-tag.js` (5 remaining),
-   `routes/admin-rosters.js` (18, has `withTransaction` x2 + `INSERT OR`),
-   `routes/admin-volunteers.js` (3, has `withTransaction` + `INSERT OR`),
-   `routes/checkout.js` (3), `routes/kiosk.js` (3); and utils:
+   writing - re-grep, these drift, and some of these earlier counts were
+   undercounted due to the codebase's `db\n  .prepare(...)` line-break
+   style not matching a same-line grep): `routes/admin.js`,
+   `routes/admin-documents.js`, `routes/admin-library.js`,
+   `routes/admin-logs.js`, `routes/admin-rosters.js` (has
+   `withTransaction` x2 + `INSERT OR`), `routes/admin-volunteers.js` (has
+   `withTransaction` + `INSERT OR`), `routes/checkout.js`; and utils:
    `utils/backup.js` (1, `PRAGMA` - needs its own design, see below),
-   `utils/classSchedule.js` (40, the biggest util file, has
-   `withTransaction` x2 + `INSERT OR` x4 - heavily depended on by
-   `routes/admin-schedule.js`, `admin-rosters.js`, `admin-volunteers.js`,
-   `kiosk-class-checkin.js`, `admin-logs.js` and others, so converting it
-   means re-touching all of those call sites too),
-   `utils/members.js` (15, also widely depended on),
-   `utils/miscBadgeData.js` (6), `utils/nameTagData.js` (1),
-   `utils/schedule.js` (2), `utils/scheduleCardData.js` (1),
-   `utils/substitutes.js` (14, has `INSERT OR`),
-   `utils/volunteers.js` (7, has `INSERT OR`).
+   `utils/classSchedule.js` (the biggest util file, has `withTransaction`
+   x2 + `INSERT OR` x4 - heavily depended on by `admin-schedule.js`,
+   `admin-rosters.js`, `admin-volunteers.js`, `kiosk-class-checkin.js`,
+   `admin-logs.js` and others, so converting it means re-touching all of
+   those call sites too), `utils/members.js` (also widely depended on -
+   convert this before tackling the rest of `admin-members.js`, which is
+   the single biggest remaining route file), `utils/miscBadgeData.js`,
+   `utils/schedule.js` (see the coupling note above - do this one
+   carefully, not as a quick pass), `utils/substitutes.js` (has
+   `INSERT OR`), `utils/volunteers.js` (has `INSERT OR`).
 
-   Suggested order for whoever picks this up: the small, low-coupling
-   utils first (`scheduleCardData.js`, `nameTagData.js`, `schedule.js`,
-   `miscBadgeData.js`), then `utils/members.js` (high-value, unblocks
-   most remaining route files), then the two `withTransaction`-bearing
-   giants (`classSchedule.js`, then whatever routes still use it),
-   `substitutes.js`/`volunteers.js` together (both have `INSERT OR`),
-   and `backup.js` last (needs a real design decision, not just a
-   mechanical pass - see below).
+   Suggested order for whoever picks this up: `utils/members.js` next
+   (high-value, unblocks most of `admin-members.js` and others), then
+   `utils/schedule.js` (budgeting for the `scheduleCardData.js` ripple
+   above), then `utils/miscBadgeData.js`, then the two
+   `withTransaction`-bearing giants (`classSchedule.js`, then whatever
+   routes still use it), `substitutes.js`/`volunteers.js` together (both
+   have `INSERT OR`), and `backup.js` last (needs a real design decision,
+   not just a mechanical pass - see below).
 
 ## What's NOT done yet — the actual remaining work
 
