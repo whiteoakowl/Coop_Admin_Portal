@@ -1,4 +1,4 @@
-/* global keepInputFocused */
+/* global keepInputFocused, initIdKeypad */
 (function () {
   const form = document.getElementById('scan-form');
   if (!form) return; // no session today
@@ -9,6 +9,7 @@
   const icon = status.querySelector('.kiosk-status-icon');
 
   keepInputFocused(input);
+  initIdKeypad(document.getElementById('id-keypad'), input, form);
 
   let resetTimer = null;
 
@@ -21,7 +22,7 @@
   function resetSoon() {
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      setState('idle', 'Scan your name tag barcode', 'camera');
+      setState('idle', 'Scan your barcode or enter your ID number', 'camera');
     }, 2500);
   }
 

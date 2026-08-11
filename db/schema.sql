@@ -23,6 +23,19 @@ CREATE TABLE IF NOT EXISTS members (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   barcode TEXT NOT NULL UNIQUE,
+  -- The member's permanent 6-digit ID (utils/members.js's
+  -- generateMemberCode), assigned once at creation and never changed
+  -- again - editing a member's name does NOT reassign it. barcode above
+  -- is set to match it at creation time and is what every printed
+  -- barcode/kiosk scan actually reads, so every member's barcode is the
+  -- same fixed length (unlike the old name-based barcode, which made
+  -- printed barcodes vary in width with how long someone's name was -
+  -- see the barcode-only print sheet's own notes in public/js/
+  -- barcode-print-shrink-name.js for why that mattered enough to fix).
+  -- Kept as its own column (not just read out of barcode) so it reads
+  -- as a real "Member ID" on a profile/export, independent of whatever
+  -- barcode itself happens to hold.
+  member_code TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
   member_type TEXT NOT NULL DEFAULT 'student' CHECK(member_type IN ('student','parent','admin')),
@@ -550,6 +563,12 @@ CREATE INDEX IF NOT EXISTS idx_roster_archives_day ON roster_archives(day, archi
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_checkouts_session ON checkouts(roster_id, session_date);
 CREATE INDEX IF NOT EXISTS idx_members_barcode ON members(barcode);
+-- Partial (not a plain UNIQUE column constraint - see db/index.js's
+-- migration for why member_code couldn't be declared UNIQUE inline) so
+-- SQLite doesn't try to enforce uniqueness among the (temporary, one boot
+-- only) NULLs a fresh ADD COLUMN leaves before that migration backfills
+-- every row.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_members_member_code ON members(member_code) WHERE member_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_roster_members_member ON roster_members(member_id);
 CREATE INDEX IF NOT EXISTS idx_roster_dates_date ON roster_dates(session_date);
 CREATE INDEX IF NOT EXISTS idx_volunteer_members_section ON volunteer_members(section_id);

@@ -97,6 +97,20 @@ function saveHourLabels(day, labels) {
   });
 }
 
+// A single hour's label, for callers editing just one card at a time (the
+// Floater Teams page - each card is one hour) - saveHourLabels above
+// always rewrites every HOUR_POSITIONS entry for the day (it's built for
+// the Class Schedule page's one "Edit" dialog that shows all of them at
+// once), so reusing it for a single card would silently reset every other
+// hour's label back to its "Hour N" default.
+function saveHourLabel(day, position, label) {
+  const trimmed = (label || '').trim() || `Hour ${position}`;
+  db.prepare(
+    `INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)
+     ON CONFLICT(day, position) DO UPDATE SET label = excluded.label`
+  ).run(day, position, trimmed);
+}
+
 function studentsForClass(classId) {
   return db
     .prepare(
@@ -704,6 +718,7 @@ module.exports = {
   formatGradeRange,
   hoursForDay,
   saveHourLabels,
+  saveHourLabel,
   gridForDay,
   roomGridForDay,
   roomsForDay,

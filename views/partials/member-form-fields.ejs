@@ -151,19 +151,7 @@ const US_STATES = [
         <% }); %>
       </select>
     </label>
-    <% if (families.length === 0) { %>
-      <p class="hint">No families yet - use "+ Add Family" on the Members page first.</p>
-    <% } else { %>
-      <div class="member-form-checklist" data-family-checklist>
-        <% families.forEach(function(f) { %>
-          <button type="button" class="member-form-checklist-row<%= memberFamilyId === f.id ? ' is-checked' : '' %>" data-family-option="<%= f.id %>">
-            <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
-            <span class="member-form-checklist-name">The <%= f.name %> Family</span>
-            <span class="member-form-checklist-count"><%= f.memberCount %> member<%= f.memberCount === 1 ? '' : 's' %></span>
-          </button>
-        <% }); %>
-      </div>
-    <% } %>
+    <button type="button" class="btn-secondary member-form-add-family-btn" data-add-family-open>+ Add New Family</button>
   </div>
 
   <div class="manage-section member-form-section-box member-form-section-green" id="parent-only-fields" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">

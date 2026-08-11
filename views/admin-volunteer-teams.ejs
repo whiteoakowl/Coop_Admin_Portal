@@ -39,12 +39,29 @@
         <p class="roster-empty">No floaters on <%= dayLabel %>'s list yet - use + Add Member above.</p>
       <% } %>
 
-      <div class="team-card-grid setup-team-card-grid">
+      <div class="team-card-grid floater-team-card-grid">
         <% teams.forEach(function(team, i) { %>
-          <div class="team-col">
+          <%# Same inline "unfreeze the card" edit as Setup/Cleanup
+              (views/admin-setup.ejs, public/js/edit-toggle.js) - Edit
+              enables the hour-title input and every member's rank select,
+              and reveals the per-member remove trash icon, all at once. %>
+          <div class="team-col edit-section">
             <div class="team-info-card team-accent-<%= i % 5 %>">
+              <div class="team-card-corner-actions no-print">
+                <button type="button" class="icon-btn" data-edit-toggle-edit aria-label="Edit <%= team.hourLabel %>" title="Edit Hour">
+                  <svg class="icon"><use href="#icon-edit"/></svg>
+                </button>
+                <button type="submit" class="icon-btn" form="hour-edit-form-<%= team.section.id %>" data-edit-toggle-save hidden aria-label="Save <%= team.hourLabel %>" title="Save">
+                  <svg class="icon"><use href="#icon-check"/></svg>
+                </button>
+                <button type="button" class="icon-btn" data-edit-toggle-cancel hidden aria-label="Cancel editing <%= team.hourLabel %>" title="Cancel">
+                  <svg class="icon"><use href="#icon-x-circle"/></svg>
+                </button>
+              </div>
               <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-              <h3 class="team-info-title"><%= team.hourLabel %></h3>
+              <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/hour-label" id="hour-edit-form-<%= team.section.id %>" class="team-info-edit-form">
+                <input type="text" name="label" class="team-info-title team-info-title-input" value="<%= team.hourLabel %>" required disabled />
+              </form>
               <span class="team-info-pill"><svg class="icon"><use href="#icon-users"/></svg> <span><%= team.members.length %> floater<%= team.members.length === 1 ? '' : 's' %></span></span>
             </div>
             <div class="team-members-card">
@@ -58,13 +75,13 @@
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                     <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(child &le;2)</span><% } %></span>
                     <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
-                      <select name="rank" class="team-member-rank-select" onchange="this.form.submit()">
+                      <select name="rank" class="team-member-rank-select" onchange="this.form.requestSubmit()" disabled>
                         <% ranks.forEach(function(r) { %>
                           <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
                         <% }); %>
                       </select>
                     </form>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= m.name %> from <%= team.hourLabel %>?">
+                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from <%= team.hourLabel %>?">
                       <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </form>
                   </div>
@@ -114,5 +131,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/edit-toggle.js"></script>
 </body>
 </html>

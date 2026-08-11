@@ -230,11 +230,9 @@
         </table>
       <% } else if (tab === 'classrisk') { %>
         <div class="roster-toolbar no-print">
-          <div class="category-filter" style="margin: 0;">
-            <select id="day-select" onchange="window.location = '/admin/logs?tab=classrisk&day=' + this.value">
-              <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-              <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-            </select>
+          <div class="day-toggle">
+            <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/logs?tab=classrisk&day=monday">Monday</a>
+            <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/logs?tab=classrisk&day=wednesday">Wednesday</a>
           </div>
           <div class="roster-btn-row">
             <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
@@ -244,11 +242,14 @@
       <% } else if (tab === 'substitutes') { %>
         <div class="roster-toolbar no-print">
           <div class="filter-row">
-            <div class="category-filter" style="margin: 0;">
-              <select onchange="window.location = '/admin/logs?tab=substitutes&day=' + this.value + (document.getElementById('sub-log-date').value ? '&date=' + document.getElementById('sub-log-date').value : '')">
-                <option value="monday" <%= day === 'monday' ? 'selected' : '' %>>Viewing Monday</option>
-                <option value="wednesday" <%= day === 'wednesday' ? 'selected' : '' %>>Viewing Wednesday</option>
-              </select>
+            <div class="day-toggle">
+              <%# The whole href is built in JS and output as a single
+                  expression - not literal "&day=..." text mixed with a
+                  separately-interpolated "&date=..." piece - so EJS's
+                  auto-escaping applies uniformly across the full query
+                  string instead of only to the dynamic part. %>
+              <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="<%= '/admin/logs?tab=substitutes&day=monday' + (dateFilter ? '&date=' + dateFilter : '') %>">Monday</a>
+              <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="<%= '/admin/logs?tab=substitutes&day=wednesday' + (dateFilter ? '&date=' + dateFilter : '') %>">Wednesday</a>
             </div>
             <div class="category-filter">
               <label for="sub-log-date">For Date</label>

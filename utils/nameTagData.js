@@ -17,10 +17,16 @@ function cleanupTeamsForParent(memberId) {
 
 // The field values a badge template can place on a member's tag.
 function badgeDataForMember(member) {
+  // member_code is the permanent 6-digit ID assigned at creation (see
+  // db/schema.sql's own comment) - shown as "ID#123456" so it reads as a
+  // label rather than a bare number the eye might mistake for something
+  // else on the tag.
+  const memberCode = member.member_code ? `ID#${member.member_code}` : '';
   if (member.member_type === 'parent') {
     return {
       name: member.name,
       cleanupTeam: cleanupTeamsForParent(member.id).join(', '),
+      memberCode,
       barcodeValue: member.barcode,
     };
   }
@@ -28,6 +34,7 @@ function badgeDataForMember(member) {
     name: member.name,
     gradeLevel: member.grade_level || '',
     allergies: member.medical_notes || '',
+    memberCode,
     barcodeValue: member.barcode,
   };
 }

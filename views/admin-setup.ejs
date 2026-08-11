@@ -42,20 +42,42 @@
 
       <div class="team-card-grid setup-team-card-grid">
         <% teams.forEach(function(t, i) { %>
-          <div class="team-col">
+          <%# The whole card (info + members) is one edit-toggle .edit-
+              section (public/js/edit-toggle.js) - clicking Edit unfreezes
+              the title/description/leader fields in place and reveals the
+              delete-team and per-member remove trash icons, all at once.
+              No popup: "Edit" just unfreezes this same card. %>
+          <div class="team-col edit-section" data-edit-toggle-section>
             <div class="team-info-card team-accent-<%= i % 5 %>">
-              <button type="button" class="team-edit-btn no-print" onclick="document.getElementById('edit-team-dialog-<%= t.id %>').showModal()" aria-label="Edit <%= t.title %>" title="Edit Team">
-                <svg class="icon"><use href="#icon-edit"/></svg>
-              </button>
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <h3 class="team-info-title"><%= t.title %></h3>
-              <div class="team-info-leader">
-                <svg class="icon"><use href="#icon-user"/></svg>
-                Leader: <%= t.leaderName || 'None' %>
+              <div class="team-card-corner-actions no-print">
+                <button type="button" class="icon-btn" data-edit-toggle-edit aria-label="Edit <%= t.title %>" title="Edit Team">
+                  <svg class="icon"><use href="#icon-edit"/></svg>
+                </button>
+                <button type="submit" class="icon-btn" form="team-edit-form-<%= t.id %>" data-edit-toggle-save hidden aria-label="Save <%= t.title %>" title="Save">
+                  <svg class="icon"><use href="#icon-check"/></svg>
+                </button>
+                <button type="button" class="icon-btn" data-edit-toggle-cancel hidden aria-label="Cancel editing <%= t.title %>" title="Cancel">
+                  <svg class="icon"><use href="#icon-x-circle"/></svg>
+                </button>
+                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Delete team &quot;<%= t.title %>&quot;? This cannot be undone.">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= t.title %>" title="Delete Team"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
               </div>
-              <% if (t.description) { %>
-                <span class="team-info-pill"><svg class="icon"><use href="#icon-tag"/></svg> <span><%= t.description %></span></span>
-              <% } %>
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+              <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" id="team-edit-form-<%= t.id %>" class="team-info-edit-form">
+                <input type="text" name="title" class="team-info-title team-info-title-input" value="<%= t.title %>" required disabled />
+                <div class="team-info-leader">
+                  <svg class="icon"><use href="#icon-user"/></svg>
+                  Leader:
+                  <select name="leaderId" class="team-info-leader-select" disabled>
+                    <option value="">No leader</option>
+                    <% availableParents.forEach(function(p) { %>
+                      <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <input type="text" name="description" class="team-info-desc-input" value="<%= t.description || '' %>" placeholder="Short description (optional)" disabled />
+              </form>
             </div>
             <div class="team-members-card">
               <h4>Members</h4>
@@ -64,9 +86,12 @@
                   <p class="team-card-empty">No members yet.</p>
                 <% } %>
                 <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row">
+                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                    <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %></span>
+                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from this team?">
+                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
                   </div>
                 <% }); %>
               </div>
@@ -82,60 +107,6 @@
               </div>
             <% } %>
           </div>
-
-          <dialog id="edit-team-dialog-<%= t.id %>" class="class-view-dialog">
-            <div class="class-view-header">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <h3>Edit Team</h3>
-              <div class="class-view-header-actions">
-                <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/delete" class="inline-block-form" data-confirm="Delete team &quot;<%= t.title %>&quot;? This cannot be undone.">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                </form>
-                <button type="submit" class="roster-action-btn" form="edit-team-form-<%= t.id %>">Save</button>
-              </div>
-              <%# autofocus, not the Delete button that happens to come
-                  first in DOM order above - see class-schedule-view-
-                  fragment.ejs's own version of this same fix. %>
-              <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close" autofocus><svg class="icon"><use href="#icon-x-circle"/></svg></button>
-            </div>
-
-            <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" id="edit-team-form-<%= t.id %>" class="member-form-grid">
-              <label class="member-form-full">Team Title
-                <input type="text" name="title" value="<%= t.title %>" required />
-              </label>
-              <label class="member-form-full">Description
-                <input type="text" name="description" value="<%= t.description || '' %>" placeholder="Short description (optional)" />
-              </label>
-              <label class="member-form-full">Leader
-                <select name="leaderId">
-                  <option value="">No leader</option>
-                  <% availableParents.forEach(function(p) { %>
-                    <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
-                  <% }); %>
-                </select>
-              </label>
-            </form>
-
-            <div class="manage-section">
-              <div class="grid-box-header">
-                <h2>Members (<%= t.members.length %>)</h2>
-              </div>
-              <div class="team-card-members">
-                <% if (t.members.length === 0) { %>
-                  <p class="team-card-empty">No members yet.</p>
-                <% } %>
-                <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row">
-                    <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
-                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form" data-confirm="Remove <%= m.name %> from this team?">
-                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                <% }); %>
-              </div>
-            </div>
-          </dialog>
         <% }); %>
       </div>
     </div>
@@ -192,5 +163,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/edit-toggle.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* global keepInputFocused */
+/* global keepInputFocused, initIdKeypad */
 (function () {
   const scanForm = document.getElementById('scan-form');
   if (!scanForm) return; // no session today
@@ -16,6 +16,7 @@
   const cancelBtn = document.getElementById('cancel-btn');
 
   keepInputFocused(input);
+  initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
 
   let currentMemberId = null;
 
@@ -40,7 +41,7 @@
     currentMemberId = null;
     stepNumber.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
-    setScanState('idle', 'Scan your name tag barcode', 'camera');
+    setScanState('idle', 'Scan your barcode or enter your ID number', 'camera');
     numberMessage.textContent = '';
     numpad.querySelectorAll('.numpad-btn').forEach((b) => b.classList.remove('numpad-btn-selected'));
     setTimeout(() => input.focus(), 50);
@@ -69,14 +70,14 @@
         });
         stepScan.classList.add('kiosk-hidden');
         stepNumber.classList.remove('kiosk-hidden');
-        setScanState('idle', 'Scan your name tag barcode', 'camera');
+        setScanState('idle', 'Scan your barcode or enter your ID number', 'camera');
       } else {
         setScanState('error', data.message, 'x-circle');
-        setTimeout(() => setScanState('idle', 'Scan your name tag barcode', 'camera'), 2500);
+        setTimeout(() => setScanState('idle', 'Scan your barcode or enter your ID number', 'camera'), 2500);
       }
     } catch (err) {
       setScanState('error', 'Connection error. Please try again.', 'x-circle');
-      setTimeout(() => setScanState('idle', 'Scan your name tag barcode', 'camera'), 2500);
+      setTimeout(() => setScanState('idle', 'Scan your barcode or enter your ID number', 'camera'), 2500);
     }
   });
 

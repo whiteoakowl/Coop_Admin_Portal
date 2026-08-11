@@ -27,6 +27,24 @@
           </div>
         </div>
       </form>
+
+      <%# Outside #member-form on purpose - a <form> can't nest inside another
+          <form> (the browser silently drops the inner tag), so this dialog's
+          own form has to live as a sibling, not a descendant, of the main
+          Add/Edit Member form. See data-add-family-* in public/js/member-form.js. %>
+      <dialog class="member-picker-dialog" data-add-family-dialog>
+        <form data-add-family-form>
+          <h3>Add Family</h3>
+          <label>Family Last Name
+            <input type="text" name="name" placeholder="e.g. Anderson" required />
+          </label>
+          <p class="alert alert-error" data-add-family-error hidden></p>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Add Family</button>
+          </div>
+        </form>
+      </dialog>
     </div>
 
   </main>

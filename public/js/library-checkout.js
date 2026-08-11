@@ -160,7 +160,7 @@
       input.value = item.id;
       checkoutItemInputs.appendChild(input);
     });
-    checkoutForm.submit();
+    checkoutForm.requestSubmit();
   });
 
   renderPending();

@@ -26,7 +26,11 @@
       <div class="badge-sheet-page barcode-sheet">
         <% pageMembers.forEach(function(m) { %>
           <div class="barcode-cell">
-            <svg class="badge-el-barcode barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
+            <%# Not badge-el-barcode (public/js/name-tag-render.js's shared
+                selector) - this page renders its own barcodes, with a
+                fixed bar width instead of that renderer's stretch-to-a-
+                fixed-box sizing. See barcode-print-shrink-name.js. %>
+            <svg class="barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
             <div class="barcode-cell-name"><%= m.name %></div>
           </div>
         <% }); %>
@@ -34,7 +38,11 @@
     <% }); %>
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
-  <script src="/js/name-tag-render.js"></script>
-  <script src="/js/print-auto.js"></script>
+  <%# Not public/js/name-tag-render.js (the shared badge-el-barcode
+      renderer) or public/js/print-auto.js like every other print-preview
+      page - this one renders its own barcodes (fixed bar width) and
+      triggers window.print() itself, only once that and the name-shrink
+      pass have actually finished. See that script's own comment for why. %>
+  <script src="/js/barcode-print-shrink-name.js"></script>
 </body>
 </html>

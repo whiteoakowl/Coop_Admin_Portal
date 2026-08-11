@@ -12,13 +12,16 @@
 // select/checkbox/radio/date controls - several of those in this app
 // auto-submit their own form the moment they change (the rank <select>
 // in admin-volunteer-teams.ejs, the date-add <input type="date"> in
-// admin-volunteers.ejs), calling the plain DOM .submit() method - which,
-// unlike requestSubmit(), never fires a 'submit' event to clear the flag
-// first. Scoping to 'input' on text-like fields sidesteps that entirely:
-// none of this app's auto-submit controls are ever typed into, so they
-// never mark anything dirty, and the one thing this guard exists to
-// catch - someone typing a name/note/address and then navigating away -
-// is exactly what an 'input' event on a text-like field is.
+// admin-volunteers.ejs). Scoping to 'input' on text-like fields sidesteps
+// needing to special-case any of them: none of this app's auto-submit
+// controls are ever typed into, so they never mark anything dirty, and
+// the one thing this guard exists to catch - someone typing a name/note/
+// address and then navigating away - is exactly what an 'input' event on
+// a text-like field is. (Those auto-submit controls call
+// form.requestSubmit(), not the older .submit() - the distinction
+// matters elsewhere: only requestSubmit() fires a real 'submit' event,
+// which is what lets public/js/csrf.js's own delegated listener attach
+// the CSRF token before the browser actually posts the form.)
 (function () {
   if (!window.CSRF_TOKEN) return;
 

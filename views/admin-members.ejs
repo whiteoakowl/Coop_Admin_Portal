@@ -35,6 +35,7 @@
         <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('mass-import-dialog').showModal()">Mass Import Families</button>
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
       </div>
@@ -63,6 +64,24 @@
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="mass-import-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/mass-import" enctype="multipart/form-data">
+        <h3>Mass Import Families</h3>
+        <p class="hint">
+          One row per family. The family name comes from the Primary Parent's last name; the 2nd Parent (if any) and every
+          Child 1&ndash;8 with a name filled in are connected to that same family. Address/City/State/Zip/Phone are applied to
+          every member of the family, including the kids - each parent's own email goes on just their profile. Every new
+          member gets their own auto-generated 6-digit Member ID, which is also what their barcode encodes.
+        </p>
+        <a class="btn-secondary import-sample-link" href="/admin/members/mass-import/sample.xlsx">Download Sample File</a>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import Families</button>
         </div>
       </form>
     </dialog>

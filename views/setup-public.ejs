@@ -41,9 +41,9 @@
                 <p class="team-card-empty">No members on this team yet.</p>
               <% } %>
               <% t.members.forEach(function(m) { %>
-                <div class="team-member-row">
+                <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
                   <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                  <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                  <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %></span>
                 </div>
               <% }); %>
             </div>

@@ -8,7 +8,7 @@ const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOpti
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { defaultDay, requireDay } = require('../utils/days');
-const { hoursForDay, syncDayMemberRosters, classesAtRiskForDay } = require('../utils/classSchedule');
+const { hoursForDay, syncDayMemberRosters, syncMemberSchedulesForDay, saveHourLabel, classesAtRiskForDay } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -319,6 +319,24 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, (req,
     syncDayMemberRosters(day);
   }
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Member added.'));
+});
+
+// Renames the shared hour label a floater team's card displays (the same
+// class_schedule_hours row the Class Schedule page's own "Edit" dialog
+// edits) - one card's Save, so this only ever touches that one hour's
+// position (saveHourLabel, not the bulk saveHourLabels every position at
+// once), and re-syncs schedule cards the same way that dialog does.
+router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireDay, (req, res) => {
+  const day = req.params.day;
+  const list = getListByDay(day);
+  const sectionId = parseInt(req.params.sectionId, 10);
+  const section = sectionsForList(list.id).find((s) => s.id === sectionId);
+  if (!section) {
+    return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Team not found.'));
+  }
+  saveHourLabel(day, section.position, req.body.label);
+  syncMemberSchedulesForDay(day);
+  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Hour renamed.'));
 });
 
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, (req, res) => {

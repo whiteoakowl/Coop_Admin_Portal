@@ -2,9 +2,14 @@
 // class's info + roster as an HTML fragment and shows it in a shared
 // dialog, via the shared public/js/fragment-dialog.js helper, so viewing
 // (and, once unlocked, editing) a class never navigates away from the
-// grid. Saving/deleting/roster changes are still real form submissions
+// grid. Saving/deleting the class itself are still real form submissions
 // (this app has no client framework), so those do leave the popup - they
-// land back on this same grid page.
+// land back on this same grid page. Adding a roster member is the one
+// exception (see the submit handler below): that action gets repeated
+// many times in a row while building out a class's roster, so it's worth
+// the extra fetch()-based plumbing to keep the popup open across each
+// add instead of bouncing back to the grid and making the admin reopen
+// it every single time.
 (function () {
   const dialog = document.getElementById('class-view-dialog');
   if (!dialog || !window.loadFragmentIntoDialog) return;
@@ -39,5 +44,41 @@
     if (e.target.closest('[data-cancel-edit-btn]')) {
       if (currentClassId) loadClass(currentClassId);
     }
+  });
+
+  // Add Member (views/class-schedule-view-fragment.ejs's own nested
+  // dialog) - posts via fetch instead of a plain form submission, so a
+  // success just closes that small picker and refreshes the roster list
+  // underneath it, with the outer class-view-dialog never closing at
+  // all. Falls back to a real form submission (the old behavior) on any
+  // error, same safety net loadClass() itself already uses.
+  document.addEventListener('submit', (e) => {
+    const form = e.target.closest('[data-roster-add-form]');
+    if (!form || !dialog.contains(form)) return;
+    e.preventDefault();
+
+    // URL-encoded, not FormData directly - this route has no multer
+    // middleware (it's not a file upload), and Express's body parser
+    // only parses application/x-www-form-urlencoded/json, not
+    // multipart/form-data (see public/js/csrf.js's own comment on that
+    // same distinction) - a raw FormData body would leave req.body
+    // undefined server-side.
+    fetch(form.action, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-Token': window.CSRF_TOKEN || '',
+      },
+      body: new URLSearchParams(new FormData(form)),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then(() => {
+        const pickerDialog = form.closest('dialog');
+        if (pickerDialog) pickerDialog.close();
+        if (currentClassId) loadClass(currentClassId);
+      })
+      .catch(() => form.submit());
   });
 })();

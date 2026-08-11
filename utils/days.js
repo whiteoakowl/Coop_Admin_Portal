@@ -1,8 +1,10 @@
 // Shared by both the Volunteers and Setup/Cleanup features, which each
 // have exactly two fixed lists: one for Monday, one for Wednesday.
+const { todayISO, weekdayOf } = require('./dates');
 
 const DAYS = ['monday', 'wednesday'];
 const DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday' };
+const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 
 function isValidDay(day) {
   return DAYS.includes(day);
@@ -26,4 +28,15 @@ function defaultDay() {
   return 'monday';
 }
 
-module.exports = { DAYS, DAY_LABELS, isValidDay, defaultDay, requireDay };
+// Only meaningful when today itself falls on the given day - otherwise
+// there's no real "today" to default to for a Monday/Wednesday-scoped view
+// (e.g. looking at Monday's Setup/Cleanup teams on a Wednesday). Shared by
+// every day-scoped page that highlights "as of today" state against a
+// specific date: the Class Schedule grid's absent-student flag and Setup/
+// Cleanup Teams' absent-member highlight both key off this.
+function defaultDateFor(day) {
+  const today = todayISO();
+  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
+}
+
+module.exports = { DAYS, DAY_LABELS, isValidDay, defaultDay, requireDay, defaultDateFor };
