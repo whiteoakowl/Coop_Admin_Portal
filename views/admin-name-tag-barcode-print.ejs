@@ -17,13 +17,14 @@
     <% } %>
 
     <%
-      // 3 across x 8 down fills a US Letter sheet with room for margins -
-      // 24 per page.
+      // 2 across x 6 down of fixed 3in x 1.75in cards fills a US Letter
+      // sheet (with a tighter page margin than the badge-sheet-page this
+      // reuses - see .barcode-only-sheet-page) - 12 per page.
       var pages = [];
-      for (var i = 0; i < members.length; i += 24) pages.push(members.slice(i, i + 24));
+      for (var i = 0; i < members.length; i += 12) pages.push(members.slice(i, i + 12));
     %>
     <% pages.forEach(function(pageMembers) { %>
-      <div class="badge-sheet-page barcode-sheet">
+      <div class="badge-sheet-page barcode-only-sheet-page barcode-sheet">
         <% pageMembers.forEach(function(m) { %>
           <div class="barcode-cell">
             <%# Not badge-el-barcode (public/js/name-tag-render.js's shared
@@ -39,10 +40,9 @@
   </main>
   <script src="/js/vendor/jsbarcode.min.js"></script>
   <%# Not public/js/name-tag-render.js (the shared badge-el-barcode
-      renderer) or public/js/print-auto.js like every other print-preview
-      page - this one renders its own barcodes (fixed bar width) and
-      triggers window.print() itself, only once that and the name-shrink
-      pass have actually finished. See that script's own comment for why. %>
+      renderer) - this one renders its own barcodes (fixed bar width) and
+      shrinks each name to fit, once document.fonts.ready resolves. See
+      that script's own comment for why. %>
   <script src="/js/barcode-print-shrink-name.js"></script>
 </body>
 </html>

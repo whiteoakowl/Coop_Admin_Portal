@@ -2406,25 +2406,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    border, unlike a real .badge-canvas. */
 .badge-canvas-blank { background: none; border: none; box-shadow: none; }
 
-/* Barcode-only print sheet: 3 columns x 8 rows (24 per page), filling the
-   full width/height of the .badge-sheet-page it's nested in - unlike
-   .badge-sheet's fixed-pixel badge grid, these columns are meant to
-   stretch and fill the sheet, so plain "fr" tracks on a definite-width
-   container divide evenly with no stretching ambiguity to work around. */
+/* Barcode-only print sheet: fixed 3in x 1.75in cards, 2 columns x 6 rows
+   (12 per page) - unlike .badge-sheet's fixed-pixel badge grid this used
+   to share tracks with, both dimensions are pinned in real print units so
+   every card comes out exactly 3in x 1.75in regardless of page size,
+   rather than stretching to fill whatever width/height was available.
+   width: max-content + margin: 0 auto centers the (narrower-than-the-
+   page) grid horizontally, the same centering trick .badge-sheet uses. */
 .barcode-sheet {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 1.275in;
+  grid-template-columns: repeat(2, 3in);
+  grid-auto-rows: 1.75in;
   gap: 0;
+  width: max-content;
+  margin: 0 auto;
 }
+/* A tighter page margin than plain .badge-sheet-page's 0.4in - 6 rows x
+   1.75in = 10.5in, so this needs the full 11in - 2 x 0.25in = 10.5in of
+   vertical room a 0.4in margin wouldn't leave. */
+.barcode-only-sheet-page { padding: 0.25in; }
 .barcode-cell {
   border: 1px solid rgba(28, 37, 48, 0.35);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.08in;
-  padding: 0.1in;
+  gap: 0.1in;
+  padding: 0.15in;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -2434,14 +2442,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    value, routes/admin-members.js) is; the total rendered width is then
    left to vary with content, same as any real-world barcode does, capped
    here so a very long name's barcode can't overflow its cell. */
-.barcode-cell-svg { max-width: 85%; height: 0.65in; }
-/* Meant to be read at a glance across a table, not squinted at up close -
-   bumped well past body-text size (0.8rem was barely legible on the
-   printed sheet). Still comfortably clears the cell's remaining vertical
-   space: 1.275in row - 0.65in barcode - 0.2in padding - 0.08in gap =
-   ~0.345in left, and 1.4rem at line-height 1.2 is ~0.28in. */
+.barcode-cell-svg { max-width: 85%; height: 0.9in; }
+/* Meant to be read at a glance across a table, not squinted at up close.
+   Comfortably clears the cell's remaining vertical space: 1.75in row -
+   0.9in barcode - 0.3in padding - 0.1in gap = ~0.45in left, and 1.6rem at
+   line-height 1.2 is ~0.32in. */
 .barcode-cell-name {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
   text-align: center;
   color: var(--ink);
@@ -2451,6 +2458,65 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      forces this back to the cell's actual rendered width so a too-long
      name ellipsizes instead of silently overflowing past its cell border. */
   width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Barcode + name + ID mailing-label sheet (views/admin-name-tag-barcode-
+   labels-print.ejs): sized to print directly onto Avery 08160-style
+   address label sheets (2-5/8in x 1in labels, 3 across x 10 down = 30 per
+   sheet, 0.5in top/bottom page margin, 0.1875in left/right, 0.125in
+   between columns - the standard layout that label size ships with).
+   3 x 2.625in + 2 x 0.125in gaps + 2 x 0.1875in margins = 8.5in exactly;
+   10 x 1in + 2 x 0.5in margins = 11in exactly - no leftover slack to
+   center, unlike .barcode-sheet's page. Reuses .barcode-cell-svg/
+   .barcode-cell-name (and public/js/barcode-print-shrink-name.js
+   unmodified) at a much smaller size than the barcode-only sheet, since
+   each label is a fraction of that sheet's card size. */
+.avery-label-sheet-page {
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  padding: 0.5in 0.1875in;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+}
+.avery-label-sheet-page:not(:last-child) { page-break-after: always; }
+
+.avery-label-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 2.625in);
+  grid-auto-rows: 1in;
+  column-gap: 0.125in;
+  row-gap: 0;
+}
+.avery-label-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.03in;
+  padding: 0.05in 0.1in;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+/* Overrides the barcode-only sheet's much larger defaults - a label is a
+   fraction of that sheet's card size, so the barcode/name here need to be
+   small enough that a third line (the ID number, which that sheet
+   doesn't show at all) still fits inside 1in of label height. */
+.avery-label-cell .barcode-cell-svg { height: 0.32in; max-width: 90%; }
+.avery-label-cell .barcode-cell-name { font-size: 0.8rem; line-height: 1.15; }
+.barcode-cell-id {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  width: 100%;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3980,17 +4046,39 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .print-header-title { font-size: 1.25rem; font-weight: 800; margin: 0; color: #000; }
   .print-header-sub { font-size: 0.95rem; margin: 0.1rem 0 0; color: #333; }
 
-  /* Data-bearing text inputs read as plain values, not editable boxes. */
+  /* Data-bearing text inputs read as plain values, not editable boxes.
+     team-info-title/-desc-input already render border-less by default
+     (their resting :disabled state, see the .team-info-edit-form rules
+     above) - this just pins the color to solid black and drops any
+     leftover focus/hover styling a print engine might otherwise render. */
   .volunteer-cell-input,
-  .setup-team-title-input,
-  .setup-team-desc-input {
+  .team-info-title-input,
+  .team-info-desc-input,
+  .team-info-leader-select {
     border: none !important;
     background: none !important;
     padding: 0.15rem 0.2rem !important;
     color: #000 !important;
+    appearance: none;
   }
-  .setup-team-title-input { font-weight: 700; }
-  .setup-team-card { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+  .team-info-title-input { font-weight: 700; }
+  .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
+
+  /* Setup/Cleanup and Floater Teams: always a clean 2-per-row grid on
+     paper (portrait, see the @page rule in each view) - "two cards on
+     top, two on the bottom" for Floater Teams' fixed 4 hour cards,
+     matching the on-screen layout, instead of Setup/Cleanup's wider
+     desktop column count (which doesn't fit a portrait page) or the
+     narrow-viewport horizontal-scroll layout either grid falls back to
+     under 1100px - print's page-width viewport is well under that
+     breakpoint, so without this override the scrolling layout (useless
+     on paper - there's no scrolling a printed page) would otherwise win. */
+  .setup-team-card-grid,
+  .floater-team-card-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
 
   /* The on-screen "sheet of paper" chrome (drop shadow, border, the gap
      between pages) is there to preview the page, not to print onto it -

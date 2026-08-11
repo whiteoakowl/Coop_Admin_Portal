@@ -241,6 +241,16 @@ function sortMembersByFamily(members) {
   return [...orderedGroups.flatMap((g) => g.group), ...inactive];
 }
 
+// Every member id who teaches at least one class (class_staff.role =
+// 'teacher') - a Set so membersWithDetails can do an O(1) lookup per
+// member instead of a per-member query. Assistants don't count as
+// teachers here (a separate role in the same table) - the Design/Print
+// hub's "Teachers Only" filter is specifically for who to hand a class
+// roster/mailing label to as the instructor of record.
+function teacherMemberIds() {
+  return new Set(db.prepare("SELECT DISTINCT member_id FROM class_staff WHERE role = 'teacher'").all().map((r) => r.member_id));
+}
+
 // Family is now a named entity (families.name, e.g. "Anderson") rather
 // than a list of everyone else sharing family_id - a plain left join gets
 // each member's family surname in one query instead of the old per-member
@@ -254,10 +264,12 @@ function membersWithDetails(typeFilter) {
   const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
   const sorted = sortMembersByFamily(members);
   const rostersById = rostersByMemberIds(sorted.map((m) => m.id));
+  const teacherIds = teacherMemberIds();
   return sorted.map((m) => ({
     ...m,
     rosters: rostersById.get(m.id) || [],
     familyName: m.family_name || null,
+    isTeacher: teacherIds.has(m.id),
   }));
 }
 

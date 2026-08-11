@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
+  <%# Explicit portrait, not left to whatever orientation the browser/
+      printer last remembered - see .setup-team-card-grid's own @media
+      print override in styles.css for the matching 2-per-row layout. %>
+  <style>@page { size: letter portrait; margin: 0.5in; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>

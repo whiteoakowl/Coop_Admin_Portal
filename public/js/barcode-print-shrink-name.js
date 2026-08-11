@@ -70,19 +70,22 @@
     document.querySelectorAll('.barcode-cell-name').forEach(shrinkToFit);
   }
 
-  // This page skips the generic public/js/print-auto.js (every other
-  // print-preview page uses it) and triggers window.print() itself below
-  // instead - shrinking has to happen-and-finish strictly before print
-  // fires, and a plain 'load' listener can't guarantee that on its own:
-  // web fonts (partials/head.ejs, loaded with display: swap) may still be
-  // swapping in when 'load' fires, and measuring/shrinking against the
-  // fallback font's metrics, then having the real font swap in afterward,
-  // can leave a name too big for its cell with no further pass to catch
-  // it. document.fonts.ready resolves once the real fonts are actually
-  // applied, so it's the one point it's safe to measure text from - one
-  // pass, not a "measure early, hope a second pass corrects it later"
-  // race. Barcode rendering doesn't depend on web fonts, but there's no
-  // reason to render it any earlier than this same one gate.
+  // Shrinking has to happen-and-finish strictly before anything is
+  // measured, and a plain 'load' listener can't guarantee that on its
+  // own: web fonts (partials/head.ejs, loaded with display: swap) may
+  // still be swapping in when 'load' fires, and measuring/shrinking
+  // against the fallback font's metrics, then having the real font swap
+  // in afterward, can leave a name too big for its cell with no further
+  // pass to catch it. document.fonts.ready resolves once the real fonts
+  // are actually applied, so it's the one point it's safe to measure text
+  // from - one pass, not a "measure early, hope a second pass corrects it
+  // later" race. Barcode rendering doesn't depend on web fonts, but
+  // there's no reason to render it any earlier than this same one gate.
+  //
+  // Unlike this file's previous version, nothing here calls
+  // window.print() - see public/js/print-auto.js's own comment for why
+  // pages don't auto-print anymore. The page renders and waits for the
+  // visible Print button to be clicked.
   function ready(fn) {
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(fn);
@@ -94,7 +97,6 @@
   ready(function () {
     renderAllBarcodes();
     shrinkAllNames();
-    window.print();
   });
 
   // Defensive re-run if the sheet is printed again later (the page's own
