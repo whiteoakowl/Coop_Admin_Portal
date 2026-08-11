@@ -5,11 +5,13 @@ const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const { teamsForDay, membersForTeam } = require('../utils/setup');
 
 // Public, no-login view-only page: shows every Setup/Cleanup team for a day.
-router.get('/setup/:day', (req, res) => {
+router.get('/setup/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
-  const teams = teamsForDay(day).map((t) => ({ ...t, members: membersForTeam(t.id) }));
+  const dayTeams = await teamsForDay(day);
+  const teams = [];
+  for (const t of dayTeams) teams.push({ ...t, members: await membersForTeam(t.id) });
 
   res.render('setup-public', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,

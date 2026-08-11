@@ -34,18 +34,23 @@ router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${de
 // Each team's own linked task list (if any - see task_list_sections.team_id)
 // rides along so its numbered tasks can print right on that team's card
 // (item 31).
-function teamsWithMembers(day) {
-  return teamsForDay(day).map((t) => ({ ...t, members: membersForTeam(t.id), taskSection: taskSectionForTeam(t.id) }));
+async function teamsWithMembers(day) {
+  const teams = await teamsForDay(day);
+  const result = [];
+  for (const t of teams) {
+    result.push({ ...t, members: await membersForTeam(t.id), taskSection: taskSectionForTeam(t.id) });
+  }
+  return result;
 }
 
-router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
 
   res.render('admin-setup', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
     day,
     dayLabel: DAY_LABELS[day],
-    teams: teamsWithMembers(day),
+    teams: await teamsWithMembers(day),
     availableParents: activeParentOptions(),
     // Only actually highlights anyone when today falls on this day - no
     // date picker here (teams are a standing weekly roster, not tied to a
@@ -57,7 +62,7 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
   });
 });
 
-router.post('/setup/:day/teams', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
@@ -65,24 +70,24 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, (req, res) => {
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  db.prepare('INSERT INTO setup_teams (day, title, description, leader_id) VALUES (?, ?, ?, ?)').run(day, title, description || null, leaderId);
+  await db.prepare('INSERT INTO setup_teams (day, title, description, leader_id) VALUES (?, ?, ?, ?)').run(day, title, description || null, leaderId);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
 });
 
 // Leader dropdown auto-submits on change, same pattern as a Floater
 // Teams rank select - no separate "edit" step.
-router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const leaderId = parseInt(req.body.leaderId, 10) || null;
-  setTeamLeader(teamId, leaderId);
+  await setTeamLeader(teamId, leaderId);
   res.redirect(`/admin/setup/${day}/manage`);
 });
 
 // Team cards are view-only until Edit is clicked - title/description/
 // leader all save together from that one popup, replacing the old
 // inline-editable card.
-router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const title = (req.body.title || '').trim();
@@ -91,40 +96,43 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, (req, re
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  updateTeam(teamId, { title, description, leaderId });
+  await updateTeam(teamId, { title, description, leaderId });
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
 });
 
-router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
-  db.prepare('DELETE FROM setup_teams WHERE id = ? AND day = ?').run(teamId, day);
+  await db.prepare('DELETE FROM setup_teams WHERE id = ? AND day = ?').run(teamId, day);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Team deleted.'));
 });
 
 // Single "+ Add Member" popup (toolbar, not per-card) - member + team
 // dropdowns, so adding someone doesn't require opening a specific card.
-router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.body.teamId, 10);
   const memberId = parseInt(req.body.memberId, 10);
   if (teamId && memberId) {
-    db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
+    // INSERT OR IGNORE - SQLite-only syntax, deliberately left as-is here
+    // (see MIGRATION.md's special-cases list); this file's routine
+    // async/await pass doesn't touch dialect-specific SQL text.
+    await db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
   }
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Member added.'));
 });
 
-router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireDay, (req, res) => {
+router.post('/setup/:day/teams/:teamId/remove-member/:memberId', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const memberId = parseInt(req.params.memberId, 10);
-  db.prepare('DELETE FROM setup_team_members WHERE team_id = ? AND member_id = ?').run(teamId, memberId);
+  await db.prepare('DELETE FROM setup_team_members WHERE team_id = ? AND member_id = ?').run(teamId, memberId);
   res.redirect(`/admin/setup/${day}/manage`);
 });
 
-router.get('/setup/:day/export.csv', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const teams = teamsWithMembers(day);
+  const teams = await teamsWithMembers(day);
 
   const lines = [toCsvRow(['Team', 'Description', 'Member'])];
   for (const t of teams) {
@@ -141,14 +149,14 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, (req, res) => {
 // --- Task List tab: stacked numbered task lists, optionally each tied
 // to a Setup/Cleanup team (see utils/taskList.js taskSectionForTeam) ---
 
-router.get('/setup/:day/tasks', requireAdmin, requireDay, (req, res) => {
+router.get('/setup/:day/tasks', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-setup-tasks', {
     title: `${DAY_LABELS[day]} Task List`,
     day,
     dayLabel: DAY_LABELS[day],
     sections: taskListSectionsForDay(day),
-    teams: teamsForDay(day),
+    teams: await teamsForDay(day),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
