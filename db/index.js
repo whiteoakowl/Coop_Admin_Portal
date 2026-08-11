@@ -392,6 +392,34 @@ for (const memberType of ['student', 'parent']) {
   );
 }
 
+// One-time upgrade: the student/parent name tag's top title box used to be
+// a fixed "Sanford Homeschoolers" label - member IDs are more useful there
+// now that every member has a permanent one (see the member_code column
+// above). Any saved template whose box is still literally that untouched
+// default text gets migrated to show the member's own Member ID instead,
+// in the exact spot/style the admin already had it - same "only touch the
+// untouched default" fingerprinting the schedule card template migration
+// below uses, just at the single-element level since this only replaces
+// one box rather than a whole layout.
+for (const memberType of ['student', 'parent']) {
+  const row = db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
+  if (!row) continue;
+  let layout;
+  try {
+    layout = JSON.parse(row.layout_json);
+  } catch (err) {
+    continue;
+  }
+  const elements = Array.isArray(layout) ? layout : layout && Array.isArray(layout.elements) ? layout.elements : null;
+  if (!elements) continue;
+  const orgEl = elements.find((el) => el.type === 'text' && el.field === 'custom' && el.text === 'Sanford Homeschoolers');
+  if (!orgEl) continue;
+  orgEl.field = 'memberCode';
+  delete orgEl.text;
+  const wrapped = Array.isArray(layout) ? { background: '#ffffff', elements } : layout;
+  db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify(wrapped), memberType);
+}
+
 // Seed a starter design for each misc badge type (Setup/Cleanup, Custom),
 // same pattern as the per-member-type name tag seeding above.
 for (const badgeType of ['setupCleanup', 'custom']) {

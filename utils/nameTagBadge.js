@@ -22,10 +22,12 @@ const FIELDS_BY_TYPE = {
     { field: 'name', label: 'Name' },
     { field: 'gradeLevel', label: 'Grade Level' },
     { field: 'allergies', label: 'Allergies' },
+    { field: 'memberCode', label: 'Member ID' },
   ],
   parent: [
     { field: 'name', label: 'Name' },
     { field: 'cleanupTeam', label: 'Cleanup Team' },
+    { field: 'memberCode', label: 'Member ID' },
   ],
   setupCleanup: [
     { field: 'badgeNumber', label: 'Badge Number' },
@@ -78,7 +80,7 @@ const DEFAULT_LAYOUTS = {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
-      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 56, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
       { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 78, width: 320, height: 40, fontSize: 11, color: '#dc2626', bold: true, align: 'center', valign: 'middle' },
@@ -89,7 +91,7 @@ const DEFAULT_LAYOUTS = {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
-      { id: 'org', type: 'text', field: 'custom', text: 'Sanford Homeschoolers', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 28, width: 320, height: 30, fontSize: 19, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 60, width: 320, height: 36, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },

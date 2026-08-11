@@ -14,9 +14,18 @@
     <p class="kiosk-date"><%= dateLabel %></p>
 
     <div id="step-scan" class="kiosk-panel">
-      <p id="kiosk-instructions" class="kiosk-instructions">Scan your name tag barcode</p>
-      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan your barcode or enter your ID number</p>
+      <div class="kiosk-scan-columns">
+        <div class="kiosk-scan-col">
+          <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+            <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+          </div>
+          <p class="kiosk-scan-col-label">Scan barcode</p>
+        </div>
+        <div class="kiosk-scan-col">
+          <div id="id-keypad"></div>
+          <p class="kiosk-scan-col-label">Enter ID number</p>
+        </div>
       </div>
       <form id="scan-form" autocomplete="off">
         <input
@@ -40,6 +49,7 @@
     </div>
   </main>
   <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-id-keypad.js"></script>
   <script src="/js/kiosk-checkout.js"></script>
   <script src="/js/fullscreen-nav.js"></script>
 </body>

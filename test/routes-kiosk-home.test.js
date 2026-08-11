@@ -1,13 +1,13 @@
-// Real HTTP-level coverage for a bug report this session: "Class Check In"
-// on the kiosk home screen (views/kiosk-home.ejs) used to be a small grey
-// pill tucked into the top-right corner-actions group, styled identically
-// to utility controls like "Full Screen View"/"Admin" - easy to overlook
-// next to the six big colorful landing-card tiles, and not purple like the
-// user asked for ("Button should be purple to match kiosk purple button").
-// Promoted it to a full landing-card (purple, matching Absence/Late Form
-// and Name Tag Form) among the other primary actions instead. This suite
-// just locks in the markup shape so that promotion doesn't silently regress
-// back into a corner link.
+// Real HTTP-level coverage for "Class Check In & Out" on the kiosk home
+// screen (views/kiosk-home.ejs). This went through two shapes this
+// session: it started as a small grey top-corner pill (styled like the
+// plain "Full Screen View"/"Admin" utility controls), got promoted to a
+// full purple landing-card tile so it wouldn't be overlooked, and was then
+// explicitly reverted back to a small top-corner pill - "class check in &
+// out should still be a small button top right and keep the color and
+// icon" - just now purple (matching .landing-card-purple) and with its
+// graduation-cap icon, instead of losing that color/icon by going back to
+// a plain admin-corner-link. This suite locks in that final shape.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -30,16 +30,25 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test('kiosk home: "Class Check In" is a purple landing-card, not a corner link', async () => {
+test('kiosk home: "Class Check In & Out" is a small purple top-right corner button, not a landing-card tile', async () => {
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  const cardMatch = /<a class="landing-card landing-card-purple[^"]*" href="\/kiosk\/class-checkin">/.exec(res.text);
-  assert.ok(cardMatch, 'expected a purple landing-card linking to /kiosk/class-checkin');
+  assert.match(
+    res.text,
+    /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/,
+    'expected a small purple corner button with the graduation-cap icon, linking to /kiosk/class-checkin'
+  );
+
+  assert.doesNotMatch(
+    res.text,
+    /<a class="landing-card landing-card-purple[^"]*" href="\/kiosk\/class-checkin">/,
+    'Class Check In & Out should no longer be one of the big landing-grid tiles'
+  );
 
   assert.doesNotMatch(
     res.text,
     /<a class="admin-corner-link" href="\/kiosk\/class-checkin">/,
-    'Class Check In should no longer be one of the small top-corner pill links'
+    'and should not have reverted all the way to a plain grey admin-corner-link either - it keeps its purple color and icon'
   );
 });

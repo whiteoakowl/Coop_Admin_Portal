@@ -14,19 +14,28 @@
     <p class="kiosk-date"><%= dateLabel %></p>
 
     <div class="kiosk-panel">
-      <p id="kiosk-instructions" class="kiosk-instructions">Scan a barcode or type a name</p>
-      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan a barcode or enter an ID number</p>
+      <div class="kiosk-scan-columns">
+        <div class="kiosk-scan-col">
+          <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+            <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+          </div>
+          <p class="kiosk-scan-col-label">Scan barcode</p>
+        </div>
+        <div class="kiosk-scan-col">
+          <div id="id-keypad"></div>
+          <p class="kiosk-scan-col-label">Enter ID number</p>
+        </div>
       </div>
-      <p class="hint">Use a phone's barcode-scanning camera app, an external barcode scanner, or type a member's name below.</p>
+      <p class="hint">Use a phone's barcode-scanning camera app, an external barcode scanner, the keypad above, or type a member's name below.</p>
       <form id="scan-form" class="class-scan-form" autocomplete="off">
         <input
           id="barcode-input"
           class="class-scan-input"
           name="barcode"
           type="text"
-          aria-label="Scan a barcode or type a name"
-          placeholder="Scan a barcode or type a name"
+          aria-label="Scan a barcode, enter an ID number, or type a name"
+          placeholder="Scan a barcode, enter an ID number, or type a name"
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
@@ -36,6 +45,7 @@
     </div>
   </main>
   <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-id-keypad.js"></script>
   <script src="/js/kiosk-class-checkin-scan.js"></script>
 </body>
 </html>

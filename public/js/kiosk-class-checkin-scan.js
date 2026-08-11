@@ -1,4 +1,4 @@
-/* global keepInputFocused */
+/* global keepInputFocused, initIdKeypad */
 // Mirrors public/js/kiosk-checkin.js's fetch-and-show pattern exactly,
 // just posting to this class's own scoped, mode-specific scan endpoint
 // (routes/kiosk-class-checkin.js) instead of the main portal's - see that
@@ -7,8 +7,9 @@
 // hardcoded into a shared script, so this one file works for both Check
 // In and Check Out on every class. Unlike the main portal's kiosk scan
 // pages, this input is visible and typeable (not just a hidden target for
-// a hardware scanner) - one of the three supported input methods here is
-// typing a member's name by hand (utils/memberLookup.js).
+// a hardware scanner) - one of the input methods here is typing a member's
+// name by hand (utils/memberLookup.js), on top of the shared scanner +
+// numeric ID keypad every other kiosk scan screen offers.
 (function () {
   const form = document.getElementById('scan-form');
   if (!form) return;
@@ -19,9 +20,10 @@
   const status = document.getElementById('kiosk-status');
   const instructions = document.getElementById('kiosk-instructions');
   const icon = status.querySelector('.kiosk-status-icon');
-  const idleMessage = 'Scan a barcode or type a name';
+  const idleMessage = 'Scan a barcode or enter an ID number';
 
   keepInputFocused(input);
+  initIdKeypad(document.getElementById('id-keypad'), input, form);
 
   let resetTimer = null;
 

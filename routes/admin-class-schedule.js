@@ -41,11 +41,11 @@ router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/c
 // single path segment, including "import-template.xlsx").
 router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) => {
   const buffer = buildTemplateWorkbook(
-    ['Day', 'Hour', 'Class Name', 'Room', 'Age Group'],
+    ['Day', 'Hour', 'Class Name', 'Room', 'Age Group', 'Teacher', 'Assistant 1', 'Assistant 2', 'Assistant 3'],
     [
-      ['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7'],
-      ['Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13'],
-      ['Wednesday', '1', 'PE', 'Gym', 'All Ages'],
+      ['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane Smith', 'John Doe', '', ''],
+      ['Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13', 'Pat Rivera', '', '', ''],
+      ['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', ''],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -375,6 +375,10 @@ const IMPORT_ALIASES = {
   className: ['class name', 'class', 'subject'],
   room: ['room'],
   ageGroup: ['age group', 'ages', 'age range'],
+  teacher: ['teacher'],
+  assistant1: ['assistant 1', 'assistant'],
+  assistant2: ['assistant 2'],
+  assistant3: ['assistant 3'],
 };
 
 function normalizeImportRow(row) {
@@ -407,18 +411,39 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
 
   let created = 0;
   let skipped = 0;
+  let staffNotFound = 0;
   for (const r of rows) {
     const rowDay = (r.day || day).toLowerCase();
     if (rowDay !== 'monday' && rowDay !== 'wednesday') { skipped++; continue; }
     const hourPosition = parseInt(r.hour, 10);
     if (!HOUR_POSITIONS.includes(hourPosition)) { skipped++; continue; }
-    createClass({ day: rowDay, hourPosition, className: r.className, room: r.room, ageGroup: r.ageGroup });
+    const classId = createClass({ day: rowDay, hourPosition, className: r.className, room: r.room, ageGroup: r.ageGroup });
     created++;
+
+    // Teacher + up to 3 Assistants are optional columns - a blank cell
+    // just means "no one assigned yet", not a skipped row. Matched against
+    // active parents by exact (case-insensitive) name, same lookup the
+    // roster import above already uses for students.
+    const staffToAdd = [
+      { name: r.teacher, role: 'teacher' },
+      { name: r.assistant1, role: 'assistant' },
+      { name: r.assistant2, role: 'assistant' },
+      { name: r.assistant3, role: 'assistant' },
+    ].filter((s) => s.name);
+    for (const s of staffToAdd) {
+      const parent = db.prepare("SELECT id FROM members WHERE name = ? COLLATE NOCASE AND member_type = 'parent' AND active = 1").get(s.name);
+      if (parent) addStaff(classId, parent.id, s.role);
+      else staffNotFound++;
+    }
   }
 
   res.redirect(
     `/admin/class-schedule/${day}?notice=` +
-      encodeURIComponent(`Imported ${created} class(es)` + (skipped ? `, ${skipped} row(s) skipped.` : '.'))
+      encodeURIComponent(
+        `Imported ${created} class(es)` +
+          (skipped ? `, ${skipped} row(s) skipped.` : '.') +
+          (staffNotFound ? ` ${staffNotFound} teacher/assistant name(s) not found.` : '')
+      )
   );
 });
 

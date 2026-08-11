@@ -1,4 +1,4 @@
-/* global keepInputFocused */
+/* global keepInputFocused, initIdKeypad */
 (function () {
   const form = document.getElementById('scan-form');
   if (!form) return;
@@ -14,6 +14,7 @@
   const scanAgainBtn = document.getElementById('scan-again-btn');
 
   keepInputFocused(input);
+  initIdKeypad(document.getElementById('id-keypad'), input, form);
 
   let resetTimer = null;
 
@@ -26,7 +27,7 @@
   function resetSoon() {
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      setState('idle', 'Scan student name tag', 'camera');
+      setState('idle', "Scan student's barcode or enter their ID number", 'camera');
     }, 2500);
   }
 
@@ -78,7 +79,7 @@
       });
       const data = await res.json();
       if (data.ok) {
-        setState('idle', 'Scan student name tag', 'camera');
+        setState('idle', "Scan student's barcode or enter their ID number", 'camera');
         renderResults(data);
         return;
       }
@@ -93,7 +94,7 @@
   scanAgainBtn.addEventListener('click', () => {
     resultsView.hidden = true;
     scanView.hidden = false;
-    setState('idle', 'Scan student name tag', 'camera');
+    setState('idle', "Scan student's barcode or enter their ID number", 'camera');
     input.focus();
   });
 })();

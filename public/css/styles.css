@@ -217,17 +217,6 @@ textarea:focus-visible,
 
 .landing-grid-two { grid-template-columns: repeat(2, 220px); }
 
-/* Class Check In is the 7th card in a 3-column grid, so it's alone on its
-   own row - park it under the middle column instead of letting grid
-   auto-flow leave it stranded on the left. */
-.landing-card-centered-last { grid-column: 2; }
-@media (max-width: 760px) {
-  /* .landing-grid drops to 2 columns here - centering under column 2 no
-     longer makes sense with only 2 tracks, so let it fall back to normal
-     auto-flow (2nd card of that final row). */
-  .landing-card-centered-last { grid-column: auto; }
-}
-
 .landing-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -578,6 +567,48 @@ textarea:focus-visible,
   font-size: 1rem;
 }
 
+/* Scan-or-keypad layout shared by every kiosk scan screen (Check In, Check
+   Out, Find a Parent, Class Check-In) - the barcode scanner's status circle
+   stays on the left (untouched, still a hidden input a hardware scanner
+   types into), a numeric keypad for typing a Member ID by hand sits on the
+   right (public/js/kiosk-id-keypad.js builds it into #id-keypad). */
+.kiosk-scan-columns {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+.kiosk-scan-col { display: flex; flex-direction: column; align-items: center; }
+.kiosk-scan-col-label { margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
+
+.id-keypad-display {
+  min-width: 168px;
+  padding: 0.55rem 1rem;
+  margin-bottom: 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--control-radius);
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--ink);
+  background: #f8fafc;
+}
+.id-keypad-display-empty { font-size: 0.8rem; font-weight: 600; letter-spacing: normal; color: var(--muted); }
+
+.id-keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 190px;
+}
+.id-keypad-btn { aspect-ratio: 1; font-size: 1.25rem; }
+
+@media (max-width: 640px) {
+  .kiosk-scan-columns { flex-direction: column; align-items: center; gap: 1.25rem; }
+}
+
 /* Find a Parent - corner button (mirrors .admin-corner-link's pill shape
    but filled orange, since this is a real kiosk feature, not a quiet
    utility link) and the scan-result cards. */
@@ -597,6 +628,26 @@ textarea:focus-visible,
   cursor: pointer;
 }
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+/* Class Check In & Out - same small top-corner pill shape as Find a
+   Parent, just filled purple (matching .landing-card-purple) instead of
+   orange, sitting in the top-right corner-actions group alongside Full
+   Screen View/Admin rather than as one of the big landing-grid tiles. */
+.class-checkin-corner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-purple);
+  border: 1px solid var(--btn-purple);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.class-checkin-corner-btn:hover { background: var(--btn-purple-hover); border-color: var(--btn-purple-hover); }
 
 /* Find a Parent results - each parent's actual Schedule Card
    (.badge-canvas, same rendering as the Members "View Cards" dialog and

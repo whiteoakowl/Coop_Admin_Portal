@@ -13,9 +13,18 @@
     </div>
 
     <div id="scan-view" class="kiosk-panel">
-      <p id="kiosk-instructions" class="kiosk-instructions">Scan student name tag</p>
-      <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-        <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+      <p id="kiosk-instructions" class="kiosk-instructions">Scan student's barcode or enter their ID number</p>
+      <div class="kiosk-scan-columns">
+        <div class="kiosk-scan-col">
+          <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+            <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+          </div>
+          <p class="kiosk-scan-col-label">Scan barcode</p>
+        </div>
+        <div class="kiosk-scan-col">
+          <div id="id-keypad"></div>
+          <p class="kiosk-scan-col-label">Enter ID number</p>
+        </div>
       </div>
       <form id="scan-form" autocomplete="off">
         <input
@@ -38,6 +47,7 @@
     </div>
   </main>
   <script src="/js/kiosk-common.js"></script>
+  <script src="/js/kiosk-id-keypad.js"></script>
   <script src="/js/kiosk-find-parent.js"></script>
   <script src="/js/idle-redirect.js"></script>
   <script src="/js/fullscreen-nav.js"></script>
