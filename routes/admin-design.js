@@ -32,7 +32,7 @@ const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'B
 // the Logs tab (/admin/logs?tab=nametag) keeps working exactly as before,
 // this is a second, independent way to reach the same underlying
 // name_tag_requests data, not a replacement for it.
-function nameTagSubmissions(showArchived, dateFilter) {
+async function nameTagSubmissions(showArchived, dateFilter) {
   let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
              n.description AS description, n.created_at AS createdAt
              FROM name_tag_requests n
@@ -63,14 +63,14 @@ router.get('/design', async (req, res) => {
   // the Print tab's bulk picker lists are meant to look and read like that
   // list (just with a selection checkbox instead of Actions), not a bare
   // name-only table.
-  const members = membersWithDetails().filter((m) => m.active);
+  const members = (await membersWithDetails()).filter((m) => m.active);
 
   // Requests tab data - only meaningful when tab === 'requests', but
   // computed unconditionally (same eager-compute style as members/badges
   // above) rather than branching the render call in two.
   const dateFilter = req.query.date || '';
   const showArchived = req.query.archived === '1';
-  const allSubmissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+  const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
     id: r.id,
     timestamp: formatTimestamp(r.createdAt),
     memberName: r.memberName,
@@ -78,10 +78,11 @@ router.get('/design', async (req, res) => {
     dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
     description: r.description || '—',
   }));
-  const requestDates = db
-    .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
-    .all(showArchived ? 1 : 0)
-    .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
+  const requestDates = (
+    await db
+      .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
+      .all(showArchived ? 1 : 0)
+  ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
   const requestsPagination = paginate(allSubmissions, parsePage(req.query.page));
 
   res.render('admin-design', {
@@ -128,10 +129,10 @@ router.get('/design', async (req, res) => {
   });
 });
 
-router.get('/design/requests/export.csv', (req, res) => {
+router.get('/design/requests/export.csv', async (req, res) => {
   const showArchived = req.query.archived === '1';
   const dateFilter = req.query.date || '';
-  const submissions = nameTagSubmissions(showArchived, dateFilter);
+  const submissions = await nameTagSubmissions(showArchived, dateFilter);
   const lines = [
     toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
     ...submissions.map((r) =>
@@ -147,15 +148,15 @@ router.get('/design/requests/export.csv', (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
-router.post('/design/requests/:id/archive', (req, res) => {
+router.post('/design/requests/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
   res.redirect('/admin/design?tab=requests');
 });
 
-router.post('/design/requests/:id/unarchive', (req, res) => {
+router.post('/design/requests/:id/unarchive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
   res.redirect('/admin/design?tab=requests&archived=1');
 });
 
@@ -163,18 +164,18 @@ router.post('/design/requests/:id/unarchive', (req, res) => {
 // cards side by side, one row per member - unlike the separate bulk Name
 // Tag / Schedule Card sheets (8-per-page grids of one card type), this is
 // a comparison/cut-together layout, so it isn't pinned to that grid.
-router.post('/design/print-both', (req, res) => {
+router.post('/design/print-both', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
+  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
 
   res.render('admin-name-tag-both-print', {
     title: 'Print Name Tags + Schedule Cards',
-    pairs: buildCardPairs(members),
+    pairs: await buildCardPairs(members),
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
     cardWidth: CARD_WIDTH,
@@ -187,16 +188,16 @@ router.post('/design/print-both', (req, res) => {
 // (see utils/duplexPrint.js), so printing double-sided and cutting along
 // the grid lines gives each member a single two-sided card instead of
 // two separate ones.
-router.post('/design/print-duplex', (req, res) => {
+router.post('/design/print-duplex', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
+  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
 
-  const { frontPages, backPages } = buildDuplexPages(buildCardPairs(members));
+  const { frontPages, backPages } = buildDuplexPages(await buildCardPairs(members));
 
   res.render('admin-cards-duplex-print', {
     title: 'Print Name Tags + Schedule Cards (Front & Back)',

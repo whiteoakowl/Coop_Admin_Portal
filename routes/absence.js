@@ -11,22 +11,22 @@ const { createRateLimiter } = require('../utils/rateLimit');
 // public, no-login endpoint with repeated attendance-record writes.
 const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
-router.get('/absence', (req, res) => {
+router.get('/absence', async (req, res) => {
   res.render('absence', {
     title: 'Absence/Late Form',
-    parents: activeParentOptions(),
-    childrenByParent: familyGroupsByParent(),
+    parents: await activeParentOptions(),
+    childrenByParent: await familyGroupsByParent(),
     result: null,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
   });
 });
 
-router.post('/absence/submit', (req, res) => {
+router.post('/absence/submit', async (req, res) => {
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('absence', {
       title: 'Absence/Late Form',
-      parents: activeParentOptions(),
-      childrenByParent: familyGroupsByParent(),
+      parents: await activeParentOptions(),
+      childrenByParent: await familyGroupsByParent(),
       formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
     });
@@ -40,8 +40,8 @@ router.post('/absence/submit', (req, res) => {
   const reasonCategory = ['personal', 'medical'].includes(req.body.reasonCategory) ? req.body.reasonCategory : null;
   const reason = (req.body.reason || '').trim() || null;
 
-  const parents = activeParentOptions();
-  const childrenByParent = familyGroupsByParent();
+  const parents = await activeParentOptions();
+  const childrenByParent = await familyGroupsByParent();
   const formValues = {
     type,
     parentId: req.body.parentId || '',
@@ -58,7 +58,11 @@ router.post('/absence/submit', (req, res) => {
   const parent = parentId ? parents.find((p) => p.id === parentId) : null;
   if (!parent) return fail('Please select your name.');
 
-  const students = studentIds.map((id) => loadFamilyMember(id, parentId)).filter(Boolean);
+  const students = [];
+  for (const id of studentIds) {
+    const student = await loadFamilyMember(id, parentId);
+    if (student) students.push(student);
+  }
   if (students.length === 0) return fail('Please select at least one name.');
 
   if (!isValidISODate(sessionDate)) return fail('Please choose a class date.');
@@ -74,7 +78,7 @@ router.post('/absence/submit', (req, res) => {
 
     let skippedAsPresent = 0;
     for (const roster of rosters) {
-      const existing = db
+      const existing = await db
         .prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
         .get(student.id, roster.id, sessionDate);
 
@@ -84,15 +88,20 @@ router.post('/absence/submit', (req, res) => {
       }
 
       const status = type === 'late' ? 'late' : 'absent';
+      // datetime('now') - SQLite-only, deliberately left as-is (see
+      // MIGRATION.md's special-cases list); not touched by this routine
+      // async/await pass.
       if (existing) {
-        db.prepare(
-          `UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = datetime('now') WHERE id = ?`
-        ).run(status, reasonCategory, reason, existing.id);
+        await db
+          .prepare(`UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = datetime('now') WHERE id = ?`)
+          .run(status, reasonCategory, reason, existing.id);
       } else {
-        db.prepare(
-          `INSERT INTO attendance (member_id, roster_id, session_date, status, source, reason_category, reason_text)
-           VALUES (?, ?, ?, ?, 'absence_form', ?, ?)`
-        ).run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
+        await db
+          .prepare(
+            `INSERT INTO attendance (member_id, roster_id, session_date, status, source, reason_category, reason_text)
+             VALUES (?, ?, ?, ?, 'absence_form', ?, ?)`
+          )
+          .run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
       }
     }
     totalRosters += rosters.length;

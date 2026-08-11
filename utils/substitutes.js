@@ -1,8 +1,7 @@
 const db = require('../db');
 const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate } = require('./classSchedule');
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
-const { hasInfantChild } = require('./members');
-const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
+const { todayISO, weekdayOf, formatTimestamp, ageFromBirthday } = require('./dates');
 const { parseClockMinutes, splitTimeRange } = require('./schedule');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
@@ -105,6 +104,22 @@ function memberName(memberId) {
   return row ? row.name : null;
 }
 
+// Same "does this member's family include a 2-and-under" check as
+// utils/members.js's hasInfantChild - duplicated here as a plain
+// synchronous query (rather than importing that now-async helper)
+// because this whole module is still built on synchronous db.prepare()
+// calls throughout, same as MIGRATION.md's minimal-touch guidance for
+// files that aren't otherwise being converted in this pass.
+function hasInfantChildSync(memberId) {
+  const self = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+  if (!self || self.family_id == null) return false;
+  const family = db.prepare('SELECT birthday FROM members WHERE family_id = ? AND id != ? AND active = 1').all(self.family_id, memberId);
+  return family.some((m) => {
+    const age = ageFromBirthday(m.birthday);
+    return age !== null && age <= 2;
+  });
+}
+
 // An admin actively choosing someone (accepting a pending pick as-is,
 // or overriding with someone else entirely) is always the final word -
 // always lands as 'approved', whether or not a pending row already
@@ -146,7 +161,7 @@ function assignedInfo(existing) {
     name: memberName(existing.member_id),
     isOverride: !!existing.is_override,
     status: existing.status,
-    infant: hasInfantChild(existing.member_id),
+    infant: hasInfantChildSync(existing.member_id),
     updatedLabel: formatTimestamp(existing.created_at),
   };
 }

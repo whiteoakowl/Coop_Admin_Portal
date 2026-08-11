@@ -14,23 +14,21 @@ const { formatTime, formatDateLabel } = require('./dates');
 // Every roster (each weekday's Parent/Student roster, every class's own
 // roster) lists members alphabetically by last name, not first - see
 // byLastName in utils/members.js.
-function rosterMembers(rosterId) {
-  return db
+async function rosterMembers(rosterId) {
+  const members = await db
     .prepare(
       `SELECT m.*
        FROM members m
        JOIN roster_members rm ON rm.member_id = m.id
        WHERE rm.roster_id = ? AND m.active = 1`
     )
-    .all(rosterId)
-    .sort(byLastName);
+    .all(rosterId);
+  return members.sort(byLastName);
 }
 
-function rosterDates(rosterId) {
-  return db
-    .prepare('SELECT session_date FROM roster_dates WHERE roster_id = ? ORDER BY session_date ASC')
-    .all(rosterId)
-    .map((r) => r.session_date);
+async function rosterDates(rosterId) {
+  const rows = await db.prepare('SELECT session_date FROM roster_dates WHERE roster_id = ? ORDER BY session_date ASC').all(rosterId);
+  return rows.map((r) => r.session_date);
 }
 
 // datesOverride lets a class roster borrow its dates from the day's
@@ -39,13 +37,13 @@ function rosterDates(rosterId) {
 // attendance view, both of which pass it in for exactly that reason.
 // Attendance itself still lives under the class's own roster_id either
 // way, only which dates count as real columns changes.
-function buildRosterGridData(roster, datesOverride) {
-  const dates = datesOverride || rosterDates(roster.id);
+async function buildRosterGridData(roster, datesOverride) {
+  const dates = datesOverride || (await rosterDates(roster.id));
   const placeholders = dates.map(() => '?').join(',');
-  const members = rosterMembers(roster.id);
+  const members = await rosterMembers(roster.id);
 
   const attendanceRows = members.length && dates.length
-    ? db
+    ? await db
         .prepare(
           `SELECT member_id, session_date, status, check_in_time FROM attendance
            WHERE roster_id = ? AND session_date IN (${placeholders})`
@@ -53,7 +51,7 @@ function buildRosterGridData(roster, datesOverride) {
         .all(roster.id, ...dates)
     : [];
   const checkoutRows = members.length && dates.length
-    ? db
+    ? await db
         .prepare(
           `SELECT member_id, session_date, number, check_out_time FROM checkouts
            WHERE roster_id = ? AND session_date IN (${placeholders})`
@@ -66,11 +64,12 @@ function buildRosterGridData(roster, datesOverride) {
   const checkoutByKey = {};
   for (const r of checkoutRows) checkoutByKey[`${r.member_id}|${r.session_date}`] = r;
 
-  const rows = members.map((m) => {
-    const { arrival, departure } = arrivalDepartureLabels(m.id, roster.schedule_day);
-    return {
+  const rows = [];
+  for (const m of members) {
+    const { arrival, departure } = await arrivalDepartureLabels(m.id, roster.schedule_day);
+    rows.push({
       member: m,
-      parentName: familyOf(m.id).map((p) => p.name).join(', ') || null,
+      parentName: (await familyOf(m.id)).map((p) => p.name).join(', ') || null,
       arrivalLabel: arrival,
       departureLabel: departure,
       cells: dates.map((d) => {
@@ -87,8 +86,8 @@ function buildRosterGridData(roster, datesOverride) {
           number: out ? out.number : null,
         };
       }),
-    };
-  });
+    });
+  }
 
   const summary = dates.map((d, i) => {
     let present = 0, late = 0, absent = 0;

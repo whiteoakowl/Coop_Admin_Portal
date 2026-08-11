@@ -134,7 +134,7 @@ router.post('/find-parent/scan', async (req, res) => {
     return res.json({ ok: false, message: `${student.name} isn't a student - scan a student's name tag.` });
   }
 
-  const parents = familyOf(student.id).filter((m) => m.member_type === 'parent');
+  const parents = (await familyOf(student.id)).filter((m) => m.member_type === 'parent');
   if (parents.length === 0) {
     return res.json({ ok: true, studentName: student.name, parents: [], cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
   }
@@ -145,11 +145,14 @@ router.post('/find-parent/scan', async (req, res) => {
   // card, not a separate hand-built view.
   const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
-  const parentData = parents.map((p) => ({
-    name: p.name,
-    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(p)),
-    bgCss,
-  }));
+  const parentData = [];
+  for (const p of parents) {
+    parentData.push({
+      name: p.name,
+      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(p)),
+      bgCss,
+    });
+  }
 
   res.json({ ok: true, studentName: student.name, parents: parentData, cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
 });

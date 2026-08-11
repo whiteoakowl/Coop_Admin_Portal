@@ -9,25 +9,27 @@ const { getTemplate, badgeDataForMember } = require('./nameTagData');
 const { getScheduleCardTemplate, scheduleCardDataForMember } = require('./scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
-function buildCardPairs(members) {
-  const nameTagTemplates = { student: getTemplate('student'), parent: getTemplate('parent') };
-  const scheduleCardTemplate = getScheduleCardTemplate();
+async function buildCardPairs(members) {
+  const nameTagTemplates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
+  const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
-  return members.map((m) => {
+  const pairs = [];
+  for (const m of members) {
     const nameTagLayout = nameTagTemplates[m.member_type] || nameTagTemplates.student;
-    return {
+    pairs.push({
       name: m.name,
       nameTag: {
-        html: NameTagRenderCore.renderBadgeElements(nameTagLayout.elements, badgeDataForMember(m)),
+        html: NameTagRenderCore.renderBadgeElements(nameTagLayout.elements, await badgeDataForMember(m)),
         bgCss: NameTagRenderCore.backgroundCss(nameTagLayout.background, nameTagLayout.backgroundOpacity),
       },
       scheduleCard: {
-        html: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(m)),
+        html: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, await scheduleCardDataForMember(m)),
         bgCss: scheduleCardBgCss,
       },
-    };
-  });
+    });
+  }
+  return pairs;
 }
 
 module.exports = { buildCardPairs };

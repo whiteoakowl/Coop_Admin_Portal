@@ -13,8 +13,8 @@ function fourRows(rows) {
   return CLASS_NUMBERS.map((n) => byNumber[n] || { class_number: n, time: '', class_name: '', room: '', teacher: '' });
 }
 
-function getMemberSchedule(memberId) {
-  const rows = db.prepare('SELECT * FROM member_schedules WHERE member_id = ? ORDER BY day, class_number').all(memberId);
+async function getMemberSchedule(memberId) {
+  const rows = await db.prepare('SELECT * FROM member_schedules WHERE member_id = ? ORDER BY day, class_number').all(memberId);
   const monday = fourRows(rows.filter((r) => r.day === 'monday'));
   const wednesday = fourRows(rows.filter((r) => r.day === 'wednesday'));
   const lastUpdated = rows.length ? rows.map((r) => r.updated_at).sort().slice(-1)[0] : null;
@@ -67,12 +67,12 @@ function splitTimeRange(raw) {
 // both days combined. Returns raw label strings (whatever the admin typed
 // for that class's time, not reformatted) or null if nothing on the
 // schedule parses.
-function arrivalDepartureLabels(memberId, day) {
-  const familyIds = [memberId, ...familyOf(memberId).map((m) => m.id)];
+async function arrivalDepartureLabels(memberId, day) {
+  const familyIds = [memberId, ...(await familyOf(memberId)).map((m) => m.id)];
   let earliest = null;
   let latest = null;
-  familyIds.forEach((id) => {
-    const { monday, wednesday } = getMemberSchedule(id);
+  for (const id of familyIds) {
+    const { monday, wednesday } = await getMemberSchedule(id);
     const rows = day === 'monday' ? monday : day === 'wednesday' ? wednesday : [...monday, ...wednesday];
     rows.forEach((row) => {
       if (!row.time) return;
@@ -86,7 +86,7 @@ function arrivalDepartureLabels(memberId, day) {
         latest = { min: endMin, label: endRaw };
       }
     });
-  });
+  }
   return { arrival: earliest ? earliest.label : null, departure: latest ? latest.label : null };
 }
 
@@ -104,11 +104,9 @@ const STATUS_LABELS = { none: 'No Schedule', partial: 'Incomplete', complete: 'C
 
 // One row per active student, joined with their schedule summary, for the
 // Class Schedules table. Filters are all optional/AND-combined.
-function scheduleList(filters) {
+async function scheduleList(filters) {
   filters = filters || {};
-  let members = db
-    .prepare('SELECT * FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE')
-    .all();
+  let members = await db.prepare('SELECT * FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
 
   if (filters.search) {
     const q = filters.search.toLowerCase();
@@ -119,7 +117,7 @@ function scheduleList(filters) {
   }
   if (filters.rosterId) {
     const memberIds = new Set(
-      db.prepare('SELECT member_id FROM roster_members WHERE roster_id = ?').all(filters.rosterId).map((r) => r.member_id)
+      (await db.prepare('SELECT member_id FROM roster_members WHERE roster_id = ?').all(filters.rosterId)).map((r) => r.member_id)
     );
     members = members.filter((m) => memberIds.has(m.id));
   }
@@ -130,10 +128,11 @@ function scheduleList(filters) {
     members = members.filter((m) => m.member_type === filters.memberType);
   }
 
-  let rows = members.map((m) => {
-    const { monday, wednesday, lastUpdated } = getMemberSchedule(m.id);
-    return { member: m, monday, wednesday, lastUpdated, status: scheduleStatus(monday, wednesday) };
-  });
+  let rows = [];
+  for (const m of members) {
+    const { monday, wednesday, lastUpdated } = await getMemberSchedule(m.id);
+    rows.push({ member: m, monday, wednesday, lastUpdated, status: scheduleStatus(monday, wednesday) });
+  }
 
   if (filters.day === 'monday') rows = rows.filter((r) => r.monday.some((c) => !rowIsBlank(c)));
   if (filters.day === 'wednesday') rows = rows.filter((r) => r.wednesday.some((c) => !rowIsBlank(c)));

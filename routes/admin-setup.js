@@ -51,7 +51,7 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
     day,
     dayLabel: DAY_LABELS[day],
     teams: await teamsWithMembers(day),
-    availableParents: activeParentOptions(),
+    availableParents: await activeParentOptions(),
     // Only actually highlights anyone when today falls on this day - no
     // date picker here (teams are a standing weekly roster, not tied to a
     // specific date the admin chooses), so "absent that day" means "absent

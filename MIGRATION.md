@@ -165,57 +165,152 @@ requests to Supabase both fail/reset). This means:
      `badgeDataForMember`, `getTemplate`)
    - `routes/admin-name-tag.js` — fully converted (last 4
      `COLLATE NOCASE` in the file fixed too)
-   - `routes/admin-design.js`, `routes/admin-members.js` — **partially**
-     converted: only the specific handlers that call
-     `getScheduleCardTemplate`/`getTemplate`/`badgeDataForMember` were
-     touched (2 handlers in `admin-members.js`, the `GET /design`
-     handler in `admin-design.js`). Both files still have plenty of
-     their own untouched `db.prepare(` calls - don't assume "no longer
-     in the not-yet-started list" means "fully converted" for these two.
+   - `routes/admin-design.js` — **fully** converted (the `GET /design`
+     handler, `nameTagSubmissions()`, the requests export/archive/
+     unarchive routes, and `print-both`/`print-duplex`).
+   - `routes/admin-members.js` — **fully** converted (every handler and
+     every local helper function -
+     `attendanceHistoryForMember`/`syncCleanupTeams`/
+     `clearVolunteerMembershipIfNotParent`/`ensureFamilyForParent`/
+     `allSetupTeams`/`cleanupTeamIdsForMember`/`createFamilyFromLastName`/
+     `createOrLinkFamilyMember` - plus every `COLLATE NOCASE` in the file
+     fixed). This was the single biggest remaining route file; see the
+     regression writeup below for why it needed a full pass rather than a
+     partial one.
+   - `utils/members.js` — **fully** converted, every exported db-touching
+     function (`findMemberByName`, `activeParentOptions`, `familyOf`,
+     `hasInfantChild`, `familyGroupsByParent`, `loadFamilyMember`,
+     `allFamilies`, `setMemberFamily`, `setPrimaryParent`,
+     `membersWithMedicalNotes`, `rostersForMember`, `rostersByMemberIds`,
+     `teacherMemberIds`, `membersWithDetails`, `generateMemberCode`), 8
+     `COLLATE NOCASE` fixed. `lastNameOf`/`byLastName`/
+     `sortMembersByFamily` stay plain sync helpers (no db access).
+   - `utils/schedule.js` — **fully** converted (`getMemberSchedule`,
+     `arrivalDepartureLabels`, `scheduleList`), including the
+     `scheduleCardData.js` ripple flagged below.
+   - `utils/scheduleCardData.js` — **fully** converted
+     (`scheduleCardDataForMember` and `primaryParentFor`, on top of the
+     `getScheduleCardTemplate()` conversion from earlier).
+   - `utils/rosterGrid.js` — **fully** converted (`rosterMembers`,
+     `rosterDates`, `buildRosterGridData`).
+   - `utils/cardPairs.js` — **fully** converted (`buildCardPairs`) - this
+     one was a genuine regression (see below), not routine follow-on work.
+   - `routes/name-tag.js` — **fully** converted (both handlers; the
+     `members.map(loadFamilyMember)` loop restructured to a `for...of` so
+     each lookup can be awaited).
+   - `routes/absence.js`, `routes/kiosk.js`, `routes/kiosk-class-
+     checkin.js` — **fully** converted for every call site that touches
+     the functions above (both `absence.js` handlers; `kiosk.js`'s
+     `find-parent/scan`; `kiosk-class-checkin.js`'s attendance view).
+   - `routes/admin-schedule.js` — **fully** converted (every
+     `scheduleList`/`getMemberSchedule` call site, plus `GET
+     /schedule/export.csv` and `GET /schedule/print`, which weren't
+     `async` before at all).
+   - `routes/admin-setup.js`, `routes/admin-volunteers.js` — **partially**
+     converted: only the specific handlers forced to change by the
+     `utils/members.js`/`utils/rosterGrid.js` conversions above (4
+     handlers in `admin-volunteers.js`: `/volunteers/:day/manage`,
+     `/volunteers/:day/teams`, `/volunteers/:day/teams/export.csv`, the
+     import loop's `findMemberByName` call; 1 more `activeParentOptions()`
+     await in `admin-setup.js`). Both files still have plenty of their
+     own untouched `db.prepare(` calls.
+   - `routes/admin-rosters.js` — **partially** converted: only
+     `buildDaySnapshot()`, `archiveDay()`, `POST /rosters/:day/archive`,
+     `GET /rosters`, and `GET /roster/:tab/export.csv` (all forced by the
+     `rosterGrid.js` conversion). Still has its own `withTransaction` +
+     `INSERT OR` untouched, deliberately - see "not yet started" below.
+   - `routes/admin-logs.js` — **partially** converted: only `GET /logs`'s
+     `allergies` tab branch and the 3 `/logs/allergies/*` routes (forced
+     by `membersWithMedicalNotes()` becoming async). The rest of the file
+     (checkinout/nametag/absence/classrisk/substitutes tabs, and its own
+     duplicate `nameTagSubmissions()`) is still fully synchronous,
+     deliberately untouched.
+   - `utils/substitutes.js` — **not** converted to async. Instead,
+     `assignedInfo()`'s call to the now-async `hasInfantChild()` was
+     replaced with a small local synchronous duplicate
+     (`hasInfantChildSync`) that runs the same query directly, so this
+     module stays 100% synchronous rather than pulling
+     `substituteBoard`/`jobAssignmentGrid`/`dailyAssignmentCards*`/
+     `pendingApprovalsForToday` (and their callers in
+     `routes/volunteers.js`, `routes/admin-logs.js`,
+     `routes/admin-volunteers.js`, `utils/alerts.js`) into a much bigger
+     ripple than this pass needed. Still has its own `INSERT OR` +
+     everything else untouched - a real conversion of this file still
+     needs to happen later and should drop `hasInfantChildSync` in favor
+     of the real (by-then-safe-to-await) `hasInfantChild` again.
 
-   **Important coupling discovered doing the above, relevant to whoever
-   converts `utils/schedule.js` next**: `utils/schedule.js`'s
-   `getMemberSchedule()` is called by `utils/scheduleCardData.js`'s
-   `scheduleCardDataForMember()`, which in turn is called (still
-   synchronously, deliberately left that way so far) from
-   `routes/admin-schedule.js`, `routes/admin-members.js` (x2), and
-   `routes/kiosk.js` - all already fully/partially converted this
-   session. Converting `schedule.js` means making `getMemberSchedule`
-   async, which cascades into making `scheduleCardDataForMember` async
-   too, which then means re-touching every one of those call sites
-   *again* to add an `await` in front of `scheduleCardDataForMember(...)`
-   specifically (not just the `getScheduleCardTemplate()` calls already
-   awaited there). Budget for that ripple, don't do `schedule.js` as a
-   quick "just this one small file" pass.
+   **A real regression chain, not just routine follow-on work - read this
+   if you're about to convert a widely-imported `utils/*.js` file**:
+   converting `utils/members.js` broke callers that weren't touched in
+   the same pass, in two ways that only surfaced via `npm test`'s full
+   run, not via `node -c` or eslint:
+   1. A grep sweep that only checked `routes/*.js` and `test/*.js` missed
+      `utils/cardPairs.js`'s own call into `utils/nameTagData.js`'s
+      already-async functions from an *earlier* session pass - a
+      util-to-util call site, not a route. **Grep `utils/` too, every
+      time**, not just `routes/` and `test/`.
+   2. `routes/admin-members.js` called `generateMemberCode()` (and 6
+      other now-async `utils/members.js` functions) synchronously at 13+
+      sites; this wasn't caught until `npm test` produced a real runtime
+      `TypeError: Provided value cannot be bound to SQLite parameter N`
+      inside `createOrLinkFamilyMember` (a Promise was being bound as a
+      SQL parameter). A handful of other stray sync call sites turned up
+      the same way in `routes/admin-design.js`
+      (`membersWithDetails(...).filter is not a function`),
+      `routes/name-tag.js` (`parents.find is not a function`), and
+      `routes/admin-logs.js`'s allergies tab.
+
+   **The actual lesson**: when a `utils/*.js` function that's imported
+   from many places becomes `async`, a grep for its name across the
+   *entire* repo (`routes/`, `utils/`, `test/` - all three, every time)
+   is not optional busywork, it's the only thing that reliably finds
+   every call site. `npm test`'s full run (not just the test file for
+   whatever you're actively converting) is the backstop that catches
+   what the grep still misses - which it will, so budget time for a
+   second full-suite run after the "final" grep sweep looks clean, the
+   way this session needed two.
+
+   **Important coupling this session had to budget for**:
+   `utils/schedule.js`'s `getMemberSchedule()` is called by
+   `utils/scheduleCardData.js`'s `scheduleCardDataForMember()`, which is
+   in turn called from `routes/admin-schedule.js`, `routes/admin-
+   members.js` (x2), and `routes/kiosk.js`. Converting `schedule.js`
+   cascaded into `scheduleCardData.js`, which cascaded into re-touching
+   every one of those call sites *again* to await
+   `scheduleCardDataForMember(...)` itself (not just the
+   `getScheduleCardTemplate()` calls already awaited there). Both are now
+   done, but this is the shape to expect from any similarly central file.
 
    **Not yet started** (direct `db.prepare(` call counts as of this
    writing - re-grep, these drift, and some of these earlier counts were
    undercounted due to the codebase's `db\n  .prepare(...)` line-break
    style not matching a same-line grep): `routes/admin.js`,
    `routes/admin-documents.js`, `routes/admin-library.js`,
-   `routes/admin-logs.js`, `routes/admin-rosters.js` (has
-   `withTransaction` x2 + `INSERT OR`), `routes/admin-volunteers.js` (has
-   `withTransaction` + `INSERT OR`), `routes/checkout.js`; and utils:
-   `utils/backup.js` (1, `PRAGMA` - needs its own design, see below),
-   `utils/classSchedule.js` (the biggest util file, has `withTransaction`
-   x2 + `INSERT OR` x4 - heavily depended on by `admin-schedule.js`,
-   `admin-rosters.js`, `admin-volunteers.js`, `kiosk-class-checkin.js`,
-   `admin-logs.js` and others, so converting it means re-touching all of
-   those call sites too), `utils/members.js` (also widely depended on -
-   convert this before tackling the rest of `admin-members.js`, which is
-   the single biggest remaining route file), `utils/miscBadgeData.js`,
-   `utils/schedule.js` (see the coupling note above - do this one
-   carefully, not as a quick pass), `utils/substitutes.js` (has
-   `INSERT OR`), `utils/volunteers.js` (has `INSERT OR`).
+   `routes/checkout.js`; the rest of `routes/admin-rosters.js` (has
+   `withTransaction` x2 + `INSERT OR`), the rest of
+   `routes/admin-volunteers.js` (has `withTransaction` + `INSERT OR`),
+   the rest of `routes/admin-logs.js`, the rest of
+   `routes/admin-setup.js`; and utils: `utils/backup.js` (1, `PRAGMA` -
+   needs its own design, see below), `utils/classSchedule.js` (the
+   biggest util file, has `withTransaction` x2 + `INSERT OR` x4 - heavily
+   depended on by `admin-schedule.js`, `admin-rosters.js`,
+   `admin-volunteers.js`, `kiosk-class-checkin.js`, `admin-logs.js` and
+   others, so converting it means re-touching all of those call sites
+   too), `utils/miscBadgeData.js`, `utils/substitutes.js` (has
+   `INSERT OR`, plus the `hasInfantChildSync` duplication above to clean
+   up when it's converted), `utils/volunteers.js` (has `INSERT OR`).
 
-   Suggested order for whoever picks this up: `utils/members.js` next
-   (high-value, unblocks most of `admin-members.js` and others), then
-   `utils/schedule.js` (budgeting for the `scheduleCardData.js` ripple
-   above), then `utils/miscBadgeData.js`, then the two
-   `withTransaction`-bearing giants (`classSchedule.js`, then whatever
-   routes still use it), `substitutes.js`/`volunteers.js` together (both
-   have `INSERT OR`), and `backup.js` last (needs a real design decision,
-   not just a mechanical pass - see below).
+   Suggested order for whoever picks this up: `utils/miscBadgeData.js`
+   next (small, low-risk, unblocks the rest of `admin-design.js`), then
+   the two `withTransaction`-bearing giants (`classSchedule.js`, then
+   whatever routes still use it - this will finish off the remaining
+   pieces of `admin-schedule.js`, `admin-rosters.js`,
+   `admin-volunteers.js`, `admin-logs.js`, `kiosk-class-checkin.js` along
+   the way), `substitutes.js`/`volunteers.js` together (both have `INSERT
+   OR`, and converting `substitutes.js` is also the place to retire
+   `hasInfantChildSync` back to the real `hasInfantChild`), and
+   `backup.js` last (needs a real design decision, not just a mechanical
+   pass - see below).
 
 ## What's NOT done yet — the actual remaining work
 

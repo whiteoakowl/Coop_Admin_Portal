@@ -94,15 +94,18 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
   const filters = { memberType, memberId: selectedMemberId || undefined };
 
-  const rows = scheduleList(filters);
+  const rows = await scheduleList(filters);
 
   const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
-  const summarized = rows.map((r) => ({
-    member: r.member,
-    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(r.member)),
-  }));
+  const summarized = [];
+  for (const r of rows) {
+    summarized.push({
+      member: r.member,
+      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, await scheduleCardDataForMember(r.member)),
+    });
+  }
   summarized.sort((a, b) => byLastName(a.member, b.member));
 
   const allNames = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?').all(memberType)).sort(byLastName);
@@ -247,10 +250,13 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
 
   const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
-  const cards = members.map((m) => ({
-    html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(m)),
-    bgCss,
-  }));
+  const cards = [];
+  for (const m of members) {
+    cards.push({
+      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(m)),
+      bgCss,
+    });
+  }
 
   res.render('admin-schedule-print-cards', {
     title: 'Print Schedule Cards',
@@ -301,7 +307,7 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
-  const { monday, wednesday } = getMemberSchedule(id);
+  const { monday, wednesday } = await getMemberSchedule(id);
   res.render('admin-schedule-manage', {
     title: `Schedule - ${member.name}`,
     member,
@@ -312,7 +318,7 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
   });
 });
 
-router.get('/schedule/export.csv', requireFullAdmin, (req, res) => {
+router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
   const filters = {
     search: (req.query.search || '').trim(),
     day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
@@ -323,7 +329,7 @@ router.get('/schedule/export.csv', requireFullAdmin, (req, res) => {
     rosterId: req.query.rosterId ? parseInt(req.query.rosterId, 10) : null,
     memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
   };
-  const rows = scheduleList(filters);
+  const rows = await scheduleList(filters);
 
   const lines = [toCsvRow(['Member Name', 'Day', 'Class Number', 'Time', 'Class Name', 'Room', 'Teacher'])];
   rows.forEach((r) => {
@@ -338,7 +344,7 @@ router.get('/schedule/export.csv', requireFullAdmin, (req, res) => {
   sendCsv(res, 'class-schedules.csv', lines);
 });
 
-router.get('/schedule/print', requireFullAdmin, (req, res) => {
+router.get('/schedule/print', requireFullAdmin, async (req, res) => {
   const filters = {
     search: (req.query.search || '').trim(),
     day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
@@ -349,7 +355,7 @@ router.get('/schedule/print', requireFullAdmin, (req, res) => {
     rosterId: req.query.rosterId ? parseInt(req.query.rosterId, 10) : null,
     memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
   };
-  const rows = scheduleList(filters);
+  const rows = await scheduleList(filters);
   res.render('admin-schedule-print', { title: 'Print Schedules', rows });
 });
 

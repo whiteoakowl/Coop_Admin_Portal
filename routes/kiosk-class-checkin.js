@@ -120,7 +120,7 @@ router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
   const today = todayISO();
-  const grid = buildRosterGridData(roster, [today]);
+  const grid = await buildRosterGridData(roster, [today]);
   res.render('kiosk-class-checkin-attendance', {
     title: `Attendance - ${cls.class_name}`,
     cls,

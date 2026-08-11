@@ -11,11 +11,11 @@ const DAYS = ['monday', 'wednesday', 'both'];
 // still a real cap on this public, no-login endpoint.
 const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 10 });
 
-router.get('/name-tag', (req, res) => {
+router.get('/name-tag', async (req, res) => {
   res.render('name-tag', {
     title: 'Name Tag Form',
-    parents: activeParentOptions(),
-    childrenByParent: familyGroupsByParent(),
+    parents: await activeParentOptions(),
+    childrenByParent: await familyGroupsByParent(),
     result: null,
     formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
   });
@@ -25,8 +25,8 @@ router.post('/name-tag/submit', async (req, res) => {
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('name-tag', {
       title: 'Name Tag Form',
-      parents: activeParentOptions(),
-      childrenByParent: familyGroupsByParent(),
+      parents: await activeParentOptions(),
+      childrenByParent: await familyGroupsByParent(),
       formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
     });
@@ -39,8 +39,8 @@ router.post('/name-tag/submit', async (req, res) => {
   const day = DAYS.includes(req.body.day) ? req.body.day : null;
   const description = (req.body.description || '').trim() || null;
 
-  const parents = activeParentOptions();
-  const childrenByParent = familyGroupsByParent();
+  const parents = await activeParentOptions();
+  const childrenByParent = await familyGroupsByParent();
   const formValues = {
     parentId: req.body.parentId || '',
     memberIds,
@@ -56,7 +56,11 @@ router.post('/name-tag/submit', async (req, res) => {
   const parent = parentId ? parents.find((p) => p.id === parentId) : null;
   if (!parent) return fail('Please select your name.');
 
-  const members = memberIds.map((id) => loadFamilyMember(id, parentId)).filter(Boolean);
+  const members = [];
+  for (const id of memberIds) {
+    const member = await loadFamilyMember(id, parentId);
+    if (member) members.push(member);
+  }
   if (members.length === 0) return fail('Please select at least one name.');
 
   if (!requestType) return fail('Please select Lost Name Tag or Schedule Change.');

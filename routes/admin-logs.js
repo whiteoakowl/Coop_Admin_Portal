@@ -98,7 +98,7 @@ function nameTagSubmissions(showArchived, dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
-router.get('/logs', requireAdmin, (req, res) => {
+router.get('/logs', requireAdmin, async (req, res) => {
   const tab = LOG_TABS.includes(req.query.tab) ? req.query.tab : 'absence';
   const dateFilter = req.query.date || '';
 
@@ -190,7 +190,7 @@ router.get('/logs', requireAdmin, (req, res) => {
     return res.render('admin-logs', {
       title: 'Allergies/Medical Log',
       tab,
-      medicalMembers: membersWithMedicalNotes(),
+      medicalMembers: await membersWithMedicalNotes(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -216,21 +216,21 @@ router.get('/logs', requireAdmin, (req, res) => {
 // button on roster/class view pages (fetched as a fragment, same pattern
 // as the Class Schedule "View" popup). ---
 
-router.get('/logs/allergies/fragment', requireAdmin, (req, res) => {
-  res.render('partials/allergy-log-popup-fragment', { medicalMembers: membersWithMedicalNotes() });
+router.get('/logs/allergies/fragment', requireAdmin, async (req, res) => {
+  res.render('partials/allergy-log-popup-fragment', { medicalMembers: await membersWithMedicalNotes() });
 });
 
-router.get('/logs/allergies/export.csv', requireAdmin, (req, res) => {
+router.get('/logs/allergies/export.csv', requireAdmin, async (req, res) => {
   const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [
     toCsvRow(['Name', 'Type', 'Grade Level', 'Medical Notes']),
-    ...membersWithMedicalNotes().map((m) => toCsvRow([m.name, typeLabel(m.member_type), m.grade_level || '', m.medical_notes])),
+    ...(await membersWithMedicalNotes()).map((m) => toCsvRow([m.name, typeLabel(m.member_type), m.grade_level || '', m.medical_notes])),
   ];
   sendCsv(res, 'allergies-medical-log.csv', lines);
 });
 
-router.get('/logs/allergies/print', requireAdmin, (req, res) => {
-  res.render('logs-allergies-print', { title: 'Allergies/Medical Log', medicalMembers: membersWithMedicalNotes() });
+router.get('/logs/allergies/print', requireAdmin, async (req, res) => {
+  res.render('logs-allergies-print', { title: 'Allergies/Medical Log', medicalMembers: await membersWithMedicalNotes() });
 });
 
 router.get('/logs/absence/export.csv', requireAdmin, (req, res) => {

@@ -158,30 +158,31 @@ function archiveGrid(gridData) {
 // Builds the full self-contained snapshot for one day - Parent, Student,
 // and every class meeting that day, each with its own grid (a class's
 // dates mirror the Student roster's, same as the live view).
-function buildDaySnapshot(day) {
+async function buildDaySnapshot(day) {
   const parentRosterId = ensureDayRoster(day, 'parent');
   const studentRosterId = ensureDayRoster(day, 'student');
-  const parentRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(parentRosterId);
-  const studentRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(studentRosterId);
-  const studentDates = rosterDates(studentRosterId);
+  const parentRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(parentRosterId);
+  const studentRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(studentRosterId);
+  const studentDates = await rosterDates(studentRosterId);
 
-  const classes = allClassesList(day).map((c) => {
-    const classRoster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(c.roster_id);
-    return {
+  const classes = [];
+  for (const c of allClassesList(day)) {
+    const classRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(c.roster_id);
+    classes.push({
       className: c.class_name,
       hourLabel: c.hourLabel,
       gradeLabel: c.gradeLabel,
       timeLabel: c.timeLabel,
       teacherNames: c.teacherNames,
       assistantNames: c.assistantNames,
-      ...archiveGrid(buildRosterGridData(classRoster, studentDates)),
-    };
-  });
+      ...archiveGrid(await buildRosterGridData(classRoster, studentDates)),
+    });
+  }
 
   return {
     day,
-    parent: { label: TABS[`${day}-parent`].label, ...archiveGrid(buildRosterGridData(parentRoster)) },
-    student: { label: TABS[`${day}-student`].label, ...archiveGrid(buildRosterGridData(studentRoster)) },
+    parent: { label: TABS[`${day}-parent`].label, ...archiveGrid(await buildRosterGridData(parentRoster)) },
+    student: { label: TABS[`${day}-student`].label, ...archiveGrid(await buildRosterGridData(studentRoster)) },
     classes,
   };
 }
@@ -198,8 +199,8 @@ function clearDayRosterData(rosterId) {
 // The one write path for the whole archive-and-clear operation - snapshot
 // first, then clear, wrapped in a transaction so a mid-operation failure
 // can never leave a day half-cleared without ever having been saved.
-function archiveDay(day) {
-  const snapshot = buildDaySnapshot(day);
+async function archiveDay(day) {
+  const snapshot = await buildDaySnapshot(day);
   if (snapshot.parent.dates.length === 0 && snapshot.student.dates.length === 0) {
     return { ok: false, message: `${DAY_LABELS[day]} has no session dates to archive yet.` };
   }
@@ -237,12 +238,12 @@ function loadArchive(id) {
   return { id: row.id, day: row.day, archivedAtLabel: formatTimestamp(row.archived_at), ...JSON.parse(row.data_json) };
 }
 
-router.get('/rosters', requireAdmin, (req, res) => {
+router.get('/rosters', requireAdmin, async (req, res) => {
   const requestedTab = req.query.tab || '';
 
   if (requestedTab === 'archive') {
     const dayFilter = isValidDay(req.query.day) ? req.query.day : '';
-    const rows = db
+    const rows = await db
       .prepare(`SELECT * FROM roster_archives ${dayFilter ? 'WHERE day = ?' : ''} ORDER BY archived_at DESC`)
       .all(...(dayFilter ? [dayFilter] : []));
     return res.render('admin-rosters', {
@@ -301,13 +302,13 @@ router.get('/rosters', requireAdmin, (req, res) => {
   }
 
   const rosterId = rosterIdForTab(tab);
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   // A class roster has no dates of its own to manage - it always mirrors
   // whichever day's Student roster it belongs to (a class only ever
   // meets when that day's students do), so there's no separate Edit
   // Dates step for it (see the view - Edit Dates/+ Add Member are hidden
   // whenever classId is set).
-  const dates = classId ? rosterDates(ensureDayRoster(day, 'student')) : rosterDates(rosterId);
+  const dates = classId ? await rosterDates(ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
   const alertDate = todayIfSessionDay(day);
 
   res.render('admin-rosters', {
@@ -320,7 +321,7 @@ router.get('/rosters', requireAdmin, (req, res) => {
     tabLabel,
     dayLabel: DAY_LABELS[day],
     roster,
-    ...buildRosterGridData(roster, classId ? dates : undefined),
+    ...(await buildRosterGridData(roster, classId ? dates : undefined)),
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     alertDate,
     alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
@@ -438,9 +439,9 @@ router.post('/rosters/:tab/attendance', requireAdmin, (req, res) => {
 
 // --- Archive routes ---
 
-router.post('/rosters/:day/archive', requireAdmin, requireDay, (req, res) => {
+router.post('/rosters/:day/archive', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const result = archiveDay(day);
+  const result = await archiveDay(day);
   const query = result.ok
     ? `notice=${encodeURIComponent(result.message)}`
     : `error=${encodeURIComponent(result.message)}`;
@@ -499,14 +500,14 @@ router.get('/rosters/archive/:id/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, `${archive.day}-attendance-archive-${archive.id}.csv`, lines);
 });
 
-router.get('/roster/:tab/export.csv', requireAdmin, (req, res) => {
+router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const classId = classIdFromTab(tab);
   const label = classId ? (classRosterInfo(classId) || {}).class_name : (TABS[tab] || {}).label;
   const rosterId = rosterIdForTab(tab);
   if (!rosterId || !label) return res.status(404).send('Not found');
-  const roster = db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
-  const data = buildRosterGridData(roster);
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
+  const data = await buildRosterGridData(roster);
 
   const header = ['Name'];
   for (const d of data.dates) {

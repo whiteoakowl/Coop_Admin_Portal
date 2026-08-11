@@ -66,7 +66,7 @@ function deletePhotoFile(photoPath) {
 
 // Every attendance record for this member across every roster they're on,
 // newest first - the Members profile page's Attendance tab.
-function attendanceHistoryForMember(memberId) {
+async function attendanceHistoryForMember(memberId) {
   return db
     .prepare(
       `SELECT r.name AS rosterName, a.session_date AS date, a.status,
@@ -82,7 +82,7 @@ function attendanceHistoryForMember(memberId) {
 
 // --- Members page (the full member list) ---
 
-router.get('/members', (req, res) => {
+router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
   // getMemberSchedule()) used to be computed here for every member on
@@ -90,7 +90,7 @@ router.get('/members', (req, res) => {
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const withRosters = membersWithDetails(typeFilter).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
+  const withRosters = (await membersWithDetails(typeFilter)).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -122,7 +122,7 @@ router.get('/members/:id/cards-fragment', async (req, res) => {
     member,
     badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, await badgeDataForMember(member)),
     badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
-    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(member)),
+    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, await scheduleCardDataForMember(member)),
     scheduleCardBgCss: NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity),
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
@@ -135,19 +135,19 @@ router.get('/members/:id/cards-fragment', async (req, res) => {
 // public/js/members-dialogs.js). This is the getMemberSchedule() query
 // the /members list route used to run for every row up front, done here
 // for exactly the one member whose dialog was actually opened.
-router.get('/members/:id/schedule-fragment', (req, res) => {
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
+router.get('/members/:id/schedule-fragment', async (req, res) => {
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
-  res.render('member-schedule-fragment', { member, schedule: getMemberSchedule(member.id) });
+  res.render('member-schedule-fragment', { member, schedule: await getMemberSchedule(member.id) });
 });
 
 // Exports every field a member's profile can hold - the same information
 // originally collected about them (contact info, address, birthday/grade,
 // medical notes, family, rosters) - not just the Name/Type/Family/Rosters
 // subset shown in the on-screen table.
-router.get('/members/export.csv', (req, res) => {
+router.get('/members/export.csv', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
-  const members = membersWithDetails(typeFilter);
+  const members = await membersWithDetails(typeFilter);
 
   const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [
@@ -230,20 +230,20 @@ function memberFormFields(req) {
 // real list) so converting an existing parent to student/admin drops their
 // stale team membership instead of leaving them stuck on a chart they can
 // no longer manage from their own profile.
-function syncCleanupTeams(memberId, teamIds) {
-  db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
+async function syncCleanupTeams(memberId, teamIds) {
+  await db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
   if (!teamIds) return;
   const link = db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)');
-  for (const teamId of teamIds) link.run(teamId, memberId);
+  for (const teamId of teamIds) await link.run(teamId, memberId);
 }
 
 // Floater Assignments (volunteer_members) only ever gets a parent added to
 // it via the Volunteers admin page, never from a member's own profile - so
 // there's nothing here to sync, only to clear if they're no longer a
 // parent, for the same "converted away from parent" staleness as above.
-function clearVolunteerMembershipIfNotParent(memberId, memberType) {
+async function clearVolunteerMembershipIfNotParent(memberId, memberType) {
   if (memberType === 'parent') return;
-  db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
+  await db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
 }
 
 // Full-profile import (below) links an imported student to its "Parent
@@ -251,38 +251,38 @@ function clearVolunteerMembershipIfNotParent(memberId, memberType) {
 // exist now, so if the matched parent doesn't have one yet, one is
 // invented from their surname (mirrors the migration in db/index.js) so
 // the import's existing "link student to parent" behavior keeps working.
-function ensureFamilyForParent(parentId) {
-  const parent = db.prepare('SELECT id, name, family_id FROM members WHERE id = ?').get(parentId);
+async function ensureFamilyForParent(parentId) {
+  const parent = await db.prepare('SELECT id, name, family_id FROM members WHERE id = ?').get(parentId);
   if (!parent) return null;
   if (parent.family_id != null) return parent.family_id;
   const lastName = parent.name.trim().split(/\s+/).pop() || parent.name;
   let name = lastName;
   let suffix = 1;
-  while (db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name)) {
+  while (await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?)').get(name)) {
     suffix++;
     name = `${lastName} ${suffix}`;
   }
-  const familyId = db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
-  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(name)).lastInsertRowid;
+  await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
   return familyId;
 }
 
 // memberCount included for the form's "Setup Team - 2 members" checklist
 // display, same idea as allFamilies() in utils/members.js.
-function allSetupTeams() {
+async function allSetupTeams() {
   return db
     .prepare(
       `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS memberCount
        FROM setup_teams t
        LEFT JOIN setup_team_members stm ON stm.team_id = t.id
        GROUP BY t.id
-       ORDER BY t.day, t.title COLLATE NOCASE`
+       ORDER BY t.day, LOWER(t.title)`
     )
     .all();
 }
 
-function cleanupTeamIdsForMember(memberId) {
-  return db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId).map((r) => r.team_id);
+async function cleanupTeamIdsForMember(memberId) {
+  return (await db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId)).map((r) => r.team_id);
 }
 
 // A family only shows up on the "Choose a Family" dropdown once it's been
@@ -290,7 +290,7 @@ function cleanupTeamIdsForMember(memberId) {
 // see the wantsJson branch below) the "+ Add New Family" dialog on the
 // Add/Edit Member form itself, so a new family can be created without
 // leaving that form and losing whatever else was already typed in.
-router.post('/members/families/new', (req, res) => {
+router.post('/members/families/new', async (req, res) => {
   const name = (req.body.name || '').trim();
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
 
@@ -299,18 +299,18 @@ router.post('/members/families/new', (req, res) => {
     if (wantsJson) return res.status(400).json({ error: message });
     return res.redirect('/admin/members?error=' + encodeURIComponent(message));
   }
-  const exists = db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name);
+  const exists = await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?)').get(name);
   if (exists) {
     const message = `"${name}" family already exists.`;
     if (wantsJson) return res.status(409).json({ error: message });
     return res.redirect('/admin/members?error=' + encodeURIComponent(message));
   }
-  const familyId = db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(name)).lastInsertRowid;
   if (wantsJson) return res.json({ id: familyId, name });
   res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 
-router.get('/members/new', (req, res) => {
+router.get('/members/new', async (req, res) => {
   res.render('admin-member-edit', {
     title: 'Add Member',
     mode: 'create',
@@ -330,16 +330,16 @@ router.get('/members/new', (req, res) => {
       medical_notes: '',
       is_primary_parent: 0,
     },
-    families: allFamilies(),
+    families: await allFamilies(),
     memberFamilyId: null,
     gradeLevels: GRADE_LEVELS,
-    setupTeams: allSetupTeams(),
+    setupTeams: await allSetupTeams(),
     memberCleanupTeamIds: [],
     error: req.query.error || null,
   });
 });
 
-router.post('/members/new', uploadPhoto.single('photo'), (req, res) => {
+router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
   const f = memberFormFields(req);
 
   if (!f.name) {
@@ -351,15 +351,15 @@ router.post('/members/new', uploadPhoto.single('photo'), (req, res) => {
   // member_code instead (see utils/members.js's generateMemberCode),
   // that's no longer automatic, so it's checked directly here to keep
   // the same practical behavior.
-  const exists = db.prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE').get(f.name);
+  const exists = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?)').get(f.name);
   if (exists) {
     return res.redirect('/admin/members/new?error=' + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
 
-  const memberCode = generateMemberCode();
+  const memberCode = await generateMemberCode();
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : null;
 
-  const info = db
+  const info = await db
     .prepare(
       `INSERT INTO members
          (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
@@ -381,9 +381,9 @@ router.post('/members/new', uploadPhoto.single('photo'), (req, res) => {
       f.gradeLevel,
       f.medicalNotes
     );
-  syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
-  setMemberFamily(info.lastInsertRowid, f.familyId);
-  setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
+  await syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
+  await setMemberFamily(info.lastInsertRowid, f.familyId);
+  await setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
 });
@@ -413,13 +413,13 @@ const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 // class enrollment/staffing automatically (see syncMemberSchedulesForDay
 // in utils/classSchedule.js); actually editing the profile itself is
 // still the dedicated Edit page, linked from the Profile tab.
-router.get('/members/:id', (req, res) => {
+router.get('/members/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
   const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
 
-  const family = db
+  const family = await db
     .prepare('SELECT f.name AS familyName FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
     .get(id);
 
@@ -428,10 +428,10 @@ router.get('/members/:id', (req, res) => {
     member,
     tab,
     familyName: family ? family.familyName : null,
-    familyMembers: familyOf(id).map((m) => m.name),
-    rosters: rostersForMember(id),
-    schedule: getMemberSchedule(id),
-    history: attendanceHistoryForMember(id).map((r) => ({
+    familyMembers: (await familyOf(id)).map((m) => m.name),
+    rosters: await rostersForMember(id),
+    schedule: await getMemberSchedule(id),
+    history: (await attendanceHistoryForMember(id)).map((r) => ({
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),
       statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
@@ -443,25 +443,25 @@ router.get('/members/:id', (req, res) => {
   });
 });
 
-router.get('/members/:id/edit', (req, res) => {
+router.get('/members/:id/edit', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
   res.render('admin-member-edit', {
     title: `Edit ${member.name}`,
     mode: 'edit',
     member,
-    families: allFamilies(),
+    families: await allFamilies(),
     memberFamilyId: member.family_id,
     gradeLevels: GRADE_LEVELS,
-    setupTeams: allSetupTeams(),
-    memberCleanupTeamIds: cleanupTeamIdsForMember(id),
+    setupTeams: await allSetupTeams(),
+    memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
     error: req.query.error || null,
   });
 });
 
-router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
+router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const f = memberFormFields(req);
 
@@ -474,18 +474,18 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
   // (generateMemberCode) and never reassigned just because their name
   // was edited (a typo fix or legal name change shouldn't invalidate an
   // already-printed barcode).
-  const clash = db.prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE AND id != ?').get(f.name, id);
+  const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
-  const existing = db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : existing ? existing.photo_path : null;
   // A newly uploaded photo replaces the old one in photo_path below - the
   // old file itself isn't referenced anywhere else once that happens, so
   // clean it up now rather than leaving it orphaned on disk indefinitely.
   if (req.file && existing && existing.photo_path) deletePhotoFile(existing.photo_path);
 
-  db.prepare(
+  await db.prepare(
     `UPDATE members SET
        name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
        photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
@@ -505,10 +505,10 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
     f.medicalNotes,
     id
   );
-  syncCleanupTeams(id, f.cleanupTeamIds);
-  clearVolunteerMembershipIfNotParent(id, f.memberType);
-  setMemberFamily(id, f.familyId);
-  setPrimaryParent(id, f.isPrimaryParent);
+  await syncCleanupTeams(id, f.cleanupTeamIds);
+  await clearVolunteerMembershipIfNotParent(id, f.memberType);
+  await setMemberFamily(id, f.familyId);
+  await setPrimaryParent(id, f.isPrimaryParent);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });
@@ -602,7 +602,7 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
   const mergeCandidates = [];
 
   for (const r of rows) {
-    const existing = db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(r.name);
+    const existing = await db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(r.name);
     if (existing) {
       nameToId[r.name.toLowerCase()] = existing.id;
       skipped++;
@@ -614,8 +614,8 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
     }
     const typeLower = (r.type || '').toLowerCase();
     const memberType = MEMBER_TYPES.includes(typeLower) ? typeLower : 'student';
-    const memberCode = generateMemberCode();
-    const info = db
+    const memberCode = await generateMemberCode();
+    const info = await db
       .prepare(
         `INSERT INTO members (name, barcode, member_code, member_type, address, city, state, zip, phone, email, birthday, grade_level, medical_notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -643,14 +643,14 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
   for (const r of rows) {
     if (!r.parentName) continue;
     const studentId = nameToId[r.name.toLowerCase()];
-    const parentRow = db
-      .prepare("SELECT id FROM members WHERE active = 1 AND member_type = 'parent' AND name = ? COLLATE NOCASE")
+    const parentRow = await db
+      .prepare("SELECT id FROM members WHERE active = 1 AND member_type = 'parent' AND LOWER(name) = LOWER(?)")
       .get(r.parentName);
     const parentId = nameToId[r.parentName.toLowerCase()] || (parentRow ? parentRow.id : null);
     if (studentId && parentId && studentId !== parentId) {
-      const familyId = ensureFamilyForParent(parentId);
+      const familyId = await ensureFamilyForParent(parentId);
       if (familyId != null) {
-        db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, studentId);
+        await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, studentId);
         linkedParents++;
       }
     }
@@ -679,19 +679,20 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
   });
 });
 
-router.post('/members/import/confirm', (req, res) => {
+router.post('/members/import/confirm', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const payloads = [].concat(req.body.payloads || []);
   const ids = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
 
   let merged = 0;
-  ids.forEach((id, i) => {
-    if (!memberIds.includes(id)) return; // this row's checkbox wasn't checked
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (!memberIds.includes(id)) continue; // this row's checkbox wasn't checked
     let updates;
     try {
       updates = JSON.parse(payloads[i] || '{}');
     } catch (err) {
-      return;
+      continue;
     }
     const setClauses = [];
     const params = [];
@@ -701,11 +702,11 @@ router.post('/members/import/confirm', (req, res) => {
       setClauses.push(`${column} = ?`);
       params.push(value);
     }
-    if (setClauses.length === 0) return;
+    if (setClauses.length === 0) continue;
     params.push(id);
-    db.prepare(`UPDATE members SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
+    await db.prepare(`UPDATE members SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
     merged++;
-  });
+  }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
 });
@@ -775,15 +776,15 @@ function normalizeMassImportRow(row) {
 // coincidental surname match doesn't mean the same household). Same
 // "Smith", "Smith 2", ... disambiguation as ensureFamilyForParent above,
 // for the same reason.
-function createFamilyFromLastName(fullName) {
+async function createFamilyFromLastName(fullName) {
   const last = lastNameOf(fullName) || fullName;
   let name = last;
   let suffix = 1;
-  while (db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name)) {
+  while (await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?)').get(name)) {
     suffix++;
     name = `${last} ${suffix}`;
   }
-  return db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
+  return (await db.prepare('INSERT INTO families (name) VALUES (?)').run(name)).lastInsertRowid;
 }
 
 // One person-slot (primary parent / 2nd parent / a child) from a mass
@@ -793,14 +794,14 @@ function createFamilyFromLastName(fullName) {
 // family if they weren't already in one, so re-running the same file
 // (or a file that overlaps an existing roster) is safe rather than
 // creating duplicates.
-function createOrLinkFamilyMember(name, memberType, familyId, fields) {
-  const existing = db.prepare('SELECT id, family_id FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name);
+async function createOrLinkFamilyMember(name, memberType, familyId, fields) {
+  const existing = await db.prepare('SELECT id, family_id FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(name);
   if (existing) {
-    if (existing.family_id == null) db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, existing.id);
+    if (existing.family_id == null) await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, existing.id);
     return { id: existing.id, created: false };
   }
-  const memberCode = generateMemberCode();
-  const info = db
+  const memberCode = await generateMemberCode();
+  const info = await db
     .prepare(
       `INSERT INTO members (name, barcode, member_code, member_type, address, city, state, zip, phone, email, birthday, grade_level, family_id, is_primary_parent)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -845,7 +846,7 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
   let membersLinked = 0;
 
   for (const r of rows) {
-    const familyId = createFamilyFromLastName(r.primaryParentName);
+    const familyId = await createFamilyFromLastName(r.primaryParentName);
     familiesCreated++;
 
     // Address/city/state/zip/phone are the shared household contact
@@ -856,7 +857,7 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
     // family's shared contact email on every kid's profile too.
     const shared = { address: r.address, city: r.city, state: r.state, zip: r.zip, phone: r.phone };
 
-    const primary = createOrLinkFamilyMember(r.primaryParentName, 'parent', familyId, {
+    const primary = await createOrLinkFamilyMember(r.primaryParentName, 'parent', familyId, {
       ...shared,
       email: r.primaryParentEmail,
       isPrimaryParent: true,
@@ -865,13 +866,13 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
     else membersLinked++;
 
     if (r.secondParentName) {
-      const second = createOrLinkFamilyMember(r.secondParentName, 'parent', familyId, { ...shared, email: r.secondParentEmail });
+      const second = await createOrLinkFamilyMember(r.secondParentName, 'parent', familyId, { ...shared, email: r.secondParentEmail });
       if (second.created) membersCreated++;
       else membersLinked++;
     }
 
     for (const child of r.children) {
-      const result = createOrLinkFamilyMember(child.name, 'student', familyId, {
+      const result = await createOrLinkFamilyMember(child.name, 'student', familyId, {
         ...shared,
         email: r.primaryParentEmail,
         birthday: child.birthday,
@@ -889,10 +890,10 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
 });
 
-router.post('/members/:id/notes', (req, res) => {
+router.post('/members/:id/notes', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const notes = (req.body.notes || '').trim();
-  db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
+  await db.prepare('UPDATE members SET notes = ? WHERE id = ?').run(notes || null, id);
   res.redirect('/admin/members');
 });
 
@@ -918,7 +919,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
   if (layout === 'sideBySide') {
     return res.render('admin-name-tag-both-print', {
       title: `Cards - ${member.name}`,
-      pairs: buildCardPairs([member]),
+      pairs: await buildCardPairs([member]),
       badgeWidth: BADGE_WIDTH,
       badgeHeight: BADGE_HEIGHT,
       cardWidth: CARD_WIDTH,
@@ -927,7 +928,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
   }
 
   if (layout === 'frontBack') {
-    const { frontPages, backPages } = buildDuplexPages(buildCardPairs([member]));
+    const { frontPages, backPages } = buildDuplexPages(await buildCardPairs([member]));
     return res.render('admin-cards-duplex-print', {
       title: `Cards - ${member.name}`,
       frontPages,
@@ -953,7 +954,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
     const template = await getScheduleCardTemplate();
     cards.push({
       heading: 'Schedule Card',
-      html: NameTagRenderCore.renderBadgeElements(template.elements, scheduleCardDataForMember(member)),
+      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(member)),
       bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
@@ -967,10 +968,10 @@ router.get('/members/:id/cards/print', async (req, res) => {
   });
 });
 
-router.post('/members/:id/delete', (req, res) => {
+router.post('/members/:id/delete', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  db.prepare('DELETE FROM members WHERE id = ?').run(id);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  await db.prepare('DELETE FROM members WHERE id = ?').run(id);
   // ON DELETE CASCADE handles every other table referencing this member,
   // but a photo file on disk isn't a foreign key SQLite can clean up on
   // its own - without this, "Delete" leaves an actual photo of a real

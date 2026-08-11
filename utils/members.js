@@ -47,39 +47,36 @@ async function parseNamesFromUpload(buffer, filename) {
 // new members get added to the system. An optional memberType restricts the
 // match to just 'student' or 'parent' profiles (e.g. Floater Assignments
 // and Setup/Cleanup only ever match parents).
-function findMemberByName(name, memberType) {
+async function findMemberByName(name, memberType) {
   if (memberType) {
     return (
-      db
-        .prepare('SELECT * FROM members WHERE active = 1 AND member_type = ? AND name = ? COLLATE NOCASE')
-        .get(memberType, name) || null
+      (await db.prepare('SELECT * FROM members WHERE active = 1 AND member_type = ? AND LOWER(name) = LOWER(?)').get(memberType, name)) ||
+      null
     );
   }
-  return db.prepare('SELECT * FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name) || null;
+  return (await db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(name)) || null;
 }
 
 // Every active parent-type member - the picker list on the public
 // Absence/Late and Name Tag Request forms.
-function activeParentOptions() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
+async function activeParentOptions() {
+  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY LOWER(name)").all();
 }
 
 // Every other active member sharing memberId's family_id (any type -
 // family is symmetric and not restricted to parent/student). Empty if the
 // member isn't connected to anyone.
-function familyOf(memberId) {
-  const self = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+async function familyOf(memberId) {
+  const self = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
   if (!self || self.family_id == null) return [];
-  return db
-    .prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY name COLLATE NOCASE')
-    .all(self.family_id, memberId);
+  return db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY LOWER(name)').all(self.family_id, memberId);
 }
 
 // True if any of memberId's family members is 2 years old or younger -
 // used to flag a parent as having an infant on floater lists, since a
 // floater with an infant may need a different kind of coverage.
-function hasInfantChild(memberId) {
-  return familyOf(memberId).some((m) => {
+async function hasInfantChild(memberId) {
+  return (await familyOf(memberId)).some((m) => {
     const age = ageFromBirthday(m.birthday);
     return age !== null && age <= 2;
   });
@@ -90,11 +87,11 @@ function hasInfantChild(memberId) {
 // this list, so it deliberately excludes the parent themselves (no more
 // "children only" restriction now that family is a symmetric group
 // rather than a parent->child link).
-function familyGroupsByParent() {
-  const parents = db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all();
+async function familyGroupsByParent() {
+  const parents = await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all();
   const byParent = {};
   for (const p of parents) {
-    byParent[p.id] = familyOf(p.id).map((m) => ({ id: m.id, name: m.name }));
+    byParent[p.id] = (await familyOf(p.id)).map((m) => ({ id: m.id, name: m.name }));
   }
   return byParent;
 }
@@ -102,11 +99,11 @@ function familyGroupsByParent() {
 // Confirms memberId is really part of parentId's family (themselves, or
 // anyone sharing their family_id) before letting a form submission touch
 // that record.
-function loadFamilyMember(memberId, parentId) {
+async function loadFamilyMember(memberId, parentId) {
   if (memberId === parentId) {
     return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
   }
-  const parent = db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
+  const parent = await db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
   if (!parent || parent.family_id == null) return null;
   return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, parent.family_id);
 }
@@ -116,14 +113,14 @@ function loadFamilyMember(memberId, parentId) {
 // A family only ever appears there once it's been added here first.
 // memberCount (active members currently in that family) is included for
 // the form's "The Anderson Family - 2 members" checklist display.
-function allFamilies() {
+async function allFamilies() {
   return db
     .prepare(
       `SELECT f.id, f.name, COUNT(m.id) AS memberCount
        FROM families f
        LEFT JOIN members m ON m.family_id = f.id AND m.active = 1
        GROUP BY f.id
-       ORDER BY f.name COLLATE NOCASE`
+       ORDER BY LOWER(f.name)`
     )
     .all();
 }
@@ -134,48 +131,48 @@ function allFamilies() {
 // plain assignment rather than a group-rebuild. Silently no-ops (leaves
 // family_id untouched) if familyId doesn't match a real family, so a
 // tampered/stale form value can't attach a member to a bogus id.
-function setMemberFamily(memberId, familyId) {
+async function setMemberFamily(memberId, familyId) {
   if (familyId == null) {
-    db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(memberId);
+    await db.prepare('UPDATE members SET family_id = NULL WHERE id = ?').run(memberId);
     return;
   }
-  const exists = db.prepare('SELECT id FROM families WHERE id = ?').get(familyId);
+  const exists = await db.prepare('SELECT id FROM families WHERE id = ?').get(familyId);
   if (!exists) return;
-  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, memberId);
+  await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, memberId);
 }
 
 // Only one member per family can be "primary" - marking a new one clears
 // the flag off anyone else sharing the same family_id first. A member
 // with no family yet can still be marked (harmless - they just sort as
 // their own one-person "family" either way).
-function setPrimaryParent(memberId, isPrimary) {
-  const member = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+async function setPrimaryParent(memberId, isPrimary) {
+  const member = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
   if (!member) return;
   if (isPrimary && member.family_id != null) {
-    db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(member.family_id);
+    await db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(member.family_id);
   }
-  db.prepare('UPDATE members SET is_primary_parent = ? WHERE id = ?').run(isPrimary ? 1 : 0, memberId);
+  await db.prepare('UPDATE members SET is_primary_parent = ? WHERE id = ?').run(isPrimary ? 1 : 0, memberId);
 }
 
 // Every active member (any type) with something written in Allergies &
 // Medical Notes - the Allergies/Medical log's one data source, shared by
 // the Logs tab and the popup button on roster/class view pages.
-function membersWithMedicalNotes() {
+async function membersWithMedicalNotes() {
   return db
     .prepare(
       `SELECT id, name, member_type, grade_level, medical_notes FROM members
        WHERE active = 1 AND medical_notes IS NOT NULL AND TRIM(medical_notes) != ''
-       ORDER BY name COLLATE NOCASE`
+       ORDER BY LOWER(name)`
     )
     .all();
 }
 
-function rostersForMember(memberId) {
+async function rostersForMember(memberId) {
   return db
     .prepare(
       `SELECT r.* FROM rosters r
        JOIN roster_members rm ON rm.roster_id = r.id
-       WHERE rm.member_id = ? ORDER BY r.name COLLATE NOCASE`
+       WHERE rm.member_id = ? ORDER BY LOWER(r.name)`
     )
     .all(memberId);
 }
@@ -185,15 +182,15 @@ function rostersForMember(memberId) {
 // once) used to call rostersForMember in a .map(), one extra query per
 // row. Returns a Map so a caller iterating members can just
 // `.get(m.id) || []` instead of re-filtering a flat list per member.
-function rostersByMemberIds(memberIds) {
+async function rostersByMemberIds(memberIds) {
   const byId = new Map();
   if (memberIds.length === 0) return byId;
   const placeholders = memberIds.map(() => '?').join(',');
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT rm.member_id AS memberId, r.* FROM rosters r
        JOIN roster_members rm ON rm.roster_id = r.id
-       WHERE rm.member_id IN (${placeholders}) ORDER BY r.name COLLATE NOCASE`
+       WHERE rm.member_id IN (${placeholders}) ORDER BY LOWER(r.name)`
     )
     .all(...memberIds);
   for (const row of rows) {
@@ -247,8 +244,9 @@ function sortMembersByFamily(members) {
 // teachers here (a separate role in the same table) - the Design/Print
 // hub's "Teachers Only" filter is specifically for who to hand a class
 // roster/mailing label to as the instructor of record.
-function teacherMemberIds() {
-  return new Set(db.prepare("SELECT DISTINCT member_id FROM class_staff WHERE role = 'teacher'").all().map((r) => r.member_id));
+async function teacherMemberIds() {
+  const rows = await db.prepare("SELECT DISTINCT member_id FROM class_staff WHERE role = 'teacher'").all();
+  return new Set(rows.map((r) => r.member_id));
 }
 
 // Family is now a named entity (families.name, e.g. "Anderson") rather
@@ -257,14 +255,12 @@ function teacherMemberIds() {
 // familyOf() lookup. Shared by the Members page and any other member list
 // that wants that same photo/type/family/rosters shape (e.g. the Design/
 // Print hub's bulk print picker lists).
-function membersWithDetails(typeFilter) {
-  const allMembers = db
-    .prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id')
-    .all();
+async function membersWithDetails(typeFilter) {
+  const allMembers = await db.prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id').all();
   const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
   const sorted = sortMembersByFamily(members);
-  const rostersById = rostersByMemberIds(sorted.map((m) => m.id));
-  const teacherIds = teacherMemberIds();
+  const rostersById = await rostersByMemberIds(sorted.map((m) => m.id));
+  const teacherIds = await teacherMemberIds();
   return sorted.map((m) => ({
     ...m,
     rosters: rostersById.get(m.id) || [],
@@ -279,12 +275,12 @@ function membersWithDetails(typeFilter) {
 // it at creation time too, so every member's printed barcode is the same
 // fixed length regardless of how long their name is (db/index.js's
 // migration backfills this same way for every member who predates it).
-function generateMemberCode() {
+async function generateMemberCode() {
   const exists = db.prepare('SELECT 1 FROM members WHERE member_code = ?');
   let code;
   do {
     code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-  } while (exists.get(code));
+  } while (await exists.get(code));
   return code;
 }
 

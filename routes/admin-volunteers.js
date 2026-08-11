@@ -61,7 +61,7 @@ router.get('/volunteers/:day/assistants', requireAdmin, requireDay, (req, res) =
 
 // --- Floater Assignments: position/room/name planning grid + Substitutes Needed ---
 
-router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
+router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const hours = hoursForDay(day);
@@ -79,9 +79,9 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, (req, res) => {
   const upcomingDates = dates.filter((d) => d >= today);
   const selectedDate = upcomingDates.includes(req.query.date) ? req.query.date : upcomingDates[0] || null;
 
-  const allParents = activeParentOptions();
+  const allParents = await activeParentOptions();
   const infantByMemberId = {};
-  allParents.forEach((p) => { infantByMemberId[p.id] = hasInfantChild(p.id); });
+  for (const p of allParents) infantByMemberId[p.id] = await hasInfantChild(p.id);
 
   // The chart itself is now the assign UI - every permanent job (whether
   // filled or not) plus any class whose teacher(s) are absent, one row
@@ -279,7 +279,7 @@ router.get('/volunteers/:day/risk', requireAdmin, requireDay, (req, res) => {
 
 // --- Floater Teams: who's on the list for each hour, ranked ---
 
-router.get('/volunteers/:day/teams', requireAdmin, requireDay, (req, res) => {
+router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const sections = sectionsForList(list.id);
@@ -287,11 +287,16 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, (req, res) => {
   const hourLabelByPosition = {};
   hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
 
-  const teams = sections.map((section) => ({
-    section,
-    hourLabel: hourLabelByPosition[section.position] || section.label,
-    members: membersForSection(list.id, section.id).map((m) => ({ ...m, infant: hasInfantChild(m.id) })),
-  }));
+  const teams = [];
+  for (const section of sections) {
+    const sectionMembers = [];
+    for (const m of membersForSection(list.id, section.id)) sectionMembers.push({ ...m, infant: await hasInfantChild(m.id) });
+    teams.push({
+      section,
+      hourLabel: hourLabelByPosition[section.position] || section.label,
+      members: sectionMembers,
+    });
+  }
 
   res.render('admin-volunteer-teams', {
     title: `${DAY_LABELS[day]} Floater Teams`,
@@ -301,7 +306,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, (req, res) => {
     teams,
     ranks: RANKS,
     rankLabels: RANK_LABELS,
-    availableParents: activeParentOptions(),
+    availableParents: await activeParentOptions(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -354,7 +359,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requir
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
 });
 
-router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, (req, res) => {
+router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = getListByDay(day);
   const sections = sectionsForList(list.id);
@@ -363,11 +368,13 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, (req, 
   hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
 
   const lines = [toCsvRow(['Hour', 'Name', 'Rank', 'Has Child 2 or Younger'])];
-  sections.forEach((section) => {
-    membersForSection(list.id, section.id).forEach((m) => {
-      lines.push(toCsvRow([hourLabelByPosition[section.position] || section.label, m.name, RANK_LABELS[m.rank] || m.rank, hasInfantChild(m.id) ? 'Yes' : '']));
-    });
-  });
+  for (const section of sections) {
+    for (const m of membersForSection(list.id, section.id)) {
+      lines.push(
+        toCsvRow([hourLabelByPosition[section.position] || section.label, m.name, RANK_LABELS[m.rank] || m.rank, (await hasInfantChild(m.id)) ? 'Yes' : ''])
+      );
+    }
+  }
 
   sendCsv(res, `${day}-floater-teams.csv`, lines);
 });
@@ -391,7 +398,7 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   let added = 0;
   let notFound = 0;
   for (const name of names) {
-    const member = findMemberByName(name, 'parent');
+    const member = await findMemberByName(name, 'parent');
     if (!member) { notFound++; continue; }
     addMemberToSection(list.id, member.id, firstSection.id);
     added++;

@@ -17,8 +17,8 @@ function toTableRows(dayRows) {
 // The family's designated primary parent (see is_primary_parent on
 // members - Members page), falling back to whichever parent in the
 // family comes first alphabetically if nobody's been marked primary yet.
-function primaryParentFor(member) {
-  const family = familyOf(member.id);
+async function primaryParentFor(member) {
+  const family = await familyOf(member.id);
   const parents = family.filter((m) => m.member_type === 'parent');
   if (parents.length === 0) return null;
   return parents.find((p) => p.is_primary_parent) || parents[0];
@@ -29,9 +29,9 @@ function primaryParentFor(member) {
 // a parent's own card leaves it blank rather than showing some other
 // parent in the family (or, for a single-parent family, nothing at all
 // since familyOf() excludes the card's own owner from the lookup).
-function scheduleCardDataForMember(member) {
-  const { monday, wednesday } = getMemberSchedule(member.id);
-  const primaryParent = member.member_type === 'student' ? primaryParentFor(member) : null;
+async function scheduleCardDataForMember(member) {
+  const { monday, wednesday } = await getMemberSchedule(member.id);
+  const primaryParent = member.member_type === 'student' ? await primaryParentFor(member) : null;
   return {
     name: member.name,
     primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
