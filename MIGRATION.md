@@ -455,164 +455,183 @@ requests to Supabase both fail/reset). This means:
    right after requiring the module, which is a call-site change across
    every one of those ~30 files, not a small fix.
 
+8. **Netlify deployment config** (`netlify.toml` + `netlify/functions/app.js`)
+    — wraps the existing Express `app` export in `serverless-http` (`binary:
+    true`, needed for photo/document/PDF downloads to survive the
+    Lambda-style response envelope intact) behind a catch-all rewrite, so
+    every existing route/URL keeps working unchanged; static files actually
+    present in `public/` at build time are served directly by Netlify's CDN
+    without ever touching the function. Verified end-to-end (not just
+    lint-clean) with a standalone script that invoked the exported
+    `handler` directly against a simulated Netlify Lambda event and a
+    throwaway SQLite DB: a real page returned 200 with the right HTML body,
+    a nonexistent path returned 404. `eslint.config.js` needed
+    `netlify/**/*.js` (and, for the item below, `scripts/**/*.js`) added to
+    its server-side CommonJS glob - both were simply missing.
+    `.env.example` documents the Supabase/Netlify env vars, commented out
+    and explicitly scoped as not needed for a normal local/LAN install.
+    **Not by itself a complete deployment** — see the file's own header
+    comment: it still needs item 1 below (DB + Storage cutover) landed in
+    the same deploy, or the function boots against a database/upload
+    directory that doesn't persist between invocations.
+
+9. **`scripts/migrate-to-supabase.js`** — the one-time production data +
+    file export/import script, written and dry-run-verified against the
+    real dev SQLite database (`node scripts/migrate-to-supabase.js
+    --dry-run` correctly walked every upload directory and every one of
+    the 41 migrated tables - the `sessions` table is deliberately excluded,
+    see below - with accurate row/file counts), but **never run against a
+    real Supabase project** - this sandboxed environment cannot reach
+    Supabase at all (see "A real environment constraint hit during this
+    work" above), so the actual Postgres-writing and Storage-uploading
+    code paths are correct by careful reading and by successfully
+    exercising every other part of the script, not by an end-to-end run
+    against production infra. Whoever runs this for real should re-read it
+    once first.
+
+    What it does, in order:
+    1. **Files → Storage.** Walks each of the 5 `public/uploads/*`
+       subdirectories and uploads every file to a matching bucket, reusing
+       the existing filename as the Storage key (not
+       `utils/storage.js`'s `generateKey()` - that's for the app's own
+       future new-upload path; reusing today's filename here means this
+       step needs no separate old-name → new-key mapping table and is
+       trivially safe to re-run, `upsert: true`). Bucket list (none of
+       these buckets exist yet - create them in the Supabase dashboard
+       before running this):
+
+       | local directory              | bucket                     | public? |
+       |-------------------------------|-----------------------------|---------|
+       | `uploads/members`             | `member-photos`             | yes     |
+       | `uploads/membership-children` | `membership-child-photos`   | yes     |
+       | `uploads/name-tags`           | `name-tag-images`           | yes     |
+       | `uploads/schedule-cards`      | `schedule-card-images`      | yes     |
+       | `uploads/documents`           | `documents`                 | **no**  |
+
+       `documents` is private on purpose:
+       `routes/admin-documents.js` gates every document behind
+       `requireFullAdmin`, and a public bucket would make that gate
+       meaningless (anyone with the URL could read it, no login required).
+       **Known gap**: as of this script, that route still serves documents
+       from local disk (`res.sendFile`) - before this bucket is actually
+       used in production, `utils/storage.js` needs a signed-URL (or
+       server-side proxy-download) helper added, since it currently only
+       has `publicUrl()`. Create the bucket private either way, so this
+       can't be forgotten later.
+    2. **Rows → Postgres**, in the 41-table foreign-key-safe order kept as
+       an explicit, human-auditable list in the script (not computed by a
+       runtime topological sort) - verified by hand against every
+       `REFERENCES` clause in `db/schema.sql`. `sessions` is the one table
+       intentionally excluded: it's express-session's own ephemeral login
+       state, not data worth preserving across the cutover - every admin
+       just logs back in once afterward. Every table copies over
+       column-for-column (the Postgres schema is a verified 1:1 column
+       translation of the SQLite one - see the migration file's own header
+       comment), with two rewrites applied in flight:
+       - `members.photo_path` / `membership_request_children.photo_path` /
+         `documents.file_path` (today store a full local path like
+         `/uploads/members/172...png`) get rewritten to the bare Storage
+         key, matching `utils/storage.js`'s own documented convention that
+         these columns should hold a key, with `publicUrl()` (or the
+         still-to-be-built signed-URL helper, for `documents`) computing
+         the actual URL at render time. **This only renders correctly
+         once the upload routes/view templates are switched from
+         `multer.diskStorage()`/`res.sendFile` to `utils/storage.js`
+         (item 1 below) - that swap must land in the same deploy as
+         running this script**, or photos/documents 404 until it does.
+       - `name_tag_templates`/`misc_badge_templates`/
+         `schedule_card_templates.layout_json` (a JSON array of
+         positioned elements) has each `{ type: 'image', src:
+         '/uploads/name-tags/...' }` element's `src` rewritten to the
+         *full* public Storage URL, not a bare key - a deliberate, narrow
+         exception to the bare-key convention above, because this `src` is
+         consumed directly as a literal URL by client-side rendering code
+         (the design editor's live preview, `public/js/name-tag-render-
+         core.js` for on-screen preview and print) with no server-side
+         "look up the key, call `publicUrl()`" step at render time the way
+         a normal DB column has.
+       Tables with `id integer generated always as identity primary key`
+       (detected at runtime via `information_schema.columns.is_identity`,
+       not a hardcoded list) get their rows inserted with `OVERRIDING
+       SYSTEM VALUE` to preserve the original ids, followed by a
+       `setval(pg_get_serial_sequence(...), max(id), ...)` reset so the
+       next real app-driven INSERT doesn't collide with an imported id.
+       The whole row-copy runs inside one Postgres transaction, and the
+       script refuses to run at all if the target database isn't already
+       empty (checked via a `families` row count) - it's a one-shot bulk
+       load, not a merge; re-running against a partially-loaded database
+       needs the target truncated back to empty first, not a second blind
+       run.
+    3. Supports `--dry-run` (no writes anywhere, just prints what would
+       happen - needs no Supabase env vars at all), `--skip-files`, and
+       `--skip-rows`, so the file and row migrations can be run and
+       re-verified as two separate passes if needed.
+
 ## What's NOT done yet — the actual remaining work
 
-1. **The big one: migrate every route file off synchronous SQLite calls.**
-   ~24 files in `routes/`, plus every `utils/*.js` module that does
-   `db.prepare(...)`. This is the largest remaining piece by far, but a key
-   discovery makes it much lower-risk than it sounds:
-
-   **`await` on a value that isn't a Promise is a transparent no-op
-   pass-through in JS** (confirmed with a throwaway test during this
-   session - `await db.prepare(sql).get(x)` returns the exact same thing
-   whether `db` is the *old, still-synchronous* SQLite object or the *new*
-   async Postgres one). That means every route file can be converted to
-   `async`/`await` **right now, before the actual database swap, with zero
-   behavior change to the live app** - `server.js` keeps requiring
-   `db/index.js` (still SQLite) the entire time this conversion is
-   happening, and nothing breaks, because `await`-ing a synchronous return
-   value just works. Express 5 (this app's version) also auto-catches
-   rejected Promises from `async` route handlers, so no explicit try/catch
-   wrapping is needed just to keep error handling working.
-
-   This means: **the existing SQLite-backed test suite is the real safety
-   net for each file's conversion** - after converting a route file, run
-   the full existing suite (`npm test`) and it must stay 100% green,
-   completely unchanged in what it asserts. That proves the conversion
-   didn't change behavior. A pglite-based test is only extra-needed for
-   files that hit genuine SQLite-vs-Postgres dialect differences (see
-   below), not for routine "add await, make handler async" conversions.
-
-   Practical approach: one file (or a small logical group) at a time -
-   convert every `db.prepare(sql).get()/.all()/.run()` call to
-   `await ...`, mark the containing route handler `async`, run `npm test`
-   + `npm run lint`, commit. Grep for `db.prepare(` to find remaining call
-   sites - note this grep will still match *already-converted* files too
-   (the call shape is deliberately unchanged, just awaited now), so "done"
-   means every call site has an `await` in front of it and sits inside an
-   `async` function, not that the grep returns zero hits.
-
-   **Special cases that need actual dialect fixes, not just await/async**
-   (grep for these specifically - `grep -rn "INSERT OR \|withTransaction\|PRAGMA\|strftime(" routes utils`):
-   - `db.withTransaction(fn)` call sites - `fn` must become `async (tx) => {...}`
-     and every query inside must go through `tx.prepare(...)`, not the outer
-     `db` - see `db/postgres.js`'s own header comment for the exact
-     right/wrong example. `utils/classSchedule.js` has several of these
-     (`setEnrollment`, `deleteClass`, others - grep it directly).
-   - `INSERT OR IGNORE` / `INSERT OR REPLACE` - Postgres equivalent is
-     `INSERT ... ON CONFLICT (col) DO NOTHING` / `ON CONFLICT (col) DO
-     UPDATE SET ...` (needs an explicit conflict target and, for REPLACE,
-     an explicit SET list - not a blind "replace" the same way SQLite's
-     `OR REPLACE` works).
-   - Any raw `PRAGMA` statement - SQLite-only, no Postgres equivalent
-     needed (Postgres always enforces foreign keys when declared; there's
-     no `PRAGMA table_info()` equivalent needed either, since nothing in
-     this app introspects its own schema at runtime outside `db/index.js`
-     itself, which isn't part of this list).
-   - `db.exec('BEGIN'/'COMMIT'/'ROLLBACK')` used directly (not via
-     `withTransaction`) - same transaction-connection-binding concern as
-     `withTransaction` above; check whether any file does this outside
-     `db/index.js`'s own `withTransaction` implementation.
-   - **`COLLATE NOCASE`** (52 occurrences across 20 files as of this
-     writing - `grep -rn "COLLATE NOCASE" routes utils`) - SQLite's
-     built-in case-insensitive collation, used throughout for
-     case-insensitive sorting (`ORDER BY name COLLATE NOCASE`) and
-     equality (`WHERE name = ? COLLATE NOCASE`, duplicate-name checks
-     etc). **Do not try to create a matching `NOCASE` collation in
-     Postgres as a drop-in fix** - I tried this (`CREATE COLLATION nocase
-     (provider = icu, locale = 'und-u-ks-level2', deterministic =
-     false)`), and while it's a real, documented Postgres technique, it
-     silently broke case-insensitive *equality* matching under PGlite even
-     though case-insensitive *sorting* worked fine with it (`ORDER BY ...
-     COLLATE NOCASE` returned correctly sorted rows; `WHERE name = ?
-     COLLATE NOCASE` matched nothing). Whether that's a PGlite/WASM-ICU
-     limitation specifically or a genuine Postgres behavior I'm not
-     currently able to verify against a real server - either way, it's far
-     too risky to build 20 files' worth of duplicate-detection and lookup
-     logic on an unverified, exotic feature. **Use `LOWER(col) =
-     LOWER(?)` for equality and `ORDER BY LOWER(col)` for sorting
-     instead** - plain, boring, and behaves identically on both engines
-     (SQLite's own `COLLATE NOCASE` is ASCII-only case-folding by default
-     too, same as `LOWER()`, so this is a behavior-preserving rewrite, not
-     a behavior change). Fix this in the same pass as each file's
-     async/await conversion, not as a separate sweep - you're already
-     touching every one of that file's queries anyway.
-   - **`datetime('now')` used inline in application SQL** (17 occurrences
-     across 10 files as of this writing - `grep -rn "datetime('now')"
-     routes utils`; NOT the same as `db/schema.sql`'s column `DEFAULT
-     (datetime('now'))` clauses, which the Postgres migration already
-     handles via `now_text()` - see the schema file's own header comment).
-     **Do not swap these to `now_text()` during the routine async/await
-     pass** - I made this mistake converting `routes/kiosk-class-
-     checkin.js` and caught it before committing: `now_text()` only
-     exists in the Postgres schema, so writing it into a query that still
-     runs against live SQLite (which is every file until the final
-     cutover) throws "no such function: now_text" immediately, breaking
-     the route outright - unlike the `await`-on-non-Promise trick, this
-     one has no safe no-op form on the still-SQLite-backed app. Leave
-     `datetime('now')` exactly as-is when doing a file's routine
-     conversion pass; fix all 17 at once in a dedicated commit right
-     before/during the actual `db/index.js` → `db/postgres.js` cutover,
-     verified against pglite first. (An even more portable option worth
-     considering then: compute the timestamp in JS - e.g. `new
-     Date().toISOString().slice(0,19).replace('T',' ')` matches
-     `now_text()`'s exact output format - and pass it as a bound
-     parameter instead of relying on either engine's own "now" SQL
-     function at all.)
-   - **Converting a util function to `async` means grepping `test/` too,
-     not just `routes/`/`utils/`.** Caught this converting
-     `utils/memberLookup.js`: `test/memberLookup.test.js` calls
-     `findMemberByBarcodeOrName` directly (not through an HTTP request),
-     so making it `async` turned its return value into a Promise and every
-     assertion in that test file broke, even though every real route
-     call site was already fixed correctly. `npm test`'s full run is the
-     only thing that actually catches this - running just the route-level
-     test file for whatever you're converting isn't enough by itself.
-
-2. **Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
+1. **Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
    app** (`server.js`'s `session()` config, and each of the 5 route files
    using `multer.diskStorage()` — see `db/postgres.js`'s sibling comment
    trail for the exact list: `routes/admin-documents.js`,
    `routes/admin-members.js`, `routes/admin-name-tag.js`,
    `routes/admin-schedule.js`, `routes/membership.js`). Needs
-   `SUPABASE_SERVICE_ROLE_KEY` first.
+   `SUPABASE_SERVICE_ROLE_KEY` first. This swap has to land in the same
+   deploy as running `scripts/migrate-to-supabase.js` (item 9 above) -
+   that script rewrites `photo_path`/`file_path`/`layout_json` values to
+   point at Storage, which only resolves correctly once these routes and
+   their view templates actually read from Storage instead of local disk.
+   Also add the private-bucket signed-URL (or proxy-download) helper
+   `utils/storage.js` doesn't have yet, needed before `admin-documents.js`
+   can serve the private `documents` bucket.
 
-3. **Netlify deployment config** — wrap the Express app with `serverless-http`
-   as a Netlify Function, `netlify.toml` redirect rules so every existing URL
-   keeps working, env var wiring for the *production* Supabase project
-   (different from the dev one used so far).
+2. **Run `scripts/migrate-to-supabase.js` for real**, against the actual
+   production SQLite file and a freshly-provisioned production Supabase
+   project (distinct from the dev project used throughout this work) -
+   the script itself is written and dry-run-verified (item 9 above), but
+   has never touched a real Supabase project, since this sandboxed
+   environment can't reach one. Create the 5 Storage buckets first (table
+   above), then run without `--dry-run`.
 
-4. **One-time production data export/import** — once everything above is
-   tested and ready to cut over, export the live SQLite data and import it
-   into the production Supabase project's Postgres schema. Not started; no
-   production Supabase project has been configured yet (only the dev one has
-   the schema applied).
-
-5. **`db/index.js` (the SQLite version) gets deleted, and `db/postgres.js`
-   gets promoted to be `db/index.js`** — the very last step, once every route
-   file is converted and the whole test suite is green using ONLY the
-   Postgres path. Until then, both coexist deliberately (the SQLite version
-   is what the live `main`/production app still runs on).
+3. **`db/index.js` (the SQLite version) gets deleted, and `db/postgres.js`
+   gets promoted to be `db/index.js`** — the very last step, once item 1
+   above is wired in and the whole test suite is green using ONLY the
+   Postgres path (a pglite-backed run, at minimum, since this environment
+   can't reach a real Postgres server either). Until then, both coexist
+   deliberately (the SQLite version is what the live `main`/production app
+   still runs on). Also revisit `server.js`'s `ensureDayRosterSync` startup
+   fix at this point - see its own header comment and the "real, confirmed
+   startup race" writeup above for why the synchronous-completion trick it
+   relies on stops holding once the live driver is genuinely async
+   Postgres.
 
 ## Suggested next steps for whoever picks this up
 
-1. Read this file, then skim the "What's done" file list above to get
-   oriented.
+Every piece of this migration that can be built, tested, and verified
+*without* a live Supabase connection is now done (schema translation, the
+async DB layer, session store, Storage wrapper, the full route/utils
+async/await conversion, Netlify deployment config, and the data/file
+migration script - see "What's done so far" above). What's left all
+genuinely requires either real Supabase connectivity or a human's own
+judgment call, which is why it's stopped here rather than being guessed at:
+
+1. Read this file, then skim the "What's done so far" and "What's NOT done
+   yet" sections above to get oriented - the latter is the authoritative
+   remaining-work list (3 items as of this writing).
 2. Check whether your session's environment can reach `supabase.co` (try
-   `curl -sS -o /dev/null -w '%{http_code}\n' https://supabase.co`) — if
-   yes, ask the user for the dev project's connection details again (they'll
-   need to re-share them; nothing carries over) and do a **real** connection
-   test before continuing, strictly better than this session's PGlite-only
+   `curl -sS -o /dev/null -w '%{http_code}\n' https://supabase.co`) — every
+   session that has worked on this so far (including this one) has been
+   unable to, so this needs re-checking each time, not assumed. If yes, ask
+   the user for the dev project's connection details again (they'll need to
+   re-share them; nothing carries over) and do a **real** connection test
+   before continuing, strictly better than this session's PGlite-only
    verification.
 3. Also ask the user for `SUPABASE_SERVICE_ROLE_KEY` if it's needed for the
-   next piece of work (Storage wiring specifically).
-4. Continue the route-file migration one file at a time, in whatever order
-   seems natural — there's no dependency ordering between most of them
-   except that anything gating on `req.session.adminId` implicitly depends
-   on the session store actually being wired in first if you want to test it
-   end-to-end through real HTTP requests (route-level tests can still use
-   `test/pgTestDb.js` directly without that, the way `test/dbPostgres.test.js`
-   and `test/pgSessionStore.test.js` already do).
+   next piece of work (Storage wiring, item 1 under "What's NOT done yet").
+4. Do the 3 remaining items in order - each one genuinely depends on the
+   one before it (Storage/session wiring, then a real run of
+   `scripts/migrate-to-supabase.js`, then the final `db/index.js` deletion/
+   promotion) - unlike the earlier route-by-route conversion work, which
+   had no real ordering dependency between files.
 5. Keep committing and pushing to `supabase-migration` after each real,
    tested chunk of progress — don't let uncommitted work pile up in one
    giant, harder-to-review change.
