@@ -33,9 +33,9 @@ test('kiosk home: Class Check In & Out and Admin are green bottom-right corner b
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  await t.test('both live in the bottom-right corner group', () => {
-    const groupMatch = /<div class="landing-corner-actions-bottom-right">([\s\S]*?)<\/div>/.exec(res.text);
-    assert.ok(groupMatch, 'expected a .landing-corner-actions-bottom-right group');
+  await t.test('both live in the bottom-right corner group, inside a <footer> landmark (not a bare <div>, which axe-core flags as page content not contained by any landmark)', () => {
+    const groupMatch = /<footer class="landing-corner-actions-bottom-right">([\s\S]*?)<\/footer>/.exec(res.text);
+    assert.ok(groupMatch, 'expected a <footer class="landing-corner-actions-bottom-right"> group');
     assert.match(groupMatch[1], /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin">/);
     assert.match(groupMatch[1], /<a class="admin-corner-link-green" href="\/admin">Admin<\/a>/);
   });
