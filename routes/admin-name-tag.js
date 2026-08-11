@@ -13,6 +13,8 @@ const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { isMiscBadgeType, saveMiscTemplate } = require('../utils/miscBadgeData');
 const { imageFileFilter } = require('../utils/uploads');
 const { sweepNameTagImages } = require('../utils/designImageGC');
+const { createStorageClient, publicUrl } = require('../utils/storage');
+const { saveUpload } = require('../utils/uploadBackend');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { jsonScriptSafe } = require('../utils/json');
 const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
@@ -26,15 +28,11 @@ const DAY_LABELS = { ...BASE_DAY_LABELS, both: 'Both' };
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';
+const storageClient = createStorageClient();
 
 const uploadDesignImage = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, DESIGN_IMAGE_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
@@ -177,9 +175,24 @@ router.post('/name-tag/template/:type', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/name-tag/design-image', uploadDesignImage.single('image'), (req, res) => {
+router.post('/name-tag/design-image', uploadDesignImage.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, message: 'No image uploaded.' });
-  res.json({ ok: true, url: `/uploads/name-tags/${req.file.filename}` });
+  // Unlike photo_path, a layout's image element `src` is consumed
+  // directly as a literal URL by client-side rendering code (the design
+  // editor's live preview, public/js/name-tag-render-core.js) with no
+  // server-side "look up the key, resolve the URL" step at render time -
+  // so the *full* URL has to be handed back here, not a bare key (see
+  // MIGRATION.md's own note on this deliberate exception).
+  const key = await saveUpload({
+    client: storageClient,
+    bucket: NAME_TAG_IMAGES_BUCKET,
+    localDir: DESIGN_IMAGE_DIR,
+    buffer: req.file.buffer,
+    originalName: req.file.originalname,
+    contentType: req.file.mimetype,
+  });
+  const url = storageClient ? publicUrl(NAME_TAG_IMAGES_BUCKET, key) : `/uploads/name-tags/${key}`;
+  res.json({ ok: true, url });
 });
 
 router.post('/name-tag/print', async (req, res) => {

@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
+const { createStorageClient } = require('./storage');
 
 // Extracts every image element's `src` across a set of saved layouts,
 // tolerating both shapes layout_json has ever been stored in: the
@@ -69,13 +70,25 @@ const SCHEDULE_CARD_DIR = path.join(UPLOADS_DIR, 'schedule-cards');
 // need scanning together before sweeping it, or an image still used by
 // one type would look unreferenced and get deleted because only the
 // other type's templates were checked.
+// KNOWN GAP (see MIGRATION.md): when Supabase Storage is configured,
+// uploaded design images live in a bucket, not the local directories
+// this sweep scans - fs.readdirSync() would see an empty/irrelevant
+// directory and delete nothing, which is at least safe (never deletes a
+// real Storage object by mistake), but it also means orphaned Storage
+// images from removed layout elements are never actually cleaned up.
+// A Storage-side sweep (list bucket objects, diff against
+// referencedImagePaths()) would need its own implementation - skipped
+// here rather than guessed at, same reasoning as MIGRATION.md's other
+// deliberately-deferred items.
 async function sweepNameTagImages() {
+  if (createStorageClient()) return;
   const nameTagRows = (await db.prepare('SELECT layout_json FROM name_tag_templates').all()).map((r) => r.layout_json);
   const miscBadgeRows = (await db.prepare('SELECT layout_json FROM misc_badge_templates').all()).map((r) => r.layout_json);
   sweepUnreferencedImages(NAME_TAG_DIR, '/uploads/name-tags', referencedImagePaths([...nameTagRows, ...miscBadgeRows]));
 }
 
 async function sweepScheduleCardImages() {
+  if (createStorageClient()) return;
   const rows = (await db.prepare('SELECT layout_json FROM schedule_card_templates').all()).map((r) => r.layout_json);
   sweepUnreferencedImages(SCHEDULE_CARD_DIR, '/uploads/schedule-cards', referencedImagePaths(rows));
 }

@@ -33,20 +33,18 @@ const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { sweepScheduleCardImages } = require('../utils/designImageGC');
+const { createStorageClient, publicUrl } = require('../utils/storage');
+const { saveUpload } = require('../utils/uploadBackend');
 
 const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'schedule-cards');
 if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+const SCHEDULE_CARD_IMAGES_BUCKET = 'schedule-card-images';
+const storageClient = createStorageClient();
 
 const uploadDesignImage = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, DESIGN_IMAGE_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
@@ -294,9 +292,22 @@ router.post('/schedule/design/template', requireFullAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/schedule/design-image', requireFullAdmin, uploadDesignImage.single('image'), (req, res) => {
+router.post('/schedule/design-image', requireFullAdmin, uploadDesignImage.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, message: 'No image uploaded.' });
-  res.json({ ok: true, url: `/uploads/schedule-cards/${req.file.filename}` });
+  // See routes/admin-name-tag.js's identical route for why this hands
+  // back a full URL rather than a bare key - a layout's image element
+  // `src` is consumed directly as a literal URL by client-side rendering
+  // code, with no server-side resolution step at render time.
+  const key = await saveUpload({
+    client: storageClient,
+    bucket: SCHEDULE_CARD_IMAGES_BUCKET,
+    localDir: DESIGN_IMAGE_DIR,
+    buffer: req.file.buffer,
+    originalName: req.file.originalname,
+    contentType: req.file.mimetype,
+  });
+  const url = storageClient ? publicUrl(SCHEDULE_CARD_IMAGES_BUCKET, key) : `/uploads/schedule-cards/${key}`;
+  res.json({ ok: true, url });
 });
 
 // Read-only - member_schedules is entirely derived from the master Class
