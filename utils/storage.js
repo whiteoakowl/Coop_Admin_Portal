@@ -78,4 +78,18 @@ function publicUrl(bucket, key) {
   return `${base}/storage/v1/object/public/${bucket}/${key}`;
 }
 
-module.exports = { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey };
+// The private-bucket counterpart to publicUrl() above (see MIGRATION.md's
+// "Known gap" note on the `documents` bucket) - a private bucket has no
+// stable public URL at all, so the only way to actually serve one is to
+// download the bytes server-side and stream them through the app's own
+// route, same as res.sendFile(localPath) already does for the SQLite/
+// local-disk version of this route. Callers set their own
+// Content-Type/Content-Disposition from the DB row (the real original
+// filename, not whatever key Storage stores it under) same as today.
+async function downloadFile(client, bucket, key) {
+  const { data, error } = await client.storage.from(bucket).download(key);
+  if (error) throw new Error(`Supabase Storage download failed (${bucket}/${key}): ${error.message}`);
+  return Buffer.from(await data.arrayBuffer());
+}
+
+module.exports = { createStorageClient, uploadFile, deleteFile, publicUrl, downloadFile, generateKey };

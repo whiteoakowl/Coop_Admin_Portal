@@ -9,13 +9,13 @@
 // expects, and handle its documented { error } result shape correctly.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { uploadFile, deleteFile, publicUrl, generateKey, createStorageClient } = require('../utils/storage');
+const { uploadFile, deleteFile, publicUrl, downloadFile, generateKey, createStorageClient } = require('../utils/storage');
 
-// Mirrors @supabase/supabase-js's client.storage.from(bucket).upload/remove
-// shape closely enough to prove utils/storage.js calls it correctly,
-// without needing the real package's network behavior.
-function fakeClient({ uploadError = null, removeError = null } = {}) {
-  const calls = { uploads: [], removes: [] };
+// Mirrors @supabase/supabase-js's client.storage.from(bucket).upload/remove/
+// download shape closely enough to prove utils/storage.js calls it
+// correctly, without needing the real package's network behavior.
+function fakeClient({ uploadError = null, removeError = null, downloadError = null, downloadBytes = null } = {}) {
+  const calls = { uploads: [], removes: [], downloads: [] };
   return {
     calls,
     storage: {
@@ -28,6 +28,12 @@ function fakeClient({ uploadError = null, removeError = null } = {}) {
           async remove(keys) {
             calls.removes.push({ bucket, keys });
             return { error: removeError };
+          },
+          async download(key) {
+            calls.downloads.push({ bucket, key });
+            if (downloadError) return { data: null, error: downloadError };
+            const bytes = downloadBytes || Buffer.from('fake file bytes');
+            return { data: { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) }, error: null };
           },
         };
       },
@@ -75,6 +81,24 @@ test('deleteFile', async (t) => {
     const client = fakeClient();
     await deleteFile(client, 'member-photos', null);
     assert.equal(client.calls.removes.length, 0);
+  });
+});
+
+test('downloadFile', async (t) => {
+  await t.test('downloads the given key from the given bucket and returns a Buffer', async () => {
+    const client = fakeClient({ downloadBytes: Buffer.from('hello document') });
+    const buf = await downloadFile(client, 'documents', 'some-key.pdf');
+    assert.deepEqual(client.calls.downloads, [{ bucket: 'documents', key: 'some-key.pdf' }]);
+    assert.ok(Buffer.isBuffer(buf));
+    assert.equal(buf.toString(), 'hello document');
+  });
+
+  await t.test('throws with a clear message when Supabase reports an error', async () => {
+    const client = fakeClient({ downloadError: { message: 'object not found' } });
+    await assert.rejects(
+      downloadFile(client, 'documents', 'missing.pdf'),
+      /Supabase Storage download failed \(documents\/missing\.pdf\): object not found/
+    );
   });
 });
 
