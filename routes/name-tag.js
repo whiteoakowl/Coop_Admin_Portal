@@ -21,7 +21,7 @@ router.get('/name-tag', (req, res) => {
   });
 });
 
-router.post('/name-tag/submit', (req, res) => {
+router.post('/name-tag/submit', async (req, res) => {
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('name-tag', {
       title: 'Name Tag Form',
@@ -63,7 +63,7 @@ router.post('/name-tag/submit', (req, res) => {
   if (!day) return fail('Please select Monday, Wednesday, or Both.');
 
   const insert = db.prepare('INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, ?, ?, ?)');
-  for (const member of members) insert.run(member.id, requestType, day, description);
+  for (const member of members) await insert.run(member.id, requestType, day, description);
 
   const names = members.map((m) => m.name).join(', ');
 

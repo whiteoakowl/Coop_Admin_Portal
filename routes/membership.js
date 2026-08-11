@@ -63,7 +63,7 @@ function parseChildren(body) {
   return [];
 }
 
-router.post('/membership', requireFullAdmin, upload.any(), (req, res) => {
+router.post('/membership', requireFullAdmin, upload.any(), async (req, res) => {
   const body = req.body;
   const parent1FirstName = (body.parent1FirstName || '').trim();
   const parent1LastName = (body.parent1LastName || '').trim();
@@ -83,7 +83,7 @@ router.post('/membership', requireFullAdmin, upload.any(), (req, res) => {
 
   const volunteerInterests = [].concat(body.volunteerInterests || []).filter((v) => VOLUNTEER_INTEREST_OPTIONS.includes(v));
 
-  const info = db
+  const info = await db
     .prepare(
       `INSERT INTO membership_requests
         (parent1_first_name, parent1_last_name, parent1_email, parent1_phone,
@@ -113,9 +113,9 @@ router.post('/membership', requireFullAdmin, upload.any(), (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
 
-  children.forEach((c) => {
+  for (const c of children) {
     const photoFile = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
-    insertChild.run(
+    await insertChild.run(
       requestId,
       c.firstName.trim(),
       c.lastName.trim(),
@@ -130,7 +130,7 @@ router.post('/membership', requireFullAdmin, upload.any(), (req, res) => {
       (c.medicalNotes || '').trim() || null,
       photoFile ? `/uploads/membership-children/${photoFile.filename}` : null
     );
-  });
+  }
 
   res.redirect('/membership?notice=' + encodeURIComponent('Thanks! Your membership request has been submitted.'));
 });

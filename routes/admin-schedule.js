@@ -54,7 +54,7 @@ const uploadDesignImage = multer({
 const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
 const PAGE_SIZE = 25;
 
-router.get('/schedule', requireAdmin, (req, res) => {
+router.get('/schedule', requireAdmin, async (req, res) => {
   let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
 
   // Student/Parent Schedules is the per-member schedule list + editor -
@@ -105,10 +105,7 @@ router.get('/schedule', requireAdmin, (req, res) => {
   }));
   summarized.sort((a, b) => byLastName(a.member, b.member));
 
-  const allNames = db
-    .prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?')
-    .all(memberType)
-    .sort(byLastName);
+  const allNames = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?').all(memberType)).sort(byLastName);
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
@@ -208,14 +205,12 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
     const day = r.day.toLowerCase();
     if (!isValidDay(day)) { skipped++; continue; }
 
-    const member = db
-      .prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE AND member_type = ? AND active = 1')
+    const member = await db
+      .prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND member_type = ? AND active = 1')
       .get(r.name, memberType);
     if (!member) { skipped++; continue; }
 
-    const candidates = db
-      .prepare('SELECT * FROM classes WHERE day = ? AND class_name = ? COLLATE NOCASE')
-      .all(day, r.className);
+    const candidates = await db.prepare('SELECT * FROM classes WHERE day = ? AND LOWER(class_name) = LOWER(?)').all(day, r.className);
     let cls = candidates[0];
     if (candidates.length > 1) {
       cls = candidates.find((c) => normalizeMatchText(c.start_time) === normalizeMatchText(r.startTime)) || null;
@@ -225,7 +220,7 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
     if (!cls) { skipped++; continue; }
 
     if (memberType === 'student') {
-      const existingIds = db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id).map((e) => e.student_id);
+      const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
       if (!existingIds.includes(member.id)) setEnrollment(cls.id, [...existingIds, member.id]);
     } else {
       addStaff(cls.id, member.id, 'teacher');
@@ -239,15 +234,15 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
   );
 });
 
-router.post('/schedule/print-cards', requireFullAdmin, (req, res) => {
+router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db
-    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`)
+  const members = await db
+    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`)
     .all(...memberIds);
 
   const template = getScheduleCardTemplate();
@@ -265,7 +260,7 @@ router.post('/schedule/print-cards', requireFullAdmin, (req, res) => {
   });
 });
 
-router.post('/schedule/design/template', requireFullAdmin, (req, res) => {
+router.post('/schedule/design/template', requireFullAdmin, async (req, res) => {
   let layout;
   try {
     layout = typeof req.body.layout === 'string' ? JSON.parse(req.body.layout) : req.body.layout;
@@ -276,10 +271,12 @@ router.post('/schedule/design/template', requireFullAdmin, (req, res) => {
     return res.status(400).json({ ok: false, message: 'Invalid layout.' });
   }
 
-  db.prepare(
-    `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, datetime('now'))
-     ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
-  ).run(JSON.stringify(layout));
+  await db
+    .prepare(
+      `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+    )
+    .run(JSON.stringify(layout));
 
   // See the equivalent comment in routes/admin-name-tag.js's own
   // template-save route - a layout can add/remove any number of image
@@ -300,9 +297,9 @@ router.post('/schedule/design-image', requireFullAdmin, uploadDesignImage.single
 // Schedule now (see syncMemberSchedulesForDay in utils/classSchedule.js),
 // so there's nothing to hand-edit here anymore. Enroll/staff the member on
 // the Schedules page to change what shows up.
-router.get('/schedule/member/:id/manage', requireFullAdmin, (req, res) => {
+router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
   const { monday, wednesday } = getMemberSchedule(id);
   res.render('admin-schedule-manage', {
