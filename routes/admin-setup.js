@@ -3,7 +3,8 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, defaultDay, requireDay } = require('../utils/days');
+const { DAY_LABELS, defaultDay, requireDay, defaultDateFor } = require('../utils/days');
+const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const { teamsForDay, membersForTeam, setTeamLeader, updateTeam } = require('../utils/setup');
 const {
   taskListSectionsForDay,
@@ -46,6 +47,11 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, (req, res) => {
     dayLabel: DAY_LABELS[day],
     teams: teamsWithMembers(day),
     availableParents: activeParentOptions(),
+    // Only actually highlights anyone when today falls on this day - no
+    // date picker here (teams are a standing weekly roster, not tied to a
+    // specific date the admin chooses), so "absent that day" means "absent
+    // today" and only has anything to show while today matches the tab.
+    absentIds: absentMemberIdsForDate(defaultDateFor(day)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

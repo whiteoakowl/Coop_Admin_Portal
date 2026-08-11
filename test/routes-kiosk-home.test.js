@@ -1,13 +1,12 @@
-// Real HTTP-level coverage for "Class Check In & Out" on the kiosk home
-// screen (views/kiosk-home.ejs). This went through two shapes this
-// session: it started as a small grey top-corner pill (styled like the
-// plain "Full Screen View"/"Admin" utility controls), got promoted to a
-// full purple landing-card tile so it wouldn't be overlooked, and was then
-// explicitly reverted back to a small top-corner pill - "class check in &
-// out should still be a small button top right and keep the color and
-// icon" - just now purple (matching .landing-card-purple) and with its
-// graduation-cap icon, instead of losing that color/icon by going back to
-// a plain admin-corner-link. This suite locks in that final shape.
+// Real HTTP-level coverage for "Class Check In & Out" and "Admin" on the
+// kiosk home screen (views/kiosk-home.ejs). Both went through a few shapes
+// this session before landing here: Class Check In & Out started as a
+// small grey top-corner pill, got promoted to a full landing-card tile,
+// got reverted back to a small top-corner pill (purple, keeping its
+// graduation-cap icon), and finally moved down to the bottom-right corner
+// alongside Admin - both recolored green ("color only matches the green
+// buttons on the kiosk pages"), while Full Screen View stays put in the
+// original top-right corner group. This suite locks in that final shape.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -30,25 +29,32 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test('kiosk home: "Class Check In & Out" is a small purple top-right corner button, not a landing-card tile', async () => {
+test('kiosk home: Class Check In & Out and Admin are green bottom-right corner buttons', async (t) => {
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  assert.match(
-    res.text,
-    /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/,
-    'expected a small purple corner button with the graduation-cap icon, linking to /kiosk/class-checkin'
-  );
+  await t.test('both live in the bottom-right corner group', () => {
+    const groupMatch = /<div class="landing-corner-actions-bottom-right">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(groupMatch, 'expected a .landing-corner-actions-bottom-right group');
+    assert.match(groupMatch[1], /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin">/);
+    assert.match(groupMatch[1], /<a class="admin-corner-link-green" href="\/admin">Admin<\/a>/);
+  });
 
-  assert.doesNotMatch(
-    res.text,
-    /<a class="landing-card landing-card-purple[^"]*" href="\/kiosk\/class-checkin">/,
-    'Class Check In & Out should no longer be one of the big landing-grid tiles'
-  );
+  await t.test('Class Check In & Out keeps its graduation-cap icon', () => {
+    assert.match(
+      res.text,
+      /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/
+    );
+  });
 
-  assert.doesNotMatch(
-    res.text,
-    /<a class="admin-corner-link" href="\/kiosk\/class-checkin">/,
-    'and should not have reverted all the way to a plain grey admin-corner-link either - it keeps its purple color and icon'
-  );
+  await t.test('neither is a big landing-grid tile anymore', () => {
+    assert.doesNotMatch(res.text, /<a class="landing-card landing-card-purple[^"]*" href="\/kiosk\/class-checkin">/);
+  });
+
+  await t.test('Full Screen View is unaffected, still in the original top-right corner group', () => {
+    const topGroupMatch = /<div class="landing-corner-actions">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(topGroupMatch);
+    assert.match(topGroupMatch[1], /id="fullscreen-toggle-btn"/);
+    assert.doesNotMatch(topGroupMatch[1], /\/kiosk\/class-checkin|\/admin"/, 'Class Check In & Out and Admin should have moved out of this group');
+  });
 });

@@ -629,16 +629,17 @@ textarea:focus-visible,
 }
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
-/* Class Check In & Out - same small top-corner pill shape as Find a
-   Parent, just filled purple (matching .landing-card-purple) instead of
-   orange, sitting in the top-right corner-actions group alongside Full
-   Screen View/Admin rather than as one of the big landing-grid tiles. */
+/* Class Check In & Out + Admin - bottom-right corner group (Full Screen
+   View stays in the original top-right .landing-corner-actions group).
+   Same small pill shape as Find a Parent, just filled green (matching
+   .landing-card-green - color only, these aren't landing-grid tiles). */
+.landing-corner-actions-bottom-right { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
 .class-checkin-corner-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--btn-purple);
-  border: 1px solid var(--btn-purple);
+  background: var(--btn-green);
+  border: 1px solid var(--btn-green);
   border-radius: 999px;
   padding: 0.45rem 1.1rem;
   font-size: 0.85rem;
@@ -647,7 +648,22 @@ textarea:focus-visible,
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   cursor: pointer;
 }
-.class-checkin-corner-btn:hover { background: var(--btn-purple-hover); border-color: var(--btn-purple-hover); }
+.class-checkin-corner-btn:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
+
+.admin-corner-link-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--btn-green);
+  border: 1px solid var(--btn-green);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-link-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
 /* Find a Parent results - each parent's actual Schedule Card
    (.badge-canvas, same rendering as the Members "View Cards" dialog and
@@ -3182,6 +3198,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-card-members { display: flex; flex-direction: column; }
 .team-member-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
 .team-member-row:first-child { border-top: none; }
+
+/* Whole-line red highlight for a Setup/Cleanup team member marked absent
+   today (routes/admin-setup.js and routes/setup.js's absentIds, same
+   attendance-status source as the Class Schedule grid's own absent-count
+   flag) - same red-bg/red-text pairing as .cell-absent and
+   .status-badge-absent elsewhere, just spanning the full row here instead
+   of one cell/badge. Negative margin+padding lets the highlight bleed to
+   the card's own edges rather than leaving a thin unhighlighted margin. */
+.team-member-row-absent {
+  background: var(--red-bg);
+  color: var(--red);
+  margin: 0 -0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+}
+.team-member-row-absent .team-member-avatar { background: rgba(255,255,255,0.6); color: var(--red); }
 .team-member-avatar {
   width: 1.6rem;
   height: 1.6rem;

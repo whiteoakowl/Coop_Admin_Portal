@@ -86,9 +86,9 @@
                   <p class="team-card-empty">No members yet.</p>
                 <% } %>
                 <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row">
+                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %></span>
+                    <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %></span>
                     <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from this team?">
                       <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                     </form>

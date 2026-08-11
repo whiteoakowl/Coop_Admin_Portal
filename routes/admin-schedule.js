@@ -6,7 +6,8 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { isValidISODate, todayISO, weekdayOf } = require('../utils/dates');
+const { isValidISODate } = require('../utils/dates');
+const { defaultDateFor } = require('../utils/days');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
@@ -51,16 +52,7 @@ const uploadDesignImage = multer({
 });
 
 const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
-const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 const PAGE_SIZE = 25;
-
-// Only defaults the absence-highlight date picker to today when today
-// actually falls on the tab's day - otherwise there's nothing meaningful
-// to highlight yet (mirrors admin-class-schedule.js's defaultDateFor).
-function defaultDateFor(day) {
-  const today = todayISO();
-  return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
-}
 
 router.get('/schedule', requireAdmin, (req, res) => {
   let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
