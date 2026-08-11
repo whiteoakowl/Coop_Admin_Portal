@@ -2,19 +2,20 @@ const db = require('../db');
 const { formatDateLabel } = require('./dates');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 
-function getListByDay(day) {
+async function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
 }
 
-function sectionsForList(listId) {
+async function sectionsForList(listId) {
   return db.prepare('SELECT * FROM volunteer_sections WHERE volunteer_list_id = ? ORDER BY position').all(listId);
 }
 
-function datesForList(listId) {
-  return db
-    .prepare('SELECT session_date FROM volunteer_dates WHERE volunteer_list_id = ? ORDER BY session_date ASC')
-    .all(listId)
-    .map((r) => r.session_date);
+async function datesForList(listId) {
+  return (
+    await db
+      .prepare('SELECT session_date FROM volunteer_dates WHERE volunteer_list_id = ? ORDER BY session_date ASC')
+      .all(listId)
+  ).map((r) => r.session_date);
 }
 
 const RANKS = ['first', 'sometimes', 'backup'];
@@ -26,13 +27,13 @@ const RANK_ORDER = { first: 0, sometimes: 1, backup: 2 };
 // One row per member on the list, each carrying the full set of section
 // IDs they're assigned to (a member can float across multiple hours) and
 // their rank (kept identical across all of that member's section rows).
-function membersForList(listId) {
-  const rows = db
+async function membersForList(listId) {
+  const rows = await db
     .prepare(
       `SELECT m.*, vm.section_id AS sectionId, vm.rank AS rank FROM members m
        JOIN volunteer_members vm ON vm.member_id = m.id
        WHERE vm.volunteer_list_id = ? AND m.active = 1
-       ORDER BY m.name COLLATE NOCASE`
+       ORDER BY LOWER(m.name)`
     )
     .all(listId);
 
@@ -51,29 +52,29 @@ function membersForList(listId) {
 // Writes rank to every one of memberId's section rows on this list, so a
 // member has exactly one rank regardless of which/how many hours they're
 // assigned to.
-function setMemberRank(listId, memberId, rank) {
+async function setMemberRank(listId, memberId, rank) {
   if (!RANKS.includes(rank)) return;
-  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ?').run(rank, listId, memberId);
+  await db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ?').run(rank, listId, memberId);
 }
 
 // Everyone on one specific hour section, each carrying just that section's
 // own rank - unlike setMemberRank above, a member's importance can now
 // differ hour to hour (Floater Teams tab), so this reads/writes exactly
 // one (list, member, section) row instead of every one of a member's rows.
-function membersForSection(listId, sectionId) {
+async function membersForSection(listId, sectionId) {
   return db
     .prepare(
       `SELECT m.*, vm.rank AS rank FROM members m
        JOIN volunteer_members vm ON vm.member_id = m.id
        WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1
-       ORDER BY m.name COLLATE NOCASE`
+       ORDER BY LOWER(m.name)`
     )
     .all(listId, sectionId);
 }
 
-function setSectionRank(listId, memberId, sectionId, rank) {
+async function setSectionRank(listId, memberId, sectionId, rank) {
   if (!RANKS.includes(rank)) return;
-  db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+  await db.prepare('UPDATE volunteer_members SET rank = ? WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
     rank,
     listId,
     memberId,
@@ -83,8 +84,8 @@ function setSectionRank(listId, memberId, sectionId, rank) {
 
 // Removes a member from just one hour (Floater Teams card's trash can) -
 // unlike remove-member elsewhere, which drops them from the whole list.
-function removeMemberFromSection(listId, memberId, sectionId) {
-  db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+async function removeMemberFromSection(listId, memberId, sectionId) {
+  await db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
     listId,
     memberId,
     sectionId
@@ -93,20 +94,23 @@ function removeMemberFromSection(listId, memberId, sectionId) {
 
 // Adds a member to one hour section (Floater Teams "+ Add Member" popup) -
 // default rank 'sometimes', same as the day list's own quick-add.
-function addMemberToSection(listId, memberId, sectionId) {
-  db.prepare(
-    "INSERT OR IGNORE INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, 'sometimes')"
-  ).run(listId, memberId, sectionId);
+async function addMemberToSection(listId, memberId, sectionId) {
+  await db
+    .prepare(
+      `INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, 'sometimes')
+       ON CONFLICT (volunteer_list_id, member_id, section_id) DO NOTHING`
+    )
+    .run(listId, memberId, sectionId);
 }
 
 // Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
 // for a list, optionally narrowed to a single date. A member appears once
 // under every section they're assigned to, sharing the same per-date
 // position/room across all of their hours.
-function buildListGrid(listId, dateFilter) {
-  const sections = sectionsForList(listId);
-  const members = membersForList(listId);
-  const dates = dateFilter ? [dateFilter] : datesForList(listId);
+async function buildListGrid(listId, dateFilter) {
+  const sections = await sectionsForList(listId);
+  const members = await membersForList(listId);
+  const dates = dateFilter ? [dateFilter] : await datesForList(listId);
 
   let sql = 'SELECT member_id, session_date, position, room FROM volunteer_assignments WHERE volunteer_list_id = ?';
   const params = [listId];
@@ -114,7 +118,7 @@ function buildListGrid(listId, dateFilter) {
     sql += ' AND session_date = ?';
     params.push(dateFilter);
   }
-  const assignmentRows = dates.length ? db.prepare(sql).all(...params) : [];
+  const assignmentRows = dates.length ? await db.prepare(sql).all(...params) : [];
   const byKey = {};
   for (const a of assignmentRows) byKey[`${a.member_id}|${a.session_date}`] = a;
 

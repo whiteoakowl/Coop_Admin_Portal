@@ -63,9 +63,9 @@ router.get('/volunteers/:day/assistants', requireAdmin, requireDay, (req, res) =
 
 router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const hours = await hoursForDay(day);
-  const dates = datesForList(list.id);
+  const dates = await datesForList(list.id);
   const dateLabels = dates.map(formatDateLabel);
   const today = todayISO();
 
@@ -135,18 +135,18 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
   });
 });
 
-router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare('INSERT OR IGNORE INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)');
-  for (const d of dates) insertDate.run(list.id, d);
+  for (const d of dates) await insertDate.run(list.id, d);
   res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req) }));
 });
 
 router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const date = req.params.date;
   await db.withTransaction(async (tx) => {
     await tx.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
@@ -157,8 +157,8 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, asy
 
 router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  const dates = datesForList(list.id);
+  const list = await getListByDay(day);
+  const dates = await datesForList(list.id);
   const grid = await jobAssignmentGrid(day, dates);
   const hours = await hoursForDay(day);
   const hourLabel = {};
@@ -185,16 +185,16 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, async (req, 
 // of this day's real session dates - guards the three routes below from
 // a tampered/stale date in the URL surfacing an upcoming (still-editable-
 // via-Substitutes-Needed) date under the read-only Archive routes.
-function loadArchivedDate(day, date) {
+async function loadArchivedDate(day, date) {
   if (!isValidISODate(date) || date >= todayISO()) return false;
-  const list = getListByDay(day);
-  return datesForList(list.id).includes(date);
+  const list = await getListByDay(day);
+  return (await datesForList(list.id)).includes(date);
 }
 
 router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  const allDates = datesForList(list.id);
+  const list = await getListByDay(day);
+  const allDates = await datesForList(list.id);
   const today = todayISO();
   const pastDates = allDates.filter((d) => d < today).sort().reverse();
 
@@ -215,7 +215,7 @@ router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res
 router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
 
   res.render('volunteer-archive-view-fragment', {
     day,
@@ -229,7 +229,7 @@ router.get('/volunteers/:day/archive/:date/view-fragment', requireAdmin, require
 router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
 
   res.render('volunteer-archive-print', {
     title: `${DAY_LABELS[day]} Floater Assignments — ${formatDateLong(date)}`,
@@ -243,7 +243,7 @@ router.get('/volunteers/:day/archive/:date/print', requireAdmin, requireDay, asy
 router.get('/volunteers/:day/archive/:date/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.params.date;
-  if (!loadArchivedDate(day, date)) return res.status(404).send('Not found');
+  if (!(await loadArchivedDate(day, date))) return res.status(404).send('Not found');
 
   const cards = await dailyAssignmentCardsWithLabels(day, date);
   const lines = [toCsvRow(['Hour', 'Position', 'Room', 'Floater Assigned'])];
@@ -281,8 +281,8 @@ router.get('/volunteers/:day/risk', requireAdmin, requireDay, async (req, res) =
 
 router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  const sections = sectionsForList(list.id);
+  const list = await getListByDay(day);
+  const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
   const hourLabelByPosition = {};
   hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
@@ -290,7 +290,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
   const teams = [];
   for (const section of sections) {
     const sectionMembers = [];
-    for (const m of membersForSection(list.id, section.id)) sectionMembers.push({ ...m, infant: await hasInfantChild(m.id) });
+    for (const m of await membersForSection(list.id, section.id)) sectionMembers.push({ ...m, infant: await hasInfantChild(m.id) });
     teams.push({
       section,
       hourLabel: hourLabelByPosition[section.position] || section.label,
@@ -314,11 +314,11 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
 
 router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const memberId = parseInt(req.body.memberId, 10);
   const sectionId = parseInt(req.body.sectionId, 10);
   if (memberId && sectionId) {
-    addMemberToSection(list.id, memberId, sectionId);
+    await addMemberToSection(list.id, memberId, sectionId);
     // A floater's own schedule/roster picks this hour up too - see
     // syncDayMemberRosters/syncMemberSchedulesForDay in utils/classSchedule.
     await syncDayMemberRosters(day);
@@ -333,9 +333,9 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async
 // once), and re-syncs schedule cards the same way that dialog does.
 router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const sectionId = parseInt(req.params.sectionId, 10);
-  const section = sectionsForList(list.id).find((s) => s.id === sectionId);
+  const section = (await sectionsForList(list.id)).find((s) => s.id === sectionId);
   if (!section) {
     return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Team not found.'));
   }
@@ -344,32 +344,32 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Hour renamed.'));
 });
 
-router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  setSectionRank(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10), req.body.rank);
+  const list = await getListByDay(day);
+  await setSectionRank(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10), req.body.rank);
   res.redirect(`/admin/volunteers/${day}/teams`);
 });
 
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  removeMemberFromSection(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10));
+  const list = await getListByDay(day);
+  await removeMemberFromSection(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10));
   await syncDayMemberRosters(day);
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
 });
 
 router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  const sections = sectionsForList(list.id);
+  const list = await getListByDay(day);
+  const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
   const hourLabelByPosition = {};
   hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
 
   const lines = [toCsvRow(['Hour', 'Name', 'Rank', 'Has Child 2 or Younger'])];
   for (const section of sections) {
-    for (const m of membersForSection(list.id, section.id)) {
+    for (const m of await membersForSection(list.id, section.id)) {
       lines.push(
         toCsvRow([hourLabelByPosition[section.position] || section.label, m.name, RANK_LABELS[m.rank] || m.rank, (await hasInfantChild(m.id)) ? 'Yes' : ''])
       );
@@ -381,8 +381,8 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async 
 
 router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
-  const list = getListByDay(day);
-  const firstSection = sectionsForList(list.id)[0];
+  const list = await getListByDay(day);
+  const firstSection = (await sectionsForList(list.id))[0];
   if (!req.file) {
     return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Please choose a file to import.'));
   }
@@ -400,7 +400,7 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   for (const name of names) {
     const member = await findMemberByName(name, 'parent');
     if (!member) { notFound++; continue; }
-    addMemberToSection(list.id, member.id, firstSection.id);
+    await addMemberToSection(list.id, member.id, firstSection.id);
     added++;
   }
   if (added) await syncDayMemberRosters(day);

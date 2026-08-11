@@ -14,9 +14,9 @@ router.get('/volunteers/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   const today = todayISO();
-  const scheduledToday = datesForList(list.id).includes(today);
+  const scheduledToday = (await datesForList(list.id)).includes(today);
   const cards = scheduledToday ? await dailyAssignmentCardsWithLabels(day, today) : [];
 
   res.render('volunteers-public', {

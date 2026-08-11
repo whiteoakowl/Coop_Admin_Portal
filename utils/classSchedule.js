@@ -599,13 +599,10 @@ async function ensureDayMemberRosters() {
 // Everyone floating any hour on a day's Floater Assignments list - a
 // parent only needs to be assigned to ONE hour to count as floating that
 // day, same "day-level" granularity as teaching/assisting a class.
-// Still fully synchronous - getListByDay/membersForList come from
-// utils/volunteers.js, which hasn't been converted to async/await yet
-// (see MIGRATION.md).
-function floaterMemberIdsForDay(day) {
-  const list = getListByDay(day);
+async function floaterMemberIdsForDay(day) {
+  const list = await getListByDay(day);
   if (!list) return [];
-  return membersForList(list.id).map((m) => m.id);
+  return (await membersForList(list.id)).map((m) => m.id);
 }
 
 // Rebuilds a day's Parent and Student roster membership from everyone
@@ -625,7 +622,7 @@ async function syncDayMemberRosters(day) {
       parentIds.add(r.member_id)
     );
   }
-  floaterMemberIdsForDay(day).forEach((id) => parentIds.add(id));
+  (await floaterMemberIdsForDay(day)).forEach((id) => parentIds.add(id));
   await setRosterMembership(await ensureDayRoster(day, 'student'), studentIds);
   await setRosterMembership(await ensureDayRoster(day, 'parent'), parentIds);
   await syncMemberSchedulesForDay(day);
@@ -684,11 +681,11 @@ async function syncMemberSchedulesForDay(day) {
      VALUES (?, ?, ?, ?, 'Floater', '', '', datetime('now'))
      ON CONFLICT(member_id, day, class_number) DO NOTHING`
   );
-  const list = getListByDay(day);
+  const list = await getListByDay(day);
   if (list) {
     const hourLabels = {};
     (await hoursForDay(day)).forEach((h) => { hourLabels[h.position] = h.label; });
-    for (const section of sectionsForList(list.id)) {
+    for (const section of await sectionsForList(list.id)) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         await insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
       }

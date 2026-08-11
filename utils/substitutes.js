@@ -86,15 +86,13 @@ function classStaffSlotId(classId, staffMemberId) {
 // positions line up 1-4 across both features by convention. Reads each
 // member's rank for THIS specific hour (membersForSection), not a
 // single member-wide rank, since Floater Teams now lets rank vary hour
-// to hour. Still fully synchronous - getListByDay/sectionsForList/
-// membersForSection come from utils/volunteers.js, which hasn't been
-// converted to async/await yet (see MIGRATION.md).
-function floaterMembersForHour(day, hourPosition) {
-  const list = getListByDay(day);
+// to hour.
+async function floaterMembersForHour(day, hourPosition) {
+  const list = await getListByDay(day);
   if (!list) return [];
-  const section = sectionsForList(list.id).find((s) => s.position === hourPosition);
+  const section = (await sectionsForList(list.id)).find((s) => s.position === hourPosition);
   if (!section) return [];
-  return rankSort(membersForSection(list.id, section.id));
+  return rankSort(await membersForSection(list.id, section.id));
 }
 
 async function assignmentFor(date, slotType, slotId) {
@@ -177,7 +175,7 @@ async function substituteBoard(day, date) {
   const result = [];
   for (const hourGroup of grid) {
     const hourPosition = hourGroup.position;
-    const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !missingById.has(m.id));
+    const floaterPool = (await floaterMembersForHour(day, hourPosition)).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 

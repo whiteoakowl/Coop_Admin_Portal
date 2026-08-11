@@ -296,17 +296,30 @@ requests to Supabase both fail/reset). This means:
    style not matching a same-line grep): `routes/admin.js` (only the
    `todaysAlerts()`-touching handler converted, plenty of its own untouched
    `db.prepare(` calls remain), `routes/admin-documents.js`,
-   `routes/admin-library.js`, `routes/checkout.js`; and utils:
-   `utils/backup.js` (1, `PRAGMA` - needs its own design, see below),
-   `utils/volunteers.js` (has `INSERT OR` - `getListByDay`/
-   `sectionsForList`/`membersForList`/`membersForSection` etc. are all
-   still plain sync, deliberately, since nothing forced them yet).
+   `routes/admin-library.js`, `routes/checkout.js`; and `utils/backup.js`
+   (1, `PRAGMA` - needs its own design, see below, and is genuinely the
+   only file left with an unconverted `db.prepare(` call anywhere in the
+   codebase as of this writing).
 
-   Suggested order for whoever picks this up: `utils/volunteers.js` next
-   (small-ish, and its conversion is also the natural place to retire the
-   `hasInfantChildSync`/`floaterMembersForHour`-stays-sync notes below back
-   to real awaited calls), then `backup.js` last (needs a real design
-   decision, not just a mechanical pass - see below).
+   Suggested order for whoever picks this up: the 4 remaining route files
+   next (small, independent, no more forced ripples expected from any of
+   them), then `backup.js` last (needs a real design decision, not just a
+   mechanical pass - see below) to close out this task entirely.
+
+   - `utils/volunteers.js` — **fully** converted (every exported
+     function), including `addMemberToSection`'s `INSERT OR IGNORE`
+     rewritten to `ON CONFLICT ... DO NOTHING`, 2 `COLLATE NOCASE` fixed.
+     This was the last remaining `utils/*.js` file with any unconverted
+     `db.prepare(` calls. Retired `utils/substitutes.js`'s
+     `floaterMembersForHour` and `utils/classSchedule.js`'s
+     `floaterMemberIdsForDay`/`syncMemberSchedulesForDay`'s
+     `getListByDay`/`sectionsForList` calls back to real awaited calls (all
+     3 had been left deliberately synchronous in earlier passes specifically
+     because this file wasn't converted yet). Forced follow-on awaits
+     across the rest of `routes/admin-volunteers.js` (every remaining
+     `getListByDay`/`sectionsForList`/`datesForList`/`membersForSection`/
+     `setSectionRank`/`removeMemberFromSection`/`addMemberToSection` call
+     site) and `routes/volunteers.js` (the public floater-chart view).
 
    - `utils/classSchedule.js` — **fully** converted, both `withTransaction`
      call sites (`deleteClass`, `setEnrollment`) and all 4 `INSERT OR`
