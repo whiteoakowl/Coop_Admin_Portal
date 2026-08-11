@@ -569,20 +569,14 @@ requests to Supabase both fail/reset). This means:
 
 ## What's NOT done yet — the actual remaining work
 
-1. **Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
-   app** (`server.js`'s `session()` config, and each of the 5 route files
-   using `multer.diskStorage()` — see `db/postgres.js`'s sibling comment
-   trail for the exact list: `routes/admin-documents.js`,
-   `routes/admin-members.js`, `routes/admin-name-tag.js`,
-   `routes/admin-schedule.js`, `routes/membership.js`). Needs
-   `SUPABASE_SERVICE_ROLE_KEY` first. This swap has to land in the same
-   deploy as running `scripts/migrate-to-supabase.js` (item 9 above) -
-   that script rewrites `photo_path`/`file_path`/`layout_json` values to
-   point at Storage, which only resolves correctly once these routes and
-   their view templates actually read from Storage instead of local disk.
-   Also add the private-bucket signed-URL (or proxy-download) helper
-   `utils/storage.js` doesn't have yet, needed before `admin-documents.js`
-   can serve the private `documents` bucket.
+1. ~~Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
+   app~~ **Done** (a later session, still without live Supabase access -
+   see its own writeup below). What's left in this area is real-world
+   verification once real credentials + network access exist: actually
+   exercise an upload against a real Supabase project, confirm
+   `SUPABASE_SERVICE_ROLE_KEY` has the right permissions, and decide
+   whether the Storage-side design-image GC gap (also below) needs fixing
+   before production cutover or can wait.
 
 2. **Run `scripts/migrate-to-supabase.js` for real**, against the actual
    production SQLite file and a freshly-provisioned production Supabase
@@ -604,6 +598,105 @@ requests to Supabase both fail/reset). This means:
    relies on stops holding once the live driver is genuinely async
    Postgres.
 
+## Session update: Storage + session-store wiring (item 1 done)
+
+Same network restriction as every prior session (`curl` and a raw TCP
+connect to the Postgres pooler both still fail from this sandbox, and
+there's still no `.env` with real credentials in a fresh container) - so
+this, too, is built and tested without ever touching a live Supabase
+project. What changed:
+
+- **`server.js`** now picks the session store based on whether
+  `DATABASE_URL` is set: `PgSessionStore` (backed by `db/postgres.js`'s
+  own connection pool, independent of which db module the rest of the
+  app's queries still go through) when it is, the existing
+  `SqliteSessionStore` when it isn't. Local/LAN installs are unaffected -
+  they never set `DATABASE_URL`, so this is a no-op for them.
+
+- **`utils/uploadBackend.js`** (new) - a small shared helper
+  (`saveUpload`/`removeUpload`/`urlForUpload`) factoring out the
+  "Storage when a client is passed, local disk otherwise" logic that was
+  about to be duplicated across all 5 upload routes. Takes the Storage
+  client as an explicit argument rather than calling
+  `createStorageClient()` itself, same reasoning as `utils/storage.js`'s
+  own design: testable with a fake client, no real network call. See
+  `test/uploadBackend.test.js`.
+
+- **`utils/storage.js`** gained `downloadFile()` - the signed-URL/
+  proxy-download helper the previous session flagged as a known gap for
+  the private `documents` bucket. Went with proxy-download (stream the
+  bytes through the app's own route) over a signed URL, since
+  `admin-documents.js` already sets its own `Content-Disposition` with
+  the real original filename - a redirect to a signed Supabase URL
+  wouldn't preserve that as cleanly, and proxying keeps the existing
+  `/admin/documents/:id/file` URL contract unchanged for anything already
+  linking to it.
+
+- **All 5 routes converted** from `multer.diskStorage()` to
+  `multer.memoryStorage()` + `uploadBackend.js`, each with a
+  module-scoped `createStorageClient()` call (cheap, no network call of
+  its own) deciding the backend for that process's whole lifetime:
+  - `routes/admin-documents.js` - `documents` bucket (private); upload,
+    delete, and the `GET /documents/:id/file` serve route all updated.
+    `documents.file_path` already stored a bare filename before this
+    change, so no data-shape change needed there.
+  - `routes/admin-members.js` - `member-photos` bucket (public); create,
+    edit (including old-photo cleanup), and delete all updated.
+  - `routes/membership.js` - `membership-child-photos` bucket (public);
+    the per-child upload loop updated. Note: `membership_request_children
+    .photo_path` is write-only today - nothing in the current app reads
+    it back (no admin UI displays a pending request's child photos yet),
+    so this was a pure write-path change with no template work needed.
+  - `routes/admin-name-tag.js` / `routes/admin-schedule.js` - design-image
+    uploads (`name-tag-images` / `schedule-card-images` buckets, both
+    public). These hand back a **full URL**, not a bare key, unlike every
+    other route above - a layout's image element `src` is consumed
+    directly as a literal URL by client-side rendering code
+    (`public/js/name-tag-render-core.js`) with no server-side "look up
+    the key, resolve the URL" step at render time, so the route itself
+    has to compute the right URL (`publicUrl()` vs the local `/uploads/
+    .../<key>` path) before responding.
+
+- **`photo_path` rendering**: `members.photo_path` is read back by 5
+  templates. Rather than touching all 5 (or every `utils/members.js`
+  query function that returns a member row), a single `photoUrl(key)`
+  function is now computed once at boot in `server.js` (from the same
+  module-scoped Storage client pattern above) and exposed via
+  `res.locals` - the same mechanism `isFullAdmin`/`csrfToken` already use
+  to reach every EJS view without each route passing it explicitly.
+  `utils/uploadBackend.js`'s `urlForUpload()` also treats any value
+  already starting with `/` as a complete legacy path and returns it
+  unchanged - so members photographed before this change (stored as
+  `/uploads/members/<filename>`, the old convention) keep rendering
+  correctly, with no data migration needed for existing local installs.
+  Verified end-to-end with a real supertest run: log in, upload a member
+  photo via multipart, confirm it lands on disk under a bare key, and
+  confirm the member list renders the right `<img src>` from `photoUrl()`.
+
+- **`utils/designImageGC.js`'s** two sweep functions
+  (`sweepNameTagImages`/`sweepScheduleCardImages`) now no-op when Storage
+  is configured, rather than harmlessly scanning an empty/irrelevant local
+  directory. **New known gap, flagged but not fixed**: this means
+  orphaned Storage images (from a layout that removed/replaced an image
+  element) are never actually cleaned up once Storage is active - a real
+  Storage-side sweep (list bucket objects, diff against
+  `referencedImagePaths()`) would need its own implementation. Safe
+  either way (never deletes a real Storage object it shouldn't), just not
+  complete.
+
+- **Test coverage added**: `test/uploadBackend.test.js` (the new shared
+  helper, both backends), `downloadFile` tests added to
+  `test/storage.test.js`. Full suite: 395 tests passing, `npx eslint .`
+  clean, both re-verified after every file in this list.
+
+**What this does NOT do**: it doesn't touch `db/index.js` vs
+`db/postgres.js` for the app's actual query layer (item 3 is still
+separate and still not started - see its own entry above), and it's
+still never been exercised against a real Supabase project - only PGlite/
+fakes/local disk. The next session with real network access should treat
+"does an actual upload round-trip through a real bucket" as unverified
+until it's actually tried.
+
 ## Suggested next steps for whoever picks this up
 
 Every piece of this migration that can be built, tested, and verified
@@ -616,7 +709,8 @@ judgment call, which is why it's stopped here rather than being guessed at:
 
 1. Read this file, then skim the "What's done so far" and "What's NOT done
    yet" sections above to get oriented - the latter is the authoritative
-   remaining-work list (3 items as of this writing).
+   remaining-work list (2 items left as of this writing: running the real
+   data migration, then the final `db/index.js` cutover).
 2. Check whether your session's environment can reach `supabase.co` (try
    `curl -sS -o /dev/null -w '%{http_code}\n' https://supabase.co`) — every
    session that has worked on this so far (including this one) has been
