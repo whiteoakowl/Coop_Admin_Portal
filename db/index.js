@@ -54,10 +54,46 @@ const newMemberColumns = {
   grade_level: 'TEXT',
   medical_notes: 'TEXT',
   family_id: 'INTEGER',
+  // Not UNIQUE here - SQLite's ALTER TABLE ADD COLUMN can't add a UNIQUE
+  // constraint inline, only schema.sql's CREATE TABLE (a fresh install)
+  // can. The partial unique index right after schema.sql's members table
+  // (idx_members_member_code) enforces it for both a fresh install and an
+  // upgraded one, and tolerates the brief all-NULL moment between this
+  // ADD COLUMN and the backfill loop below assigning every existing
+  // member their own code.
+  member_code: 'TEXT',
 };
 for (const [column, definition] of Object.entries(newMemberColumns)) {
   if (!memberColumns.includes(column)) {
     db.exec(`ALTER TABLE members ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+// One-time backfill: every member used to have their barcode set to their
+// own name (routes/admin-members.js), which meant a printed barcode's
+// width varied with how long that person's name was - see public/js/
+// barcode-print-shrink-name.js's own notes on why that was worth fixing.
+// Barcodes now encode a fixed-length 6-digit member_code instead (see
+// utils/members.js's generateMemberCode, used by every member-creation
+// route going forward), so every member who predates this change gets
+// one assigned here, and their barcode updated to match - existing
+// printed name tags/barcodes stop scanning until reprinted with the new
+// code, which is the deliberate tradeoff of fixing this for everyone at
+// once instead of only for members created from here on.
+{
+  const membersNeedingCode = db.prepare('SELECT id FROM members WHERE member_code IS NULL').all();
+  if (membersNeedingCode.length > 0) {
+    const usedCodes = new Set(db.prepare('SELECT member_code FROM members WHERE member_code IS NOT NULL').all().map((r) => r.member_code));
+    const updateMember = db.prepare('UPDATE members SET member_code = ?, barcode = ? WHERE id = ?');
+    for (const { id } of membersNeedingCode) {
+      let code;
+      do {
+        code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+      } while (usedCodes.has(code));
+      usedCodes.add(code);
+      updateMember.run(code, code, id);
+    }
+    console.log(`Assigned a new 6-digit member ID (and matching barcode) to ${membersNeedingCode.length} existing member(s).`);
   }
 }
 

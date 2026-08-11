@@ -44,7 +44,10 @@ function assertDayToggle(html, basePath) {
 
 test('Logs: Class Cancellation Risk tab uses the pill day-toggle', async () => {
   const cookie = await loginAsAdmin();
-  const res = await request(app).get('/admin/logs?tab=classrisk').set('Cookie', cookie);
+  // day pinned explicitly - the route's own default (utils/days.js's
+  // defaultDay()) is today's actual weekday, which would make this
+  // flaky depending what day the suite happens to run on.
+  const res = await request(app).get('/admin/logs?tab=classrisk&day=monday').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assertDayToggle(res.text, '/admin/logs\\?tab=classrisk');
 });

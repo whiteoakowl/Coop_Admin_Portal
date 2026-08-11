@@ -34,6 +34,7 @@
           </div>
         </div>
         <dl class="member-profile-list">
+          <% if (member.member_code) { %><dt>Member ID</dt><dd><%= member.member_code %></dd><% } %>
           <% if (member.address || member.city || member.state || member.zip) { %>
             <dt>Address</dt>
             <dd><%= [member.address, member.city, [member.state, member.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') %></dd>

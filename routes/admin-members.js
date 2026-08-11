@@ -14,7 +14,16 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMemberSchedule } = require('../utils/schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { familyOf, allFamilies, setMemberFamily, setPrimaryParent, rostersForMember, membersWithDetails } = require('../utils/members');
+const {
+  familyOf,
+  allFamilies,
+  setMemberFamily,
+  setPrimaryParent,
+  rostersForMember,
+  membersWithDetails,
+  generateMemberCode,
+  lastNameOf,
+} = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages } = require('../utils/duplexPrint');
@@ -144,6 +153,7 @@ router.get('/members/export.csv', (req, res) => {
   const lines = [
     toCsvRow([
       'Name',
+      'Member ID',
       'Type',
       'Active',
       'Address',
@@ -163,6 +173,7 @@ router.get('/members/export.csv', (req, res) => {
     ...members.map((m) =>
       toCsvRow([
         m.name,
+        m.member_code || '',
         typeLabel(m.member_type),
         m.active ? 'Yes' : 'No',
         m.address || '',
@@ -334,23 +345,30 @@ router.post('/members/new', uploadPhoto.single('photo'), (req, res) => {
   if (!f.name) {
     return res.redirect('/admin/members/new?error=' + encodeURIComponent('Name is required.'));
   }
-  const barcode = f.name;
-  const exists = db.prepare('SELECT id FROM members WHERE barcode = ?').get(barcode);
+  // Duplicate-name check used to piggyback on barcode's old UNIQUE
+  // constraint (barcode = name), which incidentally also blocked two
+  // members from ever sharing a name - now that barcode is a generated
+  // member_code instead (see utils/members.js's generateMemberCode),
+  // that's no longer automatic, so it's checked directly here to keep
+  // the same practical behavior.
+  const exists = db.prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE').get(f.name);
   if (exists) {
-    return res.redirect('/admin/members/new?error=' + encodeURIComponent(`"${barcode}" is already in the member list.`));
+    return res.redirect('/admin/members/new?error=' + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
 
+  const memberCode = generateMemberCode();
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : null;
 
   const info = db
     .prepare(
       `INSERT INTO members
-         (name, barcode, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       f.name,
-      barcode,
+      memberCode,
+      memberCode,
       f.memberType,
       f.address,
       f.city,
@@ -450,10 +468,15 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
   if (!f.name) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   }
-  const barcode = f.name;
-  const clash = db.prepare('SELECT id FROM members WHERE barcode = ? AND id != ?').get(barcode, id);
+  // Same duplicate-name check as /members/new - see that route's own
+  // comment. Note this no longer touches barcode/member_code at all:
+  // those are the member's permanent ID, assigned once at creation
+  // (generateMemberCode) and never reassigned just because their name
+  // was edited (a typo fix or legal name change shouldn't invalidate an
+  // already-printed barcode).
+  const clash = db.prepare('SELECT id FROM members WHERE name = ? COLLATE NOCASE AND id != ?').get(f.name, id);
   if (clash) {
-    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${barcode}" is already in the member list.`));
+    return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
   const existing = db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
   const photoPath = req.file ? `/uploads/members/${req.file.filename}` : existing ? existing.photo_path : null;
@@ -464,12 +487,11 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), (req, res) => {
 
   db.prepare(
     `UPDATE members SET
-       name = ?, barcode = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
+       name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
        photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
      WHERE id = ?`
   ).run(
     f.name,
-    barcode,
     f.memberType,
     f.address,
     f.city,
@@ -592,18 +614,16 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
     }
     const typeLower = (r.type || '').toLowerCase();
     const memberType = MEMBER_TYPES.includes(typeLower) ? typeLower : 'student';
-    let barcode = r.name;
-    if (db.prepare('SELECT id FROM members WHERE barcode = ?').get(barcode)) {
-      barcode = `${r.name} (${Date.now().toString(36)})`;
-    }
+    const memberCode = generateMemberCode();
     const info = db
       .prepare(
-        `INSERT INTO members (name, barcode, member_type, address, city, state, zip, phone, email, birthday, grade_level, medical_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO members (name, barcode, member_code, member_type, address, city, state, zip, phone, email, birthday, grade_level, medical_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         r.name,
-        barcode,
+        memberCode,
+        memberCode,
         memberType,
         r.address || null,
         r.city || null,
@@ -688,6 +708,185 @@ router.post('/members/import/confirm', (req, res) => {
   });
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
+});
+
+// --- Mass Import: one row = one whole household (up to 2 parents + 8
+// kids), unlike the full-profile import above (one row = one member,
+// linked to a family by a separate "Parent Name" column). Built for
+// standing up a co-op's roster from an existing family list in one pass -
+// every child on a row lands in the same family as its row's parents,
+// with no per-row linking step needed. ---
+
+const MASS_IMPORT_CHILD_SLOTS = 8;
+
+const MASS_IMPORT_HEADERS = ['Primary Parent Name', 'Primary Parent Email', '2nd Parent Name', '2nd Parent Email', 'Address', 'City', 'State', 'Zip Code', 'Phone Number'];
+for (let i = 1; i <= MASS_IMPORT_CHILD_SLOTS; i++) {
+  MASS_IMPORT_HEADERS.push(`Child ${i} Name`, `Child ${i} Birthday`, `Child ${i} Grade`);
+}
+
+router.get('/members/mass-import/sample.xlsx', (req, res) => {
+  const exampleRow = [
+    'Jane Smith', 'jane@example.com', 'John Smith', 'john@example.com',
+    '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543',
+    'Alice Smith', '2015-04-12', '5th Grade',
+    'Ben Smith', '2017-08-03', '3rd Grade',
+  ];
+  // Pad out the remaining 6 empty child slots (18 columns) so the row
+  // lines up with MASS_IMPORT_HEADERS exactly.
+  while (exampleRow.length < MASS_IMPORT_HEADERS.length) exampleRow.push('');
+
+  const buffer = buildTemplateWorkbook(MASS_IMPORT_HEADERS, [exampleRow]);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="mass-import-template.xlsx"');
+  res.send(buffer);
+});
+
+function normalizeMassImportRow(row) {
+  const lowerMap = {};
+  for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
+  const get = (label) => {
+    const v = lowerMap[label.toLowerCase()];
+    return v === undefined || v === null ? '' : String(v).trim();
+  };
+
+  const children = [];
+  for (let i = 1; i <= MASS_IMPORT_CHILD_SLOTS; i++) {
+    const name = get(`Child ${i} Name`);
+    if (!name) continue;
+    children.push({ name, birthday: get(`Child ${i} Birthday`), grade: get(`Child ${i} Grade`) });
+  }
+
+  return {
+    primaryParentName: get('Primary Parent Name'),
+    primaryParentEmail: get('Primary Parent Email'),
+    secondParentName: get('2nd Parent Name'),
+    secondParentEmail: get('2nd Parent Email'),
+    address: get('Address'),
+    city: get('City'),
+    state: get('State'),
+    zip: get('Zip Code'),
+    phone: get('Phone Number'),
+    children,
+  };
+}
+
+// Always a brand-new family row named after the primary parent's last
+// name - never silently merges into an existing same-named family (a
+// coincidental surname match doesn't mean the same household). Same
+// "Smith", "Smith 2", ... disambiguation as ensureFamilyForParent above,
+// for the same reason.
+function createFamilyFromLastName(fullName) {
+  const last = lastNameOf(fullName) || fullName;
+  let name = last;
+  let suffix = 1;
+  while (db.prepare('SELECT id FROM families WHERE name = ? COLLATE NOCASE').get(name)) {
+    suffix++;
+    name = `${last} ${suffix}`;
+  }
+  return db.prepare('INSERT INTO families (name) VALUES (?)').run(name).lastInsertRowid;
+}
+
+// One person-slot (primary parent / 2nd parent / a child) from a mass
+// import row. If an active member already has this exact name, nothing
+// about their existing profile is touched (never overwrites data an
+// admin may have already curated) - they're just linked into this row's
+// family if they weren't already in one, so re-running the same file
+// (or a file that overlaps an existing roster) is safe rather than
+// creating duplicates.
+function createOrLinkFamilyMember(name, memberType, familyId, fields) {
+  const existing = db.prepare('SELECT id, family_id FROM members WHERE active = 1 AND name = ? COLLATE NOCASE').get(name);
+  if (existing) {
+    if (existing.family_id == null) db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, existing.id);
+    return { id: existing.id, created: false };
+  }
+  const memberCode = generateMemberCode();
+  const info = db
+    .prepare(
+      `INSERT INTO members (name, barcode, member_code, member_type, address, city, state, zip, phone, email, birthday, grade_level, family_id, is_primary_parent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      name,
+      memberCode,
+      memberCode,
+      memberType,
+      fields.address || null,
+      fields.city || null,
+      fields.state || null,
+      fields.zip || null,
+      fields.phone || null,
+      fields.email || null,
+      fields.birthday || null,
+      fields.gradeLevel || null,
+      familyId,
+      fields.isPrimaryParent ? 1 : 0
+    );
+  return { id: info.lastInsertRowid, created: true };
+}
+
+router.post('/members/mass-import', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
+  }
+
+  let rows;
+  try {
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeMassImportRow).filter((r) => r.primaryParentName);
+  } catch (err) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the sample spreadsheet format.'));
+  }
+
+  if (rows.length === 0) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('No rows with a Primary Parent Name were found in that file.'));
+  }
+
+  let familiesCreated = 0;
+  let membersCreated = 0;
+  let membersLinked = 0;
+
+  for (const r of rows) {
+    const familyId = createFamilyFromLastName(r.primaryParentName);
+    familiesCreated++;
+
+    // Address/city/state/zip/phone are the shared household contact
+    // info - every member of the family gets them, parents and kids
+    // alike. Email is the one exception: each parent's own email column
+    // goes on just their own profile; a child has no email column on
+    // this template, so the primary parent's email doubles as the
+    // family's shared contact email on every kid's profile too.
+    const shared = { address: r.address, city: r.city, state: r.state, zip: r.zip, phone: r.phone };
+
+    const primary = createOrLinkFamilyMember(r.primaryParentName, 'parent', familyId, {
+      ...shared,
+      email: r.primaryParentEmail,
+      isPrimaryParent: true,
+    });
+    if (primary.created) membersCreated++;
+    else membersLinked++;
+
+    if (r.secondParentName) {
+      const second = createOrLinkFamilyMember(r.secondParentName, 'parent', familyId, { ...shared, email: r.secondParentEmail });
+      if (second.created) membersCreated++;
+      else membersLinked++;
+    }
+
+    for (const child of r.children) {
+      const result = createOrLinkFamilyMember(child.name, 'student', familyId, {
+        ...shared,
+        email: r.primaryParentEmail,
+        birthday: child.birthday,
+        gradeLevel: child.grade,
+      });
+      if (result.created) membersCreated++;
+      else membersLinked++;
+    }
+  }
+
+  const summary =
+    `Mass import complete: ${familiesCreated} famil${familiesCreated === 1 ? 'y' : 'ies'} created, ${membersCreated} new member(s) created` +
+    (membersLinked ? `, ${membersLinked} already-existing member(s) linked to their family.` : '.');
+
+  res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
 });
 
 router.post('/members/:id/notes', (req, res) => {

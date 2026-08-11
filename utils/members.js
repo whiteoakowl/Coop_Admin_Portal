@@ -261,6 +261,21 @@ function membersWithDetails(typeFilter) {
   }));
 }
 
+// Every member's permanent 6-digit ID, assigned once here at creation and
+// never touched again afterward (not even if their name later changes) -
+// see db/schema.sql's member_code column comment. barcode is set to match
+// it at creation time too, so every member's printed barcode is the same
+// fixed length regardless of how long their name is (db/index.js's
+// migration backfills this same way for every member who predates it).
+function generateMemberCode() {
+  const exists = db.prepare('SELECT 1 FROM members WHERE member_code = ?');
+  let code;
+  do {
+    code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  } while (exists.get(code));
+  return code;
+}
+
 module.exports = {
   parseNamesFromUpload,
   findMemberByName,
@@ -279,4 +294,5 @@ module.exports = {
   membersWithDetails,
   lastNameOf,
   byLastName,
+  generateMemberCode,
 };
