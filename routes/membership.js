@@ -7,6 +7,8 @@ const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { imageFileFilter } = require('../utils/uploads');
 const { GRADE_OPTIONS, VOLUNTEER_INTEREST_OPTIONS } = require('../utils/membership');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload } = require('../utils/uploadBackend');
 const { isValidISODate } = require('../utils/dates');
 
 // Despite living outside the /admin URL prefix (unchanged here to avoid
@@ -28,15 +30,11 @@ const { isValidISODate } = require('../utils/dates');
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'membership-children');
 if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
+const CHILD_PHOTOS_BUCKET = 'membership-child-photos';
+const storageClient = createStorageClient();
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, PHOTO_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
@@ -115,6 +113,16 @@ router.post('/membership', requireFullAdmin, upload.any(), async (req, res) => {
 
   for (const c of children) {
     const photoFile = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
+    const photoPath = photoFile
+      ? await saveUpload({
+          client: storageClient,
+          bucket: CHILD_PHOTOS_BUCKET,
+          localDir: PHOTO_DIR,
+          buffer: photoFile.buffer,
+          originalName: photoFile.originalname,
+          contentType: photoFile.mimetype,
+        })
+      : null;
     await insertChild.run(
       requestId,
       c.firstName.trim(),
@@ -128,7 +136,7 @@ router.post('/membership', requireFullAdmin, upload.any(), async (req, res) => {
       isValidISODate((c.birthdate || '').trim()) ? c.birthdate.trim() : null,
       GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
       (c.medicalNotes || '').trim() || null,
-      photoFile ? `/uploads/membership-children/${photoFile.filename}` : null
+      photoPath
     );
   }
 
