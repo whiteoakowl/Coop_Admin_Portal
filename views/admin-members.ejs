@@ -103,7 +103,7 @@
             <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>">
               <td class="members-col-photo">
                 <% if (m.photo_path) { %>
-                  <img class="member-thumb" src="<%= m.photo_path %>" alt="" />
+                  <img class="member-thumb" src="<%= photoUrl(m.photo_path) %>" alt="" />
                 <% } else { %>
                   <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                 <% } %>

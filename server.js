@@ -170,11 +170,29 @@ if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 // the same SQLite file everything else already lives in - see its own
 // header comment for why that's a hand-written ~80 lines rather than a
 // third-party package.
-const SqliteSessionStore = require('./utils/sqliteSessionStore');
+//
+// DATABASE_URL being set is what actually distinguishes a Supabase/Netlify
+// deploy from a normal local/LAN install (see MIGRATION.md and
+// .env.example) - Netlify Functions get a fresh, empty filesystem per
+// invocation, so the SQLite file the local-disk store above relies on
+// can't persist sessions there at all. utils/pgSessionStore.js is the
+// Postgres/Supabase-backed equivalent, built directly on db/postgres.js's
+// own connection pool (independent of which db module the rest of the
+// app's queries go through - see db/postgres.js's own header comment on
+// why the full query-layer cutover is still a separate, later step).
+let sessionStore;
+if (process.env.DATABASE_URL) {
+  const { createPgDb } = require('./db/postgres');
+  const PgSessionStore = require('./utils/pgSessionStore');
+  sessionStore = new PgSessionStore(createPgDb(process.env.DATABASE_URL));
+} else {
+  const SqliteSessionStore = require('./utils/sqliteSessionStore');
+  sessionStore = new SqliteSessionStore(db);
+}
 
 app.use(
   session({
-    store: new SqliteSessionStore(db),
+    store: sessionStore,
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -187,6 +205,21 @@ app.use(
   })
 );
 
+// Member photos may live in Supabase Storage or on local disk (see
+// utils/uploadBackend.js and MIGRATION.md) - computed once at boot, not
+// per-request, since createStorageClient() just builds a lightweight
+// client object from env vars with no network call of its own. Exposed
+// to every EJS view below as photoUrl(key) so templates (member list/
+// profile/edit forms, roster grid, print picker) can render a
+// members.photo_path value without each route file having to resolve it
+// first and thread the result through res.render()'s data separately.
+const { createStorageClient } = require('./utils/storage');
+const { urlForUpload } = require('./utils/uploadBackend');
+const memberPhotosClient = createStorageClient();
+function photoUrl(key) {
+  return urlForUpload({ client: memberPhotosClient, bucket: 'member-photos', webDir: '/uploads/members', key });
+}
+
 // Available in every EJS view (including partials/admin-nav) without each
 // route having to pass it explicitly. True only for the single master Admin
 // account. Also generates (once per session) and exposes the CSRF
@@ -197,6 +230,7 @@ app.use(
 app.use((req, res, next) => {
   const isAdmin = !!(req.session && req.session.adminId);
   res.locals.isFullAdmin = isAdmin;
+  res.locals.photoUrl = photoUrl;
   if (isAdmin) {
     if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
     res.locals.csrfToken = req.session.csrfToken;

@@ -268,7 +268,7 @@
               <dialog id="profile-dialog-<%= row.member.id %>" class="member-profile-dialog">
                 <div class="member-profile-header">
                   <% if (row.member.photo_path) { %>
-                    <img class="member-photo-preview" src="<%= row.member.photo_path %>" alt="" />
+                    <img class="member-photo-preview" src="<%= photoUrl(row.member.photo_path) %>" alt="" />
                   <% } %>
                   <div>
                     <h3><%= row.member.name %><%- include('partials/medical-flag', { member: row.member }) %></h3>

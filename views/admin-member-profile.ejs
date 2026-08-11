@@ -27,7 +27,7 @@
       <% if (tab === 'profile') { %>
         <div class="member-profile-header">
           <% if (member.photo_path) { %>
-            <img class="member-photo-preview" src="<%= member.photo_path %>" alt="" />
+            <img class="member-photo-preview" src="<%= photoUrl(member.photo_path) %>" alt="" />
           <% } %>
           <div>
             <span class="badge-pill"><%= member.member_type === 'parent' ? 'Parent' : 'Student' %></span>

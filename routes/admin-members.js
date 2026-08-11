@@ -8,6 +8,8 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
+const { createStorageClient } = require('../utils/storage');
+const { saveUpload, removeUpload } = require('../utils/uploadBackend');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -34,34 +36,43 @@ router.use(requireFullAdmin);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 const MEMBER_TYPES = ['student', 'parent'];
 
-// Member profile photos - stored on disk (not memory) since they're kept
-// long-term and served back out, unlike the CSV imports above.
+// Member profile photos - go to Supabase Storage when configured, local
+// disk otherwise (see utils/uploadBackend.js and MIGRATION.md). multer
+// uses memoryStorage now regardless of backend, since a Storage upload
+// needs the raw buffer anyway and the local-disk path writes that same
+// buffer itself (via saveUpload) rather than letting multer write it.
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
 if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
+const MEMBER_PHOTOS_BUCKET = 'member-photos';
+const storageClient = createStorageClient();
 
 const uploadPhoto = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, PHOTO_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
 
-// Removes a member's photo file from disk given the web path stored in
-// photo_path (e.g. "/uploads/members/172...-4821.jpg") - called whenever
-// a photo is replaced or the member itself is deleted, so an old photo of
-// a real child or parent doesn't sit on disk forever with no way to
-// remove it once it's no longer referenced anywhere. Silently no-ops for
-// null/already-missing files (deleting a member who never had a photo is
-// the common case, not an error).
+// Saves an uploaded photo (Storage or local disk, see above) and returns
+// the key to store in photo_path.
+function savePhotoFile(file) {
+  return saveUpload({
+    client: storageClient,
+    bucket: MEMBER_PHOTOS_BUCKET,
+    localDir: PHOTO_DIR,
+    buffer: file.buffer,
+    originalName: file.originalname,
+    contentType: file.mimetype,
+  });
+}
+
+// Removes a member's stored photo given the key/path in photo_path -
+// called whenever a photo is replaced or the member itself is deleted, so
+// an old photo of a real child or parent doesn't sit around forever with
+// no way to remove it once it's no longer referenced anywhere. Silently
+// no-ops for null/already-missing files (deleting a member who never had
+// a photo is the common case, not an error).
 function deletePhotoFile(photoPath) {
-  if (!photoPath) return;
-  const filePath = path.join(PHOTO_DIR, path.basename(photoPath));
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  return removeUpload({ client: storageClient, bucket: MEMBER_PHOTOS_BUCKET, localDir: PHOTO_DIR, key: photoPath });
 }
 
 // Every attendance record for this member across every roster they're on,
@@ -357,7 +368,7 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
   }
 
   const memberCode = await generateMemberCode();
-  const photoPath = req.file ? `/uploads/members/${req.file.filename}` : null;
+  const photoPath = req.file ? await savePhotoFile(req.file) : null;
 
   const info = await db
     .prepare(
@@ -479,11 +490,11 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
   const existing = await db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
-  const photoPath = req.file ? `/uploads/members/${req.file.filename}` : existing ? existing.photo_path : null;
+  const photoPath = req.file ? await savePhotoFile(req.file) : existing ? existing.photo_path : null;
   // A newly uploaded photo replaces the old one in photo_path below - the
   // old file itself isn't referenced anywhere else once that happens, so
-  // clean it up now rather than leaving it orphaned on disk indefinitely.
-  if (req.file && existing && existing.photo_path) deletePhotoFile(existing.photo_path);
+  // clean it up now rather than leaving it orphaned indefinitely.
+  if (req.file && existing && existing.photo_path) await deletePhotoFile(existing.photo_path);
 
   await db.prepare(
     `UPDATE members SET
@@ -973,10 +984,10 @@ router.post('/members/:id/delete', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   await db.prepare('DELETE FROM members WHERE id = ?').run(id);
   // ON DELETE CASCADE handles every other table referencing this member,
-  // but a photo file on disk isn't a foreign key SQLite can clean up on
+  // but a stored photo isn't a foreign key the database can clean up on
   // its own - without this, "Delete" leaves an actual photo of a real
   // person behind indefinitely, with no way to remove it from the app.
-  if (member) deletePhotoFile(member.photo_path);
+  if (member) await deletePhotoFile(member.photo_path);
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
   );
