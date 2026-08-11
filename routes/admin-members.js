@@ -115,12 +115,12 @@ router.get('/members', (req, res) => {
 router.get('/members/:id/cards-fragment', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
   const badgeLayout = templates[member.member_type] || templates.student;
   const scheduleCardTemplate = await getScheduleCardTemplate();
   res.render('member-cards-fragment', {
     member,
-    badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeDataForMember(member)),
+    badgeHtml: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, await badgeDataForMember(member)),
     badgeBgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
     scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataForMember(member)),
     scheduleCardBgCss: NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity),
@@ -941,10 +941,10 @@ router.get('/members/:id/cards/print', async (req, res) => {
 
   const cards = [];
   if (layout === 'nameTag') {
-    const badgeLayout = getTemplate(member.member_type);
+    const badgeLayout = await getTemplate(member.member_type);
     cards.push({
       heading: 'Name Tag',
-      html: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, badgeDataForMember(member)),
+      html: NameTagRenderCore.renderBadgeElements(badgeLayout.elements, await badgeDataForMember(member)),
       bgCss: NameTagRenderCore.backgroundCss(badgeLayout.background, badgeLayout.backgroundOpacity),
       width: BADGE_WIDTH,
       height: BADGE_HEIGHT,

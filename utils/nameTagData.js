@@ -4,19 +4,19 @@
 const db = require('../db');
 const { DEFAULT_LAYOUTS } = require('./nameTagBadge');
 
-function cleanupTeamsForParent(memberId) {
-  return db
+async function cleanupTeamsForParent(memberId) {
+  const rows = await db
     .prepare(
       `SELECT st.title FROM setup_teams st
        JOIN setup_team_members stm ON stm.team_id = st.id
        WHERE stm.member_id = ? ORDER BY st.day, st.title`
     )
-    .all(memberId)
-    .map((r) => r.title);
+    .all(memberId);
+  return rows.map((r) => r.title);
 }
 
 // The field values a badge template can place on a member's tag.
-function badgeDataForMember(member) {
+async function badgeDataForMember(member) {
   // member_code is the permanent 6-digit ID assigned at creation (see
   // db/schema.sql's own comment) - shown as "ID#123456" so it reads as a
   // label rather than a bare number the eye might mistake for something
@@ -25,7 +25,7 @@ function badgeDataForMember(member) {
   if (member.member_type === 'parent') {
     return {
       name: member.name,
-      cleanupTeam: cleanupTeamsForParent(member.id).join(', '),
+      cleanupTeam: (await cleanupTeamsForParent(member.id)).join(', '),
       memberCode,
       barcodeValue: member.barcode,
     };
@@ -39,8 +39,8 @@ function badgeDataForMember(member) {
   };
 }
 
-function getTemplate(memberType) {
-  const row = db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
+async function getTemplate(memberType) {
+  const row = await db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
   if (!row) return DEFAULT_LAYOUTS[memberType];
   try {
     const parsed = JSON.parse(row.layout_json);

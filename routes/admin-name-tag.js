@@ -41,7 +41,7 @@ const uploadDesignImage = multer({
 
 const NAME_TAG_TABS = ['design', 'print', 'requests', 'archived'];
 
-function nameTagSubmissions(showArchived, dateFilter) {
+async function nameTagSubmissions(showArchived, dateFilter) {
   let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
              n.description AS description, n.created_at AS createdAt
              FROM name_tag_requests n
@@ -57,12 +57,12 @@ function nameTagSubmissions(showArchived, dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
-router.get('/name-tag', (req, res) => {
+router.get('/name-tag', async (req, res) => {
   const tab = NAME_TAG_TABS.includes(req.query.tab) ? req.query.tab : 'design';
   const showArchived = tab === 'archived';
   const dateFilter = req.query.date || '';
 
-  const submissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+  const submissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
     id: r.id,
     timestamp: formatTimestamp(r.createdAt),
     memberName: r.memberName,
@@ -71,14 +71,11 @@ router.get('/name-tag', (req, res) => {
     description: r.description || '—',
   }));
 
-  const dates = db
-    .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
-    .all(showArchived ? 1 : 0)
-    .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
+  const dates = (
+    await db.prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`).all(showArchived ? 1 : 0)
+  ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
 
-  const members = db
-    .prepare("SELECT id, name, member_type FROM members WHERE active = 1 ORDER BY name COLLATE NOCASE")
-    .all();
+  const members = await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
 
   res.render('admin-name-tag', {
     title: 'Name Tags',
@@ -89,7 +86,7 @@ router.get('/name-tag', (req, res) => {
     showArchived,
     members,
     nameTagDataJson: jsonScriptSafe({
-      templates: { student: getTemplate('student'), parent: getTemplate('parent') },
+      templates: { student: await getTemplate('student'), parent: await getTemplate('parent') },
       defaultLayouts: DEFAULT_LAYOUTS,
       fieldsByType: FIELDS_BY_TYPE,
       shapeTypes: SHAPE_TYPES,
@@ -100,10 +97,10 @@ router.get('/name-tag', (req, res) => {
   });
 });
 
-router.get('/name-tag/requests/export.csv', (req, res) => {
+router.get('/name-tag/requests/export.csv', async (req, res) => {
   const showArchived = req.query.archived === '1';
   const dateFilter = req.query.date || '';
-  const submissions = nameTagSubmissions(showArchived, dateFilter);
+  const submissions = await nameTagSubmissions(showArchived, dateFilter);
 
   const lines = [
     toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
@@ -121,15 +118,15 @@ router.get('/name-tag/requests/export.csv', (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
-router.post('/name-tag/:id/archive', (req, res) => {
+router.post('/name-tag/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
   res.redirect('/admin/name-tag?tab=requests');
 });
 
-router.post('/name-tag/:id/unarchive', (req, res) => {
+router.post('/name-tag/:id/unarchive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
   res.redirect('/admin/name-tag?tab=archived');
 });
 
@@ -185,24 +182,25 @@ router.post('/name-tag/design-image', uploadDesignImage.single('image'), (req, r
   res.json({ ok: true, url: `/uploads/name-tags/${req.file.filename}` });
 });
 
-router.post('/name-tag/print', (req, res) => {
+router.post('/name-tag/print', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
+  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
 
-  const templates = { student: getTemplate('student'), parent: getTemplate('parent') };
-  const badges = members.map((m) => {
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
+  const badges = [];
+  for (const m of members) {
     const layout = templates[m.member_type] || templates.student;
-    const data = badgeDataForMember(m);
-    return {
+    const data = await badgeDataForMember(m);
+    badges.push({
       html: NameTagRenderCore.renderBadgeElements(layout.elements, data),
       bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
-    };
-  });
+    });
+  }
 
   res.render('admin-name-tag-bulk-print', {
     title: 'Print Name Tags',
@@ -214,14 +212,14 @@ router.post('/name-tag/print', (req, res) => {
 
 // Barcode-only sheet: just the scan code and name, no name tag design -
 // for a cheap, fast-to-print stack of scan cards.
-router.post('/name-tag/print-barcodes', (req, res) => {
+router.post('/name-tag/print-barcodes', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`).all(...memberIds);
+  const members = await db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
 
   res.render('admin-name-tag-barcode-print', {
     title: 'Print Barcodes',
@@ -234,15 +232,15 @@ router.post('/name-tag/print-barcodes', (req, res) => {
 // (fixed 3in x 1.75in cards meant to be cut into a scan-card stack), this
 // fits an off-the-shelf label sheet and adds each member's permanent ID
 // number as plain text alongside the barcode.
-router.post('/name-tag/print-barcode-labels', (req, res) => {
+router.post('/name-tag/print-barcode-labels', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = db
-    .prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders}) ORDER BY name COLLATE NOCASE`)
+  const members = await db
+    .prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`)
     .all(...memberIds);
 
   res.render('admin-name-tag-barcode-labels-print', {

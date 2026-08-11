@@ -103,8 +103,8 @@ router.get('/design', async (req, res) => {
     showArchived,
     nameTagDataJson: jsonScriptSafe({
       templates: {
-        student: getTemplate('student'),
-        parent: getTemplate('parent'),
+        student: await getTemplate('student'),
+        parent: await getTemplate('parent'),
         setupCleanup: getMiscTemplate('setupCleanup'),
         custom: getMiscTemplate('custom'),
       },

@@ -25,7 +25,7 @@ test('DEFAULT_LAYOUTS.student/parent no longer have a literal "Sanford Homeschoo
   }
 });
 
-test('badgeDataForMember formats memberCode as "ID#123456" for both parents and students', (t) => {
+test('badgeDataForMember formats memberCode as "ID#123456" for both parents and students', async (t) => {
   const testDbPath = path.join(os.tmpdir(), `name-tag-member-code-test-db-${process.pid}.db`);
   process.env.DB_PATH = testDbPath;
   const db = require('../db');
@@ -47,8 +47,8 @@ test('badgeDataForMember formats memberCode as "ID#123456" for both parents and 
   const parent = db.prepare('SELECT * FROM members WHERE id = ?').get(parentId);
   const student = db.prepare('SELECT * FROM members WHERE id = ?').get(studentId);
 
-  assert.equal(badgeDataForMember(parent).memberCode, 'ID#000111');
-  assert.equal(badgeDataForMember(student).memberCode, 'ID#000222');
+  assert.equal((await badgeDataForMember(parent)).memberCode, 'ID#000111');
+  assert.equal((await badgeDataForMember(student)).memberCode, 'ID#000222');
 });
 
 // Subprocess boot, same pattern as test/memberCodeMigration.test.js - a
