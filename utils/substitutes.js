@@ -1,7 +1,8 @@
 const db = require('../db');
 const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate } = require('./classSchedule');
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
-const { todayISO, weekdayOf, formatTimestamp, ageFromBirthday } = require('./dates');
+const { hasInfantChild } = require('./members');
+const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
 const { parseClockMinutes, splitTimeRange } = require('./schedule');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
@@ -11,7 +12,7 @@ const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 // anywhere - the board re-flags the slot as still needing a substitute
 // instead of quietly trusting a no-show assignment. Only meaningful for
 // today (there's no "current time" to compare a future/past date against).
-function assignedIsOverdue(existing, date, hourLabel) {
+async function assignedIsOverdue(existing, date, hourLabel) {
   if (!existing || existing.status !== 'approved') return false;
   if (date !== todayISO()) return false;
   const { startRaw } = splitTimeRange(hourLabel);
@@ -19,33 +20,33 @@ function assignedIsOverdue(existing, date, hourLabel) {
   if (startMin === null) return false;
   const now = new Date();
   if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
-  const checkedIn = db
+  const checkedIn = await db
     .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
     .get(existing.member_id, date);
   return !checkedIn;
 }
 
-function permanentJobsForDay(day) {
-  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? ORDER BY hour_position, title COLLATE NOCASE').all(day);
+async function permanentJobsForDay(day) {
+  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? ORDER BY hour_position, LOWER(title)').all(day);
 }
 
-function getPermanentJob(id) {
+async function getPermanentJob(id) {
   return db.prepare('SELECT * FROM permanent_jobs WHERE id = ?').get(id);
 }
 
-function floaterIdsForJob(jobId) {
-  return db.prepare('SELECT member_id FROM permanent_job_floaters WHERE job_id = ?').all(jobId).map((r) => r.member_id);
+async function floaterIdsForJob(jobId) {
+  return (await db.prepare('SELECT member_id FROM permanent_job_floaters WHERE job_id = ?').all(jobId)).map((r) => r.member_id);
 }
 
-function createPermanentJob(fields) {
-  const info = db
+async function createPermanentJob(fields) {
+  const info = await db
     .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES (?, ?, ?, ?)')
     .run(fields.day, fields.hourPosition, fields.title, fields.room || null);
   return info.lastInsertRowid;
 }
 
-function updatePermanentJob(id, fields) {
-  db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ?, room = ? WHERE id = ?').run(
+async function updatePermanentJob(id, fields) {
+  await db.prepare('UPDATE permanent_jobs SET hour_position = ?, title = ?, room = ? WHERE id = ?').run(
     fields.hourPosition,
     fields.title,
     fields.room || null,
@@ -53,15 +54,15 @@ function updatePermanentJob(id, fields) {
   );
 }
 
-function deletePermanentJob(id) {
-  db.prepare("DELETE FROM substitute_assignments WHERE slot_type = 'job' AND slot_id = ?").run(id);
-  db.prepare('DELETE FROM permanent_jobs WHERE id = ?').run(id);
+async function deletePermanentJob(id) {
+  await db.prepare("DELETE FROM substitute_assignments WHERE slot_type = 'job' AND slot_id = ?").run(id);
+  await db.prepare('DELETE FROM permanent_jobs WHERE id = ?').run(id);
 }
 
-function setJobFloaters(jobId, memberIds) {
-  db.prepare('DELETE FROM permanent_job_floaters WHERE job_id = ?').run(jobId);
-  const link = db.prepare('INSERT OR IGNORE INTO permanent_job_floaters (job_id, member_id) VALUES (?, ?)');
-  for (const memberId of memberIds) link.run(jobId, memberId);
+async function setJobFloaters(jobId, memberIds) {
+  await db.prepare('DELETE FROM permanent_job_floaters WHERE job_id = ?').run(jobId);
+  const link = db.prepare('INSERT INTO permanent_job_floaters (job_id, member_id) VALUES (?, ?) ON CONFLICT (job_id, member_id) DO NOTHING');
+  for (const memberId of memberIds) await link.run(jobId, memberId);
 }
 
 function rankSort(members) {
@@ -85,7 +86,9 @@ function classStaffSlotId(classId, staffMemberId) {
 // positions line up 1-4 across both features by convention. Reads each
 // member's rank for THIS specific hour (membersForSection), not a
 // single member-wide rank, since Floater Teams now lets rank vary hour
-// to hour.
+// to hour. Still fully synchronous - getListByDay/sectionsForList/
+// membersForSection come from utils/volunteers.js, which hasn't been
+// converted to async/await yet (see MIGRATION.md).
 function floaterMembersForHour(day, hourPosition) {
   const list = getListByDay(day);
   if (!list) return [];
@@ -94,38 +97,22 @@ function floaterMembersForHour(day, hourPosition) {
   return rankSort(membersForSection(list.id, section.id));
 }
 
-function assignmentFor(date, slotType, slotId) {
+async function assignmentFor(date, slotType, slotId) {
   if (!date) return null;
   return db.prepare('SELECT * FROM substitute_assignments WHERE session_date = ? AND slot_type = ? AND slot_id = ?').get(date, slotType, slotId);
 }
 
-function memberName(memberId) {
-  const row = db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
+async function memberName(memberId) {
+  const row = await db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
   return row ? row.name : null;
-}
-
-// Same "does this member's family include a 2-and-under" check as
-// utils/members.js's hasInfantChild - duplicated here as a plain
-// synchronous query (rather than importing that now-async helper)
-// because this whole module is still built on synchronous db.prepare()
-// calls throughout, same as MIGRATION.md's minimal-touch guidance for
-// files that aren't otherwise being converted in this pass.
-function hasInfantChildSync(memberId) {
-  const self = db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
-  if (!self || self.family_id == null) return false;
-  const family = db.prepare('SELECT birthday FROM members WHERE family_id = ? AND id != ? AND active = 1').all(self.family_id, memberId);
-  return family.some((m) => {
-    const age = ageFromBirthday(m.birthday);
-    return age !== null && age <= 2;
-  });
 }
 
 // An admin actively choosing someone (accepting a pending pick as-is,
 // or overriding with someone else entirely) is always the final word -
 // always lands as 'approved', whether or not a pending row already
 // existed for this slot.
-function setAssignment(date, slotType, slotId, memberId, isOverride) {
-  db.prepare(
+async function setAssignment(date, slotType, slotId, memberId, isOverride) {
+  await db.prepare(
     `INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status)
      VALUES (?, ?, ?, ?, ?, 'approved')
      ON CONFLICT(session_date, slot_type, slot_id) DO UPDATE SET member_id = excluded.member_id, is_override = excluded.is_override, status = 'approved'`
@@ -135,8 +122,8 @@ function setAssignment(date, slotType, slotId, memberId, isOverride) {
 // The automated sub system's own pick - only written when nothing exists
 // yet for this slot, so it never clobbers an admin's approved choice (or
 // someone else's still-pending pick from a moment ago).
-function autoAssign(date, slotType, slotId, memberId) {
-  db.prepare(
+async function autoAssign(date, slotType, slotId, memberId) {
+  await db.prepare(
     `INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status)
      VALUES (?, ?, ?, ?, 0, 'pending')
      ON CONFLICT(session_date, slot_type, slot_id) DO NOTHING`
@@ -144,24 +131,24 @@ function autoAssign(date, slotType, slotId, memberId) {
 }
 
 // Admin confirms the automated pick without changing who it is.
-function approveAssignment(date, slotType, slotId) {
-  db.prepare(
+async function approveAssignment(date, slotType, slotId) {
+  await db.prepare(
     `UPDATE substitute_assignments SET status = 'approved' WHERE session_date = ? AND slot_type = ? AND slot_id = ? AND status = 'pending'`
   ).run(date, slotType, slotId);
 }
 
-function clearAssignment(date, slotType, slotId) {
-  db.prepare('DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = ? AND slot_id = ?').run(date, slotType, slotId);
+async function clearAssignment(date, slotType, slotId) {
+  await db.prepare('DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = ? AND slot_id = ?').run(date, slotType, slotId);
 }
 
-function assignedInfo(existing) {
+async function assignedInfo(existing) {
   if (!existing) return null;
   return {
     id: existing.member_id,
-    name: memberName(existing.member_id),
+    name: await memberName(existing.member_id),
     isOverride: !!existing.is_override,
     status: existing.status,
-    infant: hasInfantChildSync(existing.member_id),
+    infant: await hasInfantChild(existing.member_id),
     updatedLabel: formatTimestamp(existing.created_at),
   };
 }
@@ -177,17 +164,18 @@ function assignedInfo(existing) {
 // preferred-floater list) and persisted as 'pending', so approving it is
 // a one-click confirm instead of a fresh choice every time the board is
 // viewed.
-function substituteBoard(day, date) {
-  const missingById = date ? missingMemberIdsForDate(date) : new Map();
-  const grid = gridForDay(day);
-  const jobs = permanentJobsForDay(day);
+async function substituteBoard(day, date) {
+  const missingById = date ? await missingMemberIdsForDate(date) : new Map();
+  const grid = await gridForDay(day);
+  const jobs = await permanentJobsForDay(day);
   const jobsByHour = {};
   jobs.forEach((j) => {
     if (!jobsByHour[j.hour_position]) jobsByHour[j.hour_position] = [];
     jobsByHour[j.hour_position].push(j);
   });
 
-  return grid.map((hourGroup) => {
+  const result = [];
+  for (const hourGroup of grid) {
     const hourPosition = hourGroup.position;
     const floaterPool = floaterMembersForHour(day, hourPosition).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
@@ -201,13 +189,13 @@ function substituteBoard(day, date) {
       return floaterPool.find((m) => !usedThisHour.has(m.id)) || null;
     }
 
-    function resolveSlot(slotType, slotId, preferredIds) {
-      let existing = assignmentFor(date, slotType, slotId);
+    async function resolveSlot(slotType, slotId, preferredIds) {
+      let existing = await assignmentFor(date, slotType, slotId);
       if (!existing && date) {
         const candidate = pickCandidate(preferredIds);
         if (candidate) {
-          autoAssign(date, slotType, slotId, candidate.id);
-          existing = assignmentFor(date, slotType, slotId);
+          await autoAssign(date, slotType, slotId, candidate.id);
+          existing = await assignmentFor(date, slotType, slotId);
         }
       }
       if (existing) usedThisHour.add(existing.member_id);
@@ -220,14 +208,14 @@ function substituteBoard(day, date) {
     // assign/accept flow. A "late" status counts the same as "absent"
     // here (see missingMemberIdsForDate) - either way that staff member
     // isn't going to be covering their spot.
-    hourGroup.classes.forEach((cls) => {
-      cls.staff.forEach((person) => {
-        if (person.role !== 'teacher' && person.role !== 'assistant') return;
+    for (const cls of hourGroup.classes) {
+      for (const person of cls.staff) {
+        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
         const status = missingById.get(person.id);
-        if (!status) return;
+        if (!status) continue;
 
         const slotId = classStaffSlotId(cls.id, person.id);
-        const existing = resolveSlot('class', slotId, null);
+        const existing = await resolveSlot('class', slotId, null);
         const roleLabel = person.role === 'teacher' ? 'Teacher' : 'Assistant';
         const statusLabel = status === 'late' ? 'running late' : 'absent';
 
@@ -239,26 +227,26 @@ function substituteBoard(day, date) {
           detail: cls.room ? `Room ${cls.room}` : '',
           ageGroup: cls.age_group || '',
           reason: `${roleLabel} ${statusLabel}: ${person.name}`,
-          assigned: assignedInfo(existing),
-          overdue: assignedIsOverdue(existing, date, hourGroup.label),
+          assigned: await assignedInfo(existing),
+          overdue: await assignedIsOverdue(existing, date, hourGroup.label),
         });
-      });
-    });
+      }
+    }
 
-    (jobsByHour[hourPosition] || []).forEach((job) => {
-      const existing = resolveSlot('job', job.id, floaterIdsForJob(job.id));
+    for (const job of jobsByHour[hourPosition] || []) {
+      const existing = await resolveSlot('job', job.id, await floaterIdsForJob(job.id));
 
       slots.push({
-        overdue: assignedIsOverdue(existing, date, hourGroup.label),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
         slotType: 'job',
         slotId: job.id,
         label: job.title,
         room: job.room || '',
         detail: 'Permanent Job',
         reason: 'Staffed every session',
-        assigned: assignedInfo(existing),
+        assigned: await assignedInfo(existing),
       });
-    });
+    }
 
     // Ranked, still-available candidates for this hour (best/"Choose
     // First" ranked members first) - the Substitutes Needed card's assign
@@ -266,8 +254,9 @@ function substituteBoard(day, date) {
     // is the top suggestion, while still allowing an admin to pick anyone.
     const suggestedFloaters = rankSort(floaterPool.filter((m) => !usedThisHour.has(m.id)));
 
-    return { position: hourPosition, label: hourGroup.label, slots, suggestedFloaters };
-  });
+    result.push({ position: hourPosition, label: hourGroup.label, slots, suggestedFloaters });
+  }
+  return result;
 }
 
 // Multi-date planning grid for the Monday/Wednesday Floater Assignments
@@ -278,25 +267,26 @@ function substituteBoard(day, date) {
 // assigning someone here is exactly the same action as approving a
 // substitute - there's only one "who's covering this slot" system,
 // whether it's being planned weeks ahead or filled last-minute.
-function jobAssignmentGrid(day, dates) {
-  const jobs = permanentJobsForDay(day);
+async function jobAssignmentGrid(day, dates) {
+  const jobs = await permanentJobsForDay(day);
   const byHour = {};
   jobs.forEach((j) => {
     if (!byHour[j.hour_position]) byHour[j.hour_position] = [];
     byHour[j.hour_position].push(j);
   });
-  return HOUR_POSITIONS.map((hourPosition) => ({
-    position: hourPosition,
-    jobs: (byHour[hourPosition] || []).map((job) => ({
-      id: job.id,
-      title: job.title,
-      room: job.room || '',
-      cells: dates.map((date) => ({
-        date,
-        assigned: assignedInfo(assignmentFor(date, 'job', job.id)),
-      })),
-    })),
-  })).filter((h) => h.jobs.length > 0);
+  const hours = [];
+  for (const hourPosition of HOUR_POSITIONS) {
+    const hourJobs = [];
+    for (const job of byHour[hourPosition] || []) {
+      const cells = [];
+      for (const date of dates) {
+        cells.push({ date, assigned: await assignedInfo(await assignmentFor(date, 'job', job.id)) });
+      }
+      hourJobs.push({ id: job.id, title: job.title, room: job.room || '', cells });
+    }
+    hours.push({ position: hourPosition, jobs: hourJobs });
+  }
+  return hours.filter((h) => h.jobs.length > 0);
 }
 
 // Single-date "Floater Assignment Dashboard" cards (the Chart tab's view,
@@ -304,8 +294,8 @@ function jobAssignmentGrid(day, dates) {
 // same permanent-job/substitute_assignments data as jobAssignmentGrid,
 // just reshaped for one date's cards instead of a multi-date table (each
 // job gets one `assigned` directly, not a one-element `cells` array).
-function dailyAssignmentCards(day, date) {
-  return jobAssignmentGrid(day, [date]).map((hour) => ({
+async function dailyAssignmentCards(day, date) {
+  return (await jobAssignmentGrid(day, [date])).map((hour) => ({
     position: hour.position,
     jobs: hour.jobs.map((job) => ({ id: job.id, title: job.title, room: job.room, assigned: job.cells[0].assigned })),
   }));
@@ -314,25 +304,28 @@ function dailyAssignmentCards(day, date) {
 // dailyAssignmentCards with each hour's real label merged in - shared by
 // the Archive tab/print page and the public kiosk view
 // (partials/floater-assignment-cards.ejs needs `label` on every hour).
-function dailyAssignmentCardsWithLabels(day, date) {
+async function dailyAssignmentCardsWithLabels(day, date) {
   const hourLabelByPosition = {};
-  hoursForDay(day).forEach((h) => { hourLabelByPosition[h.position] = h.label; });
-  return dailyAssignmentCards(day, date).map((hour) => ({ ...hour, label: hourLabelByPosition[hour.position] || `Hour ${hour.position}` }));
+  (await hoursForDay(day)).forEach((h) => { hourLabelByPosition[h.position] = h.label; });
+  return (await dailyAssignmentCards(day, date)).map((hour) => ({ ...hour, label: hourLabelByPosition[hour.position] || `Hour ${hour.position}` }));
 }
 
 // Archive tab: one row per date that's already passed, with how many of
 // that day's permanent-job positions ended up with an approved floater -
 // same underlying data as dailyAssignmentCards, just counted instead of
 // rendered, for the log list before an admin opens one date's full record.
-function archivedDateSummaries(day, dates) {
-  const jobs = permanentJobsForDay(day);
-  return dates.map((date) => {
-    const assignedCount = jobs.filter((j) => {
-      const a = assignmentFor(date, 'job', j.id);
-      return a && a.status === 'approved';
-    }).length;
-    return { date, totalPositions: jobs.length, assignedCount };
-  });
+async function archivedDateSummaries(day, dates) {
+  const jobs = await permanentJobsForDay(day);
+  const result = [];
+  for (const date of dates) {
+    let assignedCount = 0;
+    for (const j of jobs) {
+      const a = await assignmentFor(date, 'job', j.id);
+      if (a && a.status === 'approved') assignedCount++;
+    }
+    result.push({ date, totalPositions: jobs.length, assignedCount });
+  }
+  return result;
 }
 
 // Auto-fills (see substituteBoard) and collects every slot left in
@@ -344,11 +337,11 @@ function archivedDateSummaries(day, dates) {
 // weekday actually matches today - otherwise "today" isn't a real
 // session for that list and permanent jobs would get auto-filled
 // against a date that was never one of their sessions.
-function pendingApprovalsForToday() {
+async function pendingApprovalsForToday() {
   const date = todayISO();
   const items = [];
-  DAYS.filter((day) => weekdayOf(date) === DAY_WEEKDAY[day]).forEach((day) => {
-    const board = substituteBoard(day, date);
+  for (const day of DAYS.filter((day) => weekdayOf(date) === DAY_WEEKDAY[day])) {
+    const board = await substituteBoard(day, date);
     board.forEach((hour) => {
       hour.slots.forEach((slot) => {
         if (slot.assigned && slot.assigned.status === 'pending') {
@@ -363,7 +356,7 @@ function pendingApprovalsForToday() {
         }
       });
     });
-  });
+  }
   return { count: items.length, items, date };
 }
 

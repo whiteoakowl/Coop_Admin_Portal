@@ -25,7 +25,7 @@ function todaysSessionDays(date) {
 // person) - the Alert Log's own signal that a form came in today, same
 // as the dedicated Absence/Late Log tab an admin would otherwise have to
 // go check manually.
-function absenceFormAlertsForDay(day, date) {
+async function absenceFormAlertsForDay(day, date) {
   return db
     .prepare(
       `SELECT DISTINCT a.member_id AS memberId, m.name AS memberName, a.status
@@ -33,18 +33,18 @@ function absenceFormAlertsForDay(day, date) {
        JOIN members m ON m.id = a.member_id
        JOIN rosters r ON r.id = a.roster_id
        WHERE a.session_date = ? AND a.source = 'absence_form' AND r.schedule_day = ?
-       ORDER BY m.name COLLATE NOCASE`
+       ORDER BY LOWER(m.name)`
     )
     .all(date, day);
 }
 
-function todaysAlerts() {
+async function todaysAlerts() {
   const date = todayISO();
   const alerts = [];
 
-  todaysSessionDays(date).forEach((day) => {
+  for (const day of todaysSessionDays(date)) {
     const dayLabel = DAY_LABELS[day];
-    const board = substituteBoard(day, date);
+    const board = await substituteBoard(day, date);
     board.forEach((hour) => {
       hour.slots.forEach((slot) => {
         if (!slot.assigned) {
@@ -71,7 +71,7 @@ function todaysAlerts() {
       });
     });
 
-    absenceFormAlertsForDay(day, date).forEach((sub) => {
+    (await absenceFormAlertsForDay(day, date)).forEach((sub) => {
       alerts.push({
         type: sub.status === 'late' ? 'late_form' : 'absence_form',
         severity: sub.status === 'late' ? 'warning' : 'danger',
@@ -83,7 +83,7 @@ function todaysAlerts() {
       });
     });
 
-    classesAtRiskForDay(day, date).forEach((c) => {
+    (await classesAtRiskForDay(day, date)).forEach((c) => {
       alerts.push({
         type: 'class_risk',
         severity: 'warning',
@@ -94,7 +94,7 @@ function todaysAlerts() {
         link: `/admin/logs?tab=classrisk&day=${day}`,
       });
     });
-  });
+  }
 
   return alerts;
 }

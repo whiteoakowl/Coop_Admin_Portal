@@ -21,7 +21,7 @@ router.get('/setup/:day', async (req, res) => {
     // admin manage page (routes/admin-setup.js) - kiosk-home always links
     // here with today's own day already (/setup/<%= defaultDay %>), so in
     // practice this is just "who's absent today".
-    absentIds: absentMemberIdsForDate(defaultDateFor(day)),
+    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
   });
 });
 

@@ -165,7 +165,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
       day,
       dayLabel: DAY_LABELS[day],
       alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
-      classesAtRisk: classesAtRiskForDay(day, alertDate),
+      classesAtRisk: await classesAtRiskForDay(day, alertDate),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -180,7 +180,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
       day,
       dayLabel: DAY_LABELS[day],
       dateFilter,
-      board: substituteBoard(day, dateFilter || null),
+      board: await substituteBoard(day, dateFilter || null),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });

@@ -542,10 +542,17 @@ if (leadershipCount === 0) {
 // one table that has to stay consistent with each other should use this
 // instead of running bare statements in a row - see routes/admin-rosters.js's
 // archiveDay() for the original hand-written version this generalizes.
-function withTransaction(fn) {
+// `fn` receives a tx handle here too (async, matching db/postgres.js's own
+// contract - see that file's header comment), even though the SQLite
+// driver has exactly one connection so there's no pooling hazard to guard
+// against: the handle it hands back is `db` itself, so `tx.prepare(...)`
+// inside `fn` is identical to `db.prepare(...)` here, and call sites are
+// written once (`await db.withTransaction(async (tx) => {...})`) and work
+// unchanged against either driver.
+async function withTransaction(fn) {
   db.exec('BEGIN');
   try {
-    const result = fn();
+    const result = await fn(db);
     db.exec('COMMIT');
     return result;
   } catch (err) {

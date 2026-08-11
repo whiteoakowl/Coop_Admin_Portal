@@ -51,7 +51,7 @@ function requireUnlocked(req, res, next) {
 async function findClassWithLabels(id) {
   const raw = await db.prepare('SELECT day FROM classes WHERE id = ?').get(id);
   if (!raw) return null;
-  return allClassesList(raw.day).find((c) => c.id === id) || null;
+  return (await allClassesList(raw.day)).find((c) => c.id === id) || null;
 }
 
 router.get('/', (req, res) => {
@@ -59,7 +59,7 @@ router.get('/', (req, res) => {
   res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: null });
 });
 
-router.post('/unlock', (req, res) => {
+router.post('/unlock', async (req, res) => {
   if (pinLimiter.isRateLimited(req.ip)) {
     return res.render('kiosk-class-checkin-pin', {
       title: 'Class Check-In',
@@ -67,7 +67,7 @@ router.post('/unlock', (req, res) => {
     });
   }
   const pin = (req.body.pin || '').trim();
-  if (!verifyClassCheckinPin(pin)) {
+  if (!(await verifyClassCheckinPin(pin))) {
     pinLimiter.recordFailure(req.ip);
     return res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: 'Incorrect PIN.' });
   }
@@ -92,11 +92,11 @@ router.get('/classes', requireUnlocked, (req, res) => {
 // the admin Classes tab's own day+hour filter pattern (see
 // routes/admin-rosters.js), minus the day dropdown itself since the day
 // is already fixed by the URL here.
-router.get('/classes/:day', requireUnlocked, (req, res) => {
+router.get('/classes/:day', requireUnlocked, async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
   const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
-  let classes = allClassesList(day);
+  let classes = await allClassesList(day);
   if (hourFilter) classes = classes.filter((c) => c.hour_position === hourFilter);
   res.render('kiosk-class-checkin-classes', {
     title: 'Class Check-In',
@@ -171,7 +171,7 @@ async function resolveScan(req, res) {
   // comment) - so "is this class actually in session today" is really
   // "does the Student roster have today as a session date", not
   // anything tracked against the class's own roster_id.
-  const studentRosterId = ensureDayRoster(cls.day, 'student');
+  const studentRosterId = await ensureDayRoster(cls.day, 'student');
   const inSessionToday = await db
     .prepare('SELECT 1 FROM roster_dates WHERE roster_id = ? AND session_date = ?')
     .get(studentRosterId, today);

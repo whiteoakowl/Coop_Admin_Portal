@@ -71,14 +71,14 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       topTab: 'schedules',
       day: tab,
       dayLabel: CLASS_DAY_LABELS[tab],
-      hours: hoursForDay(tab),
-      roomGrid: roomGridForDay(tab),
-      rooms: roomsForDay(tab),
+      hours: await hoursForDay(tab),
+      roomGrid: await roomGridForDay(tab),
+      rooms: await roomsForDay(tab),
       gradeLevels: GRADE_LEVELS,
       colorPalette: COLOR_PALETTE,
-      availableStaff: activeParentsForStaff(),
+      availableStaff: await activeParentsForStaff(),
       selectedDate,
-      absentIds: absentMemberIdsForDate(selectedDate),
+      absentIds: await absentMemberIdsForDate(selectedDate),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -224,9 +224,9 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
 
     if (memberType === 'student') {
       const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
-      if (!existingIds.includes(member.id)) setEnrollment(cls.id, [...existingIds, member.id]);
+      if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id]);
     } else {
-      addStaff(cls.id, member.id, 'teacher');
+      await addStaff(cls.id, member.id, 'teacher');
     }
     matched++;
   }

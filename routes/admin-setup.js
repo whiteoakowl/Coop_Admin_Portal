@@ -56,7 +56,7 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
     // date picker here (teams are a standing weekly roster, not tied to a
     // specific date the admin chooses), so "absent that day" means "absent
     // today" and only has anything to show while today matches the tab.
-    absentIds: absentMemberIdsForDate(defaultDateFor(day)),
+    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

@@ -34,7 +34,7 @@ function subUrl(day, params) {
   return `/admin/volunteers/${day}/manage` + (qs ? `?${qs}` : '');
 }
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();
   const room = (req.body.room || '').trim();
@@ -44,40 +44,40 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, req
   if (!title || hourPositions.length === 0) {
     return res.redirect(subUrl(day, { date: req.body.date, error: 'Job title and at least one hour are required.' }));
   }
-  hourPositions.forEach((hourPosition) => createPermanentJob({ day, hourPosition, title, room }));
+  for (const hourPosition of hourPositions) await createPermanentJob({ day, hourPosition, title, room });
   const hourNote = hourPositions.length > 1 ? `Hours ${hourPositions.join(', ')}` : `Hour ${hourPositions[0]}`;
   res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).` }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const id = parseInt(req.params.id, 10);
   const title = (req.body.title || '').trim();
   const room = (req.body.room || '').trim();
   const hourPosition = parseInt(req.body.hourPosition, 10);
   if (title && HOUR_POSITIONS.includes(hourPosition)) {
-    updatePermanentJob(id, { title, hourPosition, room });
+    await updatePermanentJob(id, { title, hourPosition, room });
   }
   res.redirect(subUrl(day, { date: req.body.date }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/floaters', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/floaters', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const id = parseInt(req.params.id, 10);
   const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  setJobFloaters(id, memberIds);
+  await setJobFloaters(id, memberIds);
   res.redirect(subUrl(day, { date: req.body.date }));
 });
 
-router.post('/volunteers/:day/substitutes/permanent-jobs/:id/delete', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/permanent-jobs/:id/delete', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const id = parseInt(req.params.id, 10);
-  const job = getPermanentJob(id);
-  deletePermanentJob(id);
+  const job = await getPermanentJob(id);
+  await deletePermanentJob(id);
   res.redirect(subUrl(day, { date: req.body.date, notice: job ? `Deleted "${job.title}".` : 'Job deleted.' }));
 });
 
-router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
   const slotType = req.body.slotType === 'job' ? 'job' : 'class';
@@ -85,29 +85,29 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, (re
   const memberId = parseInt(req.body.memberId, 10);
   const isOverride = req.body.isOverride === '1';
   if (isValidISODate(date) && slotId && memberId) {
-    setAssignment(date, slotType, slotId, memberId, isOverride);
+    await setAssignment(date, slotType, slotId, memberId, isOverride);
   }
   res.redirect(subUrl(day, { date }));
 });
 
-router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
   const slotType = req.body.slotType === 'job' ? 'job' : 'class';
   const slotId = parseInt(req.body.slotId, 10);
-  if (isValidISODate(date) && slotId) clearAssignment(date, slotType, slotId);
+  if (isValidISODate(date) && slotId) await clearAssignment(date, slotType, slotId);
   res.redirect(subUrl(day, { date }));
 });
 
 // Confirms the automated sub system's own pick as-is - a one-click
 // approve, distinct from /assign (which is also used to override with a
 // different person entirely).
-router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, (req, res) => {
+router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
   const slotType = req.body.slotType === 'job' ? 'job' : 'class';
   const slotId = parseInt(req.body.slotId, 10);
-  if (isValidISODate(date) && slotId) approveAssignment(date, slotType, slotId);
+  if (isValidISODate(date) && slotId) await approveAssignment(date, slotType, slotId);
   res.redirect(subUrl(day, { date }));
 });
 
@@ -117,8 +117,8 @@ router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, (r
 // admin could also find there. Also where the automated sub system's
 // today's-board auto-fill actually happens for admins who never open the
 // Floater Assignments manage page themselves.
-router.get('/alerts.json', requireAdmin, (req, res) => {
-  const items = todaysAlerts();
+router.get('/alerts.json', requireAdmin, async (req, res) => {
+  const items = await todaysAlerts();
   res.json({ count: items.length, items });
 });
 

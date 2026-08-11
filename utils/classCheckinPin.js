@@ -10,12 +10,12 @@ const { appSetting, setAppSetting } = require('./classSchedule');
 
 const PIN_SETTING_KEY = 'class_checkin_pin_hash';
 
-function setClassCheckinPin(pin) {
-  setAppSetting(PIN_SETTING_KEY, bcrypt.hashSync(pin, 10));
+async function setClassCheckinPin(pin) {
+  await setAppSetting(PIN_SETTING_KEY, bcrypt.hashSync(pin, 10));
 }
 
-function verifyClassCheckinPin(pin) {
-  const hash = appSetting(PIN_SETTING_KEY, null);
+async function verifyClassCheckinPin(pin) {
+  const hash = await appSetting(PIN_SETTING_KEY, null);
   if (!hash || typeof pin !== 'string') return false;
   return bcrypt.compareSync(pin, hash);
 }

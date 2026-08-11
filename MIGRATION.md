@@ -293,32 +293,133 @@ requests to Supabase both fail/reset). This means:
    **Not yet started** (direct `db.prepare(` call counts as of this
    writing - re-grep, these drift, and some of these earlier counts were
    undercounted due to the codebase's `db\n  .prepare(...)` line-break
-   style not matching a same-line grep): `routes/admin.js`,
-   `routes/admin-documents.js`, `routes/admin-library.js`,
-   `routes/checkout.js`; the rest of `routes/admin-rosters.js` (has
-   `withTransaction` x2 + `INSERT OR`), the rest of
-   `routes/admin-volunteers.js` (has `withTransaction` + `INSERT OR`),
-   the rest of `routes/admin-logs.js`, the rest of
-   `routes/admin-setup.js`; and utils: `utils/backup.js` (1, `PRAGMA` -
-   needs its own design, see below), `utils/classSchedule.js` (the
-   biggest util file, has `withTransaction` x2 + `INSERT OR` x4 - heavily
-   depended on by `admin-schedule.js`, `admin-rosters.js`,
-   `admin-volunteers.js`, `kiosk-class-checkin.js`, `admin-logs.js` and
-   others, so converting it means re-touching all of those call sites
-   too), `utils/substitutes.js` (has `INSERT OR`, plus the
-   `hasInfantChildSync` duplication above to clean up when it's
-   converted), `utils/volunteers.js` (has `INSERT OR`).
+   style not matching a same-line grep): `routes/admin.js` (only the
+   `todaysAlerts()`-touching handler converted, plenty of its own untouched
+   `db.prepare(` calls remain), `routes/admin-documents.js`,
+   `routes/admin-library.js`, `routes/checkout.js`; and utils:
+   `utils/backup.js` (1, `PRAGMA` - needs its own design, see below),
+   `utils/volunteers.js` (has `INSERT OR` - `getListByDay`/
+   `sectionsForList`/`membersForList`/`membersForSection` etc. are all
+   still plain sync, deliberately, since nothing forced them yet).
 
-   Suggested order for whoever picks this up: the two
-   `withTransaction`-bearing giants next (`classSchedule.js`, then
-   whatever routes still use it - this will finish off the remaining
-   pieces of `admin-schedule.js`, `admin-rosters.js`,
-   `admin-volunteers.js`, `admin-logs.js`, `kiosk-class-checkin.js` along
-   the way), `substitutes.js`/`volunteers.js` together (both have `INSERT
-   OR`, and converting `substitutes.js` is also the place to retire
-   `hasInfantChildSync` back to the real `hasInfantChild`), and
-   `backup.js` last (needs a real design decision, not just a mechanical
-   pass - see below).
+   Suggested order for whoever picks this up: `utils/volunteers.js` next
+   (small-ish, and its conversion is also the natural place to retire the
+   `hasInfantChildSync`/`floaterMembersForHour`-stays-sync notes below back
+   to real awaited calls), then `backup.js` last (needs a real design
+   decision, not just a mechanical pass - see below).
+
+   - `utils/classSchedule.js` — **fully** converted, both `withTransaction`
+     call sites (`deleteClass`, `setEnrollment`) and all 4 `INSERT OR`
+     sites rewritten to `ON CONFLICT ... DO NOTHING`/`DO UPDATE SET`
+     (`class_enrollments`, `class_staff`, `roster_members` x2). Every
+     `COLLATE NOCASE` in the file fixed. `syncMemberSchedulesForDay`'s
+     `datetime('now')` deliberately left untouched.
+   - `utils/substitutes.js` — **fully** converted (every exported
+     function), retiring the `hasInfantChildSync` duplicate from the
+     earlier `utils/members.js` pass back to the real (now-safe-to-await)
+     `hasInfantChild`. `setJobFloaters`'s `INSERT OR IGNORE` rewritten to
+     `ON CONFLICT ... DO NOTHING`.
+   - `utils/classCheckinPin.js` — **fully** converted
+     (`setClassCheckinPin`/`verifyClassCheckinPin`).
+   - `routes/admin-class-schedule.js` — **fully** converted (every
+     handler - this was the single biggest remaining route file, all of
+     `getClass`/`createClass`/`updateClass`/`deleteClass`/`setEnrollment`/
+     `addStaff`/`removeStaff` call sites, both import handlers' `COLLATE
+     NOCASE` fixed).
+   - `routes/admin-rosters.js` — **fully** converted (the rest of it,
+     beyond the earlier archive-only pass): `rosterIdForTab`/
+     `siblingRosterId` made async (both call `ensureDayRoster`), and
+     every one of their callers - `dates/add`, `dates/:date/remove` (its
+     own `withTransaction` converted to the `tx` pattern), `add-member`,
+     `remove-member/:memberId`, `attendance`, plus `GET /rosters`'s
+     `classesAtRiskForDay`/`classesNeedingStaffForDay`/`allClassesList`
+     calls and `GET /roster/:tab/export.csv`.
+   - `routes/admin-volunteers.js` — **fully** converted (every remaining
+     handler: `manage`, `dates/:date/remove`'s `withTransaction`,
+     `export.csv`, the whole Archive section, `risk`, `teams`,
+     `teams/add-member`, `teams/:sectionId/hour-label`,
+     `teams/:sectionId/members/:memberId/remove`, `teams/export.csv`,
+     `import`).
+   - `routes/admin-substitutes.js`, `routes/volunteers.js`,
+     `utils/alerts.js` — **fully** converted (forced by `substitutes.js`
+     becoming async: every permanent-job/assignment CRUD route, the public
+     floater-chart view, and `todaysAlerts()`'s own board/absence/
+     class-risk aggregation).
+   - `routes/admin-logs.js`, `routes/admin-setup.js`, `routes/setup.js` —
+     one more handler/await each (`substitutes` + `classrisk` tabs in
+     `admin-logs.js`; `absentMemberIdsForDate` in the other two). Both
+     `admin-logs.js` and `admin-setup.js` still have plenty of their own
+     untouched `db.prepare(` calls elsewhere in the file.
+   - `routes/kiosk-class-checkin.js` — 3 more awaits (`allClassesList` x2,
+     `ensureDayRoster`), plus the PIN unlock route's `verifyClassCheckinPin`.
+   - `routes/admin.js` — 1 more await (`todaysAlerts()` in the dashboard
+     handler).
+
+   **A `withTransaction` contract change, not just a mechanical pass**:
+   converting `classSchedule.js`'s 2 `withTransaction` call sites (plus 3
+   more found in `admin-rosters.js`/`admin-volunteers.js` that were still
+   using the old no-argument form) required actually fixing
+   `db/index.js`'s own `withTransaction` first - the SQLite version
+   previously called `fn()` with no argument at all, while
+   `db/postgres.js`'s version always passed a `tx` handle (see that file's
+   own header comment on why: a pooled Postgres connection needs every
+   query inside the transaction to run on the one connection that issued
+   BEGIN, not the outer `db`). `db/index.js`'s `withTransaction` is now
+   `async` and passes `db` itself as `tx` (SQLite only ever has the one
+   connection, so `tx.prepare(...)` there is literally `db.prepare(...)`),
+   matching the Postgres contract - every call site now reads
+   `await db.withTransaction(async (tx) => { await tx.prepare(...)... })`
+   and works unchanged against either driver.
+
+   **A real, confirmed startup race, not a hypothetical one** - read this
+   before converting anything else `server.js` depends on at module-load
+   time: `server.js` seeds the 4 always-exist Monday/Wednesday
+   Parent/Student rosters at boot via `utils/classSchedule.js`'s
+   `ensureDayRoster`/`syncDayMemberRosters`. Those becoming `async` broke
+   this in two distinct ways, both caught only by the full test suite
+   (never by `node -c` or eslint):
+   1. The original code fired all 4 `ensureDayRoster` calls via a bare
+      `.forEach` with no `await` between them - once the function was
+      async, all 4 calls raced each other's "does this roster already
+      exist" check before any of their inserts had committed, creating
+      *duplicate* rosters with the same name (caught via a real
+      `roster archive` test failure - the archived snapshot was missing
+      data because `buildDaySnapshot` and the test's own direct-SQL setup
+      had each independently created and looked up *different* "Monday
+      Students" rosters).
+   2. Fixing that by making the seeding a real sequential `await` chain
+      does NOT fully fix the deeper problem: `require('./server')` can't
+      block on a `Promise`, so multiple `test/routes-*.test.js` files whose
+      `test.before()` hooks insert rows referencing the well-known roster
+      ids 1-4 *immediately* after requiring the module were still racing
+      ahead of the async seeding chain (2 more real failures, both
+      `FOREIGN KEY constraint failed`, in `test/routes-logs-pagination.
+      test.js` and `test/routes-search.test.js`). Node's own scheduling
+      does not guarantee the seeding chain's microtasks fully drain before
+      a synchronously-registered `test.before()` hook runs.
+
+   **The fix, and why it's not just a workaround**: `server.js`'s roster
+   *existence* seeding now uses a small local synchronous helper
+   (`ensureDayRosterSync`, duplicating `ensureDayRoster`'s two-query logic
+   directly against `db.prepare(...).run()` with no `await`/`async`) so
+   the 4 rosters are guaranteed to exist by the time `require('./server')`
+   returns to its caller - true today because the live driver really is
+   still synchronous SQLite underneath the async wrapper, same reasoning
+   as the rest of this migration's "await on a non-Promise is a
+   pass-through" trick, just applied in the other direction (a
+   synchronous duplicate of an async function, used only where sync
+   completion is a hard requirement). Roster *membership* sync
+   (`syncDayMemberRosters`) has no such ordering requirement - nothing
+   reads it before the first class/floater edit in a fresh database - so
+   that piece is left calling the real async function, unawaited, at
+   boot. **Whoever does the final `db/index.js` → `db/postgres.js` cutover
+   needs to revisit this**: once the live driver is genuinely async
+   Postgres, `ensureDayRosterSync`'s synchronous-completion guarantee no
+   longer holds, and `server.js`'s own bootstrapping (not just this one
+   seeding step) will need a real "wait for ready" contract - likely
+   exporting a startup Promise that `test/routes-*.test.js` files await
+   right after requiring the module, which is a call-site change across
+   every one of those ~30 files, not a small fix.
 
 ## What's NOT done yet — the actual remaining work
 

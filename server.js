@@ -43,9 +43,42 @@ require('./utils/backup').applyPendingUploadsRestore();
 // / profile Class Schedule data) from current enrollment/staffing, so
 // existing classes are reflected everywhere on every boot, not just after
 // their next edit.
-const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
+//
+// utils/classSchedule.js's own ensureDayRoster/syncDayMemberRosters are
+// async now (Supabase/Postgres migration - see MIGRATION.md), but this one
+// call site can't await them: require('./server') has to hand back a fully
+// bootstrapped `app` synchronously (every test/routes-*.test.js file relies
+// on that - they insert rows referencing these 4 rosters' ids immediately
+// after requiring this module, no await possible on a require() call), and
+// there's no way to block a synchronous module load on a Promise. Rather
+// than risk exactly that ordering (confirmed the hard way once, as a
+// FOREIGN KEY constraint failure in two test files whose setup hooks ran
+// before the async roster-creation chain had resolved), the 4 rosters
+// themselves are ensured here with plain synchronous db calls - safe to
+// duplicate ensureDayRoster's own tiny query pair since the live db really
+// is still synchronous SQLite underneath the async wrapper. Roster
+// *membership* sync (syncDayMemberRosters) has no such hard ordering
+// requirement - nothing reads it before the first class/floater edit ever
+// happens in a fresh database - so that one small piece stays async and
+// unawaited here.
+const { syncDayMemberRosters } = require('./utils/classSchedule');
+function ensureDayRosterSync(day, role) {
+  const key = `${day}_${role}_roster_id`;
+  const existingId = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
+  if (existingId) {
+    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId.value);
+    if (existing) return existing.id;
+  }
+  const label = day === 'monday' ? 'Monday' : 'Wednesday';
+  const name = `${label} ${role === 'parent' ? 'Parents' : 'Students'}`;
+  const info = db.prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)').run(name, 'Class Schedule', day);
+  db.prepare(
+    `INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  ).run(key, String(info.lastInsertRowid));
+  return info.lastInsertRowid;
+}
 ['monday', 'wednesday'].forEach((day) => {
-  ['parent', 'student'].forEach((role) => ensureDayRoster(day, role));
+  ['parent', 'student'].forEach((role) => ensureDayRosterSync(day, role));
   syncDayMemberRosters(day);
 });
 

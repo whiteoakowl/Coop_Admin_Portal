@@ -77,24 +77,24 @@ const COLOR_PALETTE = [
   '#CBAE8B', // sand
 ];
 
-function nextPaletteColor() {
-  const count = db.prepare('SELECT COUNT(*) AS c FROM classes').get().c;
-  return COLOR_PALETTE[count % COLOR_PALETTE.length];
+async function nextPaletteColor() {
+  const row = await db.prepare('SELECT COUNT(*) AS c FROM classes').get();
+  return COLOR_PALETTE[row.c % COLOR_PALETTE.length];
 }
 
-function hoursForDay(day) {
+async function hoursForDay(day) {
   return db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? ORDER BY position').all(day);
 }
 
-function saveHourLabels(day, labels) {
+async function saveHourLabels(day, labels) {
   const upsert = db.prepare(
     `INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)
      ON CONFLICT(day, position) DO UPDATE SET label = excluded.label`
   );
-  HOUR_POSITIONS.forEach((position) => {
+  for (const position of HOUR_POSITIONS) {
     const label = (labels[position - 1] || `Hour ${position}`).trim() || `Hour ${position}`;
-    upsert.run(day, position, label);
-  });
+    await upsert.run(day, position, label);
+  }
 }
 
 // A single hour's label, for callers editing just one card at a time (the
@@ -103,58 +103,58 @@ function saveHourLabels(day, labels) {
 // the Class Schedule page's one "Edit" dialog that shows all of them at
 // once), so reusing it for a single card would silently reset every other
 // hour's label back to its "Hour N" default.
-function saveHourLabel(day, position, label) {
+async function saveHourLabel(day, position, label) {
   const trimmed = (label || '').trim() || `Hour ${position}`;
-  db.prepare(
+  await db.prepare(
     `INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)
      ON CONFLICT(day, position) DO UPDATE SET label = excluded.label`
   ).run(day, position, trimmed);
 }
 
-function studentsForClass(classId) {
+async function studentsForClass(classId) {
   return db
     .prepare(
       `SELECT m.*, f.name AS family_name FROM class_enrollments ce
        JOIN members m ON m.id = ce.student_id
        LEFT JOIN families f ON f.id = m.family_id
        WHERE ce.class_id = ? AND m.active = 1
-       ORDER BY m.name COLLATE NOCASE`
+       ORDER BY LOWER(m.name)`
     )
     .all(classId);
 }
 
-function staffForClass(classId) {
+async function staffForClass(classId) {
   return db
     .prepare(
       `SELECT m.*, cs.role FROM class_staff cs
        JOIN members m ON m.id = cs.member_id
        WHERE cs.class_id = ? AND m.active = 1
-       ORDER BY cs.role, m.name COLLATE NOCASE`
+       ORDER BY cs.role, LOWER(m.name)`
     )
     .all(classId);
 }
 
 // One class, fully hydrated with its enrolled students and staff - used by
 // both the manage form and the public signup page.
-function getClass(id) {
-  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
+async function getClass(id) {
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
   if (!cls) return null;
-  return { ...cls, students: studentsForClass(id), staff: staffForClass(id) };
+  return { ...cls, students: await studentsForClass(id), staff: await staffForClass(id) };
 }
 
 // Every class on a day, grouped under its hour slot - the shape the
 // colored grid (admin and public) renders directly.
-function gridForDay(day) {
-  const hours = hoursForDay(day);
-  const classes = db
-    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, class_name COLLATE NOCASE')
+async function gridForDay(day) {
+  const hours = await hoursForDay(day);
+  const classes = await db
+    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)')
     .all(day);
 
   const byHour = {};
   for (const h of HOUR_POSITIONS) byHour[h] = [];
-  classes.forEach((cls) => {
-    byHour[cls.hour_position].push({ ...cls, students: studentsForClass(cls.id), staff: staffForClass(cls.id) });
-  });
+  for (const cls of classes) {
+    byHour[cls.hour_position].push({ ...cls, students: await studentsForClass(cls.id), staff: await staffForClass(cls.id) });
+  }
 
   return hours.map((h) => ({ ...h, classes: byHour[h.position] || [] }));
 }
@@ -164,22 +164,23 @@ function gridForDay(day) {
 // color are treated as one class that runs across both blocks, and
 // rendered as a single cell spanning both columns instead of two
 // separate cards.
-function roomGridForDay(day) {
-  const hours = hoursForDay(day);
-  const classes = db
-    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, class_name COLLATE NOCASE')
-    .all(day)
-    .map((cls) => {
-      const staff = staffForClass(cls.id);
-      return {
-        ...cls,
-        students: studentsForClass(cls.id),
-        staff,
-        gradeLabel: formatGradeRange(cls.age_group),
-        teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
-        assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
-      };
+async function roomGridForDay(day) {
+  const hours = await hoursForDay(day);
+  const rawClasses = await db
+    .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)')
+    .all(day);
+  const classes = [];
+  for (const cls of rawClasses) {
+    const staff = await staffForClass(cls.id);
+    classes.push({
+      ...cls,
+      students: await studentsForClass(cls.id),
+      staff,
+      gradeLabel: formatGradeRange(cls.age_group),
+      teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+      assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
     });
+  }
 
   const roomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : 'Unassigned')))].sort(
     (a, b) => {
@@ -226,22 +227,23 @@ function roomGridForDay(day) {
 // managed entity (just whatever string is typed into each class's room
 // field), so "Edit Room Numbers" works off whatever's actually in use,
 // same idea as Edit Hours but derived instead of a fixed table.
-function roomsForDay(day) {
-  return db
-    .prepare("SELECT DISTINCT room FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY room COLLATE NOCASE")
-    .all(day)
-    .map((r) => r.room);
+async function roomsForDay(day) {
+  return (
+    await db
+      .prepare("SELECT DISTINCT room FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY LOWER(room)")
+      .all(day)
+  ).map((r) => r.room);
 }
 
 // Renames a room across every class on a day that currently uses it - the
 // bulk-edit half of "Edit Room Numbers".
-function renameRoom(day, oldName, newName) {
+async function renameRoom(day, oldName, newName) {
   if (!oldName || !newName || oldName === newName) return;
-  db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
+  await db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
 }
 
-function createClass(fields) {
-  const info = db
+async function createClass(fields) {
+  const info = await db
     .prepare(
       `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -252,19 +254,19 @@ function createClass(fields) {
       fields.className,
       fields.room || null,
       fields.ageGroup || null,
-      fields.color || nextPaletteColor(),
+      fields.color || (await nextPaletteColor()),
       fields.notes || null,
       fields.startTime || null,
       fields.endTime || null
     );
   const id = info.lastInsertRowid;
-  ensureClassRoster(id);
+  await ensureClassRoster(id);
   return id;
 }
 
-function updateClass(id, fields) {
-  const before = db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
-  db.prepare(
+async function updateClass(id, fields) {
+  const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
+  await db.prepare(
     `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ? WHERE id = ?`
   ).run(
     fields.day,
@@ -280,75 +282,76 @@ function updateClass(id, fields) {
   );
   // Keep the class's auto-roster's name/day in step with the class itself.
   if (before && before.roster_id) {
-    db.prepare('UPDATE rosters SET name = ?, schedule_day = ? WHERE id = ?').run(fields.className, fields.day, before.roster_id);
+    await db.prepare('UPDATE rosters SET name = ?, schedule_day = ? WHERE id = ?').run(fields.className, fields.day, before.roster_id);
   }
   // Re-derive roster membership + member_schedules for whichever day(s)
   // are affected - both the old day (in case this class just moved off
   // it) and the new one.
-  syncDayMemberRosters(fields.day);
-  if (before && before.day && before.day !== fields.day) syncDayMemberRosters(before.day);
+  await syncDayMemberRosters(fields.day);
+  if (before && before.day && before.day !== fields.day) await syncDayMemberRosters(before.day);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing
 // the class - a hard delete would cascade-wipe its attendance history
 // (attendance.roster_id references rosters ON DELETE CASCADE). Deactivating
 // just retires it from active use, same as manually archiving any roster.
-function deleteClass(id) {
-  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
+async function deleteClass(id) {
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
   if (!cls) return;
-  db.withTransaction(() => {
+  await db.withTransaction(async (tx) => {
     if (cls.roster_id) {
-      db.prepare('UPDATE rosters SET active = 0 WHERE id = ?').run(cls.roster_id);
+      await tx.prepare('UPDATE rosters SET active = 0 WHERE id = ?').run(cls.roster_id);
     }
-    db.prepare('DELETE FROM classes WHERE id = ?').run(id);
+    await tx.prepare('DELETE FROM classes WHERE id = ?').run(id);
   });
-  syncDayMemberRosters(cls.day);
+  await syncDayMemberRosters(cls.day);
 }
 
-function setEnrollment(classId, studentIds) {
-  db.withTransaction(() => {
-    db.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
-    const link = db.prepare('INSERT OR IGNORE INTO class_enrollments (class_id, student_id) VALUES (?, ?)');
-    for (const studentId of studentIds) link.run(classId, studentId);
+async function setEnrollment(classId, studentIds) {
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
+    const link = tx.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?) ON CONFLICT (class_id, student_id) DO NOTHING');
+    for (const studentId of studentIds) await link.run(classId, studentId);
   });
-  syncClassRosterMembers(classId);
-  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
-  if (cls) syncDayMemberRosters(cls.day);
+  await syncClassRosterMembers(classId);
+  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) await syncDayMemberRosters(cls.day);
 }
 
 // Adds one teacher/assistant - used by both the admin manage form (one at
 // a time, via the picker) and the public self-signup page.
-function addStaff(classId, memberId, role) {
-  db.prepare('INSERT OR REPLACE INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)').run(
-    classId,
-    memberId,
-    role === 'assistant' ? 'assistant' : 'teacher'
-  );
-  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
-  if (cls) syncDayMemberRosters(cls.day);
+async function addStaff(classId, memberId, role) {
+  await db
+    .prepare(
+      `INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)
+       ON CONFLICT (class_id, member_id) DO UPDATE SET role = excluded.role`
+    )
+    .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
+  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) await syncDayMemberRosters(cls.day);
 }
 
-function removeStaff(classId, memberId) {
-  db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, memberId);
-  const cls = db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
-  if (cls) syncDayMemberRosters(cls.day);
+async function removeStaff(classId, memberId) {
+  await db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, memberId);
+  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  if (cls) await syncDayMemberRosters(cls.day);
 }
 
 // Active students, for the enrollment picker.
-function activeStudents() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY name COLLATE NOCASE").all();
+async function activeStudents() {
+  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY LOWER(name)").all();
 }
 
 // Active parents, for the teacher/assistant picker - same restriction the
 // Floater Assignments and Setup/Cleanup pickers already use.
-function activeParentsForStaff() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY name COLLATE NOCASE").all();
+async function activeParentsForStaff() {
+  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY LOWER(name)").all();
 }
 
 // Every class on this day missing a teacher and/or an assistant - drives
 // the Floater Assignments page's "needs a teacher or assistant" log.
-function classesNeedingStaffForDay(day) {
-  const hours = gridForDay(day);
+async function classesNeedingStaffForDay(day) {
+  const hours = await gridForDay(day);
   const result = [];
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
@@ -371,8 +374,8 @@ function classesNeedingStaffForDay(day) {
 // Every distinct teacher or assistant staffing a class on this day, each
 // with the full list of classes they're staffing that day - drives the
 // Volunteers page's Teachers/Class Assistants tabs.
-function staffListForDay(day, role) {
-  const hours = gridForDay(day);
+async function staffListForDay(day, role) {
+  const hours = await gridForDay(day);
   const byMember = {};
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
@@ -392,9 +395,9 @@ function staffListForDay(day, role) {
 // may need to be canceled for low turnout. Counts both students who've
 // already checked in and those who haven't checked in yet, only
 // excluding students confirmed absent for that date.
-function classesAtRiskForDay(day, date) {
-  const hours = gridForDay(day);
-  const absentIds = date ? absentMemberIdsForDate(date) : new Set();
+async function classesAtRiskForDay(day, date) {
+  const hours = await gridForDay(day);
+  const absentIds = date ? await absentMemberIdsForDate(date) : new Set();
   const result = [];
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
@@ -417,10 +420,12 @@ function classesAtRiskForDay(day, date) {
 // Every member marked absent (any roster) on a given date - the Class
 // Schedule grid cross-references this against each class's enrolled
 // students to highlight who's out that day.
-function absentMemberIdsForDate(date) {
+async function absentMemberIdsForDate(date) {
   if (!date) return new Set();
   return new Set(
-    db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND status = 'absent'`).all(date).map((r) => r.member_id)
+    (await db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND status = 'absent'`).all(date)).map(
+      (r) => r.member_id
+    )
   );
 }
 
@@ -428,13 +433,14 @@ function absentMemberIdsForDate(date) {
 // type - a "late" submission means they still won't be at their usual
 // spot on time, so the automated sub system shouldn't count on them for a
 // floater slot that day either).
-function absenceFormMemberIdsForDate(date) {
+async function absenceFormMemberIdsForDate(date) {
   if (!date) return new Set();
   return new Set(
-    db
-      .prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND source = 'absence_form' AND status IN ('absent', 'late')`)
-      .all(date)
-      .map((r) => r.member_id)
+    (
+      await db
+        .prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND source = 'absence_form' AND status IN ('absent', 'late')`)
+        .all(date)
+    ).map((r) => r.member_id)
   );
 }
 
@@ -446,9 +452,9 @@ function absenceFormMemberIdsForDate(date) {
 // assistants. Maps member id -> whichever status was recorded ('absent'
 // wins if a member somehow has mixed statuses across rosters for the same
 // date).
-function missingMemberIdsForDate(date) {
+async function missingMemberIdsForDate(date) {
   if (!date) return new Map();
-  const rows = db
+  const rows = await db
     .prepare(`SELECT member_id, status FROM attendance WHERE session_date = ? AND status IN ('absent', 'late')`)
     .all(date);
   const map = new Map();
@@ -473,19 +479,18 @@ function missingMemberIdsForDate(date) {
 // 'manual', via the Attendance page's Add Member popup) are never touched
 // here, so they survive every resync instead of getting silently dropped
 // the next time class enrollment/staffing changes.
-function setRosterMembership(rosterId, memberIdSet) {
-  const existingIds = db
-    .prepare("SELECT member_id FROM roster_members WHERE roster_id = ? AND source = 'auto'")
-    .all(rosterId)
-    .map((r) => r.member_id);
+async function setRosterMembership(rosterId, memberIdSet) {
+  const existingIds = (
+    await db.prepare("SELECT member_id FROM roster_members WHERE roster_id = ? AND source = 'auto'").all(rosterId)
+  ).map((r) => r.member_id);
   const existing = new Set(existingIds);
   const insert = db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')");
   const remove = db.prepare("DELETE FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'");
   for (const memberId of memberIdSet) {
-    if (!existing.has(memberId)) insert.run(rosterId, memberId);
+    if (!existing.has(memberId)) await insert.run(rosterId, memberId);
   }
   for (const memberId of existingIds) {
-    if (!memberIdSet.has(memberId)) remove.run(rosterId, memberId);
+    if (!memberIdSet.has(memberId)) await remove.run(rosterId, memberId);
   }
 }
 
@@ -495,63 +500,67 @@ function setRosterMembership(rosterId, memberIdSet) {
 // The Attendance page's Class Rosters log list - every class (optionally
 // filtered to one day), alphabetical by title, each with the grade(s)/
 // day/time/teacher/assistants needed for that one-line summary.
-function allClassesList(day) {
-  const rows = db
+async function allClassesList(day) {
+  const rows = await db
     .prepare(
       `SELECT c.*, h.label AS hourLabel,
               (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS studentCount
        FROM classes c
        JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
        WHERE (@day IS NULL OR c.day = @day)
-       ORDER BY c.class_name COLLATE NOCASE`
+       ORDER BY LOWER(c.class_name)`
     )
     .all({ day: day || null });
-  return rows.map((r) => {
-    const staff = staffForClass(r.id);
-    return {
+  const list = [];
+  for (const r of rows) {
+    const staff = await staffForClass(r.id);
+    list.push({
       ...r,
       dayLabel: DAY_LABELS[r.day],
       gradeLabel: formatGradeRange(r.age_group),
-      timeLabel: timeRangeForClass(r),
+      timeLabel: await timeRangeForClass(r),
       teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
       assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
-    };
-  });
+    });
+  }
+  return list;
 }
 
 // Adds someone to a roster by hand (Attendance page's Add Member popup) -
 // tagged source = 'manual' so setRosterMembership's auto-resync never
-// removes them again. INSERT OR IGNORE so re-adding an existing auto
-// member is a harmless no-op rather than an error.
-function addManualRosterMember(rosterId, memberId) {
-  db.prepare("INSERT OR IGNORE INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(rosterId, memberId);
+// removes them again. INSERT ... ON CONFLICT DO NOTHING so re-adding an
+// existing auto member is a harmless no-op rather than an error.
+async function addManualRosterMember(rosterId, memberId) {
+  await db
+    .prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual') ON CONFLICT (roster_id, member_id) DO NOTHING")
+    .run(rosterId, memberId);
 }
 
 // Creates (once) the students-only roster for a single class, or returns
 // its existing one.
-function ensureClassRoster(classId) {
-  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+async function ensureClassRoster(classId) {
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls) return null;
   if (cls.roster_id) {
-    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(cls.roster_id);
+    const existing = await db.prepare('SELECT id FROM rosters WHERE id = ?').get(cls.roster_id);
     if (existing) return existing.id;
   }
-  const info = db
+  const info = await db
     .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
     .run(cls.class_name, 'Class Roster', cls.day);
-  db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(info.lastInsertRowid, classId);
+  await db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(info.lastInsertRowid, classId);
   return info.lastInsertRowid;
 }
 
 // Rebuilds a class's roster membership from its current enrollment
 // (students only - a class roster never includes its teachers/assistants).
-function syncClassRosterMembers(classId) {
-  const rosterId = ensureClassRoster(classId);
+async function syncClassRosterMembers(classId) {
+  const rosterId = await ensureClassRoster(classId);
   if (!rosterId) return;
   const studentIds = new Set(
-    db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId).map((r) => r.student_id)
+    (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId)).map((r) => r.student_id)
   );
-  setRosterMembership(rosterId, studentIds);
+  await setRosterMembership(rosterId, studentIds);
 }
 
 const DAY_ROSTER_LABEL = { monday: 'Monday', wednesday: 'Wednesday' };
@@ -563,33 +572,36 @@ function dayRosterSettingKey(day, role) {
 // Creates (once) one of the 4 day-level rosters (Monday/Wednesday x
 // Parent/Student), remembering its id via app_settings, or returns the
 // existing one.
-function ensureDayRoster(day, role) {
+async function ensureDayRoster(day, role) {
   const key = dayRosterSettingKey(day, role);
-  const existingId = appSetting(key, null);
+  const existingId = await appSetting(key, null);
   if (existingId) {
-    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId);
+    const existing = await db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId);
     if (existing) return existing.id;
   }
   const name = `${DAY_ROSTER_LABEL[day]} ${role === 'parent' ? 'Parents' : 'Students'}`;
-  const info = db
+  const info = await db
     .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
     .run(name, 'Class Schedule', day);
-  setAppSetting(key, String(info.lastInsertRowid));
+  await setAppSetting(key, String(info.lastInsertRowid));
   return info.lastInsertRowid;
 }
 
 // Ensures all 4 day-level rosters exist and returns their ids.
-function ensureDayMemberRosters() {
+async function ensureDayMemberRosters() {
   const ids = {};
-  DAYS.forEach((day) => {
-    ids[day] = { parent: ensureDayRoster(day, 'parent'), student: ensureDayRoster(day, 'student') };
-  });
+  for (const day of DAYS) {
+    ids[day] = { parent: await ensureDayRoster(day, 'parent'), student: await ensureDayRoster(day, 'student') };
+  }
   return ids;
 }
 
 // Everyone floating any hour on a day's Floater Assignments list - a
 // parent only needs to be assigned to ONE hour to count as floating that
 // day, same "day-level" granularity as teaching/assisting a class.
+// Still fully synchronous - getListByDay/membersForList come from
+// utils/volunteers.js, which hasn't been converted to async/await yet
+// (see MIGRATION.md).
 function floaterMemberIdsForDay(day) {
   const list = getListByDay(day);
   if (!list) return [];
@@ -600,31 +612,31 @@ function floaterMemberIdsForDay(day) {
 // enrolled in (students) or staffing/floating (parents) that day - a
 // class's teacher/assistants, or anyone on the Floater Assignments list
 // for any hour that day.
-function syncDayMemberRosters(day) {
-  const classIds = db.prepare('SELECT id FROM classes WHERE day = ?').all(day).map((r) => r.id);
+async function syncDayMemberRosters(day) {
+  const classIds = (await db.prepare('SELECT id FROM classes WHERE day = ?').all(day)).map((r) => r.id);
   const studentIds = new Set();
   const parentIds = new Set();
   if (classIds.length > 0) {
     const placeholders = classIds.map(() => '?').join(',');
-    db.prepare(`SELECT DISTINCT student_id FROM class_enrollments WHERE class_id IN (${placeholders})`)
-      .all(...classIds)
-      .forEach((r) => studentIds.add(r.student_id));
-    db.prepare(`SELECT DISTINCT member_id FROM class_staff WHERE class_id IN (${placeholders})`)
-      .all(...classIds)
-      .forEach((r) => parentIds.add(r.member_id));
+    (await db.prepare(`SELECT DISTINCT student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach(
+      (r) => studentIds.add(r.student_id)
+    );
+    (await db.prepare(`SELECT DISTINCT member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) =>
+      parentIds.add(r.member_id)
+    );
   }
   floaterMemberIdsForDay(day).forEach((id) => parentIds.add(id));
-  setRosterMembership(ensureDayRoster(day, 'student'), studentIds);
-  setRosterMembership(ensureDayRoster(day, 'parent'), parentIds);
-  syncMemberSchedulesForDay(day);
+  await setRosterMembership(await ensureDayRoster(day, 'student'), studentIds);
+  await setRosterMembership(await ensureDayRoster(day, 'parent'), parentIds);
+  await syncMemberSchedulesForDay(day);
 }
 
 // A class's display time range: its own start_time/end_time if an admin
 // set them, otherwise its hour block's shared label (e.g. "Hour 1" or
 // whatever an admin renamed it to via Edit Hours).
-function timeRangeForClass(cls) {
+async function timeRangeForClass(cls) {
   if (cls.start_time && cls.end_time) return `${cls.start_time} - ${cls.end_time}`;
-  const hour = db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
+  const hour = await db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
   return (hour && hour.label) || '';
 }
 
@@ -642,9 +654,13 @@ function timeRangeForClass(cls) {
 // Floater Assignments chart's "Hour N" against the class grid's own
 // "Hour N", the same position class_schedule_hours already keys both by),
 // not to any specific class, so it never overwrites a real one.
-function syncMemberSchedulesForDay(day) {
-  const classes = db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
-  db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
+//
+// datetime('now') - SQLite-only, deliberately left as-is (see
+// MIGRATION.md's special-cases list); not touched by this routine
+// async/await pass.
+async function syncMemberSchedulesForDay(day) {
+  const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  await db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
   const upsert = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -653,15 +669,15 @@ function syncMemberSchedulesForDay(day) {
        teacher = excluded.teacher, updated_at = datetime('now')`
   );
 
-  classes.forEach((cls) => {
-    const time = timeRangeForClass(cls);
-    const staff = staffForClass(cls.id);
+  for (const cls of classes) {
+    const time = await timeRangeForClass(cls);
+    const staff = await staffForClass(cls.id);
     const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
-    const people = [...studentsForClass(cls.id), ...staff];
-    people.forEach((person) => {
-      upsert.run(person.id, day, cls.hour_position, time, cls.class_name, cls.room || '', teacherNames);
-    });
-  });
+    const people = [...(await studentsForClass(cls.id)), ...staff];
+    for (const person of people) {
+      await upsert.run(person.id, day, cls.hour_position, time, cls.class_name, cls.room || '', teacherNames);
+    }
+  }
 
   const insertIfEmpty = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
@@ -671,36 +687,37 @@ function syncMemberSchedulesForDay(day) {
   const list = getListByDay(day);
   if (list) {
     const hourLabels = {};
-    hoursForDay(day).forEach((h) => { hourLabels[h.position] = h.label; });
-    sectionsForList(list.id).forEach((section) => {
-      membersForSectionRaw(list.id, section.id).forEach((memberId) => {
-        insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
-      });
-    });
+    (await hoursForDay(day)).forEach((h) => { hourLabels[h.position] = h.label; });
+    for (const section of sectionsForList(list.id)) {
+      for (const memberId of await membersForSectionRaw(list.id, section.id)) {
+        await insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
+      }
+    }
   }
 }
 
 // Bare member ids on one floater hour section - a lightweight variant of
 // utils/volunteers.js's membersForSection (which joins in rank/other
 // display fields this sync doesn't need).
-function membersForSectionRaw(listId, sectionId) {
-  return db
-    .prepare(
-      `SELECT m.id FROM members m
-       JOIN volunteer_members vm ON vm.member_id = m.id
-       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1`
-    )
-    .all(listId, sectionId)
-    .map((r) => r.id);
+async function membersForSectionRaw(listId, sectionId) {
+  return (
+    await db
+      .prepare(
+        `SELECT m.id FROM members m
+         JOIN volunteer_members vm ON vm.member_id = m.id
+         WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1`
+      )
+      .all(listId, sectionId)
+  ).map((r) => r.id);
 }
 
-function appSetting(key, fallback) {
-  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
+async function appSetting(key, fallback) {
+  const row = await db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
 }
 
-function setAppSetting(key, value) {
-  db.prepare(
+async function setAppSetting(key, value) {
+  await db.prepare(
     `INSERT INTO app_settings (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`
   ).run(key, value);

@@ -79,10 +79,10 @@ function classRosterInfo(classId) {
     .get(classId);
 }
 
-function rosterIdForTab(tab) {
+async function rosterIdForTab(tab) {
   const classId = classIdFromTab(tab);
   if (classId) {
-    const cls = db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(classId);
+    const cls = await db.prepare('SELECT roster_id FROM classes WHERE id = ?').get(classId);
     return cls ? cls.roster_id : null;
   }
   const cfg = TABS[tab];
@@ -159,14 +159,14 @@ function archiveGrid(gridData) {
 // and every class meeting that day, each with its own grid (a class's
 // dates mirror the Student roster's, same as the live view).
 async function buildDaySnapshot(day) {
-  const parentRosterId = ensureDayRoster(day, 'parent');
-  const studentRosterId = ensureDayRoster(day, 'student');
+  const parentRosterId = await ensureDayRoster(day, 'parent');
+  const studentRosterId = await ensureDayRoster(day, 'student');
   const parentRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(parentRosterId);
   const studentRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(studentRosterId);
   const studentDates = await rosterDates(studentRosterId);
 
   const classes = [];
-  for (const c of allClassesList(day)) {
+  for (const c of await allClassesList(day)) {
     const classRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(c.roster_id);
     classes.push({
       className: c.class_name,
@@ -189,11 +189,13 @@ async function buildDaySnapshot(day) {
 
 // Wipes exactly what buildDaySnapshot just captured for one roster - the
 // same three tables dates/:date/remove already clears for a single date
-// (see below), just for every date at once.
-function clearDayRosterData(rosterId) {
-  db.prepare('DELETE FROM roster_dates WHERE roster_id = ?').run(rosterId);
-  db.prepare('DELETE FROM attendance WHERE roster_id = ?').run(rosterId);
-  db.prepare('DELETE FROM checkouts WHERE roster_id = ?').run(rosterId);
+// (see below), just for every date at once. Takes the transaction's own
+// tx handle (see archiveDay below) rather than the outer db, so every
+// query here runs on the same connection that issued BEGIN.
+async function clearDayRosterData(tx, rosterId) {
+  await tx.prepare('DELETE FROM roster_dates WHERE roster_id = ?').run(rosterId);
+  await tx.prepare('DELETE FROM attendance WHERE roster_id = ?').run(rosterId);
+  await tx.prepare('DELETE FROM checkouts WHERE roster_id = ?').run(rosterId);
 }
 
 // The one write path for the whole archive-and-clear operation - snapshot
@@ -205,13 +207,13 @@ async function archiveDay(day) {
     return { ok: false, message: `${DAY_LABELS[day]} has no session dates to archive yet.` };
   }
 
-  const parentRosterId = ensureDayRoster(day, 'parent');
-  const studentRosterId = ensureDayRoster(day, 'student');
-  const classRosterIds = allClassesList(day).map((c) => c.roster_id).filter(Boolean);
+  const parentRosterId = await ensureDayRoster(day, 'parent');
+  const studentRosterId = await ensureDayRoster(day, 'student');
+  const classRosterIds = (await allClassesList(day)).map((c) => c.roster_id).filter(Boolean);
 
-  db.withTransaction(() => {
-    db.prepare('INSERT INTO roster_archives (day, data_json) VALUES (?, ?)').run(day, JSON.stringify(snapshot));
-    for (const rosterId of [parentRosterId, studentRosterId, ...classRosterIds]) clearDayRosterData(rosterId);
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('INSERT INTO roster_archives (day, data_json) VALUES (?, ?)').run(day, JSON.stringify(snapshot));
+    for (const rosterId of [parentRosterId, studentRosterId, ...classRosterIds]) await clearDayRosterData(tx, rosterId);
   });
 
   return { ok: true, message: `Archived ${DAY_LABELS[day]} attendance. The live roster has been cleared for a fresh start.` };
@@ -261,7 +263,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   if (requestedTab === 'classes') {
     const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
     const hourFilter = HOUR_POSITIONS.includes(parseInt(req.query.hour, 10)) ? parseInt(req.query.hour, 10) : null;
-    let classes = allClassesList(dayFilter || null);
+    let classes = await allClassesList(dayFilter || null);
     // Filtered here rather than in allClassesList() itself (its two other
     // callers - buildDaySnapshot and clearDayRosterData's own roster-id
     // lookup - have no concept of "hour" to filter by) - by hour_position
@@ -301,14 +303,14 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     tabLabel = cfg.label;
   }
 
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   // A class roster has no dates of its own to manage - it always mirrors
   // whichever day's Student roster it belongs to (a class only ever
   // meets when that day's students do), so there's no separate Edit
   // Dates step for it (see the view - Edit Dates/+ Add Member are hidden
   // whenever classId is set).
-  const dates = classId ? await rosterDates(ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
+  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
   const alertDate = todayIfSessionDay(day);
 
   res.render('admin-rosters', {
@@ -326,8 +328,8 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     alertDate,
     alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
     absenceAlerts: absenceFormSubmissionsForRoster(rosterId, alertDate),
-    classesAtRisk: classesAtRiskForDay(day, alertDate),
-    classesNeedingStaff: classesNeedingStaffForDay(day),
+    classesAtRisk: await classesAtRiskForDay(day, alertDate),
+    classesNeedingStaff: await classesNeedingStaffForDay(day),
     availableMembers: availableMembersForRoster(rosterId, memberTypeForTab(tab)),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -345,59 +347,59 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 // "Monday Parents" roster without that date - so a teaching parent
 // reporting their own absence via the public form would be told they
 // "aren't on any roster" for a date their own kids' roster had just fine.
-function siblingRosterId(tab) {
+async function siblingRosterId(tab) {
   const info = TABS[tab];
   if (!info) return null;
   const otherRole = info.role === 'parent' ? 'student' : 'parent';
   return ensureDayRoster(info.day, otherRole);
 }
 
-router.post('/rosters/:tab/dates/add', requireAdmin, (req, res) => {
+router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
-  const siblingId = siblingRosterId(tab);
+  const siblingId = await siblingRosterId(tab);
   for (const d of dates) {
-    insertDate.run(rosterId, d);
-    if (siblingId) insertDate.run(siblingId, d);
+    await insertDate.run(rosterId, d);
+    if (siblingId) await insertDate.run(siblingId, d);
   }
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
 
-router.post('/rosters/:tab/dates/:date/remove', requireAdmin, (req, res) => {
+router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const date = req.params.date;
-  const rosterIds = [rosterId, siblingRosterId(tab)].filter(Boolean);
+  const rosterIds = [rosterId, await siblingRosterId(tab)].filter(Boolean);
   const placeholders = rosterIds.map(() => '?').join(',');
-  db.withTransaction(() => {
-    db.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
-    db.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
-    db.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+  await db.withTransaction(async (tx) => {
+    await tx.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+    await tx.prepare(`DELETE FROM attendance WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
+    await tx.prepare(`DELETE FROM checkouts WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
   });
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)} and its attendance records.`));
 });
 
 // --- Roster membership ---
 
-router.post('/rosters/:tab/add-member', requireAdmin, (req, res) => {
+router.post('/rosters/:tab/add-member', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  memberIds.forEach((memberId) => addManualRosterMember(rosterId, memberId));
+  for (const memberId of memberIds) await addManualRosterMember(rosterId, memberId);
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${memberIds.length} member(s).`));
 });
 
-router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, (req, res) => {
+router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const memberId = parseInt(req.params.memberId, 10);
-  db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
+  await db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
   res.redirect(`/admin/rosters?tab=${tab}`);
 });
 
@@ -407,9 +409,9 @@ router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, (req, res) =>
 // 'present'/'late'/'absent'/'' (blank clears the cell). Entries made here
 // are tagged source='manual' so they're distinguishable from real kiosk
 // scans.
-router.post('/rosters/:tab/attendance', requireAdmin, (req, res) => {
+router.post('/rosters/:tab/attendance', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
 
   const upsert = db.prepare(
@@ -427,9 +429,9 @@ router.post('/rosters/:tab/attendance', requireAdmin, (req, res) => {
     const [, memberId, date] = match;
     const value = (req.body[key] || '').trim();
     if (value === 'present' || value === 'late' || value === 'absent') {
-      upsert.run(parseInt(memberId, 10), rosterId, date, value);
+      await upsert.run(parseInt(memberId, 10), rosterId, date, value);
     } else {
-      clear.run(parseInt(memberId, 10), rosterId, date);
+      await clear.run(parseInt(memberId, 10), rosterId, date);
     }
   }
 
@@ -504,7 +506,7 @@ router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const classId = classIdFromTab(tab);
   const label = classId ? (classRosterInfo(classId) || {}).class_name : (TABS[tab] || {}).label;
-  const rosterId = rosterIdForTab(tab);
+  const rosterId = await rosterIdForTab(tab);
   if (!rosterId || !label) return res.status(404).send('Not found');
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
   const data = await buildRosterGridData(roster);

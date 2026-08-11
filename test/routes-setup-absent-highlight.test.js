@@ -70,19 +70,19 @@ test('utils/classSchedule.js absentMemberIdsForDate', async (t) => {
   db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'absent', 'admin')").run(absentId, rosterId);
   db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'present', 'admin')").run(presentId, rosterId);
 
-  await t.test('returns only members marked absent on that exact date', () => {
-    const ids = absentMemberIdsForDate('2026-01-05');
+  await t.test('returns only members marked absent on that exact date', async () => {
+    const ids = await absentMemberIdsForDate('2026-01-05');
     assert.ok(ids.has(absentId));
     assert.ok(!ids.has(presentId));
   });
 
-  await t.test('returns nothing for a date with no attendance records at all', () => {
-    assert.equal(absentMemberIdsForDate('2026-01-06').size, 0);
+  await t.test('returns nothing for a date with no attendance records at all', async () => {
+    assert.equal((await absentMemberIdsForDate('2026-01-06')).size, 0);
   });
 
-  await t.test('an empty/falsy date returns an empty set rather than matching everything', () => {
-    assert.equal(absentMemberIdsForDate('').size, 0);
-    assert.equal(absentMemberIdsForDate(null).size, 0);
+  await t.test('an empty/falsy date returns an empty set rather than matching everything', async () => {
+    assert.equal((await absentMemberIdsForDate('')).size, 0);
+    assert.equal((await absentMemberIdsForDate(null)).size, 0);
   });
 });
 

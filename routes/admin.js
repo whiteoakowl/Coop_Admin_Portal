@@ -156,7 +156,7 @@ function statsWithTrends(memberType, today, previousDate) {
   };
 }
 
-router.get('/', requireAdmin, (req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   const today = todayISO();
   const previousDate = previousSessionDate(today);
   const memberCount = db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get().c;
@@ -170,7 +170,7 @@ router.get('/', requireAdmin, (req, res) => {
     parentCount,
     studentStats: statsWithTrends('student', today, previousDate),
     parentStats: statsWithTrends('parent', today, previousDate),
-    alerts: todaysAlerts(),
+    alerts: await todaysAlerts(),
   });
 });
 
@@ -295,12 +295,12 @@ router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, (req, re
 // logged in as full Admin, and the PIN itself is a lower-stakes secondary
 // check (kiosk class check-in access), not the credential that gates
 // everything else the way the admin password does.
-router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, (req, res) => {
+router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async (req, res) => {
   const newPin = (req.body.newPin || '').trim();
   if (!/^\d{4}$/.test(newPin)) {
     return renderSettings(req, res, 'PIN must be exactly 4 digits.', null, 'classcheckin');
   }
-  setClassCheckinPin(newPin);
+  await setClassCheckinPin(newPin);
   renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
 });
 
