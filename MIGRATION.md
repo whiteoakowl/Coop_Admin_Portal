@@ -131,9 +131,23 @@ requests to Supabase both fail/reset). This means:
 
 6. **Tests**: `test/dbPostgres.test.js`, `test/pgSessionStore.test.js`,
    `test/storage.test.js`, plus the shared `test/pgTestDb.js` helper. All run
-   as part of the normal `npm test` (355 tests total across the whole repo,
+   as part of the normal `npm test` (374 tests total across the whole repo,
    all passing as of the last commit on this branch). `npm run lint` and
    `npm run lint:css` also clean.
+
+7. **Route files converted to async/await so far** (item 1 under "What's
+   NOT done yet" below - keep this list updated as more get done, so
+   nobody has to re-grep the whole repo to find where this left off):
+   - `routes/contact-admins.js`
+   - `routes/admin-schedule.js` (also fixed 3 `COLLATE NOCASE` → `LOWER()`)
+   - `routes/membership.js` (also: per-child insert loop changed
+     `forEach` → `for...of` so each insert can be awaited)
+   - `routes/name-tag.js`
+
+   Everything else in `routes/` and every `utils/*.js` that does
+   `db.prepare(...)` is still synchronous SQLite - see the special-cases
+   list below for the ones with real dialect work (`withTransaction`,
+   `INSERT OR IGNORE/REPLACE`) rather than a routine await/async pass.
 
 ## What's NOT done yet — the actual remaining work
 
