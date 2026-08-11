@@ -25,10 +25,12 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "multer": "^2.2.0",
+    "pg": "^8.23.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@electric-sql/pglite": "^0.5.4",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "globals": "^17.9.0",
