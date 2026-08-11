@@ -139,15 +139,84 @@ requests to Supabase both fail/reset). This means:
 
 1. **The big one: migrate every route file off synchronous SQLite calls.**
    ~24 files in `routes/`, plus every `utils/*.js` module that does
-   `db.prepare(...)`. This is the largest remaining piece by far. Approach:
-   one file at a time, convert its DB calls to the new async shape, add
-   route-level tests (or confirm existing ones still pass) using
-   `test/pgTestDb.js` instead of a real SQLite file, commit each file (or a
-   small logical group of related files) separately rather than attempting
-   all 24 in one shot. Grep for `db.prepare(` to find every call site still
-   needing conversion — that grep should return zero results in `routes/`
-   and `utils/` once this is done (excluding the untouched SQLite files
-   themselves, which stay as-is until final cutover).
+   `db.prepare(...)`. This is the largest remaining piece by far, but a key
+   discovery makes it much lower-risk than it sounds:
+
+   **`await` on a value that isn't a Promise is a transparent no-op
+   pass-through in JS** (confirmed with a throwaway test during this
+   session - `await db.prepare(sql).get(x)` returns the exact same thing
+   whether `db` is the *old, still-synchronous* SQLite object or the *new*
+   async Postgres one). That means every route file can be converted to
+   `async`/`await` **right now, before the actual database swap, with zero
+   behavior change to the live app** - `server.js` keeps requiring
+   `db/index.js` (still SQLite) the entire time this conversion is
+   happening, and nothing breaks, because `await`-ing a synchronous return
+   value just works. Express 5 (this app's version) also auto-catches
+   rejected Promises from `async` route handlers, so no explicit try/catch
+   wrapping is needed just to keep error handling working.
+
+   This means: **the existing SQLite-backed test suite is the real safety
+   net for each file's conversion** - after converting a route file, run
+   the full existing suite (`npm test`) and it must stay 100% green,
+   completely unchanged in what it asserts. That proves the conversion
+   didn't change behavior. A pglite-based test is only extra-needed for
+   files that hit genuine SQLite-vs-Postgres dialect differences (see
+   below), not for routine "add await, make handler async" conversions.
+
+   Practical approach: one file (or a small logical group) at a time -
+   convert every `db.prepare(sql).get()/.all()/.run()` call to
+   `await ...`, mark the containing route handler `async`, run `npm test`
+   + `npm run lint`, commit. Grep for `db.prepare(` to find remaining call
+   sites - note this grep will still match *already-converted* files too
+   (the call shape is deliberately unchanged, just awaited now), so "done"
+   means every call site has an `await` in front of it and sits inside an
+   `async` function, not that the grep returns zero hits.
+
+   **Special cases that need actual dialect fixes, not just await/async**
+   (grep for these specifically - `grep -rn "INSERT OR \|withTransaction\|PRAGMA\|strftime(" routes utils`):
+   - `db.withTransaction(fn)` call sites - `fn` must become `async (tx) => {...}`
+     and every query inside must go through `tx.prepare(...)`, not the outer
+     `db` - see `db/postgres.js`'s own header comment for the exact
+     right/wrong example. `utils/classSchedule.js` has several of these
+     (`setEnrollment`, `deleteClass`, others - grep it directly).
+   - `INSERT OR IGNORE` / `INSERT OR REPLACE` - Postgres equivalent is
+     `INSERT ... ON CONFLICT (col) DO NOTHING` / `ON CONFLICT (col) DO
+     UPDATE SET ...` (needs an explicit conflict target and, for REPLACE,
+     an explicit SET list - not a blind "replace" the same way SQLite's
+     `OR REPLACE` works).
+   - Any raw `PRAGMA` statement - SQLite-only, no Postgres equivalent
+     needed (Postgres always enforces foreign keys when declared; there's
+     no `PRAGMA table_info()` equivalent needed either, since nothing in
+     this app introspects its own schema at runtime outside `db/index.js`
+     itself, which isn't part of this list).
+   - `db.exec('BEGIN'/'COMMIT'/'ROLLBACK')` used directly (not via
+     `withTransaction`) - same transaction-connection-binding concern as
+     `withTransaction` above; check whether any file does this outside
+     `db/index.js`'s own `withTransaction` implementation.
+   - **`COLLATE NOCASE`** (52 occurrences across 20 files as of this
+     writing - `grep -rn "COLLATE NOCASE" routes utils`) - SQLite's
+     built-in case-insensitive collation, used throughout for
+     case-insensitive sorting (`ORDER BY name COLLATE NOCASE`) and
+     equality (`WHERE name = ? COLLATE NOCASE`, duplicate-name checks
+     etc). **Do not try to create a matching `NOCASE` collation in
+     Postgres as a drop-in fix** - I tried this (`CREATE COLLATION nocase
+     (provider = icu, locale = 'und-u-ks-level2', deterministic =
+     false)`), and while it's a real, documented Postgres technique, it
+     silently broke case-insensitive *equality* matching under PGlite even
+     though case-insensitive *sorting* worked fine with it (`ORDER BY ...
+     COLLATE NOCASE` returned correctly sorted rows; `WHERE name = ?
+     COLLATE NOCASE` matched nothing). Whether that's a PGlite/WASM-ICU
+     limitation specifically or a genuine Postgres behavior I'm not
+     currently able to verify against a real server - either way, it's far
+     too risky to build 20 files' worth of duplicate-detection and lookup
+     logic on an unverified, exotic feature. **Use `LOWER(col) =
+     LOWER(?)` for equality and `ORDER BY LOWER(col)` for sorting
+     instead** - plain, boring, and behaves identically on both engines
+     (SQLite's own `COLLATE NOCASE` is ASCII-only case-folding by default
+     too, same as `LOWER()`, so this is a behavior-preserving rewrite, not
+     a behavior change). Fix this in the same pass as each file's
+     async/await conversion, not as a separate sweep - you're already
+     touching every one of that file's queries anyway.
 
 2. **Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
    app** (`server.js`'s `session()` config, and each of the 5 route files
