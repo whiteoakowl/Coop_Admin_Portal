@@ -116,7 +116,7 @@ async function loadFamilyMember(memberId, parentId) {
 async function allFamilies() {
   return db
     .prepare(
-      `SELECT f.id, f.name, COUNT(m.id) AS memberCount
+      `SELECT f.id, f.name, COUNT(m.id) AS "memberCount"
        FROM families f
        LEFT JOIN members m ON m.family_id = f.id AND m.active = 1
        GROUP BY f.id
@@ -188,7 +188,7 @@ async function rostersByMemberIds(memberIds) {
   const placeholders = memberIds.map(() => '?').join(',');
   const rows = await db
     .prepare(
-      `SELECT rm.member_id AS memberId, r.* FROM rosters r
+      `SELECT rm.member_id AS "memberId", r.* FROM rosters r
        JOIN roster_members rm ON rm.roster_id = r.id
        WHERE rm.member_id IN (${placeholders}) ORDER BY LOWER(r.name)`
     )

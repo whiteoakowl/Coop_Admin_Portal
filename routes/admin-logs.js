@@ -20,9 +20,9 @@ function todayIfSessionDay(day) {
 }
 
 // Every Absence/Late form submission across all rosters, newest first.
-function allAbsenceSubmissions(dateFilter) {
-  let sql = `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date, a.status,
-             a.reason_category AS reasonCategory, a.reason_text AS reasonText
+async function allAbsenceSubmissions(dateFilter) {
+  let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date, a.status,
+             a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
              FROM attendance a
              JOIN members m ON m.id = a.member_id
              JOIN rosters r ON r.id = a.roster_id
@@ -32,11 +32,11 @@ function allAbsenceSubmissions(dateFilter) {
     sql += ' AND a.session_date = ?';
     params.push(dateFilter);
   }
-  sql += ' ORDER BY a.session_date DESC, m.name COLLATE NOCASE';
+  sql += ' ORDER BY a.session_date DESC, LOWER(m.name)';
 
-  return db
+  return (await db
     .prepare(sql)
-    .all(...params)
+    .all(...params))
     .map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
@@ -47,16 +47,16 @@ function allAbsenceSubmissions(dateFilter) {
     }));
 }
 
-function absenceSubmissionDates() {
-  return db
+async function absenceSubmissionDates() {
+  return (await db
     .prepare(`SELECT DISTINCT session_date FROM attendance WHERE source = 'absence_form' ORDER BY session_date DESC`)
-    .all()
+    .all())
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }
 
-function checkinoutLogRows(dateFilter) {
-  let sql = `SELECT m.name AS memberName, r.name AS rosterName, a.session_date AS date,
-             a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+async function checkinoutLogRows(dateFilter) {
+  let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date,
+             a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime", c.number AS number
              FROM attendance a
              JOIN members m ON m.id = a.member_id
              JOIN rosters r ON r.id = a.roster_id
@@ -72,19 +72,19 @@ function checkinoutLogRows(dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
-function checkinoutLogDates() {
-  return db
+async function checkinoutLogDates() {
+  return (await db
     .prepare(`SELECT DISTINCT session_date FROM attendance WHERE check_in_time IS NOT NULL ORDER BY session_date DESC`)
-    .all()
+    .all())
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }
 
 const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
 
-function nameTagSubmissions(showArchived, dateFilter) {
-  let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
-             n.description AS description, n.created_at AS createdAt
+async function nameTagSubmissions(showArchived, dateFilter) {
+  let sql = `SELECT n.id AS id, m.name AS "memberName", n.request_type AS "requestType", n.day AS day,
+             n.description AS description, n.created_at AS "createdAt"
              FROM name_tag_requests n
              JOIN members m ON m.id = n.member_id
              WHERE n.archived = ?`;
@@ -103,7 +103,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
 
   if (tab === 'checkinout') {
-    const allRows = checkinoutLogRows(dateFilter).map((r) => ({
+    const allRows = (await checkinoutLogRows(dateFilter)).map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),
@@ -119,7 +119,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
       allRows,
       pagination,
       baseHref: `/admin/logs?tab=checkinout${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
-      dates: checkinoutLogDates(),
+      dates: await checkinoutLogDates(),
       dateFilter,
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -128,7 +128,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
 
   if (tab === 'nametag') {
     const showArchived = req.query.archived === '1';
-    const allSubmissions = nameTagSubmissions(showArchived, dateFilter).map((r) => ({
+    const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
       id: r.id,
       timestamp: formatTimestamp(r.createdAt),
       memberName: r.memberName,
@@ -136,9 +136,9 @@ router.get('/logs', requireAdmin, async (req, res) => {
       dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
       description: r.description || '—',
     }));
-    const dates = db
-      .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
-      .all(showArchived ? 1 : 0)
+    const dates = (await db
+      .prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
+      .all(showArchived ? 1 : 0))
       .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
     const pagination = paginate(allSubmissions, parsePage(req.query.page));
     return res.render('admin-logs', {
@@ -196,7 +196,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
     });
   }
 
-  const allSubmissions = allAbsenceSubmissions(dateFilter);
+  const allSubmissions = await allAbsenceSubmissions(dateFilter);
   const pagination = paginate(allSubmissions, parsePage(req.query.page));
   res.render('admin-logs', {
     title: 'Absence/Late Log',
@@ -205,7 +205,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
     allSubmissions,
     pagination,
     baseHref: `/admin/logs?tab=absence${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
-    dates: absenceSubmissionDates(),
+    dates: await absenceSubmissionDates(),
     dateFilter,
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -233,9 +233,9 @@ router.get('/logs/allergies/print', requireAdmin, async (req, res) => {
   res.render('logs-allergies-print', { title: 'Allergies/Medical Log', medicalMembers: await membersWithMedicalNotes() });
 });
 
-router.get('/logs/absence/export.csv', requireAdmin, (req, res) => {
+router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
-  const submissions = allAbsenceSubmissions(dateFilter);
+  const submissions = await allAbsenceSubmissions(dateFilter);
   const lines = [
     toCsvRow(['Name', 'Roster', 'Date', 'Status', 'Reason', 'Description']),
     ...submissions.map((s) => toCsvRow([s.memberName, s.rosterName, s.dateLabel, s.statusLabel, s.reasonLabel, s.description || ''])),
@@ -243,9 +243,9 @@ router.get('/logs/absence/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, 'absence-late-log.csv', lines);
 });
 
-router.get('/logs/checkinout/export.csv', requireAdmin, (req, res) => {
+router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
-  const rows = checkinoutLogRows(dateFilter);
+  const rows = await checkinoutLogRows(dateFilter);
   const lines = [
     toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
     ...rows.map((r) =>
@@ -262,10 +262,10 @@ router.get('/logs/checkinout/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, 'check-in-out-log.csv', lines);
 });
 
-router.get('/logs/nametag/export.csv', requireAdmin, (req, res) => {
+router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {
   const showArchived = req.query.archived === '1';
   const dateFilter = req.query.date || '';
-  const submissions = nameTagSubmissions(showArchived, dateFilter);
+  const submissions = await nameTagSubmissions(showArchived, dateFilter);
   const lines = [
     toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
     ...submissions.map((r) =>
@@ -281,15 +281,15 @@ router.get('/logs/nametag/export.csv', requireAdmin, (req, res) => {
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
 
-router.post('/logs/nametag/:id/archive', requireAdmin, (req, res) => {
+router.post('/logs/nametag/:id/archive', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 1 WHERE id = ?').run(id);
   res.redirect('/admin/logs?tab=nametag');
 });
 
-router.post('/logs/nametag/:id/unarchive', requireAdmin, (req, res) => {
+router.post('/logs/nametag/:id/unarchive', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
+  await db.prepare('UPDATE name_tag_requests SET archived = 0 WHERE id = ?').run(id);
   res.redirect('/admin/logs?tab=nametag&archived=1');
 });
 

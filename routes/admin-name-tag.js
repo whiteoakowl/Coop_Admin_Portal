@@ -40,8 +40,8 @@ const uploadDesignImage = multer({
 const NAME_TAG_TABS = ['design', 'print', 'requests', 'archived'];
 
 async function nameTagSubmissions(showArchived, dateFilter) {
-  let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
-             n.description AS description, n.created_at AS createdAt
+  let sql = `SELECT n.id AS id, m.name AS "memberName", n.request_type AS "requestType", n.day AS day,
+             n.description AS description, n.created_at AS "createdAt"
              FROM name_tag_requests n
              JOIN members m ON m.id = n.member_id
              WHERE n.archived = ?`;
@@ -70,7 +70,7 @@ router.get('/name-tag', async (req, res) => {
   }));
 
   const dates = (
-    await db.prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`).all(showArchived ? 1 : 0)
+    await db.prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`).all(showArchived ? 1 : 0)
   ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
 
   const members = await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
@@ -154,13 +154,10 @@ router.post('/name-tag/template/:type', async (req, res) => {
     return res.json({ ok: true });
   }
 
-  // datetime('now') - SQLite-only, deliberately left as-is (see
-  // MIGRATION.md's special-cases list); not touched by this routine
-  // async/await pass.
   await db
     .prepare(
-      `INSERT INTO name_tag_templates (member_type, layout_json, updated_at) VALUES (?, ?, datetime('now'))
-       ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+      `INSERT INTO name_tag_templates (member_type, layout_json, updated_at) VALUES (?, ?, now_text())
+       ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = now_text()`
     )
     .run(type, JSON.stringify(layout));
 

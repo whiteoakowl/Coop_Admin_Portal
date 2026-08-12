@@ -28,16 +28,16 @@ function todayIfSessionDay(day) {
 
 // Absence/Late form submissions on this roster for one date, split by
 // status - feeds the Attendance page's "Today's Alerts" log.
-function absenceFormSubmissionsForRoster(rosterId, date) {
+async function absenceFormSubmissionsForRoster(rosterId, date) {
   if (!date) return { absences: [], lates: [] };
-  const rows = db
+  const rows = (await db
     .prepare(
-      `SELECT m.name AS name, a.status, a.reason_category AS reasonCategory, a.reason_text AS reasonText
+      `SELECT m.name AS name, a.status, a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
        FROM attendance a
        JOIN members m ON m.id = a.member_id
        WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form'`
     )
-    .all(rosterId, date)
+    .all(rosterId, date))
     .sort(byLastName)
     .map((r) => ({
       memberName: r.name,
@@ -69,10 +69,10 @@ function classIdFromTab(tab) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-function classRosterInfo(classId) {
+async function classRosterInfo(classId) {
   return db
     .prepare(
-      `SELECT c.*, h.label AS hourLabel FROM classes c
+      `SELECT c.*, h.label AS "hourLabel" FROM classes c
        JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
        WHERE c.id = ?`
     )
@@ -98,14 +98,14 @@ function memberTypeForTab(tab) {
   return cfg ? cfg.role : null;
 }
 
-function availableMembersForRoster(rosterId, memberType) {
+async function availableMembersForRoster(rosterId, memberType) {
   if (!memberType) return [];
-  return db
+  return (await db
     .prepare(
       `SELECT id, name FROM members WHERE active = 1 AND member_type = ?
        AND id NOT IN (SELECT member_id FROM roster_members WHERE roster_id = ?)`
     )
-    .all(memberType, rosterId)
+    .all(memberType, rosterId))
     .sort(byLastName);
 }
 
@@ -234,8 +234,8 @@ function archiveSummary(row) {
   };
 }
 
-function loadArchive(id) {
-  const row = db.prepare('SELECT * FROM roster_archives WHERE id = ?').get(id);
+async function loadArchive(id) {
+  const row = await db.prepare('SELECT * FROM roster_archives WHERE id = ?').get(id);
   if (!row) return null;
   return { id: row.id, day: row.day, archivedAtLabel: formatTimestamp(row.archived_at), ...JSON.parse(row.data_json) };
 }
@@ -292,7 +292,7 @@ router.get('/rosters', requireAdmin, async (req, res) => {
   let tabLabel;
 
   if (classId) {
-    const cls = classRosterInfo(classId);
+    const cls = await classRosterInfo(classId);
     if (!cls) return res.redirect('/admin/rosters?tab=classes');
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
@@ -327,10 +327,10 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
     alertDate,
     alertDateLabel: alertDate ? formatDateLabel(alertDate) : null,
-    absenceAlerts: absenceFormSubmissionsForRoster(rosterId, alertDate),
+    absenceAlerts: await absenceFormSubmissionsForRoster(rosterId, alertDate),
     classesAtRisk: await classesAtRiskForDay(day, alertDate),
     classesNeedingStaff: await classesNeedingStaffForDay(day),
-    availableMembers: availableMembersForRoster(rosterId, memberTypeForTab(tab)),
+    availableMembers: await availableMembersForRoster(rosterId, memberTypeForTab(tab)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -359,7 +359,9 @@ router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
   const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
-  const insertDate = db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)');
+  const insertDate = db.prepare(
+    'INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING'
+  );
   const siblingId = await siblingRosterId(tab);
   for (const d of dates) {
     await insertDate.run(rosterId, d);
@@ -450,14 +452,14 @@ router.post('/rosters/:day/archive', requireAdmin, requireDay, async (req, res) 
   res.redirect(`/admin/rosters?tab=${day}-student&${query}`);
 });
 
-router.get('/rosters/archive/:id/view-fragment', requireAdmin, (req, res) => {
-  const archive = loadArchive(parseInt(req.params.id, 10));
+router.get('/rosters/archive/:id/view-fragment', requireAdmin, async (req, res) => {
+  const archive = await loadArchive(parseInt(req.params.id, 10));
   if (!archive) return res.status(404).send('Not found');
   res.render('roster-archive-view-fragment', { archive, dayLabel: DAY_LABELS[archive.day] });
 });
 
-router.get('/rosters/archive/:id/print', requireAdmin, (req, res) => {
-  const archive = loadArchive(parseInt(req.params.id, 10));
+router.get('/rosters/archive/:id/print', requireAdmin, async (req, res) => {
+  const archive = await loadArchive(parseInt(req.params.id, 10));
   if (!archive) return res.status(404).send('Not found');
   res.render('admin-rosters-archive-print', {
     title: `${DAY_LABELS[archive.day]} Attendance Archive — ${archive.archivedAtLabel}`,
@@ -489,8 +491,8 @@ function gridCsvSection(sectionLabel, grid) {
   return [toCsvRow([sectionLabel]), toCsvRow(header), ...rowLines, ...summaryRows, toCsvRow([])];
 }
 
-router.get('/rosters/archive/:id/export.csv', requireAdmin, (req, res) => {
-  const archive = loadArchive(parseInt(req.params.id, 10));
+router.get('/rosters/archive/:id/export.csv', requireAdmin, async (req, res) => {
+  const archive = await loadArchive(parseInt(req.params.id, 10));
   if (!archive) return res.status(404).send('Not found');
 
   const lines = [
@@ -505,7 +507,7 @@ router.get('/rosters/archive/:id/export.csv', requireAdmin, (req, res) => {
 router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const classId = classIdFromTab(tab);
-  const label = classId ? (classRosterInfo(classId) || {}).class_name : (TABS[tab] || {}).label;
+  const label = classId ? ((await classRosterInfo(classId)) || {}).class_name : (TABS[tab] || {}).label;
   const rosterId = await rosterIdForTab(tab);
   if (!rosterId || !label) return res.status(404).send('Not found');
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);

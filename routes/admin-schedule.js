@@ -277,8 +277,8 @@ router.post('/schedule/design/template', requireFullAdmin, async (req, res) => {
 
   await db
     .prepare(
-      `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, datetime('now'))
-       ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+      `INSERT INTO schedule_card_templates (id, layout_json, updated_at) VALUES (1, ?, now_text())
+       ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json, updated_at = now_text()`
     )
     .run(JSON.stringify(layout));
 

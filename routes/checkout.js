@@ -25,7 +25,7 @@ router.post('/checkout/scan', async (req, res) => {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
-  const rosters = getMemberRostersForDate(member.id, today);
+  const rosters = await getMemberRostersForDate(member.id, today);
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
@@ -60,19 +60,16 @@ router.post('/checkout/submit', async (req, res) => {
     return res.json({ ok: false, message: 'Member not found.' });
   }
 
-  const rosters = getMemberRostersForDate(member.id, today);
+  const rosters = await getMemberRostersForDate(member.id, today);
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
 
-  // datetime('now') - SQLite-only, deliberately left as-is (see
-  // MIGRATION.md's special-cases list); not touched by this routine
-  // async/await pass.
   const upsert = db.prepare(
     `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET number = excluded.number, check_out_time = excluded.check_out_time, recorded_at = datetime('now')`
+     DO UPDATE SET number = excluded.number, check_out_time = excluded.check_out_time, recorded_at = now_text()`
   );
   const now = Date.now();
   for (const roster of rosters) {

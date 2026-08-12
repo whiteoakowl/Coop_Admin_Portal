@@ -9,7 +9,7 @@ const db = require('../db');
 async function taskListSectionsForDay(day) {
   const sections = await db
     .prepare(
-      `SELECT ts.*, st.title AS teamTitle
+      `SELECT ts.*, st.title AS "teamTitle"
        FROM task_list_sections ts
        LEFT JOIN setup_teams st ON st.id = ts.team_id
        WHERE ts.day = ?
@@ -31,7 +31,7 @@ async function getSection(id) {
 }
 
 async function nextSectionPosition(day) {
-  const row = await db.prepare('SELECT MAX(position) AS maxPos FROM task_list_sections WHERE day = ?').get(day);
+  const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM task_list_sections WHERE day = ?').get(day);
   return (row && row.maxPos != null ? row.maxPos : -1) + 1;
 }
 
@@ -64,7 +64,7 @@ async function swapSectionPosition(day, sectionId, direction) {
 }
 
 async function nextItemPosition(sectionId) {
-  const row = await db.prepare('SELECT MAX(position) AS maxPos FROM task_list_items WHERE section_id = ?').get(sectionId);
+  const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM task_list_items WHERE section_id = ?').get(sectionId);
   return (row && row.maxPos != null ? row.maxPos : -1) + 1;
 }
 

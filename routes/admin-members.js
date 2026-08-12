@@ -80,8 +80,8 @@ function deletePhotoFile(photoPath) {
 async function attendanceHistoryForMember(memberId) {
   return db
     .prepare(
-      `SELECT r.name AS rosterName, a.session_date AS date, a.status,
-              a.check_in_time AS checkInTime, c.check_out_time AS checkOutTime, c.number AS number
+      `SELECT r.name AS "rosterName", a.session_date AS date, a.status,
+              a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime", c.number AS number
        FROM attendance a
        JOIN rosters r ON r.id = a.roster_id
        LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
@@ -244,7 +244,7 @@ function memberFormFields(req) {
 async function syncCleanupTeams(memberId, teamIds) {
   await db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
   if (!teamIds) return;
-  const link = db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)');
+  const link = db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING');
   for (const teamId of teamIds) await link.run(teamId, memberId);
 }
 
@@ -283,7 +283,7 @@ async function ensureFamilyForParent(parentId) {
 async function allSetupTeams() {
   return db
     .prepare(
-      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS memberCount
+      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS "memberCount"
        FROM setup_teams t
        LEFT JOIN setup_team_members stm ON stm.team_id = t.id
        GROUP BY t.id
@@ -431,7 +431,7 @@ router.get('/members/:id', async (req, res) => {
   const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
 
   const family = await db
-    .prepare('SELECT f.name AS familyName FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
+    .prepare('SELECT f.name AS "familyName" FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
     .get(id);
 
   res.render('admin-member-profile', {

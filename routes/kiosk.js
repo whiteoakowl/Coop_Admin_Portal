@@ -65,7 +65,7 @@ router.post('/checkin/scan', async (req, res) => {
   // checkin.js) - two independent presence signals by design, not two
   // paths to the same one, so "checked in at the front door" and
   // "actually sat in this specific classroom" stay distinguishable.
-  const rosters = getMemberRostersForDate(member.id, today).filter((r) => r.category !== 'Class Roster');
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
@@ -88,14 +88,11 @@ router.post('/checkin/scan', async (req, res) => {
     });
   }
 
-  // datetime('now') - SQLite-only, deliberately left as-is (see
-  // MIGRATION.md's special-cases list); not touched by this routine
-  // async/await pass.
   const upsert = db.prepare(
     `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
      VALUES (?, ?, ?, 'present', ?, 'kiosk')
      ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = datetime('now')`
+     DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = now_text()`
   );
   for (const r of rosters) {
     await upsert.run(member.id, r.id, today, now);

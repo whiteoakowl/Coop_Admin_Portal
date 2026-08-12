@@ -33,8 +33,8 @@ const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'B
 // this is a second, independent way to reach the same underlying
 // name_tag_requests data, not a replacement for it.
 async function nameTagSubmissions(showArchived, dateFilter) {
-  let sql = `SELECT n.id AS id, m.name AS memberName, n.request_type AS requestType, n.day AS day,
-             n.description AS description, n.created_at AS createdAt
+  let sql = `SELECT n.id AS id, m.name AS "memberName", n.request_type AS "requestType", n.day AS day,
+             n.description AS description, n.created_at AS "createdAt"
              FROM name_tag_requests n
              JOIN members m ON m.id = n.member_id
              WHERE n.archived = ?`;
@@ -80,7 +80,7 @@ router.get('/design', async (req, res) => {
   }));
   const requestDates = (
     await db
-      .prepare(`SELECT DISTINCT date(created_at) AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
+      .prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
       .all(showArchived ? 1 : 0)
   ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
   const requestsPagination = paginate(allSubmissions, parsePage(req.query.page));

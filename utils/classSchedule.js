@@ -230,7 +230,7 @@ async function roomGridForDay(day) {
 async function roomsForDay(day) {
   return (
     await db
-      .prepare("SELECT DISTINCT room FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY LOWER(room)")
+      .prepare("SELECT DISTINCT room, LOWER(room) AS \"sortRoom\" FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY \"sortRoom\"")
       .all(day)
   ).map((r) => r.room);
 }
@@ -501,16 +501,17 @@ async function setRosterMembership(rosterId, memberIdSet) {
 // filtered to one day), alphabetical by title, each with the grade(s)/
 // day/time/teacher/assistants needed for that one-line summary.
 async function allClassesList(day) {
+  const dayParam = day || null;
   const rows = await db
     .prepare(
-      `SELECT c.*, h.label AS hourLabel,
-              (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS studentCount
+      `SELECT c.*, h.label AS "hourLabel",
+              (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS "studentCount"
        FROM classes c
        JOIN class_schedule_hours h ON h.day = c.day AND h.position = c.hour_position
-       WHERE (@day IS NULL OR c.day = @day)
+       WHERE (?::text IS NULL OR c.day = ?::text)
        ORDER BY LOWER(c.class_name)`
     )
-    .all({ day: day || null });
+    .all(dayParam, dayParam);
   const list = [];
   for (const r of rows) {
     const staff = await staffForClass(r.id);
@@ -652,18 +653,15 @@ async function timeRangeForClass(cls) {
 // "Hour N", the same position class_schedule_hours already keys both by),
 // not to any specific class, so it never overwrites a real one.
 //
-// datetime('now') - SQLite-only, deliberately left as-is (see
-// MIGRATION.md's special-cases list); not touched by this routine
-// async/await pass.
 async function syncMemberSchedulesForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
   await db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
   const upsert = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     VALUES (?, ?, ?, ?, ?, ?, ?, now_text())
      ON CONFLICT(member_id, day, class_number) DO UPDATE SET
        time = excluded.time, class_name = excluded.class_name, room = excluded.room,
-       teacher = excluded.teacher, updated_at = datetime('now')`
+       teacher = excluded.teacher, updated_at = now_text()`
   );
 
   for (const cls of classes) {
@@ -678,7 +676,7 @@ async function syncMemberSchedulesForDay(day) {
 
   const insertIfEmpty = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
-     VALUES (?, ?, ?, ?, 'Floater', '', '', datetime('now'))
+     VALUES (?, ?, ?, ?, 'Floater', '', '', now_text())
      ON CONFLICT(member_id, day, class_number) DO NOTHING`
   );
   const list = await getListByDay(day);

@@ -22,13 +22,10 @@ async function getMiscTemplate(badgeType) {
   }
 }
 
-// datetime('now') - SQLite-only, deliberately left as-is (see
-// MIGRATION.md's special-cases list); not touched by this routine
-// async/await pass.
 async function saveMiscTemplate(badgeType, layout) {
   await db.prepare(
-    `INSERT INTO misc_badge_templates (badge_type, layout_json, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(badge_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = datetime('now')`
+    `INSERT INTO misc_badge_templates (badge_type, layout_json, updated_at) VALUES (?, ?, now_text())
+     ON CONFLICT(badge_type) DO UPDATE SET layout_json = excluded.layout_json, updated_at = now_text()`
   ).run(badgeType, JSON.stringify(layout));
 }
 

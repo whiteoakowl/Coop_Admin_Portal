@@ -220,7 +220,7 @@ router.post('/classes/:id/scan/checkin', requireUnlocked, async (req, res) => {
       `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
        VALUES (?, ?, ?, 'present', ?, 'kiosk_class_checkin')
        ON CONFLICT(member_id, roster_id, session_date)
-       DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk_class_checkin', recorded_at = datetime('now')`
+       DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk_class_checkin', recorded_at = now_text()`
     )
     .run(member.id, cls.roster_id, today, Date.now());
 
@@ -261,7 +261,7 @@ router.post('/classes/:id/scan/checkout', requireUnlocked, async (req, res) => {
       `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
        VALUES (?, ?, ?, NULL, ?)
        ON CONFLICT(member_id, roster_id, session_date)
-       DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = datetime('now')`
+       DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = now_text()`
     )
     .run(member.id, cls.roster_id, today, Date.now());
 

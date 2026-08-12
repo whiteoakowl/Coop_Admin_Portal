@@ -4,7 +4,7 @@ const { byLastName } = require('./members');
 async function teamsForDay(day) {
   return db
     .prepare(
-      `SELECT st.*, m.name AS leaderName
+      `SELECT st.*, m.name AS "leaderName"
        FROM setup_teams st
        LEFT JOIN members m ON m.id = st.leader_id AND m.active = 1
        WHERE st.day = ?

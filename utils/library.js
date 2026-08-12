@@ -64,11 +64,8 @@ async function checkoutItems(memberId, itemIds, dueDate) {
   for (const itemId of itemIds) await insert.run(memberId, itemId, dueDate || null);
 }
 
-// datetime('now') - SQLite-only, deliberately left as-is (see
-// MIGRATION.md's special-cases list); not touched by this routine
-// async/await pass.
 async function returnCheckout(id) {
-  await db.prepare("UPDATE library_checkouts SET checked_in_at = datetime('now') WHERE id = ?").run(id);
+  await db.prepare("UPDATE library_checkouts SET checked_in_at = now_text() WHERE id = ?").run(id);
 }
 
 // Members page: every member who currently has at least one item checked

@@ -30,7 +30,7 @@ const RANK_ORDER = { first: 0, sometimes: 1, backup: 2 };
 async function membersForList(listId) {
   const rows = await db
     .prepare(
-      `SELECT m.*, vm.section_id AS sectionId, vm.rank AS rank FROM members m
+      `SELECT m.*, vm.section_id AS "sectionId", vm.rank AS rank FROM members m
        JOIN volunteer_members vm ON vm.member_id = m.id
        WHERE vm.volunteer_list_id = ? AND m.active = 1
        ORDER BY LOWER(m.name)`

@@ -73,7 +73,7 @@ router.post('/absence/submit', async (req, res) => {
   const namesRecorded = [];
 
   for (const student of students) {
-    const rosters = getMemberRostersForDate(student.id, sessionDate);
+    const rosters = await getMemberRostersForDate(student.id, sessionDate);
     if (rosters.length === 0) continue;
 
     let skippedAsPresent = 0;
@@ -88,12 +88,9 @@ router.post('/absence/submit', async (req, res) => {
       }
 
       const status = type === 'late' ? 'late' : 'absent';
-      // datetime('now') - SQLite-only, deliberately left as-is (see
-      // MIGRATION.md's special-cases list); not touched by this routine
-      // async/await pass.
       if (existing) {
         await db
-          .prepare(`UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = datetime('now') WHERE id = ?`)
+          .prepare(`UPDATE attendance SET status = ?, source = 'absence_form', reason_category = ?, reason_text = ?, recorded_at = now_text() WHERE id = ?`)
           .run(status, reasonCategory, reason, existing.id);
       } else {
         await db

@@ -114,10 +114,9 @@ router.post('/setup/:day/teams/add-member', requireAdmin, requireDay, async (req
   const teamId = parseInt(req.body.teamId, 10);
   const memberId = parseInt(req.body.memberId, 10);
   if (teamId && memberId) {
-    // INSERT OR IGNORE - SQLite-only syntax, deliberately left as-is here
-    // (see MIGRATION.md's special-cases list); this file's routine
-    // async/await pass doesn't touch dialect-specific SQL text.
-    await db.prepare('INSERT OR IGNORE INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
+    await db
+      .prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING')
+      .run(teamId, memberId);
   }
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent('Member added.'));
 });

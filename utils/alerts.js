@@ -28,12 +28,12 @@ function todaysSessionDays(date) {
 async function absenceFormAlertsForDay(day, date) {
   return db
     .prepare(
-      `SELECT DISTINCT a.member_id AS memberId, m.name AS memberName, a.status
+      `SELECT DISTINCT a.member_id AS "memberId", m.name AS "memberName", a.status, LOWER(m.name) AS "sortName"
        FROM attendance a
        JOIN members m ON m.id = a.member_id
        JOIN rosters r ON r.id = a.roster_id
        WHERE a.session_date = ? AND a.source = 'absence_form' AND r.schedule_day = ?
-       ORDER BY LOWER(m.name)`
+       ORDER BY "sortName"`
     )
     .all(date, day);
 }

@@ -139,7 +139,9 @@ router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, 
   const day = req.params.day;
   const list = await getListByDay(day);
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
-  const insertDate = db.prepare('INSERT OR IGNORE INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)');
+  const insertDate = db.prepare(
+    'INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?) ON CONFLICT (volunteer_list_id, session_date) DO NOTHING'
+  );
   for (const d of dates) await insertDate.run(list.id, d);
   res.redirect(manageUrl(day, { notice: `Added ${dates.length} date(s).`, dialog: dialogParam(req) }));
 });
