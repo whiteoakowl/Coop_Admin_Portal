@@ -584,19 +584,17 @@ requests to Supabase both fail/reset). This means:
    the script itself is written and dry-run-verified (item 9 above), but
    has never touched a real Supabase project, since this sandboxed
    environment can't reach one. Create the 5 Storage buckets first (table
-   above), then run without `--dry-run`.
+   above), then run without `--dry-run`. **This is now the only item left
+   before this branch is production-ready** — see the next section for why
+   item 3 (below) no longer blocks it.
 
-3. **`db/index.js` (the SQLite version) gets deleted, and `db/postgres.js`
-   gets promoted to be `db/index.js`** — the very last step, once item 1
-   above is wired in and the whole test suite is green using ONLY the
-   Postgres path (a pglite-backed run, at minimum, since this environment
-   can't reach a real Postgres server either). Until then, both coexist
-   deliberately (the SQLite version is what the live `main`/production app
-   still runs on). Also revisit `server.js`'s `ensureDayRosterSync` startup
-   fix at this point - see its own header comment and the "real, confirmed
-   startup race" writeup above for why the synchronous-completion trick it
-   relies on stops holding once the live driver is genuinely async
-   Postgres.
+3. ~~`db/index.js` (the SQLite version) gets deleted, and `db/postgres.js`
+   gets promoted to be `db/index.js`~~ **Done** — see "Session update: full
+   DB cutover" below for the full writeup (design, the dialect bugs found,
+   the test-suite hang root-cause, everything). The app's entire query
+   layer is now Postgres/PGlite; `node:sqlite` is gone from every runtime
+   code path (it survives only inside `scripts/migrate-to-supabase.js`,
+   which legitimately needs to *read* the old SQLite file as its source).
 
 ## Session update: Storage + session-store wiring (item 1 done)
 
@@ -697,20 +695,215 @@ fakes/local disk. The next session with real network access should treat
 "does an actual upload round-trip through a real bucket" as unverified
 until it's actually tried.
 
+## Session update: full DB cutover (item 3 done)
+
+Same network restriction as every prior session — this was built and fully
+tested without ever reaching a live Supabase project. Context for why this
+phase happened now rather than waiting for real credentials: the user
+confirmed there's no real production data yet ("we are getting ready to
+launch"), so there was nothing at risk in cutting the code over immediately
+and validating it against PGlite, rather than leaving `db/index.js` (SQLite)
+and `db/postgres.js` coexisting until a live connection became available.
+
+### The new `db/index.js`
+
+Rewritten from scratch as the single db-module entrypoint: real Postgres
+(`createPgDb`) when `DATABASE_URL` is set, otherwise an embedded PGlite
+instance. `db/postgres.js` (previously the not-yet-wired-in replacement) is
+now the only driver — the old synchronous `node:sqlite`-based module is gone.
+
+Two distinct "not ready yet" promises, deliberately kept separate:
+- **`schemaReady`** — PGlite has no tables until its schema is applied
+  (async; a real Supabase project already has its schema live, so this
+  resolves instantly there). Passed into `db/postgres.js`'s query wrapper so
+  every `.get/.all/.run()` transparently waits for it — including calls made
+  by `seedIfMissing()` itself, which is why this has to be the *narrower* of
+  the two promises: gating every query on "seeding has finished" would
+  deadlock the seeding step against itself.
+- **`db.ready`** (exported) — `schemaReady` **and** first-boot seeding both
+  done. `server.js` layers its own roster-bootstrap step on top of this and
+  exposes the combined result as `app.ready`, which every
+  `test/routes-*.test.js` file now awaits right after requiring the module,
+  the same synchronous-boot guarantee `node:sqlite` used to give for free.
+
+`DB_PATH` being *set at all* (any value) now means "give me an isolated
+in-memory instance" — every test file already sets it to a unique throwaway
+path (a leftover convention from the `node:sqlite` days), and `node --test`
+already isolates each file into its own process, so in-memory is exactly as
+isolated and meaningfully faster (seconds saved per file vs. giving each test
+file its own on-disk WASM database). `DB_PATH` unset means a real local/LAN
+install (`node server.js` with no Supabase involved at all — still a
+supported deployment), which persists to a fixed `data/pglite` directory so
+data survives a restart. (Earlier draft of this logic had it backwards —
+treating `DB_PATH`'s *value* as a real persistence directory — which broke
+test cleanup with `EISDIR` since `fs.rmSync` without `recursive: true` can't
+remove a directory; fixed by flipping to "set at all" vs "unset".)
+
+### `server.js`'s boot sequence
+
+The old `ensureDayRosterSync` trick (a synchronous duplicate of
+`ensureDayRoster`, needed only because the live driver used to still be
+synchronous SQLite underneath the async wrapper) is gone. `bootRosters()` now
+just calls the real async `ensureDayRoster`/`syncDayMemberRosters` in a
+sequential `await` loop, chained onto `db.ready` and exported as `app.ready`.
+`if (require.main === module)` now does `app.ready.then(() => app.listen(...))`
+instead of listening immediately.
+
+### Ten real Postgres-vs-SQLite dialect bugs found and fixed
+
+All found by running the full test suite against real PGlite (a real
+Postgres engine, not a mock) — none of these would have been caught by
+`eslint` or `node -c`:
+
+1. **Unquoted identifier case-folding.** Postgres lowercases unquoted
+   identifiers; SQLite doesn't. Every camelCase SQL alias (`AS "hourLabel"`,
+   `AS "studentCount"`, etc.) needed explicit double-quoting — 36 fixes
+   across 11 files. The very first one found, `utils/taskList.js`'s
+   `MAX(position) AS maxPos`, had been silently returning 0 for every
+   `nextSectionPosition`/`nextItemPosition` call.
+2. **`SELECT DISTINCT ... ORDER BY` must match the select list exactly.**
+   `utils/classSchedule.js`'s `roomsForDay` and `utils/alerts.js`'s
+   `absenceFormAlertsForDay` both sorted by a case-folded expression not in
+   the select list — fixed by adding the expression to the select list under
+   its own alias and sorting by that alias.
+3. **No named parameters.** SQLite's `@day`-style named params don't exist in
+   Postgres (`@` is an operator there) — `utils/classSchedule.js`'s
+   `allClassesList` rewritten to positional `?` placeholders with `::text`
+   casts (`? IS NULL` alone isn't enough — Postgres can't infer the
+   parameter's type without one).
+4. **Transaction poisoning (25P02).** A failed statement inside a
+   transaction blocks every subsequent statement until `ROLLBACK` — the
+   original try/insert/catch/retry pattern for tables without a surrogate
+   `id` column broke inside `withTransaction`. Fixed by proactively checking
+   `information_schema.columns` first instead of trying and catching.
+5. **`date()` returns a native `date`, not text.** Several `date(created_at)
+   AS d` selects got a JS `Date` object back via the `pg` driver instead of
+   a string — fixed with an explicit `::text` cast where the caller expected
+   a string.
+6. **`COUNT(*)` returns bigint-as-string.** Every `Number()`-less comparison
+   against a `COUNT(*)` result needed wrapping — caught across ~15 test
+   files doing `assert.equal(count, 3)` against a `"3"` string.
+7. **`INSERT OR IGNORE` doesn't exist.** Every occurrence rewritten to
+   `INSERT ... ON CONFLICT (...) DO NOTHING` across
+   `db/postgres.js`/`routes/admin-members.js`/`routes/admin-setup.js`/
+   `routes/admin-volunteers.js`/`utils/classSchedule.js`/`utils/library.js`/
+   `utils/volunteers.js`/`utils/substitutes.js`.
+8. **`COLLATE NOCASE` doesn't exist.** Every case-insensitive comparison
+   rewritten to `LOWER(...)` on both sides.
+9. **`datetime('now')` doesn't exist.** Replaced with `now_text()`, a
+   Postgres function already defined in the schema that reproduces SQLite's
+   exact `'YYYY-MM-DD HH:MM:SS'` output format, across 9 files.
+10. **`run()`'s `lastInsertRowid` extraction regressed itself mid-session** —
+    an early fix gated `.id` extraction on which SQL-rewrite path was taken,
+    which broke an INSERT that already had its own explicit `RETURNING`
+    clause. Fixed by always attempting to read `res.rows[0].id` regardless
+    of which path ran, caught by `test/dbPostgres.test.js`'s own coverage for
+    that exact case.
+
+### Backup/Restore disabled
+
+`utils/backup.js` was SQLite-only by construction (`PRAGMA integrity_check`,
+opening an arbitrary uploaded file as a throwaway SQLite connection to
+validate it) with no Postgres equivalent worth building right now. Rather
+than half-port it, the user chose to disable the feature with an explanatory
+message (Supabase backs up the data on its own end; a Supabase-native
+backup/restore feature "may be added later"). Removed: `utils/backup.js`,
+`test/backup.test.js`, `test/backupPackage.test.js`, `test/restore.test.js`,
+the 3 restore routes + multer config in `routes/admin.js`, and the dead
+`databaseFileFilter`/`RESTORE_EXTENSIONS` helpers in `utils/uploads.js`. The
+Settings page's Backup/Restore tab now just explains the situation.
+
+### The "hanging for hours" investigation
+
+The user twice flagged the test suite as apparently hung ("should it still
+be running this long?", "its been running for hours now") — correctly, as it
+turned out. Root cause was two compounding problems, not one:
+
+1. **Zombie process accumulation.** `timeout` only signals its own direct
+   child, not the grandchild processes `node --test`'s file-isolation
+   mechanism spawns — repeated background `npm test` invocations across
+   turns, without waiting for or killing the prior one first, left orphaned
+   `node` processes accumulating in the background, consuming resources and
+   making each successive run look slower/stuck.
+2. **A real dangling-handle bug.** Any test file that made its first HTTP
+   request (e.g. logging in) *without* first awaiting `app.ready` could have
+   that request race ahead of admin-account seeding — login would fail with
+   no `Set-Cookie` header, and a later `.set('Cookie', undefined)` on that
+   `undefined` would throw mid-flight, leaving a dangling handle that
+   prevented the process from ever exiting naturally, even though `node
+   --test`'s own TAP output showed the file's tests reporting results.
+   Fixed by adding `test.before(() => app.ready)` to the 9 test files
+   missing it, found via a systematic sweep (not just the one file where the
+   symptom first surfaced).
+
+Confirmed via `--test-force-exit` (Node 22) making a previously-hanging
+process exit cleanly despite the dangling handle — added to `package.json`'s
+`test` script as a permanent defense-in-depth measure, independent of
+whether every test file gets this exactly right in the future.
+
+### A second, subtler bug found *after* the hang was fixed
+
+Once the suite ran to completion instead of hanging, two real test
+failures surfaced that the hang had been masking:
+
+- `test/routes-search.test.js` hardcoded `roster_id = 2` in a raw INSERT,
+  assuming a specific seed-order roster id — fixed to look up a real roster
+  id (`SELECT id FROM rosters LIMIT 1`) instead of assuming one.
+- That fix uncovered a second, more interesting bug in the same file:
+  **Node's test runner does not run multiple top-level `test.before()` hooks
+  strictly sequentially.** The file had `test.before(() => app.ready)`
+  followed by a second, separate `test.before(async () => {...})` doing
+  setup inserts — and the second hook could start running *before* the
+  first one's `app.ready` had actually resolved, racing ahead of roster
+  seeding (confirmed by direct reproduction: a debug hook logging the
+  roster count read `0` under `node --test`, but consistently `4` when the
+  exact same boot sequence was driven by a plain `node -e` script with no
+  test runner involved — the ordering guarantee only breaks under `node
+  --test`'s own hook scheduling). Grepped every test file for this same
+  "more than one top-level `test.before()`" shape — `routes-search.test.js`
+  was the only one — and fixed it by merging into a single hook that awaits
+  `app.ready` itself, rather than relying on hook registration order. Worth
+  remembering for any *future* test file that adds a second `test.before()`:
+  each one needs to independently await `app.ready` if it touches the db,
+  not just the first one.
+
+Also deleted `test/zzrepro.test.js`, a scratch debug file created earlier in
+this investigation to reproduce the original hang report — no assertions,
+never meant to be committed.
+
+### Dead code removed
+
+`utils/sqliteSessionStore.js` — no longer required anywhere (`server.js` was
+already exclusively using `utils/pgSessionStore.js`). No other
+`node:sqlite`/`better-sqlite3` references remain in any runtime code path;
+`scripts/migrate-to-supabase.js`'s own `node:sqlite` import is expected and
+correct — it's the one script that legitimately still needs to *read* the
+old SQLite file as its migration source. `db/schema.sql` (the original
+SQLite schema) was deliberately left in place, unread by any code now, since
+several comments elsewhere in the codebase still point to it as
+documentation of the original column/constraint definitions.
+
+### Final state
+
+373 tests passing, `npm test` exits cleanly on its own (no hang, no
+`--test-force-exit` needed in practice anymore, though it stays as a safety
+net), `npx eslint .` clean.
+
 ## Suggested next steps for whoever picks this up
 
 Every piece of this migration that can be built, tested, and verified
 *without* a live Supabase connection is now done (schema translation, the
-async DB layer, session store, Storage wrapper, the full route/utils
-async/await conversion, Netlify deployment config, and the data/file
-migration script - see "What's done so far" above). What's left all
-genuinely requires either real Supabase connectivity or a human's own
-judgment call, which is why it's stopped here rather than being guessed at:
+async DB layer now fully cut over to Postgres/PGlite with `node:sqlite` gone
+entirely, session store, Storage wrapper, the full route/utils async/await
+conversion, Netlify deployment config, and the data/file migration script -
+see "What's done so far" above). Exactly one item is left, and it genuinely
+requires real Supabase connectivity, which is why it's stopped here rather
+than being guessed at:
 
 1. Read this file, then skim the "What's done so far" and "What's NOT done
    yet" sections above to get oriented - the latter is the authoritative
-   remaining-work list (2 items left as of this writing: running the real
-   data migration, then the final `db/index.js` cutover).
+   remaining-work list (1 item left as of this writing: running the real
+   data migration).
 2. Check whether your session's environment can reach `supabase.co` (try
    `curl -sS -o /dev/null -w '%{http_code}\n' https://supabase.co`) — every
    session that has worked on this so far (including this one) has been
@@ -719,13 +912,20 @@ judgment call, which is why it's stopped here rather than being guessed at:
    re-share them; nothing carries over) and do a **real** connection test
    before continuing, strictly better than this session's PGlite-only
    verification.
-3. Also ask the user for `SUPABASE_SERVICE_ROLE_KEY` if it's needed for the
-   next piece of work (Storage wiring, item 1 under "What's NOT done yet").
-4. Do the 3 remaining items in order - each one genuinely depends on the
-   one before it (Storage/session wiring, then a real run of
-   `scripts/migrate-to-supabase.js`, then the final `db/index.js` deletion/
-   promotion) - unlike the earlier route-by-route conversion work, which
-   had no real ordering dependency between files.
-5. Keep committing and pushing to `supabase-migration` after each real,
+3. Ask the user for `SUPABASE_SERVICE_ROLE_KEY` — needed for
+   `scripts/migrate-to-supabase.js` to actually upload files to Storage, and
+   for the live app's own uploads to work post-cutover. Never ask them to
+   paste it (or any DB password) directly into chat — it only belongs in a
+   local `.env` file on whatever machine actually runs the migration script.
+4. Create the 5 Storage buckets in the Supabase dashboard (table in "What's
+   done so far" → item 9), then run `scripts/migrate-to-supabase.js` for
+   real (start with `--dry-run` again against the real project first, then
+   without it) against the production SQLite file and a freshly-provisioned
+   production Supabase project.
+5. Once real data is loaded and verified, set `DATABASE_URL` in the actual
+   deployment's environment and the app runs entirely on Postgres — no
+   further code changes needed for that switch, since the db layer no
+   longer has a SQLite path to fall back to.
+6. Keep committing and pushing to `supabase-migration` after each real,
    tested chunk of progress — don't let uncommitted work pile up in one
    giant, harder-to-review change.
