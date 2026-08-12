@@ -18,10 +18,12 @@
 //   1. `.run()` on an INSERT that reads `.lastInsertRowid` afterward.
 //      SQLite hands that back for free; Postgres only will if the
 //      statement has a RETURNING clause. This module auto-appends
-//      `RETURNING id` to any bare INSERT (every table's primary key here
-//      is literally named `id`), so `.lastInsertRowid` keeps working
-//      without touching the SQL text itself - but an INSERT that already
-//      has its own RETURNING clause is left alone.
+//      `RETURNING id` to any bare INSERT targeting a table that actually
+//      has an `id` column (checked once via information_schema.columns,
+//      cached - see tableHasIdColumn below; a handful of tables are keyed
+//      by their own natural/composite key instead), so `.lastInsertRowid`
+//      keeps working without touching the SQL text itself - but an INSERT
+//      that already has its own RETURNING clause is left alone.
 //
 //   2. `db.withTransaction(fn)`. The old version needed no argument - the
 //      whole app has exactly one, single-threaded, synchronous SQLite
@@ -44,6 +46,35 @@ function isBareInsert(sql) {
   return /^\s*insert\s/i.test(sql) && !/\breturning\b/i.test(sql);
 }
 
+function insertTableName(sql) {
+  const m = /^\s*insert\s+into\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/i.exec(sql);
+  return m ? m[1] : null;
+}
+
+// A handful of tables (app_settings, name_tag_templates,
+// misc_badge_templates, sessions, roster_dates, class_enrollments, ...)
+// are keyed by their own natural/composite key, not a surrogate `id`
+// column, so auto-appending `RETURNING id` to their INSERTs would fail.
+// Whether a table has one is checked once via information_schema.columns
+// and cached for the life of the process (schemas don't change at
+// runtime) - decided BEFORE the INSERT ever runs, not discovered by
+// trying it and catching the error: a failed statement inside a
+// transaction poisons the whole transaction (Postgres error 25P02,
+// "current transaction is aborted, commands ignored until end of
+// transaction block"), so a same-transaction retry would fail too,
+// masking the real error - confirmed the hard way, see MIGRATION.md.
+const idColumnCache = new Map();
+
+async function tableHasIdColumn(queryable, tableName) {
+  if (idColumnCache.has(tableName)) return idColumnCache.get(tableName);
+  const res = await queryable.query("SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = 'id'", [
+    tableName,
+  ]);
+  const has = res.rows.length > 0;
+  idColumnCache.set(tableName, has);
+  return has;
+}
+
 // SQLite's `?` positional placeholders -> Postgres's `$1, $2, ...`. Every
 // query in this codebase uses `?` exclusively (never named params, never a
 // literal `?` character inside a string literal), so a straight sequential
@@ -57,43 +88,49 @@ function toPgPlaceholders(sql) {
 // method (a `pg` Pool, a checked-out `pg` Client, or a PGlite/PGlite
 // transaction handle - they're API-compatible for this) into the
 // `.prepare(sql).get/.all/.run(...)` shape every route file already uses.
-function wrapQueryable(queryable) {
+//
+// `ready` (optional, defaults to an already-resolved promise) is awaited
+// before every .get/.all/.run - see db/index.js's own header comment for
+// why: a fresh PGlite instance has no tables until its schema is applied,
+// and that's necessarily async, so every existing `await
+// db.prepare(sql).get()` call site across the whole app transparently
+// waits for that instead of racing it, with zero changes needed at those
+// call sites. Deliberately gates on schema-readiness only, not full
+// first-boot seeding - see db/index.js for why that distinction matters.
+function wrapQueryable(queryable, ready = Promise.resolve()) {
   function prepare(sql) {
     const text = toPgPlaceholders(sql);
     const runText = isBareInsert(text) ? `${text} RETURNING id` : text;
     return {
       async get(...params) {
+        await ready;
         const res = await queryable.query(text, params);
         return res.rows[0];
       },
       async all(...params) {
+        await ready;
         const res = await queryable.query(text, params);
         return res.rows;
       },
       async run(...params) {
-        try {
-          const res = await queryable.query(runText, params);
-          return {
-            lastInsertRowid: res.rows && res.rows[0] ? res.rows[0].id : undefined,
-            changes: res.rowCount,
-          };
-        } catch (err) {
-          // A handful of tables (app_settings, name_tag_templates,
-          // misc_badge_templates, sessions, ...) are keyed by their own
-          // natural key, not a surrogate `id` column - the auto-appended
-          // `RETURNING id` above assumes every table has one, which isn't
-          // true for those. Rather than hardcoding that table list here
-          // (and it silently drifting out of sync with the schema), retry
-          // the original statement with no RETURNING clause whenever
-          // Postgres reports specifically that `id` doesn't exist -
-          // .lastInsertRowid just comes back undefined for these, same as
-          // it would for any SQLite insert nothing ever reads it from.
-          if (runText !== text && err.code === '42703') {
-            const res = await queryable.query(text, params);
-            return { lastInsertRowid: undefined, changes: res.rowCount };
-          }
-          throw err;
+        await ready;
+        // isBareInsert() (runText !== text) means this INSERT has no
+        // RETURNING clause of its own yet - decide whether to auto-append
+        // `RETURNING id` based on whether the target table actually has
+        // one. An INSERT that already supplies its own RETURNING clause
+        // (runText === text) is always sent as-is; .id is still read from
+        // whatever row it hands back below, same as the auto-appended case.
+        let finalText = text;
+        if (runText !== text) {
+          const tableName = insertTableName(text);
+          const hasId = tableName ? await tableHasIdColumn(queryable, tableName) : false;
+          if (hasId) finalText = runText;
         }
+        const res = await queryable.query(finalText, params);
+        return {
+          lastInsertRowid: res.rows && res.rows[0] ? res.rows[0].id : undefined,
+          changes: res.rowCount,
+        };
       },
     };
   }
@@ -111,13 +148,13 @@ function wrapQueryable(queryable) {
 // Project Settings > Database), not the direct one - serverless functions
 // open/close connections far more often than a long-running server would,
 // which is exactly what the pooler is for.
-function createPgDb(connectionString) {
+function createPgDb(connectionString, ready) {
   const pool = new Pool({ connectionString });
-  const base = wrapQueryable(pool);
+  const base = wrapQueryable(pool, ready);
 
   base.withTransaction = async (fn) => {
     const client = await pool.connect();
-    const tx = wrapQueryable(client);
+    const tx = wrapQueryable(client, ready);
     try {
       await client.query('BEGIN');
       const result = await fn(tx);
@@ -140,11 +177,11 @@ function createPgDb(connectionString) {
 // file. PGlite has no connection pool (it's a single embedded engine), and
 // its own `.transaction()` already handles BEGIN/COMMIT/ROLLBACK correctly
 // for it - delegated to directly rather than reimplementing that here.
-function createPgliteDb(pglite) {
-  const base = wrapQueryable(pglite);
+function createPgliteDb(pglite, ready) {
+  const base = wrapQueryable(pglite, ready);
 
   base.withTransaction = (fn) =>
-    pglite.transaction(async (tx) => fn(wrapQueryable(tx)));
+    pglite.transaction(async (tx) => fn(wrapQueryable(tx, ready)));
 
   base.end = () => pglite.close();
   return base;

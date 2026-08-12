@@ -25,15 +25,7 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-const db = require('./db'); // initialize database + seed default admin
-
-// Swaps in any staged Restore's uploaded files (member photos, documents,
-// design images) - see utils/backup.js's own comments for the full
-// design. Must run before anything below (or any route file, once
-// required) can create/touch public/uploads/, same reasoning as
-// db/index.js's own database swap running before anything opens the
-// database.
-require('./utils/backup').applyPendingUploadsRestore();
+const db = require('./db'); // constructs the db handle; db.ready resolves once schema + first-boot seeding are done (see db/index.js)
 
 // The Monday/Wednesday Parent/Student rosters are normally created lazily
 // the first time a class enrolls/staffs someone that day - ensure all 4
@@ -43,43 +35,28 @@ require('./utils/backup').applyPendingUploadsRestore();
 // / profile Class Schedule data) from current enrollment/staffing, so
 // existing classes are reflected everywhere on every boot, not just after
 // their next edit.
-//
-// utils/classSchedule.js's own ensureDayRoster/syncDayMemberRosters are
-// async now (Supabase/Postgres migration - see MIGRATION.md), but this one
-// call site can't await them: require('./server') has to hand back a fully
-// bootstrapped `app` synchronously (every test/routes-*.test.js file relies
-// on that - they insert rows referencing these 4 rosters' ids immediately
-// after requiring this module, no await possible on a require() call), and
-// there's no way to block a synchronous module load on a Promise. Rather
-// than risk exactly that ordering (confirmed the hard way once, as a
-// FOREIGN KEY constraint failure in two test files whose setup hooks ran
-// before the async roster-creation chain had resolved), the 4 rosters
-// themselves are ensured here with plain synchronous db calls - safe to
-// duplicate ensureDayRoster's own tiny query pair since the live db really
-// is still synchronous SQLite underneath the async wrapper. Roster
-// *membership* sync (syncDayMemberRosters) has no such hard ordering
-// requirement - nothing reads it before the first class/floater edit ever
-// happens in a fresh database - so that one small piece stays async and
-// unawaited here.
-const { syncDayMemberRosters } = require('./utils/classSchedule');
-function ensureDayRosterSync(day, role) {
-  const key = `${day}_${role}_roster_id`;
-  const existingId = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
-  if (existingId) {
-    const existing = db.prepare('SELECT id FROM rosters WHERE id = ?').get(existingId.value);
-    if (existing) return existing.id;
+const { ensureDayRoster, syncDayMemberRosters } = require('./utils/classSchedule');
+async function bootRosters() {
+  for (const day of ['monday', 'wednesday']) {
+    for (const role of ['parent', 'student']) await ensureDayRoster(day, role);
+    await syncDayMemberRosters(day);
   }
-  const label = day === 'monday' ? 'Monday' : 'Wednesday';
-  const name = `${label} ${role === 'parent' ? 'Parents' : 'Students'}`;
-  const info = db.prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)').run(name, 'Class Schedule', day);
-  db.prepare(
-    `INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-  ).run(key, String(info.lastInsertRowid));
-  return info.lastInsertRowid;
 }
-['monday', 'wednesday'].forEach((day) => {
-  ['parent', 'student'].forEach((role) => ensureDayRosterSync(day, role));
-  syncDayMemberRosters(day);
+
+// `require('./server')` can no longer hand back a fully-bootstrapped `app`
+// synchronously the way it could when the db underneath was still
+// synchronous SQLite - db.ready and the roster seeding above are both
+// necessarily async now. app.ready (set near the bottom of this file,
+// once every route/middleware below is registered) is that same
+// guarantee, just explicit instead of implicit: every test/routes-*.test.js
+// file now does `await app.ready` right after requiring this module and
+// before its own setup queries or first request, instead of relying on
+// require() itself having already blocked until boot finished. See
+// MIGRATION.md for the full story on why this changed.
+const bootReady = db.ready.then(() => bootRosters());
+bootReady.catch((err) => {
+  console.error('Server failed to boot:', err);
+  process.exit(1);
 });
 
 const { defaultDay } = require('./utils/days');
@@ -166,33 +143,15 @@ if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 // app actually deploys as: every admin gets logged out on every restart/
 // deploy, and MemoryStore never evicts anything on its own, so its memory
 // footprint only ever grows for the life of the process (this app's own
-// earlier audit flagged both). SqliteSessionStore persists sessions in
-// the same SQLite file everything else already lives in - see its own
-// header comment for why that's a hand-written ~80 lines rather than a
-// third-party package.
-//
-// DATABASE_URL being set is what actually distinguishes a Supabase/Netlify
-// deploy from a normal local/LAN install (see MIGRATION.md and
-// .env.example) - Netlify Functions get a fresh, empty filesystem per
-// invocation, so the SQLite file the local-disk store above relies on
-// can't persist sessions there at all. utils/pgSessionStore.js is the
-// Postgres/Supabase-backed equivalent, built directly on db/postgres.js's
-// own connection pool (independent of which db module the rest of the
-// app's queries go through - see db/postgres.js's own header comment on
-// why the full query-layer cutover is still a separate, later step).
-let sessionStore;
-if (process.env.DATABASE_URL) {
-  const { createPgDb } = require('./db/postgres');
-  const PgSessionStore = require('./utils/pgSessionStore');
-  sessionStore = new PgSessionStore(createPgDb(process.env.DATABASE_URL));
-} else {
-  const SqliteSessionStore = require('./utils/sqliteSessionStore');
-  sessionStore = new SqliteSessionStore(db);
-}
+// earlier audit flagged both). PgSessionStore persists sessions in the
+// same database everything else already lives in (real Postgres in
+// production, PGlite locally - see db/index.js), same reasoning
+// node:sqlite's own hand-written session store used to have.
+const PgSessionStore = require('./utils/pgSessionStore');
 
 app.use(
   session({
-    store: sessionStore,
+    store: new PgSessionStore(db),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -313,31 +272,49 @@ function lanAddresses() {
   return addresses;
 }
 
+// Resolves once the database is ready (schema + first-boot seeding) and
+// the 4 always-exist rosters are seeded - see bootReady's own definition
+// above for why require('./server') can't give these guarantees
+// synchronously anymore. `test/routes-*.test.js` files must `await
+// app.ready` right after requiring this module, before their own setup
+// queries or first supertest request - the same guarantee node:sqlite's
+// synchronous boot used to give implicitly.
+app.ready = bootReady;
+
 // Only binds a port when this file is run directly (`node server.js` /
 // `npm start`) - not when something else requires() it. That's what lets
 // the route-level tests (test/routes-*.test.js) `require('../server')`
 // and get the fully-wired `app` (every router, session/CSRF middleware,
 // db init) to drive with supertest, without a real port ever being
-// opened or two test files racing over the same one.
+// opened or two test files racing over the same one. Waits for app.ready
+// first so the server never accepts a real request before boot (schema/
+// seeding/roster setup) has actually finished.
 if (require.main === module) {
-  const server = app.listen(PORT, () => {
-    console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
-    const addresses = lanAddresses();
-    if (addresses.length > 0) {
-      console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
-      for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
-    }
-  });
+  app.ready
+    .then(() => {
+      const server = app.listen(PORT, () => {
+        console.log(`Sanford Homeschoolers Check-In/Out running at http://localhost:${PORT}`);
+        const addresses = lanAddresses();
+        if (addresses.length > 0) {
+          console.log('On this same wifi network, other devices (like a second kiosk) can reach it at:');
+          for (const addr of addresses) console.log(`  http://${addr}:${PORT}`);
+        }
+      });
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\nSomething else on this computer is already using port ${PORT}, so the server can't start.`);
-      console.error(`Close that other program, or open the .env file and change PORT to a different number (e.g. 3001), then try again.\n`);
-    } else {
-      console.error('\nThe server failed to start:', err.message, '\n');
-    }
-    process.exitCode = 1;
-  });
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\nSomething else on this computer is already using port ${PORT}, so the server can't start.`);
+          console.error(`Close that other program, or open the .env file and change PORT to a different number (e.g. 3001), then try again.\n`);
+        } else {
+          console.error('\nThe server failed to start:', err.message, '\n');
+        }
+        process.exitCode = 1;
+      });
+    })
+    // Already logged + process.exit(1) by bootReady's own .catch() above -
+    // this second catch only exists so a boot failure doesn't also print
+    // Node's default "unhandled promise rejection" noise on top of that.
+    .catch(() => {});
 }
 
 module.exports = app;

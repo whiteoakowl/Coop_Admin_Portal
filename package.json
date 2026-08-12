@@ -8,7 +8,7 @@
     "dev": "node --no-warnings --watch server.js",
     "lint": "eslint .",
     "lint:css": "stylelint \"public/css/**/*.css\"",
-    "test": "node --test",
+    "test": "node --test --test-force-exit",
     "test:a11y": "node --test a11y/accessibility-check.js"
   },
   "repository": {
