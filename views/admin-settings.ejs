@@ -50,33 +50,14 @@
         </div>
       <% } else if (activeTab === 'backup') { %>
         <div class="manage-section">
-          <h2>Backup</h2>
-          <p class="hint">Download a complete, ready-to-restore copy of everything - the database plus every uploaded photo, document, and design image. Keep a recent copy somewhere safe (a cloud drive, a USB stick) in case this device is ever lost or damaged.</p>
-          <a class="primary-btn" href="/admin/settings/backup" download>Back Up Now</a>
-        </div>
-
-        <div class="manage-section">
-          <h2>Restore</h2>
-          <% if (restoreStaged) { %>
-            <div class="alert alert-success">A backup is staged and ready. <strong>Close and reopen the app</strong> (the same way you normally start it) to finish restoring — this will replace all current data with that backup.</div>
-            <form method="POST" action="/admin/settings/restore/cancel" data-confirm="Cancel the staged restore? Nothing will be changed.">
-              <button type="submit" class="btn-secondary">Cancel Staged Restore</button>
-            </form>
-          <% } else { %>
-            <p class="hint">Upload a previously downloaded backup to replace all current data. The app checks the file is a valid backup before staging it, but <strong>the restore itself only happens the next time the app is restarted</strong>, and cannot be undone.</p>
-            <form
-              method="POST"
-              action="/admin/settings/restore"
-              enctype="multipart/form-data"
-              class="stack-form stack-form-narrow"
-              data-confirm="This will replace ALL current data with the uploaded backup the next time the app restarts. Continue?"
-            >
-              <label for="restoreFile">Backup file</label>
-              <input id="restoreFile" name="file" type="file" accept=".shcbackup,.db" required />
-
-              <button type="submit" class="primary-btn">Upload &amp; Stage Restore</button>
-            </form>
-          <% } %>
+          <h2>Backup / Restore</h2>
+          <p class="hint">
+            This app's data now lives in Supabase (hosted Postgres + file storage) rather than a local file on this
+            device, so the local backup/restore feature that used to live here doesn't apply anymore - there's no
+            single on-device database file to download or replace. Supabase backs up your data on its own end.
+            A Supabase-native backup/restore feature for this app may be added later; until then, use your Supabase
+            project's own dashboard for backup/export options.
+          </p>
         </div>
       <% } else if (activeTab === 'classcheckin') { %>
         <div class="manage-section">

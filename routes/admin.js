@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
@@ -9,17 +8,8 @@ const { todayISO, formatDateLabel } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
-const { backupPackageBuffer, stageRestore, isRestoreStaged, cancelStagedRestore } = require('../utils/backup');
-const { databaseFileFilter } = require('../utils/uploads');
 const { setClassCheckinPin } = require('../utils/classCheckinPin');
 const { computeTrend } = require('../utils/dashboardTrends');
-
-// Restore uploads never touch disk (memoryStorage) - the whole file needs
-// to be in hand before it can be validated/unpacked. 200MB is generous
-// headroom over any realistic co-op-scale backup - the database alone is
-// typically hundreds of KB, and even a large collection of member photos
-// and documents comfortably fits well under this.
-const restoreUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 }, fileFilter: databaseFileFilter });
 
 // --- Auth ---
 
@@ -210,7 +200,6 @@ async function renderSettings(req, res, error, success, activeTab) {
     isFullAdmin,
     activeTab: tab,
     documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
-    restoreStaged: isRestoreStaged(),
     error,
     success,
   });
@@ -249,54 +238,14 @@ router.post('/settings/password', requireAdmin, requireFullAdmin, async (req, re
   await renderSettings(req, res, null, 'Password updated.', 'account');
 });
 
-// One-click backup download: the database plus every uploaded file
-// (member photos, documents, design images) - see utils/backup.js for
-// how the package itself is built. Full-Admin-only, same as the rest of
-// the Account tab: a Co-op Admin (a member, not the master admin
-// account) has no business downloading the entire database.
-router.get('/settings/backup', requireAdmin, requireFullAdmin, (req, res) => {
-  // backupPackageBuffer/stageRestore/isRestoreStaged/cancelStagedRestore
-  // (utils/backup.js) are still fully synchronous, deliberately - see
-  // MIGRATION.md's own note on that file needing a real design decision
-  // (PRAGMA integrity_check, temp-file validation) rather than a routine
-  // async/await pass.
-  const buffer = backupPackageBuffer();
-  const stamp = todayISO();
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="attendance-backup-${stamp}.shcbackup"`);
-  res.send(buffer);
-});
-
-// Uploads a backup file and, once it passes validation (see
-// utils/backup.js), stages it to replace the live database - and, for a
-// current-format backup, every uploaded file too - on the app's next
-// startup. There's no in-app "restart now" button because a bare `node
-// server.js` process (this app's typical deployment, see SETUP.md) has
-// nothing to restart it if it stopped itself. The staged file only takes
-// effect once an admin closes and reopens the app, same as they already
-// do to stop/start it day to day.
-router.post('/settings/restore', requireAdmin, requireFullAdmin, restoreUpload.single('file'), async (req, res) => {
-  if (!req.file) {
-    return renderSettings(req, res, 'Please choose a backup file to restore.', null, 'backup');
-  }
-  try {
-    stageRestore(req.file.buffer);
-  } catch (err) {
-    return renderSettings(req, res, err.message, null, 'backup');
-  }
-  await renderSettings(
-    req,
-    res,
-    null,
-    'Backup validated and staged. Close and reopen the app to finish restoring - this will replace all current data.',
-    'backup'
-  );
-});
-
-router.post('/settings/restore/cancel', requireAdmin, requireFullAdmin, async (req, res) => {
-  cancelStagedRestore();
-  await renderSettings(req, res, null, 'Staged restore cancelled. Nothing was changed.', 'backup');
-});
+// Backup/Restore (routes/settings/backup, /settings/restore,
+// /settings/restore/cancel) were removed here - they were built entirely
+// around SQLite-specific mechanics (VACUUM INTO, opening a candidate file
+// as a throwaway SQLite connection to validate it) that have no Postgres
+// equivalent, now that the app's data lives in Supabase (see
+// MIGRATION.md and utils/backup.js's own header comment). Supabase backs
+// up data on its own end; a Postgres-native replacement for this feature
+// is a real, separate future project, not a routine conversion.
 
 // One shared 4-digit PIN for the kiosk's Class Check-In flow (routes/
 // kiosk-class-checkin.js) - not tied to any admin account, same as
