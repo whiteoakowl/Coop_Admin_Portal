@@ -24,6 +24,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -32,12 +33,12 @@ test.after(() => {
 });
 
 test('POST /name-tag/submit', async (t) => {
-  const { lastInsertRowid: parentId } = db
+  const { lastInsertRowid: parentId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Robin Parent', 'Robin Parent', 'parent')")
     .run();
-  const { lastInsertRowid: familyId } = db.prepare('INSERT INTO families (name) VALUES (?)').run('Parent Family');
-  db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
-  const { lastInsertRowid: childId } = db
+  const { lastInsertRowid: familyId } = await db.prepare('INSERT INTO families (name) VALUES (?)').run('Parent Family');
+  await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
+  const { lastInsertRowid: childId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Robin Kid', 'Robin Kid', 'student', ?)")
     .run(familyId);
 
@@ -55,7 +56,7 @@ test('POST /name-tag/submit', async (t) => {
     assert.equal(res.status, 200);
     assert.match(res.text, /Request submitted for/);
 
-    const rows = db.prepare('SELECT member_id FROM name_tag_requests ORDER BY member_id').all();
+    const rows = await db.prepare('SELECT member_id FROM name_tag_requests ORDER BY member_id').all();
     assert.deepEqual(
       rows.map((r) => r.member_id).sort((a, b) => a - b),
       [parentId, childId].sort((a, b) => a - b)
@@ -63,10 +64,10 @@ test('POST /name-tag/submit', async (t) => {
   });
 
   await t.test('a member outside the submitting parent\'s family is rejected, nothing inserted', async () => {
-    const { lastInsertRowid: strangerId } = db
+    const { lastInsertRowid: strangerId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Stranger Kid', 'Stranger Kid', 'student')")
       .run();
-    const before = db.prepare('SELECT COUNT(*) AS c FROM name_tag_requests').get().c;
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM name_tag_requests').get()).c);
 
     const res = await request(app)
       .post('/name-tag/submit')
@@ -74,6 +75,6 @@ test('POST /name-tag/submit', async (t) => {
       .send({ parentId: String(parentId), memberIds: [String(strangerId)], requestType: 'lost_tag', day: 'monday' });
     assert.equal(res.status, 200);
     assert.match(res.text, /Please select at least one name/);
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM name_tag_requests').get().c, before);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM name_tag_requests').get()).c), before);
   });
 });

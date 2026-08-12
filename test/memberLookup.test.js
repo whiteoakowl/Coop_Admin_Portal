@@ -23,11 +23,11 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test.before(() => {
-  db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Lookup Test Kid', 'lookup-test-barcode', 'student')").run();
-  db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Inactive Lookup Kid', 'inactive-lookup-barcode', 'student', 0)").run();
-  db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Duplicate Name Kid', 'dup-barcode-1', 'student')").run();
-  db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Duplicate Name Kid', 'dup-barcode-2', 'student')").run();
+test.before(async () => {
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Lookup Test Kid', 'lookup-test-barcode', 'student')").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Inactive Lookup Kid', 'inactive-lookup-barcode', 'student', 0)").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Duplicate Name Kid', 'dup-barcode-1', 'student')").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Duplicate Name Kid', 'dup-barcode-2', 'student')").run();
 });
 
 test('findMemberByBarcodeOrName', async (t) => {

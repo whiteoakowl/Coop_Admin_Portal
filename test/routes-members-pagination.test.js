@@ -24,6 +24,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -44,7 +45,7 @@ test('Members list pagination', async (t) => {
   const cookie = await loginAsAdmin();
   const insert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
   for (let i = 1; i <= 65; i++) {
-    insert.run(`Pagination Kid ${String(i).padStart(2, '0')}`, `pagination-kid-${i}`);
+    await insert.run(`Pagination Kid ${String(i).padStart(2, '0')}`, `pagination-kid-${i}`);
   }
 
   await t.test('page 1 shows the first 50 on screen but all 65 in the print table', async () => {

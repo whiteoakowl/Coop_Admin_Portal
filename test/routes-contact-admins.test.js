@@ -23,6 +23,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -39,11 +40,11 @@ async function loginAsAdmin() {
 }
 
 test('GET /contact-admins sorts leadership contacts case-insensitively by role (LOWER(role), not COLLATE NOCASE)', async () => {
-  db.prepare('DELETE FROM leadership_contacts').run();
+  await db.prepare('DELETE FROM leadership_contacts').run();
   const insert = db.prepare('INSERT INTO leadership_contacts (role, name, email, position) VALUES (?, ?, ?, 0)');
-  insert.run('zebra role', 'Z Person', 'z@example.com');
-  insert.run('Apple Role', 'A Person', 'a@example.com');
-  insert.run('banana role', 'B Person', 'b@example.com');
+  await insert.run('zebra role', 'Z Person', 'z@example.com');
+  await insert.run('Apple Role', 'A Person', 'a@example.com');
+  await insert.run('banana role', 'B Person', 'b@example.com');
 
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/contact-admins').set('Cookie', cookie);
@@ -65,7 +66,7 @@ test('POST /contact-admins', async (t) => {
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const saved = db.prepare('SELECT * FROM contact_admin_messages WHERE sender_email = ?').get('parent@example.com');
+    const saved = await db.prepare('SELECT * FROM contact_admin_messages WHERE sender_email = ?').get('parent@example.com');
     assert.ok(saved);
     assert.equal(saved.leadership_team, 'Director');
     assert.equal(saved.title, 'Question');
@@ -73,7 +74,7 @@ test('POST /contact-admins', async (t) => {
   });
 
   await t.test('a submission missing a required field is rejected, not saved', async () => {
-    const before = db.prepare('SELECT COUNT(*) AS c FROM contact_admin_messages').get().c;
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM contact_admin_messages').get()).c);
     const res = await request(app)
       .post('/contact-admins')
       .set('Cookie', cookie)
@@ -81,7 +82,7 @@ test('POST /contact-admins', async (t) => {
       .send({ leadershipTeam: '', senderEmail: 'parent@example.com', title: 'Question', message: 'Hello there', _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    const after = db.prepare('SELECT COUNT(*) AS c FROM contact_admin_messages').get().c;
+    const after = Number((await db.prepare('SELECT COUNT(*) AS c FROM contact_admin_messages').get()).c);
     assert.equal(after, before, 'nothing should have been inserted');
   });
 });

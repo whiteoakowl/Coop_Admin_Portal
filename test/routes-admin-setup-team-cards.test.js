@@ -25,6 +25,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -41,13 +42,13 @@ async function loginAsAdmin() {
 test('Setup/Cleanup team card: inline edit-in-place markup, no popup dialog', async (t) => {
   const { cookie } = await loginAsAdmin();
 
-  const { lastInsertRowid: teamId } = db
+  const { lastInsertRowid: teamId } = await db
     .prepare("INSERT INTO setup_teams (day, title, description) VALUES ('monday', 'Chairs & Tables', 'Set up folding chairs')")
     .run();
-  const { lastInsertRowid: memberId } = db
+  const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Volunteer', 'Pat Volunteer', 'parent')")
     .run();
-  db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
+  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
 
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
@@ -90,7 +91,7 @@ test('POST /admin/setup/:day/teams/:teamId/edit still saves title/description/le
   const csrfMatch = /name="csrf-token" content="([^"]*)"/.exec(page.text);
   const csrfToken = csrfMatch ? csrfMatch[1] : null;
 
-  const { lastInsertRowid: teamId } = db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Original Title')").run();
+  const { lastInsertRowid: teamId } = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Original Title')").run();
 
   await t.test('saving updates the team row', async () => {
     const res = await request(app)
@@ -99,7 +100,7 @@ test('POST /admin/setup/:day/teams/:teamId/edit still saves title/description/le
       .type('form')
       .send({ title: 'Renamed Title', description: 'New description', leaderId: '', _csrf: csrfToken });
     assert.equal(res.status, 302);
-    const row = db.prepare('SELECT title, description FROM setup_teams WHERE id = ?').get(teamId);
+    const row = await db.prepare('SELECT title, description FROM setup_teams WHERE id = ?').get(teamId);
     assert.equal(row.title, 'Renamed Title');
     assert.equal(row.description, 'New description');
   });

@@ -52,24 +52,32 @@ function memberRows(html) {
   return rows;
 }
 
-test.before(() => {
+test.before(async () => {
+  // Node's test runner does not run multiple top-level test.before() hooks
+  // strictly sequentially - a second hook can start before an earlier
+  // one (even one that just awaits app.ready) has resolved - so this hook
+  // has to await app.ready itself rather than relying on hook order.
+  await app.ready;
   const insertMember = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, ?)");
 
-  const attendanceKidId = insertMember.run('Zzsearch Attendance Kid', 'zzsearch-att', 'student').lastInsertRowid;
-  db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, '2024-03-04', 'present', 'kiosk')").run(attendanceKidId);
+  const attendanceKidId = (await insertMember.run('Zzsearch Attendance Kid', 'zzsearch-att', 'student')).lastInsertRowid;
+  const anyRoster = await db.prepare('SELECT id FROM rosters LIMIT 1').get();
+  await db
+    .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2024-03-04', 'present', 'kiosk')")
+    .run(attendanceKidId, anyRoster.id);
 
-  const floaterParentId = insertMember.run('Zzsearch Floater Parent', 'zzsearch-floater', 'parent').lastInsertRowid;
-  const list = db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
-  const section = db.prepare('SELECT id FROM volunteer_sections WHERE volunteer_list_id = ? LIMIT 1').get(list.id);
-  db.prepare('INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, ?)').run(list.id, floaterParentId, section.id, 'sometimes');
+  const floaterParentId = (await insertMember.run('Zzsearch Floater Parent', 'zzsearch-floater', 'parent')).lastInsertRowid;
+  const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
+  const section = await db.prepare('SELECT id FROM volunteer_sections WHERE volunteer_list_id = ? LIMIT 1').get(list.id);
+  await db.prepare('INSERT INTO volunteer_members (volunteer_list_id, member_id, section_id, rank) VALUES (?, ?, ?, ?)').run(list.id, floaterParentId, section.id, 'sometimes');
 
-  const libraryKidId = insertMember.run('Zzsearch Library Kid', 'zzsearch-lib', 'student').lastInsertRowid;
-  const itemId = db.prepare("INSERT INTO library_items (title, barcode) VALUES ('Zzsearch Book Title', 'zzsearch-book-1')").run().lastInsertRowid;
-  db.prepare('INSERT INTO library_checkouts (member_id, item_id, checked_out_at) VALUES (?, ?, ?)').run(libraryKidId, itemId, Date.now());
+  const libraryKidId = (await insertMember.run('Zzsearch Library Kid', 'zzsearch-lib', 'student')).lastInsertRowid;
+  const itemId = (await db.prepare("INSERT INTO library_items (title, barcode) VALUES ('Zzsearch Book Title', 'zzsearch-book-1')").run()).lastInsertRowid;
+  await db.prepare('INSERT INTO library_checkouts (member_id, item_id, checked_out_at) VALUES (?, ?, ?)').run(libraryKidId, itemId, Date.now());
 
-  insertMember.run('Zzsearch Plain Kid', 'zzsearch-plain', 'student');
+  await insertMember.run('Zzsearch Plain Kid', 'zzsearch-plain', 'student');
 
-  db.prepare("INSERT INTO library_items (title, barcode) VALUES ('Zzsearch Unclaimed Book', 'zzsearch-book-2')").run();
+  await db.prepare("INSERT INTO library_items (title, barcode) VALUES ('Zzsearch Unclaimed Book', 'zzsearch-book-2')").run();
 });
 
 test('global admin search', async (t) => {

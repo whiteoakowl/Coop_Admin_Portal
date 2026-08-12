@@ -26,6 +26,7 @@ const app = require('../server');
 const db = require('../db');
 const { todayISO } = require('../utils/dates');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -59,20 +60,20 @@ test('dashboard KPI trend indicators', async (t) => {
     const insertMember = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
     const ids = [];
     for (let i = 1; i <= 3; i++) {
-      ids.push(insertMember.run(`Dashboard Trend Kid ${i}`, `dashboard-trend-kid-${i}`).lastInsertRowid);
+      ids.push((await insertMember.run(`Dashboard Trend Kid ${i}`, `dashboard-trend-kid-${i}`)).lastInsertRowid);
     }
 
     const prevDate = '2020-01-06';
     const today = todayISO();
 
     // Previous session: 1 present, 1 late.
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[0], prevDate);
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'late', 'kiosk')").run(ids[1], prevDate);
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[0], prevDate);
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'late', 'kiosk')").run(ids[1], prevDate);
 
     // Today: 3 present (checked-in up from 1 to 3), 0 late (down from 1 to 0).
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[0], today);
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[1], today);
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[2], today);
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[0], today);
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[1], today);
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, 2, ?, 'present', 'kiosk')").run(ids[2], today);
 
     const res = await request(app).get('/admin').set('Cookie', cookie);
     assert.equal(res.status, 200);
@@ -86,16 +87,16 @@ test('dashboard KPI trend indicators', async (t) => {
     const before = await request(app).get('/admin').set('Cookie', cookie);
     const checkedInBefore = checkedInCountFor(before.text, 'Students');
 
-    const classRosterId = db.prepare("INSERT INTO rosters (name, category) VALUES ('Isolation Test Class Roster', 'Class Roster')").run().lastInsertRowid;
-    const memberId = db
+    const classRosterId = (await db.prepare("INSERT INTO rosters (name, category) VALUES ('Isolation Test Class Roster', 'Class Roster')").run()).lastInsertRowid;
+    const memberId = (await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Class Only Dashboard Kid', 'class-only-dashboard-kid', 'student')")
-      .run().lastInsertRowid;
-    db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'kiosk_class_checkin')").run(
+      .run()).lastInsertRowid;
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'kiosk_class_checkin')").run(
       memberId,
       classRosterId,
       today
     );
-    db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, NULL, ?)').run(
+    await db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, NULL, ?)').run(
       memberId,
       classRosterId,
       today,

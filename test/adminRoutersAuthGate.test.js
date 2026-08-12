@@ -29,6 +29,8 @@ process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 const request = require('supertest');
 const app = require('../server');
 
+test.before(() => app.ready);
+
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });

@@ -23,6 +23,8 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
+
+test.before(() => app.ready);
 const { MAX_ATTEMPTS } = require('../utils/loginRateLimit');
 
 test.after(() => {

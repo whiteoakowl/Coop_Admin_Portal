@@ -25,6 +25,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -57,9 +58,9 @@ test('POST /membership', async (t) => {
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const request_ = db.prepare('SELECT * FROM membership_requests WHERE parent1_email = ?').get('pat@example.com');
+    const request_ = await db.prepare('SELECT * FROM membership_requests WHERE parent1_email = ?').get('pat@example.com');
     assert.ok(request_);
-    const children = db
+    const children = await db
       .prepare('SELECT first_name, last_name FROM membership_request_children WHERE request_id = ? ORDER BY id')
       .all(request_.id);
     assert.deepEqual(
@@ -69,7 +70,7 @@ test('POST /membership', async (t) => {
   });
 
   await t.test('missing parent info is rejected, nothing saved', async () => {
-    const before = db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get().c;
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
     const res = await request(app)
       .post('/membership')
       .set('Cookie', cookie)
@@ -77,11 +78,11 @@ test('POST /membership', async (t) => {
       .send({ parent1FirstName: '', parent1LastName: 'Guardian', parent1Email: 'x@example.com' });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get().c, before);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);
   });
 
   await t.test('no children is rejected, nothing saved', async () => {
-    const before = db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get().c;
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
     const res = await request(app)
       .post('/membership')
       .set('Cookie', cookie)
@@ -89,6 +90,6 @@ test('POST /membership', async (t) => {
       .send({ parent1FirstName: 'Pat', parent1LastName: 'Guardian', parent1Email: 'nokids@example.com' });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get().c, before);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);
   });
 });

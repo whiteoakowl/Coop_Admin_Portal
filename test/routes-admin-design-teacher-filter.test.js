@@ -25,6 +25,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -33,14 +34,14 @@ test.after(() => {
 });
 
 test('Design/Print hub print tab marks teachers with data-teacher, and offers a Teachers Only filter option', async () => {
-  const { lastInsertRowid: teacherId } = db
+  const { lastInsertRowid: teacherId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Teacher', 'Pat Teacher', 'parent')")
     .run();
-  db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Sam Parent', 'Sam Parent', 'parent')").run();
-  const { lastInsertRowid: classId } = db
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Sam Parent', 'Sam Parent', 'parent')").run();
+  const { lastInsertRowid: classId } = await db
     .prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Art')")
     .run();
-  db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId, teacherId);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId, teacherId);
 
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];

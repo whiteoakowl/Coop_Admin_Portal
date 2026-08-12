@@ -26,6 +26,7 @@ const app = require('../server');
 const db = require('../db');
 const XLSX = require('xlsx');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -61,7 +62,7 @@ test('importing a Student Schedule row enrolls the student on the class roster a
     .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
     .set('Cookie', cookie)
     .attach('file', classBuffer, 'classes.xlsx');
-  const cls = db.prepare("SELECT * FROM classes WHERE class_name = 'Import Roster Class'").get();
+  const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Import Roster Class'").get();
   assert.ok(cls, 'setup: the class should exist before importing a schedule row for it');
 
   await t.test('the schedule import puts the student on both the class roster and the day-level Student roster', async () => {
@@ -76,20 +77,20 @@ test('importing a Student Schedule row enrolls the student on the class roster a
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('Matched 1 schedule row'));
 
-    const student = db.prepare("SELECT id FROM members WHERE name = 'Roster Test Kid'").get();
+    const student = await db.prepare("SELECT id FROM members WHERE name = 'Roster Test Kid'").get();
 
     // On the class's own roster (Class Roster - what Class Check-In and
     // the class's attendance sheet read from).
-    const onClassRoster = db
+    const onClassRoster = await db
       .prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?')
       .get(cls.roster_id, student.id);
     assert.ok(onClassRoster, 'the student should be on the class\'s own roster after import');
 
     // On Monday's day-level Student roster (what the main dashboard /
     // Attendance page reads from for "who's expected Monday").
-    const mondayStudentRosterId = db.prepare("SELECT value FROM app_settings WHERE key = 'monday_student_roster_id'").get();
+    const mondayStudentRosterId = await db.prepare("SELECT value FROM app_settings WHERE key = 'monday_student_roster_id'").get();
     assert.ok(mondayStudentRosterId, 'setup: the day-level Monday Student roster should already exist');
-    const onDayRoster = db
+    const onDayRoster = await db
       .prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?')
       .get(mondayStudentRosterId.value, student.id);
     assert.ok(onDayRoster, 'the student should also be on Monday\'s day-level Student roster after import, not just the class roster');

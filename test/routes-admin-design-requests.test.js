@@ -22,6 +22,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -36,10 +37,10 @@ async function loginAsAdmin() {
 
 test('Design/Print hub Requests tab', async (t) => {
   const cookie = await loginAsAdmin();
-  const { lastInsertRowid: memberId } = db
+  const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Jordan Requestor', 'Jordan Requestor', 'student')")
     .run();
-  const { lastInsertRowid: requestId } = db
+  const { lastInsertRowid: requestId } = await db
     .prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'lost_tag', 'monday', 'testing')")
     .run(memberId);
 

@@ -33,7 +33,7 @@ test('globalSearch', async (t) => {
   });
 
   await t.test('preserves the original casing of the query for display, while matching case-insensitively', async () => {
-    db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Case Insensitive Kid', 'case-insensitive-kid', 'student')").run();
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Case Insensitive Kid', 'case-insensitive-kid', 'student')").run();
     const result = await globalSearch('  CASE insensitive  ');
     assert.equal(result.query, 'CASE insensitive');
     assert.equal(result.members.length, 1);
@@ -43,7 +43,7 @@ test('globalSearch', async (t) => {
   await t.test('caps member results at MAX_RESULTS even when more match', async () => {
     const insert = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
     for (let i = 0; i < MAX_RESULTS + 5; i++) {
-      insert.run(`Capacity Test Kid ${i}`, `capacity-test-kid-${i}`);
+      await insert.run(`Capacity Test Kid ${i}`, `capacity-test-kid-${i}`);
     }
     const result = await globalSearch('Capacity Test Kid');
     assert.equal(result.members.length, MAX_RESULTS);
@@ -52,14 +52,14 @@ test('globalSearch', async (t) => {
   await t.test('caps library item results at MAX_RESULTS even when more match', async () => {
     const insert = db.prepare("INSERT INTO library_items (title, barcode) VALUES (?, ?)");
     for (let i = 0; i < MAX_RESULTS + 5; i++) {
-      insert.run(`Capacity Test Book ${i}`, `capacity-test-book-${i}`);
+      await insert.run(`Capacity Test Book ${i}`, `capacity-test-book-${i}`);
     }
     const result = await globalSearch('Capacity Test Book');
     assert.equal(result.libraryItems.length, MAX_RESULTS);
   });
 
   await t.test('an inactive member is never returned', async () => {
-    const id = db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Inactive Search Kid', 'inactive-search-kid', 'student', 0)").run().lastInsertRowid;
+    const id = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Inactive Search Kid', 'inactive-search-kid', 'student', 0)").run()).lastInsertRowid;
     const result = await globalSearch('Inactive Search Kid');
     assert.equal(result.members.some((m) => m.id === id), false);
   });

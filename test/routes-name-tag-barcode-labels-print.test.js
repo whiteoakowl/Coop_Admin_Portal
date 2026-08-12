@@ -18,6 +18,8 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
+
+test.before(() => app.ready);
 const db = require('../db');
 
 test.after(() => {
@@ -33,7 +35,7 @@ test('POST /admin/name-tag/print-barcode-labels', async (t) => {
   const page = await request(app).get('/admin/name-tag?tab=print').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 
-  const { lastInsertRowid: memberId } = db
+  const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('Riley Chen', '482913', '482913', 'student')")
     .run();
 

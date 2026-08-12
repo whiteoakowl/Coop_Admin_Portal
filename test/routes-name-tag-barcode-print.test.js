@@ -36,6 +36,8 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
+
+test.before(() => app.ready);
 const db = require('../db');
 
 test.after(() => {
@@ -51,7 +53,7 @@ test('barcode-only print sheet loads the shrink-to-fit script, not the generic a
   const page = await request(app).get('/admin/name-tag?tab=print').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 
-  const { lastInsertRowid: memberId } = db
+  const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Jordan Fitzgerald-Montgomery', 'Jordan Fitzgerald-Montgomery', 'student')")
     .run();
 

@@ -75,13 +75,13 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
     writeUpload(nameTagDir, 'kept.jpg', 'kept');
     writeUpload(nameTagDir, 'orphan.jpg', 'orphan');
 
-    db.prepare(
+    await db.prepare(
       "INSERT INTO name_tag_templates (member_type, layout_json) VALUES ('student', ?) ON CONFLICT(member_type) DO UPDATE SET layout_json = excluded.layout_json"
     ).run(JSON.stringify({ elements: [{ type: 'image', src: '/uploads/name-tags/kept.jpg' }] }));
     // A misc badge template referencing nothing shouldn't matter to
     // whether the OTHER type's referenced image survives - both need
     // scanning together, not just whichever one was just saved.
-    db.prepare(
+    await db.prepare(
       "INSERT INTO misc_badge_templates (badge_type, layout_json) VALUES ('setupCleanup', ?) ON CONFLICT(badge_type) DO UPDATE SET layout_json = excluded.layout_json"
     ).run(JSON.stringify({ elements: [] }));
 
@@ -93,7 +93,7 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
 
   await t.test('an image referenced by a misc badge template (not a name tag one) still survives', async () => {
     writeUpload(nameTagDir, 'badge-image.jpg', 'badge image');
-    db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(
+    await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(
       JSON.stringify({ elements: [{ type: 'image', src: '/uploads/name-tags/badge-image.jpg' }] })
     );
 
@@ -106,7 +106,7 @@ test('sweepNameTagImages / sweepScheduleCardImages', async (t) => {
     writeUpload(scheduleCardDir, 'kept.jpg', 'kept');
     writeUpload(scheduleCardDir, 'orphan.jpg', 'orphan');
 
-    db.prepare(
+    await db.prepare(
       "INSERT INTO schedule_card_templates (id, layout_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET layout_json = excluded.layout_json"
     ).run(JSON.stringify({ elements: [{ type: 'image', src: '/uploads/schedule-cards/kept.jpg' }] }));
 

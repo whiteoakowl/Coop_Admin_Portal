@@ -23,6 +23,8 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
+
+test.before(() => app.ready);
 const db = require('../db');
 
 test.after(() => {
@@ -39,7 +41,7 @@ async function loginAsAdmin() {
 
 test('member Cards dialog print layouts', async (t) => {
   const cookie = await loginAsAdmin();
-  const memberInfo = db
+  const memberInfo = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Print Layout Kid', 'Print_Layout_Kid', 'student')")
     .run();
   const memberId = memberInfo.lastInsertRowid;

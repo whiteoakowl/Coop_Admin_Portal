@@ -23,6 +23,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -48,7 +49,7 @@ test('Setup/Cleanup Task List', async (t) => {
       .type('form')
       .send({ title: 'Chairs & Tables', _csrf: csrfToken });
 
-    const section = db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Chairs & Tables'").get();
+    const section = await db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Chairs & Tables'").get();
     assert.ok(section);
 
     await request(app)
@@ -62,7 +63,7 @@ test('Setup/Cleanup Task List', async (t) => {
       .type('form')
       .send({ sectionId: String(section.id), description: 'Fold tables', _csrf: csrfToken });
 
-    let items = db.prepare('SELECT * FROM task_list_items WHERE section_id = ? ORDER BY position').all(section.id);
+    let items = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ? ORDER BY position').all(section.id);
     assert.deepEqual(items.map((i) => i.description), ['Set up chairs', 'Fold tables']);
 
     // Move the second item up - order should flip.
@@ -72,13 +73,13 @@ test('Setup/Cleanup Task List', async (t) => {
       .type('form')
       .send({ direction: 'up', _csrf: csrfToken });
 
-    items = db.prepare('SELECT * FROM task_list_items WHERE section_id = ? ORDER BY position').all(section.id);
+    items = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ? ORDER BY position').all(section.id);
     assert.deepEqual(items.map((i) => i.description), ['Fold tables', 'Set up chairs']);
   });
 
   await t.test('the Save form updates a section title and an item description together', async () => {
-    const section = db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Old Title', 99)").run();
-    const item = db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Old task');
+    const section = await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Old Title', 99)").run();
+    const item = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Old task');
 
     await request(app)
       .post('/admin/setup/monday/tasks/save')
@@ -90,13 +91,13 @@ test('Setup/Cleanup Task List', async (t) => {
         _csrf: csrfToken,
       });
 
-    assert.equal(db.prepare('SELECT title FROM task_list_sections WHERE id = ?').get(section.lastInsertRowid).title, 'New Title');
-    assert.equal(db.prepare('SELECT description FROM task_list_items WHERE id = ?').get(item.lastInsertRowid).description, 'New task');
+    assert.equal((await db.prepare('SELECT title FROM task_list_sections WHERE id = ?').get(section.lastInsertRowid)).title, 'New Title');
+    assert.equal((await db.prepare('SELECT description FROM task_list_items WHERE id = ?').get(item.lastInsertRowid)).description, 'New task');
   });
 
   await t.test('deleting a section removes it (and its items, via cascade)', async () => {
-    const section = db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Temp List', 100)").run();
-    db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Temp task');
+    const section = await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Temp List', 100)").run();
+    await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Temp task');
 
     await request(app)
       .post(`/admin/setup/monday/tasks/${section.lastInsertRowid}/delete`)
@@ -104,14 +105,14 @@ test('Setup/Cleanup Task List', async (t) => {
       .type('form')
       .send({ _csrf: csrfToken });
 
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM task_list_sections WHERE id = ?').get(section.lastInsertRowid).c, 0);
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM task_list_items WHERE section_id = ?').get(section.lastInsertRowid).c, 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM task_list_sections WHERE id = ?').get(section.lastInsertRowid)).c), 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM task_list_items WHERE section_id = ?').get(section.lastInsertRowid)).c), 0);
   });
 
   await t.test('a Setup/Cleanup team card shows its own linked task list', async () => {
-    const team = db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Linked Team')").run();
-    const section = db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Team Tasks', ?, 0)").run(team.lastInsertRowid);
-    db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Linked task');
+    const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Linked Team')").run();
+    const section = await db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Team Tasks', ?, 0)").run(team.lastInsertRowid);
+    await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Linked task');
 
     const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
     assert.equal(res.status, 200);

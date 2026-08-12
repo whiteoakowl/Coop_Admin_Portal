@@ -22,6 +22,7 @@ const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -48,7 +49,7 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
       .send({ name: 'Priya Patel', memberType: 'student', _csrf: csrfToken });
     assert.equal(res.status, 302);
 
-    const row = db.prepare('SELECT barcode, member_code FROM members WHERE name = ?').get('Priya Patel');
+    const row = await db.prepare('SELECT barcode, member_code FROM members WHERE name = ?').get('Priya Patel');
     assert.match(row.member_code, /^\d{6}$/);
     assert.equal(row.barcode, row.member_code);
   });
@@ -56,7 +57,7 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
   await t.test('two members created back to back never collide on member_code', async () => {
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Sam Rivera', memberType: 'student', _csrf: csrfToken });
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Jordan Kim', memberType: 'student', _csrf: csrfToken });
-    const codes = db.prepare("SELECT member_code FROM members WHERE name IN ('Sam Rivera', 'Jordan Kim')").all().map((r) => r.member_code);
+    const codes = (await db.prepare("SELECT member_code FROM members WHERE name IN ('Sam Rivera', 'Jordan Kim')").all()).map((r) => r.member_code);
     assert.equal(codes.length, 2);
     assert.notEqual(codes[0], codes[1]);
   });
@@ -65,7 +66,7 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
 test('editing a member never changes their member_code/barcode, even when their name changes', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
   await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Original Name', memberType: 'student', _csrf: csrfToken });
-  const before = db.prepare('SELECT id, member_code, barcode FROM members WHERE name = ?').get('Original Name');
+  const before = await db.prepare('SELECT id, member_code, barcode FROM members WHERE name = ?').get('Original Name');
 
   await t.test('renaming the member on their edit page keeps the same member_code and barcode', async () => {
     const res = await request(app)
@@ -75,7 +76,7 @@ test('editing a member never changes their member_code/barcode, even when their 
       .send({ name: 'Renamed Person', memberType: 'student', _csrf: csrfToken });
     assert.equal(res.status, 302);
 
-    const after = db.prepare('SELECT member_code, barcode FROM members WHERE id = ?').get(before.id);
+    const after = await db.prepare('SELECT member_code, barcode FROM members WHERE id = ?').get(before.id);
     assert.equal(after.member_code, before.member_code, "the member's permanent ID must not change just because they were renamed");
     assert.equal(after.barcode, before.barcode);
   });
@@ -84,7 +85,7 @@ test('editing a member never changes their member_code/barcode, even when their 
 test('the barcode-only print sheet renders the member_code-based barcode value', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
   await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Barcode Check Kid', memberType: 'student', _csrf: csrfToken });
-  const member = db.prepare('SELECT id, member_code FROM members WHERE name = ?').get('Barcode Check Kid');
+  const member = await db.prepare('SELECT id, member_code FROM members WHERE name = ?').get('Barcode Check Kid');
 
   await t.test('the printed barcode SVG carries the member_code as its data-barcode-value, not the name', async () => {
     const res = await request(app)

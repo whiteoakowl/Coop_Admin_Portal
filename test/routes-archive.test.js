@@ -25,6 +25,7 @@ const app = require('../server');
 const db = require('../db');
 const { todayISO } = require('../utils/dates');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -51,23 +52,23 @@ test('roster archive', async (t) => {
     const res = await request(app).post('/admin/rosters/wednesday/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM roster_archives WHERE day = 'wednesday'").get().n, 0);
+    assert.equal(Number((await db.prepare("SELECT COUNT(*) AS n FROM roster_archives WHERE day = 'wednesday'").get()).n), 0);
   });
 
   await t.test('archiving a day with data snapshots it and clears the live roster', async () => {
-    const parentRoster = db.prepare("SELECT id FROM rosters WHERE name = 'Monday Parents'").get();
-    const studentRoster = db.prepare("SELECT id FROM rosters WHERE name = 'Monday Students'").get();
-    const { lastInsertRowid: memberId } = db
+    const parentRoster = await db.prepare("SELECT id FROM rosters WHERE name = 'Monday Parents'").get();
+    const studentRoster = await db.prepare("SELECT id FROM rosters WHERE name = 'Monday Students'").get();
+    const { lastInsertRowid: memberId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Test Kid', 'Archive Test Kid', 'student')")
       .run();
     const today = todayISO();
-    db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(studentRoster.id, today);
-    db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(parentRoster.id, today);
-    db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(studentRoster.id, memberId);
-    db.prepare(
+    await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(studentRoster.id, today);
+    await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(parentRoster.id, today);
+    await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(studentRoster.id, memberId);
+    await db.prepare(
       "INSERT INTO attendance (roster_id, member_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'kiosk')"
     ).run(studentRoster.id, memberId, today);
-    db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, ?, ?)').run(
+    await db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, ?, ?)').run(
       memberId,
       studentRoster.id,
       today,
@@ -80,7 +81,7 @@ test('roster archive', async (t) => {
     assert.match(res.headers.location, /notice=/);
 
     // A permanent record was written...
-    const archive = db.prepare("SELECT * FROM roster_archives WHERE day = 'monday'").get();
+    const archive = await db.prepare("SELECT * FROM roster_archives WHERE day = 'monday'").get();
     assert.ok(archive, 'expected an archive row to have been created');
     const snapshot = JSON.parse(archive.data_json);
     assert.equal(snapshot.day, 'monday');
@@ -92,12 +93,12 @@ test('roster archive', async (t) => {
     // ...and every live table the audit flagged is now clean for this
     // roster - across BOTH sibling rosters, same as the per-date removal
     // route's own transaction.
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM roster_dates WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id).n, 0);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id).n, 0);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id).n, 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM roster_dates WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id)).n), 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id)).n), 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE roster_id IN (?, ?)').get(parentRoster.id, studentRoster.id)).n), 0);
     // Roster membership itself (who's on the roster, independent of any
     // date) is untouched - only the per-date data was in scope.
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE roster_id = ?').get(studentRoster.id).n, 1);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE roster_id = ?').get(studentRoster.id)).n), 1);
   });
 
   await t.test('an unauthenticated request is rejected before reaching archiveDay at all', async () => {

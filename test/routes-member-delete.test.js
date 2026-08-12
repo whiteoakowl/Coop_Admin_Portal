@@ -27,6 +27,7 @@ const app = require('../server');
 const db = require('../db');
 const { todayISO } = require('../utils/dates');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -47,19 +48,19 @@ test('member deletion', async (t) => {
   assert.ok(csrfToken, 'expected a CSRF token to be present on the rendered admin page');
 
   await t.test('deleting a member cascades to every table that referenced them', async () => {
-    const roster = db.prepare('SELECT id FROM rosters WHERE active = 1 LIMIT 1').get();
-    const { lastInsertRowid: familyId } = db.prepare("INSERT INTO families (name) VALUES ('Cascade Test Family')").run();
-    const { lastInsertRowid: memberId } = db
+    const roster = await db.prepare('SELECT id FROM rosters WHERE active = 1 LIMIT 1').get();
+    const { lastInsertRowid: familyId } = await db.prepare("INSERT INTO families (name) VALUES ('Cascade Test Family')").run();
+    const { lastInsertRowid: memberId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Cascade Test Kid', 'Cascade Test Kid', 'student', ?)")
       .run(familyId);
     const today = todayISO();
 
-    db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(roster.id, today);
-    db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(roster.id, memberId);
-    db.prepare(
+    await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(roster.id, today);
+    await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(roster.id, memberId);
+    await db.prepare(
       "INSERT INTO attendance (roster_id, member_id, session_date, status, source) VALUES (?, ?, ?, 'present', 'kiosk')"
     ).run(roster.id, memberId, today);
-    db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, ?, ?)').run(
+    await db.prepare('INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time) VALUES (?, ?, ?, ?, ?)').run(
       memberId,
       roster.id,
       today,
@@ -68,22 +69,22 @@ test('member deletion', async (t) => {
     );
 
     // Sanity check the fixture actually landed before deleting anything.
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE member_id = ?').get(memberId).n, 1);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE member_id = ?').get(memberId).n, 1);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE member_id = ?').get(memberId).n, 1);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE member_id = ?').get(memberId)).n), 1);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE member_id = ?').get(memberId)).n), 1);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE member_id = ?').get(memberId)).n), 1);
 
     const res = await request(app).post(`/admin/members/${memberId}/delete`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    assert.equal(db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), undefined);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE member_id = ?').get(memberId).n, 0);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE member_id = ?').get(memberId).n, 0);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE member_id = ?').get(memberId).n, 0);
+    assert.equal(await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), undefined);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM roster_members WHERE member_id = ?').get(memberId)).n), 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE member_id = ?').get(memberId)).n), 0);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM checkouts WHERE member_id = ?').get(memberId)).n), 0);
 
     // The family itself is untouched - deleting one member of a family
     // was never meant to take the family record down with it.
-    assert.ok(db.prepare('SELECT * FROM families WHERE id = ?').get(familyId), 'expected the family row to survive');
+    assert.ok(await db.prepare('SELECT * FROM families WHERE id = ?').get(familyId), 'expected the family row to survive');
   });
 
   await t.test('deleting an already-nonexistent member id is a harmless no-op, not a crash', async () => {
@@ -93,21 +94,21 @@ test('member deletion', async (t) => {
   });
 
   await t.test('an unauthenticated request is rejected before reaching the delete handler at all', async () => {
-    const { lastInsertRowid: memberId } = db
+    const { lastInsertRowid: memberId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Should Survive Kid', 'Should Survive Kid', 'student')")
       .run();
     const res = await request(app).post(`/admin/members/${memberId}/delete`).type('form').send({});
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /\/admin\/login/);
-    assert.ok(db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), 'expected the member to still exist');
+    assert.ok(await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), 'expected the member to still exist');
   });
 
   await t.test('a request with a valid session but a missing/wrong CSRF token is rejected (403), member survives', async () => {
-    const { lastInsertRowid: memberId } = db
+    const { lastInsertRowid: memberId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('CSRF Guard Kid', 'CSRF Guard Kid', 'student')")
       .run();
     const res = await request(app).post(`/admin/members/${memberId}/delete`).set('Cookie', cookie).type('form').send({});
     assert.equal(res.status, 403);
-    assert.ok(db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), 'expected the member to still exist');
+    assert.ok(await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId), 'expected the member to still exist');
   });
 });

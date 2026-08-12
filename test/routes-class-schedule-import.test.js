@@ -24,6 +24,7 @@ const app = require('../server');
 const db = require('../db');
 const XLSX = require('xlsx');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -81,10 +82,10 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const cls = db.prepare("SELECT id FROM classes WHERE class_name = 'Art Adventures'").get();
+    const cls = await db.prepare("SELECT id FROM classes WHERE class_name = 'Art Adventures'").get();
     assert.ok(cls, 'the class should have been created');
 
-    const staff = db
+    const staff = await db
       .prepare('SELECT m.name, cs.role FROM class_staff cs JOIN members m ON m.id = cs.member_id WHERE cs.class_id = ?')
       .all(cls.id);
     const teacher = staff.find((s) => s.role === 'teacher');
@@ -104,10 +105,10 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
       .attach('file', buffer, 'classes-3-assist.xlsx');
     assert.equal(res.status, 302);
 
-    const cls = db.prepare("SELECT id FROM classes WHERE class_name = 'Science Lab'").get();
-    const assistantNames = db
+    const cls = await db.prepare("SELECT id FROM classes WHERE class_name = 'Science Lab'").get();
+    const assistantNames = (await db
       .prepare("SELECT m.name FROM class_staff cs JOIN members m ON m.id = cs.member_id WHERE cs.class_id = ? AND cs.role = 'assistant'")
-      .all(cls.id)
+      .all(cls.id))
       .map((r) => r.name)
       .sort();
     assert.deepEqual(assistantNames, ['Alex Assistant', 'Assistant Three', 'Assistant Two']);
@@ -122,9 +123,9 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('not found'), 'the notice should mention the unmatched teacher/assistant name');
 
-    const cls = db.prepare("SELECT id FROM classes WHERE class_name = 'PE'").get();
+    const cls = await db.prepare("SELECT id FROM classes WHERE class_name = 'PE'").get();
     assert.ok(cls, 'the class itself should still be created even though the teacher name did not match anyone');
-    const staffCount = db.prepare('SELECT COUNT(*) AS c FROM class_staff WHERE class_id = ?').get(cls.id).c;
+    const staffCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_staff WHERE class_id = ?').get(cls.id)).c);
     assert.equal(staffCount, 0);
   });
 });

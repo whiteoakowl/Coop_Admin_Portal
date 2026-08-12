@@ -23,6 +23,7 @@ const app = require('../server');
 const db = require('../db');
 const XLSX = require('xlsx');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -96,10 +97,10 @@ test('POST /admin/members/mass-import', async (t) => {
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const family = db.prepare('SELECT id FROM families WHERE name = ?').get('Doe');
+    const family = await db.prepare('SELECT id FROM families WHERE name = ?').get('Doe');
     assert.ok(family, 'a "Doe" family should have been created from the primary parent\'s last name');
 
-    const members = db.prepare('SELECT * FROM members WHERE family_id = ? ORDER BY name').all(family.id);
+    const members = await db.prepare('SELECT * FROM members WHERE family_id = ? ORDER BY name').all(family.id);
     assert.equal(members.length, 4, 'Jane, John, Amy, Ben');
 
     const jane = members.find((m) => m.name === 'Jane Doe');
@@ -135,8 +136,8 @@ test('POST /admin/members/mass-import', async (t) => {
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'single-parent.xlsx');
     assert.equal(res.status, 302);
 
-    const family = db.prepare('SELECT id FROM families WHERE name = ?').get('Lopez');
-    const members = db.prepare('SELECT name FROM members WHERE family_id = ?').all(family.id).map((m) => m.name);
+    const family = await db.prepare('SELECT id FROM families WHERE name = ?').get('Lopez');
+    const members = (await db.prepare('SELECT name FROM members WHERE family_id = ?').all(family.id)).map((m) => m.name);
     assert.deepEqual(members.sort(), ['Diego Lopez', 'Maria Lopez']);
   });
 
@@ -148,7 +149,7 @@ test('POST /admin/members/mass-import', async (t) => {
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'same-surname.xlsx');
     assert.equal(res.status, 302);
 
-    const chenFamilies = db.prepare("SELECT name FROM families WHERE name LIKE 'Chen%'").all().map((f) => f.name);
+    const chenFamilies = (await db.prepare("SELECT name FROM families WHERE name LIKE 'Chen%'").all()).map((f) => f.name);
     assert.equal(chenFamilies.length, 2, 'expected "Chen" and a disambiguated "Chen 2"');
     assert.ok(chenFamilies.includes('Chen'));
     assert.ok(chenFamilies.some((n) => n !== 'Chen'));
@@ -159,19 +160,19 @@ test('POST /admin/members/mass-import', async (t) => {
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'blank-primary.xlsx');
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(db.prepare("SELECT id FROM members WHERE name = 'Orphan Row Kid'").get(), undefined);
+    assert.equal(await db.prepare("SELECT id FROM members WHERE name = 'Orphan Row Kid'").get(), undefined);
   });
 
   await t.test('re-uploading the same file a second time does not create duplicate members, only links them again', async () => {
     const buffer = buildImportBuffer([padRow(['Pat Rivera', 'pat@example.com', '', '', '', '', '', '', '', 'Kid Rivera', '2017-05-05', '3rd Grade'])]);
     await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'rivera-1.xlsx');
-    const countAfterFirst = db.prepare("SELECT COUNT(*) AS c FROM members WHERE name IN ('Pat Rivera', 'Kid Rivera')").get().c;
+    const countAfterFirst = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE name IN ('Pat Rivera', 'Kid Rivera')").get()).c);
     assert.equal(countAfterFirst, 2);
 
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'rivera-2.xlsx');
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
-    const countAfterSecond = db.prepare("SELECT COUNT(*) AS c FROM members WHERE name IN ('Pat Rivera', 'Kid Rivera')").get().c;
+    const countAfterSecond = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE name IN ('Pat Rivera', 'Kid Rivera')").get()).c);
     assert.equal(countAfterSecond, 2, 're-importing the same names must not create duplicate members');
   });
 });

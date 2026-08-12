@@ -42,7 +42,8 @@ function countOccurrences(text, needle) {
   return text.split(needle).length - 1;
 }
 
-test.before(() => {
+test.before(async () => {
+  await app.ready;
   const insertMember = db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'student')");
   const insertAbsence = db.prepare(
     "INSERT INTO attendance (member_id, roster_id, session_date, status, source, reason_category, reason_text) VALUES (?, 2, '2024-03-04', 'absent', 'absence_form', 'personal', 'testing')"
@@ -54,10 +55,10 @@ test.before(() => {
 
   for (let i = 1; i <= 60; i++) {
     const name = `Log Test Kid ${String(i).padStart(2, '0')}`;
-    const memberId = insertMember.run(name, `log-test-kid-${i}`).lastInsertRowid;
-    insertAbsence.run(memberId);
-    insertCheckin.run(memberId, Date.now() + i);
-    insertNametag.run(memberId);
+    const memberId = (await insertMember.run(name, `log-test-kid-${i}`)).lastInsertRowid;
+    await insertAbsence.run(memberId);
+    await insertCheckin.run(memberId, Date.now() + i);
+    await insertNametag.run(memberId);
   }
 });
 

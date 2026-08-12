@@ -37,6 +37,7 @@ const { todayISO, weekdayOf } = require('../utils/dates');
 const { defaultDateFor } = require('../utils/days');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
 
+test.before(() => app.ready);
 test.after(() => {
   fs.rmSync(testDbPath, { force: true });
   fs.rmSync(`${testDbPath}-wal`, { force: true });
@@ -60,15 +61,15 @@ test('utils/days.js defaultDateFor only returns today for the day of the week th
 });
 
 test('utils/classSchedule.js absentMemberIdsForDate', async (t) => {
-  const { lastInsertRowid: rosterId } = db.prepare("INSERT INTO rosters (name, category) VALUES ('Unit Test Roster', 'Class Schedule')").run();
-  const { lastInsertRowid: absentId } = db
+  const { lastInsertRowid: rosterId } = await db.prepare("INSERT INTO rosters (name, category) VALUES ('Unit Test Roster', 'Class Schedule')").run();
+  const { lastInsertRowid: absentId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Some Absent Person', 'unit-test-absent', 'parent')")
     .run();
-  const { lastInsertRowid: presentId } = db
+  const { lastInsertRowid: presentId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Some Present Person', 'unit-test-present', 'parent')")
     .run();
-  db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'absent', 'admin')").run(absentId, rosterId);
-  db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'present', 'admin')").run(presentId, rosterId);
+  await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'absent', 'admin')").run(absentId, rosterId);
+  await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, '2026-01-05', 'present', 'admin')").run(presentId, rosterId);
 
   await t.test('returns only members marked absent on that exact date', async () => {
     const ids = await absentMemberIdsForDate('2026-01-05');
@@ -88,22 +89,22 @@ test('utils/classSchedule.js absentMemberIdsForDate', async (t) => {
 
 test('Setup/Cleanup: admin + kiosk views highlight an absent member\'s whole row red, only on today\'s own day', async (t) => {
   const cookie = await loginAsAdmin();
-  const { lastInsertRowid: rosterId } = db.prepare("INSERT INTO rosters (name, category) VALUES ('Test Roster', 'Class Schedule')").run();
-  const { lastInsertRowid: absentMemberId } = db
+  const { lastInsertRowid: rosterId } = await db.prepare("INSERT INTO rosters (name, category) VALUES ('Test Roster', 'Class Schedule')").run();
+  const { lastInsertRowid: absentMemberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('Absent Volunteer', '000301', '000301', 'parent')")
     .run();
-  const { lastInsertRowid: presentMemberId } = db
+  const { lastInsertRowid: presentMemberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('Present Volunteer', '000302', '000302', 'parent')")
     .run();
   // Absent *today* - whether that ends up mattering to either tab depends
   // on whether today is actually Monday or Wednesday, checked per-day below.
-  db.prepare(
+  await db.prepare(
     `INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'admin')`
   ).run(absentMemberId, rosterId, today);
 
   for (const day of ['monday', 'wednesday']) {
-    const { lastInsertRowid: teamId } = db.prepare(`INSERT INTO setup_teams (day, title) VALUES ('${day}', 'Chairs & Tables')`).run();
-    db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?), (?, ?)').run(teamId, absentMemberId, teamId, presentMemberId);
+    const { lastInsertRowid: teamId } = await db.prepare(`INSERT INTO setup_teams (day, title) VALUES ('${day}', 'Chairs & Tables')`).run();
+    await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?), (?, ?)').run(teamId, absentMemberId, teamId, presentMemberId);
 
     const isToday = weekdayOf(today) === DAY_WEEKDAY[day];
 

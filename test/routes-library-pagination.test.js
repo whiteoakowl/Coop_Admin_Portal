@@ -39,16 +39,17 @@ function countOccurrences(text, needle) {
   return text.split(needle).length - 1;
 }
 
-test.before(() => {
+test.before(async () => {
+  await app.ready;
   const insert = db.prepare('INSERT INTO library_items (title, barcode) VALUES (?, ?)');
   for (let i = 1; i <= 65; i++) {
-    insert.run(`Library Book ${String(i).padStart(2, '0')}`, `lib-book-${i}`);
+    await insert.run(`Library Book ${String(i).padStart(2, '0')}`, `lib-book-${i}`);
   }
-  db.prepare("INSERT INTO library_item_types (name) VALUES ('Book')").run();
+  await db.prepare("INSERT INTO library_item_types (name) VALUES ('Book')").run();
   // 55 of the 65 are typed 'Book' - enough to still paginate under the
   // filter, so the Next-link test below actually exercises a real Next
   // link rather than a single-page result with nothing to click.
-  db.prepare("UPDATE library_items SET type = 'Book' WHERE id <= 55").run();
+  await db.prepare("UPDATE library_items SET type = 'Book' WHERE id <= 55").run();
 });
 
 test('Library Catalog tab pagination', async (t) => {
