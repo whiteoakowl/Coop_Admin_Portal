@@ -167,7 +167,13 @@ async function buildDaySnapshot(day) {
 
   const classes = [];
   for (const c of await allClassesList(day)) {
+    // roster_id is nullable (ON DELETE SET NULL, and not filled in until
+    // ensureClassRoster's first call for this class - see archiveDay
+    // below's own classRosterIds .filter(Boolean) for the same gap) - a
+    // class with no roster yet has nothing to snapshot.
+    if (!c.roster_id) continue;
     const classRoster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(c.roster_id);
+    if (!classRoster) continue;
     classes.push({
       className: c.class_name,
       hourLabel: c.hourLabel,
@@ -305,6 +311,11 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 
   const rosterId = await rosterIdForTab(tab);
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
+  // rosterIdForTab returns a class's roster_id verbatim for a class tab,
+  // which is nullable (ON DELETE SET NULL, and not filled in until
+  // ensureClassRoster's first call for this class) - classRosterInfo above
+  // only proves the class itself exists, not that it has a roster yet.
+  if (!roster) return res.redirect('/admin/rosters?tab=classes');
   // A class roster has no dates of its own to manage - it always mirrors
   // whichever day's Student roster it belongs to (a class only ever
   // meets when that day's students do), so there's no separate Edit

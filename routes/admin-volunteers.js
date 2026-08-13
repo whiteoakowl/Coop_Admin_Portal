@@ -64,6 +64,11 @@ router.get('/volunteers/:day/assistants', requireAdmin, requireDay, (req, res) =
 router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  // getListByDay can return undefined if this day's volunteer_lists row
+  // hasn't been seeded yet (db/bootstrapPg.js) - normally impossible once
+  // app.ready has resolved, guarded here the same as every other lookup-
+  // by-possibly-missing-row in this app.
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const hours = await hoursForDay(day);
   const dates = await datesForList(list.id);
   const dateLabels = dates.map(formatDateLabel);
@@ -138,6 +143,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
 router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   const insertDate = db.prepare(
     'INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?) ON CONFLICT (volunteer_list_id, session_date) DO NOTHING'
@@ -149,6 +155,7 @@ router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, 
 router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(manageUrl(day, { error: 'Floater list not found.' }));
   const date = req.params.date;
   await db.withTransaction(async (tx) => {
     await tx.prepare('DELETE FROM volunteer_dates WHERE volunteer_list_id = ? AND session_date = ?').run(list.id, date);
@@ -160,6 +167,7 @@ router.post('/volunteers/:day/dates/:date/remove', requireAdmin, requireDay, asy
 router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.status(404).send('Not found');
   const dates = await datesForList(list.id);
   const grid = await jobAssignmentGrid(day, dates);
   const hours = await hoursForDay(day);
@@ -190,12 +198,14 @@ router.get('/volunteers/:day/export.csv', requireAdmin, requireDay, async (req, 
 async function loadArchivedDate(day, date) {
   if (!isValidISODate(date) || date >= todayISO()) return false;
   const list = await getListByDay(day);
+  if (!list) return false;
   return (await datesForList(list.id)).includes(date);
 }
 
 router.get('/volunteers/:day/archive', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const allDates = await datesForList(list.id);
   const today = todayISO();
   const pastDates = allDates.filter((d) => d < today).sort().reverse();
@@ -284,6 +294,7 @@ router.get('/volunteers/:day/risk', requireAdmin, requireDay, async (req, res) =
 router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
   const hourLabelByPosition = {};
@@ -317,6 +328,7 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
 router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   const memberId = parseInt(req.body.memberId, 10);
   const sectionId = parseInt(req.body.sectionId, 10);
   if (memberId && sectionId) {
@@ -336,6 +348,7 @@ router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async
 router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   const sectionId = parseInt(req.params.sectionId, 10);
   const section = (await sectionsForList(list.id)).find((s) => s.id === sectionId);
   if (!section) {
@@ -349,6 +362,7 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   await setSectionRank(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10), req.body.rank);
   res.redirect(`/admin/volunteers/${day}/teams`);
 });
@@ -356,6 +370,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireA
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   await removeMemberFromSection(list.id, parseInt(req.params.memberId, 10), parseInt(req.params.sectionId, 10));
   await syncDayMemberRosters(day);
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Removed from team.'));
@@ -364,6 +379,7 @@ router.post('/volunteers/:day/teams/:sectionId/members/:memberId/remove', requir
 router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.status(404).send('Not found');
   const sections = await sectionsForList(list.id);
   const hours = await hoursForDay(day);
   const hourLabelByPosition = {};
@@ -384,6 +400,7 @@ router.get('/volunteers/:day/teams/export.csv', requireAdmin, requireDay, async 
 router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
+  if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   const firstSection = (await sectionsForList(list.id))[0];
   if (!req.file) {
     return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Please choose a file to import.'));

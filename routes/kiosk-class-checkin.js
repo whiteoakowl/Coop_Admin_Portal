@@ -119,6 +119,10 @@ router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
   const cls = await findClassWithLabels(parseInt(req.params.id, 10));
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
   const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
+  // roster_id is nullable (ON DELETE SET NULL) and isn't filled in until
+  // ensureClassRoster's first call for this class - see resolveScan below,
+  // which already guards the same gap.
+  if (!roster) return res.status(404).render('404', { title: 'Not Found' });
   const today = todayISO();
   const grid = await buildRosterGridData(roster, [today]);
   res.render('kiosk-class-checkin-attendance', {
