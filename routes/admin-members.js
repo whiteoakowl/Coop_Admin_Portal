@@ -42,9 +42,12 @@ const MEMBER_TYPES = ['student', 'parent'];
 // needs the raw buffer anyway and the local-disk path writes that same
 // buffer itself (via saveUpload) rather than letting multer write it.
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
-if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 const MEMBER_PHOTOS_BUCKET = 'member-photos';
 const storageClient = createStorageClient();
+// Only needed as a local-disk fallback - a serverless deployment's
+// filesystem is read-only outside /tmp, so this must not run when
+// Storage is actually configured.
+if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
 const uploadPhoto = multer({
   storage: multer.memoryStorage(),

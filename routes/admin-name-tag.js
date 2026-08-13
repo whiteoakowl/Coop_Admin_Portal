@@ -27,9 +27,12 @@ const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Sched
 const DAY_LABELS = { ...BASE_DAY_LABELS, both: 'Both' };
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
-if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
 const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';
 const storageClient = createStorageClient();
+// Only needed as a local-disk fallback - a serverless deployment's
+// filesystem is read-only outside /tmp, so this must not run when
+// Storage is actually configured.
+if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
 
 const uploadDesignImage = multer({
   storage: multer.memoryStorage(),

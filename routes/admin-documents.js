@@ -20,8 +20,12 @@ router.use(requireFullAdmin);
 // downstream needs to know which backend actually stored it.
 const DOCUMENTS_BUCKET = 'documents';
 
+// Only needed as a local-disk fallback - a serverless deployment's
+// filesystem is read-only outside /tmp, so this must not run when
+// Storage is actually configured (createStorageClient() below is cheap,
+// no network call of its own - safe to call here just to check).
 const DOCUMENT_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
-if (!fs.existsSync(DOCUMENT_DIR)) fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
+if (!createStorageClient() && !fs.existsSync(DOCUMENT_DIR)) fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
 
 const upload = multer({
   storage: multer.memoryStorage(),

@@ -29,9 +29,12 @@ const { isValidISODate } = require('../utils/dates');
 // it would intercept /admin/login itself, along with everything else.
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'membership-children');
-if (!fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 const CHILD_PHOTOS_BUCKET = 'membership-child-photos';
 const storageClient = createStorageClient();
+// Only needed as a local-disk fallback - a serverless deployment's
+// filesystem is read-only outside /tmp, so this must not run when
+// Storage is actually configured.
+if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
 const upload = multer({
   storage: multer.memoryStorage(),

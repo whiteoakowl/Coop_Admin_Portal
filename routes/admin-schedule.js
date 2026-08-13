@@ -39,9 +39,12 @@ const { saveUpload } = require('../utils/uploadBackend');
 const uploadScheduleImport = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'schedule-cards');
-if (!fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
 const SCHEDULE_CARD_IMAGES_BUCKET = 'schedule-card-images';
 const storageClient = createStorageClient();
+// Only needed as a local-disk fallback - a serverless deployment's
+// filesystem is read-only outside /tmp, so this must not run when
+// Storage is actually configured.
+if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
 
 const uploadDesignImage = multer({
   storage: multer.memoryStorage(),
