@@ -41,6 +41,15 @@
   # Marking it external tells Netlify to include its real node_modules
   # files in the function bundle instead of trying to statically trace it.
   external_node_modules = ["ejs"]
+  # esbuild only bundles the JS module graph it can trace - it has no idea
+  # server.js's app.set('views', ...) needs the *.ejs template files under
+  # views/ to exist as real files at runtime (they're never `require()`d,
+  # so there's nothing for esbuild to trace here at all). included_files
+  # copies them into the deployed function bundle, landing at
+  # /var/task/views/... - see server.js's own comment on why it resolves
+  # the views path via LAMBDA_TASK_ROOT to match where these actually end
+  # up, instead of the __dirname it uses for a normal local/LAN install.
+  included_files = ["views/**"]
 
 # Every path not matched by an actual file in `public/` falls through to
 # the one function - this has to be the last/only redirect rule (a 200

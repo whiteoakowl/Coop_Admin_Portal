@@ -90,7 +90,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+// __dirname is correct for a normal `node server.js` run, but esbuild
+// bundles this whole file (and everything it requires) into one file
+// living at netlify/functions/app.js for the Netlify deployment - at
+// runtime there, __dirname resolves to that bundle's own directory, not
+// this file's original location, so a plain __dirname-relative path can't
+// find the real views/ directory. LAMBDA_TASK_ROOT is set by the Lambda
+// runtime Netlify Functions run on (never set for a normal local/LAN
+// install) and points at /var/task, matching where netlify.toml's
+// `included_files` actually copies views/ to - see that file's own
+// comment on this same problem for ejs's require().
+const viewsRoot = process.env.LAMBDA_TASK_ROOT || __dirname;
+app.set('views', path.join(viewsRoot, 'views'));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
