@@ -31,25 +31,41 @@
   # native addons in the dependency tree once db/postgres.js (pure-JS `pg`
   # driver) replaced node:sqlite as the DB layer.
   node_bundler = "esbuild"
-  # `ejs` is the one exception: Express's View class loads the view engine
-  # via `require(ext)` with `ext` computed at runtime from the view
-  # engine's name (see server.js's `app.set('view engine', 'ejs')`) rather
-  # than a literal `require('ejs')` anywhere in this app's own code -
-  # esbuild's static analysis can't see that dynamic require, so it silently
-  # left `ejs` out of the bundle entirely (confirmed by a real deploy
-  # failing with "Cannot find module 'ejs'" on the very first page render).
-  # Marking it external tells Netlify to include its real node_modules
-  # files in the function bundle instead of trying to statically trace it.
-  external_node_modules = ["ejs"]
-  # esbuild only bundles the JS module graph it can trace - it has no idea
-  # server.js's app.set('views', ...) needs the *.ejs template files under
-  # views/ to exist as real files at runtime (they're never `require()`d,
-  # so there's nothing for esbuild to trace here at all). included_files
-  # copies them into the deployed function bundle, landing at
-  # /var/task/views/... - see server.js's own comment on why it resolves
-  # the views path via LAMBDA_TASK_ROOT to match where these actually end
-  # up, instead of the __dirname it uses for a normal local/LAN install.
-  included_files = ["views/**"]
+  # Two exceptions esbuild's static analysis can't see, both confirmed by
+  # real deploy failures rather than guessed at:
+  # - `ejs`: Express's View class loads the view engine via `require(ext)`
+  #   with `ext` computed at runtime from the view engine's name (see
+  #   server.js's `app.set('view engine', 'ejs')`) rather than a literal
+  #   `require('ejs')` anywhere in this app's own code - failed with
+  #   "Cannot find module 'ejs'" on the very first page render.
+  # - `xlsx`: already bundles fine for the *main* thread's own
+  #   `require('xlsx')` in utils/spreadsheet.js (a literal, traceable
+  #   require) - but utils/spreadsheetWorker.js runs in a separate
+  #   worker_threads Worker (see included_files below for why that file
+  #   itself isn't bundled at all), which does its own independent
+  #   `require('xlsx')` that esbuild's trace from the main entry point
+  #   never sees or bundles for.
+  # Marking both external tells Netlify to include their real
+  # node_modules files in the function bundle instead of trying to
+  # statically trace them.
+  external_node_modules = ["ejs", "xlsx"]
+  # esbuild only bundles the JS module graph it can trace via require() -
+  # it has no idea these files are read straight from disk at runtime by
+  # code that never `require()`s them:
+  # - views/** - server.js's app.set('views', ...) (every *.ejs template).
+  # - utils/spreadsheetWorker.js - loaded by `new Worker(path)` in
+  #   utils/spreadsheet.js's readRowsFromFile (the CSV/XLSX import parser,
+  #   isolated in its own thread with a hard timeout as a mitigation for
+  #   the installed xlsx version's unpatched ReDoS advisory - see that
+  #   file's own header comment). A Worker script path is not a
+  #   `require()` call, so esbuild has no way to trace or bundle it.
+  # included_files copies both into the deployed function bundle, landing
+  # at /var/task/views/... and /var/task/utils/spreadsheetWorker.js - see
+  # server.js's and utils/spreadsheet.js's own comments on why they
+  # resolve these paths via LAMBDA_TASK_ROOT to match where these actually
+  # end up, instead of the __dirname they use for a normal local/LAN
+  # install.
+  included_files = ["views/**", "utils/spreadsheetWorker.js"]
 
 # Every path not matched by an actual file in `public/` falls through to
 # the one function - this has to be the last/only redirect rule (a 200

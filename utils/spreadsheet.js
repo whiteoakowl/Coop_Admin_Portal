@@ -41,9 +41,21 @@ const DEFAULT_PARSE_TIMEOUT_MS = 10 * 1000;
 // timeoutMs is an optional override (tests use a tiny one to prove the
 // termination path actually fires, rather than trusting it untested -
 // no real caller needs anything but the default).
+// __dirname is correct for a normal `node server.js` run, but esbuild
+// bundles this file into the single netlify/functions/app.js output for
+// the Netlify deployment - __dirname there resolves to that bundle's own
+// directory, not this file's original location, and worker_threads' Worker
+// loads spreadsheetWorker.js as a real file from disk (never `require()`d,
+// so esbuild has no way to trace or bundle it at all), same class of
+// problem as server.js's views/ path. LAMBDA_TASK_ROOT (set by the Lambda
+// runtime Netlify Functions run on, never set for a normal local/LAN
+// install) matches where netlify.toml's `included_files` actually copies
+// utils/spreadsheetWorker.js to.
+const WORKER_ROOT = process.env.LAMBDA_TASK_ROOT ? path.join(process.env.LAMBDA_TASK_ROOT, 'utils') : __dirname;
+
 function readRowsFromFile(buffer, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(path.join(__dirname, 'spreadsheetWorker.js'));
+    const worker = new Worker(path.join(WORKER_ROOT, 'spreadsheetWorker.js'));
     let settled = false;
 
     const timer = setTimeout(() => {
