@@ -6,23 +6,44 @@ const express = require('express');
 const session = require('express-session');
 const { logError } = require('./utils/logger');
 
+// True only for a real `node server.js` run (the normal local/LAN install
+// - see the require.main === module block near the bottom of this file);
+// false when this module is `require()`d by something else instead -
+// every test/routes-*.test.js file, and netlify/functions/app.js for the
+// Netlify deployment. That distinction matters a lot for the two process
+// event handlers and bootReady's own catch below: process.exit() is the
+// right call for a real standalone server process (fail fast rather than
+// limp along in an unknown state), but it's actively harmful inside a
+// Netlify Function - Netlify reuses warm containers across requests, so
+// exiting the process there kills the *whole container*, not just the
+// one request that happened to trigger the error, showing up to a real
+// user as an opaque "Runtime exited with error: exit status 1" with none
+// of the actual error detail Netlify's own function logs would otherwise
+// show. Confirmed against a real deploy: an error in one route (the
+// public floater-assignment chart) took down the *next*, completely
+// unrelated request (the admin login page) the same way.
+const IS_MAIN_PROCESS = require.main === module;
+
 // Belt-and-suspenders for anything that escapes Express's own error
 // handling entirely - a throw or rejection outside a request (a timer
 // callback, something at startup). Node already terminates the process
 // for both of these by default (and has since Node 15 for unhandled
 // rejections) - continuing to run after either is explicitly against
-// Node's own guidance, since the process may now be in an unknown state.
-// The only thing added here is making sure it's logged somewhere that
-// survives the terminal window being closed before someone notices.
+// Node's own guidance for a real long-running server, since the process
+// may now be in an unknown state; that guidance doesn't apply the same
+// way inside a Netlify Function (see IS_MAIN_PROCESS above), where each
+// invocation is already a fresh, isolated call and forcibly exiting only
+// makes the failure harder to diagnose. The logging (console.error +
+// logError) always happens either way.
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err);
   logError('uncaughtException', err);
-  process.exit(1);
+  if (IS_MAIN_PROCESS) process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled promise rejection:', reason);
   logError('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
-  process.exit(1);
+  if (IS_MAIN_PROCESS) process.exit(1);
 });
 
 const db = require('./db'); // constructs the db handle; db.ready resolves once schema + first-boot seeding are done (see db/index.js)
@@ -56,7 +77,7 @@ async function bootRosters() {
 const bootReady = db.ready.then(() => bootRosters());
 bootReady.catch((err) => {
   console.error('Server failed to boot:', err);
-  process.exit(1);
+  if (IS_MAIN_PROCESS) process.exit(1);
 });
 
 const { defaultDay } = require('./utils/days');

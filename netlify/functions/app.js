@@ -15,17 +15,25 @@
 // so binary bytes survive the Lambda-style JSON response envelope Netlify
 // Functions use under the hood.
 //
-// IMPORTANT - this function alone is not a complete deployment. See
-// MIGRATION.md's "Netlify deployment config" section: until the database
-// backend is actually cut over to db/postgres.js (DATABASE_URL pointing at
-// the real Supabase project) and the upload routes are switched from
-// multer.diskStorage() to utils/storage.js (Supabase Storage), this
-// function would boot against a SQLite file that doesn't persist between
-// invocations here - every write would vanish on the next cold start. Both
-// of those swaps have to land together, in the same deploy, for this to
-// actually work in production; this file is the deployment-plumbing half
-// of that, ready to go once the other half lands.
+// server.js's own `require.main === module` block never runs here (this
+// file requires server.js, it doesn't execute it as the entry script), so
+// the guarantee that block normally gives - the app never accepts a
+// request until app.ready (schema + first-boot seeding + the 4 always-
+// exist day rosters) has actually resolved - doesn't exist for this
+// deployment target on its own. Without awaiting it here, a cold start's
+// very first request(s) could reach a route while, say, the admin account
+// or a day roster hasn't been seeded yet, throwing on data the route
+// assumes already exists - confirmed against a real deploy, where this
+// broke both the admin login page and the public floater-assignment
+// chart. Every invocation awaits app.ready before delegating to
+// serverless-http; after the first one it's already resolved, so this
+// adds no real latency beyond that first cold start.
 const serverless = require('serverless-http');
 const app = require('../../server');
 
-module.exports.handler = serverless(app, { binary: true });
+const httpHandler = serverless(app, { binary: true });
+
+module.exports.handler = async (event, context) => {
+  await app.ready;
+  return httpHandler(event, context);
+};

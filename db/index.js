@@ -64,11 +64,17 @@ if (process.env.DATABASE_URL) {
 db.ready = schemaReady.then(() => seedIfMissing(db));
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -
-// fail loudly and immediately rather than limping along with every
-// request hanging on a promise that'll never resolve.
+// worth logging loudly regardless of context. Deciding what to *do* about
+// it (crash a real standalone server vs. let a Netlify Function's request
+// fail normally vs. let a test see the rejection) is server.js's call, not
+// this module's - it has no way to know which of those it's running
+// under, and calling process.exit() here directly would kill a test
+// process or a Netlify Function's warm container just as readily as a
+// real server (see server.js's own IS_MAIN_PROCESS for the full story).
+// server.js's bootReady already chains off this same promise and decides
+// there.
 db.ready.catch((err) => {
   console.error('Database failed to initialize:', err);
-  process.exit(1);
 });
 
 module.exports = db;
