@@ -26,11 +26,21 @@
 [functions]
   directory = "netlify/functions"
   # Node built-ins (fs, path, crypto) plus this app's own deps (express,
-  # ejs, pg, bcryptjs, multer, xlsx, @supabase/supabase-js) all bundle
-  # cleanly with esbuild - no native addons in the dependency tree once
-  # db/postgres.js (pure-JS `pg` driver) replaces node:sqlite as the DB
-  # layer at cutover.
+  # pg, bcryptjs, multer, xlsx, @supabase/supabase-js) all bundle cleanly
+  # with esbuild via their normal top-of-file `require(...)` calls - no
+  # native addons in the dependency tree once db/postgres.js (pure-JS `pg`
+  # driver) replaced node:sqlite as the DB layer.
   node_bundler = "esbuild"
+  # `ejs` is the one exception: Express's View class loads the view engine
+  # via `require(ext)` with `ext` computed at runtime from the view
+  # engine's name (see server.js's `app.set('view engine', 'ejs')`) rather
+  # than a literal `require('ejs')` anywhere in this app's own code -
+  # esbuild's static analysis can't see that dynamic require, so it silently
+  # left `ejs` out of the bundle entirely (confirmed by a real deploy
+  # failing with "Cannot find module 'ejs'" on the very first page render).
+  # Marking it external tells Netlify to include its real node_modules
+  # files in the function bundle instead of trying to statically trace it.
+  external_node_modules = ["ejs"]
 
 # Every path not matched by an actual file in `public/` falls through to
 # the one function - this has to be the last/only redirect rule (a 200
