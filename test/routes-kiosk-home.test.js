@@ -1,12 +1,12 @@
-// Real HTTP-level coverage for "Class Check In & Out" and "Admin" on the
-// kiosk home screen (views/kiosk-home.ejs). Both went through a few shapes
-// this session before landing here: Class Check In & Out started as a
-// small grey top-corner pill, got promoted to a full landing-card tile,
-// got reverted back to a small top-corner pill (purple, keeping its
-// graduation-cap icon), and finally moved down to the bottom-right corner
-// alongside Admin - both recolored green ("color only matches the green
-// buttons on the kiosk pages"), while Full Screen View stays put in the
-// original top-right corner group. This suite locks in that final shape.
+// Real HTTP-level coverage for Find a Parent / Class Check In & Out /
+// Admin on the kiosk home screen (views/kiosk-home.ejs). These went
+// through a few shapes before landing here: independently
+// `position: fixed`-corner pills (Find a Parent top-left, Class Check In &
+// Out + Admin bottom-right), which could overlap each other and the page
+// content on a narrow/mobile viewport - a bug report on exactly that -
+// then merged into one full-width bottom action bar with equal-width
+// buttons, while Full Screen View stays put in the original top-right
+// corner group. This suite locks in that final shape.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -31,32 +31,40 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test('kiosk home: Class Check In & Out and Admin are green bottom-right corner buttons', async (t) => {
+test('kiosk home: Find a Parent, Class Check In & Out, and Admin share one bottom action bar', async (t) => {
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  await t.test('both live in the bottom-right corner group, inside a <footer> landmark (not a bare <div>, which axe-core flags as page content not contained by any landmark)', () => {
-    const groupMatch = /<footer class="landing-corner-actions-bottom-right">([\s\S]*?)<\/footer>/.exec(res.text);
-    assert.ok(groupMatch, 'expected a <footer class="landing-corner-actions-bottom-right"> group');
-    assert.match(groupMatch[1], /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin">/);
-    assert.match(groupMatch[1], /<a class="admin-corner-link-green" href="\/admin">Admin<\/a>/);
+  await t.test('all three live in the bottom action bar, inside a <footer> landmark (not a bare <div>, which axe-core flags as page content not contained by any landmark)', () => {
+    const groupMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
+    assert.ok(groupMatch, 'expected a <footer class="landing-action-bar"> group');
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-orange" href="\/kiosk\/find-parent">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-green" href="\/kiosk\/class-checkin">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-green" href="\/admin">Admin<\/a>/);
   });
 
-  await t.test('Class Check In & Out keeps its graduation-cap icon', () => {
+  await t.test('Find a Parent and Class Check In & Out keep their icons', () => {
+    assert.match(res.text, /<svg class="icon"><use href="#icon-search"\/><\/svg> Find a Parent<\/a>/);
     assert.match(
       res.text,
-      /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/
+      /<svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/
     );
   });
 
-  await t.test('neither is a big landing-grid tile anymore', () => {
-    assert.doesNotMatch(res.text, /<a class="landing-card landing-card-purple[^"]*" href="\/kiosk\/class-checkin">/);
+  await t.test('none of the three is a big landing-grid tile', () => {
+    assert.doesNotMatch(res.text, /<a class="landing-card[^"]*" href="\/kiosk\/(find-parent|class-checkin)">/);
+    assert.doesNotMatch(res.text, /<a class="landing-card[^"]*" href="\/admin">/);
+  });
+
+  await t.test('the old independently-positioned corner groups are gone', () => {
+    assert.doesNotMatch(res.text, /landing-corner-actions-left/);
+    assert.doesNotMatch(res.text, /landing-corner-actions-bottom-right/);
   });
 
   await t.test('Full Screen View is unaffected, still in the original top-right corner group', () => {
     const topGroupMatch = /<div class="landing-corner-actions">([\s\S]*?)<\/div>/.exec(res.text);
     assert.ok(topGroupMatch);
     assert.match(topGroupMatch[1], /id="fullscreen-toggle-btn"/);
-    assert.doesNotMatch(topGroupMatch[1], /\/kiosk\/class-checkin|\/admin"/, 'Class Check In & Out and Admin should have moved out of this group');
+    assert.doesNotMatch(topGroupMatch[1], /\/kiosk\/class-checkin|\/admin"|\/kiosk\/find-parent/, 'the other three buttons should have moved out of this group');
   });
 });

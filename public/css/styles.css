@@ -629,41 +629,59 @@ textarea:focus-visible,
 }
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
-/* Class Check In & Out + Admin - bottom-right corner group (Full Screen
-   View stays in the original top-right .landing-corner-actions group).
-   Same small pill shape as Find a Parent, just filled green (matching
-   .landing-card-green - color only, these aren't landing-grid tiles). */
-.landing-corner-actions-bottom-right { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
-.class-checkin-corner-btn {
+/* Find a Parent / Class Check In & Out / Admin - kiosk-home.ejs's bottom
+   action bar (Full Screen View stays in its own top-right corner,
+   .landing-corner-actions, since it's not part of this group). Used to be
+   3 independently `position: fixed`-corner pills (top-left, bottom-right
+   x2), which could overlap each other and the page content on a narrow/
+   mobile viewport - a single full-width flex bar with equal-width buttons
+   avoids that regardless of viewport size. .landing-has-action-bar (on
+   <body>) reserves room at the bottom of .landing's centered content so
+   this bar never covers the landing-grid's last row. */
+.landing-has-action-bar { padding-bottom: 5.5rem; }
+.landing-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+}
+.landing-action-bar-btn {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  background: var(--btn-green);
-  border: 1px solid var(--btn-green);
   border-radius: 999px;
-  padding: 0.45rem 1.1rem;
+  padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 700;
   color: #000;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   cursor: pointer;
+  text-align: center;
 }
-.class-checkin-corner-btn:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
+.landing-action-bar-btn-orange { background: var(--btn-bg); border: 1px solid var(--btn-bg); }
+.landing-action-bar-btn-orange:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+.landing-action-bar-btn-green { background: var(--btn-green); border: 1px solid var(--btn-green); }
+.landing-action-bar-btn-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
-.admin-corner-link-green {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: var(--btn-green);
-  border: 1px solid var(--btn-green);
-  border-radius: 999px;
-  padding: 0.45rem 1.1rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #000;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+@media (max-width: 480px) {
+  /* "Class Check In & Out" is the longest label of the three - tighten
+     spacing rather than shrinking .landing-action-bar-btn's flex: 1 (that
+     would let the shorter labels crowd it out unevenly). Text is allowed
+     to wrap to a second line rather than overflow; the bar's own height
+     grows to fit since it isn't a fixed height. */
+  .landing-action-bar { gap: 0.4rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+  .landing-action-bar-btn { font-size: 0.75rem; padding: 0.55rem 0.4rem; gap: 0.25rem; }
+  .landing-has-action-bar { padding-bottom: 6.5rem; }
 }
-.admin-corner-link-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
 /* Find a Parent results - each parent's actual Schedule Card
    (.badge-canvas, same rendering as the Members "View Cards" dialog and
