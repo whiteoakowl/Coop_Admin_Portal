@@ -1,12 +1,13 @@
-// Real HTTP-level coverage for Find a Parent / Full Screen View / Admin
-// on the site root (views/index.ejs) - the actual landing page people
-// reach the app on, as opposed to views/kiosk-home.ejs's own /kiosk full-
-// screen view (see test/routes-kiosk-home.test.js). These were 3
-// independently `position: fixed`-corner pills (Find a Parent top-left,
-// Full Screen View + Admin top-right), which could overlap each other on
-// a narrow/mobile viewport - reported as exactly that. Merged into one
-// full-width bottom action bar with equal-width buttons, matching
-// kiosk-home.ejs's own fix for the identical problem.
+// Real HTTP-level coverage for the site root (views/index.ejs) - the
+// actual landing page people reach the app on, as opposed to
+// views/kiosk-home.ejs's own separate /kiosk full-screen view (see
+// test/routes-kiosk-home.test.js). Went through two shapes: first Find a
+// Parent/Full Screen View/Admin sharing one bottom bar (a bug report on
+// them overlapping each other up top), then corrected to what's actually
+// wanted here - Find a Parent/Class Check In & Out/Admin in a solid-
+// orange bottom bar, with Full Screen View moved back to its own
+// top-right corner (clear of the centered logo/banner, not part of this
+// group at all).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -31,30 +32,41 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test('site root: Find a Parent, Full Screen View, and Admin share one bottom action bar', async (t) => {
+test('site root: Find a Parent, Class Check In & Out, and Admin share one solid-orange bottom bar', async (t) => {
   const res = await request(app).get('/');
   assert.equal(res.status, 200);
 
-  await t.test('all three live in the bottom action bar, inside a <footer> landmark (not a bare <div>, which axe-core flags as page content not contained by any landmark)', () => {
+  await t.test('all three live in the bottom action bar, inside a <footer> landmark, all the orange variant', () => {
     const groupMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
     assert.ok(groupMatch, 'expected a <footer class="landing-action-bar"> group');
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-orange" href="\/kiosk\/find-parent">/);
-    assert.match(groupMatch[1], /id="fullscreen-toggle-btn"/);
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-neutral" href="\/admin">Admin<\/a>/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-orange" href="\/kiosk\/class-checkin">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-orange" href="\/admin">Admin<\/a>/);
+    assert.doesNotMatch(groupMatch[1], /landing-action-bar-btn-green|landing-action-bar-btn-neutral|fullscreen-toggle-btn/);
   });
 
-  await t.test('Find a Parent keeps its icon', () => {
+  await t.test('Find a Parent and Class Check In & Out keep their icons', () => {
     assert.match(res.text, /<svg class="icon"><use href="#icon-search"\/><\/svg> Find a Parent<\/a>/);
+    assert.match(res.text, /<svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/);
   });
 
-  await t.test('the old independently-positioned corner groups are gone', () => {
-    assert.doesNotMatch(res.text, /landing-corner-actions-left/);
-    assert.doesNotMatch(res.text, /<header>/);
+  await t.test('Full Screen View moved back to its own top-right corner group, not the bottom bar', () => {
+    const topGroupMatch = /<div class="landing-corner-actions">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(topGroupMatch, 'expected a top-right .landing-corner-actions group');
+    assert.match(topGroupMatch[1], /id="fullscreen-toggle-btn"/);
   });
 
-  await t.test('the landing-grid cards are unaffected', () => {
-    assert.match(res.text, /Floater Assignments/);
-    assert.match(res.text, /Check In</);
-    assert.match(res.text, /Check Out</);
+  await t.test('the landing-grid cards are grouped by color and reordered: Check In, Check Out, Setup/Cleanup, Floater Assignments, Name Tag, Absence', () => {
+    const gridMatch = /<div class="landing-grid">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(gridMatch, 'expected a .landing-grid');
+    const labels = [...gridMatch[1].matchAll(/<span class="landing-label">([^<]+)<\/span>/g)].map((m) => m[1]);
+    assert.deepEqual(labels, [
+      'Check In',
+      'Check Out',
+      'Setup/Cleanup Teams',
+      'Floater Assignments',
+      'Name Tag Form',
+      'Absence/Late Form',
+    ]);
   });
 });
