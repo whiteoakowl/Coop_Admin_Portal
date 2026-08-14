@@ -37,6 +37,20 @@ let db;
 let schemaReady;
 
 if (process.env.DATABASE_URL) {
+  // TEMPORARY diagnostic (see MIGRATION.md's troubleshooting notes) -
+  // prints what Node actually parsed out of DATABASE_URL, with the
+  // password never included, so a "wrong host" report can be confirmed
+  // from the real deployed value instead of guessing from a screenshot of
+  // wherever it was typed. Safe to leave in briefly; remove once the
+  // connection issue it's diagnosing is resolved.
+  try {
+    const parsed = new URL(process.env.DATABASE_URL);
+    console.error(
+      `DATABASE_URL diagnostic: protocol="${parsed.protocol}" username="${parsed.username}" host="${parsed.hostname}" port="${parsed.port}" pathname="${parsed.pathname}" totalLength=${process.env.DATABASE_URL.length}`
+    );
+  } catch (err) {
+    console.error(`DATABASE_URL diagnostic: could not be parsed as a URL at all - ${err.message} - totalLength=${process.env.DATABASE_URL.length}`);
+  }
   schemaReady = Promise.resolve();
   db = createPgDb(process.env.DATABASE_URL, schemaReady);
 } else {
