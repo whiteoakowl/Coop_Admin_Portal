@@ -7,13 +7,15 @@
 // a narrow/mobile viewport - a bug report on exactly that - then merged
 // into one full-width bottom action bar, but applied at every viewport
 // width, which changed the desktop/tablet layout too (a second bug
-// report, on the site root but the identical fix applies here). Settled
-// here: the bottom bar (.landing-action-bar, display: none outside a
-// max-width: 640px query) only replaces the original corner pills
-// (.landing-desktop-only) below that same breakpoint (see
-// public/css/styles.css) - desktop/tablet keeps the original corner
-// layout unchanged. Both markup shapes are always in the response; only
-// CSS decides which one is visible.
+// report, on the site root but the identical fix applies here), then
+// restyled again to icon-on-top/label-below tab items on a solid
+// var(--accent) bar, matching the admin dashboard's own mobile bottom bar
+// (.admin-mobile-tabs). Settled here: the bottom bar (.landing-action-bar,
+// display: none outside a max-width: 640px query) only replaces the
+// original corner pills (.landing-desktop-only) below that same
+// breakpoint (see public/css/styles.css) - desktop/tablet keeps the
+// original corner layout unchanged. Both markup shapes are always in the
+// response; only CSS decides which one is visible.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -42,20 +44,21 @@ test('kiosk home: mobile action bar and desktop/tablet corner pills both render,
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  await t.test('the mobile-only bottom bar has Find a Parent (orange), Class Check In & Out (green), and Admin (green)', () => {
+  await t.test('the mobile-only bottom bar has Find a Parent, Class Check In & Out, and Admin as icon-on-top/label-below tab items', () => {
     const groupMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
     assert.ok(groupMatch, 'expected a <footer class="landing-action-bar"> group');
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-orange" href="\/kiosk\/find-parent">/);
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-green" href="\/kiosk\/class-checkin">/);
-    assert.match(groupMatch[1], /<a class="landing-action-bar-btn landing-action-bar-btn-green" href="\/admin">Admin<\/a>/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/find-parent">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/class-checkin">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/admin">/);
   });
 
-  await t.test('Find a Parent and Class Check In & Out keep their icons', () => {
-    assert.match(res.text, /<svg class="icon"><use href="#icon-search"\/><\/svg> Find a Parent<\/a>/);
+  await t.test('the bottom bar items keep their icons and labels', () => {
+    assert.match(res.text, /<svg class="icon"><use href="#icon-search"\/><\/svg><span>Find a Parent<\/span><\/a>/);
     assert.match(
       res.text,
-      /<svg class="icon"><use href="#icon-graduation-cap"\/><\/svg> Class Check In &amp; Out<\/a>/
+      /<svg class="icon"><use href="#icon-graduation-cap"\/><\/svg><span>Class Check In &amp; Out<\/span><\/a>/
     );
+    assert.match(res.text, /<svg class="icon"><use href="#icon-lock"\/><\/svg><span>Admin<\/span><\/a>/);
   });
 
   await t.test('none of the three is a big landing-grid tile', () => {

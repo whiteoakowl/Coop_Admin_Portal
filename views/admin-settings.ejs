@@ -14,7 +14,6 @@
     <div class="view-tabs">
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
-        <a class="view-tab<%= activeTab === 'backup' ? ' active' : '' %>" href="/admin/settings?tab=backup">Backup/Restore</a>
         <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
@@ -47,17 +46,6 @@
 
             <button type="submit" class="primary-btn">Update</button>
           </form>
-        </div>
-      <% } else if (activeTab === 'backup') { %>
-        <div class="manage-section">
-          <h2>Backup / Restore</h2>
-          <p class="hint">
-            This app's data now lives in Supabase (hosted Postgres + file storage) rather than a local file on this
-            device, so the local backup/restore feature that used to live here doesn't apply anymore - there's no
-            single on-device database file to download or replace. Supabase backs up your data on its own end.
-            A Supabase-native backup/restore feature for this app may be added later; until then, use your Supabase
-            project's own dashboard for backup/export options.
-          </p>
         </div>
       <% } else if (activeTab === 'classcheckin') { %>
         <div class="manage-section">
