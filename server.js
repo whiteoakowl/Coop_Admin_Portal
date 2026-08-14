@@ -239,6 +239,45 @@ app.use((req, res, next) => {
   next();
 });
 
+// TEMPORARY diagnostic route (see MIGRATION.md's troubleshooting notes) -
+// deliberately doesn't touch db.ready/app.ready or the app's own `db`
+// module at all, so it still works even when the database connection is
+// completely broken (exactly when it's needed most). Shows what Node's
+// own URL parser extracted from DATABASE_URL (never the password) and
+// attempts one standalone connection to report the specific failure, in
+// plain text readable directly in a browser - no Netlify log access
+// needed (not available on the free tier this app is currently deployed
+// on). Remove this route once the connection issue it's diagnosing is
+// resolved; it's not meant to be a permanent part of the app.
+app.get('/db-diagnostic', async (req, res) => {
+  res.type('text/plain');
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return res.send('DATABASE_URL is not set at all in this environment.');
+
+  const lines = [`DATABASE_URL length: ${raw.length}`];
+  let parsed;
+  try {
+    parsed = new URL(raw);
+    lines.push(`protocol: ${parsed.protocol}`, `username: ${parsed.username}`, `host: ${parsed.hostname}`, `port: ${parsed.port}`, `pathname: ${parsed.pathname}`);
+  } catch (err) {
+    lines.push(`Could not be parsed as a URL at all: ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+
+  const { Client } = require('pg');
+  const client = new Client({ connectionString: raw, connectionTimeoutMillis: 8000 });
+  try {
+    await client.connect();
+    const result = await client.query('SELECT 1 AS ok');
+    lines.push(`Connection: SUCCESS (SELECT 1 returned ${JSON.stringify(result.rows)})`);
+  } catch (err) {
+    lines.push(`Connection: FAILED - ${err.message}`);
+  } finally {
+    await client.end().catch(() => {});
+  }
+  res.send(lines.join('\n'));
+});
+
 app.get('/', (req, res) => {
   res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
 });

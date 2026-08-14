@@ -34,6 +34,22 @@ const app = require('../../server');
 const httpHandler = serverless(app, { binary: true });
 
 module.exports.handler = async (event, context) => {
-  await app.ready;
+  // Only waiting, not un-catching: if app.ready is still pending, waiting
+  // for it closes the boot race this exists for (see above). But if it's
+  // already *rejected* (a real, permanent failure - a bad DATABASE_URL,
+  // an unreachable database), re-throwing here would make this handler's
+  // own returned promise reject, which Netlify treats as the whole
+  // function crashing ("This function has crashed", no HTTP response at
+  // all, and free-tier accounts can't see the function logs that would
+  // explain why). Falling through to the real request instead means
+  // Express's own routing still runs - most routes will fail at their
+  // first db query and get the app's normal, visible 500 error page
+  // instead of an opaque platform-level crash, and routes that don't
+  // touch the db (like /db-diagnostic) work regardless.
+  try {
+    await app.ready;
+  } catch (err) {
+    console.error('app.ready rejected - continuing to route the request anyway:', err.message);
+  }
   return httpHandler(event, context);
 };
