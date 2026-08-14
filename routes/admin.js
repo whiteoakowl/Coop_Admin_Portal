@@ -37,7 +37,12 @@ router.post('/login', async (req, res) => {
   }
 
   const { username, password } = req.body;
-  const admin = await db.prepare('SELECT * FROM admins WHERE username = ?').get((username || '').trim());
+  // Case-insensitive on purpose - there's only ever one admin account
+  // (or a small handful, all trusted), so nothing depends on "Admin" and
+  // "admin" being different logins, and a mismatched case (e.g. a mobile
+  // keyboard auto-capitalizing the first letter) shouldn't be able to
+  // lock someone out who's typing the right username.
+  const admin = await db.prepare('SELECT * FROM admins WHERE LOWER(username) = LOWER(?)').get((username || '').trim());
   if (!admin || !bcrypt.compareSync(password || '', admin.password_hash)) {
     recordFailure(req.ip);
     return res.render('admin-login', { title: 'Admin Login', error: 'Invalid username or password.', next });
@@ -214,7 +219,10 @@ router.post('/settings/username', requireAdmin, requireFullAdmin, async (req, re
 
   if (!newUsername) return renderSettings(req, res, 'New username is required.', null, 'account');
 
-  const taken = await db.prepare('SELECT id FROM admins WHERE username = ? AND id != ?').get(newUsername, req.session.adminId);
+  // Case-insensitive, matching the login lookup above - otherwise two
+  // accounts could end up differing only by case, which login could never
+  // tell apart anyway.
+  const taken = await db.prepare('SELECT id FROM admins WHERE LOWER(username) = LOWER(?) AND id != ?').get(newUsername, req.session.adminId);
   if (taken) return renderSettings(req, res, 'That username is already in use.', null, 'account');
 
   await db.prepare('UPDATE admins SET username = ? WHERE id = ?').run(newUsername, req.session.adminId);

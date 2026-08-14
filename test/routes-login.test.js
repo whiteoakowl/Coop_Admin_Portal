@@ -51,6 +51,16 @@ test('login', async (t) => {
     assert.equal(dashboard.status, 200);
   });
 
+  await t.test('username matching is case-insensitive (e.g. a mobile keyboard auto-capitalizing the first letter should not lock someone out)', async () => {
+    const res = await request(app)
+      .post('/admin/login')
+      .type('form')
+      .send({ username: 'TestAdmin', password: 'testpassword123' });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, '/admin');
+    assert.ok(res.headers['set-cookie'] && res.headers['set-cookie'].length > 0);
+  });
+
   await t.test('wrong password re-renders the login page and does not grant access', async () => {
     const res = await request(app)
       .post('/admin/login')

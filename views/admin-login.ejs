@@ -16,7 +16,7 @@
     <form method="POST" action="/admin/login" class="stack-form">
       <input type="hidden" name="next" value="<%= next %>" />
       <label for="username">Username</label>
-      <input id="username" name="username" type="text" autocomplete="username" required />
+      <input id="username" name="username" type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
 
       <label for="password">Password</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required />
