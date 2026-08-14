@@ -39,8 +39,12 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-const MASS_IMPORT_HEADERS = ['Primary Parent Name', 'Primary Parent Email', '2nd Parent Name', '2nd Parent Email', 'Address', 'City', 'State', 'Zip Code', 'Phone Number'];
-for (let i = 1; i <= 8; i++) MASS_IMPORT_HEADERS.push(`Child ${i} Name`, `Child ${i} Birthday`, `Child ${i} Grade`);
+const MASS_IMPORT_HEADERS = [
+  'Primary Parent First Name', 'Primary Parent Last Name', 'Primary Parent Email',
+  '2nd Parent First Name', '2nd Parent Last Name', '2nd Parent Email',
+  'Address', 'City', 'State', 'Zip Code', 'Phone Number',
+];
+for (let i = 1; i <= 8; i++) MASS_IMPORT_HEADERS.push(`Child ${i} First Name`, `Child ${i} Last Name`, `Child ${i} Birthday`, `Child ${i} Grade`);
 
 function buildImportBuffer(rows) {
   const ws = XLSX.utils.aoa_to_sheet([MASS_IMPORT_HEADERS, ...rows]);
@@ -55,7 +59,7 @@ function padRow(cells) {
   return row;
 }
 
-test('GET /admin/members/mass-import/sample.xlsx has the exact 33-column layout', async () => {
+test('GET /admin/members/mass-import/sample.xlsx has the exact 43-column layout', async () => {
   const { cookie } = await loginAsAdmin();
   // supertest doesn't buffer an unrecognized (binary xlsx) content-type
   // into res.body by default - force it, same as any other binary
@@ -74,7 +78,7 @@ test('GET /admin/members/mass-import/sample.xlsx has the exact 33-column layout'
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
   assert.deepEqual(rows[0], MASS_IMPORT_HEADERS);
-  assert.equal(MASS_IMPORT_HEADERS.length, 33);
+  assert.equal(MASS_IMPORT_HEADERS.length, 43);
 });
 
 test('POST /admin/members/mass-import', async (t) => {
@@ -83,10 +87,10 @@ test('POST /admin/members/mass-import', async (t) => {
   await t.test('a full household row creates one family, both parents, and every named child, all linked together', async () => {
     const buffer = buildImportBuffer([
       padRow([
-        'Jane Doe', 'jane.doe@example.com', 'John Doe', 'john.doe@example.com',
+        'Jane', 'Doe', 'jane.doe@example.com', 'John', 'Doe', 'john.doe@example.com',
         '123 Main St', 'Sanford', 'NC', '27330', '555-000-1111',
-        'Amy Doe', '2015-04-12', '5th Grade',
-        'Ben Doe', '2017-08-03', '3rd Grade',
+        'Amy', 'Doe', '2015-04-12', '5th Grade',
+        'Ben', 'Doe', '2017-08-03', '3rd Grade',
       ]),
     ]);
 
@@ -132,7 +136,7 @@ test('POST /admin/members/mass-import', async (t) => {
   });
 
   await t.test('a single-parent row (no 2nd Parent Name) creates just the primary parent + kids, no error', async () => {
-    const buffer = buildImportBuffer([padRow(['Maria Lopez', 'maria@example.com', '', '', '456 Oak Ave', 'Sanford', 'NC', '27330', '555-222-3333', 'Diego Lopez', '2016-06-20', '4th Grade'])]);
+    const buffer = buildImportBuffer([padRow(['Maria', 'Lopez', 'maria@example.com', '', '', '', '456 Oak Ave', 'Sanford', 'NC', '27330', '555-222-3333', 'Diego', 'Lopez', '2016-06-20', '4th Grade'])]);
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'single-parent.xlsx');
     assert.equal(res.status, 302);
 
@@ -143,8 +147,8 @@ test('POST /admin/members/mass-import', async (t) => {
 
   await t.test('two unrelated rows with the same last name get two distinct families, not merged into one', async () => {
     const buffer = buildImportBuffer([
-      padRow(['Alex Chen', 'alex1@example.com', '', '', '1 First St', '', '', '', '', 'Kid Chen', '2018-01-01', '2nd Grade']),
-      padRow(['Robin Chen', 'alex2@example.com', '', '', '2 Second St', '', '', '', '', 'Other Kid Chen', '2019-01-01', '1st Grade']),
+      padRow(['Alex', 'Chen', 'alex1@example.com', '', '', '', '1 First St', '', '', '', '', 'Kid', 'Chen', '2018-01-01', '2nd Grade']),
+      padRow(['Robin', 'Chen', 'alex2@example.com', '', '', '', '2 Second St', '', '', '', '', 'Other Kid', 'Chen', '2019-01-01', '1st Grade']),
     ]);
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'same-surname.xlsx');
     assert.equal(res.status, 302);
@@ -156,7 +160,7 @@ test('POST /admin/members/mass-import', async (t) => {
   });
 
   await t.test('a row with no Primary Parent Name is skipped, not imported as a family with no parent', async () => {
-    const buffer = buildImportBuffer([padRow(['', '', '', '', '', '', '', '', '', 'Orphan Row Kid', '2020-01-01', 'Kindergarten'])]);
+    const buffer = buildImportBuffer([padRow(['', '', '', '', '', '', '', '', '', '', '', 'Orphan Row', 'Kid', '2020-01-01', 'Kindergarten'])]);
     const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'blank-primary.xlsx');
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
@@ -164,7 +168,7 @@ test('POST /admin/members/mass-import', async (t) => {
   });
 
   await t.test('re-uploading the same file a second time does not create duplicate members, only links them again', async () => {
-    const buffer = buildImportBuffer([padRow(['Pat Rivera', 'pat@example.com', '', '', '', '', '', '', '', 'Kid Rivera', '2017-05-05', '3rd Grade'])]);
+    const buffer = buildImportBuffer([padRow(['Pat', 'Rivera', 'pat@example.com', '', '', '', '', '', '', '', '', 'Kid', 'Rivera', '2017-05-05', '3rd Grade'])]);
     await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'rivera-1.xlsx');
     const countAfterFirst = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE name IN ('Pat Rivera', 'Kid Rivera')").get()).c);
     assert.equal(countAfterFirst, 2);

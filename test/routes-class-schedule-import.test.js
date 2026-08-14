@@ -40,7 +40,13 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-const IMPORT_HEADERS = ['Day', 'Hour', 'Class Name', 'Room', 'Age Group', 'Teacher', 'Assistant 1', 'Assistant 2', 'Assistant 3'];
+const IMPORT_HEADERS = [
+  'Day', 'Hour', 'Class Name', 'Room', 'Age Group',
+  'Teacher First Name', 'Teacher Last Name',
+  'Assistant 1 First Name', 'Assistant 1 Last Name',
+  'Assistant 2 First Name', 'Assistant 2 Last Name',
+  'Assistant 3 First Name', 'Assistant 3 Last Name',
+];
 
 function buildImportBuffer(rows) {
   const ws = XLSX.utils.aoa_to_sheet([IMPORT_HEADERS, ...rows]);
@@ -74,7 +80,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Alex Assistant', memberType: 'parent', _csrf: csrfToken });
 
   await t.test('a row with Teacher + Assistant columns staffs the new class accordingly', async () => {
-    const buffer = buildImportBuffer([['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane Teacher', 'Alex Assistant', '', '']]);
+    const buffer = buildImportBuffer([['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane', 'Teacher', 'Alex', 'Assistant', '', '', '', '']]);
     const res = await request(app)
       .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
@@ -98,7 +104,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   await t.test('all 3 assistant columns can be used at once', async () => {
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Two', memberType: 'parent', _csrf: csrfToken });
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Three', memberType: 'parent', _csrf: csrfToken });
-    const buffer = buildImportBuffer([['Monday', '2', 'Science Lab', 'Room 8', 'Ages 8-10', '', 'Alex Assistant', 'Assistant Two', 'Assistant Three']]);
+    const buffer = buildImportBuffer([['Monday', '2', 'Science Lab', 'Room 8', 'Ages 8-10', '', '', 'Alex', 'Assistant', 'Assistant', 'Two', 'Assistant', 'Three']]);
     const res = await request(app)
       .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
@@ -115,7 +121,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   });
 
   await t.test('a Teacher/Assistant name that matches no active parent is skipped, not fatal to the row', async () => {
-    const buffer = buildImportBuffer([['Wednesday', '1', 'PE', 'Gym', 'All Ages', 'Nobody Real', '', '', '']]);
+    const buffer = buildImportBuffer([['Wednesday', '1', 'PE', 'Gym', 'All Ages', 'Nobody', 'Real', '', '', '', '', '', '']]);
     const res = await request(app)
       .post('/admin/class-schedule/wednesday/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)

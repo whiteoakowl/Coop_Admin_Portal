@@ -409,10 +409,10 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
 // path never gets shadowed by the :id param.
 router.get('/members/import-template.xlsx', (req, res) => {
   const buffer = buildTemplateWorkbook(
-    ['Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent Name'],
+    ['First Name', 'Last Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent First Name', 'Parent Last Name'],
     [
-      ['Jane Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', ''],
-      ['Alice Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane Smith'],
+      ['Jane', 'Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', '', ''],
+      ['Alice', 'Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane', 'Smith'],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -528,7 +528,8 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
 });
 
 const MEMBER_IMPORT_HEADER_ALIASES = {
-  name: ['name'],
+  firstName: ['first name', 'first'],
+  lastName: ['last name', 'last'],
   type: ['type', 'member type'],
   address: ['address'],
   city: ['city'],
@@ -539,9 +540,16 @@ const MEMBER_IMPORT_HEADER_ALIASES = {
   birthday: ['birthday', 'birth date', 'dob'],
   gradeLevel: ['grade level', 'grade'],
   medicalNotes: ['medical/allergy notes', 'medical notes', 'allergy notes', 'medical'],
-  parentName: ['parent name', 'parent'],
+  parentFirstName: ['parent first name'],
+  parentLastName: ['parent last name'],
 };
 
+// First/Last are separate columns in the spreadsheet, but every member is
+// still stored as a single "First Last" string - see utils/members.js's
+// lastNameOf - the same convention the membership form's one-box Name
+// field already uses. Joined back together here at read time so nothing
+// downstream (duplicate-name matching, family-name derivation, display)
+// needs to know the template ever had separate columns.
 function normalizeImportRow(row) {
   const lowerMap = {};
   for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
@@ -554,6 +562,8 @@ function normalizeImportRow(row) {
       }
     }
   }
+  out.name = [out.firstName, out.lastName].filter(Boolean).join(' ');
+  out.parentName = [out.parentFirstName, out.parentLastName].filter(Boolean).join(' ');
   return out;
 }
 
@@ -734,19 +744,23 @@ router.post('/members/import/confirm', async (req, res) => {
 
 const MASS_IMPORT_CHILD_SLOTS = 8;
 
-const MASS_IMPORT_HEADERS = ['Primary Parent Name', 'Primary Parent Email', '2nd Parent Name', '2nd Parent Email', 'Address', 'City', 'State', 'Zip Code', 'Phone Number'];
+const MASS_IMPORT_HEADERS = [
+  'Primary Parent First Name', 'Primary Parent Last Name', 'Primary Parent Email',
+  '2nd Parent First Name', '2nd Parent Last Name', '2nd Parent Email',
+  'Address', 'City', 'State', 'Zip Code', 'Phone Number',
+];
 for (let i = 1; i <= MASS_IMPORT_CHILD_SLOTS; i++) {
-  MASS_IMPORT_HEADERS.push(`Child ${i} Name`, `Child ${i} Birthday`, `Child ${i} Grade`);
+  MASS_IMPORT_HEADERS.push(`Child ${i} First Name`, `Child ${i} Last Name`, `Child ${i} Birthday`, `Child ${i} Grade`);
 }
 
 router.get('/members/mass-import/sample.xlsx', (req, res) => {
   const exampleRow = [
-    'Jane Smith', 'jane@example.com', 'John Smith', 'john@example.com',
+    'Jane', 'Smith', 'jane@example.com', 'John', 'Smith', 'john@example.com',
     '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543',
-    'Alice Smith', '2015-04-12', '5th Grade',
-    'Ben Smith', '2017-08-03', '3rd Grade',
+    'Alice', 'Smith', '2015-04-12', '5th Grade',
+    'Ben', 'Smith', '2017-08-03', '3rd Grade',
   ];
-  // Pad out the remaining 6 empty child slots (18 columns) so the row
+  // Pad out the remaining 6 empty child slots (24 columns) so the row
   // lines up with MASS_IMPORT_HEADERS exactly.
   while (exampleRow.length < MASS_IMPORT_HEADERS.length) exampleRow.push('');
 
@@ -755,6 +769,18 @@ router.get('/members/mass-import/sample.xlsx', (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="mass-import-template.xlsx"');
   res.send(buffer);
 });
+
+// First/Last are separate columns in the spreadsheet (easier to fill in
+// and to sort/validate than one combined name column), but every member
+// is still stored as a single "First Last" string - see utils/members.js's
+// lastNameOf - the same convention the membership form's one-box Name
+// field and every other import path already use. Joining them here at
+// read time means nothing downstream (family-name derivation, dedup
+// matching by name, display, search) needs to know this template ever
+// had separate columns.
+function joinName(first, last) {
+  return [first, last].filter(Boolean).join(' ');
+}
 
 function normalizeMassImportRow(row) {
   const lowerMap = {};
@@ -766,15 +792,15 @@ function normalizeMassImportRow(row) {
 
   const children = [];
   for (let i = 1; i <= MASS_IMPORT_CHILD_SLOTS; i++) {
-    const name = get(`Child ${i} Name`);
+    const name = joinName(get(`Child ${i} First Name`), get(`Child ${i} Last Name`));
     if (!name) continue;
     children.push({ name, birthday: get(`Child ${i} Birthday`), grade: get(`Child ${i} Grade`) });
   }
 
   return {
-    primaryParentName: get('Primary Parent Name'),
+    primaryParentName: joinName(get('Primary Parent First Name'), get('Primary Parent Last Name')),
     primaryParentEmail: get('Primary Parent Email'),
-    secondParentName: get('2nd Parent Name'),
+    secondParentName: joinName(get('2nd Parent First Name'), get('2nd Parent Last Name')),
     secondParentEmail: get('2nd Parent Email'),
     address: get('Address'),
     city: get('City'),

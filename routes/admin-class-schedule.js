@@ -41,11 +41,17 @@ router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/c
 // single path segment, including "import-template.xlsx").
 router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) => {
   const buffer = buildTemplateWorkbook(
-    ['Day', 'Hour', 'Class Name', 'Room', 'Age Group', 'Teacher', 'Assistant 1', 'Assistant 2', 'Assistant 3'],
     [
-      ['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane Smith', 'John Doe', '', ''],
-      ['Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13', 'Pat Rivera', '', '', ''],
-      ['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', ''],
+      'Day', 'Hour', 'Class Name', 'Room', 'Age Group',
+      'Teacher First Name', 'Teacher Last Name',
+      'Assistant 1 First Name', 'Assistant 1 Last Name',
+      'Assistant 2 First Name', 'Assistant 2 Last Name',
+      'Assistant 3 First Name', 'Assistant 3 Last Name',
+    ],
+    [
+      ['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane', 'Smith', 'John', 'Doe', '', '', '', ''],
+      ['Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13', 'Pat', 'Rivera', '', '', '', '', '', ''],
+      ['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', '', '', '', '', ''],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -326,7 +332,7 @@ router.get('/class-schedule/classes/:id/roster/print', requireFullAdmin, async (
 });
 
 router.get('/class-schedule/classes/:id/roster/import-template.xlsx', requireFullAdmin, (req, res) => {
-  const buffer = buildTemplateWorkbook(['Student Name'], [['Jane Smith'], ['John Smith']]);
+  const buffer = buildTemplateWorkbook(['Student First Name', 'Student Last Name'], [['Jane', 'Smith'], ['John', 'Smith']]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="class-roster-import-template.xlsx"');
   res.send(buffer);
@@ -349,8 +355,11 @@ router.post('/class-schedule/classes/:id/roster/import', requireFullAdmin, uploa
 
   const names = rows
     .map((r) => {
-      const key = Object.keys(r).find((k) => k.trim().toLowerCase() === 'student name' || k.trim().toLowerCase() === 'name');
-      return key ? String(r[key]).trim() : '';
+      const lowerMap = {};
+      for (const key of Object.keys(r)) lowerMap[key.trim().toLowerCase()] = r[key];
+      const first = lowerMap['student first name'] !== undefined ? String(lowerMap['student first name']).trim() : '';
+      const last = lowerMap['student last name'] !== undefined ? String(lowerMap['student last name']).trim() : '';
+      return [first, last].filter(Boolean).join(' ');
     })
     .filter(Boolean);
 
@@ -376,12 +385,22 @@ const IMPORT_ALIASES = {
   className: ['class name', 'class', 'subject'],
   room: ['room'],
   ageGroup: ['age group', 'ages', 'age range'],
-  teacher: ['teacher'],
-  assistant1: ['assistant 1', 'assistant'],
-  assistant2: ['assistant 2'],
-  assistant3: ['assistant 3'],
+  teacherFirst: ['teacher first name'],
+  teacherLast: ['teacher last name'],
+  assistant1First: ['assistant 1 first name'],
+  assistant1Last: ['assistant 1 last name'],
+  assistant2First: ['assistant 2 first name'],
+  assistant2Last: ['assistant 2 last name'],
+  assistant3First: ['assistant 3 first name'],
+  assistant3Last: ['assistant 3 last name'],
 };
 
+// Teacher/Assistant 1-3 are each separate First/Last columns in the
+// spreadsheet, joined back into a single "First Last" string here - the
+// same convention every member name is stored as (see
+// utils/members.js's lastNameOf) - so the exact-name match against
+// active parents below doesn't need to know the template ever had
+// separate columns.
 function normalizeImportRow(row) {
   const lowerMap = {};
   for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
@@ -394,6 +413,10 @@ function normalizeImportRow(row) {
       }
     }
   }
+  out.teacher = [out.teacherFirst, out.teacherLast].filter(Boolean).join(' ');
+  out.assistant1 = [out.assistant1First, out.assistant1Last].filter(Boolean).join(' ');
+  out.assistant2 = [out.assistant2First, out.assistant2Last].filter(Boolean).join(' ');
+  out.assistant3 = [out.assistant3First, out.assistant3Last].filter(Boolean).join(' ');
   return out;
 }
 

@@ -67,8 +67,8 @@ test('importing a Student Schedule row enrolls the student on the class roster a
 
   await t.test('the schedule import puts the student on both the class roster and the day-level Student roster', async () => {
     const scheduleBuffer = buildImportBuffer(
-      ['Member Name', 'Day', 'Class Name', 'Start Time'],
-      [['Roster Test Kid', 'Monday', 'Import Roster Class', '']]
+      ['Member First Name', 'Member Last Name', 'Day', 'Class Name', 'Start Time'],
+      [['Roster Test', 'Kid', 'Monday', 'Import Roster Class', '']]
     );
     const res = await request(app)
       .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))

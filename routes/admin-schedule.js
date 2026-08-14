@@ -152,10 +152,10 @@ router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) =
   const tab = req.params.tab;
   if (!SCHEDULE_IMPORT_TABS[tab]) return res.status(404).send('Not found');
   const buffer = buildTemplateWorkbook(
-    ['Member Name', 'Day', 'Class Name', 'Start Time'],
+    ['Member First Name', 'Member Last Name', 'Day', 'Class Name', 'Start Time'],
     [
-      ['Jane Smith', 'Monday', 'Art Adventures', '9:00 AM'],
-      ['John Smith', 'Wednesday', 'PE', '10:00 AM'],
+      ['Jane', 'Smith', 'Monday', 'Art Adventures', '9:00 AM'],
+      ['John', 'Smith', 'Wednesday', 'PE', '10:00 AM'],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -164,7 +164,8 @@ router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) =
 });
 
 const SCHEDULE_IMPORT_ALIASES = {
-  name: ['member name', 'name'],
+  firstName: ['member first name', 'first name'],
+  lastName: ['member last name', 'last name'],
   day: ['day'],
   className: ['class name', 'class', 'subject'],
   startTime: ['start time', 'time'],
@@ -182,6 +183,7 @@ function normalizeScheduleImportRow(row) {
       }
     }
   }
+  out.name = [out.firstName, out.lastName].filter(Boolean).join(' ');
   return out;
 }
 

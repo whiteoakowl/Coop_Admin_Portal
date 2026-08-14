@@ -181,7 +181,7 @@ router.get('/', requireAdmin, async (req, res) => {
 // Absence/Late - those pages only ever link an existing Members-page
 // profile by name, never create one.
 router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
-  const buffer = buildTemplateWorkbook(['Name'], [['Alice Smith'], ['Bob Jones']]);
+  const buffer = buildTemplateWorkbook(['First Name', 'Last Name'], [['Alice', 'Smith'], ['Bob', 'Jones']]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="import-names-template.xlsx"');
   res.send(buffer);

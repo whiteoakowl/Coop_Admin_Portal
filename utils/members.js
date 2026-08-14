@@ -19,12 +19,18 @@ function byLastName(a, b) {
 }
 
 // Names-only file (.csv/.txt), one name per line or name in the first column.
+// First Name and Last Name are the first two columns/cells (whatever
+// they're actually titled - this has always matched by position, not
+// header text), joined into the single "First Last" string every member
+// is stored as. Positional rather than header-matched because the plain
+// .csv/.txt path below has no header-to-value mapping to key off of.
 function parseNamesFile(buffer) {
   const text = buffer.toString('utf8');
   return text
     .split(/\r?\n/)
-    .map((line) => line.split(',')[0].trim().replace(/^"|"$/g, ''))
-    .filter((name) => name && name.toLowerCase() !== 'name');
+    .map((line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, '')))
+    .filter((cells) => cells[0] && cells[0].toLowerCase() !== 'first name')
+    .map((cells) => [cells[0], cells[1]].filter(Boolean).join(' '));
 }
 
 // Same names-only import, but also accepts .xlsx (SheetJS can't be pointed
@@ -36,10 +42,12 @@ async function parseNamesFromUpload(buffer, filename) {
 
   return (await readRowsFromFile(buffer))
     .map((row) => {
-      const firstKey = Object.keys(row)[0];
-      return firstKey ? String(row[firstKey]).trim() : '';
+      const [firstKey, lastKey] = Object.keys(row);
+      const first = firstKey ? String(row[firstKey] ?? '').trim() : '';
+      const last = lastKey ? String(row[lastKey] ?? '').trim() : '';
+      return [first, last].filter(Boolean).join(' ');
     })
-    .filter((name) => name && name.toLowerCase() !== 'name');
+    .filter(Boolean);
 }
 
 // Looks up an existing active member by exact name - never creates one.
