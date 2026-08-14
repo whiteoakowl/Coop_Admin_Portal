@@ -300,6 +300,52 @@ app.get('/db-diagnostic', async (req, res) => {
   res.send(lines.join('\n'));
 });
 
+// TEMPORARY diagnostic route (see /db-diagnostic above and MIGRATION.md's
+// troubleshooting notes) - walks through the actual login steps
+// (admins-table lookup, then a real session-table write/read-back using
+// PgSessionStore directly) so a "login silently does nothing" report can
+// be narrowed to a specific step instead of guessed at. Never touches or
+// reveals any real password. Remove alongside the other temporary
+// diagnostics once the login issue is resolved.
+app.get('/login-diagnostic', async (req, res) => {
+  res.type('text/plain');
+  const lines = [];
+  let admin;
+  try {
+    admin = await db.prepare('SELECT id, username, password_hash FROM admins WHERE LOWER(username) = LOWER(?)').get('admin');
+    lines.push(`admins row for "admin": ${admin ? `found (id=${admin.id}, username="${admin.username}", password_hash starts with "${admin.password_hash.slice(0, 7)}...", length=${admin.password_hash.length})` : 'NOT FOUND'}`);
+  } catch (err) {
+    lines.push(`admins lookup FAILED: ${err.message}`);
+    return res.send(lines.join('\n'));
+  }
+  try {
+    const allAdmins = await db.prepare('SELECT id, username FROM admins').all();
+    lines.push(`total rows in admins table: ${allAdmins.length} (usernames: ${allAdmins.map((a) => JSON.stringify(a.username)).join(', ') || 'none'})`);
+  } catch (err) {
+    lines.push(`admins count FAILED: ${err.message}`);
+  }
+
+  const PgSessionStore = require('./utils/pgSessionStore');
+  const store = new PgSessionStore(db);
+  const testSid = `diagnostic-${Date.now()}`;
+  try {
+    await new Promise((resolve, reject) => store.set(testSid, { cookie: { expires: new Date(Date.now() + 60000) }, diagnostic: true }, (err) => (err ? reject(err) : resolve())));
+    lines.push('session WRITE: SUCCESS');
+    await new Promise((resolve, reject) =>
+      store.get(testSid, (err, sess) => {
+        if (err) return reject(err);
+        lines.push(`session READ-BACK: ${sess ? 'SUCCESS (got the row back)' : 'FAILED (write succeeded but nothing came back)'}`);
+        resolve();
+      })
+    );
+    await new Promise((resolve) => store.destroy(testSid, () => resolve()));
+  } catch (err) {
+    lines.push(`session WRITE/READ FAILED: ${err.message}`);
+  }
+
+  res.send(lines.join('\n'));
+});
+
 app.get('/', (req, res) => {
   res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
 });
