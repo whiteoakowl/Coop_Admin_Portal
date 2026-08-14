@@ -569,6 +569,10 @@ requests to Supabase both fail/reset). This means:
 
 ## What's NOT done yet — the actual remaining work
 
+**Nothing.** This app is now live in production — see "Session update: the
+first real production deployment" below for the full story. Kept here for
+history:
+
 1. ~~Wire `utils/pgSessionStore.js` and `utils/storage.js` into the actual
    app~~ **Done** (a later session, still without live Supabase access -
    see its own writeup below). What's left in this area is real-world
@@ -578,15 +582,14 @@ requests to Supabase both fail/reset). This means:
    whether the Storage-side design-image GC gap (also below) needs fixing
    before production cutover or can wait.
 
-2. **Run `scripts/migrate-to-supabase.js` for real**, against the actual
-   production SQLite file and a freshly-provisioned production Supabase
-   project (distinct from the dev project used throughout this work) -
-   the script itself is written and dry-run-verified (item 9 above), but
-   has never touched a real Supabase project, since this sandboxed
-   environment can't reach one. Create the 5 Storage buckets first (table
-   above), then run without `--dry-run`. **This is now the only item left
-   before this branch is production-ready** — see the next section for why
-   item 3 (below) no longer blocks it.
+2. ~~Run `scripts/migrate-to-supabase.js` for real~~ **Turned out to be
+   unnecessary** — by the time of the real deployment, the user confirmed
+   there was no real production data yet (still pre-launch), so there was
+   nothing to migrate. The app was deployed straight to a fresh Supabase
+   project instead, which self-seeds a default admin account on first
+   boot (`db/bootstrapPg.js`) - see the Session update below. The script
+   itself is still there, dry-run-verified, if a future need for it ever
+   comes up (e.g. importing data from a spreadsheet or another system).
 
 3. ~~`db/index.js` (the SQLite version) gets deleted, and `db/postgres.js`
    gets promoted to be `db/index.js`~~ **Done** — see "Session update: full
@@ -889,43 +892,113 @@ documentation of the original column/constraint definitions.
 `--test-force-exit` needed in practice anymore, though it stays as a safety
 net), `npx eslint .` clean.
 
-## Suggested next steps for whoever picks this up
+## Session update: the first real production deployment (and a genuine bug it found)
 
-Every piece of this migration that can be built, tested, and verified
-*without* a live Supabase connection is now done (schema translation, the
-async DB layer now fully cut over to Postgres/PGlite with `node:sqlite` gone
-entirely, session store, Storage wrapper, the full route/utils async/await
-conversion, Netlify deployment config, and the data/file migration script -
-see "What's done so far" above). Exactly one item is left, and it genuinely
-requires real Supabase connectivity, which is why it's stopped here rather
-than being guessed at:
+Every prior session's work was verified against PGlite only - no session
+before this one ever had real Supabase/Netlify network access. This one
+walked the user through the actual first deployment, live, end to end: a
+real Netlify site (`coopadminportal.netlify.app`, deployed from this
+branch) connected to a real Supabase project. It's a long story because
+almost everything that could go wrong on a first real deploy did, but the
+app is now genuinely live, with a working admin login, confirmed by the
+user directly.
 
-1. Read this file, then skim the "What's done so far" and "What's NOT done
-   yet" sections above to get oriented - the latter is the authoritative
-   remaining-work list (1 item left as of this writing: running the real
-   data migration).
-2. Check whether your session's environment can reach `supabase.co` (try
-   `curl -sS -o /dev/null -w '%{http_code}\n' https://supabase.co`) — every
-   session that has worked on this so far (including this one) has been
-   unable to, so this needs re-checking each time, not assumed. If yes, ask
-   the user for the dev project's connection details again (they'll need to
-   re-share them; nothing carries over) and do a **real** connection test
-   before continuing, strictly better than this session's PGlite-only
-   verification.
-3. Ask the user for `SUPABASE_SERVICE_ROLE_KEY` — needed for
-   `scripts/migrate-to-supabase.js` to actually upload files to Storage, and
-   for the live app's own uploads to work post-cutover. Never ask them to
-   paste it (or any DB password) directly into chat — it only belongs in a
-   local `.env` file on whatever machine actually runs the migration script.
-4. Create the 5 Storage buckets in the Supabase dashboard (table in "What's
-   done so far" → item 9), then run `scripts/migrate-to-supabase.js` for
-   real (start with `--dry-run` again against the real project first, then
-   without it) against the production SQLite file and a freshly-provisioned
-   production Supabase project.
-5. Once real data is loaded and verified, set `DATABASE_URL` in the actual
-   deployment's environment and the app runs entirely on Postgres — no
-   further code changes needed for that switch, since the db layer no
-   longer has a SQLite path to fall back to.
-6. Keep committing and pushing to `supabase-migration` after each real,
-   tested chunk of progress — don't let uncommitted work pile up in one
-   giant, harder-to-review change.
+### The `DATABASE_URL` saga
+
+None of these were bugs in the app - every one was a mistake in how the
+connection string made it into Netlify's environment variables, each
+producing a different, specific, confusing error. Worth keeping as a
+troubleshooting checklist for next time, since one of these will probably
+happen again to someone:
+
+- **Wrong region in a copy-pasted example** - an earlier session's own
+  message used `aws-0-region.pooler.supabase.com` as a generic placeholder;
+  the user copied it literally, producing `getaddrinfo ENOTFOUND
+  aws-0-region.pooler.supabase.com`. Always copy the real value from
+  Supabase's own **Connect** dialog, never retype an example.
+- **Special characters in the database password** breaking the connection
+  string's own URL syntax - `SASL: SCRAM-SERVER-FIRST-MESSAGE: client
+  password must be a string`. Fixed by resetting the database password
+  (Project Settings → Database → Reset database password) to plain letters
+  and numbers only, sidestepping the whole class of encoding issues rather
+  than trying to percent-encode around it.
+- **The literal text `DATABASE_URL=` ended up inside the value field** -
+  Netlify's UI already has a separate Key field; typing/pasting `KEY=value`
+  into the Value field (a habit carried over from editing a local `.env`
+  file, where that syntax is correct) produces a string Node's `URL` parser
+  rejects outright ("Invalid URL"). The value field should contain only the
+  connection string itself, starting with `postgresql://`.
+- **Netlify free-tier build minutes ran out** partway through
+  troubleshooting - every "trigger deploy" click after that point silently
+  did nothing, so several rounds of "I fixed the value, try again" were
+  actually being tested against the same stale broken build, not the fix.
+  No way to detect this except the user noticing their credits were at
+  zero. Worth asking explicitly ("did that deploy actually show
+  'Published'?") if a fix that should obviously work still doesn't.
+
+Given no Netlify log access on a free-tier account, two temporary
+diagnostic routes (`/db-diagnostic`, `/login-diagnostic`) were added and
+later removed once the real bug (below) was found - see their final commit
+messages for what they checked. If a similar "can't tell what's actually
+wrong" situation comes up again, that same pattern (a plain-text GET route,
+deliberately independent of `db.ready`, showing safe structural facts about
+the environment rather than guessing from a screenshot) is worth reusing.
+
+### The real bug: `tableHasIdColumn` matched the wrong schema
+
+Once the connection string was finally correct, login still silently did
+nothing - no error message, no redirect, the form just cleared. Traced via
+`/login-diagnostic` to a real, previously-invisible bug in
+`db/postgres.js`'s `tableHasIdColumn()`: its `information_schema.columns`
+lookup had no schema filter, and every real Supabase project
+auto-provisions its own `auth` schema (for Supabase Auth, even though this
+app deliberately doesn't use it) with its own `sessions` table - a
+completely different table from this app's own `public.sessions`, but
+Postgres's `information_schema.columns` spans every schema by default.
+`auth.sessions` has a real `id` column; `public.sessions` (keyed by `sid`,
+by design) does not. The unscoped lookup found `auth.sessions.id` and
+wrongly concluded `public.sessions` had one too, so every login's session
+write got `RETURNING id` auto-appended and failed with `column "id" does
+not exist` - the password check itself was never the problem.
+
+Fixed by scoping the lookup to `table_schema = 'public'`. Confirmed by
+temporarily reverting the fix and re-running the new regression test (which
+manufactures the exact collision by hand - creates its own throwaway
+`auth.sessions` with an `id` column) to watch it reproduce the identical
+error, then restoring the fix and watching it pass - see
+`test/dbPostgres.test.js`. This was invisible in every prior session's
+testing because a fresh PGlite instance only ever has the `public` schema
+this app's own migration creates; there's no `auth` schema to collide with
+outside a real Supabase project. **Worth remembering if any other
+Postgres-dialect bug ever seems to only reproduce against a real Supabase
+project and never against PGlite: check whether Supabase's own
+auto-provisioned schemas (`auth`, `storage`, `realtime`, `extensions`) have
+a same-named table.**
+
+### Final state
+
+The site is live, the admin account works, and 385 tests pass locally
+against PGlite. Nothing is blocking real use of the app going forward.
+
+## For whoever picks this up next
+
+This migration is complete. The app runs entirely on Postgres/Supabase in
+production, with no SQLite path left anywhere in the runtime code. A few
+things worth knowing:
+
+1. **Netlify's free tier has a monthly build-minutes budget** - the user
+   ran out once already mid-session. Be deliberate about how often a deploy
+   gets triggered: batch code changes together rather than pushing one
+   small fix at a time, and only ask for a redeploy when there's something
+   genuinely new to test.
+2. If a future bug ever seems to only happen against the real deployment
+   and never against the local PGlite-backed test suite, the `auth` schema
+   collision above is the first thing to check - any other table this app
+   creates without a surrogate `id` column (see `db/postgres.js`'s own
+   comment for the current list: `app_settings`, `name_tag_templates`,
+   `misc_badge_templates`, `sessions`, `roster_dates`, `class_enrollments`,
+   ...) is a candidate for the same kind of same-named-table collision if
+   Supabase's own internal schemas ever happen to use that name too.
+3. `scripts/migrate-to-supabase.js` still exists, dry-run-verified but never
+   run for real (there was never any real data to migrate) - it's there if
+   a future need for it comes up.
