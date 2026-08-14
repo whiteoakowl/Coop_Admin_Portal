@@ -3,20 +3,16 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="landing">
+<body class="landing landing-has-action-bar">
   <%- include('partials/icon-sprite') %>
-  <header>
-    <div class="landing-corner-actions-left">
-      <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
-    </div>
-    <div class="landing-corner-actions">
-      <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
-        <svg class="icon"><use href="#icon-maximize"/></svg>
-        <span id="fullscreen-toggle-label">Full Screen View</span>
-      </button>
-      <a class="admin-corner-link" href="/admin">Admin</a>
-    </div>
-  </header>
+  <footer class="landing-action-bar">
+    <a class="landing-action-bar-btn landing-action-bar-btn-orange" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+    <button type="button" class="landing-action-bar-btn landing-action-bar-btn-neutral" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
+    <a class="landing-action-bar-btn landing-action-bar-btn-neutral" href="/admin">Admin</a>
+  </footer>
   <main id="main-content" tabindex="-1" class="landing-wrap">
     <div class="landing-banner">
       <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
