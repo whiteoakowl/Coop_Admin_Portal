@@ -52,6 +52,15 @@ let testClassId;
 let browser;
 
 test.before(async () => {
+  // Every test/routes-*.test.js file awaits this right after requiring
+  // server.js - this file just never did, since it lives outside test/
+  // and was missed by every sweep that added the same await elsewhere
+  // (see MIGRATION.md's "hanging for hours" writeup on why this matters:
+  // the db layer is fully async now, so a request/query landing before
+  // schema + seeding + roster bootstrap finish can fail on data that
+  // doesn't exist yet).
+  await app.ready;
+
   // One browser for the whole file, reused across every page check below
   // (a fresh browser process per page - launched, then thrown away - is
   // the expensive part; a fresh *context* per check, done in axeCheck()
@@ -88,21 +97,23 @@ test.before(async () => {
   // so the class list/attendance/scan pages render real content instead
   // of empty states.
   const today = todayISO();
-  const studentRoster = db.prepare("SELECT id FROM rosters WHERE name = 'Monday Students'").get();
-  db.prepare('INSERT OR IGNORE INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(studentRoster.id, today);
-  const classInfo = db
+  const studentRoster = await db.prepare("SELECT id FROM rosters WHERE name = 'Monday Students'").get();
+  await db
+    .prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING')
+    .run(studentRoster.id, today);
+  const classInfo = await db
     .prepare("INSERT INTO classes (day, hour_position, class_name, color) VALUES ('monday', 1, 'A11y Check Class', '#EE9A4D')")
     .run();
   testClassId = classInfo.lastInsertRowid;
-  const rosterInfo = db
+  const rosterInfo = await db
     .prepare("INSERT INTO rosters (name, category, schedule_day) VALUES ('A11y Check Class', 'Class Roster', 'monday')")
     .run();
-  db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(rosterInfo.lastInsertRowid, testClassId);
-  const memberInfo = db
+  await db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(rosterInfo.lastInsertRowid, testClassId);
+  const memberInfo = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('A11y Check Kid', 'a11y-check-kid-barcode', 'student')")
     .run();
-  db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')").run(rosterInfo.lastInsertRowid, memberInfo.lastInsertRowid);
-  db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')").run(studentRoster.id, memberInfo.lastInsertRowid);
+  await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')").run(rosterInfo.lastInsertRowid, memberInfo.lastInsertRowid);
+  await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')").run(studentRoster.id, memberInfo.lastInsertRowid);
 });
 
 test.after(async () => {
