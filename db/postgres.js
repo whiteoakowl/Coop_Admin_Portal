@@ -67,7 +67,18 @@ const idColumnCache = new Map();
 
 async function tableHasIdColumn(queryable, tableName) {
   if (idColumnCache.has(tableName)) return idColumnCache.get(tableName);
-  const res = await queryable.query("SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = 'id'", [
+  // Scoped to table_schema = 'public' - information_schema.columns spans
+  // every schema in the database, and a real Supabase project always has
+  // its own auth schema alongside this app's tables (auto-provisioned for
+  // Supabase Auth, even though this app doesn't use it - see MIGRATION.md).
+  // auth.sessions is a real table there with its own id column, so an
+  // unscoped lookup for "a table named sessions with an id column" matched
+  // that instead of this app's own public.sessions (which has none),
+  // wrongly appending RETURNING id to every session write and breaking
+  // login. Invisible against PGlite in every test, since a fresh PGlite
+  // instance only ever has the public schema this app's own migration
+  // creates - no auth schema to collide with.
+  const res = await queryable.query("SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'id'", [
     tableName,
   ]);
   const has = res.rows.length > 0;

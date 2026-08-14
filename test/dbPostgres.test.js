@@ -66,6 +66,34 @@ test('db.prepare(sql).get/.all/.run against a real (PGlite) Postgres engine', as
     const row = await db.prepare('SELECT name FROM families WHERE id = ?').get(result.lastInsertRowid);
     assert.equal(row.name, 'Returning Test');
   });
+
+  await t.test('tableHasIdColumn is scoped to the public schema - a same-named table in another schema must not leak into this app\'s own table\'s id detection', async () => {
+    // Reproduces a real production bug: every real Supabase project
+    // auto-provisions an `auth` schema for Supabase Auth (even though this
+    // app doesn't use it - see MIGRATION.md), which has its own `sessions`
+    // table with a real id column - a completely different table from
+    // this app's own public.sessions (keyed by sid, no id column, by
+    // design). An information_schema.columns lookup with no schema filter
+    // would find auth.sessions.id and wrongly conclude public.sessions has
+    // one too, breaking every login (a bare INSERT into sessions would get
+    // RETURNING id auto-appended and throw "column \"id\" does not
+    // exist"). Never caught by any other test here, since a fresh PGlite
+    // instance only ever has the public schema this app's own migration
+    // creates - this test manufactures the collision by hand.
+    await db.query('CREATE SCHEMA IF NOT EXISTS auth');
+    await db.query('CREATE TABLE IF NOT EXISTS auth.sessions (id integer primary key)');
+
+    const result = await db
+      .prepare(
+        "INSERT INTO sessions (sid, data_json, expires_at) VALUES (?, ?, ?) " +
+          'ON CONFLICT (sid) DO UPDATE SET data_json = excluded.data_json, expires_at = excluded.expires_at'
+      )
+      .run('test-sid-schema-collision', '{}', Date.now() + 60000);
+    assert.equal(result.lastInsertRowid, undefined, 'public.sessions has no id column of its own, so this must not throw or return one');
+
+    const row = await db.prepare('SELECT data_json FROM sessions WHERE sid = ?').get('test-sid-schema-collision');
+    assert.equal(row.data_json, '{}');
+  });
 });
 
 test('db.withTransaction', async (t) => {
