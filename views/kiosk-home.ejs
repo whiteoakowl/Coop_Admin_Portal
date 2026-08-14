@@ -5,14 +5,19 @@
 </head>
 <body class="landing landing-has-action-bar">
   <%- include('partials/icon-sprite') %>
-  <header>
-    <div class="landing-corner-actions">
-      <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
-        <svg class="icon"><use href="#icon-maximize"/></svg>
-        <span id="fullscreen-toggle-label">Full Screen View</span>
-      </button>
-    </div>
-  </header>
+  <div class="landing-corner-actions-left landing-desktop-only">
+    <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+  </div>
+  <div class="landing-corner-actions">
+    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
+      <span id="fullscreen-toggle-label">Full Screen View</span>
+    </button>
+  </div>
+  <div class="landing-corner-actions-bottom-right landing-desktop-only">
+    <a class="class-checkin-corner-btn" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
+    <a class="admin-corner-link-green" href="/admin">Admin</a>
+  </div>
   <footer class="landing-action-bar">
     <a class="landing-action-bar-btn landing-action-bar-btn-orange" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
     <a class="landing-action-bar-btn landing-action-bar-btn-green" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>

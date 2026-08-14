@@ -609,31 +609,40 @@ textarea:focus-visible,
   .kiosk-scan-columns { flex-direction: column; align-items: center; gap: 1.25rem; }
 }
 
-/* Find a Parent / Class Check In & Out / Admin - the bottom action bar
-   shared by index.ejs (the real site root/kiosk landing page) and
-   kiosk-home.ejs (the separate /kiosk full-screen view). Both pages keep
-   Full Screen View out of this group, in its own top-right corner
-   (.landing-corner-actions) instead, clear of the centered logo/banner.
-   Used to be up to 3 independently `position: fixed`-corner pills
-   (top-left, top/bottom-right), which could overlap each other and the
-   page content on a narrow/mobile viewport - reported as exactly that. A
-   single full-width flex bar with equal-width buttons avoids that
-   regardless of viewport size. .landing-has-action-bar (on <body>)
-   reserves room at the bottom of .landing's centered content so this bar
-   never covers the landing-grid's last row. */
-.landing-has-action-bar { padding-bottom: 5.5rem; }
-.landing-action-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+/* Mobile-only bottom action bar (Find a Parent / Class Check In & Out /
+   Admin) vs. desktop/tablet's original independently-positioned corner
+   pills, on both index.ejs (the real site root/kiosk landing page) and
+   kiosk-home.ejs (the separate /kiosk full-screen view). A narrow/mobile
+   viewport doesn't have room for 2-3 separate fixed corner groups without
+   them overlapping each other or the page content - reported as exactly
+   that - but a wider desktop/tablet viewport always did, so the bottom
+   bar is scoped to only the narrow case rather than replacing the corner
+   layout everywhere. .landing-action-bar is display: none by default and
+   only gets its real (fixed, flex) styling back inside the one
+   max-width: 640px query below - simpler than a second min-width query
+   for the opposite direction, and avoids the two ever disagreeing right
+   at the boundary. .landing-desktop-only (used directly on the corner
+   elements in each page's markup) is the matching one-way switch for
+   those. .landing-has-action-bar (on <body>) additionally reserves room
+   at the bottom of .landing's centered content, only while the bar itself
+   is actually visible, so it never covers the landing-grid's last row. */
+.landing-action-bar { display: none; }
+@media (max-width: 640px) {
+  .landing-desktop-only { display: none; }
+  .landing-has-action-bar { padding-bottom: 5.5rem; }
+  .landing-action-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+  }
 }
 .landing-action-bar-btn {
   flex: 1;
@@ -655,12 +664,71 @@ textarea:focus-visible,
 .landing-action-bar-btn-green { background: var(--btn-green); border: 1px solid var(--btn-green); }
 .landing-action-bar-btn-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
+/* Find a Parent - corner button (mirrors .admin-corner-link's pill shape
+   but filled orange, since this is a real kiosk feature, not a quiet
+   utility link) and the scan-result cards. Desktop/tablet only - see
+   .landing-desktop-only above. */
+.landing-corner-actions-left { position: fixed; top: 1rem; left: 1rem; z-index: 10; }
+.find-parent-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+/* kiosk-home.ejs's desktop/tablet-only Class Check In & Out + Admin
+   bottom-right corner group (Full Screen View stays in its own top-right
+   corner, .landing-corner-actions, at every viewport width). Same small
+   pill shape as Find a Parent, just filled green (matching
+   .landing-card-green - color only, these aren't landing-grid tiles). */
+.landing-corner-actions-bottom-right { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
+.class-checkin-corner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--btn-green);
+  border: 1px solid var(--btn-green);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.class-checkin-corner-btn:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
+
+.admin-corner-link-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--btn-green);
+  border: 1px solid var(--btn-green);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-corner-link-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
+
 @media (max-width: 480px) {
-  /* "Class Check In & Out" is the longest label of the three - tighten
-     spacing rather than shrinking .landing-action-bar-btn's flex: 1 (that
-     would let the shorter labels crowd it out unevenly). Text is allowed
-     to wrap to a second line rather than overflow; the bar's own height
-     grows to fit since it isn't a fixed height. */
+  /* "Class Check In & Out" is the longest label of the three in the
+     mobile bar - tighten spacing rather than shrinking
+     .landing-action-bar-btn's flex: 1 (that would let the shorter labels
+     crowd it out unevenly). Text is allowed to wrap to a second line
+     rather than overflow; the bar's own height grows to fit since it
+     isn't a fixed height. */
   .landing-action-bar { gap: 0.4rem; padding-left: 0.5rem; padding-right: 0.5rem; }
   .landing-action-bar-btn { font-size: 0.75rem; padding: 0.55rem 0.4rem; gap: 0.25rem; }
   .landing-has-action-bar { padding-bottom: 6.5rem; }

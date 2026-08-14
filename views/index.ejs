@@ -5,11 +5,15 @@
 </head>
 <body class="landing landing-has-action-bar">
   <%- include('partials/icon-sprite') %>
+  <div class="landing-corner-actions-left landing-desktop-only">
+    <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+  </div>
   <div class="landing-corner-actions">
     <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
       <svg class="icon"><use href="#icon-maximize"/></svg>
       <span id="fullscreen-toggle-label">Full Screen View</span>
     </button>
+    <a class="admin-corner-link landing-desktop-only" href="/admin">Admin</a>
   </div>
   <footer class="landing-action-bar">
     <a class="landing-action-bar-btn landing-action-bar-btn-orange" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
