@@ -254,7 +254,29 @@ app.get('/db-diagnostic', async (req, res) => {
   const raw = process.env.DATABASE_URL;
   if (!raw) return res.send('DATABASE_URL is not set at all in this environment.');
 
-  const lines = [`DATABASE_URL length: ${raw.length}`];
+  // Structural checks only - true/false and a handful of characters from
+  // the very start/end, never a slice wide enough to include the
+  // password (which sits between the first ":" after "postgres." and the
+  // "@" - nowhere near either end for any realistic length).
+  const lines = [
+    `DATABASE_URL length: ${raw.length}`,
+    `starts with "postgresql://": ${raw.startsWith('postgresql://')}`,
+    `starts with "postgres://": ${raw.startsWith('postgres://')}`,
+    // Only the first 15 characters, never the end - the password sits
+    // well after that (past "postgresql://postgres." plus a project ref)
+    // but could be anywhere near the end of a string that got truncated
+    // partway through, so the end is never safe to reveal even partially.
+    `first 15 characters: ${JSON.stringify(raw.slice(0, 15))}`,
+    `ends with "/postgres": ${raw.endsWith('/postgres')}`,
+    `contains "://": ${raw.includes('://')}`,
+    `contains "@": ${raw.includes('@')}`,
+    `contains "pooler.supabase.com": ${raw.includes('pooler.supabase.com')}`,
+    `contains ":6543" (transaction pooler port): ${raw.includes(':6543')}`,
+    `contains ":5432" (direct/session port): ${raw.includes(':5432')}`,
+    `contains a literal newline: ${raw.includes('\n') || raw.includes('\r')}`,
+    `contains a literal space: ${raw.includes(' ')}`,
+  ];
+
   let parsed;
   try {
     parsed = new URL(raw);
