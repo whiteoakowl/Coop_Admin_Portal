@@ -127,7 +127,7 @@
       const el = findEl(node.dataset.id);
       if (!el) return;
       if (el.locked) node.classList.add('badge-el-locked');
-      node.addEventListener('mousedown', (e) => startDrag(e, el));
+      node.addEventListener('pointerdown', (e) => startDrag(e, el));
       if (el.type === 'text' && el.field === 'custom') {
         const span = node.querySelector('.badge-el-text-inner');
         if (span) {
@@ -163,7 +163,7 @@
     HANDLES.forEach((h) => {
       const handle = document.createElement('div');
       handle.className = 'name-tag-resize-handle name-tag-resize-handle-' + h;
-      handle.addEventListener('mousedown', (e) => startResize(e, el, h));
+      handle.addEventListener('pointerdown', (e) => startResize(e, el, h));
       box.appendChild(handle);
     });
 
@@ -173,7 +173,7 @@
     const rotateHandle = document.createElement('div');
     rotateHandle.className = 'name-tag-rotate-handle';
     rotateHandle.setAttribute('title', 'Drag to rotate');
-    rotateHandle.addEventListener('mousedown', (e) => startRotate(e, el));
+    rotateHandle.addEventListener('pointerdown', (e) => startRotate(e, el));
     box.appendChild(rotateHandle);
   }
 
@@ -226,16 +226,16 @@
       renderCanvas();
     }
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       if (moved) {
         markUnsaved();
         commitHistory();
         renderProperties();
       }
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }
 
   const HANDLE_ANCHOR = {
@@ -298,16 +298,16 @@
       renderCanvas();
     }
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       if (moved) {
         markUnsaved();
         commitHistory();
         renderProperties();
       }
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }
 
   function startRotate(e, el) {
@@ -330,16 +330,16 @@
       renderCanvas();
     }
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       if (moved) {
         markUnsaved();
         commitHistory();
         renderProperties();
       }
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }
 
   function startInlineEdit(el, span) {
@@ -980,7 +980,7 @@
         paint();
       });
 
-      frame.addEventListener('mousedown', (e) => {
+      frame.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const startX = e.clientX;
         const startY = e.clientY;
@@ -992,11 +992,11 @@
           paint();
         }
         function onUp() {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
         }
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
       });
 
       cancelBtn.addEventListener('click', () => {

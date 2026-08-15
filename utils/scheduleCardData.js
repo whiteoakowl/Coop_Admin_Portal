@@ -34,6 +34,7 @@ async function scheduleCardDataForMember(member) {
   const primaryParent = member.member_type === 'student' ? await primaryParentFor(member) : null;
   return {
     name: member.name,
+    allergy: member.medical_notes || '',
     primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
     mondaySchedule: toTableRows(monday),
     wednesdaySchedule: toTableRows(wednesday),

@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { requireDay, isValidDay } = require('../utils/days');
+const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
 const { ageFromBirthday } = require('../utils/dates');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
@@ -408,6 +408,61 @@ function normalizeImportRow(row) {
   return out;
 }
 
+function parseExplicitHour(value) {
+  const n = parseInt(value, 10);
+  return HOUR_POSITIONS.includes(n) ? n : null;
+}
+
+// "10:45 AM" -> minutes since midnight, for sorting distinct Start Times
+// chronologically (buildAutoHourPositions below) - null if unparseable.
+function parseClockMinutes(value) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$/.exec(String(value || ''));
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  const suffix = m[3] ? m[3].toLowerCase() : null;
+  if (suffix === 'pm' && hour !== 12) hour += 12;
+  if (suffix === 'am' && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+// Hour is meant to be optional: a real external schedule export usually
+// has no "which of the day's 4 slots" concept at all - its own "Hour"
+// column (if it has one at all) just holds the class's actual clock
+// time, same as this app's own Class Start Time column. Whichever of the
+// two actually parses as a clock time is the row's effective start time,
+// used both for auto-slotting below and (when Class Start Time itself is
+// blank) as the value that lands on the new class's own start_time.
+function effectiveStartTime(r) {
+  return r.startTime || (parseClockMinutes(r.hour) != null ? r.hour : '');
+}
+
+// For every row that didn't give an explicit, valid 1-4 Hour, every
+// distinct effective start time seen for its day is sorted
+// chronologically and slotted into positions 1-4 in order - the same
+// fixed 4-slots-per-day model every class already has to fit into, just
+// derived instead of manually specified. A 5th+ distinct time in one day
+// has nowhere to go and is left unassigned (skipped, same as any other
+// unmatched row).
+function buildAutoHourPositions(rows) {
+  const timesByDay = {};
+  for (const r of rows) {
+    if (!r.resolvedDay || parseExplicitHour(r.hour) != null) continue;
+    const minutes = parseClockMinutes(effectiveStartTime(r));
+    if (minutes == null) continue;
+    if (!timesByDay[r.resolvedDay]) timesByDay[r.resolvedDay] = new Set();
+    timesByDay[r.resolvedDay].add(minutes);
+  }
+  const positions = {};
+  for (const [day, minuteSet] of Object.entries(timesByDay)) {
+    positions[day] = {};
+    [...minuteSet].sort((a, b) => a - b).forEach((minutes, i) => {
+      if (i < HOUR_POSITIONS.length) positions[day][minutes] = HOUR_POSITIONS[i];
+    });
+  }
+  return positions;
+}
+
 router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
@@ -416,26 +471,32 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
 
   let rows;
   try {
-    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.className && r.hour);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.className);
   } catch (err) {
     return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
+  // Day tolerates "Mon"/"Wed" abbreviations, not just the full word (see
+  // utils/days.js's parseDayValue) - falls back to whichever day tab
+  // Import was clicked from when the column's blank.
+  rows.forEach((r) => { r.resolvedDay = r.day ? parseDayValue(r.day) : day; });
+  const autoHourPositions = buildAutoHourPositions(rows);
 
   let created = 0;
   let skipped = 0;
   let staffNotFound = 0;
   for (const r of rows) {
-    const rowDay = (r.day || day).toLowerCase();
-    if (rowDay !== 'monday' && rowDay !== 'wednesday') { skipped++; continue; }
-    const hourPosition = parseInt(r.hour, 10);
-    if (!HOUR_POSITIONS.includes(hourPosition)) { skipped++; continue; }
+    const rowDay = r.resolvedDay;
+    if (!rowDay) { skipped++; continue; }
+    const rowStartTime = effectiveStartTime(r);
+    const hourPosition = parseExplicitHour(r.hour) ?? (autoHourPositions[rowDay] || {})[parseClockMinutes(rowStartTime)];
+    if (!hourPosition) { skipped++; continue; }
     const classId = await createClass({
       day: rowDay,
       hourPosition,
       className: r.className,
       room: r.room,
       ageGroup: r.ageGroup,
-      startTime: r.startTime,
+      startTime: rowStartTime,
       endTime: r.endTime,
       notes: r.description,
     });

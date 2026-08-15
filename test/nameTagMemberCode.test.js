@@ -5,8 +5,21 @@
 // boot, not just the fresh-install default.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const testDbPath = path.join(os.tmpdir(), `name-tag-member-code-test-db-${process.pid}.db`);
+process.env.DB_PATH = testDbPath;
+process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 
 const { DEFAULT_LAYOUTS, FIELDS_BY_TYPE } = require('../utils/nameTagBadge');
+
+test.after(() => {
+  fs.rmSync(testDbPath, { force: true });
+  fs.rmSync(`${testDbPath}-wal`, { force: true });
+  fs.rmSync(`${testDbPath}-shm`, { force: true });
+});
 
 test('DEFAULT_LAYOUTS.student/parent no longer have a literal "Sanford Homeschoolers" box, and expose a memberCode field', () => {
   for (const type of ['student', 'parent']) {

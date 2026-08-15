@@ -8,6 +8,14 @@
 // Group" column is now labeled "Grade", and Class Start Time, Class End
 // Time, and Class Description columns land straight on the new class's own
 // start_time/end_time/notes columns.
+//
+// A real bug report: a real registration export's Day column used "Mon"/
+// "Wed" (not the full word) and had no "Hour" concept at all - its Hour
+// column ended up holding an actual clock time instead of a 1-4 slot
+// number - so every single row got silently skipped. Day now tolerates
+// the abbreviation (utils/days.js's parseDayValue), and Hour is optional:
+// when it's missing or not a valid 1-4 position, the row's Start Time is
+// used to auto-assign one instead (see buildAutoHourPositions).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -162,5 +170,62 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(cls, 'the class itself should still be created even though the teacher name did not match anyone');
     const staffCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_staff WHERE class_id = ?').get(cls.id)).c);
     assert.equal(staffCount, 0);
+  });
+
+  await t.test('a real-world file - Day abbreviated "Mon"/"Wed" and Hour column holding an actual clock time instead of 1-4 - is not skipped', async () => {
+    const buffer = buildImportBuffer([
+      ['Mon', '10:45 AM', 'Anatomy', 'House 2', '7th,8th', '', '', '', '', '', '', '', ''],
+      ['Wed', '10:00 AM', 'Biology', 'House 3', '9th', '', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'real-world.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'), 'both rows should import, not get silently skipped');
+
+    const anatomy = await db.prepare("SELECT * FROM classes WHERE class_name = 'Anatomy'").get();
+    assert.ok(anatomy);
+    assert.equal(anatomy.day, 'monday', '"Mon" should resolve to monday');
+    assert.equal(anatomy.age_group, '7th,8th');
+
+    const biology = await db.prepare("SELECT * FROM classes WHERE class_name = 'Biology'").get();
+    assert.ok(biology);
+    assert.equal(biology.day, 'wednesday', '"Wed" should resolve to wednesday');
+  });
+
+  await t.test('rows sharing a day but no valid Hour get distinct auto-assigned slots, sorted by their own Start Time', async () => {
+    const buffer = buildImportBuffer([
+      ['Mon', '', 'Later Class', 'Room 1', '', '11:00 AM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Earlier Class', 'Room 2', '', '9:00 AM', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'auto-slots.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'));
+
+    const earlier = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Earlier Class'").get();
+    const later = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Later Class'").get();
+    assert.ok(earlier.hour_position < later.hour_position, 'the earlier Start Time should land in the lower-numbered slot regardless of row order in the file');
+  });
+
+  await t.test('a 5th distinct Start Time in the same day has no slot left and is skipped, not fatal to the others', async () => {
+    const buffer = buildImportBuffer([
+      ['Mon', '', 'Overflow A', 'Room 1', '', '8:00 AM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Overflow B', 'Room 1', '', '9:00 AM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Overflow C', 'Room 1', '', '10:00 AM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Overflow D', 'Room 1', '', '11:00 AM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Overflow E', 'Room 1', '', '12:00 PM', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'overflow.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 4 class'), 'only 4 slots exist per day');
+    assert.ok(decodeURIComponent(res.headers.location).includes('1 row(s) skipped'));
+    assert.equal(await db.prepare("SELECT id FROM classes WHERE class_name = 'Overflow E'").get(), undefined);
   });
 });

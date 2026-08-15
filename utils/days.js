@@ -10,6 +10,18 @@ function isValidDay(day) {
   return DAYS.includes(day);
 }
 
+// "Mon"/"Monday"/"Wed"/"Wednesday", case-insensitive, trimmed - real
+// spreadsheet imports (a class schedule, a member's weekly schedule) are
+// at least as likely to use the 3-letter abbreviation as the full word.
+// Anything else (including a day this app has no model for, e.g.
+// "Thursday") resolves to null rather than guessing.
+function parseDayValue(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v.startsWith('mon')) return 'monday';
+  if (v.startsWith('wed')) return 'wednesday';
+  return null;
+}
+
 // Express middleware shared by every :day route (Volunteers, Setup/Cleanup)
 // to 404 on anything other than 'monday'/'wednesday'.
 function requireDay(req, res, next) {
@@ -39,4 +51,4 @@ function defaultDateFor(day) {
   return weekdayOf(today) === DAY_WEEKDAY[day] ? today : '';
 }
 
-module.exports = { DAYS, DAY_LABELS, isValidDay, defaultDay, requireDay, defaultDateFor };
+module.exports = { DAYS, DAY_LABELS, isValidDay, parseDayValue, defaultDay, requireDay, defaultDateFor };

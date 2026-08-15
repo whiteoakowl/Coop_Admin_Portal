@@ -7,7 +7,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { isValidISODate } = require('../utils/dates');
-const { defaultDateFor } = require('../utils/days');
+const { defaultDateFor, parseDayValue } = require('../utils/days');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
   DAY_LABELS,
@@ -173,17 +173,6 @@ function scheduleFieldMismatch(candidateValue, rowValue) {
   return normalizeMatchText(candidateValue) !== normalizeMatchText(rowValue);
 }
 
-// "Mon"/"Monday"/"Wed"/"Wednesday", case-insensitive - anything else
-// (including a day this app's Class Schedule doesn't have, e.g.
-// "Thursday") resolves to null, which can never match a class's own
-// day column, so that slot is just skipped like any other no-match.
-function parseScheduleDayValue(value) {
-  const v = normalizeMatchText(value);
-  if (v.startsWith('mon')) return 'monday';
-  if (v.startsWith('wed')) return 'wednesday';
-  return null;
-}
-
 function scheduleImportHeaders() {
   const headers = ['Member First Name', 'Member Last Name', 'Allergy'];
   for (let i = 1; i <= SCHEDULE_SLOT_COUNT; i++) {
@@ -248,7 +237,7 @@ function normalizeScheduleImportRow(row) {
     if (!className) continue;
     slots.push({
       className,
-      day: parseScheduleDayValue(get(`Class Days ${i}`)),
+      day: parseDayValue(get(`Class Days ${i}`)),
       startTime: get(`Class Start Time ${i}`),
       room: getFirst([`Class Location ${i}`, `Room ${i}`]),
     });

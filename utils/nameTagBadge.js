@@ -83,8 +83,7 @@ const DEFAULT_LAYOUTS = {
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 56, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
-      { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 78, width: 320, height: 40, fontSize: 11, color: '#dc2626', bold: true, align: 'center', valign: 'middle' },
-      { id: 'barcode', type: 'barcode', x: 68, y: 145, width: 200, height: 55 },
+      { id: 'barcode', type: 'barcode', x: 68, y: 110, width: 200, height: 55 },
     ],
   },
   parent: {

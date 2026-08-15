@@ -2721,7 +2721,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
-.name-tag-canvas .badge-el { cursor: move; }
+/* touch-action: none stops a mobile browser from starting its own
+   scroll/pan gesture on drag - without it, the pointerdown/pointermove
+   drag handlers in name-tag-editor.js/schedule-card-editor.js never get
+   a clean drag on a touchscreen, since the page scrolls out from under
+   the finger before those handlers see the movement. */
+.name-tag-canvas .badge-el { cursor: move; touch-action: none; }
 .badge-el-locked { cursor: not-allowed; }
 
 /* Alignment grid overlay, toggled on via the toolbar - sits above the
@@ -2756,6 +2761,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 2px solid #fff;
   border-radius: 50%;
   pointer-events: auto;
+  touch-action: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .name-tag-resize-handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
@@ -2788,6 +2794,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: 50%;
   cursor: grab;
   pointer-events: auto;
+  touch-action: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
@@ -2864,6 +2871,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: 8px;
   margin: 0 0 0.75rem;
   cursor: move;
+  touch-action: none;
   background: #f4f7fb;
 }
 .name-tag-crop-image { position: absolute; max-width: none; max-height: none; user-select: none; pointer-events: none; }
