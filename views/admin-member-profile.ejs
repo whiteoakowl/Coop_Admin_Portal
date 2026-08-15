@@ -62,44 +62,82 @@
         <% if (familyRoster.length > 1) { %>
           <div class="category-filter member-profile-family-select">
             <label for="schedule-family-member-select">Family Member</label>
-            <select id="schedule-family-member-select" onchange="window.location = '/admin/members/' + this.value + '?tab=schedule'">
+            <select id="schedule-family-member-select" onchange="if (this.value === 'all') { window.location = '/admin/members/<%= member.id %>?tab=schedule&family=all'; } else { window.location = '/admin/members/' + this.value + '?tab=schedule'; }">
+              <option value="all" <%= scheduleFamilyAll ? 'selected' : '' %>>All</option>
               <% familyRoster.forEach(function(m) { %>
-                <option value="<%= m.id %>" <%= m.id === member.id ? 'selected' : '' %>><%= m.name %></option>
+                <option value="<%= m.id %>" <%= (!scheduleFamilyAll && m.id === member.id) ? 'selected' : '' %>><%= m.name %></option>
               <% }); %>
             </select>
           </div>
         <% } %>
-        <div class="schedule-day-columns">
-          <% [['monday', 'Monday', schedule.monday], ['wednesday', 'Wednesday', schedule.wednesday]].forEach(function (entry) { %>
-            <% var dayLabel = entry[1], rows = entry[2]; %>
-            <div class="form-section">
-              <h2><%= dayLabel %> Schedule</h2>
-              <div class="roster-scroll schedule-table-scroll">
-                <table class="roster-table schedule-edit-table">
-                  <thead>
-                    <tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr>
-                  </thead>
-                  <tbody>
-                    <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
-                    <% if (!anyRows) { %>
-                      <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
-                    <% } %>
-                    <% rows.forEach(function (r, i) { %>
-                      <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
-                      <tr>
-                        <td class="schedule-edit-label"><%= i + 1 %></td>
-                        <td><%= r.time || '—' %></td>
-                        <td><%= r.class_name || '—' %></td>
-                        <td><%= r.room || '—' %></td>
-                      </tr>
-                    <% }); %>
-                  </tbody>
-                </table>
-              </div>
+        <% if (scheduleFamilyAll) { %>
+          <% familySchedules.forEach(function(fs) { %>
+            <div class="schedule-day-columns member-profile-family-schedule">
+              <h2 class="member-profile-family-schedule-name"><%= fs.member.name %></h2>
+              <% [['monday', 'Monday', fs.schedule.monday], ['wednesday', 'Wednesday', fs.schedule.wednesday]].forEach(function (entry) { %>
+                <% var dayLabel = entry[1], rows = entry[2]; %>
+                <div class="form-section">
+                  <h3><%= dayLabel %> Schedule</h3>
+                  <div class="roster-scroll schedule-table-scroll">
+                    <table class="roster-table schedule-edit-table">
+                      <thead>
+                        <tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr>
+                      </thead>
+                      <tbody>
+                        <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                        <% if (!anyRows) { %>
+                          <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                        <% } %>
+                        <% rows.forEach(function (r, i) { %>
+                          <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                          <tr>
+                            <td class="schedule-edit-label"><%= i + 1 %></td>
+                            <td><%= r.time || '—' %></td>
+                            <td><%= r.class_name || '—' %></td>
+                            <td><%= r.room || '—' %></td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <% }); %>
             </div>
           <% }); %>
-        </div>
-        <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+          <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?familyId=<%= member.family_id %>" target="_blank">Print All Schedules</a>
+        <% } else { %>
+          <div class="schedule-day-columns">
+            <% [['monday', 'Monday', schedule.monday], ['wednesday', 'Wednesday', schedule.wednesday]].forEach(function (entry) { %>
+              <% var dayLabel = entry[1], rows = entry[2]; %>
+              <div class="form-section">
+                <h2><%= dayLabel %> Schedule</h2>
+                <div class="roster-scroll schedule-table-scroll">
+                  <table class="roster-table schedule-edit-table">
+                    <thead>
+                      <tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr>
+                    </thead>
+                    <tbody>
+                      <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                      <% if (!anyRows) { %>
+                        <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                      <% } %>
+                      <% rows.forEach(function (r, i) { %>
+                        <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                        <tr>
+                          <td class="schedule-edit-label"><%= i + 1 %></td>
+                          <td><%= r.time || '—' %></td>
+                          <td><%= r.class_name || '—' %></td>
+                          <td><%= r.room || '—' %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
+        <% } %>
       <% } else { %>
         <% if (familyRoster.length > 1) { %>
           <div class="category-filter member-profile-family-select">

@@ -501,6 +501,7 @@ router.get('/schedule/export.csv', requireFullAdmin, async (req, res) => {
 });
 
 router.get('/schedule/print', requireFullAdmin, async (req, res) => {
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
   const filters = {
     search: (req.query.search || '').trim(),
     day: ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '',
@@ -510,9 +511,16 @@ router.get('/schedule/print', requireFullAdmin, async (req, res) => {
     className: req.query.className || '',
     rosterId: req.query.rosterId ? parseInt(req.query.rosterId, 10) : null,
     memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null,
+    familyId,
   };
   const rows = await scheduleList(filters);
-  res.render('admin-schedule-print', { title: 'Print Schedules', rows });
+  // A family's "View All" print (routes/admin-members.js's Class Schedule
+  // tab) uses a compact one-row-per-member table instead of the normal
+  // one-card-per-member layout below - a family of even 3-4 people
+  // already runs each member's own two full 4-row day tables past a
+  // single printed page, which defeats the entire point of printing them
+  // together.
+  res.render('admin-schedule-print', { title: 'Print Schedules', rows, compact: !!familyId });
 });
 
 module.exports = router;

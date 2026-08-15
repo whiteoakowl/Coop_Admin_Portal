@@ -442,6 +442,11 @@ router.get('/members/:id', async (req, res) => {
     .prepare('SELECT f.name AS "familyName" FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
     .get(id);
   const restOfFamily = await familyOf(id);
+  const familyRoster = [member, ...restOfFamily].sort(byLastName);
+  // "View All" on the Class Schedule tab's Family Member dropdown - only
+  // meaningful (and only offered by the view) when there's more than one
+  // family member to show side by side.
+  const scheduleFamilyAll = tab === 'schedule' && req.query.family === 'all' && familyRoster.length > 1;
 
   res.render('admin-member-profile', {
     title: member.name,
@@ -453,9 +458,13 @@ router.get('/members/:id', async (req, res) => {
     // - powers the Class Schedule/Attendance tabs' "jump to this family
     // member" dropdown, which needs the current member as one of its own
     // options so it can show who's selected.
-    familyRoster: [member, ...restOfFamily].sort(byLastName),
+    familyRoster,
     rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
+    scheduleFamilyAll,
+    familySchedules: scheduleFamilyAll
+      ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))
+      : null,
     history: (await attendanceHistoryForMember(id)).map((r) => ({
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),

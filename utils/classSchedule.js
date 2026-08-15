@@ -915,6 +915,28 @@ async function syncDayMemberRosters(day) {
       parentIds.add(r.member_id)
     );
   }
+  // A parent belongs on this day's roster not only for teaching/assisting
+  // a class themselves, but whenever ANYONE in their family does -
+  // dropping off/picking up an enrolled kid means they're at the co-op
+  // that day too, even if they have no class assignment of their own.
+  if (studentIds.size > 0) {
+    const studentPlaceholders = Array.from(studentIds).map(() => '?').join(',');
+    const familyIds = new Set(
+      (
+        await db
+          .prepare(`SELECT DISTINCT family_id FROM members WHERE id IN (${studentPlaceholders}) AND family_id IS NOT NULL`)
+          .all(...studentIds)
+      ).map((r) => r.family_id)
+    );
+    if (familyIds.size > 0) {
+      const familyPlaceholders = Array.from(familyIds).map(() => '?').join(',');
+      (
+        await db
+          .prepare(`SELECT id FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type = 'parent' AND active = 1`)
+          .all(...familyIds)
+      ).forEach((r) => parentIds.add(r.id));
+    }
+  }
   (await floaterMemberIdsForDay(day)).forEach((id) => parentIds.add(id));
   await setRosterMembership(await ensureDayRoster(day, 'student'), studentIds);
   await setRosterMembership(await ensureDayRoster(day, 'parent'), parentIds);

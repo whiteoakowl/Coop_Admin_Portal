@@ -125,6 +125,9 @@ async function scheduleList(filters) {
   if (filters.memberId) {
     members = members.filter((m) => m.id === filters.memberId);
   }
+  if (filters.familyId) {
+    members = members.filter((m) => m.family_id === filters.familyId);
+  }
   if (filters.memberType) {
     members = members.filter((m) => m.member_type === filters.memberType);
   }

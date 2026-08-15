@@ -3250,6 +3250,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
 }
 
+/* Phone-width only: the horizontal "roll" above still needs a swipe
+   gesture to see every card, which is harder to discover than a plain
+   scroll on a small screen - stack the cards vertically instead, one full
+   -width card at a time, same as every other card grid on mobile. */
+@media (max-width: 640px) {
+  .setup-team-card-grid {
+    display: flex;
+    flex-direction: column;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+  .setup-team-card-grid .team-col {
+    flex: none;
+    width: 100%;
+  }
+}
+
 /* Floater Teams: one card per hour (HOUR_POSITIONS is a fixed 4), so - 2
    cards, then 2 more below - instead of Setup/Cleanup's many-teams 5-wide
    layout. Wider columns than that one too: member names were getting
@@ -3821,6 +3838,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-card .badge-pill { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
 .badge-pill-absent { background: var(--red-bg); color: var(--red); }
 
+/* Class Schedule room grid on a phone - the 800px desktop min-width (see
+   the grid's own comment above) forces a lot of horizontal scroll to see
+   the rest of the table on a ~375-430px screen. Shrinking the floor, plus
+   the room column/fonts/padding that scale off it, keeps every column
+   readable while cutting how much of the table is off-screen at once. */
+@media (max-width: 640px) {
+  .class-schedule-room-grid { min-width: 480px; }
+  .class-schedule-room-grid th,
+  .class-schedule-room-grid td { padding: 0.2rem 0.25rem; }
+  .class-schedule-room-grid th { font-size: 0.7rem; }
+  .class-schedule-room-grid .class-schedule-room-col { width: 72px; font-size: 0.7rem; }
+  .class-schedule-room-grid .class-card { padding: 0.35rem 0.4rem; }
+  .class-schedule-room-grid .class-card-header h3 { font-size: 0.76rem; }
+  .class-schedule-room-grid .class-card-line { font-size: 0.66rem; }
+  .class-schedule-room-grid .class-card-pill-label,
+  .class-schedule-room-grid .class-card .badge-pill { font-size: 0.62rem; }
+}
+
 /* Create/Edit Class form - the form itself takes 1/3 of the page, the
    Teachers/Assistants + Student Roster "list log" panels take the other
    2/3, side by side on desktop and stacked on narrower screens. */
@@ -3831,6 +3866,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media (max-width: 900px) {
   .class-manage-layout { flex-direction: column; }
   .class-manage-form-col { max-width: 100%; flex-basis: auto; }
+}
+@media (max-width: 480px) {
+  /* The 280px floor above is meant to keep the desktop 3-column layout's
+     fields legible, not to survive a sub-320px phone too - drop it so the
+     form column can shrink all the way down with the rest of the dialog. */
+  .class-manage-form-col { min-width: 0; }
 }
 
 /* "View" button on each class card, and the popup it opens (fetched as
@@ -3850,6 +3891,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-view-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .class-view-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
 .class-view-header h3 { margin: 0; font-size: 1.3rem; flex: 1; }
+
+/* Swatch + title + Delete/Edit (or Cancel/Save) + Close all fighting for
+   one nowrap row is what pushed Close past the dialog's own right edge on
+   a phone-width screen, forcing the whole dialog to scroll sideways to
+   reach it. Letting the row wrap keeps every button reachable without
+   ever growing wider than the dialog itself. */
+@media (max-width: 640px) {
+  .class-view-header { flex-wrap: wrap; row-gap: 0.5rem; }
+  .class-view-header-actions { flex-basis: 100%; }
+}
 .class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
 
 /* Edit/Delete (and, once editing, Cancel/Save) sit top-right of the popup
@@ -4098,6 +4149,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-edit-table input[type="text"]:focus { outline: 2px solid var(--brand-dark); outline-offset: 1px; }
 
 .schedule-day-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+
+/* Class Schedule tab's "View All" - each family member's own pair of
+   day columns, stacked one under the other with a name heading and a
+   divider so it's clear where one member's schedule ends and the next
+   begins. */
+.member-profile-family-schedule { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.member-profile-family-schedule:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.member-profile-family-schedule-name { grid-column: 1 / -1; margin: 0 0 0.5rem; }
+
 @media (max-width: 900px) {
   .schedule-day-columns { grid-template-columns: 1fr; }
 }
@@ -4114,6 +4174,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-print-card h3 { margin: 0.75rem 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
 .schedule-print-table { margin-bottom: 0.5rem; }
 .schedule-print-table th, .schedule-print-table td { text-align: left; }
+
+/* Family "View All" print (routes/admin-members.js's Class Schedule tab) -
+   one row per family member instead of a full card per member, so a
+   whole family reliably fits on one printed page. */
+.schedule-print-compact-table { width: 100%; border-collapse: collapse; }
+.schedule-print-compact-table th,
+.schedule-print-compact-table td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+.schedule-print-compact-table th { background: var(--brand-soft); font-size: 0.85rem; }
+.schedule-print-compact-name { font-weight: 700; white-space: nowrap; }
+.schedule-print-compact-line { font-size: 0.85rem; margin-bottom: 0.2rem; }
+.schedule-print-compact-line:last-child { margin-bottom: 0; }
+.schedule-print-compact-time { color: var(--muted); margin-right: 0.35rem; }
+.schedule-print-compact-empty { color: var(--muted); }
 
 /* Class Roster print: title/grade/room/time/teacher/assistants stacked
    one per line instead of a title + meta line + separate staff table. */
