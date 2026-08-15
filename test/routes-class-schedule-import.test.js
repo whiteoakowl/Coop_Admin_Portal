@@ -304,13 +304,22 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   });
 
   // A real bug report: "on the wednesday class schedule page times in the
-  // top row don't match where the classes should be" - the grid's Hour
-  // 1-4 column headers are their own stored labels (class_schedule_hours),
-  // completely separate from any class's own start_time, and importing
-  // into an auto-derived position never updated them - so the header kept
-  // showing whatever default/stale text it already had while the classes
-  // underneath were really at a different time.
-  await t.test('importing rows with auto-derived hour positions updates that day\'s column header labels to match the real times', async () => {
+  // top row don't match where the classes should be", later found to have
+  // an even worse second half: the header could get permanently STUCK
+  // showing a wrong time - an earlier fix here wrote a computed label into
+  // the stored class_schedule_hours row at import time, and that write
+  // never got undone once its triggering class was later deleted or
+  // fixed, leaving the header wrong even after the bad data was gone.
+  // Fixed by never writing anything at import time and instead deriving
+  // the header live from whatever classes actually exist right now (see
+  // roomGridForDay in utils/classSchedule.js) - this just proves import
+  // itself no longer touches the stored label at all, so it can't get
+  // stuck; the live-derivation behavior itself is covered in
+  // test/routes-class-schedule-room-grid.test.js.
+  await t.test('importing rows with auto-derived hour positions does not write anything into the stored, hand-editable hour labels', async () => {
+    const { hoursForDay } = require('../utils/classSchedule');
+    const before = await hoursForDay('wednesday');
+
     const buffer = buildImportBuffer([
       ['Wed', '', 'Label Check A', 'Room 1', '', '9:15 AM', '', '', '', '', '', '', ''],
       ['Wed', '', 'Label Check B', 'Room 2', '', '11:30 AM', '', '', '', '', '', '', ''],
@@ -322,15 +331,8 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'));
 
-    const { hoursForDay } = require('../utils/classSchedule');
-    const hours = await hoursForDay('wednesday');
-    const labelByPosition = {};
-    hours.forEach((h) => { labelByPosition[h.position] = h.label; });
-
-    const classA = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Label Check A'").get();
-    const classB = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Label Check B'").get();
-    assert.equal(labelByPosition[classA.hour_position], '9:15 AM', "the column header over Label Check A's hour position should show its real start time");
-    assert.equal(labelByPosition[classB.hour_position], '11:30 AM', "the column header over Label Check B's hour position should show its real start time");
+    const after = await hoursForDay('wednesday');
+    assert.deepEqual(after.map((h) => h.label), before.map((h) => h.label), 'the stored hour labels (what "Edit Hours" shows/edits) should be untouched by import');
   });
 
   await t.test('a 5th distinct Start Time in the same day has no slot left and is skipped, not fatal to the others', async () => {

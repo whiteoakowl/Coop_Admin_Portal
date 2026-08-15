@@ -493,19 +493,6 @@ function parseClockMinutes(value) {
   return hour * 60 + minute;
 }
 
-// The reverse of parseClockMinutes - minutes-since-midnight back to
-// "10:45 AM", for writing an auto-assigned hour position's real start
-// time onto the grid's own column header (see the sync loop after the
-// main import loop below).
-function minutesToClockLabel(minutes) {
-  let hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const period = hour >= 12 ? 'PM' : 'AM';
-  hour %= 12;
-  if (hour === 0) hour = 12;
-  return `${hour}:${String(minute).padStart(2, '0')} ${period}`;
-}
-
 // Hour is meant to be optional: a real external schedule export usually
 // has no "which of the day's 4 slots" concept at all - its own "Hour"
 // column (if it has one at all) just holds the class's actual clock
@@ -627,37 +614,16 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
     }
   }
 
-  // The grid's Hour 1-4 column headers are their own separately-stored
-  // labels (class_schedule_hours, edited by hand via "Edit Hours") - they
-  // don't automatically track whatever a class's own start_time is, so
-  // importing into an auto-assigned position without also updating the
-  // header left the top row showing stale/default text ("Hour 2") that no
-  // longer matched the real time of whatever just landed under it. Only
-  // positions this file actually auto-assigned (from real clock times) get
-  // overwritten - a position nothing in this file used a real time for
-  // (nothing auto-assigned there, or the file always gave that position an
-  // explicit 1-4 Hour number instead) keeps whatever label it already had.
-  // Done before syncDayMemberRosters (not after) - a class with no
-  // explicit Class End Time falls back to its hour block's shared label
-  // for its displayed time (timeRangeForClass), so member_schedules needs
-  // the corrected label already in place when that sync runs, not the
-  // stale one.
-  for (const d of touchedDays) {
-    const dayAutoPositions = autoHourPositions[d];
-    if (dayAutoPositions) {
-      const minutesByPosition = {};
-      for (const [minutesText, position] of Object.entries(dayAutoPositions)) minutesByPosition[position] = parseInt(minutesText, 10);
-      const existingHours = await hoursForDay(d);
-      const labels = HOUR_POSITIONS.map((position) => {
-        const minutes = minutesByPosition[position];
-        if (minutes != null) return minutesToClockLabel(minutes);
-        const existing = existingHours.find((h) => h.position === position);
-        return existing ? existing.label : `Hour ${position}`;
-      });
-      await saveHourLabels(d, labels);
-    }
-    await syncDayMemberRosters(d);
-  }
+  // The grid's own Hour 1-4 column headers are derived live from actual
+  // class data on every render (see roomGridForDay in
+  // utils/classSchedule.js), not written here - a real bug report: an
+  // earlier version of this route wrote a computed label into the stored
+  // class_schedule_hours row (based only on this one file's own rows), and
+  // that write never got undone or recomputed once its triggering class
+  // was later deleted or corrected, leaving a permanently stuck wrong
+  // label ("classes not lining up" persisting even after the bad data was
+  // fixed). Rely on the live derivation instead of writing anything here.
+  for (const d of touchedDays) await syncDayMemberRosters(d);
 
   res.redirect(
     `/admin/class-schedule/${day}?notice=` +
