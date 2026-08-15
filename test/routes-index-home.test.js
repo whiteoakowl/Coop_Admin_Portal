@@ -17,6 +17,14 @@
 // keeps exactly the original corner layout, since it never had the
 // overlap problem the bar exists to fix. Both markup shapes are always
 // in the response; only CSS decides which one is visible.
+//
+// A later bug report: the desktop/tablet corner layout was missing Class
+// Check In & Out entirely (only Find a Parent + Full Screen View/Admin),
+// so desktop/tablet had 2 of the 3 main buttons while mobile had all 3 in
+// a different arrangement. Fixed by giving index.ejs the same 3-corner
+// layout views/kiosk-home.ejs already used (Find a Parent top-left, Full
+// Screen View top-right, Class Check In & Out + Admin bottom-right) -
+// see that file's own test for the same shape.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -53,12 +61,15 @@ test('site root: mobile action bar and desktop/tablet corner pills both render, 
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/admin">/);
   });
 
-  await t.test('the desktop/tablet-only corner pills are also present: Find a Parent top-left, Admin top-right alongside Full Screen View', () => {
+  await t.test('the desktop/tablet-only corner pills are also present: Find a Parent top-left, Full Screen View top-right, Class Check In & Out + Admin bottom-right', () => {
     assert.match(res.text, /<div class="landing-corner-actions-left landing-desktop-only">[\s\S]*?<a class="find-parent-btn" href="\/kiosk\/find-parent">/);
     const topGroupMatch = /<div class="landing-corner-actions">([\s\S]*?)<\/div>/.exec(res.text);
     assert.ok(topGroupMatch, 'expected a top-right .landing-corner-actions group');
     assert.match(topGroupMatch[1], /id="fullscreen-toggle-btn"/);
-    assert.match(topGroupMatch[1], /<a class="admin-corner-link landing-desktop-only" href="\/admin">Admin<\/a>/);
+    const bottomGroupMatch = /<div class="landing-corner-actions-bottom-right landing-desktop-only">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(bottomGroupMatch, 'expected a .landing-corner-actions-bottom-right group - the desktop/tablet view was missing Class Check In & Out entirely');
+    assert.match(bottomGroupMatch[1], /<a class="class-checkin-corner-btn" href="\/kiosk\/class-checkin">/);
+    assert.match(bottomGroupMatch[1], /<a class="admin-corner-link-green" href="\/admin">Admin<\/a>/);
   });
 
   await t.test('the bottom bar items keep their icons and labels', () => {

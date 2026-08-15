@@ -43,15 +43,23 @@ router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) 
   const buffer = buildTemplateWorkbook(
     [
       'Day', 'Hour', 'Class Name', 'Room', 'Age Group',
+      'Class Start Time', 'Class End Time', 'Class Description',
       'Teacher First Name', 'Teacher Last Name',
+      '2nd Teacher First Name', '2nd Teacher Last Name',
       'Assistant 1 First Name', 'Assistant 1 Last Name',
       'Assistant 2 First Name', 'Assistant 2 Last Name',
       'Assistant 3 First Name', 'Assistant 3 Last Name',
     ],
     [
-      ['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', 'Jane', 'Smith', 'John', 'Doe', '', '', '', ''],
-      ['Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13', 'Pat', 'Rivera', '', '', '', '', '', ''],
-      ['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', '', '', '', '', ''],
+      [
+        'Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', '9:00 AM', '9:45 AM', 'Painting and drawing projects',
+        'Jane', 'Smith', '', '', 'John', 'Doe', '', '', '', '',
+      ],
+      [
+        'Monday', '2', 'Middle School Science', 'Room 8', 'Ages 11-13', '10:00 AM', '10:45 AM', '',
+        'Pat', 'Rivera', '', '', '', '', '', '', '', '',
+      ],
+      ['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', '', '', '', '', '', '', '', '', '', ''],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -385,8 +393,13 @@ const IMPORT_ALIASES = {
   className: ['class name', 'class', 'subject'],
   room: ['room'],
   ageGroup: ['age group', 'ages', 'age range'],
+  startTime: ['class start time', 'start time'],
+  endTime: ['class end time', 'end time'],
+  description: ['class description', 'description', 'notes'],
   teacherFirst: ['teacher first name'],
   teacherLast: ['teacher last name'],
+  teacher2First: ['2nd teacher first name'],
+  teacher2Last: ['2nd teacher last name'],
   assistant1First: ['assistant 1 first name'],
   assistant1Last: ['assistant 1 last name'],
   assistant2First: ['assistant 2 first name'],
@@ -395,9 +408,9 @@ const IMPORT_ALIASES = {
   assistant3Last: ['assistant 3 last name'],
 };
 
-// Teacher/Assistant 1-3 are each separate First/Last columns in the
-// spreadsheet, joined back into a single "First Last" string here - the
-// same convention every member name is stored as (see
+// Teacher/2nd Teacher/Assistant 1-3 are each separate First/Last columns
+// in the spreadsheet, joined back into a single "First Last" string here
+// - the same convention every member name is stored as (see
 // utils/members.js's lastNameOf) - so the exact-name match against
 // active parents below doesn't need to know the template ever had
 // separate columns.
@@ -414,6 +427,7 @@ function normalizeImportRow(row) {
     }
   }
   out.teacher = [out.teacherFirst, out.teacherLast].filter(Boolean).join(' ');
+  out.teacher2 = [out.teacher2First, out.teacher2Last].filter(Boolean).join(' ');
   out.assistant1 = [out.assistant1First, out.assistant1Last].filter(Boolean).join(' ');
   out.assistant2 = [out.assistant2First, out.assistant2Last].filter(Boolean).join(' ');
   out.assistant3 = [out.assistant3First, out.assistant3Last].filter(Boolean).join(' ');
@@ -441,15 +455,27 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
     if (rowDay !== 'monday' && rowDay !== 'wednesday') { skipped++; continue; }
     const hourPosition = parseInt(r.hour, 10);
     if (!HOUR_POSITIONS.includes(hourPosition)) { skipped++; continue; }
-    const classId = await createClass({ day: rowDay, hourPosition, className: r.className, room: r.room, ageGroup: r.ageGroup });
+    const classId = await createClass({
+      day: rowDay,
+      hourPosition,
+      className: r.className,
+      room: r.room,
+      ageGroup: r.ageGroup,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      notes: r.description,
+    });
     created++;
 
-    // Teacher + up to 3 Assistants are optional columns - a blank cell
-    // just means "no one assigned yet", not a skipped row. Matched against
-    // active parents by exact (case-insensitive) name, same lookup the
-    // roster import above already uses for students.
+    // Teacher + 2nd Teacher + up to 3 Assistants are optional columns - a
+    // blank cell just means "no one assigned yet", not a skipped row.
+    // Matched against active parents by exact (case-insensitive) name,
+    // same lookup the roster import above already uses for students.
+    // class_staff allows any number of 'teacher'-role rows per class, so
+    // a 2nd Teacher is staffed exactly the same way as the first.
     const staffToAdd = [
       { name: r.teacher, role: 'teacher' },
+      { name: r.teacher2, role: 'teacher' },
       { name: r.assistant1, role: 'assistant' },
       { name: r.assistant2, role: 'assistant' },
       { name: r.assistant3, role: 'assistant' },
