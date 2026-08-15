@@ -190,7 +190,7 @@
           id="schedule-archive-form-<%= tab %>"
           method="POST"
           action="/admin/schedule/<%= tab %>/archive"
-          data-confirm="Archive the selected <%= tab === 'parents' ? 'parent' : 'student' %> schedule(s)? This unenrolls them from every class they're currently on and saves a permanent record in the Archive tab."
+          data-confirm="Are you sure you want to archive the selected <%= tab === 'parents' ? 'parent' : 'student' %> schedule(s)?"
           data-confirm-yes-label="Yes, Archive"
           data-confirm-icon="icon-save"
           data-confirm-safe="1"

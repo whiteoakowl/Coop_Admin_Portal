@@ -48,7 +48,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     id="class-archive-form-<%= day %>"
     method="POST"
     action="/admin/class-schedule/<%= day %>/archive"
-    data-confirm="Archive the selected classes for <%= dayLabel %>? This removes them from the live schedule - roster and teacher/assistant assignments included - and saves a permanent record in the Class Archive tab."
+    data-confirm="Are you sure you want to archive the selected class(es)?"
     data-confirm-yes-label="Yes, Archive"
     data-confirm-icon="icon-save"
     data-confirm-safe="1"

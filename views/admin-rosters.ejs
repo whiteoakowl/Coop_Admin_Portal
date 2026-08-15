@@ -219,8 +219,6 @@
           <thead>
             <tr>
               <th class="roster-name-col">Name</th>
-              <th class="roster-secondary-col">Arrival</th>
-              <th class="roster-secondary-col">Departure</th>
               <% dateLabels.forEach(function(label) { %>
                 <th><%= label %></th>
               <% }); %>
@@ -230,7 +228,7 @@
           <tbody>
             <% if (rows.length === 0) { %>
               <tr>
-                <td colspan="<%= dateLabels.length + 4 %>" class="roster-empty">
+                <td colspan="<%= dateLabels.length + 2 %>" class="roster-empty">
                   <div class="roster-empty-state">
                     <svg class="icon roster-empty-icon"><use href="#icon-users"/></svg>
                     <p class="roster-empty-title">No members on this roster yet</p>
@@ -243,9 +241,11 @@
               <tr>
                 <td class="roster-name-col">
                   <button type="button" class="link-btn" title="View profile for <%= row.member.name %>" onclick="document.getElementById('profile-dialog-<%= row.member.id %>').showModal()"><%= row.member.name %></button><%- include('partials/medical-flag', { member: row.member }) %>
+                  <div class="roster-name-times">
+                    <span class="roster-name-time">Arrival: <%= row.arrivalLabel || '—' %></span>
+                    <span class="roster-name-time">Departure: <%= row.departureLabel || '—' %></span>
+                  </div>
                 </td>
-                <td class="roster-secondary-col"><%= row.arrivalLabel || '—' %></td>
-                <td class="roster-secondary-col"><%= row.departureLabel || '—' %></td>
                 <% row.cells.forEach(function(cell) { %>
                   <td>
                     <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
@@ -300,19 +300,16 @@
             <tfoot>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Present</td>
-                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td><span class="summary-badge summary-present"><%= s.present %></span></td><% }); %>
                 <td class="no-print"></td>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Late</td>
-                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td><span class="summary-badge summary-late"><%= s.late %></span></td><% }); %>
                 <td class="no-print"></td>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Absent</td>
-                <td></td><td></td>
                 <% summary.forEach(function(s) { %><td><span class="summary-badge summary-absent"><%= s.absent %></span></td><% }); %>
                 <td class="no-print"></td>
               </tr>
@@ -322,6 +319,7 @@
       </div>
     </div>
 
+    <% if (!classId) { %>
     <div class="manage-section no-print">
       <h2><%= dayLabel %> Alerts<% if (!alertDateLabel) { %> <span class="hint">(no session today)</span><% } else { %> <span class="hint">&mdash; <%= alertDateLabel %></span><% } %></h2>
 
@@ -373,6 +371,7 @@
         </ul>
       <% } %>
     </div>
+    <% } %>
     <% } %>
   </main>
   <script src="/js/date-list.js"></script>

@@ -1633,6 +1633,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
 
+/* Arrival/Departure, shown as small text under a member's name instead of
+   their own frozen columns (utils/schedule.js's arrivalDepartureLabels
+   already computes both from the member's whole family's earliest class
+   start/latest class end) - keeps the frozen area to just the Name column
+   while every date column scrolls freely. */
+.roster-name-times { display: flex; flex-direction: column; gap: 0.05rem; margin-top: 0.15rem; font-weight: 400; white-space: nowrap; }
+.roster-name-time { font-size: 0.7rem; color: var(--muted); }
+
 .roster-empty { color: var(--muted); padding: 2rem; }
 
 /* Softer, pill-shaped attendance badges - pastel background with an
@@ -1809,6 +1817,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .primary-parent-option { margin-top: 0.75rem; }
+
+/* Members list family collapse (public/js/members-family-collapse.js) -
+   the toggle sits inline before the head row's name link, and a collapsed
+   family's other rows are simply hidden. */
+.family-row-collapsed { display: none; }
+.family-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.25rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.family-collapse-toggle:hover { background: var(--brand-soft); color: var(--ink); }
+.family-collapse-icon { width: 1.1rem; height: 1.1rem; transition: transform 0.15s ease; }
+.family-collapse-toggle[aria-expanded="true"] .family-collapse-icon { transform: rotate(180deg); }
 
 /* ---------- Membership Form (Add/Edit member + Members list view popup) ---------- */
 /* Shared by views/partials/member-form-fields.ejs, used both on the full
@@ -2809,6 +2840,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
+/* A 12-14px circle is an easy mouse target but far below the ~44px a
+   finger can reliably hit - on a touch-primary device (no accurate
+   hover/pointer, e.g. a phone/tablet, not just a touch-capable laptop)
+   the resize/rotate handles grow enough to actually be grabbable, which
+   is what "can't resize anything on mobile" turned out to mean in
+   practice: the touch just kept missing the tiny handle and landing on
+   the badge element underneath (a move, never a resize). Declared after
+   the base rules above so it wins the cascade on a matching device. */
+@media (pointer: coarse) {
+  .name-tag-resize-handle { width: 26px; height: 26px; }
+  .name-tag-resize-handle-nw { top: -13px; left: -13px; }
+  .name-tag-resize-handle-n { top: -13px; margin-left: -13px; }
+  .name-tag-resize-handle-ne { top: -13px; right: -13px; }
+  .name-tag-resize-handle-e { margin-top: -13px; right: -13px; }
+  .name-tag-resize-handle-se { bottom: -13px; right: -13px; }
+  .name-tag-resize-handle-s { bottom: -13px; margin-left: -13px; }
+  .name-tag-resize-handle-sw { bottom: -13px; left: -13px; }
+  .name-tag-resize-handle-w { margin-top: -13px; left: -13px; }
+  .name-tag-rotate-handle { top: -40px; width: 26px; height: 26px; margin-left: -13px; }
+}
+
 .name-tag-properties:empty { display: none; }
 .name-tag-properties {
   background: var(--surface);
@@ -3406,10 +3458,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .grid-box .btn-secondary { margin-top: 0.75rem; }
 .grid-box-expanded { flex: 1 1 100%; }
 
-/* The Name column is already sticky (see .roster-name-col above); these
-   fixed widths make Arrival/Departure sticky offsets predictable so only
-   the date columns actually scroll. */
-.roster-view-page .roster-table-detailed .roster-name-col { width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+/* The Name column is already sticky (see .roster-name-col above); a fixed
+   width keeps it (and, on the Archive tab's table, the Arrival/Departure
+   sticky offsets right after it) predictable so only the date columns
+   actually scroll. Wide enough for a name plus the small Arrival/Departure
+   lines stacked under it (see .roster-name-times) on the live grid. */
+.roster-view-page .roster-table-detailed .roster-name-col { width: 200px; min-width: 200px; max-width: 200px; overflow: hidden; }
 .roster-view-page .roster-table-detailed .roster-secondary-col {
   position: sticky;
   background: var(--surface);

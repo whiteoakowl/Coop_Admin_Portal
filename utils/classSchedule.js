@@ -1,6 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
-const { getListByDay, sectionsForList, membersForList } = require('./volunteers');
+const { getListByDay, sectionsForList, membersForList, removeMemberFromSection } = require('./volunteers');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -556,6 +556,21 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
+// A member picked up as a class's teacher/assistant for an hour they were
+// already on that day's Floater Assignments list for is no longer free to
+// float that hour - drop just that one hour's floater assignment (not the
+// member's whole floater-list membership, which may still cover other
+// hours) so they don't read as double-booked. A no-op if they weren't on
+// that list/hour to begin with, or if the day has no Floater Assignments
+// list set up yet.
+async function removeFromFloaterForHour(day, hourPosition, memberId) {
+  const list = await getListByDay(day);
+  if (!list) return;
+  const section = (await sectionsForList(list.id)).find((s) => s.position === hourPosition);
+  if (!section) return;
+  await removeMemberFromSection(list.id, memberId, section.id);
+}
+
 // Adds one teacher/assistant - used by both the admin manage form (one at
 // a time, via the picker) and the public self-signup page. syncDayMemberRosters
 // rebuilds that whole day's rosters/schedules from scratch (every class,
@@ -571,8 +586,9 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
        ON CONFLICT (class_id, member_id) DO UPDATE SET role = excluded.role`
     )
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
+  const cls = await db.prepare('SELECT day, hour_position FROM classes WHERE id = ?').get(classId);
+  if (cls) await removeFromFloaterForHour(cls.day, cls.hour_position, memberId);
   if (skipSync) return;
-  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
@@ -593,22 +609,29 @@ async function activeParentsForStaff() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY LOWER(name)").all();
 }
 
-// Every class on this day missing a teacher and/or an assistant - drives
-// the Floater Assignments page's "needs a teacher or assistant" log.
-async function classesNeedingStaffForDay(day) {
+// Every class on this day whose ASSIGNED teacher and/or assistant is
+// absent/late on `date` - drives the Attendance page's "Substitutes
+// Needed" log. Not the same thing as a class that was simply never given
+// an assistant by design (that's a staffing-plan gap, not something a
+// substitute needs to cover) - only someone who IS assigned and can't
+// make it today counts, same "missing" signal substituteBoard uses to
+// decide a slot needs a floater. No date (or nothing missing yet) means
+// nothing needs covering.
+async function classesNeedingStaffForDay(day, date) {
   const hours = await gridForDay(day);
+  const missingById = date ? await missingMemberIdsForDate(date) : new Map();
   const result = [];
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
-      const hasTeacher = cls.staff.some((s) => s.role === 'teacher');
-      const hasAssistant = cls.staff.some((s) => s.role === 'assistant');
-      if (!hasTeacher || !hasAssistant) {
+      const missingTeacher = cls.staff.some((s) => s.role === 'teacher' && missingById.has(s.id));
+      const missingAssistant = cls.staff.some((s) => s.role === 'assistant' && missingById.has(s.id));
+      if (missingTeacher || missingAssistant) {
         result.push({
           hourLabel: h.label,
           className: cls.class_name,
           room: cls.room,
-          missingTeacher: !hasTeacher,
-          missingAssistant: !hasAssistant,
+          missingTeacher,
+          missingAssistant,
         });
       }
     });
@@ -635,20 +658,29 @@ async function staffListForDay(day, role) {
   return Object.values(byMember).sort((a, b) => a.member.name.localeCompare(b.member.name, undefined, { sensitivity: 'base' }));
 }
 
-// Every class on this day whose expected attendee count (enrolled minus
-// anyone confirmed absent for `date`) is 3 or fewer - flags classes that
-// may need to be canceled for low turnout. Counts both students who've
-// already checked in and those who haven't checked in yet, only
-// excluding students confirmed absent for that date.
+// Every class on this day where enough students have submitted an
+// Absence form for `date` to leave 3 or fewer expected - flags classes
+// that may need to be canceled for low turnout, i.e. all but 3 (or fewer)
+// of its students are out. Requires at least one actual absence-form
+// submission - a class that's simply small by design (3 or fewer
+// students enrolled to begin with) is not "at risk", it's just a small
+// class with full attendance. Deliberately narrower than "marked absent"
+// generally (absentMemberIdsForDate, which also covers a kiosk no-show
+// mark) - cancellation risk should only react to a parent proactively
+// saying their kid won't be there, not every way a student can end up
+// absent. Counts both students who've already checked in and those who
+// haven't checked in yet, only excluding those with an absence form on
+// file for that date.
 async function classesAtRiskForDay(day, date) {
   const hours = await gridForDay(day);
-  const absentIds = date ? await absentMemberIdsForDate(date) : new Set();
+  const absentIds = date ? await absenceFormAbsentMemberIdsForDate(date) : new Set();
   const result = [];
   hours.forEach((h) => {
     h.classes.forEach((cls) => {
       if (cls.students.length === 0) return;
-      const expectedCount = cls.students.filter((s) => !absentIds.has(s.id)).length;
-      if (expectedCount <= 3) {
+      const absentCount = cls.students.filter((s) => absentIds.has(s.id)).length;
+      const expectedCount = cls.students.length - absentCount;
+      if (absentCount > 0 && expectedCount <= 3) {
         result.push({
           hourLabel: h.label,
           className: cls.class_name,
@@ -671,6 +703,21 @@ async function absentMemberIdsForDate(date) {
     (await db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND status = 'absent'`).all(date)).map(
       (r) => r.member_id
     )
+  );
+}
+
+// Everyone who submitted an Absence form (not a Late form - someone
+// running late is still coming) for a given date - classesAtRiskForDay's
+// own narrower "actually won't be there" signal, based specifically on a
+// submitted form rather than any way a student can end up marked absent.
+async function absenceFormAbsentMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    (
+      await db
+        .prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND source = 'absence_form' AND status = 'absent'`)
+        .all(date)
+    ).map((r) => r.member_id)
   );
 }
 
@@ -993,6 +1040,7 @@ module.exports = {
   deleteAllClassArchives,
   setEnrollment,
   addStaff,
+  removeFromFloaterForHour,
   removeStaff,
   activeStudents,
   activeParentsForStaff,
@@ -1001,6 +1049,7 @@ module.exports = {
   classesAtRiskForDay,
   absentMemberIdsForDate,
   absenceFormMemberIdsForDate,
+  absenceFormAbsentMemberIdsForDate,
   missingMemberIdsForDate,
   appSetting,
   setAppSetting,

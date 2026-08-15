@@ -23,6 +23,23 @@
     return JSON.parse(JSON.stringify(layout || {}));
   }
 
+  // Caps a drag/resize/rotate callback to at most once per animation
+  // frame - see name-tag-editor.js's own copy of this for why (a
+  // touchscreen can fire pointermove far faster than the screen actually
+  // repaints, and rebuilding the whole canvas on every one of those events
+  // instead of once per frame is what made mobile dragging feel sluggish).
+  function rafThrottle(fn) {
+    let pending = false;
+    return function () {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        fn();
+      });
+    };
+  }
+
   // Working copy - edits happen here until "Save Template" persists them.
   let layout = cloneLayout(seed.template);
 
@@ -204,12 +221,17 @@
       renderCanvas();
       renderProperties();
     }
+    // Keeps this same gesture routed to the handler that started it even
+    // if a finger drifts off the (often small) element it began on -
+    // without this a touch drag can silently get reassigned mid-move.
+    if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
 
     const startX = e.clientX;
     const startY = e.clientY;
     const originX = el.x;
     const originY = el.y;
     let moved = false;
+    const scheduleRender = rafThrottle(renderCanvas);
 
     function onMove(ev) {
       moved = true;
@@ -223,12 +245,13 @@
       }
       el.x = clamp(nx, 0, Math.max(0, CARD_WIDTH - el.width));
       el.y = clamp(ny, 0, Math.max(0, CARD_HEIGHT - el.height));
-      renderCanvas();
+      scheduleRender();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       if (moved) {
+        renderCanvas();
         markUnsaved();
         commitHistory();
         renderProperties();
@@ -251,6 +274,7 @@
     if (el.locked) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
     const startX = e.clientX;
     const startY = e.clientY;
     const originW = el.width;
@@ -265,6 +289,7 @@
     const anchor = HANDLE_ANCHOR[handle];
     const delta = HANDLE_DELTA[handle];
     let moved = false;
+    const scheduleRender = rafThrottle(renderCanvas);
 
     function onMove(ev) {
       moved = true;
@@ -295,12 +320,13 @@
       el.height = newH;
       el.x = newCenter.x - newW / 2;
       el.y = newCenter.y - newH / 2;
-      renderCanvas();
+      scheduleRender();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       if (moved) {
+        renderCanvas();
         markUnsaved();
         commitHistory();
         renderProperties();
@@ -314,7 +340,9 @@
     if (el.locked) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.target.setPointerCapture) e.target.setPointerCapture(e.pointerId);
     let moved = false;
+    const scheduleRender = rafThrottle(renderCanvas);
 
     function onMove(ev) {
       moved = true;
@@ -327,12 +355,13 @@
       if (deg > 180) deg -= 360;
       if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
       el.rotation = Math.round(deg);
-      renderCanvas();
+      scheduleRender();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       if (moved) {
+        renderCanvas();
         markUnsaved();
         commitHistory();
         renderProperties();

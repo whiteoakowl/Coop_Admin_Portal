@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { todayISO, formatDateLabel } = require('../utils/dates');
+const { todayISO, formatDateLabel, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
@@ -60,8 +60,14 @@ router.post('/logout', (req, res) => {
 // --- Dashboard ---
 
 // Today's checked-in/out/late/absent counts for one member type, each as
-// "X of Y" against every active member of that type (not just those on a
-// roster today, so the denominator reads as a stable roster size).
+// "X of Y" against only the members actually expected on that date's
+// weekday - those on that weekday's day-level Parent/Student roster (the
+// auto-synced 'Class Schedule' rosters from ensureDayMemberRosters/
+// syncDayMemberRosters: everyone enrolled in, staffing, or floating a
+// class that day) - not every active member of that type regardless of
+// whether they're even scheduled to be there. The co-op only meets Monday
+// and Wednesday, so a date landing on any other weekday has no day-level
+// roster and this is 0.
 //
 // Every query here excludes rosters.category = 'Class Roster' - a member
 // showing up as present, late, absent, or checked out of one specific
@@ -73,9 +79,20 @@ router.post('/logout', (req, res) => {
 // presence signals" isolation the class check-in flow was built to keep
 // (see routes/kiosk.js's own comment), just extended to this aggregate.
 async function todayStatsForType(memberType, today) {
-  const total = (
-    await db.prepare(`SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?`).get(memberType)
-  ).c;
+  const dow = weekdayOf(today);
+  const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
+  const total = day
+    ? (
+        await db
+          .prepare(
+            `SELECT COUNT(DISTINCT m.id) AS c FROM members m
+             JOIN roster_members rm ON rm.member_id = m.id
+             JOIN rosters r ON r.id = rm.roster_id
+             WHERE m.active = 1 AND m.member_type = ? AND r.category = 'Class Schedule' AND r.schedule_day = ?`
+          )
+          .get(memberType, day)
+      ).c
+    : 0;
   const checkedIn = (
     await db
       .prepare(

@@ -100,7 +100,7 @@
         </thead>
         <tbody>
           <% members.forEach(function(m) { %>
-            <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>">
+            <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>" data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>">
               <td class="members-col-photo">
                 <% if (m.photo_path) { %>
                   <img class="member-thumb" src="<%= photoUrl(m.photo_path) %>" alt="" />
@@ -220,5 +220,6 @@
   <script src="/js/name-tag-render.js"></script>
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/members-dialogs.js"></script>
+  <script src="/js/members-family-collapse.js"></script>
 </body>
 </html>

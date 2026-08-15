@@ -91,9 +91,6 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (re
   const day = req.params.day;
   const labels = [].concat(req.body.labels || []);
   await saveHourLabels(day, labels);
-  // Every schedule row (class or floater) that falls back to the hour's
-  // shared label for its displayed time needs to pick up the rename.
-  await syncMemberSchedulesForDay(day);
 
   const oldNames = [].concat(req.body.oldNames || []);
   const newNames = [].concat(req.body.newNames || []);
@@ -106,6 +103,12 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (re
       renamed++;
     }
   }
+
+  // Every schedule row (class or floater) that falls back to the hour's
+  // shared label for its displayed time, or carries a class's room, needs
+  // to pick up both the hour-label and room renames above - run last so it
+  // reads the already-renamed rooms, not the stale pre-rename ones.
+  await syncMemberSchedulesForDay(day);
 
   res.redirect(
     `/admin/class-schedule/${day}?notice=` +
