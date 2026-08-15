@@ -22,17 +22,22 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         onchange="window.location = '<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : '')"
       />
     </div>
+    <% if (!gridReadOnly) { %>
+      <div class="class-schedule-archive-controls" id="class-schedule-archive-controls-<%= day %>" hidden>
+        <label class="checkbox-option class-schedule-select-all">
+          <input type="checkbox" data-select-all-for="class-archive-form-<%= day %>" />
+          Select All
+        </label>
+        <button type="submit" form="class-archive-form-<%= day %>" class="roster-action-btn">Archive Selected</button>
+      </div>
+    <% } %>
   </div>
   <div class="roster-btn-row">
     <% if (!gridReadOnly) { %>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
-      <label class="checkbox-option class-schedule-select-all">
-        <input type="checkbox" data-select-all-for="class-archive-form-<%= day %>" />
-        Select All
-      </label>
-      <button type="submit" form="class-archive-form-<%= day %>" class="roster-action-btn">Archive Selected</button>
+      <button type="button" class="roster-action-btn" data-archive-toggle="<%= day %>" aria-pressed="false">Archive</button>
     <% } %>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
@@ -234,7 +239,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                   <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                     <div class="class-card-header">
                       <% if (!gridReadOnly) { %>
-                        <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-archive-form-<%= day %>" class="class-card-checkbox no-print" aria-label="Select <%= cls.class_name %> for archiving" />
+                        <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-archive-form-<%= day %>" class="class-card-checkbox no-print" aria-label="Select <%= cls.class_name %> for archiving" hidden />
                       <% } %>
                       <h3><%= cls.class_name %></h3>
                       <% if (!gridReadOnly) { %>

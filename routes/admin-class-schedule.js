@@ -18,6 +18,7 @@ const {
   hoursForDay,
   saveHourLabels,
   syncMemberSchedulesForDay,
+  syncDayMemberRosters,
   gridForDay,
   roomGridForDay,
   renameRoom,
@@ -534,9 +535,19 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
   rows.forEach((r) => { r.resolvedDay = r.day ? parseDayValue(r.day) : day; });
   const autoHourPositions = buildAutoHourPositions(rows);
 
+  // Looked up once instead of once per staff name per row - a real import
+  // can name the same handful of parents across dozens of rows, and each
+  // lookup is otherwise a separate round trip to a remote Supabase/Postgres
+  // connection (unlike the old single local SQLite file, network latency
+  // on every one of those adds up fast on a large file).
+  const activeParentsByName = new Map(
+    (await db.prepare("SELECT id, name FROM members WHERE member_type = 'parent' AND active = 1").all()).map((p) => [p.name.toLowerCase(), p.id])
+  );
+
   let created = 0;
   let skipped = 0;
   let staffNotFound = 0;
+  const touchedDays = new Set();
   for (const r of rows) {
     const rowDay = r.resolvedDay;
     if (!rowDay) { skipped++; continue; }
@@ -561,6 +572,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       notes: r.description,
     });
     created++;
+    touchedDays.add(rowDay);
 
     // Teacher + 2nd Teacher + up to 3 Assistants are optional columns - a
     // blank cell just means "no one assigned yet", not a skipped row.
@@ -576,11 +588,20 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       { name: r.assistant3, role: 'assistant' },
     ].filter((s) => s.name);
     for (const s of staffToAdd) {
-      const parent = await db.prepare("SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND member_type = 'parent' AND active = 1").get(s.name);
-      if (parent) await addStaff(classId, parent.id, s.role);
+      const parentId = activeParentsByName.get(s.name.toLowerCase());
+      // skipSync: true - addStaff's default behavior rebuilds the whole
+      // day's rosters/schedules from scratch on every call, which is fine
+      // for the one-at-a-time admin picker but far too slow to run once
+      // per staff member across a whole file (a large import was timing
+      // out against a remote Supabase connection because of exactly this -
+      // dozens to hundreds of full-day rebuilds instead of one). Synced
+      // once per touched day after the loop below instead.
+      if (parentId) await addStaff(classId, parentId, s.role, { skipSync: true });
       else staffNotFound++;
     }
   }
+
+  for (const d of touchedDays) await syncDayMemberRosters(d);
 
   res.redirect(
     `/admin/class-schedule/${day}?notice=` +

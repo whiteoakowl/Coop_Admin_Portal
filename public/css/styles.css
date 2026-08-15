@@ -1490,6 +1490,17 @@ body.public-page .roster-empty {
 .filter-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
 .filter-row .category-filter { margin: 0; }
 
+/* Class Schedule grid's "Archive" toggle reveals this row (Select All +
+   Archive Selected) - flex-basis: 100% forces it onto its own line below
+   "Highlight Absences For" inside .filter-row's flex-wrap, rather than
+   sitting beside it whenever there's enough width for both. */
+.class-schedule-archive-controls { display: flex; align-items: center; gap: 1rem; flex-basis: 100%; }
+/* .roster-action-btn defaults to flex: 1 0 auto so a row of several of
+   them fills evenly (.roster-btn-row) - here it's alone next to a small
+   Select All checkbox, so left as-is it stretches to fill the entire rest
+   of the row instead of sizing to its own label. */
+.class-schedule-archive-controls .roster-action-btn { flex: 0 0 auto; }
+
 .roster-summary-row td {
   font-weight: 700;
   background: #f8fafc;

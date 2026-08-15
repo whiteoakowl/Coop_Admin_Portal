@@ -26,6 +26,7 @@ const {
   absentMemberIdsForDate,
   setEnrollment,
   addStaff,
+  syncDayMemberRosters,
   listClassArchives,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -283,6 +284,14 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
 
   let matched = 0;
   let skipped = 0;
+  // setEnrollment/addStaff each default to rebuilding that whole day's
+  // rosters/schedules from scratch on every call - fine one at a time via
+  // the admin UI, but far too slow run once per matched slot across a
+  // whole file (a member can have up to SCHEDULE_SLOT_COUNT slots, so a
+  // real import calls these dozens to hundreds of times). Both accept
+  // skipSync to skip that per-call rebuild; the affected day(s) are synced
+  // once each after the whole file's been processed instead.
+  const touchedDays = new Set();
 
   for (const r of rows) {
     const member = await db
@@ -306,13 +315,16 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
 
       if (memberType === 'student') {
         const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
-        if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id]);
+        if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id], { skipSync: true });
       } else {
-        await addStaff(cls.id, member.id, 'teacher');
+        await addStaff(cls.id, member.id, 'teacher', { skipSync: true });
       }
+      touchedDays.add(cls.day);
       matched++;
     }
   }
+
+  for (const d of touchedDays) await syncDayMemberRosters(d);
 
   res.redirect(
     `${redirectBase}&notice=` +

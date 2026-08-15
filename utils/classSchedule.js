@@ -381,26 +381,37 @@ async function deleteAllClassArchives() {
   return result.changes;
 }
 
-async function setEnrollment(classId, studentIds) {
+// skipSync - see addStaff's comment on the same option just below; the
+// full day-level rebuild is skipped here for the identical reason (a bulk
+// caller doing this once per row instead of once for the whole import).
+async function setEnrollment(classId, studentIds, { skipSync } = {}) {
   await db.withTransaction(async (tx) => {
     await tx.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
     const link = tx.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?) ON CONFLICT (class_id, student_id) DO NOTHING');
     for (const studentId of studentIds) await link.run(classId, studentId);
   });
   await syncClassRosterMembers(classId);
+  if (skipSync) return;
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
 // Adds one teacher/assistant - used by both the admin manage form (one at
-// a time, via the picker) and the public self-signup page.
-async function addStaff(classId, memberId, role) {
+// a time, via the picker) and the public self-signup page. syncDayMemberRosters
+// rebuilds that whole day's rosters/schedules from scratch (every class,
+// every student and staff member on it), so it's cheap for this one-at-a-
+// time case but far too expensive to run after every single row of a bulk
+// import - skipSync lets a bulk caller (Class Schedule Import) insert the
+// class_staff rows directly and run just one sync at the end instead of
+// one per staff member added.
+async function addStaff(classId, memberId, role, { skipSync } = {}) {
   await db
     .prepare(
       `INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)
        ON CONFLICT (class_id, member_id) DO UPDATE SET role = excluded.role`
     )
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
+  if (skipSync) return;
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
 }

@@ -111,6 +111,34 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.equal(assistants[0].name, 'Alex Assistant');
   });
 
+  // Staffing during import batches the expensive day-level roster/schedule
+  // rebuild (addStaff's skipSync option - see its own comment in
+  // utils/classSchedule.js) into one call after the whole file instead of
+  // one per staff member added, since a real import can staff dozens of
+  // rows and that rebuild was slow enough over a real network connection
+  // to Supabase to make a large file time out. This proves that rebuild
+  // still actually runs and produces the correct end state, not just that
+  // class_staff itself got the right row.
+  await t.test('the batched day-roster sync after import still reflects a newly staffed teacher (member_schedules + the day\'s auto Parent roster)', async () => {
+    const buffer = buildImportBuffer([['Monday', '4', 'Pottery', 'Room 9', '', '9:00 AM', '9:45 AM', '', 'Jane Teacher', '', '', '', '']]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'pottery.xlsx');
+    assert.equal(res.status, 302);
+
+    const teacher = await db.prepare("SELECT id FROM members WHERE name = 'Jane Teacher'").get();
+    const scheduleRow = await db.prepare('SELECT * FROM member_schedules WHERE member_id = ? AND day = ? AND class_name = ?').get(teacher.id, 'monday', 'Pottery');
+    assert.ok(scheduleRow, 'member_schedules should reflect the newly staffed teacher on this class, not just class_staff');
+
+    const rosterIdSetting = await db.prepare("SELECT value FROM app_settings WHERE key = 'monday_parent_roster_id'").get();
+    assert.ok(rosterIdSetting, "Monday's auto Parent roster should exist");
+    const onRoster = await db
+      .prepare("SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'")
+      .get(rosterIdSetting.value, teacher.id);
+    assert.ok(onRoster, 'the newly staffed teacher should be on Monday\'s auto Parent roster after import');
+  });
+
   await t.test('Class Start/End Time and Description land on the class row, and a 2nd Teacher is staffed alongside the first', async () => {
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Pat Second', memberType: 'parent', _csrf: csrfToken });
     const buffer = buildImportBuffer([

@@ -180,17 +180,29 @@ test('Class Archive tab (/admin/schedule?tab=archive)', async (t) => {
   });
 });
 
-test('the day grid offers per-class checkboxes and an Archive Selected control instead of the old Delete All button', async (t) => {
+// The day grid used to show a permanent "Select All"/"Archive Selected"
+// pair plus a checkbox on every class card at all times - now it's a
+// single "Archive" toggle button; clicking it (client-side, in
+// public/js/class-schedule-archive-select.js) reveals the checkboxes and
+// the Select All/Archive Selected row (which sits under "Highlight
+// Absences For", not in the main button row). The checkboxes/controls
+// still render in the HTML either way (so the toggle has something to
+// reveal) - just `hidden` by default - so this only asserts on markup and
+// the `hidden` attribute, not on visibility itself (that's a client-side
+// concern this route-level suite can't exercise without a real browser).
+test('the day grid offers a single Archive toggle, with per-class checkboxes and Archive Selected controls hidden until it is clicked - no Delete All button', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const classId = await createClassWithStaffAndStudent(cookie, csrfToken, { className: 'Archive Test Class 3', hourPosition: '3' });
 
-  await t.test('the grid page has the archive form, a Select All checkbox, and one classIds checkbox per class - no Delete All button', async () => {
+  await t.test('the grid page has the archive form, a hidden Select All checkbox, one hidden classIds checkbox per class, and an Archive toggle button - no Delete All button', async () => {
     const res = await request(app).get('/admin/schedule?tab=monday').set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /id="class-archive-form-monday"/);
     assert.match(res.text, /action="\/admin\/class-schedule\/monday\/archive"/);
+    assert.match(res.text, /id="class-schedule-archive-controls-monday"[^>]*hidden/, 'the Select All/Archive Selected row should start hidden');
     assert.match(res.text, /data-select-all-for="class-archive-form-monday"/);
-    assert.match(res.text, new RegExp(`name="classIds" value="${classId}" form="class-archive-form-monday"`));
+    assert.match(res.text, new RegExp(`name="classIds" value="${classId}" form="class-archive-form-monday"[^>]*hidden`), 'each class checkbox should start hidden');
+    assert.match(res.text, /data-archive-toggle="monday"/, 'a single Archive toggle button should be present');
     assert.doesNotMatch(res.text, /Delete All/);
     assert.doesNotMatch(res.text, /\/delete-all"[^>]*class="inline-block-form"/);
   });
