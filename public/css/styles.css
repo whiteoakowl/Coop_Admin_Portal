@@ -3734,6 +3734,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: 0.85rem;
 }
 .class-schedule-cell { background: #fff; }
+/* Grabbing this handle and moving up/down reorders the room rows (see
+   public/js/room-row-reorder.js) - touch-action: none stops the browser's
+   own scroll/pan gesture from hijacking a touch drag, same reasoning as
+   the name tag/schedule card design editors' draggable elements. */
+.room-row-drag-handle { display: inline-flex; cursor: grab; touch-action: none; color: var(--muted); vertical-align: middle; margin-right: 0.3rem; }
+.room-row-drag-handle .icon { width: 0.9rem; height: 0.9rem; }
+.room-row-drag-handle:active { cursor: grabbing; }
+.class-schedule-room-grid tr.room-row-dragging { opacity: 0.55; background: var(--brand-soft); }
 .class-schedule-room-grid .class-card { max-width: none; margin-bottom: 0.4rem; }
 .class-schedule-room-grid .class-card:last-child { margin-bottom: 0; }
 .class-schedule-hour-label { margin: 0 0 0.6rem; font-size: 1.1rem; color: var(--brand-dark); }
@@ -3913,7 +3921,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: left;
 }
 .class-schedule-print-grid th { background: var(--brand-soft); font-size: 0.8rem; }
-.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: nowrap; background: var(--brand-soft); font-size: 0.8rem; }
+/* white-space: normal (not the nowrap this had) - a longer room name
+   (e.g. "Fellowship Hall 2") has nowhere to wrap in this narrow a column
+   otherwise and overflows past its own border on the printout. */
+.class-schedule-print-room-col { width: 85px; font-weight: 700; white-space: normal; background: var(--brand-soft); font-size: 0.8rem; }
 
 .class-schedule-print-card {
   border-left: 5px solid var(--brand);

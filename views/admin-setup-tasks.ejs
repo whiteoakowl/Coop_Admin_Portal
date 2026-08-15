@@ -80,10 +80,10 @@
 
             <div class="roster-scroll">
               <table class="roster-table members-table condensed-table task-list-table">
-                <thead><tr><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th></tr></thead>
+                <thead><tr><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th><th class="no-print"></th></tr></thead>
                 <tbody>
                   <% if (s.items.length === 0) { %>
-                    <tr><td colspan="3" class="roster-empty">No tasks yet.</td></tr>
+                    <tr><td colspan="4" class="roster-empty">No tasks yet.</td></tr>
                   <% } %>
                   <% s.items.forEach(function(item, j) { %>
                     <tr>
@@ -99,10 +99,12 @@
                             <input type="hidden" name="direction" value="down" />
                             <button type="submit" class="icon-btn" aria-label="Move task down" title="Move down" <%= j === s.items.length - 1 ? 'disabled' : '' %>><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
                           </form>
-                          <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete this task?">
-                            <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                          </form>
                         </div>
+                      </td>
+                      <td class="no-print actions-cell">
+                        <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Delete this task?">
+                          <button type="submit" class="icon-btn" aria-label="Delete task" title="Delete Task"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
                       </td>
                     </tr>
                   <% }); %>

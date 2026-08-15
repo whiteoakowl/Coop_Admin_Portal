@@ -22,6 +22,7 @@ const {
   gridForDay,
   roomGridForDay,
   renameRoom,
+  saveRoomOrder,
   getClass,
   createClass,
   colorForClassName,
@@ -110,6 +111,18 @@ router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (re
     `/admin/class-schedule/${day}?notice=` +
       encodeURIComponent(`Hours updated${renamed ? ` and ${renamed} room(s) renamed` : ''}.`)
   );
+});
+
+// Saves a custom drag-reordered room row order for the grid - see
+// getRoomOrder/saveRoomOrder in utils/classSchedule.js. Called via fetch
+// from public/js/room-row-reorder.js right after a drag ends, not a full
+// form submit, so reordering stays a single smooth interaction instead of
+// a page reload.
+router.post('/class-schedule/:day/rooms/reorder', requireFullAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const rooms = [].concat(req.body.rooms || []).map((r) => String(r));
+  await saveRoomOrder(day, rooms);
+  res.json({ ok: true });
 });
 
 // Day-agnostic: the Create New Class form itself has a Class Day field
@@ -675,7 +688,7 @@ router.get('/class-schedule/:day/export.csv', requireAdmin, requireDay, async (r
 router.get('/class-schedule/:day/print', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   res.render('admin-class-schedule-print', {
-    title: `${DAY_LABELS[day]} Class Schedule`,
+    title: `${DAY_LABELS[day]} Schedule`,
     dayLabel: DAY_LABELS[day],
     // Room-by-hour grid (same shape the on-screen grid uses) - not the
     // hour-only gridForDay - so the printout keeps room number as its own

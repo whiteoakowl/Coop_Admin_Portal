@@ -25,6 +25,7 @@ const {
   membersWithDetails,
   generateMemberCode,
   lastNameOf,
+  byLastName,
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
@@ -440,13 +441,19 @@ router.get('/members/:id', async (req, res) => {
   const family = await db
     .prepare('SELECT f.name AS "familyName" FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
     .get(id);
+  const restOfFamily = await familyOf(id);
 
   res.render('admin-member-profile', {
     title: member.name,
     member,
     tab,
     familyName: family ? family.familyName : null,
-    familyMembers: (await familyOf(id)).map((m) => m.name),
+    familyMembers: restOfFamily.map((m) => m.name),
+    // Includes the member being viewed (not just the rest of the family)
+    // - powers the Class Schedule/Attendance tabs' "jump to this family
+    // member" dropdown, which needs the current member as one of its own
+    // options so it can show who's selected.
+    familyRoster: [member, ...restOfFamily].sort(byLastName),
     rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
     history: (await attendanceHistoryForMember(id)).map((r) => ({

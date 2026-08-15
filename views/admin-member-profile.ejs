@@ -59,7 +59,16 @@
           <% if (member.notes) { %><dt>Notes</dt><dd><%= member.notes %></dd><% } %>
         </dl>
       <% } else if (tab === 'schedule') { %>
-        <p class="hint">Generated automatically from the Class Schedule - enroll or staff <%= member.name %> on a class there to change what shows up here.</p>
+        <% if (familyRoster.length > 1) { %>
+          <div class="category-filter member-profile-family-select">
+            <label for="schedule-family-member-select">Family Member</label>
+            <select id="schedule-family-member-select" onchange="window.location = '/admin/members/' + this.value + '?tab=schedule'">
+              <% familyRoster.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= m.id === member.id ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
         <div class="schedule-day-columns">
           <% [['monday', 'Monday', schedule.monday], ['wednesday', 'Wednesday', schedule.wednesday]].forEach(function (entry) { %>
             <% var dayLabel = entry[1], rows = entry[2]; %>
@@ -92,6 +101,16 @@
         </div>
         <a class="roster-action-btn print-action-btn no-print" href="/admin/schedule/print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
       <% } else { %>
+        <% if (familyRoster.length > 1) { %>
+          <div class="category-filter member-profile-family-select">
+            <label for="attendance-family-member-select">Family Member</label>
+            <select id="attendance-family-member-select" onchange="window.location = '/admin/members/' + this.value + '?tab=attendance'">
+              <% familyRoster.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= m.id === member.id ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table">
             <thead>

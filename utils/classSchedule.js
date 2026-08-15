@@ -192,11 +192,110 @@ async function gridForDay(day) {
 // color are treated as one class that runs across both blocks, and
 // rendered as a single cell spanning both columns instead of two
 // separate cards.
+// "10:45 AM" -> minutes since midnight, null if unparseable. A local copy
+// (also exists in utils/schedule.js and routes/admin-class-schedule.js) -
+// requiring utils/schedule.js from here would be circular (it already
+// requires this file for syncClassRosterMembers/syncDayMemberRosters).
+function parseClockMinutesLocal(raw) {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$/.exec(String(raw || ''));
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  const suffix = m[3] ? m[3].toLowerCase() : null;
+  if (suffix === 'pm' && hour !== 12) hour += 12;
+  if (suffix === 'am' && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+// The reverse of parseClockMinutesLocal - minutes-since-midnight back to
+// "10:45 AM".
+function minutesToClockLabelLocal(minutes) {
+  let hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  hour %= 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+const UNASSIGNED_ROOM = 'Unassigned';
+
+function roomOrderSettingKey(day) {
+  return `${day}_room_order`;
+}
+
+// A saved custom room order for a day (drag-reordering the grid's rows),
+// or [] if the admin has never reordered anything - see roomGridForDay for
+// how it's applied. Stored as a JSON array of room names in app_settings,
+// same "no dedicated table" approach ensureDayRoster uses for its own
+// per-day settings.
+async function getRoomOrder(day) {
+  const raw = await appSetting(roomOrderSettingKey(day), null);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+async function saveRoomOrder(day, rooms) {
+  await setAppSetting(roomOrderSettingKey(day), JSON.stringify(rooms));
+}
+
 async function roomGridForDay(day) {
-  const hours = await hoursForDay(day);
+  const storedHours = await hoursForDay(day);
   const rawClasses = await db
     .prepare('SELECT * FROM classes WHERE day = ? ORDER BY hour_position, LOWER(class_name)')
     .all(day);
+
+  // Each position's real effective start time, derived from whichever
+  // currently-live classes actually occupy it (earliest, if more than
+  // one) - not the separately-stored, easily-stale class_schedule_hours
+  // label. A real bug report: that stored label only gets refreshed at
+  // import time (Class Schedule Import's own sync, for whichever position
+  // that one file's rows landed on), so a second, independent import or a
+  // manually Added Class touching the same position with a different real
+  // time left the header showing the wrong time for whatever was actually
+  // there - "classes not lining up with the right time column". Computing
+  // it fresh from live data on every render instead means it can't go
+  // stale, and self-corrects on deploy with no need to re-import or patch
+  // existing data.
+  const earliestMinutesByPosition = {};
+  rawClasses.forEach((cls) => {
+    const minutes = parseClockMinutesLocal(cls.start_time);
+    if (minutes == null) return;
+    if (earliestMinutesByPosition[cls.hour_position] == null || minutes < earliestMinutesByPosition[cls.hour_position]) {
+      earliestMinutesByPosition[cls.hour_position] = minutes;
+    }
+  });
+  const hours = storedHours.map((h) => {
+    const minutes = earliestMinutesByPosition[h.position];
+    return minutes != null ? { ...h, label: minutesToClockLabelLocal(minutes) } : h;
+  });
+
+  // How many of the day's fixed hour columns this one class spans,
+  // starting at its own hour_position, based on its own end_time crossing
+  // into a later column's real start time (earliestMinutesByPosition
+  // above) - e.g. a class stored at hour 1 with end_time 10:40, where
+  // hour 2 actually starts at 10:00, spans into hour 2's column without
+  // needing a second database row for that block. Returns 1 (no span)
+  // when there's no parseable end_time or nothing to compare it against,
+  // so the room-grid loop below falls back to the older name/color/grade
+  // adjacent-row merge for classes that were never given one.
+  function spanFromEndTime(cls) {
+    const endMinutes = parseClockMinutesLocal(cls.end_time);
+    if (endMinutes == null) return 1;
+    let span = 1;
+    let p = cls.hour_position + 1;
+    while (p <= HOUR_POSITIONS.length && earliestMinutesByPosition[p] != null && endMinutes > earliestMinutesByPosition[p]) {
+      span++;
+      p++;
+    }
+    return span;
+  }
+
   const classes = [];
   for (const cls of rawClasses) {
     const staff = await staffForClass(cls.id);
@@ -207,22 +306,31 @@ async function roomGridForDay(day) {
       gradeLabel: formatGradeRange(cls.age_group),
       teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
       assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+      endTimeSpan: spanFromEndTime(cls),
     });
   }
 
-  const roomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : 'Unassigned')))].sort(
-    (a, b) => {
-      if (a === 'Unassigned') return 1;
-      if (b === 'Unassigned') return -1;
+  const discoveredRoomNames = [...new Set(classes.map((c) => (c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM)))];
+  const savedOrder = await getRoomOrder(day);
+  // Whatever's saved comes first, in that order (skipping any room no
+  // longer in use); anything new/unordered is appended alphabetically -
+  // the same fallback order this grid always used before drag-reordering
+  // existed, so a day nobody's ever reordered looks exactly as before.
+  const ordered = savedOrder.filter((r) => discoveredRoomNames.includes(r));
+  const remaining = discoveredRoomNames
+    .filter((r) => !ordered.includes(r))
+    .sort((a, b) => {
+      if (a === UNASSIGNED_ROOM) return 1;
+      if (b === UNASSIGNED_ROOM) return -1;
       return a.localeCompare(b, undefined, { sensitivity: 'base' });
-    }
-  );
+    });
+  const roomNames = [...ordered, ...remaining];
 
   const rows = roomNames.map((room) => {
     const byHour = {};
     for (const h of HOUR_POSITIONS) byHour[h] = [];
     classes.forEach((cls) => {
-      const clsRoom = cls.room && cls.room.trim() ? cls.room.trim() : 'Unassigned';
+      const clsRoom = cls.room && cls.room.trim() ? cls.room.trim() : UNASSIGNED_ROOM;
       if (clsRoom === room) byHour[cls.hour_position].push(cls);
     });
 
@@ -230,6 +338,18 @@ async function roomGridForDay(day) {
     let h = 1;
     while (h <= HOUR_POSITIONS.length) {
       const here = byHour[h];
+
+      // Preferred over the name/color/grade merge below when the class
+      // has its own real end_time crossing into a later column - reflects
+      // what the class actually says about itself, not an inference from
+      // a second matching row.
+      if (here.length === 1 && here[0].endTimeSpan > 1) {
+        const span = Math.min(here[0].endTimeSpan, HOUR_POSITIONS.length - h + 1);
+        cells.push({ span, classes: [here[0]] });
+        h += span;
+        continue;
+      }
+
       const next = byHour[h + 1];
       // age_group (grade) is part of this match, not just name/color - a
       // real bug report: a recurring class name split across grade bands
@@ -261,23 +381,44 @@ async function roomGridForDay(day) {
   return { hours, rows };
 }
 
-// Every distinct room name in use on a day - rooms aren't their own
-// managed entity (just whatever string is typed into each class's room
-// field), so "Edit Room Numbers" works off whatever's actually in use,
-// same idea as Edit Hours but derived instead of a fixed table.
+// Every distinct room name in use on a day, plus the synthetic
+// "Unassigned" bucket roomGridForDay falls classes with a blank room back
+// to - real bug report: a class that never got a room set (e.g. a column
+// mismatch during import) showed up under "Unassigned" on the grid with
+// no way to fix it, since this list (what "Edit Room Numbers" and the Add
+// Class room datalist both offer) only ever included real stored values.
+// Rooms aren't their own managed entity otherwise (just whatever string
+// is typed into each class's room field), so this is still derived, not a
+// fixed table, same idea as Edit Hours.
 async function roomsForDay(day) {
-  return (
+  const named = (
     await db
       .prepare("SELECT DISTINCT room, LOWER(room) AS \"sortRoom\" FROM classes WHERE day = ? AND room IS NOT NULL AND room != '' ORDER BY \"sortRoom\"")
       .all(day)
   ).map((r) => r.room);
+  const hasUnassigned = await db.prepare("SELECT 1 FROM classes WHERE day = ? AND (room IS NULL OR room = '') LIMIT 1").get(day);
+  return hasUnassigned ? [...named, UNASSIGNED_ROOM] : named;
 }
 
 // Renames a room across every class on a day that currently uses it - the
-// bulk-edit half of "Edit Room Numbers".
+// bulk-edit half of "Edit Room Numbers". Renaming FROM the synthetic
+// "Unassigned" bucket (see roomsForDay above) instead assigns every
+// currently-blank-room class on that day to the new name - the only way
+// those classes can get a real room without editing them one at a time.
+// Also carries the rename into any saved custom room order, so a
+// reordered "Kitchen" row doesn't reset to the alphabetical default just
+// because it got renamed.
 async function renameRoom(day, oldName, newName) {
   if (!oldName || !newName || oldName === newName) return;
-  await db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
+  if (oldName === UNASSIGNED_ROOM) {
+    await db.prepare("UPDATE classes SET room = ? WHERE day = ? AND (room IS NULL OR room = '')").run(newName, day);
+  } else {
+    await db.prepare('UPDATE classes SET room = ? WHERE day = ? AND room = ?').run(newName, day, oldName);
+  }
+  const order = await getRoomOrder(day);
+  if (order.includes(oldName)) {
+    await saveRoomOrder(day, order.map((r) => (r === oldName ? newName : r)));
+  }
 }
 
 async function createClass(fields) {
@@ -839,6 +980,8 @@ module.exports = {
   roomGridForDay,
   roomsForDay,
   renameRoom,
+  getRoomOrder,
+  saveRoomOrder,
   getClass,
   createClass,
   colorForClassName,

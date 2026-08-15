@@ -8,7 +8,7 @@
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-preview-header no-print">
-      <h1><%= dayLabel %> Class Schedule</h1>
+      <h1><%= dayLabel %> Schedule</h1>
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
@@ -17,7 +17,7 @@
         <img src="/img/logo.png" alt="" />
         <div>
           <p class="print-header-title">Sanford Homeschoolers</p>
-          <p class="print-header-sub"><%= dayLabel %> Class Schedule</p>
+          <p class="print-header-sub"><%= dayLabel %> Schedule</p>
         </div>
       </div>
 
@@ -45,7 +45,7 @@
                         %>
                         <div class="class-schedule-print-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                           <h3><%= cls.class_name %></h3>
-                          <% if (cls.age_group) { %><p class="class-schedule-print-grade"><%= cls.age_group %></p><% } %>
+                          <% if (cls.gradeLabel) { %><p class="class-schedule-print-grade"><%= cls.gradeLabel %></p><% } %>
                           <% if (teachers.length > 0) { %><p class="class-schedule-print-staff">Teacher: <%= teachers.join(', ') %></p><% } %>
                           <% if (assistants.length > 0) { %><p class="class-schedule-print-staff">Assistant: <%= assistants.join(', ') %></p><% } %>
                         </div>

@@ -213,7 +213,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <% } %>
 
 <div class="roster-scroll">
-  <table class="roster-table class-schedule-room-grid">
+  <table class="roster-table class-schedule-room-grid"<% if (!gridReadOnly) { %> data-room-reorder-day="<%= day %>"<% } %>>
     <thead>
       <tr>
         <th class="class-schedule-room-col">Room</th>
@@ -227,8 +227,13 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <tr><td colspan="<%= roomGrid.hours.length + 1 %>" class="roster-empty">No classes yet.</td></tr>
       <% } %>
       <% roomGrid.rows.forEach(function(row) { %>
-        <tr>
-          <td class="class-schedule-room-col"><%= row.room %></td>
+        <tr data-room-row="<%= row.room %>">
+          <td class="class-schedule-room-col">
+            <% if (!gridReadOnly) { %>
+              <span class="room-row-drag-handle no-print" aria-label="Drag to reorder <%= row.room %>" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></span>
+            <% } %>
+            <%= row.room %>
+          </td>
           <% row.cells.forEach(function(cell) { %>
             <td colspan="<%= cell.span %>" class="class-schedule-cell">
               <% if (cell.classes.length === 0) { %>
@@ -277,6 +282,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <script src="/js/fragment-dialog.js"></script>
 <script src="/js/class-schedule-view.js"></script>
 <script src="/js/allergy-log-popup.js"></script>
+<script src="/js/room-row-reorder.js"></script>
 <% } %>
 <%# archive-select-toggle.js is loaded once, unconditionally, by the page
     that includes this partial (views/admin-schedule.ejs) - every tab on

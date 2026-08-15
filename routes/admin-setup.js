@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { DAY_LABELS, defaultDay, requireDay, defaultDateFor } = require('../utils/days');
+const { DAY_LABELS, defaultDay, requireDay, defaultDateFor, parseDayValue } = require('../utils/days');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const { teamsForDay, membersForTeam, setTeamLeader, updateTeam } = require('../utils/setup');
 const {
@@ -245,10 +245,11 @@ router.post('/setup/:day/tasks/save', requireAdmin, requireDay, async (req, res)
 
 router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireDay, (req, res) => {
   const buffer = buildTemplateWorkbook(
-    ['List', 'Task'],
+    ['Number', 'Day', 'List', 'Task'],
     [
-      ['Chairs & Tables', 'Set up 20 chairs in the main room'],
-      ['Chairs & Tables', 'Fold and stack tables after use'],
+      ['1', 'Monday', 'Chairs & Tables', 'Set up 20 chairs in the main room'],
+      ['2', 'Monday', 'Chairs & Tables', 'Fold and stack tables after use'],
+      ['1', 'Wednesday', 'Kitchen', 'Wipe down counters and sink'],
     ]
   );
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -256,40 +257,74 @@ router.get('/setup/:day/tasks/import-template.xlsx', requireAdmin, requireDay, (
   res.send(buffer);
 });
 
-// Matches each row to an existing list by title (case-insensitive),
-// creating the list (unlinked to any team) if it doesn't exist yet, then
-// appends that row's task to the end of that list - Number is never
-// imported, it's always just that row's position (see itemsForSection).
+// Day tolerates "Mon"/"Wed" abbreviations, not just the full word (see
+// utils/days.js's parseDayValue) - falls back to whichever day tab Import
+// was clicked from when the column's blank, same convention the Class
+// Schedule Import uses. Matches each row to an existing list by day + title
+// (case-insensitive), creating the list (unlinked to any team) if it
+// doesn't exist yet. Number controls only the ORDER rows land in their
+// list - it's never itself stored, since a list's Number column is always
+// just position (see itemsForSection); a row with no Number lands after
+// every numbered row in that same list, in file order.
 router.post('/setup/:day/tasks/import', requireAdmin, requireDay, uploadTasks.single('file'), async (req, res) => {
   const day = req.params.day;
   if (!req.file) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Please choose a file to import.'));
   }
-  let rows;
+  let rawRows;
   try {
-    rows = await readRowsFromFile(req.file.buffer);
+    rawRows = await readRowsFromFile(req.file.buffer);
   } catch (err) {
     return res.redirect(`/admin/setup/${day}/tasks?error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
-  const sectionIdByTitle = new Map();
-  (await taskListSectionsForDay(day)).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
+
+  const rows = rawRows
+    .map((row) => {
+      const keys = Object.keys(row);
+      const dayKey = keys.find((k) => k.trim().toLowerCase() === 'day');
+      const listKey = keys.find((k) => k.trim().toLowerCase() === 'list');
+      const taskKey = keys.find((k) => k.trim().toLowerCase() === 'task');
+      const numberKey = keys.find((k) => k.trim().toLowerCase() === 'number');
+      const rawDay = dayKey ? String(row[dayKey]).trim() : '';
+      const number = numberKey ? parseInt(row[numberKey], 10) : NaN;
+      return {
+        day: rawDay ? parseDayValue(rawDay) : day,
+        list: listKey ? String(row[listKey]).trim() : '',
+        task: taskKey ? String(row[taskKey]).trim() : '',
+        number: Number.isFinite(number) ? number : null,
+      };
+    })
+    .filter((r) => r.day && r.list && r.task);
+
+  // Grouped by day, then by list title (case-insensitive) - both to sort
+  // each list's rows by Number before inserting, and so a list only
+  // already-existing sections are looked up once per day instead of once
+  // per row.
+  const grouped = new Map(); // day -> Map(listTitleLower -> { listTitle, rows: [] })
+  rows.forEach((r) => {
+    if (!grouped.has(r.day)) grouped.set(r.day, new Map());
+    const dayGroups = grouped.get(r.day);
+    const key = r.list.toLowerCase();
+    if (!dayGroups.has(key)) dayGroups.set(key, { listTitle: r.list, rows: [] });
+    dayGroups.get(key).rows.push(r);
+  });
 
   let added = 0;
-  for (const row of rows) {
-    const keys = Object.keys(row);
-    const listKey = keys.find((k) => k.trim().toLowerCase() === 'list');
-    const taskKey = keys.find((k) => k.trim().toLowerCase() === 'task');
-    const listTitle = listKey ? String(row[listKey]).trim() : '';
-    const taskText = taskKey ? String(row[taskKey]).trim() : '';
-    if (!listTitle || !taskText) continue;
-
-    let sectionId = sectionIdByTitle.get(listTitle.toLowerCase());
-    if (!sectionId) {
-      sectionId = await createSection(day, listTitle, null);
-      sectionIdByTitle.set(listTitle.toLowerCase(), sectionId);
+  for (const [rowDay, dayGroups] of grouped) {
+    const sectionIdByTitle = new Map();
+    (await taskListSectionsForDay(rowDay)).forEach((s) => sectionIdByTitle.set(s.title.toLowerCase(), s.id));
+    for (const [listKey, group] of dayGroups) {
+      group.rows.sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
+      let sectionId = sectionIdByTitle.get(listKey);
+      if (!sectionId) {
+        sectionId = await createSection(rowDay, group.listTitle, null);
+        sectionIdByTitle.set(listKey, sectionId);
+      }
+      for (const r of group.rows) {
+        await addItem(sectionId, r.task);
+        added++;
+      }
     }
-    await addItem(sectionId, taskText);
-    added++;
   }
 
   res.redirect(`/admin/setup/${day}/tasks?notice=` + encodeURIComponent(`Imported ${added} task(s).`));
