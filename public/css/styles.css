@@ -3977,6 +3977,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .roster-log-name { font-weight: 700; flex: 1 1 auto; min-width: 0; }
 .roster-log-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); }
+
+/* On a narrow phone, a longer name (student rosters routinely have one)
+   wraps to two lines - .roster-log-row's align-items: center then
+   vertically centers .roster-log-meta right on top of that wrapped
+   second line instead of below it. Stacking name above meta instead of
+   side by side removes the collision regardless of how long the name is. */
+@media (max-width: 640px) {
+  .roster-log-row { flex-wrap: wrap; align-items: flex-start; row-gap: 0.3rem; }
+  .roster-log-name { flex-basis: 100%; }
+  .roster-log-meta { flex-wrap: wrap; }
+}
 .medical-flag {
   display: inline-flex;
   align-items: center;
