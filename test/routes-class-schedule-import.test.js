@@ -264,6 +264,75 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(spannedCell, 'the two hour blocks should have merged into one colspan="2" cell instead of two separate cells');
   });
 
+  // A real bug report: a recurring class name split across grade bands
+  // (e.g. the same club name offered separately to two different grade
+  // groups, same room, adjacent time slots) was getting merged into one
+  // spanned cell by the fix above - correct for one class continuing
+  // across two hours, wrong here since these are two unrelated classes
+  // that only coincidentally share a name. Merging silently dropped the
+  // second one's own grade/teacher/roster from the grid entirely, which
+  // read as that row having been ignored by the import even though it
+  // was actually created.
+  await t.test('the same class name/room but a DIFFERENT grade across two adjacent hour blocks is NOT merged - both stay visible with their own info', async () => {
+    const { roomGridForDay } = require('../utils/classSchedule');
+    const buffer = buildImportBuffer([
+      ['Mon', '', 'Forest Wildlings', 'Nature Room', 'K-2', '2:00 PM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Forest Wildlings', 'Nature Room', '3-5', '2:45 PM', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'different-grade.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'), 'both rows should be created, not treated as a duplicate');
+
+    const rows = await db.prepare("SELECT color, age_group, hour_position FROM classes WHERE class_name = 'Forest Wildlings' ORDER BY hour_position").all();
+    assert.equal(rows.length, 2, 'both grade-band rows should exist as separate classes');
+    assert.notEqual(rows[0].color, rows[1].color, 'different grades should not be forced to share a color, since they are not the same continuing class');
+
+    const grid = await roomGridForDay('monday');
+    const natureRow = grid.rows.find((r) => r.room === 'Nature Room');
+    assert.ok(natureRow, 'expected a Nature Room row in the grid');
+    const mergedCell = natureRow.cells.find((c) => c.span === 2 && c.classes[0].class_name === 'Forest Wildlings');
+    assert.equal(mergedCell, undefined, 'different-grade classes must not be merged into one spanned cell');
+    const gradeLabels = natureRow.cells
+      .filter((c) => c.classes.some((cls) => cls.class_name === 'Forest Wildlings'))
+      .flatMap((c) => c.classes)
+      .map((cls) => cls.age_group)
+      .sort();
+    assert.deepEqual(gradeLabels, ['3-5', 'K-2'], 'both grade bands should still be visible on the grid, not one hidden by the merge');
+  });
+
+  // A real bug report: "on the wednesday class schedule page times in the
+  // top row don't match where the classes should be" - the grid's Hour
+  // 1-4 column headers are their own stored labels (class_schedule_hours),
+  // completely separate from any class's own start_time, and importing
+  // into an auto-derived position never updated them - so the header kept
+  // showing whatever default/stale text it already had while the classes
+  // underneath were really at a different time.
+  await t.test('importing rows with auto-derived hour positions updates that day\'s column header labels to match the real times', async () => {
+    const buffer = buildImportBuffer([
+      ['Wed', '', 'Label Check A', 'Room 1', '', '9:15 AM', '', '', '', '', '', '', ''],
+      ['Wed', '', 'Label Check B', 'Room 2', '', '11:30 AM', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/wednesday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'label-check.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'));
+
+    const { hoursForDay } = require('../utils/classSchedule');
+    const hours = await hoursForDay('wednesday');
+    const labelByPosition = {};
+    hours.forEach((h) => { labelByPosition[h.position] = h.label; });
+
+    const classA = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Label Check A'").get();
+    const classB = await db.prepare("SELECT hour_position FROM classes WHERE class_name = 'Label Check B'").get();
+    assert.equal(labelByPosition[classA.hour_position], '9:15 AM', "the column header over Label Check A's hour position should show its real start time");
+    assert.equal(labelByPosition[classB.hour_position], '11:30 AM', "the column header over Label Check B's hour position should show its real start time");
+  });
+
   await t.test('a 5th distinct Start Time in the same day has no slot left and is skipped, not fatal to the others', async () => {
     const buffer = buildImportBuffer([
       ['Mon', '', 'Overflow A', 'Room 1', '', '8:00 AM', '', '', '', '', '', '', ''],

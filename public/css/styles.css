@@ -3719,6 +3719,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border: 1px solid var(--border);
   padding: 0.35rem 0.4rem;
   vertical-align: top;
+  /* .roster-table td (equal selector specificity, declared earlier in
+     this file) sets white-space: nowrap for its usual single-line-cell
+     tables - reset back to normal here, or a long class title has no
+     room to wrap and instead overflows past its card and even past this
+     cell's own border into whichever card sits in the next column. */
+  white-space: normal;
 }
 .class-schedule-room-grid th { background: var(--brand-soft); text-align: left; font-size: 0.85rem; }
 .class-schedule-room-grid .class-schedule-room-col {
@@ -3985,6 +3991,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-card-grid-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
 .schedule-card-grid-name { font-weight: 700; color: var(--brand-dark); text-decoration: none; }
 .schedule-card-grid-name:hover { text-decoration: underline; }
+.archive-select-checkbox { width: 1rem; height: 1rem; accent-color: var(--brand); }
 
 .schedule-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1rem; }
 .btn-disabled { pointer-events: none; opacity: 0.45; }

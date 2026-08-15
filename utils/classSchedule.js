@@ -85,19 +85,28 @@ async function nextPaletteColor() {
 // A class spanning two (or more) consecutive hour blocks is represented
 // as one separate `classes` row per block - roomGridForDay only visually
 // merges same-room adjacent rows into one colspan cell when they also
-// share the same class_name AND color (see its own comment). Creating
-// each block through the picker naturally reuses whatever color the
-// admin already has selected, but the Class Schedule Import (one file
+// share the same class_name, color, AND grade (see its own comment).
+// Creating each block through the picker naturally reuses whatever color
+// the admin already has selected, but the Class Schedule Import (one file
 // row per block, colorless) would otherwise give each block its own
 // independently-cycled nextPaletteColor() and the blocks would never
-// visually merge. This looks up whichever color a same-day/room/name
-// class already has (from earlier in this same import, or an earlier
-// one) and reuses it, only calling nextPaletteColor() the first time a
-// name is seen.
-async function colorForClassName(day, room, className) {
+// visually merge. This looks up whichever color a same-day/room/name/
+// grade class already has (from earlier in this same import, or an
+// earlier one) and reuses it, only calling nextPaletteColor() the first
+// time that combination is seen. Grade is part of the match for the same
+// reason it's part of roomGridForDay's own merge condition - a recurring
+// class name split across grade bands (e.g. "Forest Wildlings" for K-2 at
+// 10am and again for 3-5 at 10:45, same room) is two unrelated classes
+// that happen to share a name and land in adjacent slots, not one
+// continuing class, and must not end up visually identical either.
+async function colorForClassName(day, room, className, ageGroup) {
   const existing = await db
-    .prepare("SELECT color FROM classes WHERE day = ? AND LOWER(COALESCE(room, '')) = LOWER(?) AND LOWER(class_name) = LOWER(?) LIMIT 1")
-    .get(day, room || '', className);
+    .prepare(
+      `SELECT color FROM classes
+       WHERE day = ? AND LOWER(COALESCE(room, '')) = LOWER(?) AND LOWER(class_name) = LOWER(?) AND COALESCE(age_group, '') = COALESCE(?, '')
+       LIMIT 1`
+    )
+    .get(day, room || '', className, ageGroup || null);
   return existing ? existing.color : nextPaletteColor();
 }
 
@@ -222,12 +231,22 @@ async function roomGridForDay(day) {
     while (h <= HOUR_POSITIONS.length) {
       const here = byHour[h];
       const next = byHour[h + 1];
+      // age_group (grade) is part of this match, not just name/color - a
+      // real bug report: a recurring class name split across grade bands
+      // (e.g. "Forest Wildlings" for K-2 at 10am and again for 3-5 at
+      // 10:45, same room) is two unrelated classes that happen to share a
+      // name and land in adjacent slots, not one class continuing for two
+      // hours - merging them into one spanned cell silently dropped the
+      // second one's own grade/teacher/roster from the grid entirely
+      // (only `here[0]` is kept below), which read as that row having
+      // been "ignored" by import even though it was created correctly.
       if (
         here.length === 1 &&
         next &&
         next.length === 1 &&
         next[0].class_name.toLowerCase() === here[0].class_name.toLowerCase() &&
-        next[0].color === here[0].color
+        next[0].color === here[0].color &&
+        (next[0].age_group || '') === (here[0].age_group || '')
       ) {
         cells.push({ span: 2, classes: [here[0]] });
         h += 2;

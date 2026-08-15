@@ -320,6 +320,30 @@ create table if not exists class_schedule_archives (
 );
 create index if not exists idx_class_schedule_archives_day on class_schedule_archives(day, archived_at);
 
+-- One row per archived member schedule - the Student/Parent Schedules
+-- tab's own equivalent of class_schedule_archives above. Archiving a
+-- member's schedule card unenrolls them from every class they're
+-- currently enrolled in (student) or staffing (parent) - same "flatten to
+-- plain text, drop the FK-linked detail" reasoning as that table, since a
+-- class_enrollments/class_staff row has no business surviving the
+-- unenroll. member_id is kept (unlike class_schedule_archives, which has
+-- no equivalent live row to point back to) so the archive can still be
+-- traced to the member if they're re-enrolled later, but ON DELETE SET
+-- NULL rather than CASCADE - member_name/member_type are captured too so
+-- the archive record itself stays meaningful even if the member is later
+-- deleted outright. Populated by archiveMemberSchedules
+-- (utils/schedule.js).
+create table if not exists member_schedule_archives (
+  id integer generated always as identity primary key,
+  member_id integer references members(id) on delete set null,
+  member_name text not null,
+  member_type text not null check (member_type in ('student','parent')),
+  monday_schedule text,
+  wednesday_schedule text,
+  archived_at text not null default now_text()
+);
+create index if not exists idx_member_schedule_archives_type on member_schedule_archives(member_type, archived_at);
+
 create table if not exists app_settings (
   key text primary key,
   value text not null

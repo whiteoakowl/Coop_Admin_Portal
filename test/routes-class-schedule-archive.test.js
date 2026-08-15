@@ -126,7 +126,6 @@ test('Class Archive tab (/admin/schedule?tab=archive)', async (t) => {
   await t.test('lists archived classes with Export and Delete controls', async () => {
     const res = await request(app).get('/admin/schedule?tab=archive').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /Class Archive/);
     assert.match(res.text, /Archive Test Class/);
     assert.match(res.text, /\/admin\/class-schedule\/archive\/export\.csv/);
     assert.match(res.text, /\/admin\/class-schedule\/archive\/delete-all/);
@@ -183,7 +182,7 @@ test('Class Archive tab (/admin/schedule?tab=archive)', async (t) => {
 // The day grid used to show a permanent "Select All"/"Archive Selected"
 // pair plus a checkbox on every class card at all times - now it's a
 // single "Archive" toggle button; clicking it (client-side, in
-// public/js/class-schedule-archive-select.js) reveals the checkboxes and
+// public/js/archive-select-toggle.js) reveals the checkboxes and
 // the Select All/Archive Selected row (which sits under "Highlight
 // Absences For", not in the main button row). The checkboxes/controls
 // still render in the HTML either way (so the toggle has something to
@@ -202,7 +201,7 @@ test('the day grid offers a single Archive toggle, with per-class checkboxes and
     assert.match(res.text, /id="class-schedule-archive-controls-monday"[^>]*hidden/, 'the Select All/Archive Selected row should start hidden');
     assert.match(res.text, /data-select-all-for="class-archive-form-monday"/);
     assert.match(res.text, new RegExp(`name="classIds" value="${classId}" form="class-archive-form-monday"[^>]*hidden`), 'each class checkbox should start hidden');
-    assert.match(res.text, /data-archive-toggle="monday"/, 'a single Archive toggle button should be present');
+    assert.match(res.text, /data-archive-toggle="class-archive-form-monday"/, 'a single Archive toggle button should be present');
     assert.doesNotMatch(res.text, /Delete All/);
     assert.doesNotMatch(res.text, /\/delete-all"[^>]*class="inline-block-form"/);
   });

@@ -1,6 +1,7 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS } = require('./days');
 const { familyOf } = require('./members');
+const { syncClassRosterMembers, syncDayMemberRosters } = require('./classSchedule');
 
 const CLASS_NUMBERS = [1, 2, 3, 4];
 
@@ -152,6 +153,74 @@ async function scheduleList(filters) {
   return rows;
 }
 
+// One line per day summarizing a member's current schedule, for the
+// snapshot archiveMemberSchedules saves before clearing it - not meant to
+// be parsed back, just a readable historical record (same spirit as
+// class_schedule_archives flattening teachers/assistants to plain text).
+function summarizeScheduleDay(rows) {
+  const text = rows
+    .filter((r) => !rowIsBlank(r))
+    .map((r) => [r.time, r.class_name, r.room].filter(Boolean).join(' - '))
+    .join('; ');
+  return text || null;
+}
+
+// Archives the given members' current schedules (one row per member in
+// member_schedule_archives, see its own migration comment) and unenrolls
+// each one from every class they're currently on - as a student,
+// class_enrollments; as a parent, class_staff. This is the Student/Parent
+// Schedules tab's own equivalent of archiveClasses (utils/classSchedule.js):
+// clearing everyone's schedule before importing a new term's file, without
+// losing the record of what they were on. Days actually touched are
+// resynced once each at the end (not once per member/class) for the same
+// reason the Class Schedule Import batches it - see addStaff's own comment
+// on skipSync. Returns how many members were archived.
+async function archiveMemberSchedules(memberIds) {
+  let archived = 0;
+  const touchedDays = new Set();
+  for (const memberId of memberIds) {
+    const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
+    if (!member) continue;
+    const { monday, wednesday } = await getMemberSchedule(memberId);
+
+    await db
+      .prepare(
+        `INSERT INTO member_schedule_archives (member_id, member_name, member_type, monday_schedule, wednesday_schedule)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(member.id, member.name, member.member_type, summarizeScheduleDay(monday), summarizeScheduleDay(wednesday));
+
+    if (monday.some((r) => !rowIsBlank(r))) touchedDays.add('monday');
+    if (wednesday.some((r) => !rowIsBlank(r))) touchedDays.add('wednesday');
+
+    if (member.member_type === 'student') {
+      const classIds = (await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(memberId)).map((r) => r.class_id);
+      await db.prepare('DELETE FROM class_enrollments WHERE student_id = ?').run(memberId);
+      for (const classId of classIds) await syncClassRosterMembers(classId);
+    } else {
+      await db.prepare('DELETE FROM class_staff WHERE member_id = ?').run(memberId);
+    }
+    archived++;
+  }
+  for (const day of touchedDays) await syncDayMemberRosters(day);
+  return archived;
+}
+
+async function listMemberScheduleArchives(memberType) {
+  return db
+    .prepare('SELECT * FROM member_schedule_archives WHERE member_type = ? ORDER BY archived_at DESC, id DESC')
+    .all(memberType);
+}
+
+async function deleteMemberScheduleArchive(id) {
+  await db.prepare('DELETE FROM member_schedule_archives WHERE id = ?').run(id);
+}
+
+async function deleteAllMemberScheduleArchives(memberType) {
+  const result = await db.prepare('DELETE FROM member_schedule_archives WHERE member_type = ?').run(memberType);
+  return result.changes;
+}
+
 module.exports = {
   DAYS,
   CLASS_NUMBERS,
@@ -164,4 +233,8 @@ module.exports = {
   arrivalDepartureLabels,
   parseClockMinutes,
   splitTimeRange,
+  archiveMemberSchedules,
+  listMemberScheduleArchives,
+  deleteMemberScheduleArchive,
+  deleteAllMemberScheduleArchives,
 };

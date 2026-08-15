@@ -13,6 +13,10 @@ const {
   DAY_LABELS,
   getMemberSchedule,
   scheduleList,
+  archiveMemberSchedules,
+  listMemberScheduleArchives,
+  deleteMemberScheduleArchive,
+  deleteAllMemberScheduleArchives,
 } = require('../utils/schedule');
 const { byLastName } = require('../utils/members');
 const {
@@ -54,6 +58,7 @@ const uploadDesignImage = multer({
 });
 
 const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents', 'archive'];
+const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const PAGE_SIZE = 25;
 
 router.get('/schedule', requireAdmin, async (req, res) => {
@@ -86,17 +91,21 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     });
   }
 
-  // Class Archive: classes archived (rather than deleted outright) from
-  // either day's grid via the "Archive Selected" flow - see archiveClasses
-  // in utils/classSchedule.js for why teacher/assistant names and
-  // enrollment are flattened to plain text/count here rather than kept as
-  // live FK references.
+  // Archive: a pill toggle (Class/Student/Parent) switches between classes
+  // archived from either day's grid (see archiveClasses in
+  // utils/classSchedule.js) and members archived from the Student/Parent
+  // Schedules tabs (see archiveMemberSchedules in utils/schedule.js) - two
+  // different tables, same "flatten to plain text, drop the FK-linked
+  // detail" archive philosophy either way.
   if (tab === 'archive') {
+    const archiveType = ARCHIVE_TYPES.includes(req.query.type) ? req.query.type : 'class';
+    const archives = archiveType === 'class' ? await listClassArchives() : await listMemberScheduleArchives(archiveType);
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
       topTab: 'archive',
-      archives: await listClassArchives(),
+      archiveType,
+      archives,
       dayLabels: CLASS_DAY_LABELS,
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -330,6 +339,45 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
     `${redirectBase}&notice=` +
       encodeURIComponent(`Matched ${matched} schedule row(s)` + (skipped ? `, ${skipped} skipped (no matching class or member).` : '.'))
   );
+});
+
+// Archives the checked schedule cards (checkboxes on the Student/Parent
+// Schedules grid, or its "Select All") - unenrolls each member from every
+// class they're currently on, saving a snapshot of what they were on
+// first. See archiveMemberSchedules' own comment in utils/schedule.js.
+router.post('/schedule/:tab/archive', requireFullAdmin, async (req, res) => {
+  const tab = req.params.tab;
+  const memberType = SCHEDULE_IMPORT_TABS[tab];
+  if (!memberType) return res.status(404).send('Not found');
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect(`/admin/schedule?tab=${tab}&error=` + encodeURIComponent('Select at least one member to archive.'));
+  }
+  const count = await archiveMemberSchedules(memberIds);
+  res.redirect(`/admin/schedule?tab=${tab}&notice=` + encodeURIComponent(`Archived ${count} member schedule(s) - see the Archive tab.`));
+});
+
+router.get('/schedule/archive/:type/export.csv', requireFullAdmin, async (req, res) => {
+  const type = req.params.type;
+  if (!['student', 'parent'].includes(type)) return res.status(404).send('Not found');
+  const archives = await listMemberScheduleArchives(type);
+  const lines = [
+    toCsvRow(['Name', 'Monday Schedule', 'Wednesday Schedule', 'Archived At']),
+    ...archives.map((a) => toCsvRow([a.member_name, a.monday_schedule || '', a.wednesday_schedule || '', a.archived_at])),
+  ];
+  sendCsv(res, `${type}-schedule-archive.csv`, lines);
+});
+
+router.post('/schedule/archive/:id/delete', requireFullAdmin, async (req, res) => {
+  await deleteMemberScheduleArchive(parseInt(req.params.id, 10));
+  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent('Deleted from archive.'));
+});
+
+router.post('/schedule/archive/:type/delete-all', requireFullAdmin, async (req, res) => {
+  const type = req.params.type;
+  if (!['student', 'parent'].includes(type)) return res.status(404).send('Not found');
+  const count = await deleteAllMemberScheduleArchives(type);
+  res.redirect(`/admin/schedule?tab=archive&type=${type}&notice=` + encodeURIComponent(`Deleted all ${count} archived ${type} schedule(s).`));
 });
 
 router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
