@@ -1,12 +1,19 @@
-// Real HTTP-level coverage locking in existing (and easy to accidentally
-// regress) behavior: importing a Student Schedule row (Schedules ->
-// Student Schedules -> Import, routes/admin-schedule.js's
-// POST /admin/schedule/:tab/import) doesn't just record the enrollment -
-// it has to actually land the student on that specific class's roster
-// (roster_members, via utils/classSchedule.js's setEnrollment ->
-// syncClassRosterMembers) AND on the day's own Student roster the main
-// dashboard/attendance page reads from (syncDayMemberRosters), or "import
-// a schedule" wouldn't actually get anyone checked in on class day.
+// Real HTTP-level coverage for the Student/Parent Schedule Import
+// (routes/admin-schedule.js's GET /schedule/:tab/import-template.xlsx +
+// POST /schedule/:tab/import): one row = one whole member's week, with up
+// to 8 numbered class slots (Class Start Time N / Class Title N / Class
+// Location N / Class Days N), each slot carrying its own Day value rather
+// than the day being implied by slot position - this shape mirrors a real
+// external registration-system export directly, so that kind of file can
+// be uploaded with no reformatting. Plus an optional Allergy column.
+// Locks in existing (and easy to accidentally regress) enrollment
+// behavior too: importing a Student Schedule row doesn't just record the
+// enrollment - it has to actually land the student on that specific
+// class's roster (roster_members, via utils/classSchedule.js's
+// setEnrollment -> syncClassRosterMembers) AND on the day's own Student
+// roster the main dashboard/attendance page reads from
+// (syncDayMemberRosters), or "import a schedule" wouldn't actually get
+// anyone checked in on class day.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -49,27 +56,64 @@ function buildImportBuffer(headers, rows) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('importing a Student Schedule row enrolls the student on the class roster and the day roster', async (t) => {
+const SLOT_COUNT = 8;
+const SCHEDULE_HEADERS = ['Member First Name', 'Member Last Name', 'Allergy'];
+for (let i = 1; i <= SLOT_COUNT; i++) {
+  SCHEDULE_HEADERS.push(`Class Start Time ${i}`, `Class Title ${i}`, `Class Location ${i}`, `Class Days ${i}`);
+}
+
+// slots: array of { position, startTime, className, room, days } - every
+// other one of the up to 8 numbered slot columns is left blank.
+function buildScheduleRow({ firstName, lastName, allergy = '', slots = [] }) {
+  const row = [firstName, lastName, allergy];
+  for (let i = 1; i <= SLOT_COUNT; i++) {
+    const slot = slots.find((s) => s.position === i);
+    row.push(slot ? slot.startTime : '', slot ? slot.className : '', slot ? slot.room : '', slot ? slot.days : '');
+  }
+  return row;
+}
+
+test('GET /admin/schedule/students/import-template.xlsx has Member First/Last Name, Allergy, and 8 numbered Class Start Time/Title/Location/Days slots', async () => {
+  const { cookie } = await loginAsAdmin();
+  const res = await request(app)
+    .get('/admin/schedule/students/import-template.xlsx')
+    .set('Cookie', cookie)
+    .buffer(true)
+    .parse((response, callback) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => callback(null, Buffer.concat(chunks)));
+    });
+  assert.equal(res.status, 200);
+  const wb = XLSX.read(res.body, { type: 'buffer' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+  assert.deepEqual(rows[0], SCHEDULE_HEADERS);
+});
+
+test('POST /admin/schedule/students/import', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Roster Test Kid', memberType: 'student', _csrf: csrfToken });
-
   const classBuffer = buildImportBuffer(
-    ['Day', 'Hour', 'Class Name', 'Room', 'Age Group'],
-    [['Monday', '1', 'Import Roster Class', 'Room 1', 'All Ages']]
+    ['Day', 'Hour', 'Class Name', 'Room', 'Grade'],
+    [
+      ['Monday', '1', 'Import Roster Class', 'Room 1', ''],
+      ['Wednesday', '2', 'Second Class', 'Room 2', ''],
+    ]
   );
   await request(app)
     .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
     .set('Cookie', cookie)
     .attach('file', classBuffer, 'classes.xlsx');
   const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Import Roster Class'").get();
-  assert.ok(cls, 'setup: the class should exist before importing a schedule row for it');
+  const cls2 = await db.prepare("SELECT * FROM classes WHERE class_name = 'Second Class'").get();
+  assert.ok(cls && cls2, 'setup: both classes should exist before importing a schedule row for them');
 
-  await t.test('the schedule import puts the student on both the class roster and the day-level Student roster', async () => {
-    const scheduleBuffer = buildImportBuffer(
-      ['Member First Name', 'Member Last Name', 'Day', 'Class Name', 'Start Time'],
-      [['Roster Test', 'Kid', 'Monday', 'Import Roster Class', '']]
-    );
+  await t.test('a row with one filled slot (Class Days "Mon") puts the student on both the class roster and the day-level Student roster', async () => {
+    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Roster Test Kid', memberType: 'student', _csrf: csrfToken });
+
+    const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
+      buildScheduleRow({ firstName: 'Roster Test', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Mon' }] }),
+    ]);
     const res = await request(app)
       .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
@@ -94,5 +138,74 @@ test('importing a Student Schedule row enrolls the student on the class roster a
       .prepare('SELECT 1 FROM roster_members WHERE roster_id = ? AND member_id = ?')
       .get(mondayStudentRosterId.value, student.id);
     assert.ok(onDayRoster, 'the student should also be on Monday\'s day-level Student roster after import, not just the class roster');
+  });
+
+  await t.test('a row with slots on both "Mon" and "Wed" enrolls the member in both classes in one pass, regardless of slot number', async () => {
+    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Two Day Kid', memberType: 'student', _csrf: csrfToken });
+
+    const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
+      buildScheduleRow({
+        firstName: 'Two Day',
+        lastName: 'Kid',
+        // Deliberately out of "day order" (Wednesday class in slot 1,
+        // Monday class in slot 2) - a real export's slot numbers don't
+        // correspond to which day a class falls on.
+        slots: [
+          { position: 1, startTime: '', className: 'Second Class', room: '', days: 'Wed' },
+          { position: 2, startTime: '', className: 'Import Roster Class', room: '', days: 'Mon' },
+        ],
+      }),
+    ]);
+    const res = await request(app)
+      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', scheduleBuffer, 'schedule-two-day.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Matched 2 schedule row'));
+
+    const student = await db.prepare("SELECT id FROM members WHERE name = 'Two Day Kid'").get();
+    const onFirst = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(cls.id, student.id);
+    const onSecond = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(cls2.id, student.id);
+    assert.ok(onFirst, 'should be enrolled in the Monday class even though it was in slot 2');
+    assert.ok(onSecond, 'should also be enrolled in the Wednesday class even though it was in slot 1');
+  });
+
+  await t.test('a Class Days value this app has no day for (e.g. "Thursday") is skipped, not fatal to the row', async () => {
+    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Thursday Kid', memberType: 'student', _csrf: csrfToken });
+
+    const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
+      buildScheduleRow({ firstName: 'Thursday', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Thursday' }] }),
+    ]);
+    const res = await request(app)
+      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', scheduleBuffer, 'schedule-thursday.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('1 skipped'), 'a day this app has no class model for should be skipped, not throw');
+
+    const student = await db.prepare("SELECT id FROM members WHERE name = 'Thursday Kid'").get();
+    const enrolled = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(cls.id, student.id);
+    assert.equal(enrolled, undefined, 'should not have been enrolled anywhere');
+  });
+
+  await t.test('the Allergy column fills in a blank medical_notes but never overwrites an existing one', async () => {
+    await db.prepare("INSERT INTO members (name, barcode, member_type, medical_notes) VALUES ('Existing Allergy Kid', 'existing-allergy-kid', 'student', 'Already has peanut allergy on file')").run();
+    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Blank Allergy Kid 2', memberType: 'student', _csrf: csrfToken });
+
+    const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
+      buildScheduleRow({ firstName: 'Blank Allergy Kid', lastName: '2', allergy: 'Tree nut allergy', slots: [] }),
+      buildScheduleRow({ firstName: 'Existing Allergy', lastName: 'Kid', allergy: 'Should not overwrite', slots: [] }),
+    ]);
+    const res = await request(app)
+      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', scheduleBuffer, 'schedule-allergy.xlsx');
+    assert.equal(res.status, 302);
+
+    const blank = await db.prepare("SELECT medical_notes FROM members WHERE name = 'Blank Allergy Kid 2'").get();
+    assert.equal(blank.medical_notes, 'Tree nut allergy');
+
+    const existing = await db.prepare("SELECT medical_notes FROM members WHERE name = 'Existing Allergy Kid'").get();
+    assert.equal(existing.medical_notes, 'Already has peanut allergy on file', 'an already-set medical_notes value must never be overwritten by the import');
   });
 });

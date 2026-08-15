@@ -263,9 +263,10 @@ async function teacherMemberIds() {
 // familyOf() lookup. Shared by the Members page and any other member list
 // that wants that same photo/type/family/rosters shape (e.g. the Design/
 // Print hub's bulk print picker lists).
-async function membersWithDetails(typeFilter) {
+async function membersWithDetails(typeFilter, familyId) {
   const allMembers = await db.prepare('SELECT m.*, f.name AS family_name FROM members m LEFT JOIN families f ON f.id = m.family_id').all();
-  const members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
+  let members = typeFilter ? allMembers.filter((m) => m.member_type === typeFilter) : allMembers;
+  if (familyId) members = members.filter((m) => m.family_id === familyId);
   const sorted = sortMembersByFamily(members);
   const rostersById = await rostersByMemberIds(sorted.map((m) => m.id));
   const teacherIds = await teacherMemberIds();

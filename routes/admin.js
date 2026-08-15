@@ -165,12 +165,14 @@ router.get('/', requireAdmin, async (req, res) => {
   const memberCount = (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get()).c;
   const studentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c;
   const parentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c;
+  const familyCount = (await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c;
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     memberCount,
     studentCount,
     parentCount,
+    familyCount,
     studentStats: await statsWithTrends('student', today, previousDate),
     parentStats: await statsWithTrends('parent', today, previousDate),
     alerts: await todaysAlerts(),

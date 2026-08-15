@@ -127,7 +127,6 @@
     <dialog id="floater-import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/volunteers/<%= day %>/import" enctype="multipart/form-data">
         <h3>Import</h3>
-        <p class="hint">Adds active parents to <%= dayLabel %>'s first floater hour by name - matched to an existing Members-page profile, never creates one.</p>
         <a class="btn-secondary import-sample-link" href="/admin/import-template/names.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
         <div class="notes-dialog-actions">

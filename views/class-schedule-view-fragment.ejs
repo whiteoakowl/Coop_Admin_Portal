@@ -168,7 +168,6 @@
 <dialog id="roster-import-dialog-<%= cls.id %>" class="member-picker-dialog">
   <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/roster/import" enctype="multipart/form-data">
     <h3>Import Students &mdash; <%= cls.class_name %></h3>
-    <p class="hint">Adds active students to this class's roster by name.</p>
     <a class="btn-secondary import-sample-link" href="/admin/class-schedule/classes/<%= cls.id %>/roster/import-template.xlsx">Download Sample File</a>
     <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
     <div class="notes-dialog-actions">

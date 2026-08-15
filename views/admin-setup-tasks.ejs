@@ -157,7 +157,6 @@
     <dialog id="task-import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/setup/<%= day %>/tasks/import" enctype="multipart/form-data">
         <h3>Import Tasks</h3>
-        <p class="hint">Upload a .csv, .txt, or .xlsx file with List/Task columns. A list that doesn't exist yet is created automatically.</p>
         <a class="btn-secondary import-sample-link" href="/admin/setup/<%= day %>/tasks/import-template.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
         <div class="notes-dialog-actions">

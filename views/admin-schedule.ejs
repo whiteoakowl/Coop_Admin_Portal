@@ -69,7 +69,6 @@
         <dialog id="schedule-import-dialog" class="member-picker-dialog">
           <form method="POST" action="/admin/schedule/<%= tab %>/import" enctype="multipart/form-data">
             <h3>Import <%= tab === 'parents' ? 'Parent' : 'Student' %> Schedules</h3>
-            <p class="hint">Matches each row to an existing class by day, class name, and start time, then adds that person to its roster <%= tab === 'parents' ? 'as teacher' : 'as a student' %>. Doesn't create classes - set those up on the Class Schedule first.</p>
             <a class="btn-secondary import-sample-link" href="/admin/schedule/<%= tab %>/import-template.xlsx">Download Sample File</a>
             <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
             <div class="notes-dialog-actions">

@@ -17,7 +17,6 @@ const {
 const { byLastName } = require('../utils/members');
 const {
   DAY_LABELS: CLASS_DAY_LABELS,
-  isValidDay,
   hoursForDay,
   roomGridForDay,
   roomsForDay,
@@ -135,56 +134,127 @@ router.get('/schedule', requireAdmin, async (req, res) => {
 
 // --- Student/Parent Schedules: bulk import ---
 //
-// Matches each row to an existing class by day + class name + start time
-// (the class has to already exist on the Class Schedule - this only ever
-// enrolls/staffs someone onto one, it never creates classes) and adds the
-// member to that class's roster: a student row enrolls them as a
-// student, a parent row adds them as that class's teacher. No Teacher or
-// End Time columns - a schedule row is just "this person, this class,
-// starting at this time".
+// One row = one whole member's week, up to SCHEDULE_SLOT_COUNT (8)
+// classes - unlike the per-class roster import (one row = one student), a
+// member can be in several classes across the week, so each row has its
+// own numbered Class 1-8 slots (Start Time/Title/Location/Days), the same
+// numbered-slot shape Mass Import Families uses for up to 8 kids. This
+// mirrors the shape of a real external registration-system export
+// (Class Start Time N / Class Title N / Class Location N / Class Days N,
+// repeated per class) rather than inventing our own layout, so that kind
+// of file can be uploaded here with no reformatting - each slot carries
+// its own Day value instead of the day being implied by which numbered
+// slot it's in, since a real export freely mixes which slot number lands
+// on which day. Each filled-in slot is matched to an existing class by
+// day + class name + start time/location (the class has to already exist
+// on the Class Schedule - this only ever enrolls/staffs someone onto one,
+// it never creates classes): a student row enrolls them as a student, a
+// parent row adds them as that class's teacher. A slot whose Class Days
+// value isn't Monday/Wednesday (this app has no other class day) can
+// never match anything and is just skipped, same as any other unmatched
+// slot. An optional Allergy column fills in the member's medical/allergy
+// notes if they don't already have any on file - never overwrites an
+// existing value, same non-destructive-merge convention the full-profile
+// Members Import uses.
 const SCHEDULE_IMPORT_TABS = { students: 'student', parents: 'parent' };
+const SCHEDULE_SLOT_COUNT = 8;
 
 function normalizeMatchText(value) {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+// Start Time and Location are both optional disambiguators for when more
+// than one class shares a day + Class Title - a row is only rejected
+// against a candidate when BOTH sides actually have a value and they
+// disagree; either side being blank means there's nothing to compare, so
+// it's not treated as a mismatch.
+function scheduleFieldMismatch(candidateValue, rowValue) {
+  if (!rowValue || !candidateValue) return false;
+  return normalizeMatchText(candidateValue) !== normalizeMatchText(rowValue);
+}
+
+// "Mon"/"Monday"/"Wed"/"Wednesday", case-insensitive - anything else
+// (including a day this app's Class Schedule doesn't have, e.g.
+// "Thursday") resolves to null, which can never match a class's own
+// day column, so that slot is just skipped like any other no-match.
+function parseScheduleDayValue(value) {
+  const v = normalizeMatchText(value);
+  if (v.startsWith('mon')) return 'monday';
+  if (v.startsWith('wed')) return 'wednesday';
+  return null;
+}
+
+function scheduleImportHeaders() {
+  const headers = ['Member First Name', 'Member Last Name', 'Allergy'];
+  for (let i = 1; i <= SCHEDULE_SLOT_COUNT; i++) {
+    headers.push(`Class Start Time ${i}`, `Class Title ${i}`, `Class Location ${i}`, `Class Days ${i}`);
+  }
+  return headers;
+}
+
+// base: [firstName, lastName, allergy]. filledSlots: an array of
+// { position, startTime, className, room, days } for however many of
+// this row's up to 8 slots are actually filled in - every other slot's 4
+// columns are left blank.
+function scheduleExampleRow(base, filledSlots) {
+  const row = [...base];
+  for (let i = 1; i <= SCHEDULE_SLOT_COUNT; i++) {
+    const slot = filledSlots.find((s) => s.position === i);
+    row.push(slot ? slot.startTime : '', slot ? slot.className : '', slot ? slot.room : '', slot ? slot.days : '');
+  }
+  return row;
+}
+
 router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) => {
   const tab = req.params.tab;
   if (!SCHEDULE_IMPORT_TABS[tab]) return res.status(404).send('Not found');
-  const buffer = buildTemplateWorkbook(
-    ['Member First Name', 'Member Last Name', 'Day', 'Class Name', 'Start Time'],
-    [
-      ['Jane', 'Smith', 'Monday', 'Art Adventures', '9:00 AM'],
-      ['John', 'Smith', 'Wednesday', 'PE', '10:00 AM'],
-    ]
-  );
+
+  const exampleRow1 = scheduleExampleRow(['Jane', 'Smith', ''], [
+    { position: 1, startTime: '9:00 AM', className: 'Art Adventures', room: 'Room 3', days: 'Mon' },
+  ]);
+  const exampleRow2 = scheduleExampleRow(['John', 'Smith', 'Peanut allergy'], [
+    { position: 1, startTime: '9:00 AM', className: 'Art Adventures', room: 'Room 3', days: 'Mon' },
+    { position: 2, startTime: '10:00 AM', className: 'PE', room: 'Gym', days: 'Wed' },
+  ]);
+
+  const buffer = buildTemplateWorkbook(scheduleImportHeaders(), [exampleRow1, exampleRow2]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${tab}-schedule-import-template.xlsx"`);
   res.send(buffer);
 });
 
-const SCHEDULE_IMPORT_ALIASES = {
-  firstName: ['member first name', 'first name'],
-  lastName: ['member last name', 'last name'],
-  day: ['day'],
-  className: ['class name', 'class', 'subject'],
-  startTime: ['start time', 'time'],
-};
-
 function normalizeScheduleImportRow(row) {
   const lowerMap = {};
   for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
-  const out = {};
-  for (const [field, aliases] of Object.entries(SCHEDULE_IMPORT_ALIASES)) {
-    for (const alias of aliases) {
-      if (lowerMap[alias] !== undefined && String(lowerMap[alias]).trim() !== '') {
-        out[field] = String(lowerMap[alias]).trim();
-        break;
-      }
+  const get = (label) => {
+    const v = lowerMap[label.toLowerCase()];
+    return v === undefined || v === null ? '' : String(v).trim();
+  };
+  const getFirst = (labels) => {
+    for (const label of labels) {
+      const v = get(label);
+      if (v) return v;
     }
+    return '';
+  };
+
+  const firstName = getFirst(['Member First Name', 'Student First Name', 'Student First', 'First Name']);
+  const lastName = getFirst(['Member Last Name', 'Student Last Name', 'Student Last', 'Last Name']);
+  const allergy = getFirst(['Allergy', 'Allergies', 'Medical/Allergy Notes', 'Medical Notes', 'Medical Note']);
+
+  const slots = [];
+  for (let i = 1; i <= SCHEDULE_SLOT_COUNT; i++) {
+    const className = getFirst([`Class Title ${i}`, `Class Name ${i}`]);
+    if (!className) continue;
+    slots.push({
+      className,
+      day: parseScheduleDayValue(get(`Class Days ${i}`)),
+      startTime: get(`Class Start Time ${i}`),
+      room: getFirst([`Class Location ${i}`, `Room ${i}`]),
+    });
   }
-  out.name = [out.firstName, out.lastName].filter(Boolean).join(' ');
-  return out;
+
+  return { name: [firstName, lastName].filter(Boolean).join(' '), allergy, slots };
 }
 
 router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.single('file'), async (req, res) => {
@@ -199,7 +269,7 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
 
   let rows;
   try {
-    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeScheduleImportRow).filter((r) => r.name && r.day && r.className);
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeScheduleImportRow).filter((r) => r.name);
   } catch (err) {
     return res.redirect(`${redirectBase}&error=` + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
@@ -208,30 +278,33 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
   let skipped = 0;
 
   for (const r of rows) {
-    const day = r.day.toLowerCase();
-    if (!isValidDay(day)) { skipped++; continue; }
-
     const member = await db
-      .prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND member_type = ? AND active = 1')
+      .prepare('SELECT id, medical_notes FROM members WHERE LOWER(name) = LOWER(?) AND member_type = ? AND active = 1')
       .get(r.name, memberType);
-    if (!member) { skipped++; continue; }
+    if (!member) { skipped += r.slots.length || 1; continue; }
 
-    const candidates = await db.prepare('SELECT * FROM classes WHERE day = ? AND LOWER(class_name) = LOWER(?)').all(day, r.className);
-    let cls = candidates[0];
-    if (candidates.length > 1) {
-      cls = candidates.find((c) => normalizeMatchText(c.start_time) === normalizeMatchText(r.startTime)) || null;
-    } else if (candidates.length === 1 && r.startTime && candidates[0].start_time) {
-      cls = normalizeMatchText(candidates[0].start_time) === normalizeMatchText(r.startTime) ? candidates[0] : null;
+    if (r.allergy && !member.medical_notes) {
+      await db.prepare('UPDATE members SET medical_notes = ? WHERE id = ?').run(r.allergy, member.id);
     }
-    if (!cls) { skipped++; continue; }
 
-    if (memberType === 'student') {
-      const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
-      if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id]);
-    } else {
-      await addStaff(cls.id, member.id, 'teacher');
+    for (const slot of r.slots) {
+      const candidates = await db.prepare('SELECT * FROM classes WHERE day = ? AND LOWER(class_name) = LOWER(?)').all(slot.day, slot.className);
+      let cls = candidates[0];
+      if (candidates.length > 1) {
+        cls = candidates.find((c) => !scheduleFieldMismatch(c.start_time, slot.startTime) && !scheduleFieldMismatch(c.room, slot.room)) || null;
+      } else if (candidates.length === 1) {
+        cls = scheduleFieldMismatch(candidates[0].start_time, slot.startTime) || scheduleFieldMismatch(candidates[0].room, slot.room) ? null : candidates[0];
+      }
+      if (!cls) { skipped++; continue; }
+
+      if (memberType === 'student') {
+        const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
+        if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id]);
+      } else {
+        await addStaff(cls.id, member.id, 'teacher');
+      }
+      matched++;
     }
-    matched++;
   }
 
   res.redirect(

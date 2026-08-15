@@ -1,13 +1,13 @@
-// Real HTTP-level coverage for a feature this session: the "Import
-// Classes" spreadsheet import (routes/admin-class-schedule.js's own
-// /class-schedule/import-template.xlsx + /class-schedule/:day/import) now
-// also accepts a Teacher, a 2nd Teacher, and up to 3 Assistants column
-// (each matched against active parents by exact case-insensitive name and
-// staffed onto the newly created class), plus Class Start Time, Class End
-// Time, and Class Description columns that land straight on the new
-// class's own start_time/end_time/notes columns - previously this import
-// only ever created the bare class shell (day/hour/name/room/age group)
-// with no one assigned to it and no time/description set.
+// Real HTTP-level coverage for the "Import Classes" spreadsheet import
+// (routes/admin-class-schedule.js's own /class-schedule/import-template.xlsx
+// + /class-schedule/:day/import): Teacher, a 2nd Teacher, and up to 3
+// Assistants are each a single Name column (matched against active parents
+// by exact case-insensitive name and staffed onto the newly created class -
+// class_staff allows any number of 'teacher'-role rows per class, so a 2nd
+// Teacher is staffed exactly the same way as the first), the old "Age
+// Group" column is now labeled "Grade", and Class Start Time, Class End
+// Time, and Class Description columns land straight on the new class's own
+// start_time/end_time/notes columns.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -44,13 +44,9 @@ async function loginAsAdmin() {
 }
 
 const IMPORT_HEADERS = [
-  'Day', 'Hour', 'Class Name', 'Room', 'Age Group',
+  'Day', 'Hour', 'Class Name', 'Room', 'Grade',
   'Class Start Time', 'Class End Time', 'Class Description',
-  'Teacher First Name', 'Teacher Last Name',
-  '2nd Teacher First Name', '2nd Teacher Last Name',
-  'Assistant 1 First Name', 'Assistant 1 Last Name',
-  'Assistant 2 First Name', 'Assistant 2 Last Name',
-  'Assistant 3 First Name', 'Assistant 3 Last Name',
+  'Teacher', '2nd Teacher', 'Assistant 1', 'Assistant 2', 'Assistant 3',
 ];
 
 function buildImportBuffer(rows) {
@@ -60,7 +56,7 @@ function buildImportBuffer(rows) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('GET /admin/class-schedule/import-template.xlsx includes Start/End Time, Description, Teacher, 2nd Teacher, and 3 Assistant columns', async () => {
+test('GET /admin/class-schedule/import-template.xlsx has Grade (not Age Group), Start/End Time, Description, Teacher, 2nd Teacher, and 3 Assistant columns', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app)
     .get('/admin/class-schedule/import-template.xlsx')
@@ -85,7 +81,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Alex Assistant', memberType: 'parent', _csrf: csrfToken });
 
   await t.test('a row with Teacher + Assistant columns staffs the new class accordingly', async () => {
-    const buffer = buildImportBuffer([['Monday', '1', 'Art Adventures', 'Room 3', 'Ages 5-7', '', '', '', 'Jane', 'Teacher', '', '', 'Alex', 'Assistant', '', '', '', '']]);
+    const buffer = buildImportBuffer([['Monday', '1', 'Art Adventures', 'Room 3', '1st', '', '', '', 'Jane Teacher', '', 'Alex Assistant', '', '']]);
     const res = await request(app)
       .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
@@ -93,8 +89,9 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const cls = await db.prepare("SELECT id FROM classes WHERE class_name = 'Art Adventures'").get();
+    const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Art Adventures'").get();
     assert.ok(cls, 'the class should have been created');
+    assert.equal(cls.age_group, '1st', 'the Grade column still lands on the class\'s own age_group field');
 
     const staff = await db
       .prepare('SELECT m.name, cs.role FROM class_staff cs JOIN members m ON m.id = cs.member_id WHERE cs.class_id = ?')
@@ -109,7 +106,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   await t.test('Class Start/End Time and Description land on the class row, and a 2nd Teacher is staffed alongside the first', async () => {
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Pat Second', memberType: 'parent', _csrf: csrfToken });
     const buffer = buildImportBuffer([
-      ['Monday', '3', 'Music Time', 'Room 5', 'Ages 5-7', '9:00 AM', '9:45 AM', 'Singing and instruments', 'Jane', 'Teacher', 'Pat', 'Second', '', '', '', '', '', ''],
+      ['Monday', '3', 'Music Time', 'Room 5', '2nd', '9:00 AM', '9:45 AM', 'Singing and instruments', 'Jane Teacher', 'Pat Second', '', '', ''],
     ]);
     const res = await request(app)
       .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
@@ -135,7 +132,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Two', memberType: 'parent', _csrf: csrfToken });
     await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Three', memberType: 'parent', _csrf: csrfToken });
     const buffer = buildImportBuffer([
-      ['Monday', '2', 'Science Lab', 'Room 8', 'Ages 8-10', '', '', '', '', '', '', '', 'Alex', 'Assistant', 'Assistant', 'Two', 'Assistant', 'Three'],
+      ['Monday', '2', 'Science Lab', 'Room 8', '', '', '', '', '', '', 'Alex Assistant', 'Assistant Two', 'Assistant Three'],
     ]);
     const res = await request(app)
       .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
@@ -153,7 +150,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   });
 
   await t.test('a Teacher/Assistant name that matches no active parent is skipped, not fatal to the row', async () => {
-    const buffer = buildImportBuffer([['Wednesday', '1', 'PE', 'Gym', 'All Ages', '', '', '', 'Nobody', 'Real', '', '', '', '', '', '', '', '']]);
+    const buffer = buildImportBuffer([['Wednesday', '1', 'PE', 'Gym', '', '', '', '', 'Nobody Real', '', '', '', '']]);
     const res = await request(app)
       .post('/admin/class-schedule/wednesday/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)

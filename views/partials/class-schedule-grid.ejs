@@ -180,7 +180,6 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <dialog id="import-dialog-<%= day %>" class="member-picker-dialog">
   <form method="POST" action="/admin/class-schedule/<%= day %>/import" enctype="multipart/form-data">
     <h3>Import</h3>
-    <p class="hint">Adds new classes for <%= dayLabel %>. Doesn't touch enrollment or staff - add those on each class's Manage page after importing.</p>
     <a class="btn-secondary import-sample-link" href="/admin/class-schedule/import-template.xlsx">Download Sample File</a>
     <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
     <div class="notes-dialog-actions">

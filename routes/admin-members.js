@@ -98,13 +98,14 @@ async function attendanceHistoryForMember(memberId) {
 
 router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const familyFilter = parseInt(req.query.family, 10) || null;
   // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
   // getMemberSchedule()) used to be computed here for every member on
   // every page load - two renderBadgeElements() calls and a DB query
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const withRosters = (await membersWithDetails(typeFilter)).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
+  const withRosters = (await membersWithDetails(typeFilter, familyFilter)).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -115,8 +116,10 @@ router.get('/members', async (req, res) => {
     members: pagination.items,
     allMembersForPrint: withRosters,
     pagination,
-    baseHref: '/admin/members?' + (typeFilter ? `type=${typeFilter}&` : ''),
+    baseHref: '/admin/members?' + (typeFilter ? `type=${typeFilter}&` : '') + (familyFilter ? `family=${familyFilter}&` : ''),
     typeFilter,
+    familyFilter,
+    families: await allFamilies(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -161,7 +164,8 @@ router.get('/members/:id/schedule-fragment', async (req, res) => {
 // subset shown in the on-screen table.
 router.get('/members/export.csv', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
-  const members = await membersWithDetails(typeFilter);
+  const familyFilter = parseInt(req.query.family, 10) || null;
+  const members = await membersWithDetails(typeFilter, familyFilter);
 
   const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
   const lines = [

@@ -37,7 +37,6 @@
 <dialog id="<%= type %>-badge-import-dialog" class="member-picker-dialog">
   <form method="POST" action="/admin/design/badges/<%= type %>/import" enctype="multipart/form-data">
     <h3>Import <%= label %> Badges</h3>
-    <p class="hint">Replaces the current list with the rows in this file - Badge Number, Title, Description.</p>
     <a class="btn-secondary import-sample-link" href="/admin/design/badges/<%= type %>/import-template.xlsx">Download Sample File</a>
     <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
     <div class="notes-dialog-actions">

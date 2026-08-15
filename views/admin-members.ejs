@@ -24,11 +24,18 @@
 
     <div class="roster-toolbar no-print">
       <div class="category-filter" style="margin: 0;">
-        <label for="type-select">Filter by type</label>
-        <select id="type-select" onchange="window.location = '/admin/members' + (this.value ? '?type=' + this.value : '')">
-          <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
-          <option value="parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+        <label for="type-select">Filter by type or family</label>
+        <select id="type-select" onchange="window.location = this.value">
+          <option value="/admin/members" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
+          <option value="/admin/members?type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="/admin/members?type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <% if (families.length > 0) { %>
+            <optgroup label="Family">
+              <% families.forEach(function(f) { %>
+                <option value="/admin/members?family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+              <% }); %>
+            </optgroup>
+          <% } %>
         </select>
       </div>
       <div class="roster-btn-row">
@@ -36,7 +43,7 @@
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('mass-import-dialog').showModal()">Mass Import Families</button>
-        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= typeFilter ? '?type=' + typeFilter : '' %>">Export</a>
+        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
       </div>
     </div>
@@ -58,7 +65,6 @@
     <dialog id="import-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
         <h3>Import</h3>
-        <p class="hint">Upload a .csv, .txt, or .xlsx file with the columns below.</p>
         <a class="btn-secondary import-sample-link" href="/admin/members/import-template.xlsx">Download Sample File</a>
         <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
         <div class="notes-dialog-actions">
