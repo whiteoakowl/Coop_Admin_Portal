@@ -211,6 +211,31 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(earlier.hour_position < later.hour_position, 'the earlier Start Time should land in the lower-numbered slot regardless of row order in the file');
   });
 
+  await t.test('the same class name/room across two adjacent auto-assigned hour blocks gets a matching color, so the room grid merges them into one spanned cell', async () => {
+    const { roomGridForDay } = require('../utils/classSchedule');
+    const buffer = buildImportBuffer([
+      ['Mon', '', 'Long Class', 'Span Room', '', '1:00 PM', '', '', '', '', '', '', ''],
+      ['Mon', '', 'Long Class', 'Span Room', '', '1:45 PM', '', '', '', '', '', '', ''],
+    ]);
+    const res = await request(app)
+      .post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .attach('file', buffer, 'span-color.xlsx');
+    assert.equal(res.status, 302);
+    assert.ok(decodeURIComponent(res.headers.location).includes('Imported 2 class'));
+
+    const rows = await db.prepare("SELECT color, hour_position FROM classes WHERE class_name = 'Long Class' ORDER BY hour_position").all();
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].color, rows[1].color, 'both hour blocks of the same class should share a color');
+    assert.equal(rows[1].hour_position, rows[0].hour_position + 1, 'should land in adjacent hour slots');
+
+    const grid = await roomGridForDay('monday');
+    const spanRow = grid.rows.find((r) => r.room === 'Span Room');
+    assert.ok(spanRow, 'expected a Span Room row in the grid');
+    const spannedCell = spanRow.cells.find((c) => c.span === 2 && c.classes[0].class_name === 'Long Class');
+    assert.ok(spannedCell, 'the two hour blocks should have merged into one colspan="2" cell instead of two separate cells');
+  });
+
   await t.test('a 5th distinct Start Time in the same day has no slot left and is skipped, not fatal to the others', async () => {
     const buffer = buildImportBuffer([
       ['Mon', '', 'Overflow A', 'Room 1', '', '8:00 AM', '', '', '', '', '', '', ''],

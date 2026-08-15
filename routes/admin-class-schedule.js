@@ -23,8 +23,13 @@ const {
   renameRoom,
   getClass,
   createClass,
+  colorForClassName,
   updateClass,
   deleteClass,
+  archiveClasses,
+  listClassArchives,
+  deleteClassArchive,
+  deleteAllClassArchives,
   setEnrollment,
   addStaff,
   removeStaff,
@@ -224,6 +229,54 @@ router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, 
   if (!cls) return res.status(404).send('Not found');
   await deleteClass(id);
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`Deleted "${cls.class_name}".`));
+});
+
+// Archives the checked classes (checkboxes on the day's own grid, or its
+// "Select All") - e.g. clearing a day before re-running Import Classes
+// on a corrected file, without losing the record of what was there.
+// Moves them out of the live schedule and into the Class Archive tab -
+// see archiveClasses' own comment.
+router.post('/class-schedule/:day/archive', requireFullAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const classIds = [].concat(req.body.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (classIds.length === 0) {
+    return res.redirect(`/admin/class-schedule/${day}?error=` + encodeURIComponent('Select at least one class to archive.'));
+  }
+  const count = await archiveClasses(classIds);
+  res.redirect(`/admin/class-schedule/${day}?notice=` + encodeURIComponent(`Archived ${count} class(es) - see the Class Archive tab.`));
+});
+
+router.get('/class-schedule/archive/export.csv', requireFullAdmin, async (req, res) => {
+  const archives = await listClassArchives();
+  const lines = [
+    toCsvRow(['Day', 'Class Name', 'Room', 'Grade', 'Start Time', 'End Time', 'Teachers', 'Assistants', 'Students', 'Notes', 'Archived At']),
+    ...archives.map((a) =>
+      toCsvRow([
+        DAY_LABELS[a.day] || a.day,
+        a.class_name,
+        a.room || '',
+        a.age_group || '',
+        a.start_time || '',
+        a.end_time || '',
+        a.teachers || '',
+        a.assistants || '',
+        a.student_count,
+        a.notes || '',
+        a.archived_at,
+      ])
+    ),
+  ];
+  sendCsv(res, 'class-schedule-archive.csv', lines);
+});
+
+router.post('/class-schedule/archive/:id/delete', requireFullAdmin, async (req, res) => {
+  await deleteClassArchive(parseInt(req.params.id, 10));
+  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent('Deleted from archive.'));
+});
+
+router.post('/class-schedule/archive/delete-all', requireFullAdmin, async (req, res) => {
+  const count = await deleteAllClassArchives();
+  res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent(`Deleted all ${count} archived class(es).`));
 });
 
 router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, async (req, res) => {
@@ -496,6 +549,13 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       className: r.className,
       room: r.room,
       ageGroup: r.ageGroup,
+      // A same-day/room/name class already imported earlier in this file
+      // (a different hour block of what's really one multi-hour class)
+      // reuses that class's own color instead of an independently
+      // cycled one, so roomGridForDay's adjacent-cell merge (which
+      // requires matching color, not just matching name) actually spans
+      // them into one cell - see colorForClassName's own comment.
+      color: await colorForClassName(rowDay, r.room, r.className),
       startTime: rowStartTime,
       endTime: r.endTime,
       notes: r.description,

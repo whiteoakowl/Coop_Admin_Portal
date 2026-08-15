@@ -20,6 +20,7 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= topTab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
         <a class="view-tab<%= topTab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
+        <a class="view-tab<%= topTab === 'archive' ? ' active' : '' %>" href="/admin/schedule?tab=archive">Class Archive</a>
       <% } %>
     </div>
 
@@ -30,6 +31,65 @@
           <a class="day-toggle-option<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday</a>
         </div>
         <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, colorPalette, availableStaff, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+      <% } else if (tab === 'archive') { %>
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <div class="roster-toolbar no-print">
+          <div class="roster-btn-row">
+            <a class="roster-action-btn file-action-btn" href="/admin/class-schedule/archive/export.csv">Export</a>
+            <% if (archives.length > 0) { %>
+              <form method="POST" action="/admin/class-schedule/archive/delete-all" class="inline-block-form" data-confirm="Permanently delete all <%= archives.length %> archived class(es)? This cannot be undone.">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete All</button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+
+        <% if (archives.length === 0) { %>
+          <p class="roster-empty">No archived classes yet. Select classes on a day's grid and use "Archive Selected" to move them here.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Class Name</th>
+                  <th>Room</th>
+                  <th>Grade</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Teachers</th>
+                  <th>Assistants</th>
+                  <th>Students</th>
+                  <th>Archived At</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% archives.forEach(function(a) { %>
+                  <tr>
+                    <td><%= dayLabels[a.day] || a.day %></td>
+                    <td><%= a.class_name %></td>
+                    <td><%= a.room || '—' %></td>
+                    <td><%= a.age_group || '—' %></td>
+                    <td><%= a.start_time || '—' %></td>
+                    <td><%= a.end_time || '—' %></td>
+                    <td><%= a.teachers || '—' %></td>
+                    <td><%= a.assistants || '—' %></td>
+                    <td><%= a.student_count %></td>
+                    <td><%= a.archived_at %></td>
+                    <td class="actions-cell">
+                      <form method="POST" action="/admin/class-schedule/archive/<%= a.id %>/delete" class="inline-block-form" data-confirm="Permanently delete this archived class (&quot;<%= a.class_name %>&quot;)? This cannot be undone.">
+                        <button type="submit" class="icon-btn" aria-label="Delete archived <%= a.class_name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
       <% } else { %>
         <%
           function buildQuery(overrides) {

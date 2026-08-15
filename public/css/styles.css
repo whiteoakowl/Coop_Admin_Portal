@@ -3694,24 +3694,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    cell with colspan="2" instead of two separate cards (see
    roomGridForDay in utils/classSchedule.js). Sized compactly (smaller
    padding/fonts than a typical .class-card) so a full day's schedule
-   fits on one screen with minimal scrolling. */
-.class-schedule-room-grid { border: 1px solid var(--border); }
+   fits on one screen with minimal scrolling. table-layout: fixed (with
+   the Room column given an explicit width below) so every hour column -
+   none of which specify their own width - splits the remaining table
+   width equally, regardless of how much content happens to be stacked
+   in any one of them; min-width on the table itself (not per-column,
+   which fixed layout doesn't honor) keeps columns from being crushed
+   illegibly narrow on a small screen - .roster-scroll's own
+   overflow-x: auto handles the rest. */
+.class-schedule-room-grid { border: 1px solid var(--border); table-layout: fixed; min-width: 800px; }
 .class-schedule-room-grid th,
 .class-schedule-room-grid td {
   border: 1px solid var(--border);
   padding: 0.35rem 0.4rem;
   vertical-align: top;
-  min-width: 175px;
 }
-.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; white-space: nowrap; font-size: 0.85rem; }
-/* Higher specificity than the generic th/td min-width above (two classes,
-   not one) - the room column shrinks to fit its own text ("width: 1%"
-   with nowrap is the standard auto-table shrink-to-fit trick) instead of
-   sharing the same wide min-width as every hour column. */
+.class-schedule-room-grid th { background: var(--brand-soft); text-align: left; font-size: 0.85rem; }
 .class-schedule-room-grid .class-schedule-room-col {
-  min-width: 0;
-  width: 1%;
-  white-space: nowrap;
+  width: 130px;
   font-weight: 700;
   background: var(--brand-soft);
   font-size: 0.85rem;
@@ -3730,7 +3730,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   box-shadow: var(--shadow-sm);
 }
 .class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.class-card-header h3 { margin: 0; font-size: 0.92rem; }
+.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; }
+.class-card-checkbox { width: 1rem; height: 1rem; accent-color: var(--brand); flex-shrink: 0; margin-top: 0.1rem; }
 /* Grade/Teacher/Assistant - each its own line, stacked cleanly, no
    student roster (that's what View is for). */
 .class-card-info { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.3rem; }

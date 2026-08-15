@@ -140,7 +140,12 @@ function wrapQueryable(queryable, ready = Promise.resolve()) {
         const res = await queryable.query(finalText, params);
         return {
           lastInsertRowid: res.rows && res.rows[0] ? res.rows[0].id : undefined,
-          changes: res.rowCount,
+          // A real `pg` Pool/Client always sets `rowCount`. PGlite (local
+          // dev + every test) instead sets `affectedRows` and leaves
+          // `rowCount` undefined - confirmed directly against PGlite, not
+          // just inferred from a failing test. Fall back to it so `.changes`
+          // reports the real number of affected rows under both backends.
+          changes: res.rowCount !== undefined ? res.rowCount : res.affectedRows,
         };
       },
     };

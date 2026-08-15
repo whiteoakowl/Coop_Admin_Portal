@@ -82,6 +82,25 @@ async function nextPaletteColor() {
   return COLOR_PALETTE[row.c % COLOR_PALETTE.length];
 }
 
+// A class spanning two (or more) consecutive hour blocks is represented
+// as one separate `classes` row per block - roomGridForDay only visually
+// merges same-room adjacent rows into one colspan cell when they also
+// share the same class_name AND color (see its own comment). Creating
+// each block through the picker naturally reuses whatever color the
+// admin already has selected, but the Class Schedule Import (one file
+// row per block, colorless) would otherwise give each block its own
+// independently-cycled nextPaletteColor() and the blocks would never
+// visually merge. This looks up whichever color a same-day/room/name
+// class already has (from earlier in this same import, or an earlier
+// one) and reuses it, only calling nextPaletteColor() the first time a
+// name is seen.
+async function colorForClassName(day, room, className) {
+  const existing = await db
+    .prepare("SELECT color FROM classes WHERE day = ? AND LOWER(COALESCE(room, '')) = LOWER(?) AND LOWER(class_name) = LOWER(?) LIMIT 1")
+    .get(day, room || '', className);
+  return existing ? existing.color : nextPaletteColor();
+}
+
 async function hoursForDay(day) {
   return db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? ORDER BY position').all(day);
 }
@@ -305,6 +324,61 @@ async function deleteClass(id) {
     await tx.prepare('DELETE FROM classes WHERE id = ?').run(id);
   });
   await syncDayMemberRosters(cls.day);
+}
+
+// Snapshots each of the given classes into class_schedule_archives, then
+// deletes it from the live schedule (deleteClass, so its roster gets the
+// same deactivation any other deleted class's does) - the selection-based
+// alternative to deleting classes one at a time by hand, e.g. clearing a
+// day before a fresh Import Classes run without losing the record of
+// what was there. Teacher/assistant names are flattened to a comma-joined
+// string and enrollment to a plain count rather than kept as live
+// class_staff/class_enrollments references - see the table's own
+// migration comment on why. Returns how many were archived.
+async function archiveClasses(classIds) {
+  let archived = 0;
+  for (const id of classIds) {
+    const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
+    if (!cls) continue;
+    const staff = await staffForClass(id);
+    const students = await studentsForClass(id);
+    await db
+      .prepare(
+        `INSERT INTO class_schedule_archives
+           (day, class_name, room, age_group, color, notes, start_time, end_time, teachers, assistants, student_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        cls.day,
+        cls.class_name,
+        cls.room,
+        cls.age_group,
+        cls.color,
+        cls.notes,
+        cls.start_time,
+        cls.end_time,
+        staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ') || null,
+        staff.filter((s) => s.role === 'assistant').map((s) => s.name).join(', ') || null,
+        students.length
+      );
+    await deleteClass(id);
+    archived++;
+  }
+  return archived;
+}
+
+// One row of the Class Archive tab's list.
+async function listClassArchives() {
+  return db.prepare('SELECT * FROM class_schedule_archives ORDER BY archived_at DESC, id DESC').all();
+}
+
+async function deleteClassArchive(id) {
+  await db.prepare('DELETE FROM class_schedule_archives WHERE id = ?').run(id);
+}
+
+async function deleteAllClassArchives() {
+  const result = await db.prepare('DELETE FROM class_schedule_archives').run();
+  return result.changes;
 }
 
 async function setEnrollment(classId, studentIds) {
@@ -737,8 +811,13 @@ module.exports = {
   renameRoom,
   getClass,
   createClass,
+  colorForClassName,
   updateClass,
   deleteClass,
+  archiveClasses,
+  listClassArchives,
+  deleteClassArchive,
+  deleteAllClassArchives,
   setEnrollment,
   addStaff,
   removeStaff,

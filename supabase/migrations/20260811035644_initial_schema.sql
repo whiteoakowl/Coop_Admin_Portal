@@ -293,6 +293,33 @@ create table if not exists class_staff (
   primary key (class_id, member_id)
 );
 
+-- One row per archived class - the Class Schedule's own equivalent of
+-- roster_archives above, same "flatten to plain text, drop the FK-linked
+-- detail" philosophy (see that table's own header comment on why): a
+-- class_staff/class_enrollments row has no business surviving its class
+-- being deleted, so teacher/assistant names are captured as a flat
+-- comma-joined string and enrollment as a plain count rather than kept
+-- as live references. Populated by archiveClasses (utils/classSchedule.js),
+-- which snapshots then deletes the live class in one step - "archiving"
+-- a class removes it from the live schedule the same as deleting it,
+-- just with this recoverable record left behind first.
+create table if not exists class_schedule_archives (
+  id integer generated always as identity primary key,
+  day text not null check (day in ('monday','wednesday')),
+  class_name text not null,
+  room text,
+  age_group text,
+  color text,
+  notes text,
+  start_time text,
+  end_time text,
+  teachers text,
+  assistants text,
+  student_count integer not null default 0,
+  archived_at text not null default now_text()
+);
+create index if not exists idx_class_schedule_archives_day on class_schedule_archives(day, archived_at);
+
 create table if not exists app_settings (
   key text primary key,
   value text not null

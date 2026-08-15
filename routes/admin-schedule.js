@@ -26,6 +26,7 @@ const {
   absentMemberIdsForDate,
   setEnrollment,
   addStaff,
+  listClassArchives,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
@@ -51,15 +52,15 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents'];
+const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents', 'archive'];
 const PAGE_SIZE = 25;
 
 router.get('/schedule', requireAdmin, async (req, res) => {
   let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
 
-  // Student/Parent Schedules is the per-member schedule list + editor -
-  // full-Admin-only. A Co-op Admin only gets the read-only day grid.
-  if ((tab === 'students' || tab === 'parents') && !res.locals.isFullAdmin) {
+  // Student/Parent Schedules and the Class Archive are full-Admin-only. A
+  // Co-op Admin only gets the read-only day grid.
+  if ((tab === 'students' || tab === 'parents' || tab === 'archive') && !res.locals.isFullAdmin) {
     tab = 'monday';
   }
 
@@ -79,6 +80,23 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       availableStaff: await activeParentsForStaff(),
       selectedDate,
       absentIds: await absentMemberIdsForDate(selectedDate),
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  // Class Archive: classes archived (rather than deleted outright) from
+  // either day's grid via the "Archive Selected" flow - see archiveClasses
+  // in utils/classSchedule.js for why teacher/assistant names and
+  // enrollment are flattened to plain text/count here rather than kept as
+  // live FK references.
+  if (tab === 'archive') {
+    return res.render('admin-schedule', {
+      title: 'Schedules',
+      tab,
+      topTab: 'archive',
+      archives: await listClassArchives(),
+      dayLabels: CLASS_DAY_LABELS,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });

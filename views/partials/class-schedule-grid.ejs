@@ -28,10 +28,27 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-class-dialog-<%= day %>').showModal()">+ Add Class</button>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-schedule-dialog-<%= day %>').showModal()">Edit</button>
       <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog-<%= day %>').showModal()">Import</button>
+      <label class="checkbox-option class-schedule-select-all">
+        <input type="checkbox" data-select-all-for="class-archive-form-<%= day %>" />
+        Select All
+      </label>
+      <button type="submit" form="class-archive-form-<%= day %>" class="roster-action-btn">Archive Selected</button>
     <% } %>
     <a class="roster-action-btn print-action-btn" href="/admin/class-schedule/<%= day %>/print" target="_blank">Print</a>
   </div>
 </div>
+
+<% if (!gridReadOnly) { %>
+  <form
+    id="class-archive-form-<%= day %>"
+    method="POST"
+    action="/admin/class-schedule/<%= day %>/archive"
+    data-confirm="Archive the selected classes for <%= dayLabel %>? This removes them from the live schedule - roster and teacher/assistant assignments included - and saves a permanent record in the Class Archive tab."
+    data-confirm-yes-label="Yes, Archive"
+    data-confirm-icon="icon-save"
+    data-confirm-safe="1"
+  ></form>
+<% } %>
 
 <% if (!gridReadOnly) { %>
 <dialog id="add-class-dialog-<%= day %>" class="class-form-dialog">
@@ -216,6 +233,9 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                   <% var cardAbsentCount = cls.students.filter(function(s) { return absentIds.has(s.id); }).length; %>
                   <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
                     <div class="class-card-header">
+                      <% if (!gridReadOnly) { %>
+                        <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-archive-form-<%= day %>" class="class-card-checkbox no-print" aria-label="Select <%= cls.class_name %> for archiving" />
+                      <% } %>
                       <h3><%= cls.class_name %></h3>
                       <% if (!gridReadOnly) { %>
                         <button type="button" class="btn-secondary class-card-view-btn no-print" data-view-class="<%= cls.id %>">View</button>
@@ -252,4 +272,5 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <script src="/js/fragment-dialog.js"></script>
 <script src="/js/class-schedule-view.js"></script>
 <script src="/js/allergy-log-popup.js"></script>
+<script src="/js/class-schedule-archive-select.js"></script>
 <% } %>
