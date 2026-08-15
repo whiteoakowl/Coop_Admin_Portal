@@ -4,8 +4,16 @@
 // + Schedule Cards, Barcodes Only) - same photo/name/type/family/rosters
 // columns as the Members page's own table, but a selection checkbox in
 // the first column instead of Actions, since this list is for choosing
-// who to print, not managing records. Locals: members, listId.
+// who to print, not managing records. Locals: members, listId, skipRows
+// (optional) - every one of these panels lists the identical active-
+// member set (only the checkbox selections differ per flow), so
+// rendering the same hundreds-of-rows table 6 times over was enough
+// duplicated HTML to blow past Netlify's ~6MB function response cap on a
+// co-op with enough members. skipRows leaves this one's <tbody> empty;
+// public/js/design-print-hub.js clones the one real (non-skipRows)
+// table's rows into it client-side instead, once, on page load.
 %>
+<% var skipRows = typeof skipRows !== 'undefined' && skipRows; %>
 <table class="roster-table members-table condensed-table" id="<%= listId %>">
   <thead>
     <tr>
@@ -18,10 +26,11 @@
     </tr>
   </thead>
   <tbody>
-    <% if (members.length === 0) { %>
+    <% if (skipRows) { %>
+    <% } else if (members.length === 0) { %>
       <tr><td colspan="6" class="roster-empty">No members yet.</td></tr>
     <% } %>
-    <% members.forEach(function(m) { %>
+    <% (skipRows ? [] : members).forEach(function(m) { %>
       <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-name="<%= m.name.toLowerCase() %>">
         <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
         <td class="members-col-photo">

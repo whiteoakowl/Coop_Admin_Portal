@@ -59,6 +59,27 @@
   typeSelect.addEventListener('change', () => apply(typeSelect.value));
   apply(typeSelect.value);
 
+  // The 6 print flows below all list the exact same active-member set
+  // (only the checkbox selections differ per flow) - views/partials/
+  // print-picker-table.ejs only renders real rows into the Schedule
+  // Cards list (the one visible by default) and leaves the other 5
+  // tables' <tbody> empty (skipRows) so the page doesn't ship that same
+  // hundreds-of-rows table 6 times over in one response. Clone the real
+  // rows into the empty ones here, once, before any of the wiring below
+  // runs - each table's <tbody> ends up with its own independent copy of
+  // the rows/checkboxes, so everything past this point behaves exactly
+  // as if they'd all been server-rendered separately.
+  const sourceList = document.getElementById('schedule-print-list');
+  if (sourceList) {
+    const sourceRows = sourceList.querySelectorAll('tbody tr');
+    ['name-tag-bulk-list', 'cards-both-bulk-list', 'cards-duplex-bulk-list', 'barcodes-bulk-list', 'barcode-labels-bulk-list'].forEach((listId) => {
+      const target = document.getElementById(listId);
+      const tbody = target && target.querySelector('tbody');
+      if (!tbody) return;
+      sourceRows.forEach((row) => tbody.appendChild(row.cloneNode(true)));
+    });
+  }
+
   // Schedule Cards list: name search + select-all (mirrors public/js/schedule.js).
   const scheduleList = document.getElementById('schedule-print-list');
   if (scheduleList) {

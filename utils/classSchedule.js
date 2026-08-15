@@ -1,6 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
-const { getListByDay, sectionsForList, membersForList, removeMemberFromSection } = require('./volunteers');
+const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection } = require('./volunteers');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -889,6 +889,96 @@ async function ensureDayMemberRosters() {
   return ids;
 }
 
+// A parent whose schedule has a hour with no class of their own that day
+// (not enrolled as a student there, not teaching/assisting a class there)
+// that falls within their family's overall attendance window (the same
+// earliest-class-start-to-latest-class-end span arrivalDepartureLabels
+// computes, from every family member's own classes that day) gets
+// automatically placed on that hour's Floater Assignments section - a
+// parent shouldn't have to be hand-added to floater just because they're
+// on-site dropping a kid off before their own class or waiting to pick
+// one up after it. Additive only: it never removes an assignment, however
+// it got there - the one place a floater assignment is automatically
+// dropped is removeFromFloaterForHour, when that same hour gets a real
+// teacher/assistant assignment instead. Runs as part of syncDayMemberRosters,
+// so it fires on every enrollment/staffing change for the day, not on a
+// standalone schedule.
+async function autoAssignFloatersForDay(day) {
+  const list = await getListByDay(day);
+  if (!list) return;
+  const sections = await sectionsForList(list.id);
+  if (!sections.length) return;
+  const sectionByPosition = {};
+  sections.forEach((s) => { sectionByPosition[s.position] = s; });
+
+  const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  const positionRanges = derivedHourTimeRanges(classes);
+  const classIds = classes.map((c) => c.id);
+  if (!classIds.length) return;
+
+  const classById = {};
+  classes.forEach((c) => { classById[c.id] = c; });
+
+  // Every (memberId -> Set of hour positions) where that member has a
+  // real class of their own that day - used both to find each family's
+  // attendance window and to skip any hour a parent already has a class
+  // of their own on.
+  const ownPositionsByMember = {};
+  const noteOwn = (memberId, position) => {
+    if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
+    ownPositionsByMember[memberId].add(position);
+  };
+  const placeholders = classIds.map(() => '?').join(',');
+  (await db.prepare(`SELECT class_id, student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
+    const cls = classById[r.class_id];
+    if (cls) noteOwn(r.student_id, cls.hour_position);
+  });
+  (await db.prepare(`SELECT class_id, member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
+    const cls = classById[r.class_id];
+    if (cls) noteOwn(r.member_id, cls.hour_position);
+  });
+
+  const memberIds = Object.keys(ownPositionsByMember).map(Number);
+  if (!memberIds.length) return;
+  const memberPlaceholders = memberIds.map(() => '?').join(',');
+  const familyIdByMember = {};
+  (await db.prepare(`SELECT id, family_id FROM members WHERE id IN (${memberPlaceholders})`).all(...memberIds)).forEach((r) => {
+    familyIdByMember[r.id] = r.family_id;
+  });
+
+  const windowByFamily = {};
+  memberIds.forEach((memberId) => {
+    const familyId = familyIdByMember[memberId];
+    if (!familyId) return;
+    ownPositionsByMember[memberId].forEach((position) => {
+      const range = positionRanges[position];
+      if (!range) return;
+      const w = windowByFamily[familyId] || { start: null, end: null };
+      if (w.start == null || range.startMin < w.start) w.start = range.startMin;
+      if (w.end == null || range.endMin > w.end) w.end = range.endMin;
+      windowByFamily[familyId] = w;
+    });
+  });
+
+  const parents = await db
+    .prepare("SELECT id, family_id FROM members WHERE active = 1 AND member_type = 'parent' AND family_id IS NOT NULL")
+    .all();
+  for (const parent of parents) {
+    const window = windowByFamily[parent.family_id];
+    if (!window || window.start == null || window.end == null) continue;
+    const ownPositions = ownPositionsByMember[parent.id] || new Set();
+    for (const [positionStr, range] of Object.entries(positionRanges)) {
+      const position = Number(positionStr);
+      if (ownPositions.has(position)) continue;
+      const section = sectionByPosition[position];
+      if (!section) continue;
+      const overlapsWindow = range.startMin < window.end && range.endMin > window.start;
+      if (!overlapsWindow) continue;
+      await addMemberToSection(list.id, parent.id, section.id);
+    }
+  }
+}
+
 // Everyone floating any hour on a day's Floater Assignments list - a
 // parent only needs to be assigned to ONE hour to count as floating that
 // day, same "day-level" granularity as teaching/assisting a class.
@@ -903,6 +993,7 @@ async function floaterMemberIdsForDay(day) {
 // class's teacher/assistants, or anyone on the Floater Assignments list
 // for any hour that day.
 async function syncDayMemberRosters(day) {
+  await autoAssignFloatersForDay(day);
   const classIds = (await db.prepare('SELECT id FROM classes WHERE day = ?').all(day)).map((r) => r.id);
   const studentIds = new Set();
   const parentIds = new Set();
@@ -943,13 +1034,64 @@ async function syncDayMemberRosters(day) {
   await syncMemberSchedulesForDay(day);
 }
 
+// The real, parseable start/end time for each hour position on a day,
+// derived live from whichever class at that position has the earliest
+// parseable start_time - the same live-derivation roomGridForDay already
+// does for its own column headers, and for the same reason: the
+// separately-stored class_schedule_hours label only gets refreshed at
+// import time, so it's easy for it to sit stuck on the generic "Hour N"
+// default (or a stale time) while classes with real times exist at that
+// position. A class entered without its own start_time/end_time borrows
+// this derived range instead of falling straight back to that label -
+// arrivalDepartureLabels (utils/schedule.js) can't parse "Hour N" as a
+// clock time, so any row stuck on it was silently dropped from a family's
+// earliest/latest calculation.
+// { [position]: { startMin, endMin, label } } - endMin/label omitted when
+// no class at that position has a parseable end_time to pair with its
+// start.
+function derivedHourTimeRanges(rawClasses) {
+  const bestByPosition = {};
+  rawClasses.forEach((cls) => {
+    const startMinutes = parseClockMinutesLocal(cls.start_time);
+    if (startMinutes == null) return;
+    const current = bestByPosition[cls.hour_position];
+    if (!current || startMinutes < current.startMinutes) {
+      bestByPosition[cls.hour_position] = { startMinutes, endTime: cls.end_time };
+    }
+  });
+  const ranges = {};
+  Object.entries(bestByPosition).forEach(([position, { startMinutes, endTime }]) => {
+    const endMinutes = parseClockMinutesLocal(endTime);
+    ranges[position] = endMinutes != null
+      ? { startMin: startMinutes, endMin: endMinutes, label: `${minutesToClockLabelLocal(startMinutes)} - ${minutesToClockLabelLocal(endMinutes)}` }
+      : { startMin: startMinutes, endMin: startMinutes, label: minutesToClockLabelLocal(startMinutes) };
+  });
+  return ranges;
+}
+
+function derivedHourTimeLabels(rawClasses) {
+  const labels = {};
+  Object.entries(derivedHourTimeRanges(rawClasses)).forEach(([position, range]) => { labels[position] = range.label; });
+  return labels;
+}
+
+async function rawHourLabel(day, position) {
+  const hour = await db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(day, position);
+  return (hour && hour.label) || '';
+}
+
 // A class's display time range: its own start_time/end_time if an admin
-// set them, otherwise its hour block's shared label (e.g. "Hour 1" or
-// whatever an admin renamed it to via Edit Hours).
+// set them, otherwise the position's live-derived time (see
+// derivedHourTimeLabels above), otherwise its hour block's raw stored
+// label (e.g. "Hour 1" or whatever an admin renamed it to via Edit
+// Hours).
 async function timeRangeForClass(cls) {
   if (cls.start_time && cls.end_time) return `${cls.start_time} - ${cls.end_time}`;
-  const hour = await db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
-  return (hour && hour.label) || '';
+  const siblings = await db
+    .prepare('SELECT hour_position, start_time, end_time FROM classes WHERE day = ? AND hour_position = ?')
+    .all(cls.day, cls.hour_position);
+  const derived = derivedHourTimeLabels(siblings)[cls.hour_position];
+  return derived || (await rawHourLabel(cls.day, cls.hour_position));
 }
 
 // member_schedules (the per-member "Schedule Card" / profile Class
@@ -969,6 +1111,7 @@ async function timeRangeForClass(cls) {
 //
 async function syncMemberSchedulesForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  const derivedLabels = derivedHourTimeLabels(classes);
   await db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
   const upsert = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
@@ -979,7 +1122,9 @@ async function syncMemberSchedulesForDay(day) {
   );
 
   for (const cls of classes) {
-    const time = await timeRangeForClass(cls);
+    const time = (cls.start_time && cls.end_time)
+      ? `${cls.start_time} - ${cls.end_time}`
+      : derivedLabels[cls.hour_position] || (await rawHourLabel(day, cls.hour_position));
     const staff = await staffForClass(cls.id);
     const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
     const people = [...(await studentsForClass(cls.id)), ...staff];
@@ -996,7 +1141,7 @@ async function syncMemberSchedulesForDay(day) {
   const list = await getListByDay(day);
   if (list) {
     const hourLabels = {};
-    (await hoursForDay(day)).forEach((h) => { hourLabels[h.position] = h.label; });
+    (await hoursForDay(day)).forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
     for (const section of await sectionsForList(list.id)) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         await insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
@@ -1063,6 +1208,7 @@ module.exports = {
   setEnrollment,
   addStaff,
   removeFromFloaterForHour,
+  autoAssignFloatersForDay,
   removeStaff,
   activeStudents,
   activeParentsForStaff,
