@@ -5,6 +5,17 @@
 </head>
 <body class="landing landing-has-action-bar">
   <%- include('partials/icon-sprite') %>
+  <!-- See .landing-top-menu's own comment (public/css/styles.css) - a
+       full-width menu bar fixed across the very top of the screen at
+       desktop/tablet widths, living outside .landing-wrap so it isn't
+       constrained to that element's own centered max-width. -->
+  <nav class="landing-top-menu landing-desktop-only">
+    <a class="landing-top-menu-link" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
+    <a class="landing-top-menu-link" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
+    <a class="landing-top-menu-link" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+    <a class="landing-top-menu-link" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
+    <a class="landing-top-menu-link" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg> Admin</a>
+  </nav>
   <div class="landing-corner-actions">
     <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
       <svg class="icon"><use href="#icon-maximize"/></svg>
@@ -17,14 +28,6 @@
     <a class="landing-action-bar-btn" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg><span>Admin</span></a>
   </footer>
   <main id="main-content" tabindex="-1" class="landing-wrap">
-    <nav class="landing-top-menu landing-desktop-only">
-      <a class="landing-top-menu-link" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
-      <a class="landing-top-menu-link" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
-      <a class="landing-top-menu-link" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
-      <a class="landing-top-menu-link" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
-      <a class="landing-top-menu-link" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg> Admin</a>
-    </nav>
-
     <div class="landing-banner">
       <img class="landing-logo-sm" src="/img/logo-owl.png" alt="Sanford Homeschoolers" />
       <h1 class="landing-welcome">Welcome to Co-op!</h1>

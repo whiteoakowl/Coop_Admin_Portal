@@ -186,7 +186,11 @@ textarea:focus-visible,
   padding: 2rem;
 }
 
-.landing-wrap { text-align: center; max-width: 900px; }
+/* padding-top clears the fixed, full-width .landing-top-menu bar above it
+   (see that rule's own comment) - both pages that use .landing-wrap
+   (index.ejs, kiosk-home.ejs) always carry that bar at this width, reset
+   to 0 in the mobile query below where the bar itself is hidden. */
+.landing-wrap { text-align: center; max-width: 900px; padding-top: 4.5rem; }
 
 .landing-banner {
   display: flex;
@@ -332,7 +336,11 @@ textarea:focus-visible,
 
 .document-view-frame { width: 100%; height: 100%; border: none; }
 
-.landing-corner-actions { position: fixed; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
+/* Bottom-right at desktop/tablet widths, out of the way of the full-width
+   .landing-top-menu bar now spanning the top of the screen - moved back to
+   its original top-right spot in the mobile query below, where there's no
+   top bar to avoid and the bottom is already claimed by .landing-action-bar. */
+.landing-corner-actions { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
 
 .admin-corner-link {
   display: inline-flex;
@@ -745,6 +753,12 @@ textarea:focus-visible,
      media-scoped rule and keep the desktop layout visible on mobile. */
   .landing-desktop-only { display: none !important; }
   .landing-has-action-bar { padding-bottom: 5.5rem; }
+  /* .landing-top-menu is hidden here (it's .landing-desktop-only), so
+     there's no fixed bar left to clear, and .landing-corner-actions moves
+     back to its original top-right spot - the bottom is already claimed by
+     .landing-action-bar's own fixed bottom bar. */
+  .landing-wrap { padding-top: 0; }
+  .landing-corner-actions { top: 1rem; bottom: auto; }
   /* Icon-only on mobile - with its text label, this button sits close
      enough to the centered round logo below it to visually overlap. */
   .landing-corner-actions #fullscreen-toggle-btn { gap: 0; padding: 0.5rem; }
@@ -839,28 +853,33 @@ textarea:focus-visible,
 }
 .admin-corner-link-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
-/* kiosk-home.ejs's desktop/tablet redesign: an orange top menu bar for
-   the day's less-frequent forms/links (Name Tag Form, Absence/Late Form,
-   Find a Parent, Class Check In & Out, Admin), and Check In/Check Out
-   (green) + Floater Assignments/Setup-Cleanup Teams (purple) as two
-   stacked columns instead of one flat grid. Both use the existing
-   .landing-desktop-only switch (hidden below 640px, see that class's own
-   comment above) in favor of the original single-grid layout
-   (.landing-mobile-grid, the inverse switch) - two side-by-side columns
-   don't have room on a phone, and .landing-action-bar already covers the
-   top bar's own links there. index.ejs (the site root) keeps its
-   original corner-pill layout unchanged - this only applies to the
-   separate /kiosk full-screen view. */
+/* index.ejs and kiosk-home.ejs's desktop/tablet redesign: a full-width
+   orange menu bar fixed across the very top of the screen (like an
+   ordinary website nav bar, not a floating pill) for the day's
+   less-frequent forms/links (Name Tag Form, Absence/Late Form, Find a
+   Parent, Class Check In & Out, Admin), with a vertical divider between
+   each link instead of gapped pill buttons - see .landing-top-menu-link
+   below. Sits outside .landing-wrap in the markup so it can span the full
+   viewport width regardless of .landing-wrap's own centered max-width;
+   .landing-wrap's padding-top (see that rule's own comment) reserves the
+   room this fixed bar needs so it never covers the page's real content.
+   Paired with Check In/Check Out (green) + Floater Assignments/
+   Setup-Cleanup Teams (purple) as two stacked columns instead of one flat
+   grid. Both use the existing .landing-desktop-only switch (hidden below
+   640px, see that class's own comment above) in favor of the original
+   single-grid layout (.landing-mobile-grid, the inverse switch) - two
+   side-by-side columns don't have room on a phone, and .landing-action-bar
+   already covers the top bar's own links there. */
 .landing-top-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.5rem;
   width: 100%;
-  max-width: 900px;
-  margin: 0 auto 2rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
   background: var(--btn-bg);
   box-shadow: var(--shadow-sm);
 }
@@ -869,12 +888,13 @@ textarea:focus-visible,
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 1.1rem;
-  border-radius: var(--control-radius);
+  border-left: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 0.9rem 1.5rem;
   color: #000;
   font-weight: 700;
   font-size: 0.95rem;
 }
+.landing-top-menu-link:first-child { border-left: none; }
 .landing-top-menu-link:hover { background: rgba(255,255,255,0.4); }
 .landing-top-menu-link .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
 
