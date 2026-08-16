@@ -226,35 +226,85 @@ function summarizeScheduleDay(rows) {
 // resynced once each at the end (not once per member/class) for the same
 // reason the Class Schedule Import batches it - see addStaff's own comment
 // on skipSync. Returns how many members were archived.
+//
+// A real live-reported timeout: the original version called
+// getMemberSchedule(memberId) once PER member - and that function redoes
+// each day's ENTIRE live computation (every class's enrollment/staffing,
+// every floater section) from scratch on every call (see
+// liveMemberScheduleRowsForDay's own comment on why - it's built once and
+// reused for a whole page elsewhere, e.g. scheduleList). Fine for the one
+// member a real page normally archives at a time; with the Select-All-
+// across-all-pages fix landing at the same time this bug was found (now
+// a batch can genuinely be hundreds of members), that became hundreds of
+// full-day recomputations against a real, network-latency-bound
+// Postgres connection - long enough to hit Netlify's function timeout
+// before the request ever finished. Fixed the same way
+// arrivalDepartureLabelsForMembers already fixed the identical shape of
+// N+1 for Arrival/Departure: compute both days' live rows ONCE for the
+// whole batch, then reuse them per member.
 async function archiveMemberSchedules(memberIds) {
-  let archived = 0;
+  if (memberIds.length === 0) return 0;
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds);
+  if (members.length === 0) return 0;
+
+  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+
   const touchedDays = new Set();
-  for (const memberId of memberIds) {
-    const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
-    if (!member) continue;
-    const { monday, wednesday } = await getMemberSchedule(memberId);
-
-    await db
-      .prepare(
-        `INSERT INTO member_schedule_archives (member_id, member_name, member_type, monday_schedule, wednesday_schedule)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-      .run(member.id, member.name, member.member_type, summarizeScheduleDay(monday), summarizeScheduleDay(wednesday));
-
+  const studentIds = [];
+  const parentIds = [];
+  const archiveRows = members.map((member) => {
+    const monday = fourRows(Object.values(mondayRows[member.id] || {}));
+    const wednesday = fourRows(Object.values(wednesdayRows[member.id] || {}));
     if (monday.some((r) => !rowIsBlank(r))) touchedDays.add('monday');
     if (wednesday.some((r) => !rowIsBlank(r))) touchedDays.add('wednesday');
+    (member.member_type === 'student' ? studentIds : parentIds).push(member.id);
+    return { member, monday, wednesday };
+  });
 
-    if (member.member_type === 'student') {
-      const classIds = (await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(memberId)).map((r) => r.class_id);
-      await db.prepare('DELETE FROM class_enrollments WHERE student_id = ?').run(memberId);
-      for (const classId of classIds) await syncClassRosterMembers(classId);
-    } else {
-      await db.prepare('DELETE FROM class_staff WHERE member_id = ?').run(memberId);
-    }
-    archived++;
+  // Every class any archived student is currently enrolled in, gathered
+  // BEFORE the bulk delete below removes the rows that would otherwise
+  // tell us - synced once per distinct class after unenrolling everyone,
+  // not once per (student, class) pair, since more than one archived
+  // student commonly shares the same class.
+  const classIds = new Set();
+  if (studentIds.length) {
+    const studentPlaceholders = studentIds.map(() => '?').join(',');
+    (await db.prepare(`SELECT DISTINCT class_id FROM class_enrollments WHERE student_id IN (${studentPlaceholders})`).all(...studentIds)).forEach(
+      (r) => classIds.add(r.class_id)
+    );
   }
+
+  await db.withTransaction(async (tx) => {
+    for (const { member, monday, wednesday } of archiveRows) {
+      await tx
+        .prepare(
+          `INSERT INTO member_schedule_archives (member_id, member_name, member_type, monday_schedule, wednesday_schedule)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .run(member.id, member.name, member.member_type, summarizeScheduleDay(monday), summarizeScheduleDay(wednesday));
+    }
+    if (studentIds.length) {
+      const studentPlaceholders = studentIds.map(() => '?').join(',');
+      await tx.prepare(`DELETE FROM class_enrollments WHERE student_id IN (${studentPlaceholders})`).run(...studentIds);
+    }
+    if (parentIds.length) {
+      const parentPlaceholders = parentIds.map(() => '?').join(',');
+      await tx.prepare(`DELETE FROM class_staff WHERE member_id IN (${parentPlaceholders})`).run(...parentIds);
+    }
+  });
+
+  // Both sync steps read back the rows the transaction above just wrote/
+  // deleted, so they have to run after it commits, not inside it -
+  // syncClassRosterMembers/syncDayMemberRosters each use the module's own
+  // top-level db connection, not the transaction's dedicated one (see
+  // db/postgres.js's own header comment on why a query inside
+  // withTransaction MUST go through the tx handle it hands you - anything
+  // that doesn't is on a different connection, and would either miss the
+  // still-uncommitted deletes above or, worse, race the commit itself).
+  for (const classId of classIds) await syncClassRosterMembers(classId);
   for (const day of touchedDays) await syncDayMemberRosters(day);
-  return archived;
+  return members.length;
 }
 
 async function listMemberScheduleArchives(memberType) {
