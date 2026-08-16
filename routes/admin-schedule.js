@@ -312,18 +312,44 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
   // once each after the whole file's been processed instead.
   const touchedDays = new Set();
 
+  // A live-reported timeout: the original version ran the member lookup,
+  // the class lookup, AND (for students) an existing-roster lookup as
+  // separate sequential queries for EVERY slot of EVERY row - a real
+  // file (hundreds of rows, up to SCHEDULE_SLOT_COUNT slots each) fired
+  // thousands of tiny round trips at a real, network-latency-bound
+  // Postgres connection and never finished before Netlify's own function
+  // timeout. Members and classes are fetched ONCE up front instead (same
+  // fix shape as archiveMemberSchedules' own N+1 fix in
+  // utils/schedule.js) and matched against these in-memory maps for the
+  // rest of the scan - no query at all per slot until the actual writes
+  // below.
+  const membersByName = new Map();
+  (await db.prepare('SELECT id, name, medical_notes FROM members WHERE member_type = ? AND active = 1').all(memberType)).forEach((m) => {
+    membersByName.set(m.name.toLowerCase(), m);
+  });
+  const classesByDayName = new Map();
+  (await db.prepare('SELECT * FROM classes').all()).forEach((c) => {
+    const key = `${c.day}|${c.class_name.toLowerCase()}`;
+    if (!classesByDayName.has(key)) classesByDayName.set(key, []);
+    classesByDayName.get(key).push(c);
+  });
+
+  const allergyUpdates = [];
+  const allergyUpdatedMemberIds = new Set(); // first row wins for a repeated name, matching the original per-row order
+  const newStudentsByClass = new Map(); // classId -> Set(studentId)
+  const staffToAdd = []; // { classId, memberId }
+
   for (const r of rows) {
-    const member = await db
-      .prepare('SELECT id, medical_notes FROM members WHERE LOWER(name) = LOWER(?) AND member_type = ? AND active = 1')
-      .get(r.name, memberType);
+    const member = membersByName.get(r.name.toLowerCase());
     if (!member) { skipped += r.slots.length || 1; continue; }
 
-    if (r.allergy && !member.medical_notes) {
-      await db.prepare('UPDATE members SET medical_notes = ? WHERE id = ?').run(r.allergy, member.id);
+    if (r.allergy && !member.medical_notes && !allergyUpdatedMemberIds.has(member.id)) {
+      allergyUpdates.push({ memberId: member.id, allergy: r.allergy });
+      allergyUpdatedMemberIds.add(member.id);
     }
 
     for (const slot of r.slots) {
-      const candidates = await db.prepare('SELECT * FROM classes WHERE day = ? AND LOWER(class_name) = LOWER(?)').all(slot.day, slot.className);
+      const candidates = classesByDayName.get(`${slot.day}|${slot.className.toLowerCase()}`) || [];
       let cls = candidates[0];
       if (candidates.length > 1) {
         cls = candidates.find((c) => !scheduleFieldMismatch(c.start_time, slot.startTime) && !scheduleFieldMismatch(c.room, slot.room)) || null;
@@ -333,14 +359,35 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
       if (!cls) { skipped++; continue; }
 
       if (memberType === 'student') {
-        const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(cls.id)).map((e) => e.student_id);
-        if (!existingIds.includes(member.id)) await setEnrollment(cls.id, [...existingIds, member.id], { skipSync: true });
+        if (!newStudentsByClass.has(cls.id)) newStudentsByClass.set(cls.id, new Set());
+        newStudentsByClass.get(cls.id).add(member.id);
       } else {
-        await addStaff(cls.id, member.id, 'teacher', { skipSync: true });
+        staffToAdd.push({ classId: cls.id, memberId: member.id });
       }
       touchedDays.add(cls.day);
       matched++;
     }
+  }
+
+  for (const { memberId, allergy } of allergyUpdates) {
+    await db.prepare('UPDATE members SET medical_notes = ? WHERE id = ?').run(allergy, memberId);
+  }
+
+  // One setEnrollment call per distinct class touched by this import, not
+  // per matched student - the original per-slot version called it once
+  // per (student, class) pair, and setEnrollment's own DELETE-then-
+  // reinsert-the-whole-roster shape made that quadratic in a popular
+  // class's size (importing its 30th student re-wrote all 30 rows, not
+  // just the new one). Merging every newly-matched student for a class
+  // against its already-existing roster and writing it back once keeps
+  // this additive (same as the original) at a fraction of the cost.
+  for (const [classId, newIds] of newStudentsByClass) {
+    const existingIds = (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId)).map((e) => e.student_id);
+    const merged = new Set([...existingIds, ...newIds]);
+    if (merged.size !== existingIds.length) await setEnrollment(classId, [...merged], { skipSync: true });
+  }
+  for (const { classId, memberId } of staffToAdd) {
+    await addStaff(classId, memberId, 'teacher', { skipSync: true });
   }
 
   for (const d of touchedDays) await syncDayMemberRosters(d);
