@@ -173,10 +173,20 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 <dialog id="edit-schedule-dialog-<%= day %>" class="volunteer-edit-dialog">
   <h3>Edit <%= dayLabel %> Schedule</h3>
   <form method="POST" action="/admin/class-schedule/<%= day %>/edit">
-    <p class="hint">Rename the 4 hour blocks used to organize <%= dayLabel %>'s classes.</p>
-    <div class="volunteer-sections-row">
+    <p class="hint">Rename the 4 hour blocks used to organize <%= dayLabel %>'s classes, and set each hour's Start/End Time - every class in that hour uses it unless that class sets its own on its own Manage page. Needed for accurate Arrival/Departure times on rosters.</p>
+    <div class="edit-hours-grid">
       <% hours.forEach(function(h) { %>
-        <input type="text" name="labels" value="<%= h.label %>" maxlength="20" />
+        <div class="edit-hour-block">
+          <label class="edit-hour-field"><span class="hint">Label</span>
+            <input type="text" name="labels" value="<%= h.label %>" maxlength="20" />
+          </label>
+          <label class="edit-hour-field"><span class="hint">Start Time</span>
+            <input type="text" name="startTimes" value="<%= h.start_time || '' %>" placeholder="9:00 AM" />
+          </label>
+          <label class="edit-hour-field"><span class="hint">End Time</span>
+            <input type="text" name="endTimes" value="<%= h.end_time || '' %>" placeholder="9:45 AM" />
+          </label>
+        </div>
       <% }); %>
     </div>
 

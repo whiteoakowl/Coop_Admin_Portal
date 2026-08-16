@@ -114,14 +114,21 @@ async function hoursForDay(day) {
   return db.prepare('SELECT * FROM class_schedule_hours WHERE day = ? ORDER BY position').all(day);
 }
 
-async function saveHourLabels(day, labels) {
+// startTimes/endTimes are optional, same shape as labels (indexed by
+// position - 1) - the hour's own shared Start/End Time (see
+// derivedHourTimeRanges's own comment on how this feeds arrival/
+// departure and each class's displayed time), set once here instead of
+// requiring an admin to open every individual class's own Manage page.
+async function saveHourLabels(day, labels, startTimes = [], endTimes = []) {
   const upsert = db.prepare(
-    `INSERT INTO class_schedule_hours (day, position, label) VALUES (?, ?, ?)
-     ON CONFLICT(day, position) DO UPDATE SET label = excluded.label`
+    `INSERT INTO class_schedule_hours (day, position, label, start_time, end_time) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(day, position) DO UPDATE SET label = excluded.label, start_time = excluded.start_time, end_time = excluded.end_time`
   );
   for (const position of HOUR_POSITIONS) {
     const label = (labels[position - 1] || `Hour ${position}`).trim() || `Hour ${position}`;
-    await upsert.run(day, position, label);
+    const startTime = (startTimes[position - 1] || '').trim() || null;
+    const endTime = (endTimes[position - 1] || '').trim() || null;
+    await upsert.run(day, position, label, startTime, endTime);
   }
 }
 
@@ -914,7 +921,7 @@ async function ensureDayMemberRosters() {
 // blank hours to floater-fill in the first place.
 async function ownPositionsAndFamilyWindowsForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
-  const positionRanges = derivedHourTimeRanges(classes);
+  const positionRanges = derivedHourTimeRanges(classes, await hoursForDay(day));
   const classIds = classes.map((c) => c.id);
   const classById = {};
   classes.forEach((c) => { classById[c.id] = c; });
@@ -1211,10 +1218,13 @@ async function syncDayMemberRosters(day) {
 // arrivalDepartureLabels (utils/schedule.js) can't parse "Hour N" as a
 // clock time, so any row stuck on it was silently dropped from a family's
 // earliest/latest calculation.
+// hours (a day's class_schedule_hours rows, each carrying its own shared
+// start_time/end_time - see saveHourLabels) is optional and defaults to
+// none, for callers that only have classes on hand.
 // { [position]: { startMin, endMin, label } } - endMin/label omitted when
-// no class at that position has a parseable end_time to pair with its
-// start.
-function derivedHourTimeRanges(rawClasses) {
+// neither any class at that position nor the hour itself has a parseable
+// end_time to pair with a start.
+function derivedHourTimeRanges(rawClasses, hours = []) {
   const bestByPosition = {};
   rawClasses.forEach((cls) => {
     const startMinutes = parseClockMinutesLocal(cls.start_time);
@@ -1239,12 +1249,35 @@ function derivedHourTimeRanges(rawClasses) {
       ? { startMin: startMinutes, endMin: endMinutes, label: `${minutesToClockLabelLocal(startMinutes)} - ${minutesToClockLabelLocal(endMinutes)}` }
       : { startMin: startMinutes, endMin: null, label: minutesToClockLabelLocal(startMinutes) };
   });
+
+  // The hour row's own shared Start/End Time (Class Schedule page's Edit
+  // Hours dialog) is the default every class in that position uses -
+  // fills in a position with no parseable time from any class at all
+  // (the common case: no class at that position sets its own times), and
+  // fills in just the missing end when the position's earliest-starting
+  // class has its own start but no end. A class with BOTH its own start
+  // and end fully overrides the hour default, already handled above
+  // before this loop runs.
+  hours.forEach((h) => {
+    const existing = ranges[h.position];
+    const hourEnd = parseClockMinutesLocal(h.end_time);
+    if (!existing) {
+      const hourStart = parseClockMinutesLocal(h.start_time);
+      if (hourStart == null) return;
+      ranges[h.position] = hourEnd != null
+        ? { startMin: hourStart, endMin: hourEnd, label: `${minutesToClockLabelLocal(hourStart)} - ${minutesToClockLabelLocal(hourEnd)}` }
+        : { startMin: hourStart, endMin: null, label: minutesToClockLabelLocal(hourStart) };
+    } else if (existing.endMin == null && hourEnd != null) {
+      existing.endMin = hourEnd;
+      existing.label = `${minutesToClockLabelLocal(existing.startMin)} - ${minutesToClockLabelLocal(hourEnd)}`;
+    }
+  });
   return ranges;
 }
 
-function derivedHourTimeLabels(rawClasses) {
+function derivedHourTimeLabels(rawClasses, hours = []) {
   const labels = {};
-  Object.entries(derivedHourTimeRanges(rawClasses)).forEach(([position, range]) => { labels[position] = range.label; });
+  Object.entries(derivedHourTimeRanges(rawClasses, hours)).forEach(([position, range]) => { labels[position] = range.label; });
   return labels;
 }
 
@@ -1263,7 +1296,8 @@ async function timeRangeForClass(cls) {
   const siblings = await db
     .prepare('SELECT hour_position, start_time, end_time FROM classes WHERE day = ? AND hour_position = ?')
     .all(cls.day, cls.hour_position);
-  const derived = derivedHourTimeLabels(siblings)[cls.hour_position];
+  const hour = await db.prepare('SELECT position, start_time, end_time FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
+  const derived = derivedHourTimeLabels(siblings, hour ? [hour] : [])[cls.hour_position];
   return derived || (await rawHourLabel(cls.day, cls.hour_position));
 }
 
@@ -1284,7 +1318,8 @@ async function timeRangeForClass(cls) {
 //
 async function syncMemberSchedulesForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
-  const derivedLabels = derivedHourTimeLabels(classes);
+  const hours = await hoursForDay(day);
+  const derivedLabels = derivedHourTimeLabels(classes, hours);
   await db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
   const upsert = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
@@ -1314,7 +1349,7 @@ async function syncMemberSchedulesForDay(day) {
   const list = await getListByDay(day);
   if (list) {
     const hourLabels = {};
-    (await hoursForDay(day)).forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
+    hours.forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
     for (const section of await sectionsForList(list.id)) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         await insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');

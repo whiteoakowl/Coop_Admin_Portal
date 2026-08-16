@@ -90,7 +90,9 @@ router.get('/class-schedule/:day', requireAdmin, requireDay, (req, res) => {
 router.post('/class-schedule/:day/edit', requireFullAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const labels = [].concat(req.body.labels || []);
-  await saveHourLabels(day, labels);
+  const startTimes = [].concat(req.body.startTimes || []);
+  const endTimes = [].concat(req.body.endTimes || []);
+  await saveHourLabels(day, labels, startTimes, endTimes);
 
   const oldNames = [].concat(req.body.oldNames || []);
   const newNames = [].concat(req.body.newNames || []);

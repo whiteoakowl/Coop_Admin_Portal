@@ -262,6 +262,15 @@ create table if not exists class_schedule_hours (
   day text not null check (day in ('monday','wednesday')),
   position integer not null check (position between 1 and 4),
   label text not null default '',
+  -- The hour's own shared Start/End Time, set once via the Class Schedule
+  -- page's Edit Hours dialog - every class in this position that day uses
+  -- it unless that class sets its own start_time/end_time (see classes
+  -- table above), which overrides it. Nullable/free text like classes'
+  -- own start_time/end_time (utils/classSchedule.js's
+  -- parseClockMinutesLocal is what actually validates the format at read
+  -- time, not a DB constraint).
+  start_time text,
+  end_time text,
   unique (day, position)
 );
 

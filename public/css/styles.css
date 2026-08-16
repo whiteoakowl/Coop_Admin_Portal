@@ -3137,6 +3137,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-sections-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; width: 100%; }
 .volunteer-sections-row input { width: 10ch; text-align: center; }
 
+/* Class Schedule's "Edit" dialog: one card per hour, each with its own
+   Label/Start Time/End Time - the shared time every class in that hour
+   uses unless a class sets its own (see utils/classSchedule.js's
+   derivedHourTimeRanges). Wraps to 2 rows on narrow/mobile via the flex
+   container below rather than one cramped row of 4. */
+.edit-hours-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; width: 100%; margin-bottom: 0.5rem; }
+.edit-hour-block { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--control-radius); min-width: 130px; }
+.edit-hour-field { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; }
+.edit-hour-field .hint { margin: 0; }
+.edit-hour-field input { width: 100%; text-align: center; }
+
 .volunteer-date-add-form { margin-top: 0.5rem; }
 .volunteer-date-add-form input[type="date"] { width: 192px; }
 
