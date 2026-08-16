@@ -1003,7 +1003,29 @@ async function ownPositionsAndFamilyWindowsForDay(day) {
     });
   });
 
-  return { positionRanges, ownPositionsByMember, ownRangesByMember, familyIdByMember, windowByFamily };
+  return { positionRanges, ownPositionsByMember, ownRangesByMember, familyIdByMember, windowByFamily, hourByPosition };
+}
+
+// A position's range from ONLY its own class_schedule_hours start_time/
+// end_time - unlike positionRanges (derivedHourTimeRanges), this never
+// falls back to guessing off whichever class happens to have its own
+// start/end filled in. That per-class fallback is a reasonable best-effort
+// label for a position nobody's set an hour-level time for, but it's the
+// wrong source for a FLOATER's actual attendance window: a floater isn't
+// tied to any one class, so if one class sharing that hour happens to run
+// long (e.g. 10:00-11:30 while the position itself has no hour-level time
+// set), every floater assigned to that hour would silently inherit that
+// one class's own duration as their own arrival/departure - the same
+// "one longer class contaminates a shared position" bug effectiveClassRange
+// was built to avoid for real class enrollment, recurring here for
+// floaters. Returns null (honestly unknown) rather than guess.
+function hourOnlyRange(position, hourByPosition) {
+  const hour = hourByPosition[position];
+  if (!hour) return null;
+  const startMin = parseClockMinutesLocal(hour.start_time);
+  if (startMin == null) return null;
+  const endMin = parseClockMinutesLocal(hour.end_time);
+  return { startMin, endMin };
 }
 
 // Widens a { start, end } window (minutes-since-midnight, either half
@@ -1042,7 +1064,7 @@ function extendWindow(w, range) {
 // question is a genuinely different one than "what time do I personally
 // arrive/depart," which is what this function answers.
 async function familyAttendanceWindowsForDay(day) {
-  const { ownPositionsByMember, ownRangesByMember, positionRanges } = await ownPositionsAndFamilyWindowsForDay(day);
+  const { ownPositionsByMember, ownRangesByMember, hourByPosition } = await ownPositionsAndFamilyWindowsForDay(day);
 
   const list = await getListByDay(day);
   if (list) {
@@ -1050,11 +1072,13 @@ async function familyAttendanceWindowsForDay(day) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
         ownPositionsByMember[memberId].add(section.position);
-        // A floater hour isn't tied to any one specific class, so the
-        // position's own shared range (already hour-default-aware - see
-        // derivedHourTimeRanges) is the only thing to use here, unlike a
-        // real class enrollment/staffing assignment's own effectiveClassRange.
-        const range = positionRanges[section.position];
+        // A floater hour isn't tied to any one specific class, so only the
+        // hour's OWN saved start/end time counts here (see hourOnlyRange) -
+        // never positionRanges' per-class fallback guess, which is fine for
+        // a display label but would otherwise silently hand every floater
+        // on this hour whichever one class's own duration happened to be
+        // set, even though the floater has no real relation to that class.
+        const range = hourOnlyRange(section.position, hourByPosition);
         if (!range) continue;
         if (!ownRangesByMember[memberId]) ownRangesByMember[memberId] = [];
         ownRangesByMember[memberId].push(range);
