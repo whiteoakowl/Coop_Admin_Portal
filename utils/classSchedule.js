@@ -225,6 +225,18 @@ function minutesToClockLabelLocal(minutes) {
   return `${hour}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
+// A { startMin, endMin } range (see effectiveClassRange/hourOnlyRange
+// below) as a display string - "9:00 AM - 9:45 AM", or just "9:00 AM"
+// when endMin is unknown (never fabricated). null in, null out, so a
+// caller can chain a further fallback (e.g. `|| someLabel`) on the
+// result without an extra null check of its own.
+function rangeToLabel(range) {
+  if (!range) return null;
+  return range.endMin != null
+    ? `${minutesToClockLabelLocal(range.startMin)} - ${minutesToClockLabelLocal(range.endMin)}`
+    : minutesToClockLabelLocal(range.startMin);
+}
+
 const UNASSIGNED_ROOM = 'Unassigned';
 
 function roomOrderSettingKey(day) {
@@ -558,9 +570,20 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
     for (const studentId of studentIds) await link.run(classId, studentId);
   });
   await syncClassRosterMembers(classId);
+  // A student enrolled here used to never get cleared off the Floater
+  // Assignments list at all (unlike addStaff's own teacher/assistant
+  // pickup, just below) - see floaterPositionsCoveredByClass's own
+  // comment on why this also covers a position the class overlaps but
+  // isn't literally filed under. Computed once for the whole class, not
+  // once per student.
+  const { day, positions } = await floaterPositionsCoveredByClass(classId);
+  if (day) {
+    for (const studentId of studentIds) {
+      for (const position of positions) await removeFromFloaterForHour(day, position, studentId);
+    }
+  }
   if (skipSync) return;
-  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
-  if (cls) await syncDayMemberRosters(cls.day);
+  if (day) await syncDayMemberRosters(day);
 }
 
 // A member picked up as a class's teacher/assistant for an hour they were
@@ -578,6 +601,28 @@ async function removeFromFloaterForHour(day, hourPosition, memberId) {
   await removeMemberFromSection(list.id, memberId, section.id);
 }
 
+// A class's own hour_position, plus every OTHER position its own
+// effective time genuinely overlaps (see positionsOverlappingRange) - the
+// full set of positions a member picked up for this class needs clearing
+// off the Floater Assignments list for. { day, positions: Set<number> },
+// or { day: null, positions: new Set() } if the class doesn't exist.
+async function floaterPositionsCoveredByClass(classId) {
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
+  if (!cls) return { day: null, positions: new Set() };
+  const hours = await hoursForDay(cls.day);
+  const hourByPosition = {};
+  hours.forEach((h) => { hourByPosition[h.position] = h; });
+  const positions = positionsOverlappingRange(effectiveClassRange(cls, hourByPosition), hourByPosition);
+  positions.add(cls.hour_position);
+  return { day: cls.day, positions };
+}
+
+async function removeFromFloaterForOverlappingHours(classId, memberId) {
+  const { day, positions } = await floaterPositionsCoveredByClass(classId);
+  if (!day) return;
+  for (const position of positions) await removeFromFloaterForHour(day, position, memberId);
+}
+
 // Adds one teacher/assistant - used by both the admin manage form (one at
 // a time, via the picker) and the public self-signup page. syncDayMemberRosters
 // rebuilds that whole day's rosters/schedules from scratch (every class,
@@ -593,9 +638,9 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
        ON CONFLICT (class_id, member_id) DO UPDATE SET role = excluded.role`
     )
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
-  const cls = await db.prepare('SELECT day, hour_position FROM classes WHERE id = ?').get(classId);
-  if (cls) await removeFromFloaterForHour(cls.day, cls.hour_position, memberId);
+  await removeFromFloaterForOverlappingHours(classId, memberId);
   if (skipSync) return;
+  const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
@@ -1028,6 +1073,36 @@ function hourOnlyRange(position, hourByPosition) {
   return { startMin, endMin };
 }
 
+// Whether two { startMin, endMin } ranges overlap at all. Requires a real,
+// known endMin on BOTH sides - an unknown end can't be safely compared
+// against anything, so this conservatively says "no overlap" rather than
+// risk a false positive off a guessed end.
+function rangesOverlap(a, b) {
+  if (!a || !b || a.endMin == null || b.endMin == null) return false;
+  return a.startMin < b.endMin && b.startMin < a.endMin;
+}
+
+// A live bug report: a member enrolled in (or staffing) a class whose own
+// explicit time genuinely runs longer than the single hour_position it's
+// filed under (a real "double period" - e.g. a class filed under
+// position 1 with its own end_time set to what would normally be
+// position 2's end) stayed on the Floater Assignments list for position
+// 2 even after being picked up for that class - nothing had ever told the
+// floater-removal logic (see removeFromFloaterForHour) that the class's
+// own real time reaches into a position it isn't literally filed under.
+// Returns every position (the class's own hour_position, plus any other
+// position whose own hour-level time the class's effective range
+// genuinely overlaps) that a member busy with this class should be
+// cleared off the floater list for.
+function positionsOverlappingRange(range, hourByPosition) {
+  const positions = new Set();
+  if (!range) return positions;
+  for (const position of HOUR_POSITIONS) {
+    if (rangesOverlap(range, hourOnlyRange(position, hourByPosition))) positions.add(position);
+  }
+  return positions;
+}
+
 // Widens a { start, end } window (minutes-since-midnight, either half
 // possibly still null) to also cover a position's range - start always
 // participates (a class's start time is always known once it resolves at
@@ -1341,30 +1416,26 @@ function derivedHourTimeRanges(rawClasses, hours = []) {
   return ranges;
 }
 
-function derivedHourTimeLabels(rawClasses, hours = []) {
-  const labels = {};
-  Object.entries(derivedHourTimeRanges(rawClasses, hours)).forEach(([position, range]) => { labels[position] = range.label; });
-  return labels;
-}
-
 async function rawHourLabel(day, position) {
   const hour = await db.prepare('SELECT label FROM class_schedule_hours WHERE day = ? AND position = ?').get(day, position);
   return (hour && hour.label) || '';
 }
 
 // A class's display time range: its own start_time/end_time if an admin
-// set them, otherwise the position's live-derived time (see
-// derivedHourTimeLabels above), otherwise its hour block's raw stored
-// label (e.g. "Hour 1" or whatever an admin renamed it to via Edit
-// Hours).
+// set them, otherwise falls back per-half to its hour block's own
+// start/end (see effectiveClassRange), otherwise its hour block's raw
+// stored label (e.g. "Hour 1" or whatever an admin renamed it to via Edit
+// Hours). Deliberately never looks at another class sharing the same
+// hour_position (a real bug report: a class with no time of its own used
+// to borrow whichever sibling class in that hour had the earliest
+// start_time, using THAT sibling's own end_time too - see
+// effectiveClassRange's own comment on the same fix already made for
+// Arrival/Departure and the Schedule Card).
 async function timeRangeForClass(cls) {
   if (cls.start_time && cls.end_time) return `${cls.start_time} - ${cls.end_time}`;
-  const siblings = await db
-    .prepare('SELECT hour_position, start_time, end_time FROM classes WHERE day = ? AND hour_position = ?')
-    .all(cls.day, cls.hour_position);
   const hour = await db.prepare('SELECT position, start_time, end_time FROM class_schedule_hours WHERE day = ? AND position = ?').get(cls.day, cls.hour_position);
-  const derived = derivedHourTimeLabels(siblings, hour ? [hour] : [])[cls.hour_position];
-  return derived || (await rawHourLabel(cls.day, cls.hour_position));
+  const range = effectiveClassRange(cls, hour ? { [cls.hour_position]: hour } : {});
+  return rangeToLabel(range) || (await rawHourLabel(cls.day, cls.hour_position));
 }
 
 // Everyone's live schedule rows for one day - the read-side twin of
@@ -1391,13 +1462,30 @@ async function timeRangeForClass(cls) {
 async function liveMemberScheduleRowsForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
   const hours = await hoursForDay(day);
-  const derivedLabels = derivedHourTimeLabels(classes, hours);
+  const hourByPosition = {};
+  hours.forEach((h) => { hourByPosition[h.position] = h; });
   const rowsByMember = {};
+  const rangesByMember = {};
 
+  // A live bug report: this class row's own displayed time (and, below,
+  // a floater's) used to fall back to derivedHourTimeLabels - the same
+  // per-POSITION "whichever class here has the earliest start_time wins,
+  // use THAT class's own end_time" guess effectiveClassRange/hourOnlyRange
+  // were built to keep OUT of a real family's own arrival/departure
+  // window (see effectiveClassRange's own comment on the original bug
+  // report). Arrival/Departure got that fix; this Schedule Card row
+  // display quietly kept the old contamination-prone fallback, so a class
+  // sharing an hour with a longer one (or a floater on that same hour)
+  // could still show the long class's own borrowed time here even after
+  // Arrival/Departure was correct. effectiveClassRange only ever draws
+  // from the class's OWN start/end or its hour's OWN start/end - never
+  // another class's - so this row can no longer be contaminated by a
+  // neighbor sharing the same hour position.
   for (const cls of classes) {
+    const range = effectiveClassRange(cls, hourByPosition);
     const time = (cls.start_time && cls.end_time)
       ? `${cls.start_time} - ${cls.end_time}`
-      : derivedLabels[cls.hour_position] || (await rawHourLabel(day, cls.hour_position));
+      : rangeToLabel(range) || (await rawHourLabel(day, cls.hour_position));
     const staff = await staffForClass(cls.id);
     const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
     const row = { class_number: cls.hour_position, time, class_name: cls.class_name, room: cls.room || '', teacher: teacherNames };
@@ -1405,17 +1493,33 @@ async function liveMemberScheduleRowsForDay(day) {
     for (const person of people) {
       if (!rowsByMember[person.id]) rowsByMember[person.id] = {};
       rowsByMember[person.id][cls.hour_position] = row;
+      if (range) {
+        if (!rangesByMember[person.id]) rangesByMember[person.id] = [];
+        rangesByMember[person.id].push(range);
+      }
     }
   }
 
   const list = await getListByDay(day);
   if (list) {
+    // A floater hour isn't tied to any one specific class (see
+    // hourOnlyRange's own comment) - only the hour's OWN saved start/end
+    // time counts here, never a borrowed guess from whichever class
+    // happens to share the position.
     const hourLabels = {};
-    hours.forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
+    hours.forEach((h) => { hourLabels[h.position] = rangeToLabel(hourOnlyRange(h.position, hourByPosition)) || h.label; });
     for (const section of await sectionsForList(list.id)) {
+      const sectionRange = hourOnlyRange(section.position, hourByPosition);
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         if (!rowsByMember[memberId]) rowsByMember[memberId] = {};
-        if (rowsByMember[memberId][section.position]) continue; // a real class slot always wins
+        if (rowsByMember[memberId][section.position]) continue; // a real class slot at this exact position always wins
+        // A live bug report: a member whose own class genuinely runs
+        // longer than the single hour_position it's filed under (see
+        // positionsOverlappingRange's own comment) still showed up as a
+        // "Floater" for a position their real class's time actually
+        // overlaps, even though they're already busy then - the position
+        // just never had a class ROW filed under it specifically.
+        if (sectionRange && (rangesByMember[memberId] || []).some((r) => rangesOverlap(sectionRange, r))) continue;
         rowsByMember[memberId][section.position] = {
           class_number: section.position, time: hourLabels[section.position] || '', class_name: 'Floater', room: '', teacher: '',
         };
@@ -1445,7 +1549,8 @@ async function liveMemberScheduleRowsForDay(day) {
 async function syncMemberSchedulesForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
   const hours = await hoursForDay(day);
-  const derivedLabels = derivedHourTimeLabels(classes, hours);
+  const hourByPosition = {};
+  hours.forEach((h) => { hourByPosition[h.position] = h; });
   await db.prepare('DELETE FROM member_schedules WHERE day = ?').run(day);
   const upsert = db.prepare(
     `INSERT INTO member_schedules (member_id, day, class_number, time, class_name, room, teacher, updated_at)
@@ -1455,10 +1560,13 @@ async function syncMemberSchedulesForDay(day) {
        teacher = excluded.teacher, updated_at = now_text()`
   );
 
+  // Same contamination fix as liveMemberScheduleRowsForDay's own copy of
+  // this loop (see that function's comment) - effectiveClassRange/
+  // hourOnlyRange, never derivedHourTimeLabels' per-position guess.
   for (const cls of classes) {
     const time = (cls.start_time && cls.end_time)
       ? `${cls.start_time} - ${cls.end_time}`
-      : derivedLabels[cls.hour_position] || (await rawHourLabel(day, cls.hour_position));
+      : rangeToLabel(effectiveClassRange(cls, hourByPosition)) || (await rawHourLabel(day, cls.hour_position));
     const staff = await staffForClass(cls.id);
     const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
     const people = [...(await studentsForClass(cls.id)), ...staff];
@@ -1475,7 +1583,7 @@ async function syncMemberSchedulesForDay(day) {
   const list = await getListByDay(day);
   if (list) {
     const hourLabels = {};
-    hours.forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
+    hours.forEach((h) => { hourLabels[h.position] = rangeToLabel(hourOnlyRange(h.position, hourByPosition)) || h.label; });
     for (const section of await sectionsForList(list.id)) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         await insertIfEmpty.run(memberId, day, section.position, hourLabels[section.position] || '');
