@@ -83,4 +83,55 @@ async function seedIfMissing(db) {
   }
 }
 
-module.exports = { seedIfMissing };
+// Genuine one-time backfill for an ALREADY-DEPLOYED Postgres database -
+// unlike seedIfMissing above (fresh-install-only, see this file's own
+// header comment), this has to run against a name_tag_templates row that
+// already exists, because seedIfMissing only ever inserts that row once,
+// the first time the app boots against a brand new database. An install
+// that had already seeded its student/parent template before the "logo"
+// element was added to DEFAULT_LAYOUTS (utils/nameTagBadge.js) would
+// otherwise never pick the logo up on its own - the saved row simply
+// isn't touched again after that first insert.
+// Only replaces a saved layout wholesale when it still has exactly the
+// pre-logo default's own element ids (nobody has customized it in the
+// editor yet) - safe to swap in the fully-repositioned new default there.
+// Otherwise, so a real admin-customized layout is never silently
+// overwritten, this only adds a small logo image element in a free
+// corner, leaving every existing element exactly where it is.
+const PRE_LOGO_ELEMENT_IDS = {
+  student: ['memberCode', 'name', 'grade', 'barcode'],
+  parent: ['memberCode', 'name', 'team', 'barcode'],
+};
+
+function sameIds(a, b) {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((id, i) => id === sortedB[i]);
+}
+
+async function backfillNameTagLogo(db) {
+  for (const memberType of Object.keys(PRE_LOGO_ELEMENT_IDS)) {
+    const row = await db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
+    if (!row) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(row.layout_json);
+    } catch (err) {
+      continue;
+    }
+    const layout = Array.isArray(parsed) ? { background: '#ffffff', backgroundOpacity: 1, elements: parsed } : parsed;
+    if (!layout.elements || layout.elements.some((el) => el.type === 'image')) continue;
+
+    const newLayout = sameIds(layout.elements.map((el) => el.id), PRE_LOGO_ELEMENT_IDS[memberType])
+      ? DEFAULT_LAYOUTS[memberType]
+      : {
+          ...layout,
+          elements: [{ id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 288, y: 4, width: 32, height: 32 }, ...layout.elements],
+        };
+
+    await db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify(newLayout), memberType);
+  }
+}
+
+module.exports = { seedIfMissing, backfillNameTagLogo };
