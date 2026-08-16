@@ -1093,6 +1093,59 @@ async function primaryParentIdsByFamily(familyIds) {
   return result;
 }
 
+// Removes any parent who isn't their family's designated primary parent
+// from EVERY floater hour section on a day, no matter how they got there.
+// autoAssignFloatersForDay only ever adds (see its own comment) and has no
+// way to tell an old, now-wrong auto-added assignment from a deliberate
+// manual one - volunteer_members has no 'source' column the way
+// roster_members does for syncDayMemberRosters's own auto-vs-manual
+// distinction - so once a family had both parents floated (whether by an
+// earlier version of the auto-assign logic or a bulk import), nothing
+// short of this explicit, admin-triggered cleanup ever removes the extra
+// one. Not automatic, and not run as part of any regular sync - only from
+// the Floater Teams page's own confirm-guarded "Remove Non-Primary
+// Parents" button. Returns the number of (member, section) memberships
+// removed.
+async function removeNonPrimaryParentsFromFloaterTeams(day) {
+  const list = await getListByDay(day);
+  if (!list) return 0;
+  const sections = await sectionsForList(list.id);
+  if (!sections.length) return 0;
+
+  const memberIdsBySection = {};
+  const allMemberIds = new Set();
+  for (const section of sections) {
+    const ids = await membersForSectionRaw(list.id, section.id);
+    memberIdsBySection[section.id] = ids;
+    ids.forEach((id) => allMemberIds.add(id));
+  }
+  if (!allMemberIds.size) return 0;
+
+  const placeholders = Array.from(allMemberIds).map(() => '?').join(',');
+  const parents = await db
+    .prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders}) AND member_type = 'parent'`)
+    .all(...allMemberIds);
+  const familyIdByParent = {};
+  parents.forEach((p) => { familyIdByParent[p.id] = p.family_id; });
+  const familyIds = [...new Set(parents.map((p) => p.family_id).filter((id) => id != null))];
+  const primaryIds = new Set(Object.values(await primaryParentIdsByFamily(familyIds)));
+
+  let removed = 0;
+  for (const section of sections) {
+    for (const memberId of memberIdsBySection[section.id]) {
+      // Not a parent record, or a parent with no family on file - nothing
+      // to compare against "who's primary," so leave it alone rather than
+      // guessing.
+      if (!(memberId in familyIdByParent) || familyIdByParent[memberId] == null) continue;
+      if (primaryIds.has(memberId)) continue;
+      await removeMemberFromSection(list.id, memberId, section.id);
+      removed++;
+    }
+  }
+  if (removed) await syncDayMemberRosters(day);
+  return removed;
+}
+
 // Everyone floating any hour on a day's Floater Assignments list - a
 // parent only needs to be assigned to ONE hour to count as floating that
 // day, same "day-level" granularity as teaching/assisting a class.
@@ -1329,6 +1382,7 @@ module.exports = {
   addStaff,
   removeFromFloaterForHour,
   autoAssignFloatersForDay,
+  removeNonPrimaryParentsFromFloaterTeams,
   familyAttendanceWindowsForDay,
   minutesToClockLabelLocal,
   removeStaff,

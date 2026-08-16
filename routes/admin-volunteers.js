@@ -8,7 +8,14 @@ const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOpti
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { defaultDay, requireDay } = require('../utils/days');
-const { hoursForDay, syncDayMemberRosters, syncMemberSchedulesForDay, saveHourLabel, classesAtRiskForDay } = require('../utils/classSchedule');
+const {
+  hoursForDay,
+  syncDayMemberRosters,
+  syncMemberSchedulesForDay,
+  saveHourLabel,
+  classesAtRiskForDay,
+  removeNonPrimaryParentsFromFloaterTeams,
+} = require('../utils/classSchedule');
 const {
   DAY_LABELS,
   RANKS,
@@ -323,6 +330,21 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// Explicit, admin-triggered cleanup for floater team membership that
+// accumulated non-primary parents before/outside the "only the family's
+// primary parent gets auto-floated" rule - see
+// removeNonPrimaryParentsFromFloaterTeams's own comment for why nothing
+// else ever removes these automatically. Re-runnable any time; a no-op
+// once nothing is left to remove.
+router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const removed = await removeNonPrimaryParentsFromFloaterTeams(day);
+  const notice = removed
+    ? `Removed ${removed} non-primary parent assignment(s).`
+    : 'No non-primary parent assignments found to remove.';
+  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(notice));
 });
 
 router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {

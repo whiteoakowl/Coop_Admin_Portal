@@ -38,6 +38,9 @@
           <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('floater-import-dialog').showModal()">Import</button>
           <a class="roster-action-btn file-action-btn" href="/admin/volunteers/<%= day %>/teams/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <form method="POST" action="/admin/volunteers/<%= day %>/teams/cleanup" class="inline-block-form" data-confirm="Remove every non-primary parent from <%= dayLabel %>'s floater teams? Only each family's designated primary parent (or, if none is set, whoever comes first alphabetically) stays on the list. This can't be undone automatically - anyone removed would need to be added back by hand." data-confirm-yes-label="Yes, Remove" data-confirm-icon="icon-trash">
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove Non-Primary Parents</button>
+          </form>
         </div>
       </div>
 

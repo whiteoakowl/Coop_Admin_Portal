@@ -11,6 +11,7 @@ const {
   classesNeedingStaffForDay,
   allClassesList,
   addManualRosterMember,
+  syncDayMemberRosters,
   HOUR_POSITIONS,
 } = require('../utils/classSchedule');
 const { defaultDay, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
@@ -454,6 +455,21 @@ router.post('/rosters/:tab/attendance', requireAdmin, async (req, res) => {
 
   if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent('Attendance saved.'));
+});
+
+// Re-runs syncDayMemberRosters(day) on demand instead of only reactively
+// on the next enrollment/staffing/floater edit - this is normally
+// automatic (see that function's own comment), but a family whose
+// roster/floater membership went stale under old logic before a fix
+// landed has no reason to get touched again on its own, so this gives an
+// admin a way to force it without making a throwaway edit. Auto-added
+// ('source'='auto') roster members not in the freshly computed set are
+// removed; anyone added by hand via + Add Member is untouched either way.
+router.post('/rosters/:day/resync', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  await syncDayMemberRosters(day);
+  const tab = req.body.tab && TABS[req.body.tab] && TABS[req.body.tab].day === day ? req.body.tab : `${day}-student`;
+  res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`${DAY_LABELS[day]} rosters resynced.`));
 });
 
 // --- Archive routes ---
