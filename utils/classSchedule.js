@@ -1140,23 +1140,41 @@ function extendWindow(w, range) {
 // arrive/depart," which is what this function answers.
 async function familyAttendanceWindowsForDay(day) {
   const { ownPositionsByMember, ownRangesByMember, hourByPosition } = await ownPositionsAndFamilyWindowsForDay(day);
+  // Snapshot each member's REAL (class/staffing) ranges before the floater
+  // loop below adds to the same arrays - needed so the overlap check just
+  // below only ever compares a floater hour against a real class, never
+  // against another floater section already added earlier in this same
+  // loop.
+  const realRangesByMember = {};
+  Object.entries(ownRangesByMember).forEach(([memberId, ranges]) => { realRangesByMember[memberId] = [...ranges]; });
 
   const list = await getListByDay(day);
   if (list) {
     for (const section of await sectionsForList(list.id)) {
+      // A floater hour isn't tied to any one specific class, so only the
+      // hour's OWN saved start/end time counts here (see hourOnlyRange) -
+      // never positionRanges' per-class fallback guess, which is fine for
+      // a display label but would otherwise silently hand every floater
+      // on this hour whichever one class's own duration happened to be
+      // set, even though the floater has no real relation to that class.
+      const sectionRange = hourOnlyRange(section.position, hourByPosition);
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
         ownPositionsByMember[memberId].add(section.position);
-        // A floater hour isn't tied to any one specific class, so only the
-        // hour's OWN saved start/end time counts here (see hourOnlyRange) -
-        // never positionRanges' per-class fallback guess, which is fine for
-        // a display label but would otherwise silently hand every floater
-        // on this hour whichever one class's own duration happened to be
-        // set, even though the floater has no real relation to that class.
-        const range = hourOnlyRange(section.position, hourByPosition);
-        if (!range) continue;
+        if (!sectionRange) continue;
+        // A live bug report: a member whose own real class time genuinely
+        // overlaps this floater hour (a "double period" filed under a
+        // different position - see positionsOverlappingRange's own
+        // comment) shouldn't have this hour's range unioned in on top of
+        // their real class - addStaff/setEnrollment already clear this
+        // exact floater membership going forward, but a member who was
+        // already on it before that fix shipped needs the same check
+        // here too, so Arrival/Departure self-heals immediately instead
+        // of staying wrong until something happens to re-sync their
+        // specific class.
+        if ((realRangesByMember[memberId] || []).some((r) => rangesOverlap(sectionRange, r))) continue;
         if (!ownRangesByMember[memberId]) ownRangesByMember[memberId] = [];
-        ownRangesByMember[memberId].push(range);
+        ownRangesByMember[memberId].push(sectionRange);
       }
     }
   }
