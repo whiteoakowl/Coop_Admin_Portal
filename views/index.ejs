@@ -8,7 +8,11 @@
   <!-- See .landing-top-menu's own comment (public/css/styles.css) - a
        full-width menu bar fixed across the very top of the screen at
        desktop/tablet widths, living outside .landing-wrap so it isn't
-       constrained to that element's own centered max-width. -->
+       constrained to that element's own centered max-width. Below 640px
+       this is hidden in favor of .landing-mobile-grid's own 4-button grid
+       (Check In/Check Out/Floater Assignments/Setup-Cleanup Teams) and
+       .landing-action-bar's own bottom menu, which carries this same set
+       of 5 links instead. -->
   <nav class="landing-top-menu landing-desktop-only">
     <a class="landing-top-menu-link" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
     <a class="landing-top-menu-link" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
@@ -23,6 +27,8 @@
     </button>
   </div>
   <footer class="landing-action-bar">
+    <a class="landing-action-bar-btn" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg><span>Name Tag Form</span></a>
+    <a class="landing-action-bar-btn" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Absence/Late Form</span></a>
     <a class="landing-action-bar-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg><span>Find a Parent</span></a>
     <a class="landing-action-bar-btn" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg><span>Class Check In &amp; Out</span></a>
     <a class="landing-action-bar-btn" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg><span>Admin</span></a>
@@ -56,31 +62,26 @@
       </div>
     </div>
 
+    <!-- Name Tag Form and Absence/Late Form moved to .landing-action-bar
+         (the mobile bottom menu) instead of living here too - see that
+         footer above. -->
     <div class="landing-mobile-grid">
       <div class="landing-grid">
-        <a class="landing-card landing-card-orange" href="/kiosk/checkin">
+        <a class="landing-card landing-card-green" href="/kiosk/checkin">
           <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
           <span class="landing-label">Check In</span>
         </a>
-        <a class="landing-card landing-card-orange" href="/kiosk/checkout">
+        <a class="landing-card landing-card-green" href="/kiosk/checkout">
           <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
           <span class="landing-label">Check Out</span>
         </a>
-        <a class="landing-card landing-card-green" href="/setup/<%= defaultDay %>">
-          <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-          <span class="landing-label">Setup/Cleanup Teams</span>
-        </a>
-        <a class="landing-card landing-card-green" href="/volunteers/<%= defaultDay %>">
+        <a class="landing-card landing-card-purple" href="/volunteers/<%= defaultDay %>">
           <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
           <span class="landing-label">Floater Assignments</span>
         </a>
-        <a class="landing-card landing-card-purple" href="/name-tag">
-          <span class="landing-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
-          <span class="landing-label">Name Tag Form</span>
-        </a>
-        <a class="landing-card landing-card-purple" href="/absence">
-          <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
-          <span class="landing-label">Absence/Late Form</span>
+        <a class="landing-card landing-card-purple" href="/setup/<%= defaultDay %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+          <span class="landing-label">Setup/Cleanup Teams</span>
         </a>
       </div>
     </div>

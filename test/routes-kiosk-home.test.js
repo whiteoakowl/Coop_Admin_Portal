@@ -1,17 +1,18 @@
 // Real HTTP-level coverage for the kiosk home screen (views/kiosk-
 // home.ejs, the separate /kiosk full-screen view - see
-// test/routes-index-home.test.js for the actual site root). Redesigned
-// to a desktop/tablet-only orange top menu bar (Name Tag Form, Absence/
-// Late Form, Find a Parent, Class Check In & Out, Admin) plus two
-// stacked button columns (Check In/Check Out - green; Floater
-// Assignments/Setup-Cleanup Teams - purple), replacing the original
-// corner-pill layout (Find a Parent top-left, Class Check In & Out +
-// Admin bottom-right) that index.ejs (the site root) still uses. Below
-// 640px the original single-grid layout takes over instead, alongside
-// the existing mobile bottom action bar (Find a Parent/Class Check In &
-// Out/Admin) - both markup shapes are always in the response; only CSS
-// (public/css/styles.css's .landing-desktop-only / .landing-mobile-grid)
-// decides which one is visible.
+// test/routes-index-home.test.js for the site root, which now shares
+// this exact same shape). A desktop/tablet-only orange top menu bar
+// (Name Tag Form, Absence/Late Form, Find a Parent, Class Check In &
+// Out, Admin), two stacked desktop/tablet button columns (Check In/
+// Check Out - green; Floater Assignments/Setup-Cleanup Teams - purple),
+// a mobile-only 4-button grid in that same order/coloring (Name Tag
+// Form and Absence/Late Form deliberately dropped from the mobile grid
+// - they live in the mobile bottom bar instead), and a mobile-only
+// bottom bar carrying all 5 top-menu links with a vertical divider
+// between each. Below 640px the desktop shapes are hidden and the
+// mobile ones take over instead - both markup shapes are always in the
+// response; only CSS (public/css/styles.css's .landing-desktop-only /
+// .landing-mobile-grid) decides which one is visible.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -40,9 +41,11 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
   const res = await request(app).get('/kiosk');
   assert.equal(res.status, 200);
 
-  await t.test('the mobile-only bottom bar has Find a Parent, Class Check In & Out, and Admin as icon-on-top/label-below tab items', () => {
+  await t.test('the mobile-only bottom bar has all 5 top-menu links (Name Tag Form, Absence/Late Form, Find a Parent, Class Check In & Out, Admin) as icon-on-top/label-below tab items', () => {
     const groupMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
     assert.ok(groupMatch, 'expected a <footer class="landing-action-bar"> group');
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/name-tag">/);
+    assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/absence">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/find-parent">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/kiosk\/class-checkin">/);
     assert.match(groupMatch[1], /<a class="landing-action-bar-btn" href="\/admin">/);
@@ -59,7 +62,7 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
   });
 
   await t.test('the desktop/tablet-only columns have Check In/Check Out (green) on the left and Floater Assignments/Setup-Cleanup Teams (purple) on the right', () => {
-    const groupMatch = /<div class="landing-columns landing-desktop-only">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="landing-mobile-grid">/.exec(res.text);
+    const groupMatch = /<div class="landing-columns landing-desktop-only">([\s\S]*?)<\/div>\s*<\/div>/.exec(res.text);
     assert.ok(groupMatch, 'expected a .landing-columns group');
     const [leftColumn, rightColumn] = groupMatch[1].split('<div class="landing-column">').slice(1);
     assert.match(leftColumn, /<a class="landing-card landing-card-green landing-card-wide" href="\/kiosk\/checkin">/);
@@ -68,14 +71,15 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
     assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/setup\//);
   });
 
-  await t.test('the mobile-only grid still has all 6 original cards', () => {
+  await t.test('the mobile-only grid has exactly 4 cards, in order Check In, Check Out (green), Floater Assignments, Setup/Cleanup Teams (purple) - Name Tag Form/Absence/Late Form live in the bottom bar instead', () => {
     const groupMatch = /<div class="landing-mobile-grid">([\s\S]*?)<\/div>\s*<\/main>/.exec(res.text);
     assert.ok(groupMatch, 'expected a .landing-mobile-grid group');
-    ['/kiosk/checkin', '/kiosk/checkout', '/absence', '/name-tag'].forEach((href) => {
-      assert.match(groupMatch[1], new RegExp(`href="${href.replace(/\//g, '\\/')}"`));
-    });
-    assert.match(groupMatch[1], /href="\/volunteers\//);
-    assert.match(groupMatch[1], /href="\/setup\//);
+    const labels = [...groupMatch[1].matchAll(/<span class="landing-label">([^<]+)<\/span>/g)].map((m) => m[1]);
+    assert.deepEqual(labels, ['Check In', 'Check Out', 'Floater Assignments', 'Setup/Cleanup Teams']);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkin">/);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkout">/);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/volunteers\//);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup\//);
   });
 
   await t.test('Full Screen View is unaffected, still in its own top-right corner group at every viewport width', () => {

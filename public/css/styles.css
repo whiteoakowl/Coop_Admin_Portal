@@ -106,7 +106,7 @@
      with border-radius: 50% for the circular crop. */
   --logo-xl: 184px;  /* admin sidebar */
   --logo-lg: 140px;  /* login page */
-  --logo-md: 116px;  /* kiosk landing header */
+  --logo-md: 150px;  /* kiosk/root landing header */
   --logo-sm: 100px;  /* kiosk check-in/check-out header */
   --logo-xs: 86px;   /* public form header (absence, name tag, membership) */
   --logo-2xs: 34px;  /* mobile top bar */
@@ -206,7 +206,7 @@ textarea:focus-visible,
 .landing-welcome {
   margin: 0;
   color: var(--ink);
-  font-size: 2.5rem;
+  font-size: 3.2rem;
   font-weight: 800;
 }
 
@@ -387,7 +387,7 @@ textarea:focus-visible,
 
 @media (max-width: 720px) {
   .landing-grid { grid-template-columns: repeat(2, 220px); }
-  .landing-welcome { font-size: 1.4rem; padding: 0.85rem 1.5rem; }
+  .landing-welcome { font-size: 2.2rem; padding: 0.85rem 1.5rem; }
 }
 
 @media (max-width: 500px) {
@@ -770,12 +770,14 @@ textarea:focus-visible,
     right: 0;
     bottom: 0;
     z-index: 10;
-    gap: 0.2rem;
-    padding: 0.4rem 0.6rem calc(0.4rem + env(safe-area-inset-bottom));
+    padding: 0.4rem 0 calc(0.4rem + env(safe-area-inset-bottom));
     background: var(--accent);
     box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
   }
 }
+/* Vertical divider between each item, same treatment as
+   .landing-top-menu-link's own dividers above, so the two "pick a link"
+   bars (desktop top, mobile bottom) read as one consistent pattern. */
 .landing-action-bar-btn {
   flex: 1;
   display: flex;
@@ -783,8 +785,8 @@ textarea:focus-visible,
   align-items: center;
   justify-content: center;
   gap: 0.2rem;
-  border-radius: 8px;
-  padding: 0.4rem 0.5rem;
+  border-left: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 0.4rem 0.3rem;
   color: var(--ink);
   font-size: 0.65rem;
   font-weight: 600;
@@ -792,6 +794,7 @@ textarea:focus-visible,
   text-align: center;
   transition: background-color 0.15s ease;
 }
+.landing-action-bar-btn:first-child { border-left: none; }
 .landing-action-bar-btn .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
 .landing-action-bar-btn:hover { background: rgba(255,255,255,0.4); }
 
