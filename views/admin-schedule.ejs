@@ -223,6 +223,29 @@
               </div>
             <% }); %>
           </div>
+          <%
+            // "Select All" (public/js/archive-select-toggle.js) only ever
+            // checks checkboxes actually present in the DOM - and this grid
+            // only renders one page's worth of members at a time (see the
+            // route's own PAGE_SIZE slice), so on a multi-page list it used
+            // to silently select just the current page, not everyone. Only
+            // relevant on the real "every active member" view (no single-
+            // person filter picked from the Name dropdown above, which
+            // already shows just the one match with no pagination at all) -
+            // these extra boxes carry the rest of that same, already-known
+            // allNames list (every active member of this type, unfiltered
+            // by page) so "Select All" can reach them too, without needing
+            // a server round trip or a separate "select every page" concept
+            // on the archive route itself.
+            var pageIds = rows.map(function (r) { return r.member.id; });
+          %>
+          <% if (!selectedMemberId) { %>
+            <% allNames.forEach(function(n) { %>
+              <% if (pageIds.indexOf(n.id) === -1) { %>
+                <input type="checkbox" name="memberIds" value="<%= n.id %>" form="schedule-archive-form-<%= tab %>" class="archive-offpage-checkbox" aria-hidden="true" hidden />
+              <% } %>
+            <% }); %>
+          <% } %>
         <% } %>
 
         <% if (totalPages > 1) { %>
