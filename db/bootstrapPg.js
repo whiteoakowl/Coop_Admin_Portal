@@ -134,4 +134,34 @@ async function backfillNameTagLogo(db) {
   }
 }
 
-module.exports = { seedIfMissing, backfillNameTagLogo };
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// task_list_items rows, created before the barcode column existed -
+// nothing else ever revisits an old row once it's inserted (utils/
+// taskList.js's addItem only assigns a barcode to a NEW row), so without
+// this an already-live co-op's existing task list would keep every one
+// of its tasks permanently un-scannable. Also creates each backfilled
+// task's own Setup/Cleanup badge (see misc_badges.task_item_id's own
+// schema comment) - a task created before this feature shipped has no
+// badge row at all yet, same as a fresh one only gets one via
+// upsertTaskBadge at creation time.
+async function backfillTaskItemBarcodes(db) {
+  const rows = await db.prepare('SELECT id, description, section_id FROM task_list_items WHERE barcode IS NULL').all();
+  if (rows.length === 0) return;
+  const existsCode = db.prepare('SELECT 1 FROM task_list_items WHERE barcode = ?');
+  for (const row of rows) {
+    let code;
+    do {
+      code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    } while (await existsCode.get(code));
+    await db.prepare('UPDATE task_list_items SET barcode = ? WHERE id = ?').run(code, row.id);
+
+    const section = await db.prepare('SELECT title FROM task_list_sections WHERE id = ?').get(row.section_id);
+    const existingBadge = await db.prepare('SELECT id FROM misc_badges WHERE task_item_id = ?').get(row.id);
+    if (existingBadge) continue;
+    await db
+      .prepare('INSERT INTO misc_badges (badge_type, badge_number, title, description, barcode, task_item_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('setupCleanup', code, row.description, section ? section.title : null, code, row.id);
+  }
+}
+
+module.exports = { seedIfMissing, backfillNameTagLogo, backfillTaskItemBarcodes };

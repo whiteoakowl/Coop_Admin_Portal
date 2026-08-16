@@ -117,6 +117,62 @@ test('Setup/Cleanup Task List', async (t) => {
     assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM task_list_items WHERE section_id = ?').get(section.lastInsertRowid)).c), 0);
   });
 
+  await t.test('adding a task assigns it a unique barcode and creates a matching Setup/Cleanup badge', async () => {
+    await request(app)
+      .post('/admin/setup/monday/tasks/new')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ title: 'Barcode List', _csrf: csrfToken });
+    const section = await db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Barcode List'").get();
+
+    await request(app)
+      .post('/admin/setup/monday/tasks/add-item')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ sectionId: String(section.id), description: 'Barcode Task', _csrf: csrfToken });
+
+    const item = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ? AND description = ?').get(section.id, 'Barcode Task');
+    assert.ok(item.barcode, 'a barcode should be generated');
+    assert.match(item.barcode, /^\d{6}$/);
+
+    const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.id);
+    assert.ok(badge, 'a linked Setup/Cleanup badge should be created');
+    assert.equal(badge.badge_type, 'setupCleanup');
+    assert.equal(badge.title, 'Barcode Task');
+    assert.equal(badge.description, 'Barcode List');
+    assert.equal(badge.barcode, item.barcode);
+  });
+
+  await t.test('editing a task keeps its barcode and updates the linked badge title', async () => {
+    const section = await db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Barcode List'").get();
+    const item = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ? AND description = ?').get(section.id, 'Barcode Task');
+
+    await request(app)
+      .post('/admin/setup/monday/tasks/save')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ [`itemDesc_${item.id}`]: 'Renamed Task', _csrf: csrfToken });
+
+    const updated = await db.prepare('SELECT * FROM task_list_items WHERE id = ?').get(item.id);
+    assert.equal(updated.barcode, item.barcode, 'barcode should stay stable across an edit');
+
+    const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.id);
+    assert.equal(badge.title, 'Renamed Task');
+  });
+
+  await t.test('deleting a task also deletes its linked badge, via cascade', async () => {
+    const section = await db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Barcode List'").get();
+    const item = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ?').get(section.id);
+
+    await request(app)
+      .post(`/admin/setup/monday/tasks/${section.id}/items/${item.id}/delete`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ _csrf: csrfToken });
+
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM misc_badges WHERE task_item_id = ?').get(item.id)).c), 0);
+  });
+
   await t.test('a Setup/Cleanup team card shows its own linked task list', async () => {
     const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Linked Team')").run();
     const section = await db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Team Tasks', ?, 0)").run(team.lastInsertRowid);

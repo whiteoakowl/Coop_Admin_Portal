@@ -29,7 +29,7 @@ const path = require('path');
 const fs = require('fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { createPgDb, createPgliteDb } = require('./postgres');
-const { seedIfMissing, backfillNameTagLogo } = require('./bootstrapPg');
+const { seedIfMissing, backfillNameTagLogo, backfillTaskItemBarcodes } = require('./bootstrapPg');
 
 const SCHEMA_PATH = path.join(__dirname, '..', 'supabase', 'migrations', '20260811035644_initial_schema.sql');
 
@@ -61,7 +61,7 @@ if (process.env.DATABASE_URL) {
   db = createPgliteDb(pglite, schemaReady);
 }
 
-db.ready = schemaReady.then(() => seedIfMissing(db)).then(() => backfillNameTagLogo(db));
+db.ready = schemaReady.then(() => seedIfMissing(db)).then(() => backfillNameTagLogo(db)).then(() => backfillTaskItemBarcodes(db));
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -
 // worth logging loudly regardless of context. Deciding what to *do* about

@@ -1,5 +1,39 @@
 const db = require('../db');
 
+// Every task's own permanent 6-digit code, assigned once at creation and
+// never touched again - mirrors utils/members.js's generateMemberCode
+// exactly, same reasoning (fixed length so the printed barcode is
+// predictable). Checked against task_list_items.barcode specifically,
+// not members.barcode - a task's code and a member's code sharing the
+// same numeric value is harmless, since the checkout flow scans each
+// against its own table in its own step (member first, then task), never
+// searching both at once.
+async function generateTaskCode() {
+  const exists = db.prepare('SELECT 1 FROM task_list_items WHERE barcode = ?');
+  let code;
+  do {
+    code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  } while (await exists.get(code));
+  return code;
+}
+
+// Creates (or, on an update, keeps in sync) this task's own printable
+// Setup/Cleanup badge - see misc_badges.task_item_id's own schema
+// comment on why these are no longer a separately admin-imported deck.
+// title is the task's own description (what actually needs scanning at
+// checkout); description carries the list/section title for context on
+// the printed card.
+async function upsertTaskBadge(itemId, description, sectionTitle, barcode) {
+  const existing = await db.prepare('SELECT id FROM misc_badges WHERE task_item_id = ?').get(itemId);
+  if (existing) {
+    await db.prepare('UPDATE misc_badges SET title = ?, description = ? WHERE id = ?').run(description, sectionTitle, existing.id);
+    return;
+  }
+  await db
+    .prepare('INSERT INTO misc_badges (badge_type, badge_number, title, description, barcode, task_item_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run('setupCleanup', barcode, description, sectionTitle, barcode, itemId);
+}
+
 // Every task list section for a day, each with its own ordered task
 // items (Number column = row position, not a hand-typed value - see
 // reorderItems). teamTitle is set when a section is linked to a
@@ -69,14 +103,22 @@ async function nextItemPosition(sectionId) {
 }
 
 async function addItem(sectionId, description) {
+  const barcode = await generateTaskCode();
   const info = await db
-    .prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, ?)')
-    .run(sectionId, description, await nextItemPosition(sectionId));
-  return info.lastInsertRowid;
+    .prepare('INSERT INTO task_list_items (section_id, description, position, barcode) VALUES (?, ?, ?, ?)')
+    .run(sectionId, description, await nextItemPosition(sectionId), barcode);
+  const itemId = info.lastInsertRowid;
+  const section = await getSection(sectionId);
+  await upsertTaskBadge(itemId, description, section ? section.title : null, barcode);
+  return itemId;
 }
 
 async function updateItem(id, description) {
   await db.prepare('UPDATE task_list_items SET description = ? WHERE id = ?').run(description, id);
+  const item = await db.prepare('SELECT * FROM task_list_items WHERE id = ?').get(id);
+  if (!item) return;
+  const section = await getSection(item.section_id);
+  await upsertTaskBadge(id, description, section ? section.title : null, item.barcode);
 }
 
 async function deleteItem(id) {
@@ -103,6 +145,22 @@ async function taskSectionForTeam(teamId) {
   return { ...section, items: await itemsForSection(section.id) };
 }
 
+// Looks up a task by its own printed barcode - the parent checkout flow's
+// second scan step (routes/checkout.js), confirming which Setup/Cleanup
+// task they completed. Joins in the task's own section (title + day) so
+// the checkout screen can show which list the task belongs to, the same
+// way a member scan shows the member's own name.
+async function findTaskItemByBarcode(barcode) {
+  return db
+    .prepare(
+      `SELECT ti.*, ts.title AS "sectionTitle", ts.day AS "day"
+       FROM task_list_items ti
+       JOIN task_list_sections ts ON ts.id = ti.section_id
+       WHERE ti.barcode = ?`
+    )
+    .get(barcode);
+}
+
 module.exports = {
   taskListSectionsForDay,
   itemsForSection,
@@ -116,4 +174,5 @@ module.exports = {
   deleteItem,
   swapItemPosition,
   taskSectionForTeam,
+  findTaskItemByBarcode,
 };

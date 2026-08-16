@@ -60,10 +60,58 @@
       </form>
     </div>
 
-    <div id="step-number" class="kiosk-panel kiosk-hidden">
-      <p class="kiosk-instructions">Hi <span id="member-name">-</span>, select your number</p>
-      <p id="number-message" class="kiosk-submessage"></p>
-      <div id="numpad" class="numpad"></div>
+    <!-- Parents only - students check out with a single name tag scan (see
+         step-scan above and public/js/kiosk-checkout.js). Scan the
+         Setup/Cleanup badge for the task just completed, same two-method
+         shape as step-scan (its own scanner/manual chooser), just for a
+         task's barcode instead of a member's. -->
+    <div id="step-task" class="kiosk-panel kiosk-hidden">
+      <p class="kiosk-instructions">Hi <span id="member-name">-</span>, scan your Setup/Cleanup badge</p>
+
+      <div class="kiosk-method-choice">
+        <div class="kiosk-method-buttons">
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-barcode"/></svg></span>
+            <span class="landing-label">Barcode Scanner</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-manual" data-method="manual">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-grid"/></svg></span>
+            <span class="landing-label">Manually Enter ID #</span>
+          </button>
+        </div>
+      </div>
+
+      <div data-method-panel="scanner" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-scan-now-text">Scan badge now</p>
+      </div>
+
+      <div data-method-panel="manual" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <div id="task-id-keypad"></div>
+        <button type="button" id="task-manual-submit-btn" class="primary-btn">Submit</button>
+      </div>
+
+      <div id="task-kiosk-result" hidden>
+        <div id="task-kiosk-status" class="kiosk-status kiosk-status-idle">
+          <span class="kiosk-status-icon"></span>
+        </div>
+        <p id="task-kiosk-instructions" class="kiosk-instructions"></p>
+      </div>
+
+      <form id="task-scan-form" autocomplete="off">
+        <input
+          id="task-barcode-input"
+          name="barcode"
+          type="text"
+          aria-label="Scan your Setup/Cleanup badge"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="none"
+        />
+      </form>
+
       <button id="cancel-btn" type="button" class="kiosk-cancel-btn">Cancel</button>
     </div>
   </main>

@@ -124,7 +124,23 @@ create table if not exists checkouts (
   member_id integer not null references members(id) on delete cascade,
   roster_id integer not null references rosters(id) on delete cascade,
   session_date text not null,
+  -- Legacy pickup/car-line number (1-80), chosen at the old checkout
+  -- kiosk's number-grid step. That step no longer exists for either
+  -- member type (see task_item_id below) - kept only so historical rows
+  -- and their existing displays (admin-logs.js, admin-rosters.js,
+  -- routes/admin-members.js) keep working untouched; every new checkout
+  -- leaves this null.
   number integer check (number is null or number between 1 and 80),
+  -- The Setup/Cleanup task a parent scanned at checkout (routes/checkout.js's
+  -- /checkout/task-scan step), replacing the old pickup-number choice. Null
+  -- for students (who no longer scan a task at all - see routes/checkout.js)
+  -- and for any parent checkout predating this feature. No inline REFERENCES
+  -- here - task_list_items is created further down this file, so the FK
+  -- itself is added as an ALTER TABLE right after that table exists (see
+  -- below); ON DELETE SET NULL there (not CASCADE) so deleting a task from
+  -- the Task List doesn't erase the historical fact that this member
+  -- checked out that day, only which task they scanned.
+  task_item_id integer,
   check_out_time bigint not null, -- epoch ms
   recorded_at text not null default now_text(),
   unique (member_id, roster_id, session_date)
@@ -203,9 +219,33 @@ create table if not exists task_list_items (
   id integer generated always as identity primary key,
   section_id integer not null references task_list_sections(id) on delete cascade,
   description text not null,
-  position integer not null default 0
+  position integer not null default 0,
+  -- Permanent 6-digit code assigned once at creation (utils/taskList.js's
+  -- generateTaskCode, mirroring utils/members.js's generateMemberCode) -
+  -- unlike itemsForSection's own display "Number" (a derived row
+  -- position that shifts whenever an earlier item is deleted/reordered),
+  -- this is this ONE task's own stable identity, printed as a scannable
+  -- barcode on its own Setup/Cleanup badge (see misc_badges.task_item_id
+  -- below) so a parent can scan it at checkout to confirm which task
+  -- they completed.
+  barcode text unique
 );
 create index if not exists idx_task_list_items_section on task_list_items(section_id);
+
+-- checkouts.task_item_id's FK, added here (not inline on checkouts' own
+-- create table above) since task_list_items has to exist first. Wrapped
+-- in an existence check (Postgres has no "ADD CONSTRAINT IF NOT EXISTS")
+-- since this whole file re-runs against an already-schema'd PGlite
+-- database on every local boot (see db/index.js) - without it, the
+-- second run onward would fail with a duplicate-constraint error.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'checkouts_task_item_id_fkey') then
+    alter table checkouts
+      add constraint checkouts_task_item_id_fkey
+      foreign key (task_item_id) references task_list_items(id) on delete set null;
+  end if;
+end $$;
 
 create table if not exists name_tag_requests (
   id integer generated always as identity primary key,
@@ -235,7 +275,20 @@ create table if not exists misc_badges (
   badge_number text,
   title text,
   description text,
-  created_at text not null default now_text()
+  created_at text not null default now_text(),
+  -- Set only for badge_type = 'setupCleanup' rows - the same value as
+  -- that task's own task_list_items.barcode, kept here too so this
+  -- table's own existing render path (miscBadgeRowData) doesn't need a
+  -- join back to task_list_items just to print the barcode.
+  barcode text,
+  -- Links a 'setupCleanup' badge back to the Task List item it was
+  -- auto-created from (see utils/taskList.js's addItem/updateItem/
+  -- deleteItem) - Setup/Cleanup badges are no longer a separately
+  -- admin-imported deck (unlike 'custom', which still is); each one now
+  -- exists because a task exists, and ON DELETE CASCADE keeps them in
+  -- lockstep without needing separate delete-sync code. Always null for
+  -- 'custom' rows.
+  task_item_id integer references task_list_items(id) on delete cascade
 );
 
 create table if not exists member_schedules (

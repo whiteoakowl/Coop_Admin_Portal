@@ -54,9 +54,20 @@ function normalizeImportRow(row) {
 }
 
 // An import defines the full deck for this badge type - it replaces
-// whatever list was there before rather than appending to it.
+// whatever list was there before rather than appending to it. Not
+// available for 'setupCleanup' (server-side, not just the hidden UI -
+// see partials/misc-badge-print-panel.ejs's own comment) - those badges
+// are auto-created from the Task List now, and replaceMiscBadges'
+// delete-everything-then-reinsert would both orphan every task's own
+// task_item_id link and desync the badges from what the Task List
+// actually contains.
 router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('file'), async (req, res) => {
   const type = req.params.type;
+  if (type === 'setupCleanup') {
+    return res.redirect(
+      '/admin/design?tab=print&error=' + encodeURIComponent('Setup/Cleanup badges are created automatically from the Task List and can\'t be imported.')
+    );
+  }
   if (!req.file) {
     return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Please choose a file to import.'));
   }

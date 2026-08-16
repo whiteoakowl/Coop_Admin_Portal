@@ -11,30 +11,35 @@
   const manualSubmitBtn = document.getElementById('manual-submit-btn');
 
   const stepScan = document.getElementById('step-scan');
-  const stepNumber = document.getElementById('step-number');
+  const stepTask = document.getElementById('step-task');
   const memberNameEl = document.getElementById('member-name');
-  const numberMessage = document.getElementById('number-message');
-  const numpad = document.getElementById('numpad');
   const cancelBtn = document.getElementById('cancel-btn');
+
+  const taskForm = document.getElementById('task-scan-form');
+  const taskInput = document.getElementById('task-barcode-input');
+  const taskResult = document.getElementById('task-kiosk-result');
+  const taskStatus = document.getElementById('task-kiosk-status');
+  const taskInstructions = document.getElementById('task-kiosk-instructions');
+  const taskIcon = taskStatus.querySelector('.kiosk-status-icon');
+  const taskManualSubmitBtn = document.getElementById('task-manual-submit-btn');
 
   keepInputFocused(input);
   initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
-  const chooser = initKioskMethodChooser(document.getElementById('main-content'));
+  // Each step scopes its own chooser to its own panel - step-scan and
+  // step-task both have a `.kiosk-method-choice` and matching
+  // `[data-method-panel="scanner"|"manual"]` pair, and initKioskMethodChooser
+  // only looks within the root it's given, so the two steps' identical
+  // panel names never cross-toggle each other.
+  const chooser = initKioskMethodChooser(stepScan);
+
+  keepInputFocused(taskInput);
+  initIdKeypad(document.getElementById('task-id-keypad'), taskInput, taskForm);
+  const taskChooser = initKioskMethodChooser(stepTask);
 
   manualSubmitBtn.addEventListener('click', () => scanForm.requestSubmit());
+  taskManualSubmitBtn.addEventListener('click', () => taskForm.requestSubmit());
 
   let currentMemberId = null;
-
-  // Build the 1-80 number grid once.
-  for (let n = 1; n <= 80; n++) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'numpad-btn';
-    btn.textContent = n;
-    btn.dataset.number = n;
-    btn.addEventListener('click', () => chooseNumber(n));
-    numpad.appendChild(btn);
-  }
 
   function setState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
@@ -42,16 +47,26 @@
     instructions.textContent = message;
   }
 
+  function setTaskState(state, message, iconId) {
+    taskStatus.className = 'kiosk-status kiosk-status-' + state;
+    taskIcon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
+    taskInstructions.textContent = message;
+  }
+
   function resetToScan() {
     currentMemberId = null;
-    stepNumber.classList.add('kiosk-hidden');
+    stepTask.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
     result.hidden = true;
     chooser.showChooser();
-    numberMessage.textContent = '';
-    numpad.querySelectorAll('.numpad-btn').forEach((b) => b.classList.remove('numpad-btn-selected'));
+    taskResult.hidden = true;
+    taskInput.value = '';
+    taskChooser.showChooser();
   }
 
+  // Step 1: scan the member's own name tag. Students are checked out
+  // immediately (see setState('success', ...) below); parents move on to
+  // step-task to scan the Setup/Cleanup badge for the task they completed.
   scanForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const barcode = input.value.trim();
@@ -60,10 +75,10 @@
 
     // The method panel active when this submission started - if it
     // fails, that's the screen to return to, not the button-choice row.
-    const activePanel = document.querySelector('[data-method-panel]:not([hidden])');
+    const activePanel = stepScan.querySelector('[data-method-panel]:not([hidden])');
     const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
 
-    document.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
     result.hidden = false;
     setState('loading', 'Checking…', 'loader');
 
@@ -74,22 +89,26 @@
         body: 'barcode=' + encodeURIComponent(barcode),
       });
       const data = await res.json();
-      if (data.ok) {
-        currentMemberId = data.memberId;
-        memberNameEl.textContent = data.name;
-        numpad.querySelectorAll('.numpad-btn').forEach((b) => {
-          b.classList.toggle('numpad-btn-selected', data.existingNumber && Number(b.dataset.number) === data.existingNumber);
-        });
-        result.hidden = true;
-        stepScan.classList.add('kiosk-hidden');
-        stepNumber.classList.remove('kiosk-hidden');
-      } else {
+      if (!data.ok) {
         setState('error', data.message, 'x-circle');
         setTimeout(() => {
           result.hidden = true;
           chooser.showPanel(activeMethod);
         }, 2500);
+        return;
       }
+
+      if (data.memberType === 'student') {
+        setState('success', data.message, 'check-circle');
+        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+        return;
+      }
+
+      currentMemberId = data.memberId;
+      memberNameEl.textContent = data.name;
+      result.hidden = true;
+      stepScan.classList.add('kiosk-hidden');
+      stepTask.classList.remove('kiosk-hidden');
     } catch (err) {
       setState('error', 'Connection error. Please try again.', 'x-circle');
       setTimeout(() => {
@@ -99,25 +118,46 @@
     }
   });
 
-  async function chooseNumber(n) {
-    if (!currentMemberId) return;
+  // Step 2 (parents only): scan the Setup/Cleanup badge for the task just
+  // completed.
+  taskForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const barcode = taskInput.value.trim();
+    taskInput.value = '';
+    if (!barcode || !currentMemberId) return;
+
+    const activePanel = stepTask.querySelector('[data-method-panel]:not([hidden])');
+    const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
+
+    stepTask.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    taskResult.hidden = false;
+    setTaskState('loading', 'Checking…', 'loader');
+
     try {
-      const res = await fetch('/kiosk/checkout/submit', {
+      const res = await fetch('/kiosk/checkout/task-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:
-          'memberId=' + encodeURIComponent(currentMemberId) +
-          '&number=' + encodeURIComponent(n),
+        body: 'memberId=' + encodeURIComponent(currentMemberId) + '&barcode=' + encodeURIComponent(barcode),
       });
       const data = await res.json();
-      numberMessage.textContent = data.message;
       if (data.ok) {
+        setTaskState('success', data.message, 'check-circle');
         setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+        return;
       }
+      setTaskState('error', data.message, 'x-circle');
+      setTimeout(() => {
+        taskResult.hidden = true;
+        taskChooser.showPanel(activeMethod);
+      }, 2500);
     } catch (err) {
-      numberMessage.textContent = 'Connection error. Please try again.';
+      setTaskState('error', 'Connection error. Please try again.', 'x-circle');
+      setTimeout(() => {
+        taskResult.hidden = true;
+        taskChooser.showPanel(activeMethod);
+      }, 2500);
     }
-  }
+  });
 
   cancelBtn.addEventListener('click', resetToScan);
 })();

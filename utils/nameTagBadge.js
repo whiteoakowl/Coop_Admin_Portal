@@ -102,10 +102,15 @@ const DEFAULT_LAYOUTS = {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
-      { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 28, width: 320, height: 40, fontSize: 28, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
-      { id: 'title', type: 'text', field: 'title', x: 8, y: 74, width: 320, height: 26, fontSize: 16, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
-      { id: 'description', type: 'text', field: 'description', x: 8, y: 104, width: 320, height: 100, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 24, width: 320, height: 30, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'title', type: 'text', field: 'title', x: 8, y: 56, width: 320, height: 22, fontSize: 15, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'description', type: 'text', field: 'description', x: 8, y: 80, width: 320, height: 56, fontSize: 11, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      // barcodeValue is this task's own code (misc_badges.barcode, set by
+      // utils/taskList.js's upsertTaskBadge) - lets a parent scan the
+      // physical badge at checkout to confirm which task they completed
+      // (see routes/checkout.js's new step 2).
+      { id: 'barcode', type: 'barcode', x: 68, y: 140, width: 200, height: 55 },
     ],
   },
   custom: {

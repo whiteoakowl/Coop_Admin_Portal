@@ -8,7 +8,7 @@ Kiosk-style barcode attendance system built around **rosters** with their own cu
 
 - **Rosters** — an explicit list of session dates per roster, picked by the admin (as many or as few as needed — no fixed weekly schedule required). Four rosters always exist (Monday/Wednesday × Parents/Students); each class set up under Schedules gets its own too. A member can be on more than one at once. Populated automatically from Schedules enrollment/staffing, or by adding existing members individually from the roster's own page.
 - **Check-In kiosk** — members scan the barcode on their name tag to check in. Marked as a green **P** (Present), with the check-in time recorded. Sends you back to the home page a moment after a successful scan.
-- **Check-Out kiosk** — members scan their barcode, then pick a number 1-80 (e.g. a pickup/locker number). The check-out time and number are recorded, then you're returned to the home page.
+- **Check-Out kiosk** — members scan their barcode. Students are checked out immediately with a "Have a great day!" message. Parents then scan the Setup/Cleanup badge for the task they completed instead of choosing a pickup number (badges are generated automatically from the Setup/Cleanup task list - see the Admin pages table below). Either way the check-out time is recorded and you're returned to the home page.
 - **Absence/Late Form** — a public web page with a calendar date picker: an existing parent picks their own name, then which of their kids (or themselves), a class date, a reason category (Personal/Medical), and a description. Absence marks a red **A**; Late marks a yellow **L**. (If the member already checked in for that date, the submission is ignored so it doesn't overwrite a real check-in.) Redirects to the home page after submitting. No separate setup needed — every active parent and their family can already be selected.
 - **Admin dashboard** — password-protected. Active members / checked in / late / absent today at a glance, plus links to the kiosks and the public Absence/Late form.
 
@@ -22,7 +22,7 @@ Each roster has one grid: member names down the side, that roster's specific ses
 
 - **P** (green) / **L** (yellow) / **A** (red) status
 - Check-in time (if they scanned in)
-- Check-out time and pickup number (if they checked out)
+- Check-out time and, for a parent, which Setup/Cleanup task they scanned (if they checked out)
 
 All three sources — the check-in kiosk, the check-out kiosk, and the Absence/Late form — feed the same grid. The bottom of the table totals how many were Present / Late / Absent for each date. Below the grid, an Absence/Late Submissions table lists every form submission for that roster (name, date, status, reason, description), filterable to a single date. Use **Export CSV** to download the grid, or **Print** for a print-friendly landscape layout.
 

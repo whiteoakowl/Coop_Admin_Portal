@@ -52,8 +52,11 @@ async function deleteMiscBadge(id) {
 }
 
 // The field values a misc badge template can place on one row's card.
+// barcodeValue is only ever set on a 'setupCleanup' row (see misc_badges'
+// own task_item_id schema comment) - always empty for 'custom', which has
+// no barcode element on its default layout and isn't meant to be scanned.
 function miscBadgeRowData(row) {
-  return { badgeNumber: row.badge_number || '', title: row.title || '', description: row.description || '' };
+  return { badgeNumber: row.badge_number || '', title: row.title || '', description: row.description || '', barcodeValue: row.barcode || '' };
 }
 
 module.exports = {

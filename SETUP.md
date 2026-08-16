@@ -113,7 +113,7 @@ Once it's set up, running a session day is just:
 
 1. Double-click the start script (Step 3) if the computer isn't already running it.
 2. Open the check-in and check-out kiosk pages.
-3. Members scan in, scan out with their pickup number, or you handle any last-minute absences from the admin dashboard.
+3. Members scan in, scan out (students with just their name tag; parents also scan their Setup/Cleanup badge), or you handle any last-minute absences from the admin dashboard.
 
 ## Where to run this long-term
 

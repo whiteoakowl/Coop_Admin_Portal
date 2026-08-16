@@ -495,7 +495,6 @@ textarea:focus-visible,
 
 .kiosk-big-icon { font-size: 4rem; margin: 0; }
 .kiosk-message { font-size: 1.5rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
-.kiosk-submessage { color: var(--muted); margin: 0; min-height: 1.2em; }
 
 .kiosk-instructions { font-size: 1.4rem; font-weight: 600; margin: 0 0 1.5rem; }
 
@@ -555,13 +554,6 @@ textarea:focus-visible,
 
 .kiosk-hidden { display: none !important; }
 
-.numpad {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 0.5rem;
-  margin: 1.5rem 0;
-}
-
 .numpad-btn {
   aspect-ratio: 1;
   border-radius: 12px;
@@ -573,7 +565,6 @@ textarea:focus-visible,
 }
 
 .numpad-btn:active { background: var(--btn-bg); color: #fff; }
-.numpad-btn-selected { background: var(--btn-bg); color: #fff; border-color: var(--btn-bg); }
 
 .kiosk-cancel-btn {
   margin-top: 0.5rem;
@@ -931,10 +922,6 @@ textarea:focus-visible,
 .find-parent-parent-card h3 { margin: 0 0 0.6rem; font-size: 1.15rem; color: var(--brand-dark); }
 .find-parent-badge-canvas { margin: 0 auto; }
 .find-parent-scan-again { margin-top: 0.5rem; width: 100%; }
-
-@media (max-width: 640px) {
-  .numpad { grid-template-columns: repeat(5, 1fr); }
-}
 
 /* ---------- Public forms (absence, login) ---------- */
 
