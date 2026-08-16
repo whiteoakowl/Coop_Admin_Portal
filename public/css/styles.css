@@ -835,6 +835,53 @@ textarea:focus-visible,
 }
 .admin-corner-link-green:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
 
+/* kiosk-home.ejs's desktop/tablet redesign: an orange top menu bar for
+   the day's less-frequent forms/links (Name Tag Form, Absence/Late Form,
+   Find a Parent, Class Check In & Out, Admin), and Check In/Check Out
+   (green) + Floater Assignments/Setup-Cleanup Teams (purple) as two
+   stacked columns instead of one flat grid. Both use the existing
+   .landing-desktop-only switch (hidden below 640px, see that class's own
+   comment above) in favor of the original single-grid layout
+   (.landing-mobile-grid, the inverse switch) - two side-by-side columns
+   don't have room on a phone, and .landing-action-bar already covers the
+   top bar's own links there. index.ejs (the site root) keeps its
+   original corner-pill layout unchanged - this only applies to the
+   separate /kiosk full-screen view. */
+.landing-top-menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--btn-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.landing-top-menu-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--control-radius);
+  color: #000;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.landing-top-menu-link:hover { background: rgba(255,255,255,0.4); }
+.landing-top-menu-link .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
+
+.landing-columns { display: flex; justify-content: center; gap: 2rem; margin-top: 1rem; }
+.landing-column { display: flex; flex-direction: column; gap: 1.25rem; }
+.landing-card-wide { width: 260px; padding: 2.75rem 1rem; }
+
+.landing-mobile-grid { display: none; }
+@media (max-width: 640px) {
+  .landing-mobile-grid { display: block; }
+}
 
 /* Find a Parent results - each parent's actual Schedule Card
    (.badge-canvas, same rendering as the Members "View Cards" dialog and

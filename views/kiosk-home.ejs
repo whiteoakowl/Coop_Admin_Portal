@@ -5,18 +5,11 @@
 </head>
 <body class="landing landing-has-action-bar">
   <%- include('partials/icon-sprite') %>
-  <div class="landing-corner-actions-left landing-desktop-only">
-    <a class="find-parent-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
-  </div>
   <div class="landing-corner-actions">
     <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
       <svg class="icon"><use href="#icon-maximize"/></svg>
       <span id="fullscreen-toggle-label">Full Screen View</span>
     </button>
-  </div>
-  <div class="landing-corner-actions-bottom-right landing-desktop-only">
-    <a class="class-checkin-corner-btn" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
-    <a class="admin-corner-link-green" href="/admin">Admin</a>
   </div>
   <footer class="landing-action-bar">
     <a class="landing-action-bar-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg><span>Find a Parent</span></a>
@@ -24,36 +17,76 @@
     <a class="landing-action-bar-btn" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg><span>Admin</span></a>
   </footer>
   <main id="main-content" tabindex="-1" class="landing-wrap">
+    <!-- Desktop/tablet: an orange top menu for the day's less-frequent
+         forms/links, and Check In/Check Out (green) + Floater Assignments/
+         Setup-Cleanup Teams (purple) as two stacked columns instead of one
+         undifferentiated grid. Below 640px this whole block is hidden -
+         see .landing-mobile-grid below for the phone-sized layout instead,
+         and .landing-action-bar above for where its own Find a Parent/
+         Class Check In & Out/Admin links live on a phone. -->
+    <nav class="landing-top-menu landing-desktop-only">
+      <a class="landing-top-menu-link" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg> Name Tag Form</a>
+      <a class="landing-top-menu-link" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Absence/Late Form</a>
+      <a class="landing-top-menu-link" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg> Find a Parent</a>
+      <a class="landing-top-menu-link" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
+      <a class="landing-top-menu-link" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg> Admin</a>
+    </nav>
+
     <div class="landing-banner">
-      <img class="landing-logo-sm" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <img class="landing-logo-sm" src="/img/logo-owl.png" alt="Sanford Homeschoolers" />
       <h1 class="landing-welcome">Welcome to Co-op!</h1>
     </div>
 
-    <div class="landing-grid">
-      <a class="landing-card landing-card-green" href="/volunteers/<%= defaultDay %>">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-        <span class="landing-label">Floater Assignments</span>
-      </a>
-      <a class="landing-card landing-card-orange" href="/kiosk/checkin">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
-        <span class="landing-label">Check In</span>
-      </a>
-      <a class="landing-card landing-card-purple" href="/absence">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
-        <span class="landing-label">Absence/Late Form</span>
-      </a>
-      <a class="landing-card landing-card-green" href="/setup/<%= defaultDay %>">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-        <span class="landing-label">Setup/Cleanup Teams</span>
-      </a>
-      <a class="landing-card landing-card-orange" href="/kiosk/checkout">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
-        <span class="landing-label">Check Out</span>
-      </a>
-      <a class="landing-card landing-card-purple" href="/name-tag">
-        <span class="landing-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
-        <span class="landing-label">Name Tag Form</span>
-      </a>
+    <div class="landing-columns landing-desktop-only">
+      <div class="landing-column">
+        <a class="landing-card landing-card-green landing-card-wide" href="/kiosk/checkin">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+          <span class="landing-label">Check In</span>
+        </a>
+        <a class="landing-card landing-card-green landing-card-wide" href="/kiosk/checkout">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
+          <span class="landing-label">Check Out</span>
+        </a>
+      </div>
+      <div class="landing-column">
+        <a class="landing-card landing-card-purple landing-card-wide" href="/volunteers/<%= defaultDay %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+          <span class="landing-label">Floater Assignments</span>
+        </a>
+        <a class="landing-card landing-card-purple landing-card-wide" href="/setup/<%= defaultDay %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+          <span class="landing-label">Setup/Cleanup Teams</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="landing-mobile-grid">
+      <div class="landing-grid">
+        <a class="landing-card landing-card-green" href="/volunteers/<%= defaultDay %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+          <span class="landing-label">Floater Assignments</span>
+        </a>
+        <a class="landing-card landing-card-orange" href="/kiosk/checkin">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-check"/></svg></span>
+          <span class="landing-label">Check In</span>
+        </a>
+        <a class="landing-card landing-card-purple" href="/absence">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+          <span class="landing-label">Absence/Late Form</span>
+        </a>
+        <a class="landing-card landing-card-green" href="/setup/<%= defaultDay %>">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+          <span class="landing-label">Setup/Cleanup Teams</span>
+        </a>
+        <a class="landing-card landing-card-orange" href="/kiosk/checkout">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-log-out"/></svg></span>
+          <span class="landing-label">Check Out</span>
+        </a>
+        <a class="landing-card landing-card-purple" href="/name-tag">
+          <span class="landing-icon"><svg class="icon"><use href="#icon-badge"/></svg></span>
+          <span class="landing-label">Name Tag Form</span>
+        </a>
+      </div>
     </div>
   </main>
   <script src="/js/fullscreen-toggle.js"></script>
