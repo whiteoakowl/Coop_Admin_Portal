@@ -1018,21 +1018,31 @@ function extendWindow(w, range) {
   if (range.endMin != null && (w.end == null || range.endMin > w.end)) w.end = range.endMin;
 }
 
-// Every member's live attendance window for a day (earliest start /
-// latest end, in minutes-since-midnight) - their family's real-class
-// window (see ownPositionsAndFamilyWindowsForDay above) extended to also
-// cover any floater hour they or a family member currently hold, since
-// floating a hour means being physically there for it too. Computed
-// fresh from current class/enrollment/staffing/floater data on every
-// call, never read back from the separately-cached member_schedules
-// table - that table only gets rebuilt when enrollment/staffing/floater
-// assignments actually change, so a family that hasn't been touched
-// since a fix like this one landed would otherwise keep showing whatever
-// was cached under the old (buggy) logic. Returns { [memberId]: { start,
-// end } }; a member with nothing resolvable on the schedule is simply
-// absent from the map. Used by utils/schedule.js's arrivalDepartureLabels.
+// Every member's OWN live attendance window for a day (earliest start /
+// latest end, in minutes-since-midnight) - deliberately each person's
+// own commitments only (their own class enrollment, their own teaching/
+// assisting, their own floater hours), never merged with another family
+// member's separate schedule. A parent teaching Hour 1 and floating Hour
+// 3 gets a window ending at Hour 3's end even if their own kid's own
+// class runs later - the kid gets their own, independently-computed
+// window ending at their own last class. Computed fresh from current
+// class/enrollment/staffing/floater data on every call, never read back
+// from the separately-cached member_schedules table - that table only
+// gets rebuilt when enrollment/staffing/floater assignments actually
+// change, so a member who hasn't been touched since a fix to this
+// computation landed would otherwise keep showing whatever was cached
+// under the old (buggy) logic. Returns { [memberId]: { start, end } }; a
+// member with nothing resolvable on the schedule is simply absent from
+// the map. Used by utils/schedule.js's arrivalDepartureLabels. Note this
+// is a different (narrower) window than ownPositionsAndFamilyWindowsForDay's
+// own windowByFamily, which autoAssignFloatersForDay still deliberately
+// uses family-wide, to decide which of a parent's blank hours to
+// auto-float even when the parent has no class of their own that day (see
+// that function's own comment) - that "am I at the co-op at all today"
+// question is a genuinely different one than "what time do I personally
+// arrive/depart," which is what this function answers.
 async function familyAttendanceWindowsForDay(day) {
-  const { positionRanges, ownPositionsByMember, ownRangesByMember, familyIdByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
+  const { ownPositionsByMember, ownRangesByMember, positionRanges } = await ownPositionsAndFamilyWindowsForDay(day);
 
   const list = await getListByDay(day);
   if (list) {
@@ -1040,10 +1050,6 @@ async function familyAttendanceWindowsForDay(day) {
       for (const memberId of await membersForSectionRaw(list.id, section.id)) {
         if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
         ownPositionsByMember[memberId].add(section.position);
-        if (!(memberId in familyIdByMember)) {
-          const row = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
-          familyIdByMember[memberId] = row ? row.family_id : null;
-        }
         // A floater hour isn't tied to any one specific class, so the
         // position's own shared range (already hour-default-aware - see
         // derivedHourTimeRanges) is the only thing to use here, unlike a
@@ -1052,11 +1058,6 @@ async function familyAttendanceWindowsForDay(day) {
         if (!range) continue;
         if (!ownRangesByMember[memberId]) ownRangesByMember[memberId] = [];
         ownRangesByMember[memberId].push(range);
-        const familyId = familyIdByMember[memberId];
-        if (familyId == null) continue;
-        const w = windowByFamily[familyId] || { start: null, end: null };
-        extendWindow(w, range);
-        windowByFamily[familyId] = w;
       }
     }
   }
@@ -1064,13 +1065,6 @@ async function familyAttendanceWindowsForDay(day) {
   const result = {};
   Object.keys(ownPositionsByMember).forEach((memberIdStr) => {
     const memberId = Number(memberIdStr);
-    const familyId = familyIdByMember[memberId];
-    if (familyId != null && windowByFamily[familyId]) {
-      result[memberId] = windowByFamily[familyId];
-      return;
-    }
-    // No family on file - fall back to just this member's own class/
-    // floater ranges.
     let w = null;
     (ownRangesByMember[memberId] || []).forEach((range) => {
       if (!w) w = { start: null, end: null };
