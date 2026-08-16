@@ -903,48 +903,47 @@ async function ensureDayMemberRosters() {
 // teacher/assistant assignment instead. Runs as part of syncDayMemberRosters,
 // so it fires on every enrollment/staffing change for the day, not on a
 // standalone schedule.
-async function autoAssignFloatersForDay(day) {
-  const list = await getListByDay(day);
-  if (!list) return;
-  const sections = await sectionsForList(list.id);
-  if (!sections.length) return;
-  const sectionByPosition = {};
-  sections.forEach((s) => { sectionByPosition[s.position] = s; });
-
+// The shared groundwork both autoAssignFloatersForDay and utils/schedule.
+// js's arrivalDepartureLabels (via familyAttendanceWindowsForDay below)
+// build on: every member's real class positions that day (enrolled as a
+// student, or teaching/assisting), each hour position's live-derived
+// time range, and each family's resulting attendance window (earliest
+// start / latest end across every member of the family). Deliberately
+// does NOT fold in floater assignments - autoAssignFloatersForDay needs
+// the window as defined by real class assignments only, to decide which
+// blank hours to floater-fill in the first place.
+async function ownPositionsAndFamilyWindowsForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
   const positionRanges = derivedHourTimeRanges(classes);
   const classIds = classes.map((c) => c.id);
-  if (!classIds.length) return;
-
   const classById = {};
   classes.forEach((c) => { classById[c.id] = c; });
 
-  // Every (memberId -> Set of hour positions) where that member has a
-  // real class of their own that day - used both to find each family's
-  // attendance window and to skip any hour a parent already has a class
-  // of their own on.
   const ownPositionsByMember = {};
   const noteOwn = (memberId, position) => {
     if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
     ownPositionsByMember[memberId].add(position);
   };
-  const placeholders = classIds.map(() => '?').join(',');
-  (await db.prepare(`SELECT class_id, student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
-    const cls = classById[r.class_id];
-    if (cls) noteOwn(r.student_id, cls.hour_position);
-  });
-  (await db.prepare(`SELECT class_id, member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
-    const cls = classById[r.class_id];
-    if (cls) noteOwn(r.member_id, cls.hour_position);
-  });
+  if (classIds.length) {
+    const placeholders = classIds.map(() => '?').join(',');
+    (await db.prepare(`SELECT class_id, student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
+      const cls = classById[r.class_id];
+      if (cls) noteOwn(r.student_id, cls.hour_position);
+    });
+    (await db.prepare(`SELECT class_id, member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
+      const cls = classById[r.class_id];
+      if (cls) noteOwn(r.member_id, cls.hour_position);
+    });
+  }
 
   const memberIds = Object.keys(ownPositionsByMember).map(Number);
-  if (!memberIds.length) return;
-  const memberPlaceholders = memberIds.map(() => '?').join(',');
   const familyIdByMember = {};
-  (await db.prepare(`SELECT id, family_id FROM members WHERE id IN (${memberPlaceholders})`).all(...memberIds)).forEach((r) => {
-    familyIdByMember[r.id] = r.family_id;
-  });
+  if (memberIds.length) {
+    const memberPlaceholders = memberIds.map(() => '?').join(',');
+    (await db.prepare(`SELECT id, family_id FROM members WHERE id IN (${memberPlaceholders})`).all(...memberIds)).forEach((r) => {
+      familyIdByMember[r.id] = r.family_id;
+    });
+  }
 
   const windowByFamily = {};
   memberIds.forEach((memberId) => {
@@ -960,13 +959,90 @@ async function autoAssignFloatersForDay(day) {
     });
   });
 
-  const parents = await db
-    .prepare("SELECT id, family_id FROM members WHERE active = 1 AND member_type = 'parent' AND family_id IS NOT NULL")
-    .all();
-  for (const parent of parents) {
-    const window = windowByFamily[parent.family_id];
+  return { positionRanges, ownPositionsByMember, familyIdByMember, windowByFamily };
+}
+
+// Every member's live attendance window for a day (earliest start /
+// latest end, in minutes-since-midnight) - their family's real-class
+// window (see ownPositionsAndFamilyWindowsForDay above) extended to also
+// cover any floater hour they or a family member currently hold, since
+// floating a hour means being physically there for it too. Computed
+// fresh from current class/enrollment/staffing/floater data on every
+// call, never read back from the separately-cached member_schedules
+// table - that table only gets rebuilt when enrollment/staffing/floater
+// assignments actually change, so a family that hasn't been touched
+// since a fix like this one landed would otherwise keep showing whatever
+// was cached under the old (buggy) logic. Returns { [memberId]: { start,
+// end } }; a member with nothing resolvable on the schedule is simply
+// absent from the map. Used by utils/schedule.js's arrivalDepartureLabels.
+async function familyAttendanceWindowsForDay(day) {
+  const { positionRanges, ownPositionsByMember, familyIdByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
+
+  const list = await getListByDay(day);
+  if (list) {
+    for (const section of await sectionsForList(list.id)) {
+      for (const memberId of await membersForSectionRaw(list.id, section.id)) {
+        if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
+        ownPositionsByMember[memberId].add(section.position);
+        if (!(memberId in familyIdByMember)) {
+          const row = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
+          familyIdByMember[memberId] = row ? row.family_id : null;
+        }
+        const range = positionRanges[section.position];
+        if (!range) continue;
+        const familyId = familyIdByMember[memberId];
+        if (familyId == null) continue;
+        const w = windowByFamily[familyId] || { start: null, end: null };
+        if (w.start == null || range.startMin < w.start) w.start = range.startMin;
+        if (w.end == null || range.endMin > w.end) w.end = range.endMin;
+        windowByFamily[familyId] = w;
+      }
+    }
+  }
+
+  const result = {};
+  Object.keys(ownPositionsByMember).forEach((memberIdStr) => {
+    const memberId = Number(memberIdStr);
+    const familyId = familyIdByMember[memberId];
+    if (familyId != null && windowByFamily[familyId]) {
+      result[memberId] = windowByFamily[familyId];
+      return;
+    }
+    // No family on file - fall back to just this member's own positions.
+    let w = null;
+    ownPositionsByMember[memberId].forEach((position) => {
+      const range = positionRanges[position];
+      if (!range) return;
+      if (!w) w = { start: range.startMin, end: range.endMin };
+      else {
+        if (range.startMin < w.start) w.start = range.startMin;
+        if (range.endMin > w.end) w.end = range.endMin;
+      }
+    });
+    if (w) result[memberId] = w;
+  });
+  return result;
+}
+
+async function autoAssignFloatersForDay(day) {
+  const list = await getListByDay(day);
+  if (!list) return;
+  const sections = await sectionsForList(list.id);
+  if (!sections.length) return;
+  const sectionByPosition = {};
+  sections.forEach((s) => { sectionByPosition[s.position] = s; });
+
+  const { positionRanges, ownPositionsByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
+  if (!Object.keys(ownPositionsByMember).length) return;
+
+  // Only the family's designated primary parent gets auto-floated - a
+  // family with 2 parents shouldn't end up with both of them
+  // individually placed on every blank hour.
+  const primaryParentIdByFamily = await primaryParentIdsByFamily(Object.keys(windowByFamily).map(Number));
+  for (const [familyId, parentId] of Object.entries(primaryParentIdByFamily)) {
+    const window = windowByFamily[familyId];
     if (!window || window.start == null || window.end == null) continue;
-    const ownPositions = ownPositionsByMember[parent.id] || new Set();
+    const ownPositions = ownPositionsByMember[parentId] || new Set();
     for (const [positionStr, range] of Object.entries(positionRanges)) {
       const position = Number(positionStr);
       if (ownPositions.has(position)) continue;
@@ -974,9 +1050,40 @@ async function autoAssignFloatersForDay(day) {
       if (!section) continue;
       const overlapsWindow = range.startMin < window.end && range.endMin > window.start;
       if (!overlapsWindow) continue;
-      await addMemberToSection(list.id, parent.id, section.id);
+      await addMemberToSection(list.id, parentId, section.id);
     }
   }
+}
+
+// The family's designated primary parent id (Members page's own
+// is_primary_parent flag, same "one point of contact per family"
+// convention utils/scheduleCardData.js's primaryParentFor uses), falling
+// back to whichever active parent in the family comes first
+// alphabetically if nobody's been marked primary yet, so a family is
+// never left with no representative just because that flag hasn't been
+// set. { [familyId]: memberId } for every familyId passed in that has at
+// least one active parent - a family with none is simply absent from the
+// result. Shared by autoAssignFloatersForDay (above) and
+// syncDayMemberRosters (below), so "who represents this family" is
+// answered the same way everywhere it matters.
+async function primaryParentIdsByFamily(familyIds) {
+  const ids = familyIds.filter((id) => id != null);
+  if (!ids.length) return {};
+  const placeholders = ids.map(() => '?').join(',');
+  const allParents = await db
+    .prepare(
+      `SELECT id, family_id, is_primary_parent, name FROM members
+       WHERE active = 1 AND member_type = 'parent' AND family_id IN (${placeholders}) ORDER BY LOWER(name)`
+    )
+    .all(...ids);
+  const byFamily = {};
+  allParents.forEach((p) => {
+    const current = byFamily[p.family_id];
+    if (!current || (p.is_primary_parent && !current.is_primary_parent)) byFamily[p.family_id] = p;
+  });
+  const result = {};
+  Object.entries(byFamily).forEach(([familyId, p]) => { result[familyId] = p.id; });
+  return result;
 }
 
 // Everyone floating any hour on a day's Floater Assignments list - a
@@ -1010,6 +1117,9 @@ async function syncDayMemberRosters(day) {
   // a class themselves, but whenever ANYONE in their family does -
   // dropping off/picking up an enrolled kid means they're at the co-op
   // that day too, even if they have no class assignment of their own.
+  // Only the family's designated primary parent represents them here
+  // though - a family with 2 active parents shouldn't put both of them
+  // on the roster just because one kid is enrolled in a class.
   if (studentIds.size > 0) {
     const studentPlaceholders = Array.from(studentIds).map(() => '?').join(',');
     const familyIds = new Set(
@@ -1020,12 +1130,7 @@ async function syncDayMemberRosters(day) {
       ).map((r) => r.family_id)
     );
     if (familyIds.size > 0) {
-      const familyPlaceholders = Array.from(familyIds).map(() => '?').join(',');
-      (
-        await db
-          .prepare(`SELECT id FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type = 'parent' AND active = 1`)
-          .all(...familyIds)
-      ).forEach((r) => parentIds.add(r.id));
+      Object.values(await primaryParentIdsByFamily(Array.from(familyIds))).forEach((id) => parentIds.add(id));
     }
   }
   (await floaterMemberIdsForDay(day)).forEach((id) => parentIds.add(id));
@@ -1209,6 +1314,8 @@ module.exports = {
   addStaff,
   removeFromFloaterForHour,
   autoAssignFloatersForDay,
+  familyAttendanceWindowsForDay,
+  minutesToClockLabelLocal,
   removeStaff,
   activeStudents,
   activeParentsForStaff,

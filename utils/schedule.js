@@ -1,7 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS } = require('./days');
-const { familyOf } = require('./members');
-const { syncClassRosterMembers, syncDayMemberRosters } = require('./classSchedule');
+const { syncClassRosterMembers, syncDayMemberRosters, familyAttendanceWindowsForDay, minutesToClockLabelLocal } = require('./classSchedule');
 
 const CLASS_NUMBERS = [1, 2, 3, 4];
 
@@ -58,37 +57,32 @@ function splitTimeRange(raw) {
 
 // A family's earliest class start and latest class end - used to auto-fill
 // Arrival/Departure on the roster view instead of requiring an admin to
-// type them in by hand. Reads memberId's own schedule plus every other
-// member of their family (a parent's drop-off/pick-up is set by whichever
-// of their kids' classes runs earliest/latest, not just their own), so
-// every member of one family lands on the same arrival/departure pair.
-// `day` ('monday' or 'wednesday') scopes this to the roster's own day,
-// matching Monday rosters to the Monday schedule and Wednesday rosters to
-// the Wednesday schedule; omit it (or pass anything else) to fall back to
-// both days combined. Returns raw label strings (whatever the admin typed
-// for that class's time, not reformatted) or null if nothing on the
-// schedule parses.
+// type them in by hand. Computed LIVE from current class enrollment/
+// staffing/floater data (utils/classSchedule.js's
+// familyAttendanceWindowsForDay) every time this is called, rather than
+// read back from the separately-cached member_schedules table - that
+// table only gets rebuilt when enrollment/staffing/floater assignments
+// actually change, so a family whose schedule hasn't been touched since a
+// fix to this computation landed would otherwise keep showing whatever
+// was cached under the old logic. `day` ('monday' or 'wednesday') scopes
+// this to the roster's own day, matching Monday rosters to the Monday
+// schedule and Wednesday rosters to the Wednesday schedule; omit it (or
+// pass anything else) to fall back to both days combined. Returns null
+// for either half if nothing on the schedule resolves to a real time.
 async function arrivalDepartureLabels(memberId, day) {
-  const familyIds = [memberId, ...(await familyOf(memberId)).map((m) => m.id)];
+  const days = day === 'monday' || day === 'wednesday' ? [day] : DAYS;
   let earliest = null;
   let latest = null;
-  for (const id of familyIds) {
-    const { monday, wednesday } = await getMemberSchedule(id);
-    const rows = day === 'monday' ? monday : day === 'wednesday' ? wednesday : [...monday, ...wednesday];
-    rows.forEach((row) => {
-      if (!row.time) return;
-      const { startRaw, endRaw } = splitTimeRange(row.time);
-      const startMin = parseClockMinutes(startRaw);
-      const endMin = parseClockMinutes(endRaw);
-      if (startMin !== null && (!earliest || startMin < earliest.min)) {
-        earliest = { min: startMin, label: startRaw };
-      }
-      if (endMin !== null && (!latest || endMin > latest.min)) {
-        latest = { min: endMin, label: endRaw };
-      }
-    });
+  for (const d of days) {
+    const window = (await familyAttendanceWindowsForDay(d))[memberId];
+    if (!window) continue;
+    if (earliest == null || window.start < earliest) earliest = window.start;
+    if (latest == null || window.end > latest) latest = window.end;
   }
-  return { arrival: earliest ? earliest.label : null, departure: latest ? latest.label : null };
+  return {
+    arrival: earliest != null ? minutesToClockLabelLocal(earliest) : null,
+    departure: latest != null ? minutesToClockLabelLocal(latest) : null,
+  };
 }
 
 // 'none' - no classes at all. 'partial' - some classes filled in, but not

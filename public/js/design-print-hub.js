@@ -166,9 +166,121 @@
     });
   });
 
+  // A big enough "Select All" (a co-op's full membership - potentially
+  // several hundred to 1000+ people) can generate more badge HTML than
+  // Netlify's serverless functions are allowed to return in one response
+  // (~6MB - Function.ResponseSizeTooLarge), which crashes the whole print
+  // request with no page at all. None of these forms need the entire
+  // selection answered by one giant response just because they submit as
+  // one click: past MAX_PRINT_CHUNK, fetch the print page in same-size
+  // batches instead (so no single response can ever cross the cap
+  // regardless of how large the co-op's membership grows) and merge every
+  // batch's printable content into ONE already-open tab - a single
+  // combined print job, not one tab per batch (which stops scaling well
+  // once there are more than a couple of batches, and risks browsers'
+  // own per-click popup ceilings). A selection at or under the limit
+  // still submits the normal, single way with no client-side involvement
+  // here at all.
+  const MAX_PRINT_CHUNK = 100;
+
+  function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  async function fetchChunkDocument(action, memberIds) {
+    const body = new URLSearchParams();
+    memberIds.forEach((id) => body.append('memberIds', id));
+    const res = await fetch(action, {
+      method: 'POST',
+      body,
+      headers: { 'X-CSRF-Token': window.CSRF_TOKEN || '' },
+    });
+    return new DOMParser().parseFromString(await res.text(), 'text/html');
+  }
+
+  // Every one of these print pages shares the same shape: a
+  // #main-content with a .no-print header (title/Print button) followed
+  // by one or more top-level "page" elements holding the actual printable
+  // content (a repeating .badge-sheet-page per 8/12/30-per-sheet grid, or
+  // a single flowing container for the Name Tags + Schedule Cards pair
+  // layout). Always appending each batch's page elements as new top-level
+  // siblings - rather than trying to detect and merge into an existing
+  // matching container - keeps this one merge routine correct for both
+  // shapes: a repeating sheet template ends up with more (still correctly
+  // fixed-capacity) sheet pages, and the single-flowing-container
+  // template ends up with more than one of that same container back to
+  // back, which prints identically to one continuous one.
+  async function printInChunks(form) {
+    const checkedIds = Array.from(form.querySelectorAll('input[name="memberIds"]:checked')).map((cb) => cb.value);
+    const win = window.open('', '_blank');
+    if (!win) return; // Popup blocked - nothing more to do client-side; reducing the selection below MAX_PRINT_CHUNK still works the normal way.
+    win.document.write('<!doctype html><title>Preparing print job&hellip;</title><body style="font: 16px sans-serif; padding: 2rem;">Preparing your print job&hellip; this tab will fill in automatically once ready.</body>');
+    win.document.close();
+
+    const batches = chunkArray(checkedIds, MAX_PRINT_CHUNK);
+    let targetMain = null;
+    for (let i = 0; i < batches.length; i++) {
+      const doc = await fetchChunkDocument(form.action, batches[i]);
+      if (i === 0) {
+        // The first batch becomes the tab's real document as-is - full
+        // head/nav/scripts intact - so every later batch just adds more
+        // printable content into its already-correct #main-content.
+        // document.write of a document this size (the full nav/head/
+        // page shell) doesn't finish parsing synchronously - querying
+        // the DOM immediately after write()/close() can run before the
+        // parser has reached #main-content at all, so wait for the
+        // popup's own 'load' to actually fire first.
+        win.document.open();
+        win.document.write('<!doctype html>' + doc.documentElement.outerHTML);
+        win.document.close();
+        if (win.document.readyState !== 'complete') {
+          await new Promise((resolve) => win.addEventListener('load', resolve, { once: true }));
+        }
+        targetMain = win.document.getElementById('main-content');
+        continue;
+      }
+      try {
+        const sourceMain = doc.getElementById('main-content');
+        if (!sourceMain || !targetMain) continue;
+        Array.from(sourceMain.children).forEach((child) => {
+          if (child.classList.contains('no-print')) return; // the header/Print button - only the first batch's copy is kept.
+          targetMain.appendChild(win.document.importNode(child, true));
+        });
+        // Re-render whatever the newly-appended content needs (barcodes,
+        // shrink-to-fit label names) - both are idempotent on content
+        // that's already rendered, so re-running them over the whole tab
+        // on every batch is simpler, and just as safe, as tracking exactly
+        // what's new each time.
+        if (typeof win.renderNameTagBarcodes === 'function') win.renderNameTagBarcodes(win.document);
+        win.dispatchEvent(new win.Event('beforeprint'));
+      } catch (err) {
+        // One bad batch shouldn't take down the rest of an otherwise-fine
+        // print job - the remaining batches still get appended.
+        console.error('Bulk print: failed to merge one batch into the print tab', err);
+      }
+    }
+  }
+
+  function wireChunkedSubmit(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
+      const checkedCount = form.querySelectorAll('input[name="memberIds"]:checked').length;
+      if (checkedCount <= MAX_PRINT_CHUNK) return;
+      e.preventDefault();
+      printInChunks(form);
+    });
+  }
+
+  ['schedule-print-form', 'bulk-print-form', 'cards-both-print-form', 'cards-duplex-print-form', 'barcodes-print-form', 'barcode-labels-print-form'].forEach(wireChunkedSubmit);
+
   // No preview iframe on this hub - every bulk print form here just
   // submits normally (target="_blank"), opening the print page in its
-  // own tab. That page's own print-auto.js opens the OS print dialog as
-  // soon as it loads, so clicking Print here is still the only click
-  // needed.
+  // own tab (or, past MAX_PRINT_CHUNK, a tab assembled from several
+  // smaller requests - see printInChunks above). That page's own
+  // print-auto.js opens the OS print dialog as soon as it loads, so
+  // clicking Print here is still the
+  // only click needed.
 })();
