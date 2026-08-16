@@ -104,12 +104,12 @@
      of these named sizes instead of a one-off pixel value, so resizing
      "the logo" in any context is a single-variable change. Always paired
      with border-radius: 50% for the circular crop. */
-  --logo-xl: 160px;  /* admin sidebar */
-  --logo-lg: 120px;  /* login page */
-  --logo-md: 96px;   /* kiosk landing header */
-  --logo-sm: 84px;   /* kiosk check-in/check-out header */
-  --logo-xs: 72px;   /* public form header (absence, name tag, membership) */
-  --logo-2xs: 28px;  /* mobile top bar */
+  --logo-xl: 184px;  /* admin sidebar */
+  --logo-lg: 140px;  /* login page */
+  --logo-md: 116px;  /* kiosk landing header */
+  --logo-sm: 100px;  /* kiosk check-in/check-out header */
+  --logo-xs: 86px;   /* public form header (absence, name tag, membership) */
+  --logo-2xs: 34px;  /* mobile top bar */
 }
 /* stylelint-enable declaration-property-value-disallowed-list */
 
