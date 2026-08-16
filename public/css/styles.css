@@ -739,7 +739,11 @@ textarea:focus-visible,
    app read as one consistent design instead of two different ones. */
 .landing-action-bar { display: none; }
 @media (max-width: 640px) {
-  .landing-desktop-only { display: none; }
+  /* !important: elements this hides (e.g. .landing-top-menu,
+     .landing-columns) set their own unconditional `display` later in
+     this file, which would otherwise win the cascade over this
+     media-scoped rule and keep the desktop layout visible on mobile. */
+  .landing-desktop-only { display: none !important; }
   .landing-has-action-bar { padding-bottom: 5.5rem; }
   /* Icon-only on mobile - with its text label, this button sits close
      enough to the centered round logo below it to visually overlap. */
