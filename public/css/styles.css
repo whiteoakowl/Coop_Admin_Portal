@@ -470,6 +470,16 @@ textarea:focus-visible,
 .kiosk-header .form-logo { margin-bottom: 0; flex-shrink: 0; }
 .kiosk-header h1 { margin: 0; }
 
+/* At 2.4rem, a longer title (e.g. "Anatomy & Physiology · Check In") wraps
+   to 3-4 lines on a phone, made worse by the non-shrinking logo (see
+   .kiosk-header above) squeezing it into less than the full width beside
+   it. Stacking the header and shrinking the title gets every title back
+   down to 1-2 lines. */
+@media (max-width: 640px) {
+  .kiosk-header { flex-direction: column; gap: 0.5rem; }
+  .kiosk h1 { font-size: 1.6rem; text-align: center; }
+}
+
 .kiosk-wrap { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; }
 
 .kiosk-panel {
@@ -930,6 +940,10 @@ textarea:focus-visible,
 
 .public-page { min-height: 100vh; padding: 4.5rem 1.5rem 2.5rem; }
 
+@media (max-width: 640px) {
+  .public-page h1 { font-size: 1.6rem; }
+}
+
 .form-wrap { max-width: 560px; margin: 0 auto; }
 .form-wrap-narrow { max-width: 400px; }
 .form-logo { height: var(--logo-xs); width: var(--logo-xs); margin-bottom: 0.75rem; border-radius: 50%; }
@@ -1309,6 +1323,13 @@ body.public-page .roster-empty {
   /* Bottom padding clears the fixed .admin-mobile-tabs bar so page content
      never sits underneath it. */
   .admin-main { margin-left: 0; padding: 1.5rem 1.5rem 4.75rem; }
+}
+
+/* A 2rem page title (see .admin-main h1's own comment) is wider than a
+   phone screen can fit on one line for several of the app's longer titles
+   - shrinking it keeps every admin page title to 1-2 lines instead of 3+. */
+@media (max-width: 640px) {
+  .admin-main h1 { font-size: 1.5rem; }
 }
 
 .subtitle { color: var(--muted); }
@@ -2473,6 +2494,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: var(--btn-bg-hover);
   border-color: var(--btn-bg-hover);
   color: #000;
+}
+
+/* .roster-btn-row's own flex-wrap (above) is fine at desktop widths, but
+   its flex: 1 0 auto buttons (see .roster-action-btn above) wrap unevenly
+   on a phone - a short trailing button on its own row stretches to fill
+   the full width while the buttons above it stay narrow, so the row reads
+   as randomly sized rather than a clean grid. A fixed 2-column grid
+   instead keeps every button - "+ Add Class"/"Edit" on the Class Schedule
+   page, "Edit Dates"/"Print"/"Resync" on Attendance, and the same shared
+   class everywhere else .roster-btn-row is used - the same size, in even
+   rows, no matter how many buttons a given page's toolbar has. Must come
+   after .roster-btn-row/.roster-action-btn's own base (unscoped) rules
+   above - equal-specificity selectors resolve by source order regardless
+   of which one is inside a media query, so a copy declared earlier in the
+   file would lose to the unscoped display: flex further down. */
+@media (max-width: 640px) {
+  .roster-btn-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .roster-action-btn,
+  .roster-btn-form {
+    width: 100%;
+    min-width: 0;
+    flex: unset;
+  }
 }
 
 /* ---------- Manage roster page ---------- */
@@ -3686,6 +3734,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 240px; }
 .roster-view-page .roster-table-detailed tbody tr:nth-child(even) .roster-secondary-col { background: #fdfaf7; }
 .roster-view-page .roster-table-detailed tbody tr:hover .roster-secondary-col { background: var(--orange-bg); }
+
+/* On a phone, the 200px Name column above eats most of the screen width,
+   leaving only one date column visible at a time. Shrinking it to fit the
+   name + Arrival/Departure text (see .roster-name-times below) frees up
+   real width for more date columns per screen, and shrinking the row
+   padding/font-size lets more rows show without scrolling as much either.
+   The Archive tab's Arrival/Departure sticky offsets (.roster-secondary-col
+   above) shrink by the same proportion so they still sit flush against the
+   narrower Name column instead of leaving a gap. */
+@media (max-width: 640px) {
+  .roster-view-page .roster-table-detailed .roster-name-col { width: 110px; min-width: 110px; max-width: 110px; }
+  .roster-view-page .roster-table-detailed .roster-secondary-col { width: 70px; min-width: 70px; max-width: 70px; }
+  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(2) { left: 110px; }
+  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 180px; }
+  .roster-table-detailed th,
+  .roster-table-detailed td { padding: 0.2rem 0.25rem; font-size: 0.72rem; }
+  .roster-name-times { margin-top: 0.05rem; }
+  .roster-name-time { font-size: 0.62rem; }
+}
 
 /* Public kiosk Floater Assignments view - same hour-card chart as the
    admin Chart tab/Archive print page (partials/floater-assignment-
