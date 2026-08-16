@@ -41,9 +41,15 @@ function rowIsBlank(row) {
 
 // Parses a single "9:00 AM" / "1:15 PM" clock string into minutes-since-
 // midnight for comparison. Returns null if it doesn't match (freeform
-// admin-typed text isn't guaranteed to parse).
+// admin-typed text isn't guaranteed to parse). Tolerates an optional
+// ":SS" seconds component (discarded, never needed at minute
+// resolution) - "10:00:00 AM" is exactly what a spreadsheet cell
+// formatted as Excel's h:mm:ss AM/PM shows once utils/spreadsheetWorker.js
+// reads its formatted text instead of a raw serial (see that file's own
+// comment); without this, that real, common spreadsheet format would
+// still fail to parse even after that fix.
 function parseClockMinutes(raw) {
-  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/.exec((raw || '').trim());
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?$/.exec((raw || '').trim());
   if (!m) return null;
   let hour = parseInt(m[1], 10);
   const minute = parseInt(m[2], 10);

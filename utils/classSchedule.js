@@ -203,8 +203,13 @@ async function gridForDay(day) {
 // (also exists in utils/schedule.js and routes/admin-class-schedule.js) -
 // requiring utils/schedule.js from here would be circular (it already
 // requires this file for syncClassRosterMembers/syncDayMemberRosters).
+// Tolerates an optional ":SS" seconds component (discarded) - see
+// utils/schedule.js's copy of this same regex for why: a spreadsheet cell
+// formatted as Excel's h:mm:ss AM/PM reads back as "10:00:00 AM" once
+// utils/spreadsheetWorker.js uses formatted text instead of a raw serial,
+// and that's a real, common time format, not an edge case to reject.
 function parseClockMinutesLocal(raw) {
-  const m = /^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$/.exec(String(raw || ''));
+  const m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(String(raw || ''));
   if (!m) return null;
   let hour = parseInt(m[1], 10);
   const minute = parseInt(m[2], 10);
