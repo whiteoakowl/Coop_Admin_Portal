@@ -1,6 +1,12 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS } = require('./days');
-const { syncClassRosterMembers, syncDayMemberRosters, familyAttendanceWindowsForDay, minutesToClockLabelLocal } = require('./classSchedule');
+const {
+  syncClassRosterMembers,
+  syncDayMemberRosters,
+  familyAttendanceWindowsForDay,
+  liveMemberScheduleRowsForDay,
+  minutesToClockLabelLocal,
+} = require('./classSchedule');
 
 const CLASS_NUMBERS = [1, 2, 3, 4];
 
@@ -13,12 +19,20 @@ function fourRows(rows) {
   return CLASS_NUMBERS.map((n) => byNumber[n] || { class_number: n, time: '', class_name: '', room: '', teacher: '' });
 }
 
+// A single member's Monday + Wednesday schedule, computed live (see
+// liveMemberScheduleRowsForDay's own comment for why - every "member
+// schedule" display surface funnels through this one function or
+// scheduleList below, so fixing it here fixes all of them at once, with
+// no separate "did someone resync" step to go stale). Fine to call once
+// per member for a single lookup (the member profile's Schedule popup, a
+// family's few members); a caller iterating over many members at once
+// should use scheduleList instead, which computes each day's live rows
+// ONCE and reuses them, rather than recomputing the whole day per member.
 async function getMemberSchedule(memberId) {
-  const rows = await db.prepare('SELECT * FROM member_schedules WHERE member_id = ? ORDER BY day, class_number').all(memberId);
-  const monday = fourRows(rows.filter((r) => r.day === 'monday'));
-  const wednesday = fourRows(rows.filter((r) => r.day === 'wednesday'));
-  const lastUpdated = rows.length ? rows.map((r) => r.updated_at).sort().slice(-1)[0] : null;
-  return { monday, wednesday, lastUpdated };
+  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  const monday = fourRows(Object.values(mondayRows[memberId] || {}));
+  const wednesday = fourRows(Object.values(wednesdayRows[memberId] || {}));
+  return { monday, wednesday, lastUpdated: null };
 }
 
 function rowIsBlank(row) {
@@ -153,11 +167,18 @@ async function scheduleList(filters) {
     members = members.filter((m) => m.member_type === filters.memberType);
   }
 
-  let rows = [];
-  for (const m of members) {
-    const { monday, wednesday, lastUpdated } = await getMemberSchedule(m.id);
-    rows.push({ member: m, monday, wednesday, lastUpdated, status: scheduleStatus(monday, wednesday) });
-  }
+  // Computed once for the whole filtered list, not once per member -
+  // getMemberSchedule's own per-member version would otherwise redo each
+  // day's full live computation (every class/enrollment/staffing/floater
+  // row) once per member, the same severe N+1 shape already fixed once
+  // for Arrival/Departure (see arrivalDepartureLabelsForMembers's own
+  // comment) - this page can list every active member at once.
+  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  let rows = members.map((m) => {
+    const monday = fourRows(Object.values(mondayRows[m.id] || {}));
+    const wednesday = fourRows(Object.values(wednesdayRows[m.id] || {}));
+    return { member: m, monday, wednesday, lastUpdated: null, status: scheduleStatus(monday, wednesday) };
+  });
 
   if (filters.day === 'monday') rows = rows.filter((r) => r.monday.some((c) => !rowIsBlank(c)));
   if (filters.day === 'wednesday') rows = rows.filter((r) => r.wednesday.some((c) => !rowIsBlank(c)));
@@ -251,6 +272,7 @@ module.exports = {
   DAY_LABELS,
   STATUS_LABELS,
   getMemberSchedule,
+  fourRows,
   rowIsBlank,
   scheduleStatus,
   scheduleList,

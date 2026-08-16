@@ -27,21 +27,6 @@
     return typeof n === 'number' && !isNaN(n) ? n : fallback;
   }
 
-  // Schedule Card table only ever shows a class's start time, not the
-  // full "9:00 - 9:45 AM" range typed into the schedule editor. If the
-  // start half is missing an AM/PM marker but the end half has one (e.g.
-  // "9:00 - 9:45 AM"), borrow it so "9:00" doesn't print ambiguous.
-  function startTimeOnly(value) {
-    if (!value) return value;
-    var dashIndex = value.indexOf('-');
-    if (dashIndex === -1) return value.trim();
-    var start = value.slice(0, dashIndex).trim();
-    var end = value.slice(dashIndex + 1).trim();
-    var endAmPm = /(AM|PM|am|pm)\s*$/.exec(end);
-    if (endAmPm && !/(AM|PM|am|pm)\s*$/.test(start)) start += ' ' + endAmPm[1].toUpperCase();
-    return start;
-  }
-
   function hexToRgb(hex) {
     var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
     if (!m) return { r: 255, g: 255, b: 255 };
@@ -281,7 +266,7 @@
     var headers = ['#', 'Time', 'Class Name', 'Room'];
     var colValues = [
       [1, 2, 3, 4],
-      [0, 1, 2, 3].map(function (i) { return startTimeOnly((rows[i] || {}).time) || '—'; }),
+      [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).time || '—'; }),
       [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).className || '—'; }),
       [0, 1, 2, 3].map(function (i) { return (rows[i] || {}).room || '—'; }),
     ];
@@ -298,7 +283,7 @@
       var r = rows[i] || {};
       html +=
         '<tr><td style="' + cellStyle(0) + '">' + (i + 1) + '</td>' +
-        '<td style="' + cellStyle(1) + '">' + esc(startTimeOnly(r.time) || '—') + '</td>' +
+        '<td style="' + cellStyle(1) + '">' + esc(r.time || '—') + '</td>' +
         '<td style="' + cellStyle(2) + '">' + esc(r.className || '—') + '</td>' +
         '<td style="' + cellStyle(3) + '">' + esc(r.room || '—') + '</td></tr>';
     }

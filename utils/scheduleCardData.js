@@ -29,8 +29,13 @@ async function primaryParentFor(member) {
 // a parent's own card leaves it blank rather than showing some other
 // parent in the family (or, for a single-parent family, nothing at all
 // since familyOf() excludes the card's own owner from the lookup).
-async function scheduleCardDataForMember(member) {
-  const { monday, wednesday } = await getMemberSchedule(member.id);
+// precomputedSchedule (optional) is a { monday, wednesday } already
+// fetched by the caller (e.g. scheduleList's own already-batched rows) -
+// skips this function's own getMemberSchedule call, which would
+// otherwise redo a full live schedule computation per member when called
+// in a loop over many members (see getMemberSchedule's own comment).
+async function scheduleCardDataForMember(member, precomputedSchedule) {
+  const { monday, wednesday } = precomputedSchedule || (await getMemberSchedule(member.id));
   const primaryParent = member.member_type === 'student' ? await primaryParentFor(member) : null;
   return {
     name: member.name,

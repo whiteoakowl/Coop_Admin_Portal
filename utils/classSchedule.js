@@ -1343,16 +1343,76 @@ async function timeRangeForClass(cls) {
   return derived || (await rawHourLabel(cls.day, cls.hour_position));
 }
 
-// member_schedules (the per-member "Schedule Card" / profile Class
-// Schedule tab data) is entirely derived from the master Class Schedule
-// and the Floater Assignments list - there's no separate hand-typed
-// version anymore, so this fully rebuilds one day's rows every time
-// either changes (called from syncDayMemberRosters, which already runs
-// on every enrollment/staff/class/floater edit). A person shows up once
-// per class they're either enrolled in (student) or staffing (teacher/
-// assistant); "teacher" on their row lists that class's teacher(s),
-// themselves included if that's their own class. A floater then fills in
-// any of THEIR hours that aren't already a real class slot on their own
+// Everyone's live schedule rows for one day - the read-side twin of
+// syncMemberSchedulesForDay below, computed fresh from the same source
+// data (Class Schedule + Floater Assignments) every call instead of
+// reading member_schedules, which only updates when something explicitly
+// triggers that function. A real bug report: a member's Schedule Card
+// (in every one of its display surfaces - the member profile's Schedule
+// popup, admin Schedules > Student/Parent tabs, both print pages, and the
+// designed visual card) kept showing a stale End Time after a fix to how
+// times are derived landed, because nothing had re-triggered a resync of
+// that member specifically. getMemberSchedule/scheduleList (utils/
+// schedule.js) now use this instead, so every one of those surfaces is
+// always current with no separate "did someone resync" step to go stale.
+// A person shows up once per class they're either enrolled in (student)
+// or staffing (teacher/assistant); "teacher" on their row lists that
+// class's teacher(s), themselves included if that's their own class. A
+// floater then fills in any of THEIR hours that aren't already a real
+// class slot on their own schedule, labeled "Floater" - matched purely by
+// hour position, not to any specific class, so it never overwrites a real
+// one. Returns { [memberId]: { [hourPosition]: row } } - a raw
+// hourPosition-keyed map, not yet the fixed 4-row array
+// getMemberSchedule's own shape needs.
+async function liveMemberScheduleRowsForDay(day) {
+  const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
+  const hours = await hoursForDay(day);
+  const derivedLabels = derivedHourTimeLabels(classes, hours);
+  const rowsByMember = {};
+
+  for (const cls of classes) {
+    const time = (cls.start_time && cls.end_time)
+      ? `${cls.start_time} - ${cls.end_time}`
+      : derivedLabels[cls.hour_position] || (await rawHourLabel(day, cls.hour_position));
+    const staff = await staffForClass(cls.id);
+    const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ');
+    const row = { class_number: cls.hour_position, time, class_name: cls.class_name, room: cls.room || '', teacher: teacherNames };
+    const people = [...(await studentsForClass(cls.id)), ...staff];
+    for (const person of people) {
+      if (!rowsByMember[person.id]) rowsByMember[person.id] = {};
+      rowsByMember[person.id][cls.hour_position] = row;
+    }
+  }
+
+  const list = await getListByDay(day);
+  if (list) {
+    const hourLabels = {};
+    hours.forEach((h) => { hourLabels[h.position] = derivedLabels[h.position] || h.label; });
+    for (const section of await sectionsForList(list.id)) {
+      for (const memberId of await membersForSectionRaw(list.id, section.id)) {
+        if (!rowsByMember[memberId]) rowsByMember[memberId] = {};
+        if (rowsByMember[memberId][section.position]) continue; // a real class slot always wins
+        rowsByMember[memberId][section.position] = {
+          class_number: section.position, time: hourLabels[section.position] || '', class_name: 'Floater', room: '', teacher: '',
+        };
+      }
+    }
+  }
+
+  return rowsByMember;
+}
+
+// member_schedules (a cached snapshot, no longer read from directly - see
+// liveMemberScheduleRowsForDay above, which superseded it as the read
+// path) is entirely derived from the master Class Schedule and the
+// Floater Assignments list - there's no separate hand-typed version
+// anymore, so this fully rebuilds one day's rows every time either
+// changes (called from syncDayMemberRosters, which already runs on every
+// enrollment/staff/class/floater edit). A person shows up once per class
+// they're either enrolled in (student) or staffing (teacher/assistant);
+// "teacher" on their row lists that class's teacher(s), themselves
+// included if that's their own class. A floater then fills in any of
+// THEIR hours that aren't already a real class slot on their own
 // schedule, labeled "Floater" - matched purely by hour position (the
 // Floater Assignments chart's "Hour N" against the class grid's own
 // "Hour N", the same position class_schedule_hours already keys both by),
@@ -1480,6 +1540,7 @@ module.exports = {
   ensureDayMemberRosters,
   syncDayMemberRosters,
   syncMemberSchedulesForDay,
+  liveMemberScheduleRowsForDay,
   addManualRosterMember,
   allClassesList,
 };

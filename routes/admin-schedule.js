@@ -12,6 +12,7 @@ const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('
 const {
   DAY_LABELS,
   getMemberSchedule,
+  fourRows,
   scheduleList,
   archiveMemberSchedules,
   listMemberScheduleArchives,
@@ -27,6 +28,7 @@ const {
   GRADE_LEVELS,
   COLOR_PALETTE,
   activeMembersForStaff,
+  liveMemberScheduleRowsForDay,
   absentMemberIdsForDate,
   setEnrollment,
   addStaff,
@@ -131,7 +133,15 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   for (const r of rows) {
     summarized.push({
       member: r.member,
-      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, await scheduleCardDataForMember(r.member)),
+      // r already carries this member's own already-computed monday/
+      // wednesday rows (scheduleList batches the whole day once - see its
+      // own comment) - passing them through skips scheduleCardDataForMember's
+      // own getMemberSchedule call, which would otherwise redo that same
+      // live computation a second time per member on this page.
+      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(
+        scheduleCardTemplate.elements,
+        await scheduleCardDataForMember(r.member, { monday: r.monday, wednesday: r.wednesday })
+      ),
     });
   }
   summarized.sort((a, b) => byLastName(a.member, b.member));
@@ -393,10 +403,20 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
 
   const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  // Both days' live schedule rows computed once for this whole batch, not
+  // once per member - see scheduleList's own comment on why the
+  // per-member version is a severe N+1 (this route already had a
+  // documented history of choking at real co-op scale - see the payload-
+  // chunking fix on the client side for "Select All" batches).
+  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
   const cards = [];
   for (const m of members) {
+    const precomputedSchedule = {
+      monday: fourRows(Object.values(mondayRows[m.id] || {})),
+      wednesday: fourRows(Object.values(wednesdayRows[m.id] || {})),
+    };
     cards.push({
-      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(m)),
+      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(m, precomputedSchedule)),
       bgCss,
     });
   }
