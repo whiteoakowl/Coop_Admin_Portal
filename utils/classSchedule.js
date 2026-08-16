@@ -953,13 +953,24 @@ async function ownPositionsAndFamilyWindowsForDay(day) {
       const range = positionRanges[position];
       if (!range) return;
       const w = windowByFamily[familyId] || { start: null, end: null };
-      if (w.start == null || range.startMin < w.start) w.start = range.startMin;
-      if (w.end == null || range.endMin > w.end) w.end = range.endMin;
+      extendWindow(w, range);
       windowByFamily[familyId] = w;
     });
   });
 
   return { positionRanges, ownPositionsByMember, familyIdByMember, windowByFamily };
+}
+
+// Widens a { start, end } window (minutes-since-midnight, either half
+// possibly still null) to also cover a position's range - start always
+// participates (a class's start time is always known once it resolves at
+// all), but end only participates when range.endMin is a real, known
+// value. A range with no real end (see derivedHourTimeRanges) must never
+// narrow or fabricate a window's end - better an honestly-blank departure
+// than a confidently wrong one built from some other class's start time.
+function extendWindow(w, range) {
+  if (w.start == null || range.startMin < w.start) w.start = range.startMin;
+  if (range.endMin != null && (w.end == null || range.endMin > w.end)) w.end = range.endMin;
 }
 
 // Every member's live attendance window for a day (earliest start /
@@ -993,8 +1004,7 @@ async function familyAttendanceWindowsForDay(day) {
         const familyId = familyIdByMember[memberId];
         if (familyId == null) continue;
         const w = windowByFamily[familyId] || { start: null, end: null };
-        if (w.start == null || range.startMin < w.start) w.start = range.startMin;
-        if (w.end == null || range.endMin > w.end) w.end = range.endMin;
+        extendWindow(w, range);
         windowByFamily[familyId] = w;
       }
     }
@@ -1013,11 +1023,8 @@ async function familyAttendanceWindowsForDay(day) {
     ownPositionsByMember[memberId].forEach((position) => {
       const range = positionRanges[position];
       if (!range) return;
-      if (!w) w = { start: range.startMin, end: range.endMin };
-      else {
-        if (range.startMin < w.start) w.start = range.startMin;
-        if (range.endMin > w.end) w.end = range.endMin;
-      }
+      if (!w) w = { start: null, end: null };
+      extendWindow(w, range);
     });
     if (w) result[memberId] = w;
   });
@@ -1167,9 +1174,17 @@ function derivedHourTimeRanges(rawClasses) {
   const ranges = {};
   Object.entries(bestByPosition).forEach(([position, { startMinutes, endTime }]) => {
     const endMinutes = parseClockMinutesLocal(endTime);
+    // No parseable end time entered for any class at this position - endMin
+    // is left null rather than defaulting to the start time. It used to
+    // default to startMinutes (a zero-length "range"), which fed straight
+    // into familyAttendanceWindowsForDay's max-end-time calculation as if
+    // it were a real, if early, departure - so a co-op that only ever fills
+    // in Start Time got a confidently wrong Departure (the start time of a
+    // family's last class) instead of an honestly blank one. Every caller
+    // of positionRanges treats a null endMin as "unknown," not "zero."
     ranges[position] = endMinutes != null
       ? { startMin: startMinutes, endMin: endMinutes, label: `${minutesToClockLabelLocal(startMinutes)} - ${minutesToClockLabelLocal(endMinutes)}` }
-      : { startMin: startMinutes, endMin: startMinutes, label: minutesToClockLabelLocal(startMinutes) };
+      : { startMin: startMinutes, endMin: null, label: minutesToClockLabelLocal(startMinutes) };
   });
   return ranges;
 }
