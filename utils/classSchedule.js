@@ -610,10 +610,17 @@ async function activeStudents() {
   return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY LOWER(name)").all();
 }
 
-// Active parents, for the teacher/assistant picker - same restriction the
-// Floater Assignments and Setup/Cleanup pickers already use.
-async function activeParentsForStaff() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY LOWER(name)").all();
+// Active parents AND students, for the teacher/assistant picker - a
+// homeschool co-op commonly has a teen student teaching or assisting a
+// younger class alongside (or instead of) a parent, so both member types
+// are eligible here. Deliberately unlike the Floater Assignments and
+// Setup/Cleanup pickers (utils/members.js's activeParentOptions), which
+// stay parent-only - those are specifically adult volunteer slots, not a
+// class staffing role a student can also fill. Each row carries its own
+// member_type so a picker can label a student option distinctly from a
+// parent one with the same or a similar name.
+async function activeMembersForStaff() {
+  return db.prepare("SELECT id, name, member_type FROM members WHERE active = 1 AND member_type IN ('parent', 'student') ORDER BY LOWER(name)").all();
 }
 
 // Every class on this day whose ASSIGNED teacher and/or assistant is
@@ -1212,9 +1219,19 @@ async function syncDayMemberRosters(day) {
     (await db.prepare(`SELECT DISTINCT student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach(
       (r) => studentIds.add(r.student_id)
     );
-    (await db.prepare(`SELECT DISTINCT member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) =>
-      parentIds.add(r.member_id)
-    );
+    // class_staff can now hold a student (a teen teaching/assisting a
+    // class - see activeMembersForStaff), not just a parent, so which
+    // roster each staff member belongs on has to follow their own real
+    // member_type instead of assuming everyone here is a parent.
+    const staffMemberIds = [
+      ...new Set((await db.prepare(`SELECT DISTINCT member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).map((r) => r.member_id)),
+    ];
+    if (staffMemberIds.length > 0) {
+      const staffPlaceholders = staffMemberIds.map(() => '?').join(',');
+      (await db.prepare(`SELECT id, member_type FROM members WHERE id IN (${staffPlaceholders})`).all(...staffMemberIds)).forEach((r) => {
+        (r.member_type === 'student' ? studentIds : parentIds).add(r.id);
+      });
+    }
   }
   // A parent belongs on this day's roster not only for teaching/assisting
   // a class themselves, but whenever ANYONE in their family does -
@@ -1453,7 +1470,7 @@ module.exports = {
   minutesToClockLabelLocal,
   removeStaff,
   activeStudents,
-  activeParentsForStaff,
+  activeMembersForStaff,
   staffListForDay,
   classesNeedingStaffForDay,
   classesAtRiskForDay,

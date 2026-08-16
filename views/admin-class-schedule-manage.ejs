@@ -152,12 +152,12 @@
       <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/staff/add">
         <h3>Add Teacher/Assistant</h3>
         <% if (availableStaff.length === 0) { %>
-          <p class="hint">Every active parent is already assigned to this class.</p>
+          <p class="hint">Every eligible parent/student is already assigned to this class.</p>
         <% } else { %>
           <label>Member
             <select name="memberId" required>
               <% availableStaff.forEach(function(p) { %>
-                <option value="<%= p.id %>"><%= p.name %></option>
+                <option value="<%= p.id %>"><%= p.name %><%= p.member_type === 'student' ? ' (Student)' : '' %></option>
               <% }); %>
             </select>
           </label>

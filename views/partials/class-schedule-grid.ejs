@@ -140,7 +140,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <select name="teacherId" required>
           <option value="" disabled selected>Select teacher&hellip;</option>
           <% availableStaff.forEach(function(p) { %>
-            <option value="<%= p.id %>"><%= p.name %></option>
+            <option value="<%= p.id %>"><%= p.name %><%= p.member_type === 'student' ? ' (Student)' : '' %></option>
           <% }); %>
         </select>
       </div>
@@ -150,7 +150,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
           <select name="assistantIds">
             <option value="">Select&hellip;</option>
             <% availableStaff.forEach(function(p) { %>
-              <option value="<%= p.id %>"><%= p.name %></option>
+              <option value="<%= p.id %>"><%= p.name %><%= p.member_type === 'student' ? ' (Student)' : '' %></option>
             <% }); %>
           </select>
         </div>

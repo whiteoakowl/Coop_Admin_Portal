@@ -150,11 +150,11 @@
         <% }); %>
       </select>
     </label>
-    <label id="roster-add-staff-<%= cls.id %>" hidden>Parent
+    <label id="roster-add-staff-<%= cls.id %>" hidden>Teacher/Assistant
       <select name="staffId">
-        <option value="" disabled selected>Select parent&hellip;</option>
+        <option value="" disabled selected>Select&hellip;</option>
         <% availableStaff.forEach(function(p) { %>
-          <option value="<%= p.id %>"><%= p.name %></option>
+          <option value="<%= p.id %>"><%= p.name %><%= p.member_type === 'student' ? ' (Student)' : '' %></option>
         <% }); %>
       </select>
     </label>

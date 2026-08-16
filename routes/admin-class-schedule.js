@@ -36,7 +36,7 @@ const {
   addStaff,
   removeStaff,
   activeStudents,
-  activeParentsForStaff,
+  activeMembersForStaff,
 } = require('../utils/classSchedule');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -187,7 +187,7 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
     selectedGrades: ageGroupList(cls.age_group),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
-    availableStaff: (await activeParentsForStaff()).filter((p) => !staffIds.includes(p.id)),
+    availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
   });
 });
 
@@ -211,7 +211,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     selectedGrades: ageGroupList(cls.age_group),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
-    availableStaff: (await activeParentsForStaff()).filter((p) => !staffIds.includes(p.id)),
+    availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -554,12 +554,14 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
   const autoHourPositions = buildAutoHourPositions(rows);
 
   // Looked up once instead of once per staff name per row - a real import
-  // can name the same handful of parents across dozens of rows, and each
-  // lookup is otherwise a separate round trip to a remote Supabase/Postgres
-  // connection (unlike the old single local SQLite file, network latency
-  // on every one of those adds up fast on a large file).
-  const activeParentsByName = new Map(
-    (await db.prepare("SELECT id, name FROM members WHERE member_type = 'parent' AND active = 1").all()).map((p) => [p.name.toLowerCase(), p.id])
+  // can name the same handful of parents/student teachers across dozens
+  // of rows, and each lookup is otherwise a separate round trip to a
+  // remote Supabase/Postgres connection (unlike the old single local
+  // SQLite file, network latency on every one of those adds up fast on a
+  // large file). Parents AND students, matching activeMembersForStaff's
+  // own "a teen can teach/assist too" scope for the picker.
+  const activeStaffByName = new Map(
+    (await db.prepare("SELECT id, name FROM members WHERE member_type IN ('parent', 'student') AND active = 1").all()).map((p) => [p.name.toLowerCase(), p.id])
   );
 
   let created = 0;
@@ -594,10 +596,11 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
 
     // Teacher + 2nd Teacher + up to 3 Assistants are optional columns - a
     // blank cell just means "no one assigned yet", not a skipped row.
-    // Matched against active parents by exact (case-insensitive) name,
-    // same lookup the roster import above already uses for students.
-    // class_staff allows any number of 'teacher'-role rows per class, so
-    // a 2nd Teacher is staffed exactly the same way as the first.
+    // Matched against active parents or students by exact (case-
+    // insensitive) name, same lookup the roster import above already uses
+    // for students. class_staff allows any number of 'teacher'-role rows
+    // per class, so a 2nd Teacher is staffed exactly the same way as the
+    // first.
     const staffToAdd = [
       { name: r.teacher, role: 'teacher' },
       { name: r.teacher2, role: 'teacher' },
@@ -606,7 +609,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       { name: r.assistant3, role: 'assistant' },
     ].filter((s) => s.name);
     for (const s of staffToAdd) {
-      const parentId = activeParentsByName.get(s.name.toLowerCase());
+      const staffId = activeStaffByName.get(s.name.toLowerCase());
       // skipSync: true - addStaff's default behavior rebuilds the whole
       // day's rosters/schedules from scratch on every call, which is fine
       // for the one-at-a-time admin picker but far too slow to run once
@@ -614,7 +617,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       // out against a remote Supabase connection because of exactly this -
       // dozens to hundreds of full-day rebuilds instead of one). Synced
       // once per touched day after the loop below instead.
-      if (parentId) await addStaff(classId, parentId, s.role, { skipSync: true });
+      if (staffId) await addStaff(classId, staffId, s.role, { skipSync: true });
       else staffNotFound++;
     }
   }
