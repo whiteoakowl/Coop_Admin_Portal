@@ -8,7 +8,7 @@
 const db = require('../db');
 const { byLastName } = require('./members');
 const { familyOf } = require('./members');
-const { arrivalDepartureLabels } = require('./schedule');
+const { arrivalDepartureLabels, arrivalDepartureLabelsForMembers } = require('./schedule');
 const { formatTime, formatDateLabel } = require('./dates');
 
 // Every roster (each weekday's Parent/Student roster, every class's own
@@ -64,9 +64,19 @@ async function buildRosterGridData(roster, datesOverride) {
   const checkoutByKey = {};
   for (const r of checkoutRows) checkoutByKey[`${r.member_id}|${r.session_date}`] = r;
 
+  // A batch lookup, computed once for the whole roster instead of once
+  // per member - see arrivalDepartureLabelsForMembers's own comment for
+  // why the per-member version was a severe N+1 at real scale. Falls
+  // back to the (slower, but always-correct) per-member function only
+  // for the rare roster whose schedule_day isn't 'monday'/'wednesday'.
+  const isRealDay = roster.schedule_day === 'monday' || roster.schedule_day === 'wednesday';
+  const labelsByMember = isRealDay
+    ? await arrivalDepartureLabelsForMembers(members.map((m) => m.id), roster.schedule_day)
+    : null;
+
   const rows = [];
   for (const m of members) {
-    const { arrival, departure } = await arrivalDepartureLabels(m.id, roster.schedule_day);
+    const { arrival, departure } = labelsByMember ? labelsByMember[m.id] : await arrivalDepartureLabels(m.id, roster.schedule_day);
     rows.push({
       member: m,
       parentName: (await familyOf(m.id)).map((p) => p.name).join(', ') || null,

@@ -85,6 +85,33 @@ async function arrivalDepartureLabels(memberId, day) {
   };
 }
 
+// Batch version of arrivalDepartureLabels for a whole roster's worth of
+// members at once - computes familyAttendanceWindowsForDay(day) exactly
+// ONCE and reuses it for every member, instead of a caller looping
+// arrivalDepartureLabels(memberId, day) per member, which redundantly
+// re-ran that same full-day computation (classes, enrollments, staffing,
+// and every floater section's membership) from scratch for every single
+// row. That N+1 was invisible against PGlite's local, in-process test
+// data but made a real Postgres-backed roster with hundreds of members
+// severely slow (reported live: the Attendance page became unresponsive).
+// Only handles a single real day ('monday' or 'wednesday') - unlike
+// arrivalDepartureLabels, there's no "combine both days" fallback, since
+// every roster's own schedule_day is always one of those two; callers
+// with anything else should fall back to arrivalDepartureLabels per
+// member instead. Returns { [memberId]: { arrival, departure } }.
+async function arrivalDepartureLabelsForMembers(memberIds, day) {
+  const windowByMember = await familyAttendanceWindowsForDay(day);
+  const result = {};
+  for (const memberId of memberIds) {
+    const window = windowByMember[memberId];
+    result[memberId] = {
+      arrival: window ? minutesToClockLabelLocal(window.start) : null,
+      departure: window ? minutesToClockLabelLocal(window.end) : null,
+    };
+  }
+  return result;
+}
+
 // 'none' - no classes at all. 'partial' - some classes filled in, but not
 // all 8 (4 Monday + 4 Wednesday) slots. 'complete' - every slot filled.
 function scheduleStatus(monday, wednesday) {
@@ -228,6 +255,7 @@ module.exports = {
   scheduleStatus,
   scheduleList,
   arrivalDepartureLabels,
+  arrivalDepartureLabelsForMembers,
   parseClockMinutes,
   splitTimeRange,
   archiveMemberSchedules,
