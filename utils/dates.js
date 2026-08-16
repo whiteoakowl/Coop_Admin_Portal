@@ -48,9 +48,22 @@ function formatDateLong(iso) {
   return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// epochMs comes straight from a Postgres bigint column (attendance.
+// check_in_time, checkouts.check_out_time) - the pg driver returns a
+// bigint as a STRING, not a number, to avoid silent precision loss on
+// values bigger than Number.MAX_SAFE_INTEGER (irrelevant for an epoch-ms
+// timestamp, which never gets that large). new Date() treats a numeric
+// STRING as an unparseable date string, not as milliseconds-since-epoch,
+// so passing the raw string straight through silently produced
+// "Invalid Date" on any real (Postgres-backed) deploy - invisible in
+// local dev/tests, which run on PGlite, whose driver already returns a
+// bigint as a plain number. Number(epochMs) is a no-op when it's already
+// a number (PGlite, or any caller passing one directly, per this
+// function's own tests), so this is safe for both backends.
 function formatTime(epochMs) {
-  if (!epochMs) return null;
-  return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const ms = Number(epochMs);
+  if (!ms) return null;
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 // Formats a plain "HH:MM" (24-hour, from an <input type="time">) as a

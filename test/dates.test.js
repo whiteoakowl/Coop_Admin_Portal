@@ -132,6 +132,27 @@ test('formatTime', async (t) => {
     const epoch = new Date('2024-06-15T14:30:00Z').getTime();
     assert.equal(formatTime(epoch), '2:30 PM');
   });
+
+  // Coverage for a live bug report: attendance.check_in_time/checkouts.
+  // check_out_time are Postgres bigint columns, and the pg driver returns
+  // a bigint as a STRING (to avoid silent precision loss on values past
+  // Number.MAX_SAFE_INTEGER), not a number - invisible locally/in tests,
+  // which run on PGlite, whose driver already returns bigint as a plain
+  // number, so only a real Postgres deploy ever passed formatTime a
+  // string. new Date(numericString) doesn't parse as milliseconds - it's
+  // treated as an unparseable date STRING, so the real bug produced
+  // "Invalid Date" as literal on-screen text everywhere a check-in/
+  // check-out time is shown (the Attendance grid's "In/Out" badge, the
+  // Logs > Check In/Out tab, member profile history, CSV exports).
+  await t.test('formats correctly even when epochMs arrives as a numeric STRING (Postgres bigint-as-string)', () => {
+    const epoch = new Date('2024-06-15T14:30:00Z').getTime();
+    assert.equal(formatTime(String(epoch)), '2:30 PM');
+  });
+
+  await t.test('returns null (not "Invalid Date") for a falsy/zero value that arrives as a string too', () => {
+    assert.equal(formatTime('0'), null);
+    assert.equal(formatTime(''), null);
+  });
 });
 
 test('formatTimeOfDay', async (t) => {
