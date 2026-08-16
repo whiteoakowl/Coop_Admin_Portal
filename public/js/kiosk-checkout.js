@@ -1,12 +1,14 @@
-/* global keepInputFocused, initIdKeypad */
+/* global keepInputFocused, initIdKeypad, initKioskMethodChooser */
 (function () {
   const scanForm = document.getElementById('scan-form');
   if (!scanForm) return; // no session today
 
   const input = document.getElementById('barcode-input');
+  const result = document.getElementById('kiosk-result');
   const status = document.getElementById('kiosk-status');
   const instructions = document.getElementById('kiosk-instructions');
   const icon = status.querySelector('.kiosk-status-icon');
+  const manualSubmitBtn = document.getElementById('manual-submit-btn');
 
   const stepScan = document.getElementById('step-scan');
   const stepNumber = document.getElementById('step-number');
@@ -17,6 +19,9 @@
 
   keepInputFocused(input);
   initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
+  const chooser = initKioskMethodChooser(document.getElementById('main-content'));
+
+  manualSubmitBtn.addEventListener('click', () => scanForm.requestSubmit());
 
   let currentMemberId = null;
 
@@ -31,7 +36,7 @@
     numpad.appendChild(btn);
   }
 
-  function setScanState(state, message, iconId) {
+  function setState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
     icon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
     instructions.textContent = message;
@@ -41,10 +46,10 @@
     currentMemberId = null;
     stepNumber.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
-    setScanState('idle', 'Scan your barcode or enter your ID number', 'camera');
+    result.hidden = true;
+    chooser.showChooser();
     numberMessage.textContent = '';
     numpad.querySelectorAll('.numpad-btn').forEach((b) => b.classList.remove('numpad-btn-selected'));
-    setTimeout(() => input.focus(), 50);
   }
 
   scanForm.addEventListener('submit', async (e) => {
@@ -53,7 +58,14 @@
     input.value = '';
     if (!barcode) return;
 
-    setScanState('loading', 'Checking…', 'loader');
+    // The method panel active when this submission started - if it
+    // fails, that's the screen to return to, not the button-choice row.
+    const activePanel = document.querySelector('[data-method-panel]:not([hidden])');
+    const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
+
+    document.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    result.hidden = false;
+    setState('loading', 'Checking…', 'loader');
 
     try {
       const res = await fetch('/kiosk/checkout/scan', {
@@ -68,16 +80,22 @@
         numpad.querySelectorAll('.numpad-btn').forEach((b) => {
           b.classList.toggle('numpad-btn-selected', data.existingNumber && Number(b.dataset.number) === data.existingNumber);
         });
+        result.hidden = true;
         stepScan.classList.add('kiosk-hidden');
         stepNumber.classList.remove('kiosk-hidden');
-        setScanState('idle', 'Scan your barcode or enter your ID number', 'camera');
       } else {
-        setScanState('error', data.message, 'x-circle');
-        setTimeout(() => setScanState('idle', 'Scan your barcode or enter your ID number', 'camera'), 2500);
+        setState('error', data.message, 'x-circle');
+        setTimeout(() => {
+          result.hidden = true;
+          chooser.showPanel(activeMethod);
+        }, 2500);
       }
     } catch (err) {
-      setScanState('error', 'Connection error. Please try again.', 'x-circle');
-      setTimeout(() => setScanState('idle', 'Scan your barcode or enter your ID number', 'camera'), 2500);
+      setState('error', 'Connection error. Please try again.', 'x-circle');
+      setTimeout(() => {
+        result.hidden = true;
+        chooser.showPanel(activeMethod);
+      }, 2500);
     }
   });
 

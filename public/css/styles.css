@@ -609,6 +609,113 @@ textarea:focus-visible,
   .kiosk-scan-columns { flex-direction: column; align-items: center; gap: 1.25rem; }
 }
 
+/* Kiosk scan-method chooser (Check In, Check Out, Find a Parent, Class
+   Check In & Out) - one entry method is picked at a time (2 buttons where
+   there's no camera-scan option, 3 where there is) instead of every
+   method's UI sharing the screen at once. Sized/colored like the kiosk
+   home screen's own landing-card buttons so the two "pick a big touch
+   target" moments in the app read as one consistent pattern. */
+.kiosk-method-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.kiosk-method-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 180px;
+  padding: 1.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  background: var(--btn-purple);
+  border-color: var(--btn-purple);
+}
+.kiosk-method-btn:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--btn-purple-hover); }
+
+.kiosk-method-btn .landing-icon { background: rgba(255,255,255,0.6); color: #4a2050; }
+.kiosk-method-btn .landing-label { color: #000; font-size: 1.2rem; }
+
+.kiosk-method-btn-scanner { background: var(--btn-bg); border-color: var(--btn-bg); }
+.kiosk-method-btn-scanner:hover { border-color: var(--btn-bg-hover); }
+.kiosk-method-btn-scanner .landing-icon { color: #7a3d0a; }
+
+.kiosk-method-btn-manual { background: var(--btn-green); border-color: var(--btn-green); }
+.kiosk-method-btn-manual:hover { border-color: var(--btn-green-hover); }
+.kiosk-method-btn-manual .landing-icon { color: #2f4a20; }
+
+/* "Back" link out of a chosen method, back to the button row above -
+   plain-text style so it doesn't compete with the method buttons or
+   panel's own primary action for attention. */
+.kiosk-method-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.kiosk-method-back .icon { width: 1em; height: 1em; }
+
+/* Simple "Scan barcode now" panel - Check In/Check Out's Barcode Scanner
+   method, and the equivalent panel on Find a Parent/Class Check In & Out
+   (continuous: stays on this screen, re-arming after each scan, until
+   Complete is clicked - see each page's own script). */
+.kiosk-scan-now-text { font-size: 1.6rem; font-weight: 700; margin: 0; }
+
+/* Mobile Barcode Scan (Find a Parent / Class Check In & Out only) - a
+   live rear-camera preview with public/js/kiosk-camera-scanner.js (@zxing/
+   library, public/js/vendor/zxing.min.js) decoding CODE128 barcodes
+   straight out of the video frames, no separate scanning app needed. */
+.kiosk-camera-frame {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto 1.25rem;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #111;
+}
+.kiosk-camera-frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kiosk-camera-frame::after {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  border: 3px solid rgba(255,255,255,0.85);
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 999px rgba(0,0,0,0.25);
+}
+
+.kiosk-camera-error {
+  max-width: 420px;
+  margin: 0 auto 1rem;
+  padding: 1rem;
+  border-radius: var(--control-radius);
+  background: var(--red-bg);
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* Shared "leave this continuous-scan panel" action (Find a Parent / Class
+   Check In & Out) - reuses the cancel button's plain, low-emphasis look
+   since it's the same kind of "step away from what I was doing" action. */
+.kiosk-complete-btn { margin-top: 1.5rem; }
+
+@media (max-width: 640px) {
+  .kiosk-method-btn { width: 140px; padding: 1.25rem 0.75rem; }
+}
+
 /* Mobile-only bottom action bar (Find a Parent / Class Check In & Out /
    Admin) vs. desktop/tablet's original independently-positioned corner
    pills, on both index.ejs (the real site root/kiosk landing page) and

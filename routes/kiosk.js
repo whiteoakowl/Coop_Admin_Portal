@@ -98,7 +98,7 @@ router.post('/checkin/scan', async (req, res) => {
     await upsert.run(member.id, r.id, today, now);
   }
 
-  res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
+  res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });
 });
 
 // --- Find a Parent ---

@@ -35,9 +35,9 @@ function initIdKeypad(container, input, form) {
   function addDigit(d) {
     if (value.length >= ID_LENGTH) return;
     value += d;
+    input.value = value;
     render();
     if (value.length === ID_LENGTH) {
-      input.value = value;
       value = '';
       render();
       form.requestSubmit();
@@ -46,6 +46,7 @@ function initIdKeypad(container, input, form) {
 
   function backspace() {
     value = value.slice(0, -1);
+    input.value = value;
     render();
   }
 
@@ -56,7 +57,7 @@ function initIdKeypad(container, input, form) {
     if (key === 'clear') {
       btn.textContent = 'Clear';
       btn.setAttribute('aria-label', 'Clear entry');
-      btn.addEventListener('click', function () { value = ''; render(); });
+      btn.addEventListener('click', function () { value = ''; input.value = ''; render(); });
     } else if (key === 'back') {
       btn.textContent = '⌫';
       btn.setAttribute('aria-label', 'Backspace');

@@ -12,20 +12,58 @@
       <h1>Find a Parent</h1>
     </div>
 
-    <div id="scan-view" class="kiosk-panel">
-      <p id="kiosk-instructions" class="kiosk-instructions">Scan student's barcode or enter their ID number</p>
-      <div class="kiosk-scan-columns">
-        <div class="kiosk-scan-col">
-          <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
-            <span class="kiosk-status-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
-          </div>
-          <p class="kiosk-scan-col-label">Scan barcode</p>
-        </div>
-        <div class="kiosk-scan-col">
-          <div id="id-keypad"></div>
-          <p class="kiosk-scan-col-label">Enter ID number</p>
+    <div class="kiosk-panel">
+      <div class="kiosk-method-choice">
+        <p class="kiosk-instructions">How would you like to scan?</p>
+        <div class="kiosk-method-buttons">
+          <button type="button" class="kiosk-method-btn" data-method="mobile-scan">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-camera"/></svg></span>
+            <span class="landing-label">Mobile Barcode Scan</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-barcode"/></svg></span>
+            <span class="landing-label">Barcode Scan</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-manual" data-method="manual">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-grid"/></svg></span>
+            <span class="landing-label">Manually Enter ID #</span>
+          </button>
         </div>
       </div>
+
+      <div data-method-panel="mobile-scan" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <div class="kiosk-camera-frame"><video id="camera-video" autoplay playsinline muted></video></div>
+        <p id="camera-error" class="kiosk-camera-error" hidden></p>
+        <p class="kiosk-scan-now-text">Point the camera at a student's barcode</p>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div data-method-panel="scanner" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-scan-now-text">Scan barcode now</p>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div data-method-panel="manual" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <div id="id-keypad"></div>
+        <button type="button" id="manual-submit-btn" class="primary-btn">Submit</button>
+        <button type="button" class="kiosk-cancel-btn kiosk-complete-btn" data-complete>Complete</button>
+      </div>
+
+      <div id="kiosk-result" hidden>
+        <div id="kiosk-status" class="kiosk-status kiosk-status-idle">
+          <span class="kiosk-status-icon"></span>
+        </div>
+        <p id="kiosk-instructions" class="kiosk-instructions"></p>
+      </div>
+
+      <div id="find-parent-results" class="find-parent-results" hidden>
+        <h2 id="result-student-heading" class="find-parent-heading"></h2>
+        <div id="result-parents"></div>
+      </div>
+
       <form id="scan-form" autocomplete="off">
         <input
           id="barcode-input"
@@ -39,13 +77,9 @@
         />
       </form>
     </div>
-
-    <div id="results-view" class="kiosk-panel find-parent-results" hidden>
-      <h2 id="result-student-heading" class="find-parent-heading"></h2>
-      <div id="result-parents"></div>
-      <button type="button" id="scan-again-btn" class="primary-btn find-parent-scan-again">Scan Another Student</button>
-    </div>
   </main>
+  <script src="/js/vendor/zxing.min.js"></script>
+  <script src="/js/kiosk-camera-scanner.js"></script>
   <script src="/js/kiosk-common.js"></script>
   <script src="/js/kiosk-id-keypad.js"></script>
   <script src="/js/kiosk-find-parent.js"></script>
