@@ -919,27 +919,60 @@ async function ensureDayMemberRosters() {
 // does NOT fold in floater assignments - autoAssignFloatersForDay needs
 // the window as defined by real class assignments only, to decide which
 // blank hours to floater-fill in the first place.
+// A specific class's own effective time range: its own start_time/
+// end_time where it has them, falling back independently per half to its
+// hour position's shared default (see saveHourLabels) where it doesn't.
+// Deliberately per-CLASS, not per-position - two classes can share the
+// same hour_position (different rooms, running in parallel) with
+// genuinely different lengths (a real bug report: one longer class
+// sharing an hour with normal-length ones was polluting the *whole
+// position's* derived range - see derivedHourTimeRanges's own "earliest
+// start wins" position-level guess, which is fine for a display label but
+// wrong as the source for any one specific family's own window). Returns
+// null if neither the class nor its hour resolves to a real start time.
+function effectiveClassRange(cls, hourByPosition) {
+  const ownStart = parseClockMinutesLocal(cls.start_time);
+  const ownEnd = parseClockMinutesLocal(cls.end_time);
+  const hour = hourByPosition[cls.hour_position];
+  const hourStart = hour ? parseClockMinutesLocal(hour.start_time) : null;
+  const hourEnd = hour ? parseClockMinutesLocal(hour.end_time) : null;
+
+  const startMin = ownStart != null ? ownStart : hourStart;
+  if (startMin == null) return null;
+  const endMin = ownEnd != null ? ownEnd : hourEnd;
+  return { startMin, endMin };
+}
+
 async function ownPositionsAndFamilyWindowsForDay(day) {
   const classes = await db.prepare('SELECT * FROM classes WHERE day = ?').all(day);
-  const positionRanges = derivedHourTimeRanges(classes, await hoursForDay(day));
+  const hours = await hoursForDay(day);
+  const positionRanges = derivedHourTimeRanges(classes, hours);
+  const hourByPosition = {};
+  hours.forEach((h) => { hourByPosition[h.position] = h; });
   const classIds = classes.map((c) => c.id);
   const classById = {};
   classes.forEach((c) => { classById[c.id] = c; });
 
   const ownPositionsByMember = {};
-  const noteOwn = (memberId, position) => {
+  const ownRangesByMember = {};
+  const noteOwn = (memberId, cls) => {
     if (!ownPositionsByMember[memberId]) ownPositionsByMember[memberId] = new Set();
-    ownPositionsByMember[memberId].add(position);
+    ownPositionsByMember[memberId].add(cls.hour_position);
+    const range = effectiveClassRange(cls, hourByPosition);
+    if (range) {
+      if (!ownRangesByMember[memberId]) ownRangesByMember[memberId] = [];
+      ownRangesByMember[memberId].push(range);
+    }
   };
   if (classIds.length) {
     const placeholders = classIds.map(() => '?').join(',');
     (await db.prepare(`SELECT class_id, student_id FROM class_enrollments WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
       const cls = classById[r.class_id];
-      if (cls) noteOwn(r.student_id, cls.hour_position);
+      if (cls) noteOwn(r.student_id, cls);
     });
     (await db.prepare(`SELECT class_id, member_id FROM class_staff WHERE class_id IN (${placeholders})`).all(...classIds)).forEach((r) => {
       const cls = classById[r.class_id];
-      if (cls) noteOwn(r.member_id, cls.hour_position);
+      if (cls) noteOwn(r.member_id, cls);
     });
   }
 
@@ -956,16 +989,14 @@ async function ownPositionsAndFamilyWindowsForDay(day) {
   memberIds.forEach((memberId) => {
     const familyId = familyIdByMember[memberId];
     if (!familyId) return;
-    ownPositionsByMember[memberId].forEach((position) => {
-      const range = positionRanges[position];
-      if (!range) return;
+    (ownRangesByMember[memberId] || []).forEach((range) => {
       const w = windowByFamily[familyId] || { start: null, end: null };
       extendWindow(w, range);
       windowByFamily[familyId] = w;
     });
   });
 
-  return { positionRanges, ownPositionsByMember, familyIdByMember, windowByFamily };
+  return { positionRanges, ownPositionsByMember, ownRangesByMember, familyIdByMember, windowByFamily };
 }
 
 // Widens a { start, end } window (minutes-since-midnight, either half
@@ -994,7 +1025,7 @@ function extendWindow(w, range) {
 // end } }; a member with nothing resolvable on the schedule is simply
 // absent from the map. Used by utils/schedule.js's arrivalDepartureLabels.
 async function familyAttendanceWindowsForDay(day) {
-  const { positionRanges, ownPositionsByMember, familyIdByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
+  const { positionRanges, ownPositionsByMember, ownRangesByMember, familyIdByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
 
   const list = await getListByDay(day);
   if (list) {
@@ -1006,8 +1037,14 @@ async function familyAttendanceWindowsForDay(day) {
           const row = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
           familyIdByMember[memberId] = row ? row.family_id : null;
         }
+        // A floater hour isn't tied to any one specific class, so the
+        // position's own shared range (already hour-default-aware - see
+        // derivedHourTimeRanges) is the only thing to use here, unlike a
+        // real class enrollment/staffing assignment's own effectiveClassRange.
         const range = positionRanges[section.position];
         if (!range) continue;
+        if (!ownRangesByMember[memberId]) ownRangesByMember[memberId] = [];
+        ownRangesByMember[memberId].push(range);
         const familyId = familyIdByMember[memberId];
         if (familyId == null) continue;
         const w = windowByFamily[familyId] || { start: null, end: null };
@@ -1025,11 +1062,10 @@ async function familyAttendanceWindowsForDay(day) {
       result[memberId] = windowByFamily[familyId];
       return;
     }
-    // No family on file - fall back to just this member's own positions.
+    // No family on file - fall back to just this member's own class/
+    // floater ranges.
     let w = null;
-    ownPositionsByMember[memberId].forEach((position) => {
-      const range = positionRanges[position];
-      if (!range) return;
+    (ownRangesByMember[memberId] || []).forEach((range) => {
       if (!w) w = { start: null, end: null };
       extendWindow(w, range);
     });
@@ -1206,27 +1242,46 @@ async function syncDayMemberRosters(day) {
   await syncMemberSchedulesForDay(day);
 }
 
-// The real, parseable start/end time for each hour position on a day,
-// derived live from whichever class at that position has the earliest
-// parseable start_time - the same live-derivation roomGridForDay already
-// does for its own column headers, and for the same reason: the
-// separately-stored class_schedule_hours label only gets refreshed at
-// import time, so it's easy for it to sit stuck on the generic "Hour N"
-// default (or a stale time) while classes with real times exist at that
-// position. A class entered without its own start_time/end_time borrows
-// this derived range instead of falling straight back to that label -
-// arrivalDepartureLabels (utils/schedule.js) can't parse "Hour N" as a
-// clock time, so any row stuck on it was silently dropped from a family's
-// earliest/latest calculation.
+// The real, parseable start/end time for each hour POSITION on a day -
+// shared/aggregate use only (schedule card time text for a class with
+// NEITHER of its own times, and floater-hour matching); a specific
+// family's own arrival/departure window uses effectiveClassRange per
+// member instead (see ownPositionsAndFamilyWindowsForDay), precisely
+// because this function's per-position guess below is not reliable
+// enough to represent one specific class or family.
 // hours (a day's class_schedule_hours rows, each carrying its own shared
 // start_time/end_time - see saveHourLabels) is optional and defaults to
-// none, for callers that only have classes on hand.
+// none, for callers that only have classes on hand. Where the hour itself
+// has a real start time, it wins outright as the position's range - a
+// real bug report: multiple classes can share one hour position (parallel
+// rooms) with genuinely different lengths, and the old "whichever class
+// has the earliest start_time wins, use THAT class's own end_time"
+// approach let one unusually long class's end time silently become the
+// position's shared range for every OTHER, normal-length class sharing
+// that hour. Per-class start_time/end_time is now only consulted as a
+// fallback for a position with no hour-level time set at all (the same
+// live-derivation roomGridForDay does for its own column headers, and for
+// the same reason: the separately-stored class_schedule_hours label only
+// gets refreshed at import time, so it's easy for it to sit stuck on the
+// generic "Hour N" default while classes with real times exist there).
 // { [position]: { startMin, endMin, label } } - endMin/label omitted when
-// neither any class at that position nor the hour itself has a parseable
+// neither the hour nor any class at that position has a parseable
 // end_time to pair with a start.
 function derivedHourTimeRanges(rawClasses, hours = []) {
+  const ranges = {};
+
+  hours.forEach((h) => {
+    const hourStart = parseClockMinutesLocal(h.start_time);
+    if (hourStart == null) return;
+    const hourEnd = parseClockMinutesLocal(h.end_time);
+    ranges[h.position] = hourEnd != null
+      ? { startMin: hourStart, endMin: hourEnd, label: `${minutesToClockLabelLocal(hourStart)} - ${minutesToClockLabelLocal(hourEnd)}` }
+      : { startMin: hourStart, endMin: null, label: minutesToClockLabelLocal(hourStart) };
+  });
+
   const bestByPosition = {};
   rawClasses.forEach((cls) => {
+    if (ranges[cls.hour_position]) return; // the hour's own time already wins this position
     const startMinutes = parseClockMinutesLocal(cls.start_time);
     if (startMinutes == null) return;
     const current = bestByPosition[cls.hour_position];
@@ -1234,7 +1289,6 @@ function derivedHourTimeRanges(rawClasses, hours = []) {
       bestByPosition[cls.hour_position] = { startMinutes, endTime: cls.end_time };
     }
   });
-  const ranges = {};
   Object.entries(bestByPosition).forEach(([position, { startMinutes, endTime }]) => {
     const endMinutes = parseClockMinutesLocal(endTime);
     // No parseable end time entered for any class at this position - endMin
@@ -1248,29 +1302,6 @@ function derivedHourTimeRanges(rawClasses, hours = []) {
     ranges[position] = endMinutes != null
       ? { startMin: startMinutes, endMin: endMinutes, label: `${minutesToClockLabelLocal(startMinutes)} - ${minutesToClockLabelLocal(endMinutes)}` }
       : { startMin: startMinutes, endMin: null, label: minutesToClockLabelLocal(startMinutes) };
-  });
-
-  // The hour row's own shared Start/End Time (Class Schedule page's Edit
-  // Hours dialog) is the default every class in that position uses -
-  // fills in a position with no parseable time from any class at all
-  // (the common case: no class at that position sets its own times), and
-  // fills in just the missing end when the position's earliest-starting
-  // class has its own start but no end. A class with BOTH its own start
-  // and end fully overrides the hour default, already handled above
-  // before this loop runs.
-  hours.forEach((h) => {
-    const existing = ranges[h.position];
-    const hourEnd = parseClockMinutesLocal(h.end_time);
-    if (!existing) {
-      const hourStart = parseClockMinutesLocal(h.start_time);
-      if (hourStart == null) return;
-      ranges[h.position] = hourEnd != null
-        ? { startMin: hourStart, endMin: hourEnd, label: `${minutesToClockLabelLocal(hourStart)} - ${minutesToClockLabelLocal(hourEnd)}` }
-        : { startMin: hourStart, endMin: null, label: minutesToClockLabelLocal(hourStart) };
-    } else if (existing.endMin == null && hourEnd != null) {
-      existing.endMin = hourEnd;
-      existing.label = `${minutesToClockLabelLocal(existing.startMin)} - ${minutesToClockLabelLocal(hourEnd)}`;
-    }
   });
   return ranges;
 }
