@@ -74,6 +74,33 @@ async function buildRosterGridData(roster, datesOverride) {
     ? await arrivalDepartureLabelsForMembers(members.map((m) => m.id), roster.schedule_day)
     : null;
 
+  // Each member's suggested Setup/Cleanup task for that date (Setup/Cleanup
+  // > Assignments tab, see setup_task_assignments' own schema comment) -
+  // only meaningful for the day-level Parent/Student rosters (setup_task_
+  // assignments is keyed by day, monday/wednesday, same as arrival/
+  // departure above), not a per-class roster. Shown as the task's own
+  // display "Number" (its 1-indexed position within its section - see
+  // utils/taskList.js's itemsForSection), computed here with the same
+  // ROW_NUMBER()-over-position ordering so it always matches what the
+  // Task List page itself shows for that task, not the task's permanent
+  // barcode/id.
+  const cleanupByKey = {};
+  if (isRealDay && members.length && dates.length) {
+    const cleanupRows = await db
+      .prepare(
+        `SELECT sta.member_id, sta.session_date, numbered.number
+         FROM setup_task_assignments sta
+         JOIN (
+           SELECT id, ROW_NUMBER() OVER (PARTITION BY section_id ORDER BY position, id) AS number
+           FROM task_list_items
+           WHERE section_id IN (SELECT id FROM task_list_sections WHERE day = ?)
+         ) numbered ON numbered.id = sta.task_item_id
+         WHERE sta.day = ? AND sta.session_date IN (${placeholders})`
+      )
+      .all(roster.schedule_day, roster.schedule_day, ...dates);
+    for (const r of cleanupRows) cleanupByKey[`${r.member_id}|${r.session_date}`] = Number(r.number);
+  }
+
   const rows = [];
   for (const m of members) {
     const { arrival, departure } = labelsByMember ? labelsByMember[m.id] : await arrivalDepartureLabels(m.id, roster.schedule_day);
@@ -85,7 +112,8 @@ async function buildRosterGridData(roster, datesOverride) {
       cells: dates.map((d) => {
         const att = attendanceByKey[`${m.id}|${d}`];
         const out = checkoutByKey[`${m.id}|${d}`];
-        if (!att) return { date: d, tag: null, checkInTime: null, checkOutTime: null, number: null };
+        const cleanupTaskNumber = cleanupByKey[`${m.id}|${d}`] ?? null;
+        if (!att) return { date: d, tag: null, checkInTime: null, checkOutTime: null, number: null, cleanupTaskNumber };
         const tag = att.status === 'present' ? 'P' : att.status === 'late' ? 'L' : 'A';
         return {
           date: d,
@@ -94,6 +122,7 @@ async function buildRosterGridData(roster, datesOverride) {
           checkInTime: formatTime(att.check_in_time),
           checkOutTime: out ? formatTime(out.check_out_time) : null,
           number: out ? out.number : null,
+          cleanupTaskNumber,
         };
       }),
     });

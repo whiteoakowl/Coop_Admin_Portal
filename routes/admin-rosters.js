@@ -143,7 +143,14 @@ function archiveRow(row) {
     parentName: row.parentName,
     arrivalLabel: row.arrivalLabel,
     departureLabel: row.departureLabel,
-    cells: row.cells.map((c) => ({ date: c.date, tag: c.tag, checkInTime: c.checkInTime, checkOutTime: c.checkOutTime, number: c.number })),
+    cells: row.cells.map((c) => ({
+      date: c.date,
+      tag: c.tag,
+      checkInTime: c.checkInTime,
+      checkOutTime: c.checkOutTime,
+      number: c.number,
+      cleanupTaskNumber: c.cleanupTaskNumber,
+    })),
   };
 }
 
@@ -504,18 +511,18 @@ router.get('/rosters/archive/:id/print', requireAdmin, async (req, res) => {
 // column shape the live roster export already uses.
 function gridCsvSection(sectionLabel, grid) {
   const header = ['Name'];
-  for (const d of grid.dates) header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`);
+  for (const d of grid.dates) header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`, `${d} Cleanup #`);
 
   const rowLines = grid.rows.map((r) => {
     const row = [r.name];
-    for (const cell of r.cells) row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '');
+    for (const cell of r.cells) row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '', cell.cleanupTaskNumber ?? '');
     return toCsvRow(row);
   });
 
   const summaryRows = ['Present', 'Late', 'Absent'].map((label) => {
     const key = label.toLowerCase();
     const row = [label];
-    for (const s of grid.summary) row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
+    for (const s of grid.summary) row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '', '');
     return toCsvRow(row);
   });
 
@@ -546,13 +553,13 @@ router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
 
   const header = ['Name'];
   for (const d of data.dates) {
-    header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`);
+    header.push(`${d} Status`, `${d} Check-In`, `${d} Check-Out`, `${d} #`, `${d} Cleanup #`);
   }
 
   const rowLines = data.rows.map((r) => {
     const row = [r.member.name];
     for (const cell of r.cells) {
-      row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '');
+      row.push(cell.tag || '', cell.checkInTime || '', cell.checkOutTime || '', cell.number ?? '', cell.cleanupTaskNumber ?? '');
     }
     return toCsvRow(row);
   });
@@ -561,7 +568,7 @@ router.get('/roster/:tab/export.csv', requireAdmin, async (req, res) => {
     const key = label.toLowerCase();
     const row = [label];
     for (const s of data.summary) {
-      row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '');
+      row.push(key === 'present' ? s.present : key === 'late' ? s.late : s.absent, '', '', '', '');
     }
     return toCsvRow(row);
   });

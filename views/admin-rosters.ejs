@@ -262,6 +262,7 @@
                       <span class="print-only-tag cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '' %></span>
                       <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
                       <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                      <% if (cell.cleanupTaskNumber) { %><span class="cell-time">Cleanup #<%= cell.cleanupTaskNumber %></span><% } %>
                     </div>
                   </td>
                 <% }); %>
