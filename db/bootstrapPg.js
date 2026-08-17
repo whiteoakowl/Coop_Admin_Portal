@@ -251,6 +251,39 @@ async function backfillScheduleCardAllergy(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// 'parent' name_tag_templates row, saved before the Monday/Wednesday
+// setup/cleanup job fields existed (utils/nameTagData.js's
+// setupCleanupJobLabels) - seedIfMissing only ever inserts a member type's
+// row once, so an install whose parent template was already saved (even
+// the untouched fresh default, before this feature shipped) never picks
+// the new elements up on its own. A real request: those two lines need to
+// be the first thing on a parent's badge - prepended to whatever the
+// saved layout already has (front of the array is front of the badge,
+// since element order is stacking/paint order - see name-tag-render-
+// core.js's own comment) rather than appended at the end, so this lands
+// them there even for a heavily customized layout, not just a still-
+// default one. Only adds them when the saved layout has neither field at
+// all, leaving every other customization (including someone who
+// deliberately removed the old cleanupTeam field) untouched.
+async function backfillParentSetupCleanupDays(db) {
+  const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup')) return;
+
+  const newDefaults = DEFAULT_LAYOUTS.parent.elements.filter((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup');
+  const elements = [...newDefaults.map((el) => ({ ...el })), ...layout.elements];
+
+  await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // task_list_items rows, created before the barcode column existed -
 // nothing else ever revisits an old row once it's inserted (utils/
 // taskList.js's addItem only assigns a barcode to a NEW row), so without
@@ -286,5 +319,6 @@ module.exports = {
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
   backfillScheduleCardAllergy,
+  backfillParentSetupCleanupDays,
   backfillTaskItemBarcodes,
 };

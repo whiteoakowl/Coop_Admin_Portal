@@ -4,27 +4,35 @@
 const db = require('../db');
 const { DEFAULT_LAYOUTS } = require('./nameTagBadge');
 
-async function cleanupTeamsForParent(memberId) {
-  const rows = await db
+// Every setup_team a parent belongs to, in { day, title } shape - the
+// single source both cleanupTeamsForParent's flat "both days" list and
+// setupCleanupJobLabels' per-day labels (below) are derived from, so
+// there's only ever one query to keep in sync with setup_teams' own
+// schema.
+async function cleanupTeamRowsForParent(memberId) {
+  return db
     .prepare(
-      `SELECT st.title FROM setup_teams st
+      `SELECT st.day, st.title FROM setup_teams st
        JOIN setup_team_members stm ON stm.team_id = st.id
        WHERE stm.member_id = ? ORDER BY st.day, st.title`
     )
     .all(memberId);
-  return rows.map((r) => r.title);
 }
 
-// Batch version of cleanupTeamsForParent for an arbitrary list of parent
-// ids - one query for the whole list instead of one per parent, the same
-// N+1 shape a real ~800-member bulk name tag print timed out on (see
-// badgeDataForMembers below). Returns { [memberId]: [title, ...] }.
-async function cleanupTeamsForParents(memberIds) {
+async function cleanupTeamsForParent(memberId) {
+  return (await cleanupTeamRowsForParent(memberId)).map((r) => r.title);
+}
+
+// Batch version of cleanupTeamRowsForParent for an arbitrary list of
+// parent ids - one query for the whole list instead of one per parent,
+// the same N+1 shape a real ~800-member bulk name tag print timed out on
+// (see badgeDataForMembers below). Returns { [memberId]: [{day, title}, ...] }.
+async function cleanupTeamRowsForParents(memberIds) {
   if (memberIds.length === 0) return {};
   const placeholders = memberIds.map(() => '?').join(',');
   const rows = await db
     .prepare(
-      `SELECT stm.member_id AS "memberId", st.title FROM setup_teams st
+      `SELECT stm.member_id AS "memberId", st.day, st.title FROM setup_teams st
        JOIN setup_team_members stm ON stm.team_id = st.id
        WHERE stm.member_id IN (${placeholders}) ORDER BY st.day, st.title`
     )
@@ -32,9 +40,37 @@ async function cleanupTeamsForParents(memberIds) {
   const byMember = {};
   for (const row of rows) {
     if (!byMember[row.memberId]) byMember[row.memberId] = [];
-    byMember[row.memberId].push(row.title);
+    byMember[row.memberId].push({ day: row.day, title: row.title });
   }
   return byMember;
+}
+
+async function cleanupTeamsForParents(memberIds) {
+  const rowsByMember = await cleanupTeamRowsForParents(memberIds);
+  const byMember = {};
+  for (const memberId of Object.keys(rowsByMember)) byMember[memberId] = rowsByMember[memberId].map((r) => r.title);
+  return byMember;
+}
+
+// A real request: a parent's own Monday/Wednesday setup/cleanup job needs
+// to show on their name tag, day by day (not the old cleanupTeam field's
+// "both days smashed into one comma list" - a parent on Chairs Monday and
+// Snacks Wednesday couldn't tell which team was which day from that
+// alone). The "Monday: "/"Wednesday: " label is baked directly into the
+// returned string, the same convention scheduleCardData.js's
+// primaryParentPhone already uses ("Parent Phone: 555-1234") - so the
+// default parent layout's field elements don't need their own separate
+// static label text element alongside them. "—" for a day the parent
+// isn't on any team, matching this app's own established "blank schedule
+// cell" convention (see public/js/name-tag-render-core.js's table
+// renderer) rather than leaving the line looking broken/cut off.
+function setupCleanupJobLabels(teamRows) {
+  const byDay = { monday: [], wednesday: [] };
+  for (const row of teamRows) if (byDay[row.day]) byDay[row.day].push(row.title);
+  return {
+    mondaySetupCleanup: 'Monday: ' + (byDay.monday.length ? byDay.monday.join(', ') : '—'),
+    wednesdaySetupCleanup: 'Wednesday: ' + (byDay.wednesday.length ? byDay.wednesday.join(', ') : '—'),
+  };
 }
 
 // member_code is the permanent 6-digit ID assigned at creation (see
@@ -49,9 +85,11 @@ function memberCodeLabel(member) {
 async function badgeDataForMember(member) {
   const memberCode = memberCodeLabel(member);
   if (member.member_type === 'parent') {
+    const teamRows = await cleanupTeamRowsForParent(member.id);
     return {
       name: member.name,
-      cleanupTeam: (await cleanupTeamsForParent(member.id)).join(', '),
+      cleanupTeam: teamRows.map((r) => r.title).join(', '),
+      ...setupCleanupJobLabels(teamRows),
       memberCode,
       barcodeValue: member.barcode,
     };
@@ -73,14 +111,22 @@ async function badgeDataForMember(member) {
 // { [memberId]: <same shape badgeDataForMember returns> }.
 async function badgeDataForMembers(members) {
   const parentIds = members.filter((m) => m.member_type === 'parent').map((m) => m.id);
-  const teamsByParent = await cleanupTeamsForParents(parentIds);
+  const teamRowsByParent = await cleanupTeamRowsForParents(parentIds);
   const result = {};
   for (const member of members) {
     const memberCode = memberCodeLabel(member);
-    result[member.id] =
-      member.member_type === 'parent'
-        ? { name: member.name, cleanupTeam: (teamsByParent[member.id] || []).join(', '), memberCode, barcodeValue: member.barcode }
-        : { name: member.name, gradeLevel: member.grade_level || '', allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
+    if (member.member_type === 'parent') {
+      const teamRows = teamRowsByParent[member.id] || [];
+      result[member.id] = {
+        name: member.name,
+        cleanupTeam: teamRows.map((r) => r.title).join(', '),
+        ...setupCleanupJobLabels(teamRows),
+        memberCode,
+        barcodeValue: member.barcode,
+      };
+    } else {
+      result[member.id] = { name: member.name, gradeLevel: member.grade_level || '', allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
+    }
   }
   return result;
 }

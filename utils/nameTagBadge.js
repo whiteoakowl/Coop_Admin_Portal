@@ -26,7 +26,9 @@ const FIELDS_BY_TYPE = {
   ],
   parent: [
     { field: 'name', label: 'Name' },
-    { field: 'cleanupTeam', label: 'Cleanup Team' },
+    { field: 'cleanupTeam', label: 'Cleanup Team (Both Days)' },
+    { field: 'mondaySetupCleanup', label: 'Monday Setup/Cleanup Job' },
+    { field: 'wednesdaySetupCleanup', label: 'Wednesday Setup/Cleanup Job' },
     { field: 'memberCode', label: 'Member ID' },
   ],
   setupCleanup: [
@@ -91,11 +93,23 @@ const DEFAULT_LAYOUTS = {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
-      { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 4, width: 32, height: 32 },
-      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 38, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 56, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
-      { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 86, width: 320, height: 28, fontSize: 11, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
-      { id: 'barcode', type: 'barcode', x: 68, y: 120, width: 200, height: 55 },
+      // A real request: a parent's own Monday/Wednesday setup/cleanup job
+      // (which team they're on that specific day, not the old combined
+      // "both days smashed into one line" cleanupTeam field below) needs
+      // to be the first thing on the badge - front-and-center, above even
+      // the logo/name, so it's the first thing anyone (the parent
+      // themselves, or whoever's checking) sees. mondaySetupCleanup/
+      // wednesdaySetupCleanup (utils/nameTagData.js) already come back
+      // pre-labeled ("Monday: Chairs & Tables" / "Wednesday: —") - see
+      // that file's own comment on why the label is baked into the
+      // string rather than a separate static text element, matching
+      // primaryParentPhone's own convention.
+      { id: 'monday-job', type: 'text', field: 'mondaySetupCleanup', x: 8, y: 4, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'wednesday-job', type: 'text', field: 'wednesdaySetupCleanup', x: 8, y: 20, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 38, width: 32, height: 32 },
+      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 74, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 92, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
     ],
   },
   setupCleanup: {

@@ -35,6 +35,7 @@ const {
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
   backfillScheduleCardAllergy,
+  backfillParentSetupCleanupDays,
   backfillTaskItemBarcodes,
 } = require('./bootstrapPg');
 
@@ -95,6 +96,7 @@ db.ready = schemaReady
   .then(() => backfillNameTagAutoFit(db))
   .then(() => backfillMiscBadgeBarcode(db))
   .then(() => backfillScheduleCardAllergy(db))
+  .then(() => backfillParentSetupCleanupDays(db))
   .then(() => backfillTaskItemBarcodes(db));
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -
