@@ -110,6 +110,18 @@ function sameIds(a, b) {
   return sortedA.every((id, i) => id === sortedB[i]);
 }
 
+// A saved badge/schedule-card layout can predate the { background,
+// elements } wrapper - old rows stored a bare elements array instead (see
+// utils/nameTagData.js's getTemplate, which already has to unwrap this
+// same legacy shape on every read). Every backfill below needs this too:
+// checking `layout.elements` against a still-bare array would find
+// `undefined` (arrays have no .elements property) and silently skip the
+// row forever, exactly the "never went into effect" failure mode this
+// whole file exists to avoid.
+function normalizeLayout(parsed) {
+  return Array.isArray(parsed) ? { background: '#ffffff', backgroundOpacity: 1, elements: parsed } : parsed;
+}
+
 async function backfillNameTagLogo(db) {
   for (const memberType of Object.keys(PRE_LOGO_ELEMENT_IDS)) {
     const row = await db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
@@ -120,7 +132,7 @@ async function backfillNameTagLogo(db) {
     } catch (err) {
       continue;
     }
-    const layout = Array.isArray(parsed) ? { background: '#ffffff', backgroundOpacity: 1, elements: parsed } : parsed;
+    const layout = normalizeLayout(parsed);
     if (!layout.elements || layout.elements.some((el) => el.type === 'image')) continue;
 
     const newLayout = sameIds(layout.elements.map((el) => el.id), PRE_LOGO_ELEMENT_IDS[memberType])
@@ -151,7 +163,7 @@ async function backfillNameTagAutoFit(db) {
   for (const row of rows) {
     let layout;
     try {
-      layout = JSON.parse(row.layout_json);
+      layout = normalizeLayout(JSON.parse(row.layout_json));
     } catch (err) {
       continue;
     }
@@ -191,7 +203,7 @@ async function backfillMiscBadgeBarcode(db) {
   if (!row) return;
   let layout;
   try {
-    layout = JSON.parse(row.layout_json);
+    layout = normalizeLayout(JSON.parse(row.layout_json));
   } catch (err) {
     return;
   }
@@ -224,7 +236,7 @@ async function backfillScheduleCardAllergy(db) {
   if (!row) return;
   let layout;
   try {
-    layout = JSON.parse(row.layout_json);
+    layout = normalizeLayout(JSON.parse(row.layout_json));
   } catch (err) {
     return;
   }

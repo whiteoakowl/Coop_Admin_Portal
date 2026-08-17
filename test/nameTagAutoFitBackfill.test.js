@@ -55,6 +55,29 @@ test('backfillNameTagAutoFit is a no-op for a layout whose name field already ha
   assert.equal(after.layout_json, before.layout_json, 'a fresh install seeded with the current (autoFitText-included) default should be untouched');
 });
 
+test('backfillNameTagAutoFit still fixes a template stored in the old bare-elements-array shape (no wrapping object)', async () => {
+  const db = await createTestDb();
+  // Older saved templates stored a bare elements array with no wrapping
+  // { background, elements } object - see utils/nameTagData.js's
+  // getTemplate, which already has to unwrap this same legacy shape on
+  // every read. A real bug report: this exact row shape made the backfill
+  // silently skip it forever (a bare array's .elements is undefined, so
+  // the old `!Array.isArray(layout.elements)` guard always failed).
+  const bareArray = [
+    { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+    { id: 'barcode', type: 'barcode', x: 68, y: 110, width: 200, height: 55 },
+  ];
+  await db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify(bareArray), 'student');
+
+  await backfillNameTagAutoFit(db);
+
+  const row = await db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get('student');
+  const layout = JSON.parse(row.layout_json);
+  const nameEl = layout.elements.find((el) => el.id === 'name');
+  assert.equal(nameEl.autoFitText, true, 'the name field should be flagged for auto-fit even from the legacy bare-array shape');
+});
+
 test('backfillNameTagAutoFit only touches text elements whose field is "name", not any other field named similarly', async () => {
   const db = await createTestDb();
   const customized = {

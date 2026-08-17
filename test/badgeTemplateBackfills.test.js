@@ -69,6 +69,25 @@ test('backfillMiscBadgeBarcode never touches the \'custom\' badge type, which ha
   assert.ok(!layout.elements.some((el) => el.type === 'barcode'), 'custom badges should still have no barcode element');
 });
 
+test('backfillMiscBadgeBarcode still fixes a setupCleanup template stored in the old bare-elements-array shape (no wrapping object)', async () => {
+  const db = await createTestDb();
+  // Same legacy shape utils/nameTagData.js's getTemplate already has to
+  // unwrap on every read (see normalizeLayout's own comment in
+  // db/bootstrapPg.js) - a real bug report: this exact row shape made the
+  // backfill silently skip it forever.
+  const bareArray = [
+    { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+    { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 24, width: 320, height: 30, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+  ];
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(bareArray));
+
+  await backfillMiscBadgeBarcode(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.ok(layout.elements.some((el) => el.type === 'barcode'), 'a barcode element should have been added even from the legacy bare-array shape');
+});
+
 test('backfillScheduleCardAllergy removes a leftover "name" field element and adds the current default\'s allergy element', async () => {
   const db = await createTestDb();
   const preAllergy = {
@@ -102,4 +121,20 @@ test('backfillScheduleCardAllergy is a no-op for a layout that already has an al
 
   const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
   assert.equal(after.layout_json, before.layout_json, 'a fresh install seeded with the current (allergy-included) default should be untouched');
+});
+
+test('backfillScheduleCardAllergy still fixes a template stored in the old bare-elements-array shape (no wrapping object)', async () => {
+  const db = await createTestDb();
+  const bareArray = [
+    { id: 'name', type: 'text', field: 'name', x: 8, y: 5, width: 210, height: 14, fontSize: 12, color: '#1c2530', bold: true, align: 'left', valign: 'middle' },
+    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+  ];
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify(bareArray));
+
+  await backfillScheduleCardAllergy(db);
+
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  const layout = JSON.parse(row.layout_json);
+  assert.ok(!layout.elements.some((el) => el.field === 'name'), 'the leftover name element must be gone even from the legacy bare-array shape');
+  assert.ok(layout.elements.some((el) => el.field === 'allergy'), 'an allergy element must have been added even from the legacy bare-array shape');
 });
