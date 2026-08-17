@@ -1340,7 +1340,8 @@ body.public-page .roster-empty {
    dashboard opens with a single glance-able headline instead of three
    separate cards. */
 .totals-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1349,7 +1350,6 @@ body.public-page .roster-empty {
   overflow: hidden;
 }
 .totals-item {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1357,11 +1357,16 @@ body.public-page .roster-empty {
   padding: 1rem 0.75rem;
   border-right: 1px solid var(--border);
 }
-.totals-item:last-child { border-right: none; }
+.totals-item:nth-child(6n) { border-right: none; }
 
 @media (max-width: 720px) {
-  /* Mobile: all three totals stay on one line inside the single card. */
-  .totals-item { padding: 0.75rem 0.4rem; }
+  /* Mobile: 6 totals as a 3x2 grid instead of squeezing all 6 onto one
+     unreadably-narrow line - a right border between the two items in
+     each row, a bottom border between the two rows. */
+  .totals-card { grid-template-columns: repeat(3, 1fr); }
+  .totals-item { padding: 0.75rem 0.4rem; border-bottom: 1px solid var(--border); }
+  .totals-item:nth-child(3n) { border-right: none; }
+  .totals-item:nth-child(n+4) { border-bottom: none; }
   .totals-item .stat-value { font-size: 1.4rem; }
   .totals-item .stat-label { font-size: 0.7rem; }
 }

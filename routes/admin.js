@@ -176,20 +176,48 @@ async function statsWithTrends(memberType, today, previousDate) {
   };
 }
 
+// How many active members of a given type are actually scheduled on a
+// given day - i.e. on that day's auto-synced day-level 'Class Schedule'
+// roster (see todayStatsForType's own comment on what that roster means
+// and why 'Class Roster' is excluded elsewhere; this one only ever reads
+// 'Class Schedule' rosters in the first place, so no such filter is
+// needed here). Distinct from the flat "Total Students"/"Total Parents"
+// counts (every active member of that type, whether or not they're on
+// either day's roster at all) - this is "how many show up Monday" vs
+// "how many show up Wednesday" specifically.
+async function dayScheduleCount(memberType, day) {
+  return (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT m.id) AS c FROM members m
+         JOIN roster_members rm ON rm.member_id = m.id
+         JOIN rosters r ON r.id = rm.roster_id
+         WHERE m.active = 1 AND m.member_type = ? AND r.category = 'Class Schedule' AND r.schedule_day = ?`
+      )
+      .get(memberType, day)
+  ).c;
+}
+
 router.get('/', requireAdmin, async (req, res) => {
   const today = todayISO();
   const previousDate = await previousSessionDate(today);
   const memberCount = (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get()).c;
-  const studentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c;
-  const parentCount = (await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c;
   const familyCount = (await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c;
+  const [mondayStudentCount, mondayParentCount, wednesdayStudentCount, wednesdayParentCount] = await Promise.all([
+    dayScheduleCount('student', 'monday'),
+    dayScheduleCount('parent', 'monday'),
+    dayScheduleCount('student', 'wednesday'),
+    dayScheduleCount('parent', 'wednesday'),
+  ]);
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
     memberCount,
-    studentCount,
-    parentCount,
     familyCount,
+    mondayStudentCount,
+    mondayParentCount,
+    wednesdayStudentCount,
+    wednesdayParentCount,
     studentStats: await statsWithTrends('student', today, previousDate),
     parentStats: await statsWithTrends('parent', today, previousDate),
     alerts: await todaysAlerts(),
