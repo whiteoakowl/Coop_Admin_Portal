@@ -46,11 +46,29 @@
         <p class="roster-empty">No task lists yet &mdash; use + Add New List above.</p>
       <% } %>
 
-      <form id="task-list-save-form" method="POST" action="/admin/setup/<%= day %>/tasks/save" class="task-list-stack" data-task-list-form>
+      <%# task-list-save-form is a real, standalone <form> declared just
+          below (empty - no DOM children of its own). The section/item
+          fields it submits live here instead, tied to it purely via each
+          field's own form="task-list-save-form" attribute, same trick
+          already used for the Save button above and the Schedule archive
+          page's off-page checkboxes (public/js/archive-select-toggle.js).
+          This block also holds the per-row move/delete <form>s (below) -
+          those must NOT be literal DOM descendants of another <form>.
+          Nested forms are invalid HTML, and real browsers don't just
+          "flatten" the inner one the way you'd hope: submitting a form
+          that's nested inside another dispatches the 'submit' event with
+          e.target set to the OUTER form, not the one actually being
+          POSTed - so document-level delegated listeners (csrf.js,
+          confirm-dialog.js) silently act on the wrong form entirely,
+          which is exactly how this used to 403 every trash-can click here
+          (no CSRF token ever reached the real request) with no confirm
+          dialog either. %>
+      <form id="task-list-save-form" method="POST" action="/admin/setup/<%= day %>/tasks/save" hidden></form>
+      <div class="task-list-stack" data-task-list-form>
         <% sections.forEach(function(s, i) { %>
           <div class="task-list-card task-list-accent-<%= i % 5 %>">
             <div class="task-list-card-header">
-              <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly />
+              <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly form="task-list-save-form" />
               <div class="task-list-card-actions no-print" data-task-list-edit-only hidden>
                 <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
                   <input type="hidden" name="direction" value="up" />
@@ -68,7 +86,7 @@
 
             <div class="task-list-team-row no-print" data-task-list-edit-only hidden>
               <label class="task-list-team-select">Linked Team
-                <select name="sectionTeam_<%= s.id %>">
+                <select name="sectionTeam_<%= s.id %>" form="task-list-save-form">
                   <option value="">Not linked to a team</option>
                   <% teams.forEach(function(t) { %>
                     <option value="<%= t.id %>" <%= s.team_id === t.id ? 'selected' : '' %>><%= t.title %></option>
@@ -88,7 +106,7 @@
                   <% s.items.forEach(function(item, j) { %>
                     <tr>
                       <td class="task-list-num-col"><%= item.number %></td>
-                      <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly /></td>
+                      <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly form="task-list-save-form" /></td>
                       <td class="no-print" data-task-list-edit-only hidden>
                         <div class="actions-btn-row">
                           <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/items/<%= item.id %>/move" class="inline-block-form">
@@ -113,7 +131,7 @@
             </div>
           </div>
         <% }); %>
-      </form>
+      </div>
     </div>
 
     <dialog id="new-list-dialog" class="member-picker-dialog">

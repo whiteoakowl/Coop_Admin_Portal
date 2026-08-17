@@ -272,6 +272,52 @@ test('Setup/Cleanup Task List import - Number, Day, List, Task columns', async (
   });
 });
 
+test('the rendered Task List page never nests a <form> inside another <form>', async () => {
+  // Real production bug: the section/item move+delete forms used to be
+  // literal DOM descendants of the big Save form (task-list-save-form).
+  // Nested forms are invalid HTML, and real browsers don't just flatten
+  // the inner one the way you might expect - clicking a submit button
+  // whose nearest form ancestor is the NESTED form dispatches the
+  // 'submit' event with e.target set to the OUTER form instead, so
+  // document-level delegated listeners (public/js/csrf.js,
+  // public/js/confirm-dialog.js) silently act on the wrong form. csrf.js
+  // ended up adding the hidden _csrf field to the outer form - which
+  // isn't what actually gets submitted - so the real request that hit the
+  // server had no token at all and 403'd every time (see
+  // middleware/csrfProtection.js), with no confirm dialog either. This
+  // can't be caught by a plain supertest POST with _csrf already in the
+  // body (see every other test in this file) - it only shows up by
+  // inspecting the rendered HTML's own form nesting, which is what this
+  // asserts directly: at no point while scanning the document does a
+  // second <form> open before the first one closes.
+  const { cookie } = await loginAsAdmin();
+  const section = await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Nesting Check List', 300)").run();
+  await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Nesting check task');
+
+  const res = await request(app).get('/admin/setup/monday/tasks').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+
+  let depth = 0;
+  let maxDepth = 0;
+  for (const m of res.text.matchAll(/<form[ >]|<\/form>/g)) {
+    if (m[0].startsWith('<form')) {
+      depth++;
+      maxDepth = Math.max(maxDepth, depth);
+    } else {
+      depth--;
+    }
+  }
+  assert.equal(maxDepth, 1, 'no <form> should ever be nested inside another <form> on this page');
+  assert.equal(depth, 0, 'every <form> tag should have a matching close - none left dangling');
+
+  // The section title / item description inputs (and the linked-team
+  // select) live outside task-list-save-form now, tied to it only via
+  // their own form="task-list-save-form" attribute.
+  assert.match(res.text, /name="sectionTitle_\d+"[^>]*form="task-list-save-form"/);
+  assert.match(res.text, /name="itemDesc_\d+"[^>]*form="task-list-save-form"/);
+  assert.match(res.text, /<form id="task-list-save-form" method="POST" action="\/admin\/setup\/monday\/tasks\/save"[^>]*><\/form>/, 'the Save form itself should be empty - it has no DOM children of its own');
+});
+
 test('a Delete Task trash button is always visible per task row, not hidden behind Edit mode', async () => {
   const { cookie } = await loginAsAdmin();
   const section = await db.prepare("INSERT INTO task_list_sections (day, title, position) VALUES ('monday', 'Always Visible Trash List', 200)").run();
