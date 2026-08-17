@@ -135,6 +135,43 @@ async function backfillNameTagLogo(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// name_tag_templates rows, saved before autoFitText existed on the name
+// field (see public/js/name-tag-render-core.js's fitFontSize) - a real
+// bug report: a customized template (one that took backfillNameTagLogo's
+// "leave everything else as-is" branch above, so it never picked up the
+// flag from a fresh DEFAULT_LAYOUTS swap either) kept clipping a longer
+// name ("Carson Bell") instead of shrinking it to fit, on both the design
+// editor and the actual printed tag, since both render through the same
+// shared core. Every OTHER text field (grade, allergies, cleanup team,
+// custom text, ...) is left exactly as saved - shrink-to-fit only ever
+// made sense as the default for the one field every name tag actually
+// needs to stay legible regardless of how long a person's name is.
+async function backfillNameTagAutoFit(db) {
+  const rows = await db.prepare('SELECT member_type, layout_json FROM name_tag_templates').all();
+  for (const row of rows) {
+    let layout;
+    try {
+      layout = JSON.parse(row.layout_json);
+    } catch (err) {
+      continue;
+    }
+    if (!layout || !Array.isArray(layout.elements)) continue;
+
+    let changed = false;
+    const elements = layout.elements.map((el) => {
+      if (el.type === 'text' && el.field === 'name' && !el.autoFitText) {
+        changed = true;
+        return { ...el, autoFitText: true };
+      }
+      return el;
+    });
+    if (!changed) continue;
+
+    await db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify({ ...layout, elements }), row.member_type);
+  }
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // task_list_items rows, created before the barcode column existed -
 // nothing else ever revisits an old row once it's inserted (utils/
 // taskList.js's addItem only assigns a barcode to a NEW row), so without
@@ -164,4 +201,4 @@ async function backfillTaskItemBarcodes(db) {
   }
 }
 
-module.exports = { seedIfMissing, backfillNameTagLogo, backfillTaskItemBarcodes };
+module.exports = { seedIfMissing, backfillNameTagLogo, backfillNameTagAutoFit, backfillTaskItemBarcodes };
