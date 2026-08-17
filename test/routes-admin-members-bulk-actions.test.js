@@ -175,3 +175,25 @@ test('POST /admin/members/families/:id/delete removes the family but leaves its 
   assert.ok(member, 'the member must not have been deleted');
   assert.equal(member.family_id, null, 'the member should just be ungrouped, not removed');
 });
+
+test('POST /admin/members/families/:id/delete returns JSON instead of redirecting when Accept: application/json is sent', async () => {
+  // The Edit Families dialog's own Delete button (public/js/edit-families.js)
+  // fetches this with Accept: application/json specifically so a real page
+  // navigation never closes the dialog mid-cleanup - see routes/admin-
+  // members.js's own comment.
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('JSON Delete Family') RETURNING id").get()).id;
+
+  const res = await request(app)
+    .post(`/admin/members/families/${familyId}/delete`)
+    .set('Cookie', cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ _csrf: csrfToken });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.id, familyId);
+  assert.equal(res.body.name, 'JSON Delete Family');
+
+  assert.equal(await db.prepare('SELECT id FROM families WHERE id = ?').get(familyId), undefined);
+});

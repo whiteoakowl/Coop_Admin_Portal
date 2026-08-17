@@ -1126,9 +1126,17 @@ router.post('/members/families/:id/rename', async (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent('Family renamed.'));
 });
 
+// Same wantsJson branch as /members/families/new above - the Edit
+// Families dialog's own Delete button (public/js/edit-families.js) fetches
+// this so the family's row can just disappear from the still-open dialog,
+// instead of a full page navigation closing the whole dialog out from
+// under an admin who's part-way through deleting several in a row.
 router.post('/members/families/:id/delete', async (req, res) => {
-  const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(parseInt(req.params.id, 10));
-  await db.prepare('DELETE FROM families WHERE id = ?').run(parseInt(req.params.id, 10));
+  const id = parseInt(req.params.id, 10);
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
+  const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(id);
+  await db.prepare('DELETE FROM families WHERE id = ?').run(id);
+  if (wantsJson) return res.json({ ok: true, id, name: family ? family.name : null });
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(family ? `Deleted "${family.name}" family.` : 'Family deleted.')
   );

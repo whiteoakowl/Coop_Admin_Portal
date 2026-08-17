@@ -123,26 +123,32 @@
       <% if (families.length === 0) { %>
         <p class="hint">No families added yet.</p>
       <% } else { %>
-        <ul class="edit-families-list">
+        <ul class="edit-families-list" id="edit-families-list">
           <% families.forEach(function(f) { %>
-            <li class="edit-families-row">
+            <li class="edit-families-row" data-family-id="<%= f.id %>">
               <form method="POST" action="/admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
                 <input type="text" name="name" value="<%= f.name %>" required aria-label="Rename &quot;<%= f.name %>&quot; family" />
                 <button type="submit" class="btn-secondary">Save</button>
               </form>
               <span class="hint"><%= f.memberCount %> member<%= f.memberCount == 1 ? '' : 's' %></span>
-              <form
-                method="POST"
-                action="/admin/members/families/<%= f.id %>/delete"
-                class="inline-block-form"
-                data-confirm="Delete the &quot;<%= f.name %>&quot; family? <%= f.memberCount %> member(s) will no longer be grouped under it, but no member is deleted."
-                data-confirm-yes-label="Yes, Delete"
-              >
-                <button type="submit" class="icon-btn" aria-label="Delete &quot;<%= f.name %>&quot; family" title="Delete Family"><svg class="icon"><use href="#icon-trash"/></svg></button>
-              </form>
+              <%# Deliberately a plain button, not a submitting form - see
+                  public/js/edit-families.js. A real page navigation here
+                  would close this whole dialog on every single delete,
+                  which is exactly the friction an admin clearing out
+                  several old families at once doesn't want. %>
+              <button
+                type="button"
+                class="icon-btn"
+                data-delete-family="<%= f.id %>"
+                data-family-name="<%= f.name %>"
+                data-member-count="<%= f.memberCount %>"
+                aria-label="Delete &quot;<%= f.name %>&quot; family"
+                title="Delete Family"
+              ><svg class="icon"><use href="#icon-trash"/></svg></button>
             </li>
           <% }); %>
         </ul>
+        <p class="hint" id="edit-families-empty" hidden>No families added yet.</p>
       <% } %>
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
@@ -331,5 +337,6 @@
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
+  <script src="/js/edit-families.js"></script>
 </body>
 </html>

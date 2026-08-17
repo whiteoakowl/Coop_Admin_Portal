@@ -17,6 +17,14 @@
 // attribute resets to its default when a different form's confirm opens
 // next, so nothing leaks between an Archive click and a Delete click on
 // the same page.
+//
+// window.confirmAction(options) is the same dialog for callers that
+// can't use the form-submit path at all - e.g. the Edit Families dialog's
+// own Delete button (public/js/edit-families.js), which does its own
+// fetch() so the family's row can disappear in place instead of a full
+// page navigation closing the dialog out from under the admin mid-cleanup.
+// Returns a Promise<boolean> (true = confirmed) instead of re-submitting
+// anything itself - the caller decides what "confirmed" actually does.
 (function () {
   const dialog = document.getElementById('confirm-dialog');
   if (!dialog) return;
@@ -26,6 +34,17 @@
   const yesBtn = dialog.querySelector('[data-confirm-yes]');
   const cancelBtn = dialog.querySelector('[data-confirm-cancel]');
   let pendingForm = null;
+  let pendingResolve = null;
+
+  function open(options) {
+    messageEl.textContent = options.message;
+    iconUse.setAttribute('href', `#${options.icon || 'icon-trash'}`);
+    iconEl.classList.toggle('confirm-icon-safe', !!options.safe);
+    yesBtn.textContent = options.yesLabel || 'Yes, Delete';
+    yesBtn.classList.toggle('primary-btn', !!options.safe);
+    yesBtn.classList.toggle('roster-action-btn-danger', !options.safe);
+    if (!dialog.open) dialog.showModal();
+  }
 
   document.addEventListener('submit', (e) => {
     const form = e.target;
@@ -33,17 +52,29 @@
     if (!form.dataset.confirm || form.dataset.confirmed === '1') return;
     e.preventDefault();
     pendingForm = form;
-    messageEl.textContent = form.dataset.confirm;
-    iconUse.setAttribute('href', `#${form.dataset.confirmIcon || 'icon-trash'}`);
-    iconEl.classList.toggle('confirm-icon-safe', !!form.dataset.confirmSafe);
-    yesBtn.textContent = form.dataset.confirmYesLabel || 'Yes, Delete';
-    yesBtn.classList.toggle('primary-btn', !!form.dataset.confirmSafe);
-    yesBtn.classList.toggle('roster-action-btn-danger', !form.dataset.confirmSafe);
-    if (!dialog.open) dialog.showModal();
+    open({
+      message: form.dataset.confirm,
+      icon: form.dataset.confirmIcon,
+      safe: form.dataset.confirmSafe,
+      yesLabel: form.dataset.confirmYesLabel,
+    });
   });
+
+  window.confirmAction = function (options) {
+    return new Promise((resolve) => {
+      pendingResolve = resolve;
+      open(options);
+    });
+  };
 
   yesBtn.addEventListener('click', () => {
     dialog.close();
+    if (pendingResolve) {
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve(true);
+      return;
+    }
     if (pendingForm) {
       pendingForm.dataset.confirmed = '1';
       pendingForm.requestSubmit();
@@ -54,5 +85,10 @@
   cancelBtn.addEventListener('click', () => {
     dialog.close();
     pendingForm = null;
+    if (pendingResolve) {
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve(false);
+    }
   });
 })();
