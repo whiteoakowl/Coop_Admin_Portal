@@ -124,7 +124,15 @@ app.set('view engine', 'ejs');
 const viewsRoot = process.env.LAMBDA_TASK_ROOT || __dirname;
 app.set('views', path.join(viewsRoot, 'views'));
 
-app.use(express.urlencoded({ extended: true }));
+// Real bug: body-parser's urlencoded parser defaults to parameterLimit:
+// 1000 - a hard PayloadTooLargeError (500), not just slowness. Every bulk
+// print form (Name Tags, Schedule Cards, "Name Tags + Schedule Cards") and
+// the Members bulk archive/restore submit one memberIds= field per checked
+// row plus _csrf, so a co-op with exactly ~1000 members hitting "Select
+// All" already tips over that cap - confirmed live: 1000 memberIds fields
+// (1001 params with _csrf) 500'd instead of rendering. Raised well past
+// the requested 1000-card ceiling so a real co-op has headroom to grow.
+app.use(express.urlencoded({ extended: true, parameterLimit: 20000 }));
 app.use(express.json());
 
 // Stops a browser from ever re-guessing a served file's type from its
