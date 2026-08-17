@@ -56,7 +56,7 @@
   const PLACEHOLDER_DATA = {
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', memberCode: 'ID#012345', barcodeValue: '0123456789' },
     parent: { name: 'Jordan Parent', cleanupTeam: 'Chairs & Tables', memberCode: 'ID#012345', barcodeValue: '0123456789' },
-    setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.' },
+    setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
 
