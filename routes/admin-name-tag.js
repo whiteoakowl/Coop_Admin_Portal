@@ -9,7 +9,7 @@ const { formatTimestamp, formatDateLabel } = require('../utils/dates');
 
 router.use(requireFullAdmin);
 const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
-const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
+const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { isMiscBadgeType, saveMiscTemplate } = require('../utils/miscBadgeData');
 const { imageFileFilter } = require('../utils/uploads');
 const { sweepNameTagImages } = require('../utils/designImageGC');
@@ -205,15 +205,19 @@ router.post('/name-tag/print', async (req, res) => {
   const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
 
   const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
-  const badges = [];
-  for (const m of members) {
+  // Every parent's cleanup team membership computed in ONE query, not one
+  // per parent - a real bug report: printing ~800 cards timed out, the
+  // same N+1 shape already fixed for Schedule Cards (routes/admin-
+  // schedule.js's print-cards route) - see badgeDataForMembers's own
+  // comment.
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => {
     const layout = templates[m.member_type] || templates.student;
-    const data = await badgeDataForMember(m);
-    badges.push({
-      html: NameTagRenderCore.renderBadgeElements(layout.elements, data),
+    return {
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, dataByMember[m.id]),
       bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
-    });
-  }
+    };
+  });
 
   res.render('admin-name-tag-bulk-print', {
     title: 'Print Name Tags',

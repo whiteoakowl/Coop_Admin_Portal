@@ -35,6 +35,29 @@ async function getMemberSchedule(memberId) {
   return { monday, wednesday, lastUpdated: null };
 }
 
+// Batch version of getMemberSchedule for an arbitrary list of member ids -
+// not necessarily "every active member" the way scheduleList's own
+// per-member computation is, so a bulk print flow with its own specific
+// selection (Design/Print's Name Tags + Schedule Cards, Front & Back
+// Duplex, and the per-member Cards dialog - see utils/cardPairs.js) can
+// still compute each day's live schedule ONCE regardless of how many
+// members are in that selection, instead of once per member. A real bug
+// report: printing ~800 cards timed out - the exact same severe N+1 shape
+// routes/admin-schedule.js's own print-cards route was already fixed for
+// (see its own comment), just never applied to cardPairs.js. Returns
+// { [memberId]: { monday, wednesday } }.
+async function schedulesForMembers(memberIds) {
+  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
+  const result = {};
+  for (const memberId of memberIds) {
+    result[memberId] = {
+      monday: fourRows(Object.values(mondayRows[memberId] || {})),
+      wednesday: fourRows(Object.values(wednesdayRows[memberId] || {})),
+    };
+  }
+  return result;
+}
+
 function rowIsBlank(row) {
   return !row.time && !row.class_name && !row.room && !row.teacher;
 }
@@ -328,6 +351,7 @@ module.exports = {
   DAY_LABELS,
   STATUS_LABELS,
   getMemberSchedule,
+  schedulesForMembers,
   fourRows,
   rowIsBlank,
   scheduleStatus,

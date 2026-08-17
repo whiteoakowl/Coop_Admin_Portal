@@ -5,8 +5,9 @@
 // the routes that need it (routes/admin-design.js for bulk printing,
 // routes/admin-members.js for the per-member Cards dialog) have to import
 // from one another.
-const { getTemplate, badgeDataForMember } = require('./nameTagData');
-const { getScheduleCardTemplate, scheduleCardDataForMember } = require('./scheduleCardData');
+const { getTemplate, badgeDataForMembers } = require('./nameTagData');
+const { getScheduleCardTemplate, scheduleCardDataForMembers } = require('./scheduleCardData');
+const { schedulesForMembers } = require('./schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 async function buildCardPairs(members) {
@@ -14,22 +15,31 @@ async function buildCardPairs(members) {
   const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
-  const pairs = [];
-  for (const m of members) {
+  // All computed once for this whole batch, not once per member - a real
+  // bug report: printing ~800 cards timed out, the same severe N+1 shape
+  // already fixed for the Schedule-Card-only bulk print (routes/admin-
+  // schedule.js's print-cards route) and for Attendance's Arrival/
+  // Departure (utils/schedule.js's arrivalDepartureLabelsForMembers), just
+  // never applied here. See badgeDataForMembers/schedulesForMembers/
+  // scheduleCardDataForMembers' own comments.
+  const memberIds = members.map((m) => m.id);
+  const [nameTagDataByMember, scheduleByMember] = await Promise.all([badgeDataForMembers(members), schedulesForMembers(memberIds)]);
+  const scheduleCardDataByMember = await scheduleCardDataForMembers(members, scheduleByMember);
+
+  return members.map((m) => {
     const nameTagLayout = nameTagTemplates[m.member_type] || nameTagTemplates.student;
-    pairs.push({
+    return {
       name: m.name,
       nameTag: {
-        html: NameTagRenderCore.renderBadgeElements(nameTagLayout.elements, await badgeDataForMember(m)),
+        html: NameTagRenderCore.renderBadgeElements(nameTagLayout.elements, nameTagDataByMember[m.id]),
         bgCss: NameTagRenderCore.backgroundCss(nameTagLayout.background, nameTagLayout.backgroundOpacity),
       },
       scheduleCard: {
-        html: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, await scheduleCardDataForMember(m)),
+        html: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, scheduleCardDataByMember[m.id]),
         bgCss: scheduleCardBgCss,
       },
-    });
-  }
-  return pairs;
+    };
+  });
 }
 
 module.exports = { buildCardPairs };

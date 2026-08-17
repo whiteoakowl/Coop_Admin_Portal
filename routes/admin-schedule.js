@@ -12,7 +12,7 @@ const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('
 const {
   DAY_LABELS,
   getMemberSchedule,
-  fourRows,
+  schedulesForMembers,
   scheduleList,
   archiveMemberSchedules,
   listMemberScheduleArchives,
@@ -28,7 +28,6 @@ const {
   GRADE_LEVELS,
   COLOR_PALETTE,
   activeMembersForStaff,
-  liveMemberScheduleRowsForDay,
   absentMemberIdsForDate,
   setEnrollment,
   addStaff,
@@ -36,7 +35,7 @@ const {
   listClassArchives,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
-const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
+const { scheduleCardDataForMembers, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { sweepScheduleCardImages } = require('../utils/designImageGC');
@@ -129,21 +128,26 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
-  const summarized = [];
-  for (const r of rows) {
-    summarized.push({
-      member: r.member,
-      // r already carries this member's own already-computed monday/
-      // wednesday rows (scheduleList batches the whole day once - see its
-      // own comment) - passing them through skips scheduleCardDataForMember's
-      // own getMemberSchedule call, which would otherwise redo that same
-      // live computation a second time per member on this page.
-      scheduleCardHtml: NameTagRenderCore.renderBadgeElements(
-        scheduleCardTemplate.elements,
-        await scheduleCardDataForMember(r.member, { monday: r.monday, wednesday: r.wednesday })
-      ),
-    });
-  }
+  // r already carries this member's own already-computed monday/wednesday
+  // rows (scheduleList batches the whole day once - see its own comment) -
+  // passing them through as scheduleByMember skips scheduleCardDataForMembers'
+  // own getMemberSchedule call, which would otherwise redo that same live
+  // computation a second time per member on this page. This also batches
+  // the primaryParentFor phone-number lookup that a per-member
+  // scheduleCardDataForMember call would otherwise redo once per row (the
+  // same N+1 shape a real ~800-card bulk print timed out on - see
+  // scheduleCardDataForMembers' own comment) - this page can list every
+  // active member of a type at once.
+  const scheduleByMember = {};
+  for (const r of rows) scheduleByMember[r.member.id] = { monday: r.monday, wednesday: r.wednesday };
+  const cardDataByMember = await scheduleCardDataForMembers(
+    rows.map((r) => r.member),
+    scheduleByMember
+  );
+  const summarized = rows.map((r) => ({
+    member: r.member,
+    scheduleCardHtml: NameTagRenderCore.renderBadgeElements(scheduleCardTemplate.elements, cardDataByMember[r.member.id]),
+  }));
   summarized.sort((a, b) => byLastName(a.member, b.member));
 
   const allNames = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?').all(memberType)).sort(byLastName);
@@ -454,19 +458,18 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
   // once per member - see scheduleList's own comment on why the
   // per-member version is a severe N+1 (this route already had a
   // documented history of choking at real co-op scale - see the payload-
-  // chunking fix on the client side for "Select All" batches).
-  const [mondayRows, wednesdayRows] = await Promise.all([liveMemberScheduleRowsForDay('monday'), liveMemberScheduleRowsForDay('wednesday')]);
-  const cards = [];
-  for (const m of members) {
-    const precomputedSchedule = {
-      monday: fourRows(Object.values(mondayRows[m.id] || {})),
-      wednesday: fourRows(Object.values(wednesdayRows[m.id] || {})),
-    };
-    cards.push({
-      html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(m, precomputedSchedule)),
-      bgCss,
-    });
-  }
+  // chunking fix on the client side for "Select All" batches). Same shared
+  // helper utils/cardPairs.js's buildCardPairs uses now too.
+  const scheduleByMember = await schedulesForMembers(members.map((m) => m.id));
+  // Batches the primaryParentFor phone-number lookup too, not just the
+  // schedule computation above - scheduleCardDataForMember would otherwise
+  // still redo that per member even with its schedule precomputed (see
+  // scheduleCardDataForMembers' own comment).
+  const cardDataByMember = await scheduleCardDataForMembers(members, scheduleByMember);
+  const cards = members.map((m) => ({
+    html: NameTagRenderCore.renderBadgeElements(template.elements, cardDataByMember[m.id]),
+    bgCss,
+  }));
 
   res.render('admin-schedule-print-cards', {
     title: 'Print Schedule Cards',
