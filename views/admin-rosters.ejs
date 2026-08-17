@@ -252,15 +252,17 @@
                 </td>
                 <% row.cells.forEach(function(cell) { %>
                   <td>
-                    <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
-                      <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
-                      <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
-                      <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>
-                      <option value="absent" <%= cell.status === 'absent' ? 'selected' : '' %>>A</option>
-                    </select>
-                    <span class="print-only-tag cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '' %></span>
-                    <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
-                    <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                    <div class="cell-detailed">
+                      <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-tab="<%= tab %>" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
+                        <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
+                        <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
+                        <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>
+                        <option value="absent" <%= cell.status === 'absent' ? 'selected' : '' %>>A</option>
+                      </select>
+                      <span class="print-only-tag cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '' %></span>
+                      <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                      <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %><% if (cell.number) { %> #<%= cell.number %><% } %></span><% } %>
+                    </div>
                   </td>
                 <% }); %>
                 <td class="actions-cell no-print">

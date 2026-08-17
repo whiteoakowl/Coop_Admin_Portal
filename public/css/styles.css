@@ -1894,8 +1894,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: center;
 }
 .roster-table-detailed td { white-space: nowrap; }
-.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; }
-.cell-time { font-size: 0.6rem; color: var(--muted); }
+/* Stacks the P/L/A bubble above its check-in/out times (and, once
+   Setup/Cleanup Assignments exists, a task-number badge) in one narrow
+   column instead of side by side - a real bug report: without this
+   wrapper, the <select>/tag and the "In .../Out ..." text sat inline in
+   the same cell and forced every date column wide enough for the widest
+   one. max-width + ellipsis is a last-resort clamp for the rare long
+   "Out 3:15 PM #45" line; it should never actually need to truncate at
+   this font size, but a badge/time that did would push the surrounding
+   column no wider than this one line ever gets. */
+.cell-detailed { display: flex; flex-direction: column; align-items: center; gap: 0.05rem; max-width: 4.2rem; }
+.cell-time { font-size: 0.55rem; line-height: 1.1; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- View Roster page (P/L/A grid) modernization ----------
    Scoped under .roster-view-page (set on <body> only in admin-roster.ejs)
