@@ -55,7 +55,14 @@
 
   const PLACEHOLDER_DATA = {
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', memberCode: 'ID#012345', barcodeValue: '0123456789' },
-    parent: { name: 'Jordan Parent', cleanupTeam: 'Chairs & Tables', memberCode: 'ID#012345', barcodeValue: '0123456789' },
+    parent: {
+      name: 'Jordan Parent',
+      cleanupTeam: 'Chairs & Tables, Snack Table',
+      mondaySetupCleanup: 'Monday: Chairs & Tables',
+      wednesdaySetupCleanup: 'Wednesday: Snack Table',
+      memberCode: 'ID#012345',
+      barcodeValue: '0123456789',
+    },
     setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
@@ -183,6 +190,12 @@
     renderSelectionOverlay();
     updateGridOverlay();
     if (window.renderNameTagBarcodes) window.renderNameTagBarcodes(canvas);
+    // Real browser-measured correction on top of Render.fitFontSize's own
+    // server-render-time estimate (see public/js/badge-autofit.js's own
+    // comment on why the estimate alone isn't enough) - keeps the live
+    // design canvas matching what actually prints instead of only
+    // matching what the estimate predicted would print.
+    if (window.runBadgeAutoFit) window.runBadgeAutoFit(canvas);
   }
 
   const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];

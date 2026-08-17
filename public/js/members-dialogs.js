@@ -22,6 +22,7 @@
         .loadFragmentIntoDialog(dialog, `/admin/members/${id}/cards-fragment`)
         .then(() => {
           if (window.renderNameTagBarcodes) window.renderNameTagBarcodes(dialog);
+          if (window.runBadgeAutoFit) window.runBadgeAutoFit(dialog);
         })
         .catch(() => {});
       return;

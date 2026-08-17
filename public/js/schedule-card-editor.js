@@ -158,6 +158,10 @@
 
     renderSelectionOverlay();
     updateGridOverlay();
+    // See public/js/name-tag-editor.js's identical call for why - keeps
+    // the live design canvas matching what actually prints, not just what
+    // the server's own character-width estimate predicted.
+    if (window.runBadgeAutoFit) window.runBadgeAutoFit(canvas);
   }
 
   const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];

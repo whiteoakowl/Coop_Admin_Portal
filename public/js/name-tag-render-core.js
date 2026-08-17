@@ -136,7 +136,19 @@
   // approximates each character as a fraction of the font size (wider
   // for bold) rather than laying it out for real. Good enough to catch
   // "Alexandria Montgomery-Whitfield" overflowing a name tag sized for
-  // "Sam Lee" and scale it back down; exact kerning isn't the point.
+  // "Sam Lee" and scale it back down for the FIRST paint; exact kerning
+  // isn't the point, because it isn't the last word either - a real
+  // browser's actual glyph widths (and whichever webfont is actually
+  // loaded - see public/js/badge-autofit.js's own comment) can still
+  // disagree with this estimate, and disagreeing in the "should have
+  // shrunk more" direction is exactly the failure a real bug report hit:
+  // a name tag that looked fine in this estimate still wrapped onto a
+  // second line and got clipped by the box's fixed height. So this is
+  // only ever the STARTING guess; renderTextEl below forces autoFitText
+  // onto a single line (no wrap to clip) and badge-autofit.js's real
+  // browser measurement corrects the font size further down if this
+  // estimate still wasn't small enough - the two together are what
+  // actually guarantee "always fits," not this function alone.
   var AVG_CHAR_WIDTH_RATIO = { regular: 0.56, bold: 0.62 };
   var MIN_FONT_SIZE_RATIO = 0.55;
 
@@ -166,7 +178,22 @@
     // field wants a single balanced line that always fits the template's
     // box; a longer free-text field (Class Description, etc.) still
     // wraps normally instead of shrinking down to near-nothing.
-    var fontSize = el.autoFitText ? fitFontSize(raw, el) : num(el.fontSize, 14);
+    var autoFit = !!el.autoFitText;
+    var fontSize = autoFit ? fitFontSize(raw, el) : num(el.fontSize, 14);
+    // autoFitText's whole point is "stay on one line, never clip" - a
+    // wrapped second line would just get cut off by this element's own
+    // overflow:hidden (see public/css/styles.css's .badge-el-text) since
+    // the box height never grows to fit a wrap. Forcing nowrap here turns
+    // "wraps then gets silently clipped" into "browser measures it as
+    // still too wide" - the signal public/js/badge-autofit.js's real
+    // measurement pass (see its own comment) needs to correct fontSize
+    // further when this function's estimate above wasn't small enough;
+    // text-overflow: ellipsis is the static fallback if that JS doesn't
+    // run at all, same convention as the barcode-only sheet's
+    // .barcode-cell-name (see barcode-print-shrink-name.js).
+    var wrapStyle = autoFit
+      ? ' white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'
+      : ' overflow-wrap: break-word;';
     var spanStyle =
       'display:block; width:100%; font-size:' + fontSize + 'px; color:' + (el.color || '#1c2530') + ';' +
       ' font-weight:' + (el.bold ? 700 : 400) + ';' +
@@ -176,8 +203,16 @@
       ' line-height:' + num(el.lineHeight, 1.15) + ';' +
       ' text-align:' + align + ';' +
       ' text-transform:' + (el.textCase || 'none') + ';' +
-      ' overflow-wrap: break-word;';
-    return '<div class="badge-el badge-el-text" data-id="' + esc(el.id) + '" data-type="text" style="' + style + '"><span class="badge-el-text-inner" style="' + spanStyle + '">' + value + '</span></div>';
+      wrapStyle;
+    // badge-autofit.js's real-measurement pass needs to know the fontSize
+    // fitFontSize actually settled on (its own search starts from there,
+    // shrinking further only if still too wide) - reading it back off the
+    // rendered font-size style itself isn't reliable once that pass has
+    // already run once (see badge-autofit.js's own comment on why a
+    // React-less el.style.fontSize = '' reset falls back to nothing
+    // useful here, unlike a plain CSS class default).
+    var autoFitAttr = autoFit ? ' data-autofit="1" data-base-font-size="' + fontSize + '"' : '';
+    return '<div class="badge-el badge-el-text" data-id="' + esc(el.id) + '" data-type="text"' + autoFitAttr + ' style="' + style + '"><span class="badge-el-text-inner" style="' + spanStyle + '">' + value + '</span></div>';
   }
 
   function renderShapeEl(el) {

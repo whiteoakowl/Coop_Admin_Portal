@@ -79,6 +79,12 @@
             '</div>'
         )
         .join('');
+      // See public/js/badge-autofit.js's own comment - the allergy/
+      // parent-phone fields on the injected Schedule Card markup are
+      // autoFitText, and this page never goes through a full navigation
+      // (the card arrives as pre-rendered HTML over fetch), so nothing
+      // else here would ever trigger that correction pass.
+      if (window.runBadgeAutoFit) window.runBadgeAutoFit(parentsEl);
     }
 
     result.hidden = true;
