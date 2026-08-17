@@ -905,8 +905,59 @@ async function ensureClassRoster(classId) {
   const info = await db
     .prepare('INSERT INTO rosters (name, category, schedule_day) VALUES (?, ?, ?)')
     .run(cls.class_name, 'Class Roster', cls.day);
-  await db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(info.lastInsertRowid, classId);
-  return info.lastInsertRowid;
+  const rosterId = info.lastInsertRowid;
+  await db.prepare('UPDATE classes SET roster_id = ? WHERE id = ?').run(rosterId, classId);
+  // A real request: a class roster's own session dates should always
+  // match the day's Student roster - a class only ever meets when that
+  // day's students do. routes/admin-rosters.js's dates/add route keeps
+  // an EXISTING class roster in sync going forward, but a class created
+  // (or re-created after its roster was deleted) AFTER dates already
+  // exist for its day - the common case; a term's dates are usually set
+  // up once, classes get added/edited after - would otherwise start with
+  // none of its own. Copies whatever the Student roster already has at
+  // creation time; ON CONFLICT DO NOTHING makes this safe to call even
+  // if some of those dates somehow already made it in another way.
+  const studentRosterId = await ensureDayRoster(cls.day, 'student');
+  const existingDates = await db.prepare('SELECT session_date FROM roster_dates WHERE roster_id = ?').all(studentRosterId);
+  const insertDate = db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING');
+  for (const row of existingDates) await insertDate.run(rosterId, row.session_date);
+  return rosterId;
+}
+
+// Every class roster id meeting on a given day - dates added/removed on
+// that day's Parent/Student rosters (routes/admin-rosters.js's dates/add
+// and dates/:date/remove) should land on every one of these too, so a
+// class roster's own roster_dates never drifts out of sync with the day
+// it belongs to (see ensureClassRoster's own comment on why a class
+// roster needs real rows here, not just a borrowed value at render time).
+async function classRosterIdsForDay(day) {
+  return (await db.prepare('SELECT roster_id FROM classes WHERE day = ? AND roster_id IS NOT NULL').all(day)).map((r) => r.roster_id);
+}
+
+// Genuine one-time backfill for an already-deployed database: before this
+// fix, a class roster's own roster_dates was never written at all (only
+// "borrowed" from the day's Student roster at a handful of specific read
+// sites - the grid view, kiosk class check-in's own session-date check -
+// rather than actually stored). A real bug report: utils/rosters.js's
+// getMemberRostersForDate, which reads roster_dates directly for
+// whichever roster it's asked about, could never find a class roster for
+// any date no matter how many session dates the day itself had - it was
+// simply never in that table. Copies each day's CURRENT Student roster
+// dates onto every one of that day's class rosters; ON CONFLICT DO
+// NOTHING makes re-running this (or the normal dates/add route, which
+// keeps them in sync going forward) always safe.
+async function backfillClassRosterDates() {
+  for (const day of DAYS) {
+    const studentRosterId = await ensureDayRoster(day, 'student');
+    const dates = await db.prepare('SELECT session_date FROM roster_dates WHERE roster_id = ?').all(studentRosterId);
+    if (dates.length === 0) continue;
+    const classRosterIds = await classRosterIdsForDay(day);
+    if (classRosterIds.length === 0) continue;
+    const insertDate = db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING');
+    for (const classRosterId of classRosterIds) {
+      for (const row of dates) await insertDate.run(classRosterId, row.session_date);
+    }
+  }
 }
 
 // Rebuilds a class's roster membership from its current enrollment
@@ -1691,6 +1742,8 @@ module.exports = {
   setAppSetting,
   ensureClassRoster,
   syncClassRosterMembers,
+  classRosterIdsForDay,
+  backfillClassRosterDates,
   ensureDayRoster,
   ensureDayMemberRosters,
   syncDayMemberRosters,

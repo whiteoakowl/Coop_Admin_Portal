@@ -110,7 +110,17 @@ db.ready = schemaReady
   // element it removes predates both of them.
   .then(() => backfillParentRemoveLegacyCleanupTeamElement(db))
   .then(() => backfillNameTagStackedSizing(db))
-  .then(() => backfillTaskItemBarcodes(db));
+  .then(() => backfillTaskItemBarcodes(db))
+  // Lazily required (not imported at the top of this file, unlike every
+  // other backfill above) - utils/classSchedule.js itself does
+  // `require('../db')`, and this whole file IS '../db' from that
+  // module's perspective. Requiring it up top, before this module has
+  // finished building its own exports, would hand classSchedule.js back
+  // a still-incomplete module.exports (the exact real require-cycle
+  // problem db/bootstrapPg.js's own header comment warns about avoiding)
+  // - by the time this .then() callback actually runs, module loading is
+  // long since finished and require('../db') resolves normally.
+  .then(() => require('../utils/classSchedule').backfillClassRosterDates());
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -
 // worth logging loudly regardless of context. Deciding what to *do* about

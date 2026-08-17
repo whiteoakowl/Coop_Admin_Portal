@@ -12,6 +12,7 @@ const {
   allClassesList,
   addManualRosterMember,
   syncDayMemberRosters,
+  classRosterIdsForDay,
   HOUR_POSITIONS,
 } = require('../utils/classSchedule');
 const { defaultDay, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
@@ -377,6 +378,20 @@ async function siblingRosterId(tab) {
   return ensureDayRoster(info.day, otherRole);
 }
 
+// A real request: every class meeting a given day should show the same
+// session dates as that day's Parent/Student rosters - a class only ever
+// meets when that day's students do, so there's no such thing as a
+// Monday the main rosters have that a Monday class doesn't. Mirrors
+// siblingRosterId's own reasoning above, just for every class roster on
+// the day instead of one sibling roster (see utils/classSchedule.js's
+// ensureClassRoster/backfillClassRosterDates for the other two places
+// this same invariant is kept - a class created after dates already
+// exist, and an already-deployed database's existing classes).
+async function dayClassRosterIds(tab) {
+  const info = TABS[tab];
+  return info ? classRosterIdsForDay(info.day) : [];
+}
+
 router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
   const tab = req.params.tab;
   const rosterId = await rosterIdForTab(tab);
@@ -386,9 +401,11 @@ router.post('/rosters/:tab/dates/add', requireAdmin, async (req, res) => {
     'INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING'
   );
   const siblingId = await siblingRosterId(tab);
+  const classRosterIds = await dayClassRosterIds(tab);
   for (const d of dates) {
     await insertDate.run(rosterId, d);
     if (siblingId) await insertDate.run(siblingId, d);
+    for (const classRosterId of classRosterIds) await insertDate.run(classRosterId, d);
   }
   res.redirect(`/admin/rosters?tab=${tab}&notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
@@ -398,7 +415,7 @@ router.post('/rosters/:tab/dates/:date/remove', requireAdmin, async (req, res) =
   const rosterId = await rosterIdForTab(tab);
   if (!rosterId) return res.status(404).send('Not found');
   const date = req.params.date;
-  const rosterIds = [rosterId, await siblingRosterId(tab)].filter(Boolean);
+  const rosterIds = [rosterId, await siblingRosterId(tab), ...(await dayClassRosterIds(tab))].filter(Boolean);
   const placeholders = rosterIds.map(() => '?').join(',');
   await db.withTransaction(async (tx) => {
     await tx.prepare(`DELETE FROM roster_dates WHERE roster_id IN (${placeholders}) AND session_date = ?`).run(...rosterIds, date);
