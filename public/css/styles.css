@@ -4360,6 +4360,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-schedule-print-staff { margin: 0.15rem 0 0; font-size: 0.7rem; color: #333; }
 @media print {
   .class-schedule-print-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* A real "doesn't print cleanly" complaint: the Attendance Archive
+     print page stacks one grid per roster (Parent, Student, every class)
+     on the same page with no forced break - a roster near a page
+     boundary would split mid-table, part on one page and the rest on the
+     next, instead of moving to start fresh on a new page. Each roster's
+     own grid-box is usually well within one page's height on its own
+     (a team/class of even 30 people), so keeping it together rather than
+     letting it split is almost always achievable - only a roster whose
+     own table alone exceeds a full page still has to break somewhere,
+     which this can't (and shouldn't try to) prevent. */
+  .grid-box { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Same reasoning for the card-grid layouts (Setup/Cleanup Assignments,
+     Setup/Cleanup Teams, Floater Assignments/Teams) - a team/hour's own
+     card is small enough to virtually always fit whatever's left on the
+     current page; keeping it together beats letting its own member table
+     split mid-card across a page boundary. */
+  .floater-card { break-inside: avoid; page-break-inside: avoid; }
 }
 
 .member-profile-dialog {
@@ -4515,6 +4534,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-roster-print-info h2 { margin: 0 0 0.6rem; }
 .class-roster-print-info p { margin: 0.2rem 0; font-size: 0.95rem; }
 .class-roster-print-label { font-weight: 700; margin-right: 0.3rem; }
+
+/* Same fixed-height-plus-shrink-to-fit shape as .class-schedule-print-page
+   below (see its own comment for the full story) - a real class roster
+   (25+ students) was spilling a couple of rows onto an otherwise-empty
+   second page. .print-page swaps its usual min-height for a fixed one so
+   .class-roster-print-fit has a real boundary to measure against;
+   print-shrink-to-fit.js zooms the table down (never up) to land inside
+   it. The header/class-info block stays outside the shrink wrapper at
+   full size - only the table (the part that actually grows with roster
+   size) is what needs to shrink. */
+.class-roster-print-page .print-page {
+  width: 8.5in;
+  height: 11in;
+  min-height: 0;
+  padding: 0.4in;
+}
+.class-roster-print-fit { flex: 1; min-height: 0; overflow: hidden; }
 
 /* Bulk "Name Tags + Schedule Cards" print - each member's two cards sit
    side by side, one member row per line, so a shared physical card

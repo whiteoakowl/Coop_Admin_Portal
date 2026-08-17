@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: letter; margin: 0; }</style>
+  <style>@page { size: letter; margin: 0.4in; }</style>
 </head>
-<body class="admin-page">
+<body class="admin-page class-roster-print-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="print-preview-header no-print">
@@ -38,27 +38,50 @@
         <p><span class="class-roster-print-label">Assistants:</span> <%= assistants.length ? assistants.join(', ') : '—' %></p>
       </div>
 
-      <h3>Student Roster</h3>
-      <table class="roster-table">
-        <thead><tr><th>Name</th><th>Family</th><th>Age</th><th>Grade</th><th>Birthday</th><th>Medical/Allergy Notes</th></tr></thead>
-        <tbody>
-          <% if (cls.students.length === 0) { %>
-            <tr><td colspan="6" class="roster-empty">No students enrolled yet.</td></tr>
-          <% } %>
-          <% cls.students.forEach(function(s) { %>
-            <tr>
-              <td><%= s.name %></td>
-              <td><%= s.family_name || '—' %></td>
-              <td><%= s.age !== null && s.age !== undefined ? s.age : '—' %></td>
-              <td><%= s.grade_level || '—' %></td>
-              <td><%= s.birthday || '—' %></td>
-              <td><%= s.medical_notes || '—' %></td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
+      <%
+        // A real bug report: a class of 25+ students spilled 2-3 rows onto
+        // an otherwise-empty second page - the table's natural row height
+        // times a real class size routinely exceeds one physical page.
+        // Same shrink-to-fit approach admin-class-schedule-print.ejs
+        // already uses for the same reason (see its own CSS comment):
+        // .print-page gets a FIXED (not min-) height here so this wrapper
+        // has a real boundary to measure against, and print-shrink-to-fit.js
+        // zooms the table down (never up) to land inside it - a roster
+        // small enough to already fit prints at full size, unchanged.
+      %>
+      <%
+        // print-shrink-to-fit.js scales exactly ONE element - wrap.firstElementChild
+        // - so the heading and table have to share a single inner
+        // container here rather than sitting as two separate children of
+        // the [data-shrink-to-fit] wrapper (only the first of which would
+        // ever actually get measured/scaled).
+      %>
+      <div class="class-roster-print-fit" data-shrink-to-fit>
+        <div>
+          <h3>Student Roster</h3>
+          <table class="roster-table">
+            <thead><tr><th>Name</th><th>Family</th><th>Age</th><th>Grade</th><th>Birthday</th><th>Medical/Allergy Notes</th></tr></thead>
+            <tbody>
+              <% if (cls.students.length === 0) { %>
+                <tr><td colspan="6" class="roster-empty">No students enrolled yet.</td></tr>
+              <% } %>
+              <% cls.students.forEach(function(s) { %>
+                <tr>
+                  <td><%= s.name %></td>
+                  <td><%= s.family_name || '—' %></td>
+                  <td><%= s.age !== null && s.age !== undefined ? s.age : '—' %></td>
+                  <td><%= s.grade_level || '—' %></td>
+                  <td><%= s.birthday || '—' %></td>
+                  <td><%= s.medical_notes || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </main>
+  <script src="/js/print-shrink-to-fit.js"></script>
   <script src="/js/print-auto.js"></script>
 </body>
 </html>
