@@ -130,6 +130,12 @@
             </div>
             <div class="name-tag-editor-actions">
               <button type="button" class="btn-secondary" id="reset-template-btn">Reset to Default</button>
+              <%# Only meaningful between the two real per-member name tags
+                  (Student/Parent) - name-tag-editor.js shows/hides this
+                  itself based on currentType, since Setup/Cleanup Badge and
+                  Custom Badge aren't "name tags" the other one could copy
+                  to/from. %>
+              <button type="button" class="btn-secondary" id="copy-design-btn">Copy Design to All Name Tags</button>
               <button type="button" class="primary-btn" id="save-template-btn">Save Template</button>
               <span id="save-status" class="hint"></span>
             </div>

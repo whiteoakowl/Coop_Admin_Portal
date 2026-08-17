@@ -12,6 +12,13 @@
   const FONT_FAMILIES = seed.fontFamilies || [];
   const GRID_SIZE = 8;
   const MIN_SIZE = 12;
+  // The two real per-member name tags "Copy Design to All Name Tags" can
+  // copy between - matches routes/admin-name-tag.js's own NAME_TAG_TYPES.
+  // setupCleanup/custom are a different badge shape (Badge Number/Title/
+  // Description, not member fields - see utils/nameTagBadge.js's
+  // FIELDS_BY_TYPE comment), so copying between those and student/parent
+  // wouldn't carry over anything meaningful.
+  const NAME_TAG_TYPES = ['student', 'parent'];
 
   function cloneLayout(layout) {
     return JSON.parse(JSON.stringify(layout || {}));
@@ -73,6 +80,7 @@
   const toolIcons = document.getElementById('name-tag-tool-icons');
   const toolPanel = document.getElementById('name-tag-tool-panel');
   const saveStatus = document.getElementById('save-status');
+  const copyDesignBtn = document.getElementById('copy-design-btn');
   const undoBtn = document.getElementById('undo-btn');
   const redoBtn = document.getElementById('redo-btn');
   const zoomSelect = document.getElementById('name-tag-zoom-select');
@@ -1344,6 +1352,17 @@
     renderProperties();
     saveStatus.textContent = '';
     refreshHistoryButtons();
+    if (copyDesignBtn) copyDesignBtn.hidden = !NAME_TAG_TYPES.includes(type);
+  }
+
+  async function saveTemplateToServer(type, layout) {
+    const res = await fetch('/admin/name-tag/template/' + type, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
+      body: JSON.stringify({ layout }),
+    });
+    if (res.status === 401) return { ok: false, expired: true };
+    return res.json();
   }
 
   // The design editor's canvas/tool-select/etc. only exist on the Design
@@ -1398,22 +1417,45 @@
     document.getElementById('save-template-btn').addEventListener('click', async () => {
       saveStatus.textContent = 'Saving…';
       try {
-        const res = await fetch('/admin/name-tag/template/' + currentType, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
-          body: JSON.stringify({ layout: currentTemplate() }),
-        });
-        // See uploadImage above for why this check exists.
-        if (res.status === 401) {
-          saveStatus.textContent = 'Session expired - please refresh and log in again.';
-          return;
-        }
-        const data = await res.json();
-        saveStatus.textContent = data.ok ? 'Saved!' : 'Could not save.';
+        const data = await saveTemplateToServer(currentType, currentTemplate());
+        // See uploadImage above for why the 401 check exists.
+        saveStatus.textContent = data.expired ? 'Session expired - please refresh and log in again.' : data.ok ? 'Saved!' : 'Could not save.';
       } catch (err) {
         saveStatus.textContent = 'Connection error.';
       }
     });
+
+    if (copyDesignBtn) {
+      copyDesignBtn.addEventListener('click', async () => {
+        const otherType = NAME_TAG_TYPES.find((t) => t !== currentType);
+        if (!otherType) return;
+        if (!confirm('Copy the ' + currentType + ' name tag\'s design to the ' + otherType + ' name tag? This overwrites the ' + otherType + ' design (saved and unsaved) with a copy of this one.')) return;
+
+        saveStatus.textContent = 'Saving…';
+        try {
+          // Save the current type first - what gets copied should be
+          // exactly what's on screen, including any not-yet-saved edits,
+          // not whatever was last persisted.
+          const currentSave = await saveTemplateToServer(currentType, currentTemplate());
+          if (currentSave.expired) { saveStatus.textContent = 'Session expired - please refresh and log in again.'; return; }
+          if (!currentSave.ok) { saveStatus.textContent = 'Could not save.'; return; }
+
+          const copied = cloneLayout(currentTemplate());
+          layouts[otherType] = copied;
+          // Reset the other type's undo/redo history to start fresh from
+          // this copy, same shape historyFor() lazily creates - otherwise
+          // switching to it and hitting Undo would jump back to whatever
+          // it looked like before the copy.
+          history[otherType] = { stack: [cloneLayout(copied)], index: 0 };
+
+          const otherSave = await saveTemplateToServer(otherType, copied);
+          if (otherSave.expired) { saveStatus.textContent = 'Session expired - please refresh and log in again.'; return; }
+          saveStatus.textContent = otherSave.ok ? 'Copied to ' + otherType + '!' : 'Could not save the copy.';
+        } catch (err) {
+          saveStatus.textContent = 'Connection error.';
+        }
+      });
+    }
 
     document.addEventListener('keydown', (e) => {
       const activeTag = (document.activeElement && document.activeElement.tagName) || '';
