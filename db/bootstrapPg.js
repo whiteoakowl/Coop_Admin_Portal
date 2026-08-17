@@ -172,6 +172,73 @@ async function backfillNameTagAutoFit(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// misc_badge_templates 'setupCleanup' row - seedIfMissing (above) only
+// ever inserts that row once, the first time the app boots against a
+// brand new database, so an install whose row was already seeded before
+// the barcode element was added to DEFAULT_LAYOUTS.setupCleanup (utils/
+// nameTagBadge.js - lets a parent scan the physical badge at checkout,
+// see routes/checkout.js's task-scan step) never picks it up on its own.
+// A real bug report: the barcode simply never appeared on a Setup/
+// Cleanup badge's design preview OR its printed card, because both
+// render the same saved template (routes/admin-misc-badges.js's print
+// route, and the Design tab's own preview). Only adds a barcode element
+// when the saved layout has none at all, leaving every other
+// customization untouched - 'custom' is deliberately excluded, since its
+// own default has no barcode element and isn't meant to be scanned (see
+// utils/miscBadgeData.js's own miscBadgeRowData comment).
+async function backfillMiscBadgeBarcode(db) {
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = JSON.parse(row.layout_json);
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.type === 'barcode')) return;
+
+  const barcodeDefault = DEFAULT_LAYOUTS.setupCleanup.elements.find((el) => el.type === 'barcode');
+  if (!barcodeDefault) return;
+  const elements = [...layout.elements, { ...barcodeDefault }];
+
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// schedule_card_templates row (id=1) - seedIfMissing only ever inserts
+// this row once, the first time the app boots against a brand new
+// database, so an install whose row was already seeded before "remove
+// name and add allergies" landed (utils/scheduleCardBadge.js's own
+// DEFAULT_LAYOUT comment) never picked that redesign up - the saved row
+// simply isn't touched again after that first insert. A real bug report:
+// a production Schedule Card kept showing the member's name with no
+// allergy anywhere on it. Removes any leftover "name"-field element (the
+// current default no longer has one) and inserts the current default's
+// own allergy element, only when the saved layout doesn't already have
+// one - safe to run even against a layout with other real customizations
+// (tables moved, phone line restyled, ...), since only the name/allergy
+// elements themselves are touched.
+async function backfillScheduleCardAllergy(db) {
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = JSON.parse(row.layout_json);
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'allergy')) return;
+
+  const allergyDefault = SCHEDULE_CARD_DEFAULT_LAYOUT.elements.find((el) => el.field === 'allergy');
+  if (!allergyDefault) return;
+  const elements = [{ ...allergyDefault }, ...layout.elements.filter((el) => el.field !== 'name')];
+
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // task_list_items rows, created before the barcode column existed -
 // nothing else ever revisits an old row once it's inserted (utils/
 // taskList.js's addItem only assigns a barcode to a NEW row), so without
@@ -201,4 +268,11 @@ async function backfillTaskItemBarcodes(db) {
   }
 }
 
-module.exports = { seedIfMissing, backfillNameTagLogo, backfillNameTagAutoFit, backfillTaskItemBarcodes };
+module.exports = {
+  seedIfMissing,
+  backfillNameTagLogo,
+  backfillNameTagAutoFit,
+  backfillMiscBadgeBarcode,
+  backfillScheduleCardAllergy,
+  backfillTaskItemBarcodes,
+};
