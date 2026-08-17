@@ -183,7 +183,7 @@
       <table class="roster-table members-table members-list-table">
         <thead>
           <tr>
-            <th class="no-print"><span class="sr-only">Select</span></th>
+            <th class="no-print members-col-select"><span class="sr-only">Select</span></th>
             <th class="members-col-photo"><span class="sr-only">Photo</span></th>
             <th>Name</th>
             <th>Type</th>
@@ -195,7 +195,7 @@
         <tbody>
           <% members.forEach(function(m) { %>
             <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>" data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>">
-              <td class="no-print">
+              <td class="no-print members-col-select">
                 <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
               </td>
               <td class="members-col-photo">

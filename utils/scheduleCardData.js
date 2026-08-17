@@ -57,6 +57,18 @@ async function primaryParentsFor(members) {
   return result;
 }
 
+// A real request: the allergy line should read "Allergies/Medical: <the
+// notes>" instead of just the bare notes, so it's unambiguous what the
+// red text on the card actually is even without the name tag's own
+// medical-flag icon nearby (see views/partials/medical-flag.ejs) for
+// context. Left as a plain empty string (no label at all) for a member
+// with no notes on file, matching how the field already disappeared
+// entirely rather than showing an empty "Allergies/Medical:" label with
+// nothing after it.
+function allergyLabel(medicalNotes) {
+  return medicalNotes ? `Allergies/Medical: ${medicalNotes}` : '';
+}
+
 // The field values a Schedule Card template can place on a member's card.
 // The parent-phone contact line is only meaningful on a student's card -
 // a parent's own card leaves it blank rather than showing some other
@@ -76,7 +88,7 @@ async function scheduleCardDataForMember(member, precomputedSchedule) {
   const primaryParent = member.member_type === 'student' ? await primaryParentFor(member) : null;
   return {
     name: member.name,
-    allergy: member.medical_notes || '',
+    allergy: allergyLabel(member.medical_notes),
     primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
     mondaySchedule: toTableRows(monday),
     wednesdaySchedule: toTableRows(wednesday),
@@ -98,7 +110,7 @@ async function scheduleCardDataForMembers(members, scheduleByMember) {
     const primaryParent = primaryParentByMember[member.id] || null;
     result[member.id] = {
       name: member.name,
-      allergy: member.medical_notes || '',
+      allergy: allergyLabel(member.medical_notes),
       primaryParentPhone: primaryParent ? `Parent Phone: ${primaryParent.phone || 'Not on file'}` : '',
       mondaySchedule: toTableRows(schedule.monday),
       wednesdaySchedule: toTableRows(schedule.wednesday),

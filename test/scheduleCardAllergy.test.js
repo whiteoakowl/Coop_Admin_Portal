@@ -50,7 +50,13 @@ test('the Schedule Card default layout has no Member Name element, and shows All
   assert.ok(allergyEl.y <= 20, 'should sit in the top-left corner');
 });
 
-test('scheduleCardDataForMember exposes the member\'s medical_notes as "allergy"', async () => {
+// A real follow-up request: the allergy line should read "Allergies/
+// Medical: <the notes>" instead of just the bare notes, so it's
+// unambiguous what the red text on the card actually is (see utils/
+// scheduleCardData.js's allergyLabel). A member with no notes on file
+// still gets a plain empty string, not an empty "Allergies/Medical:"
+// label with nothing after it.
+test('scheduleCardDataForMember exposes the member\'s medical_notes as "Allergies/Medical: <notes>"', async () => {
   const db = require('../db');
   const { scheduleCardDataForMember } = require('../utils/scheduleCardData');
   await db.ready;
@@ -65,6 +71,6 @@ test('scheduleCardDataForMember exposes the member\'s medical_notes as "allergy"
   const memberWith = await db.prepare('SELECT * FROM members WHERE id = ?').get(withAllergy);
   const memberWithout = await db.prepare('SELECT * FROM members WHERE id = ?').get(withoutAllergy);
 
-  assert.equal((await scheduleCardDataForMember(memberWith)).allergy, 'Peanut allergy');
+  assert.equal((await scheduleCardDataForMember(memberWith)).allergy, 'Allergies/Medical: Peanut allergy');
   assert.equal((await scheduleCardDataForMember(memberWithout)).allergy, '');
 });

@@ -165,6 +165,37 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) 
 // routes/admin-volunteers.js), just simpler - no hours/positions/rooms,
 // one flat per-member suggestion instead. ---
 
+// A real request: once a task's been picked for one member, it shouldn't
+// still show up as a pickable option for anyone else on the same team
+// that same date - two people showing up expecting to do the identical
+// job is exactly the kind of double-booking this suggestion list is
+// meant to prevent. Tasks only ever mean anything within their own
+// team's own linked list (see utils/taskList.js's taskSectionForTeam), so
+// "someone else" means someone else on THIS team, not site-wide. Returns
+// { [memberId]: { slot1Options, slot2Options } } - each member's own
+// current slot1/slot2 value is always kept available in ITS OWN
+// dropdown (so a saved value still shows what it is), even though that
+// same value is excluded from every other member's dropdowns; a
+// member's own two slots also can't both point at the same task, so
+// each slot additionally excludes whatever the OTHER slot on that same
+// member currently holds.
+function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
+  const byMember = {};
+  for (const m of members) {
+    const takenByOthers = new Set();
+    for (const other of members) {
+      if (other.id === m.id) continue;
+      if (other.taskItemId) takenByOthers.add(other.taskItemId);
+      if (other.taskItemId2) takenByOthers.add(other.taskItemId2);
+    }
+    byMember[m.id] = {
+      slot1Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId2),
+      slot2Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId),
+    };
+  }
+  return byMember;
+}
+
 // One card per team for a given date - each member's currently-suggested
 // task (if any) plus the list of tasks their team's own linked task list
 // offers, i.e. what the suggestion dropdown's own options are. Shared by
@@ -173,11 +204,9 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) 
 async function assignmentCardsForDate(day, date) {
   const teams = await teamsWithMembers(day);
   const assignments = date ? await taskAssignmentsForDate(day, date) : {};
-  return teams.map((t) => ({
-    id: t.id,
-    title: t.title,
-    taskOptions: t.taskSection ? t.taskSection.items : [],
-    members: t.members.map((m) => {
+  return teams.map((t) => {
+    const allOptions = t.taskSection ? t.taskSection.items : [];
+    const members = t.members.map((m) => {
       const a = assignments[m.id] || {};
       const taskItem = a.taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId) : null;
       const taskItem2 = a.taskItemId2 && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId2) : null;
@@ -189,8 +218,15 @@ async function assignmentCardsForDate(day, date) {
         taskDescription: taskItem ? taskItem.description : null,
         taskDescription2: taskItem2 ? taskItem2.description : null,
       };
-    }),
-  }));
+    });
+    const availableOptionsByMember = taskOptionsExcludingAssignedElsewhere(allOptions, members);
+    return {
+      id: t.id,
+      title: t.title,
+      taskOptions: allOptions,
+      members: members.map((m) => ({ ...m, ...availableOptionsByMember[m.id] })),
+    };
+  });
 }
 
 router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res) => {
@@ -238,6 +274,35 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
   if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, slot, taskItemId);
   res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
+});
+
+// A real request: each card should stay frozen (plain text, no
+// dropdowns) until "Edit" is clicked, then save every member's Task 1/
+// Task 2 pick for that ONE card together via a single "Save" - not the
+// old one-dropdown-auto-submits-by-itself flow the route above still
+// serves (kept working, just no longer what the UI drives). Every
+// member on the team gets processed, including ones with no field
+// submitted at all (an admin removing every member's selection while
+// editing still needs those cleared, not silently left as whatever they
+// were before) - taskItemId falsy correctly clears that slot (see
+// setTaskAssignment's own comment). Member ids come from the team's own
+// roster (membersForTeam), never trusted off the request body, so a
+// crafted extra field can't touch some other team's assignment row.
+router.post('/setup/:day/assignments/team/:teamId/save', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const teamId = parseInt(req.params.teamId, 10);
+  const date = req.body.date;
+  if (!date || !isValidISODate(date)) {
+    return res.redirect(`/admin/setup/${day}/assignments?error=` + encodeURIComponent('Pick a date first.'));
+  }
+  const members = await membersForTeam(teamId);
+  for (const m of members) {
+    const slot1 = parseInt(req.body[`task_1_${m.id}`], 10) || null;
+    const slot2 = parseInt(req.body[`task_2_${m.id}`], 10) || null;
+    await setTaskAssignment(day, m.id, date, 1, slot1);
+    await setTaskAssignment(day, m.id, date, 2, slot2);
+  }
+  res.redirect(`/admin/setup/${day}/assignments?date=${encodeURIComponent(date)}&notice=` + encodeURIComponent('Assignments saved.'));
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {

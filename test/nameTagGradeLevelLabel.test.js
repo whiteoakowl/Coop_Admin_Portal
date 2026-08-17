@@ -2,19 +2,24 @@
 // or a named early-childhood level like Kindergarten/PreK - see utils/
 // classSchedule.js's own GRADE_LEVELS) reads ambiguously alone on a badge
 // ("3rd" - third grade? third place?). gradeLevelLabel (utils/
-// nameTagData.js) appends "Grade" to just the ordinal-numbered ones,
-// leaving the named levels (which already read fine on their own) alone.
+// nameTagData.js) pairs it with the word "Grade", and a follow-up request
+// asked for that pairing to STACK ("3rd" over "Grade") rather than run on
+// one line - returned as a 2-line array for the ordinal case (name-tag-
+// render-core.js's renderTextEl treats an array as one stacked line per
+// entry), left as a single unstacked string for the named early-childhood
+// levels (which already read fine on their own, and "Kindergarten"/"Grade"
+// stacked wouldn't make sense).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { gradeLevelLabel } = require('../utils/nameTagData');
 
-test('gradeLevelLabel appends "Grade" to an ordinal grade', () => {
-  assert.equal(gradeLevelLabel('1st'), '1st Grade');
-  assert.equal(gradeLevelLabel('3rd'), '3rd Grade');
-  assert.equal(gradeLevelLabel('12th'), '12th Grade');
+test('gradeLevelLabel returns ["<ordinal>", "Grade"] for an ordinal grade, ready to stack', () => {
+  assert.deepEqual(gradeLevelLabel('1st'), ['1st', 'Grade']);
+  assert.deepEqual(gradeLevelLabel('3rd'), ['3rd', 'Grade']);
+  assert.deepEqual(gradeLevelLabel('12th'), ['12th', 'Grade']);
 });
 
-test('gradeLevelLabel leaves a named early-childhood level unchanged', () => {
+test('gradeLevelLabel leaves a named early-childhood level as a plain unstacked string', () => {
   assert.equal(gradeLevelLabel('Kindergarten'), 'Kindergarten');
   assert.equal(gradeLevelLabel('PreK'), 'PreK');
   assert.equal(gradeLevelLabel('Preschool'), 'Preschool');
@@ -22,7 +27,7 @@ test('gradeLevelLabel leaves a named early-childhood level unchanged', () => {
   assert.equal(gradeLevelLabel('Infant'), 'Infant');
 });
 
-test('gradeLevelLabel returns an empty string for a member with no grade_level set, not "undefined Grade"', () => {
+test('gradeLevelLabel returns an empty string for a member with no grade_level set, not ["undefined", "Grade"]', () => {
   assert.equal(gradeLevelLabel(''), '');
   assert.equal(gradeLevelLabel(null), '');
   assert.equal(gradeLevelLabel(undefined), '');

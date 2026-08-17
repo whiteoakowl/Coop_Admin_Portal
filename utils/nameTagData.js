@@ -90,12 +90,34 @@ function setupCleanupJobLabels(teamRows) {
 // early-childhood level (Infant, Toddler, Preschool, PreK, Kindergarten)
 // that already reads fine on its own. A real request: the ordinal ones
 // read ambiguously alone on a badge ("3rd" - third grade? third place?) -
-// append "Grade" so it's unambiguous ("3rd Grade"), leaving the named
-// levels untouched since "Kindergarten Grade" doesn't make sense.
+// pair it with the word "Grade". A follow-up request then asked for that
+// pairing to stack ("3rd" over "Grade") rather than sit on one line, so
+// each half can run bigger - returned as a 2-line array for the ordinal
+// case (name-tag-render-core.js's renderTextEl treats an array value as
+// one stacked line per entry, the same convention setupCleanupDays above
+// already uses), left as a single unstacked string for the named levels
+// since "Kindergarten" / "Grade" stacked under it doesn't make sense.
 function gradeLevelLabel(gradeLevel) {
   const trimmed = (gradeLevel || '').trim();
   if (!trimmed) return '';
-  return /^\d+(st|nd|rd|th)$/i.test(trimmed) ? `${trimmed} Grade` : trimmed;
+  return /^\d+(st|nd|rd|th)$/i.test(trimmed) ? [trimmed, 'Grade'] : trimmed;
+}
+
+// A real request: EVERY name tag (student and parent alike) should stack
+// a member's first name over their last name instead of running both on
+// one line - freeing up real width lets the auto-fit font size for each
+// half grow larger than a single "First Last" line could ever reach
+// before hitting the box's width. Splits on the FIRST space only, so a
+// multi-word last name ("Mary Jane Smith") reads as "Mary" / "Jane Smith"
+// rather than splitting awkwardly mid-surname. A single-word name (no
+// space at all - a mononym, or a placeholder like "Guest") returns just
+// the one line rather than a blank second line.
+function splitNameLines(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '';
+  const spaceIdx = trimmed.indexOf(' ');
+  if (spaceIdx === -1) return trimmed;
+  return [trimmed.slice(0, spaceIdx), trimmed.slice(spaceIdx + 1).trim()];
 }
 
 // member_code is the permanent 6-digit ID assigned at creation (see
@@ -112,7 +134,7 @@ async function badgeDataForMember(member) {
   if (member.member_type === 'parent') {
     const teamRows = await cleanupTeamRowsForParent(member.id);
     return {
-      name: member.name,
+      name: splitNameLines(member.name),
       cleanupTeam: teamRows.map((r) => r.title).join(', '),
       ...setupCleanupJobLabels(teamRows),
       memberCode,
@@ -120,7 +142,7 @@ async function badgeDataForMember(member) {
     };
   }
   return {
-    name: member.name,
+    name: splitNameLines(member.name),
     gradeLevel: gradeLevelLabel(member.grade_level),
     allergies: member.medical_notes || '',
     memberCode,
@@ -143,14 +165,14 @@ async function badgeDataForMembers(members) {
     if (member.member_type === 'parent') {
       const teamRows = teamRowsByParent[member.id] || [];
       result[member.id] = {
-        name: member.name,
+        name: splitNameLines(member.name),
         cleanupTeam: teamRows.map((r) => r.title).join(', '),
         ...setupCleanupJobLabels(teamRows),
         memberCode,
         barcodeValue: member.barcode,
       };
     } else {
-      result[member.id] = { name: member.name, gradeLevel: gradeLevelLabel(member.grade_level), allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
+      result[member.id] = { name: splitNameLines(member.name), gradeLevel: gradeLevelLabel(member.grade_level), allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
     }
   }
   return result;
@@ -170,4 +192,4 @@ async function getTemplate(memberType) {
   }
 }
 
-module.exports = { badgeDataForMember, badgeDataForMembers, getTemplate, cleanupTeamsForParent, cleanupTeamsForParents, gradeLevelLabel };
+module.exports = { badgeDataForMember, badgeDataForMembers, getTemplate, cleanupTeamsForParent, cleanupTeamsForParents, gradeLevelLabel, splitNameLines };

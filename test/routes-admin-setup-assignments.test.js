@@ -263,6 +263,91 @@ test('Setup/Cleanup Archive', async (t) => {
   });
 });
 
+test('Setup/Cleanup Assignments: mutual exclusion + batch card save', async (t) => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+
+  const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Exclusion Crew')").run();
+  const section = await db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Exclusion Tasks', ?, 0)").run(team.lastInsertRowid);
+  const item1 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Vacuum');
+  const item2 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 1)').run(section.lastInsertRowid, 'Mop');
+  const alice = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Alice Exclusion', 'exclusion-alice', 'parent')").run();
+  const bob = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Bob Exclusion', 'exclusion-bob', 'parent')").run();
+  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, alice.lastInsertRowid);
+  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, bob.lastInsertRowid);
+  await request(app).post('/admin/setup/monday/dates/add').set('Cookie', cookie).type('form').send({ dates: '2026-09-14', _csrf: csrfToken });
+
+  await t.test('a task already assigned to one member no longer appears as an option for another member on the same team', async () => {
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-09-14', slot: '1', taskItemId: String(item1.lastInsertRowid), _csrf: csrfToken });
+
+    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    assert.equal(page.status, 200);
+    // Alice's own slot 1 still shows her current pick (Vacuum).
+    const aliceSlot1 = new RegExp(`name="task_1_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+    assert.match(aliceSlot1, /#1 &mdash; Vacuum/);
+    // Bob's slot 1 dropdown must NOT offer Vacuum - it's taken.
+    const bobSlot1 = new RegExp(`name="task_1_${bob.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+    assert.doesNotMatch(bobSlot1, /Vacuum/, 'a task already assigned to Alice must not be offered to Bob');
+    assert.match(bobSlot1, /Mop/, 'Mop is still unassigned, so it should still be offered');
+  });
+
+  await t.test('a member\'s own slot 1 and slot 2 can\'t both offer the same task they already hold in the other slot', async () => {
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-09-14', slot: '2', taskItemId: String(item2.lastInsertRowid), _csrf: csrfToken });
+
+    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const aliceSlot1 = new RegExp(`name="task_1_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+    assert.doesNotMatch(aliceSlot1, /Mop/, 'slot 1 must not also offer whatever Alice already holds in slot 2');
+    const aliceSlot2 = new RegExp(`name="task_2_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+    assert.doesNotMatch(aliceSlot2, /Vacuum/, 'slot 2 must not also offer whatever Alice already holds in slot 1');
+  });
+
+  await t.test('the Task 1/Task 2 column headers replace the old "Suggested Task" labels', async () => {
+    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    assert.match(page.text, /<th>Task 1<\/th><th>Task 2<\/th>/);
+    assert.doesNotMatch(page.text, /Suggested Task/);
+  });
+
+  await t.test('saving a whole card at once (the Edit/Save flow\'s own route) updates every member on that team together', async () => {
+    const res = await request(app)
+      .post(`/admin/setup/monday/assignments/team/${team.lastInsertRowid}/save`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        date: '2026-09-14',
+        [`task_1_${alice.lastInsertRowid}`]: '',
+        [`task_2_${alice.lastInsertRowid}`]: String(item1.lastInsertRowid),
+        [`task_1_${bob.lastInsertRowid}`]: String(item2.lastInsertRowid),
+        _csrf: csrfToken,
+      });
+    assert.equal(res.status, 302);
+    assert.match(decodeURIComponent(res.headers.location), /Assignments saved/);
+
+    const aliceRow = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', alice.lastInsertRowid, '2026-09-14');
+    assert.equal(aliceRow.task_item_id, null, 'Alice\'s slot 1 was submitted blank, clearing her previous Vacuum pick');
+    assert.equal(aliceRow.task_item_id_2, item1.lastInsertRowid, 'Alice\'s slot 2 now holds Vacuum (freed up since her own slot 1 was cleared)');
+
+    const bobRow = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', bob.lastInsertRowid, '2026-09-14');
+    assert.equal(bobRow.task_item_id, item2.lastInsertRowid, 'Bob now holds Mop');
+  });
+
+  await t.test('a batch save with no date redirects with an error instead of a bare crash', async () => {
+    const res = await request(app)
+      .post(`/admin/setup/monday/assignments/team/${team.lastInsertRowid}/save`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '', _csrf: csrfToken });
+    assert.equal(res.status, 302);
+    assert.match(decodeURIComponent(res.headers.location), /Pick a date first/);
+  });
+});
+
 test('Setup/Cleanup Teams page gained an Archive button and the shared 4-tab bar', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);

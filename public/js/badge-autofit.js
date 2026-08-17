@@ -98,9 +98,47 @@
     }
   }
 
+  // The per-line width pass above never looks at the box's HEIGHT, so a
+  // multi-line box (2+ lines, e.g. a stacked first/last name or a stacked
+  // "3rd"/"Grade") whose configured height is too short for however tall
+  // its lines actually render still gets its later line(s) silently cut
+  // off by the box's own overflow:hidden (see public/css/styles.css's
+  // .badge-el-text) - width-fitting alone doesn't guarantee that. Real bug
+  // this guards against: an already-saved template created before a
+  // field's box grew taller to fit 2 stacked lines (a fresh install picks
+  // up the current, already-tall-enough DEFAULT_LAYOUTS box automatically,
+  // but an existing saved layout keeps whatever height it already had)
+  // would otherwise clip the second line no matter how small the font got.
+  // box.scrollHeight still reports the real, unclipped content height even
+  // though overflow:hidden is visually clipping it - same technique public/
+  // js/print-shrink-to-fit.js's fitOne uses to catch the identical class of
+  // "the one-shot estimate wasn't quite right" problem, just height
+  // instead of width and correcting every line together (not per-line) so
+  // the stack keeps a consistent size rather than each line settling on
+  // its own independent font size.
+  function shrinkLinesToFitHeight(box, inners) {
+    var availableH = box.clientHeight;
+    if (!availableH) return;
+    var guard = 0;
+    while (box.scrollHeight > availableH && guard < 60) {
+      var shrunkAny = false;
+      for (var i = 0; i < inners.length; i++) {
+        var fontSize = parseFloat(inners[i].style.fontSize);
+        if (isNaN(fontSize)) continue;
+        if (fontSize > MIN_FONT_SIZE_PX) {
+          inners[i].style.fontSize = Math.max(MIN_FONT_SIZE_PX, fontSize - STEP_PX) + 'px';
+          shrunkAny = true;
+        }
+      }
+      if (!shrunkAny) break;
+      guard++;
+    }
+  }
+
   function shrinkToFit(box) {
     var inners = box.querySelectorAll('.badge-el-text-inner');
     for (var i = 0; i < inners.length; i++) shrinkLineToFit(box, inners[i]);
+    if (inners.length > 1) shrinkLinesToFitHeight(box, inners);
   }
 
   function runBadgeAutoFit(root) {

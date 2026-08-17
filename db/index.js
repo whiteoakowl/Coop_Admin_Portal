@@ -38,6 +38,8 @@ const {
   backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,
   backfillParentSetupCleanupMerge,
+  backfillParentRemoveLegacyCleanupTeamElement,
+  backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
 } = require('./bootstrapPg');
 
@@ -103,6 +105,11 @@ db.ready = schemaReady
   // Must run AFTER backfillParentSetupCleanupDays - see that backfill's
   // own comment on why this one depends on it having already run.
   .then(() => backfillParentSetupCleanupMerge(db))
+  // Independent of the two backfills above - fires whether or not this
+  // template has been migrated to setupCleanupDays yet, since the stale
+  // element it removes predates both of them.
+  .then(() => backfillParentRemoveLegacyCleanupTeamElement(db))
+  .then(() => backfillNameTagStackedSizing(db))
   .then(() => backfillTaskItemBarcodes(db));
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -

@@ -43,7 +43,7 @@ const app = require('../server');
 const db = require('../db');
 const { createTestDb } = require('./pgTestDb');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
-const { backfillParentSetupCleanupDays, backfillParentSetupCleanupMerge } = require('../db/bootstrapPg');
+const { backfillParentSetupCleanupDays, backfillParentSetupCleanupMerge, backfillParentRemoveLegacyCleanupTeamElement } = require('../db/bootstrapPg');
 const { badgeDataForMember, badgeDataForMembers } = require('../utils/nameTagData');
 
 test.before(() => app.ready);
@@ -239,4 +239,60 @@ test('backfillParentSetupCleanupDays followed by backfillParentSetupCleanupMerge
   assert.equal(layout.elements[0].field, 'setupCleanupDays');
   assert.equal(layout.elements[1].field, 'name');
   assert.ok(!layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup'));
+});
+
+// A real bug report: a parent's printed badge showed their team/assignment
+// info TWICE - once via the new setupCleanupDays element, once via a
+// stale leftover { id: 'team', field: 'cleanupTeam' } element from before
+// the Monday/Wednesday redesign, at its old overlapping position.
+test('backfillParentRemoveLegacyCleanupTeamElement removes a stale id:"team" cleanupTeam element, leaving everything else untouched', async () => {
+  const testDb = await createTestDb();
+  const withLegacyElement = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'setup-cleanup-days', type: 'text', field: 'setupCleanupDays', x: 8, y: 4, width: 320, height: 32, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 38, width: 32, height: 32 },
+      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 74, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'team', type: 'text', field: 'cleanupTeam', x: 8, y: 86, width: 320, height: 28, fontSize: 11, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 92, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+    ],
+  };
+  await testDb.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify(withLegacyElement));
+
+  await backfillParentRemoveLegacyCleanupTeamElement(testDb);
+
+  const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.ok(!layout.elements.some((el) => el.id === 'team'), 'the stale team element must be gone');
+  assert.deepEqual(
+    layout.elements,
+    withLegacyElement.elements.filter((el) => el.id !== 'team'),
+    'every other element must survive untouched, in order'
+  );
+});
+
+test('backfillParentRemoveLegacyCleanupTeamElement leaves a deliberately-added cleanupTeam element with a non-"team" id alone', async () => {
+  const testDb = await createTestDb();
+  const deliberate = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'text-abc123-7', type: 'text', field: 'cleanupTeam', x: 8, y: 150, width: 320, height: 20, fontSize: 10, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+    ],
+  };
+  await testDb.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify(deliberate));
+
+  await backfillParentRemoveLegacyCleanupTeamElement(testDb);
+
+  const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  assert.deepEqual(JSON.parse(row.layout_json), deliberate);
+});
+
+test('backfillParentRemoveLegacyCleanupTeamElement is a no-op for a fresh install (no legacy element at all)', async () => {
+  const testDb = await createTestDb();
+  const before = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  await backfillParentRemoveLegacyCleanupTeamElement(testDb);
+  const after = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  assert.equal(after.layout_json, before.layout_json);
 });

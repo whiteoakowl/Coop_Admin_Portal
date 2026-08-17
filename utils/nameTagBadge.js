@@ -92,13 +92,29 @@ const DEFAULT_LAYOUTS = {
     elements: [
       { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 148, y: 4, width: 40, height: 40 },
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 50, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      // A real request: first name stacked over last name (utils/
+      // nameTagData.js's splitNameLines hands back the two lines as an
+      // array - same convention setupCleanupDays/gradeLevel below use)
+      // instead of one "First Last" line, so each half has real room to
+      // run a bigger font than a single line sharing this same 320px
+      // width ever could. The box is taller than a single-line name field
+      // used to need for the same reason - see public/js/badge-autofit.js's
+      // shrinkLinesToFitHeight for what keeps a longer two-line name from
+      // ever clipping even on an already-saved template that hasn't
+      // picked up this taller box (a backfill only ever ADDS height, see
+      // db/bootstrapPg.js's backfillNameTagStackedSizing, but the real
+      // guarantee against clipping is that height-aware correction, not
+      // the box size itself).
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 68, width: 320, height: 40, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       // A real bug report: a longer grade_level value ("Kindergarten",
       // once badgeDataForMember started appending "Grade" to the ordinal
       // ones too - see utils/nameTagData.js's gradeLevelLabel) could clip
       // the same way an unshrunk long name used to - same autoFitText
-      // treatment as name above.
-      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 100, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      // treatment as name above. A follow-up request then asked for the
+      // ordinal grades to stack ("3rd" over "Grade" - gradeLevelLabel
+      // returns that as a 2-line array too) rather than sit on one line,
+      // for the same "more room for a bigger font" reason as name above.
+      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 110, width: 320, height: 36, fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'barcode', type: 'barcode', x: 68, y: 154, width: 200, height: 55 },
     ],
   },
@@ -122,7 +138,10 @@ const DEFAULT_LAYOUTS = {
       { id: 'setup-cleanup-days', type: 'text', field: 'setupCleanupDays', x: 8, y: 4, width: 320, height: 32, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
       { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 38, width: 32, height: 32 },
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 74, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'name', type: 'text', field: 'name', x: 8, y: 92, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      // Same first-name-over-last-name stacking as the student badge
+      // above (utils/nameTagData.js's splitNameLines) - see that
+      // element's own comment.
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 90, width: 320, height: 40, fontSize: 20, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
     ],
   },

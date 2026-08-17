@@ -230,6 +230,42 @@ async function backfillParentSetupCleanupMerge(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// 'parent' name_tag_templates row - a real bug report: a parent's printed
+// badge showed team/assignment info TWICE, in two different spots, one of
+// them overlapping other elements. Root cause: DEFAULT_LAYOUTS.parent used
+// to have an { id: 'team', field: 'cleanupTeam' } element (the flat "both
+// days smashed into one line" view) positioned at y:86 - it was dropped
+// from the default when mondaySetupCleanup/wednesdaySetupCleanup shipped
+// (see backfillParentSetupCleanupDays's own comment), but nothing ever
+// removed it from an ALREADY-SAVED row, so it kept sitting there at its
+// old position (which the newer memberCode/name elements have since grown
+// into) showing the exact same team membership the new per-day field
+// already shows, just in a stale, overlapping spot. Safe to remove
+// unconditionally wherever found: the design editor's own id generator
+// (name-tag-editor.js's newId) never produces a bare "team" id - anything
+// with exactly that id can only be this old default leftover, never
+// something an admin created themselves through the editor. cleanupTeam
+// itself is untouched as a FIELDS_BY_TYPE picker option (utils/
+// nameTagBadge.js) for anyone who deliberately wants to add it back with
+// a fresh id/position of their own choosing.
+async function backfillParentRemoveLegacyCleanupTeamElement(db) {
+  const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (!layout.elements.some((el) => el.id === 'team' && el.field === 'cleanupTeam')) return;
+
+  const elements = layout.elements.filter((el) => !(el.id === 'team' && el.field === 'cleanupTeam'));
+
+  await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // misc_badge_templates 'setupCleanup' row - seedIfMissing (above) only
 // ever inserts that row once, the first time the app boots against a
 // brand new database, so an install whose row was already seeded before
@@ -381,6 +417,57 @@ async function backfillParentSetupCleanupDays(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// student/parent name_tag_templates rows - a real request: the name field
+// (and, for student, the grade field) should have real room to run a
+// bigger font once each was split into 2 stacked lines (utils/
+// nameTagData.js's splitNameLines/gradeLevelLabel), not stay pinned at
+// the smaller single-line box/font size an older saved template still
+// has. Only ever grows height/fontSize UP to at least the current
+// DEFAULT_LAYOUTS value for that exact id+field pair, never down - a
+// template with a genuinely larger custom size already keeps it, and
+// growing a box that was already big enough is a safe no-op (the shared
+// height-aware correction in public/js/badge-autofit.js's
+// shrinkLinesToFitHeight is the real guarantee against clipping either
+// way, this backfill is purely about giving an old install the same
+// starting room a fresh install already gets).
+const STACKED_SIZING_TARGETS = {
+  student: [
+    { id: 'name', field: 'name', height: 40, fontSize: 22 },
+    { id: 'grade', field: 'gradeLevel', height: 36, fontSize: 16 },
+  ],
+  parent: [{ id: 'name', field: 'name', height: 40, fontSize: 20 }],
+};
+
+async function backfillNameTagStackedSizing(db) {
+  for (const memberType of Object.keys(STACKED_SIZING_TARGETS)) {
+    const row = await db.prepare('SELECT layout_json FROM name_tag_templates WHERE member_type = ?').get(memberType);
+    if (!row) continue;
+    let layout;
+    try {
+      layout = normalizeLayout(JSON.parse(row.layout_json));
+    } catch (err) {
+      continue;
+    }
+    if (!layout || !Array.isArray(layout.elements)) continue;
+
+    const targets = STACKED_SIZING_TARGETS[memberType];
+    let changed = false;
+    const elements = layout.elements.map((el) => {
+      const target = targets.find((t) => t.id === el.id && t.field === el.field);
+      if (!target || el.type !== 'text') return el;
+      const height = Math.max(el.height, target.height);
+      const fontSize = Math.max(el.fontSize, target.fontSize);
+      if (height === el.height && fontSize === el.fontSize) return el;
+      changed = true;
+      return { ...el, height, fontSize };
+    });
+    if (!changed) continue;
+
+    await db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify({ ...layout, elements }), memberType);
+  }
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // task_list_items rows, created before the barcode column existed -
 // nothing else ever revisits an old row once it's inserted (utils/
 // taskList.js's addItem only assigns a barcode to a NEW row), so without
@@ -419,5 +506,7 @@ module.exports = {
   backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,
   backfillParentSetupCleanupMerge,
+  backfillParentRemoveLegacyCleanupTeamElement,
+  backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
 };

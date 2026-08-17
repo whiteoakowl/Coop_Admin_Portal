@@ -1994,6 +1994,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      classes vs. one) - see that rule's own comment for why nowrap is the
      right default everywhere else. */
   .members-table td.members-col-name { white-space: normal; }
+
+  /* A real bug report: even with Photo/Family/Rosters already hidden
+     above, the 4 action icons (Notes/View Cards/View Schedule/Delete)
+     still didn't all fit on a phone screen - Name/Type/Actions alone
+     still needed more horizontal room than .roster-table's normal
+     generous 0.75rem/1rem padding left for them, on top of the row's
+     first cell (the bulk-select checkbox) spending a full padded column
+     on a checkbox that's HTML-hidden (not shown) until Edit mode is
+     turned on, so most of the time it's pure wasted width. Tightened
+     scoped to .members-table specifically - .actions-cell/.actions-btn-
+     row/.icon-btn are shared across several other pages (Library,
+     Attendance, Schedules, ...) that aren't part of this bug report and
+     have their own room to spare. */
+  .members-table th, .members-table td { padding: 0.5rem 0.4rem; }
+  /* Only collapse the select column while its checkbox is actually
+     hidden (public/js/archive-select-toggle.js's own hidden = !activating
+     toggle) - Edit mode un-hides it, and a table cell has no other CSS
+     hook for "is my child currently hidden" than :has(), already used
+     elsewhere in this file (.member-type-toggle-btn). Reclaiming this
+     column's width only when Edit mode is off (the common case) avoids
+     squeezing the checkbox itself down to nothing the one time it's
+     actually shown and needs to stay tappable. */
+  .members-table td.members-col-select:has(input[hidden]) { padding-left: 0; padding-right: 0; width: 0; }
+  .members-table .actions-cell { gap: 0.3rem; }
+  .members-table .actions-btn-row { gap: 0.3rem; }
+  .members-table .icon-btn { width: 1.7rem; height: 1.7rem; }
+  .members-table .icon-btn .icon { width: 0.9rem; height: 0.9rem; }
 }
 
 .row-inactive { opacity: 0.5; }
@@ -3317,10 +3344,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   overflow: hidden;
   break-inside: avoid;
 }
-.floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; }
+.floater-card-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.75rem; flex-wrap: wrap; }
 .floater-card-header h3 { margin: 0; font-size: 0.95rem; }
 .floater-card-icon { display: inline-flex; flex-shrink: 0; }
 .floater-card-icon .icon { width: 16px; height: 16px; }
+
+/* Setup/Cleanup Assignments' own Edit/Cancel/Save controls - pushed to
+   the header's far right (margin-left: auto), wrapping onto their own
+   row on a narrow card rather than squeezing the team title. */
+.floater-card-header-actions { display: flex; gap: 0.4rem; margin-left: auto; }
 
 .floater-card-blue .floater-card-header { background: var(--brand-soft); color: var(--brand-dark); }
 .floater-card-green .floater-card-header { background: var(--green-bg); color: var(--green); }
@@ -3352,6 +3384,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-card-table tbody tr:last-child td { border-bottom: none; }
 .floater-card-position { font-weight: 600; }
 .floater-card-unassigned { color: var(--muted); font-style: italic; }
+
+/* Setup/Cleanup Assignments' own version of .floater-card-table (shared
+   base class with Floater Assignments' Position/Room/Floater table above,
+   whose 40/24/36 split doesn't fit this table's own 3 columns) - a real
+   bug report: "SUGGESTED TASK 1"/"SUGGESTED TASK 2" ran into each other
+   at the header's inherited white-space: nowrap + a 24%-wide column, the
+   header text simply had nowhere to go but overflow sideways into its
+   neighbor. Task 1/Task 2 (this partial's own shorter column titles) get
+   equal width, wrapping onto a second line if a narrow card still can't
+   fit either header on one. */
+.setup-assignment-table th:nth-child(1), .setup-assignment-table td:nth-child(1) { width: 36%; }
+.setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
+.setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 32%; }
+.setup-assignment-table th { white-space: normal; }
+
+/* A card starts frozen (static text, no dropdown) - public/js/setup-
+   assignment-cards.js's Edit button adds .setup-card-editing to flip
+   which half of this pair shows. Both are always in the DOM (see the
+   partial's own comment on why) so print/no-JS still renders a real
+   value instead of an empty toggled-off state. */
+.setup-task-select { display: none; width: 100%; }
+.setup-card-editing .setup-task-select { display: block; }
+.setup-card-editing .setup-task-static { display: none; }
+.floater-card-header-actions [data-cancel-card],
+.floater-card-header-actions [data-save-card] { display: none; }
+.setup-card-editing .floater-card-header-actions [data-edit-card] { display: none; }
+.setup-card-editing .floater-card-header-actions [data-cancel-card],
+.setup-card-editing .floater-card-header-actions [data-save-card] { display: inline-flex; }
+
+@media print {
+  /* Whatever edit state a card happened to be in right before Print was
+     hit, the printed page always shows the frozen/static view - a live
+     <select> control has no business on a printed page, and Edit/Cancel/
+     Save are already .no-print (see the partial), this just covers the
+     text/select half of the same pair. */
+  .setup-task-select { display: none !important; }
+  .setup-task-static { display: inline !important; }
+}
 
 .floater-card-footer {
   display: flex;
