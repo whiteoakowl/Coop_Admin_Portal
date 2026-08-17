@@ -2501,13 +2501,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    its flex: 1 0 auto buttons (see .roster-action-btn above) wrap unevenly
    on a phone - a short trailing button on its own row stretches to fill
    the full width while the buttons above it stay narrow, so the row reads
-   as randomly sized rather than a clean grid. On mobile every button
-   instead shrinks to its own smaller font/padding and sits in a single,
-   horizontally-scrollable row (never wrapping to a second line, no matter
-   how many buttons a given page's toolbar has - "+ Add Class"/"Edit"/
-   "Import"/"Archive"/"Print" on Class Schedule, "Edit Dates"/"+ Add
-   Member"/"Print"/"Allergies/Medical"/"Resync"/"Archive" on Attendance,
-   and the same shared class everywhere else .roster-btn-row is used).
+   as randomly sized rather than a clean grid. A previous fix avoided that
+   by never wrapping at all (a single horizontally-scrollable row) - a
+   real bug report: that read as a slider/scrollbar the whole toolbar was
+   hidden behind. A fixed 2-column grid was tried next, but a toolbar with
+   more than 4 buttons (Attendance's Edit Dates/+Add Member/Print/
+   Allergies/Resync/Archive - 6) then spilled to 3+ rows instead of the
+   requested exactly 2. Every button (and .roster-btn-form, the same
+   toolbar slot as a <form> instead of a plain button) now always fills
+   its row's full width, split across exactly 2 rows regardless of count -
+   the column COUNT (how many buttons per row) is set inline by public/js/
+   roster-btn-row-grid.js as ceil(button count / 2), since pure CSS can't
+   compute "half of however many children this row has" - grid-auto-flow:
+   column would place items 1,3,5 on row 1, breaking reading order (see
+   that file's own comment for the full reasoning).
    Must come after .roster-btn-row/.roster-action-btn's own base
    (unscoped) rules above - equal-specificity selectors resolve by source
    order regardless of which one is inside a media query, so a copy
@@ -2515,21 +2522,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    further down. */
 @media (max-width: 640px) {
   .roster-btn-row {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 0.3rem;
+    display: grid;
+    grid-auto-flow: row;
+    justify-content: center;
+    gap: 0.4rem;
   }
   .roster-action-btn,
   .roster-btn-form {
-    flex: 0 0 auto;
-    width: auto;
+    width: 100%;
     min-width: 0;
   }
+  /* A toolbar action that's really a tiny <form method="POST"> (Resync,
+     Archive, ...) around its own .roster-action-btn button, not a plain
+     <button>, is still a .roster-btn-row grid item - display: contents
+     removes the form's own box from layout entirely so its button
+     becomes the actual grid cell (picking up the width: 100% above
+     directly) instead of an unstretched, content-sized box sitting
+     inside an invisible full-width form. */
+  .roster-btn-row > form {
+    display: contents;
+  }
   .roster-action-btn {
-    padding: 0.35rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.72rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
