@@ -26,33 +26,37 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
         </div>
         <table class="floater-card-table">
           <thead>
-            <tr><th>Member</th><th>Suggested Task</th></tr>
+            <tr><th>Member</th><th>Suggested Task 1</th><th>Suggested Task 2</th></tr>
           </thead>
           <tbody>
             <% if (team.members.length === 0) { %>
-              <tr><td colspan="2" class="roster-empty">No members yet.</td></tr>
+              <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% team.members.forEach(function(m) { %>
               <tr>
                 <td class="floater-card-position"><%= m.name %></td>
-                <td>
-                  <% if (isEditable) { %>
-                    <form method="POST" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task" class="inline-block-form">
-                      <input type="hidden" name="date" value="<%= selectedDate %>" />
-                      <select name="taskItemId" class="setup-task-select" onchange="this.form.requestSubmit()">
-                        <option value="">&mdash; No suggestion &mdash;</option>
-                        <% team.taskOptions.forEach(function(item) { %>
-                          <option value="<%= item.id %>" <%= m.taskItemId === item.id ? 'selected' : '' %>>#<%= item.number %> &mdash; <%= item.description %></option>
-                        <% }); %>
-                      </select>
-                    </form>
-                    <% if (team.taskOptions.length === 0) { %><p class="hint">No task list linked to this team yet.</p><% } %>
-                  <% } else if (m.taskDescription) { %>
-                    <%= m.taskDescription %>
-                  <% } else { %>
-                    <span class="floater-card-unassigned">No suggestion</span>
-                  <% } %>
-                </td>
+                <% [[1, m.taskItemId, m.taskDescription], [2, m.taskItemId2, m.taskDescription2]].forEach(function(slot) { %>
+                  <% var slotNum = slot[0], slotTaskItemId = slot[1], slotTaskDescription = slot[2]; %>
+                  <td>
+                    <% if (isEditable) { %>
+                      <form method="POST" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task" class="inline-block-form">
+                        <input type="hidden" name="date" value="<%= selectedDate %>" />
+                        <input type="hidden" name="slot" value="<%= slotNum %>" />
+                        <select name="taskItemId" class="setup-task-select" onchange="this.form.requestSubmit()">
+                          <option value="">&mdash; No suggestion &mdash;</option>
+                          <% team.taskOptions.forEach(function(item) { %>
+                            <option value="<%= item.id %>" <%= slotTaskItemId === item.id ? 'selected' : '' %>>#<%= item.number %> &mdash; <%= item.description %></option>
+                          <% }); %>
+                        </select>
+                      </form>
+                      <% if (slotNum === 1 && team.taskOptions.length === 0) { %><p class="hint">No task list linked to this team yet.</p><% } %>
+                    <% } else if (slotTaskDescription) { %>
+                      <%= slotTaskDescription %>
+                    <% } else { %>
+                      <span class="floater-card-unassigned">No suggestion</span>
+                    <% } %>
+                  </td>
+                <% }); %>
               </tr>
             <% }); %>
           </tbody>

@@ -1,0 +1,11 @@
+-- Real bug report: Setup/Cleanup Assignments only ever offered a single
+-- "Suggested Task" dropdown per member per date, but a small team
+-- routinely needs one member covering two jobs (e.g. Chairs AND Trash) -
+-- see setup_task_assignments' own original comment claiming "a member can
+-- only actually do one cleanup task at a time", which isn't actually true
+-- in practice. A second, independent slot rather than a join table/array
+-- column - the Assignments page always shows exactly two dropdowns per
+-- member (see partials/setup-assignment-cards.ejs), never a variable
+-- "add another" list, so a second nullable column mirrors that fixed
+-- shape directly instead of modeling a list nothing needs.
+alter table setup_task_assignments add column if not exists task_item_id_2 integer references task_list_items(id) on delete set null;

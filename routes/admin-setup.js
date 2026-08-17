@@ -178,9 +178,17 @@ async function assignmentCardsForDate(day, date) {
     title: t.title,
     taskOptions: t.taskSection ? t.taskSection.items : [],
     members: t.members.map((m) => {
-      const taskItemId = assignments[m.id] || null;
-      const taskItem = taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === taskItemId) : null;
-      return { id: m.id, taskItemId, name: m.name, taskDescription: taskItem ? taskItem.description : null };
+      const a = assignments[m.id] || {};
+      const taskItem = a.taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId) : null;
+      const taskItem2 = a.taskItemId2 && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId2) : null;
+      return {
+        id: m.id,
+        name: m.name,
+        taskItemId: a.taskItemId || null,
+        taskItemId2: a.taskItemId2 || null,
+        taskDescription: taskItem ? taskItem.description : null,
+        taskDescription2: taskItem2 ? taskItem2.description : null,
+      };
     }),
   }));
 }
@@ -226,8 +234,9 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
   const day = req.params.day;
   const memberId = parseInt(req.params.memberId, 10);
   const date = req.body.date;
+  const slot = req.body.slot === '2' ? 2 : 1;
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
-  if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, taskItemId);
+  if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, slot, taskItemId);
   res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
 });
 
@@ -236,12 +245,12 @@ router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async
   const date = req.query.date;
   const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date) : [];
 
-  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task'])];
+  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2'])];
   cards.forEach((t) => {
     if (t.members.length === 0) {
-      lines.push(toCsvRow([t.title, '', '']));
+      lines.push(toCsvRow([t.title, '', '', '']));
     } else {
-      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || ''])));
+      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || '', m.taskDescription2 || ''])));
     }
   });
 
@@ -293,12 +302,12 @@ router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireDay, asy
   if (!dates.includes(date)) return res.status(404).send('Not found');
 
   const cards = await assignmentCardsForDate(day, date);
-  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task'])];
+  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task 1', 'Suggested Task 2'])];
   cards.forEach((t) => {
     if (t.members.length === 0) {
-      lines.push(toCsvRow([t.title, '', '']));
+      lines.push(toCsvRow([t.title, '', '', '']));
     } else {
-      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || ''])));
+      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || '', m.taskDescription2 || ''])));
     }
   });
   sendCsv(res, `${day}-setup-cleanup-assignments-${date}.csv`, lines);

@@ -121,6 +121,72 @@ test('Setup/Cleanup Assignments', async (t) => {
     assert.match(res.text, /Wipe down counters/);
   });
 
+  await t.test('a member can be given a SECOND, independent suggested task without disturbing the first', async () => {
+    const item2 = await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 1)').run(section.lastInsertRowid, 'Take out trash');
+
+    // Re-set slot 1 (cleared by the previous test) so both slots are live at once.
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '1', taskItemId: String(item.lastInsertRowid), _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '2', taskItemId: String(item2.lastInsertRowid), _csrf: csrfToken });
+
+    const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, '2026-08-24');
+    assert.equal(row.task_item_id, item.lastInsertRowid, 'slot 1 should be untouched by setting slot 2');
+    assert.equal(row.task_item_id_2, item2.lastInsertRowid);
+
+    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-08-24').set('Cookie', cookie);
+    assert.match(page.text, /#1 &mdash; Wipe down counters/);
+    assert.match(page.text, /#2 &mdash; Take out trash/);
+
+    // Clearing slot 1 only nulls that column - the row survives because
+    // slot 2 still has a real suggestion.
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '1', taskItemId: '', _csrf: csrfToken });
+    const afterClearingOne = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, '2026-08-24');
+    assert.ok(afterClearingOne, 'the row should survive - slot 2 still has a suggestion');
+    assert.equal(afterClearingOne.task_item_id, null);
+    assert.equal(afterClearingOne.task_item_id_2, item2.lastInsertRowid);
+
+    // Clearing the LAST remaining slot deletes the row outright, same
+    // contract as the single-slot case above.
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '2', taskItemId: '', _csrf: csrfToken });
+    const afterClearingBoth = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, '2026-08-24');
+    assert.equal(afterClearingBoth, undefined, 'clearing the last remaining slot should delete the row');
+  });
+
+  await t.test('export.csv includes both suggested-task columns', async () => {
+    const item2 = await db.prepare("SELECT id FROM task_list_items WHERE description = 'Take out trash'").get();
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '1', taskItemId: String(item.lastInsertRowid), _csrf: csrfToken });
+    await request(app)
+      .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ date: '2026-08-24', slot: '2', taskItemId: String(item2.id), _csrf: csrfToken });
+
+    const res = await request(app).get('/admin/setup/monday/assignments/export.csv?date=2026-08-24').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /"Suggested Task 1","Suggested Task 2"/);
+    assert.match(res.text, /Wipe down counters/);
+    assert.match(res.text, /Take out trash/);
+  });
+
   await t.test('removing a date deletes its task assignments too (cascade)', async () => {
     let row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND session_date = ?').get('monday', '2026-08-24');
     assert.ok(row, 'sanity check: assignment should exist before removal');
