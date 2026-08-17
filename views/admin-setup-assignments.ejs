@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Assignments</p>
+      </div>
+    </div>
+
+    <h1>Setup/Cleanup</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'assignments' }) %>
+
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="roster-toolbar-left">
+          <div class="day-toggle">
+            <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/assignments">Monday</a>
+            <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/assignments">Wednesday</a>
+          </div>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+          <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/assignments/export.csv<%= selectedDate ? '?date=' + selectedDate : '' %>">Export</a>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive">Archive</a>
+        </div>
+      </div>
+
+      <div class="roster-toolbar no-print">
+        <div class="category-filter" style="margin: 0;">
+          <label for="assignments-date-select">Choose Date</label>
+          <select id="assignments-date-select" onchange="window.location = '/admin/setup/<%= day %>/assignments' + (this.value ? '?date=' + this.value : '')">
+            <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
+            <% upcomingDates.forEach(function(d) { %>
+              <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <% if (dates.length === 0) { %>
+        <p class="roster-empty">Add session dates above first.</p>
+      <% } else if (!selectedDate) { %>
+        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive">Archive</a> tab.</p>
+      <% } else { %>
+        <%- include('partials/setup-assignment-cards', { cards, day, selectedDate, editable: true }) %>
+      <% } %>
+    </div>
+
+    <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
+      <h3>Edit Session Dates</h3>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <tbody>
+            <% if (dates.length === 0) { %>
+              <tr><td class="roster-empty">No dates yet.</td></tr>
+            <% } %>
+            <% dates.forEach(function(d) { %>
+              <tr>
+                <td><%= d.label %></td>
+                <td class="actions-cell">
+                  <form method="POST" action="/admin/setup/<%= day %>/dates/<%= d.date %>/remove" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any task suggestions for it will be deleted too.">
+                    <button type="submit" class="link-btn link-btn-danger">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <form method="POST" action="/admin/setup/<%= day %>/dates/add" class="volunteer-date-add-form">
+        <input type="date" name="dates" onchange="if (this.value) this.form.requestSubmit();" />
+      </form>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
+  </main>
+</body>
+</html>

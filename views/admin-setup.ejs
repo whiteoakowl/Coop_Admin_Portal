@@ -23,20 +23,20 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="view-tabs no-print">
-      <a class="view-tab<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/manage">Monday Teams</a>
-      <a class="view-tab<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/manage">Wednesday Teams</a>
-      <a class="view-tab" href="/admin/setup/<%= day %>/tasks">Task List</a>
-    </div>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'teams' }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">
-        <div></div>
+        <div class="day-toggle">
+          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/manage">Monday</a>
+          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/manage">Wednesday</a>
+        </div>
         <div class="roster-btn-row">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
           <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive">Archive</a>
         </div>
       </div>
 

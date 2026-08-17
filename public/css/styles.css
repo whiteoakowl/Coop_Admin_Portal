@@ -3707,6 +3707,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
 .medical-flag .icon { width: 0.95em; height: 0.95em; }
 .team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
+/* Setup/Cleanup Assignments' per-member task-suggestion dropdown
+   (partials/setup-assignment-cards.ejs) - same auto-submit-on-change
+   pattern as .team-member-rank-select above, but needs real width since
+   its options are full task descriptions ("#3 — Wipe down tables"), not
+   a short rank word. */
+.setup-task-select { font-size: 0.78rem; padding: 0.25rem 0.4rem; width: 100%; max-width: 100%; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
 .grid-box {

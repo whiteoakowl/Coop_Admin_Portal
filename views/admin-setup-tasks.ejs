@@ -19,11 +19,7 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="view-tabs no-print">
-      <a class="view-tab" href="/admin/setup/monday/manage">Monday Teams</a>
-      <a class="view-tab" href="/admin/setup/wednesday/manage">Wednesday Teams</a>
-      <a class="view-tab active" href="/admin/setup/<%= day %>/tasks">Task List</a>
-    </div>
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'tasks' }) %>
 
     <div class="view-tab-panel">
       <div class="roster-toolbar no-print">

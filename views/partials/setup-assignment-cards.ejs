@@ -1,0 +1,67 @@
+<%
+// One card per Setup/Cleanup team, listing its members and (editable
+// mode only) a dropdown suggesting which of that team's own linked task
+// list items each one should do - mirrors partials/floater-assignment-
+// cards.ejs's per-hour card look, just per-team instead. Shared by the
+// live Assignments page (editable, day+date passed for the auto-
+// submitting form action) and the read-only Archive fragment/print for a
+// past date (editable=false, plain text instead of a dropdown - matches
+// floater-assignment-cards.ejs's own "reassigning happens on the live
+// tab, not here" rule).
+// Locals: cards (routes/admin-setup.js's assignmentCardsForDate), day,
+// selectedDate, editable (defaults true).
+var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
+var isEditable = typeof editable === 'undefined' ? true : editable;
+%>
+<% if (cards.length === 0) { %>
+  <p class="roster-empty">No teams yet &mdash; create one on the Setup/Cleanup Teams tab.</p>
+<% } else { %>
+  <div class="floater-cards-grid">
+    <% cards.forEach(function(team, idx) { %>
+      <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <div class="floater-card floater-card-<%= accent %>">
+        <div class="floater-card-header">
+          <span class="floater-card-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+          <h3><%= team.title %></h3>
+        </div>
+        <table class="floater-card-table">
+          <thead>
+            <tr><th>Member</th><th>Suggested Task</th></tr>
+          </thead>
+          <tbody>
+            <% if (team.members.length === 0) { %>
+              <tr><td colspan="2" class="roster-empty">No members yet.</td></tr>
+            <% } %>
+            <% team.members.forEach(function(m) { %>
+              <tr>
+                <td class="floater-card-position"><%= m.name %></td>
+                <td>
+                  <% if (isEditable) { %>
+                    <form method="POST" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task" class="inline-block-form">
+                      <input type="hidden" name="date" value="<%= selectedDate %>" />
+                      <select name="taskItemId" class="setup-task-select" onchange="this.form.requestSubmit()">
+                        <option value="">&mdash; No suggestion &mdash;</option>
+                        <% team.taskOptions.forEach(function(item) { %>
+                          <option value="<%= item.id %>" <%= m.taskItemId === item.id ? 'selected' : '' %>>#<%= item.number %> &mdash; <%= item.description %></option>
+                        <% }); %>
+                      </select>
+                    </form>
+                    <% if (team.taskOptions.length === 0) { %><p class="hint">No task list linked to this team yet.</p><% } %>
+                  <% } else if (m.taskDescription) { %>
+                    <%= m.taskDescription %>
+                  <% } else { %>
+                    <span class="floater-card-unassigned">No suggestion</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <div class="floater-card-footer">
+          <svg class="icon"><use href="#icon-users"/></svg>
+          <%= team.members.length %> Member<%= team.members.length === 1 ? '' : 's' %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } %>

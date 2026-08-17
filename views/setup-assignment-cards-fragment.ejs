@@ -1,0 +1,17 @@
+<%# Fragment (no <html>/<head>/<body>) - fetched by public/js/setup-archive-view.js
+    and injected into the Archive list page's shared #setup-archive-view-dialog.
+    Mirrors views/volunteer-archive-view-fragment.ejs. Locals: day, dayLabel,
+    date, dateLabel, cards. %>
+<div class="member-view-close-row volunteer-archive-actions-row">
+  <div class="volunteer-archive-actions">
+    <a class="roster-action-btn file-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/export.csv">Export</a>
+    <a class="roster-action-btn print-action-btn condensed-btn" href="/admin/setup/<%= day %>/archive/<%= date %>/print" target="_blank">Print</a>
+  </div>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+<div class="volunteer-archive-view-header">
+  <h2><%= dayLabel %> Setup/Cleanup Assignments</h2>
+  <p class="hint"><%= dateLabel %></p>
+</div>
+
+<%- include('partials/setup-assignment-cards', { cards, day, selectedDate: date, editable: false }) %>

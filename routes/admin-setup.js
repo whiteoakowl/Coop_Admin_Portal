@@ -4,8 +4,20 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { DAY_LABELS, defaultDay, requireDay, defaultDateFor, parseDayValue } = require('../utils/days');
+const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
-const { teamsForDay, membersForTeam, setTeamLeader, updateTeam } = require('../utils/setup');
+const {
+  teamsForDay,
+  membersForTeam,
+  setTeamLeader,
+  updateTeam,
+  datesForDay,
+  addSetupDates,
+  removeSetupDate,
+  taskAssignmentsForDate,
+  setTaskAssignment,
+  splitDatesByToday,
+} = require('../utils/setup');
 const {
   taskListSectionsForDay,
   getSection,
@@ -25,9 +37,10 @@ const { spreadsheetFileFilter } = require('../utils/uploads');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 
-// The landing page now lives on the combined Volunteers page, tabbed
-// between Floater Assignments and Setup/Cleanup Teams.
-router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${defaultDay()}/manage`));
+// Lands on Assignments first, same as Floater Assignments' own /volunteers
+// redirect - Assignments is the first of the 4 Setup/Cleanup tabs now
+// (see partials/setup-tabs.ejs), not Teams.
+router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${defaultDay()}/assignments`));
 
 // --- Manage page: create/edit/delete teams, add/remove members per team ---
 
@@ -143,6 +156,168 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) 
   }
 
   sendCsv(res, `${day}-setup-cleanup-teams.csv`, lines);
+});
+
+// --- Assignments tab: date-scoped, unlike the standing Teams roster
+// above - an admin picks a session date and suggests which task (from
+// that team's own linked task list) each member should do that day.
+// Mirrors Floater Assignments' manage/dates/archive shape (see
+// routes/admin-volunteers.js), just simpler - no hours/positions/rooms,
+// one flat per-member suggestion instead. ---
+
+// One card per team for a given date - each member's currently-suggested
+// task (if any) plus the list of tasks their team's own linked task list
+// offers, i.e. what the suggestion dropdown's own options are. Shared by
+// the live Assignments page (editable) and the read-only Archive view/
+// print/export for a past date - same data, just rendered differently.
+async function assignmentCardsForDate(day, date) {
+  const teams = await teamsWithMembers(day);
+  const assignments = date ? await taskAssignmentsForDate(day, date) : {};
+  return teams.map((t) => ({
+    id: t.id,
+    title: t.title,
+    taskOptions: t.taskSection ? t.taskSection.items : [],
+    members: t.members.map((m) => {
+      const taskItemId = assignments[m.id] || null;
+      const taskItem = taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === taskItemId) : null;
+      return { id: m.id, taskItemId, name: m.name, taskDescription: taskItem ? taskItem.description : null };
+    }),
+  }));
+}
+
+router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const dates = await datesForDay(day);
+  const { upcoming } = splitDatesByToday(dates);
+  const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
+
+  res.render('admin-setup-assignments', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Assignments`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    dates: dates.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    upcomingDates: upcoming.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    selectedDate,
+    cards: selectedDate ? await assignmentCardsForDate(day, selectedDate) : [],
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/setup/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
+  await addSetupDates(day, dates);
+  res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
+});
+
+router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  await removeSetupDate(day, date);
+  res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
+});
+
+// The suggestion dropdown auto-submits on change (onchange="this.form.
+// requestSubmit()", same pattern as a Floater Teams rank select) -
+// redirects back to whichever date was open, not always the earliest
+// upcoming one.
+router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const memberId = parseInt(req.params.memberId, 10);
+  const date = req.body.date;
+  const taskItemId = parseInt(req.body.taskItemId, 10) || null;
+  if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, taskItemId);
+  res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
+});
+
+router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.query.date;
+  const cards = date && isValidISODate(date) ? await assignmentCardsForDate(day, date) : [];
+
+  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task'])];
+  cards.forEach((t) => {
+    if (t.members.length === 0) {
+      lines.push(toCsvRow([t.title, '', '']));
+    } else {
+      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || ''])));
+    }
+  });
+
+  sendCsv(res, `${day}-setup-cleanup-assignments${date ? '-' + date : ''}.csv`, lines);
+});
+
+// --- Archive: read-only past dates, same "still-live, just filtered to
+// dates before today" pattern as Floater Assignments' own archive (no
+// snapshot-and-clear step - unlike the Attendance roster archive, there's
+// nothing to clear since a past date's assignments were never in the way
+// of a future one to begin with). ---
+
+router.get('/setup/:day/archive', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const dates = await datesForDay(day);
+  const { past } = splitDatesByToday(dates);
+  const pastSorted = [...past].sort().reverse();
+  const dateFilter = pastSorted.includes(req.query.date) ? req.query.date : null;
+
+  res.render('admin-setup-archive', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Archive`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    dateOptions: pastSorted.map((d) => ({ date: d, label: formatDateLabel(d) })),
+    dateFilter,
+    rows: (dateFilter ? [dateFilter] : pastSorted).map((d) => ({ date: d, label: formatDateLabel(d) })),
+  });
+});
+
+router.get('/setup/:day/archive/:date/view-fragment', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  const dates = await datesForDay(day);
+  if (!dates.includes(date)) return res.status(404).send('Not found');
+
+  res.render('setup-assignment-cards-fragment', {
+    day,
+    dayLabel: DAY_LABELS[day],
+    date,
+    dateLabel: formatDateLabel(date),
+    cards: await assignmentCardsForDate(day, date),
+  });
+});
+
+router.get('/setup/:day/archive/:date/export.csv', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  const dates = await datesForDay(day);
+  if (!dates.includes(date)) return res.status(404).send('Not found');
+
+  const cards = await assignmentCardsForDate(day, date);
+  const lines = [toCsvRow(['Team', 'Member', 'Suggested Task'])];
+  cards.forEach((t) => {
+    if (t.members.length === 0) {
+      lines.push(toCsvRow([t.title, '', '']));
+    } else {
+      t.members.forEach((m) => lines.push(toCsvRow([t.title, m.name, m.taskDescription || ''])));
+    }
+  });
+  sendCsv(res, `${day}-setup-cleanup-assignments-${date}.csv`, lines);
+});
+
+router.get('/setup/:day/archive/:date/print', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.params.date;
+  const dates = await datesForDay(day);
+  if (!dates.includes(date)) return res.status(404).send('Not found');
+
+  res.render('admin-setup-archive-print', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Assignments — ${formatDateLabel(date)}`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    date,
+    dateLabel: formatDateLabel(date),
+    cards: await assignmentCardsForDate(day, date),
+  });
 });
 
 // --- Task List tab: stacked numbered task lists, optionally each tied

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Archive</p>
+      </div>
+    </div>
+
+    <h1>Setup/Cleanup</h1>
+
+    <%- include('partials/setup-tabs', { day, activeSetupTab: 'archive' }) %>
+
+    <div class="view-tab-panel">
+      <div class="roster-toolbar no-print">
+        <div class="day-toggle">
+          <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/archive">Monday</a>
+          <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/archive">Wednesday</a>
+        </div>
+        <div class="category-filter" style="margin: 0;">
+          <label for="setup-archive-date-select">Choose Date</label>
+          <select id="setup-archive-date-select" onchange="window.location = '/admin/setup/<%= day %>/archive' + (this.value ? '?date=' + this.value : '')">
+            <option value="">All dates</option>
+            <% dateOptions.forEach(function(d) { %>
+              <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <% if (rows.length === 0) { %>
+              <tr><td class="roster-empty">No archived dates<%= dateFilter ? ' for this date' : ' yet' %> - a date moves here automatically once it's passed.</td></tr>
+            <% } %>
+            <% rows.forEach(function(r) { %>
+              <tr>
+                <td><button type="button" class="member-name-link" data-view-setup-archive-date="<%= r.date %>"><%= r.label %></button></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <dialog id="setup-archive-view-dialog" class="volunteer-archive-view-dialog"></dialog>
+  </main>
+  <script src="/js/fragment-dialog.js"></script>
+  <script src="/js/setup-archive-view.js"></script>
+</body>
+</html>

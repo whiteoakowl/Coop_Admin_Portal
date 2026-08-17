@@ -31,7 +31,29 @@ const { PGlite } = require('@electric-sql/pglite');
 const { createPgDb, createPgliteDb } = require('./postgres');
 const { seedIfMissing, backfillNameTagLogo, backfillTaskItemBarcodes } = require('./bootstrapPg');
 
-const SCHEMA_PATH = path.join(__dirname, '..', 'supabase', 'migrations', '20260811035644_initial_schema.sql');
+const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
+
+// Every *.sql file in the migrations directory, in filename order - the
+// timestamp prefix Supabase's own CLI generates (YYYYMMDDHHMMSS_name.sql)
+// already sorts correctly as plain strings, so this applies them in the
+// same order a real `supabase db push` would. Started as a single
+// hardcoded SCHEMA_PATH pointing only at the initial migration, back when
+// that was the only file that existed; a real second migration (adding a
+// table after the initial cutover) would have silently never applied to
+// local dev or the test suite under that scheme, so this generalized to
+// "apply the whole directory" the moment a second file was added. This is
+// PGlite-only (see below) - a real Supabase project applies its own
+// migrations independently (see MIGRATION.md's note on running each new
+// migration file in the Supabase SQL Editor, or the GitHub integration's
+// auto-apply, until/unless that's automated further).
+function allMigrationSql() {
+  return fs
+    .readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8'))
+    .join('\n');
+}
 
 let db;
 let schemaReady;
@@ -55,8 +77,7 @@ if (process.env.DATABASE_URL) {
   // persists to a fixed directory so data survives a restart.
   const pglite = process.env.DB_PATH ? new PGlite() : new PGlite(path.join(__dirname, '..', 'data', 'pglite'));
   schemaReady = (async () => {
-    const schemaSql = fs.readFileSync(SCHEMA_PATH, 'utf8');
-    await pglite.exec(schemaSql);
+    await pglite.exec(allMigrationSql());
   })();
   db = createPgliteDb(pglite, schemaReady);
 }

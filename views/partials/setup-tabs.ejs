@@ -1,0 +1,14 @@
+<%
+// locals: day, activeSetupTab ('assignments' | 'teams' | 'tasks' | 'archive')
+// Mirrors partials/floater-tabs.ejs's shape exactly - one shared "Setup/
+// Cleanup" tab set across 4 pages, Monday/Wednesday picked via each
+// page's own day-toggle rather than as separate top-level tabs (that's
+// what these used to be - see admin-setup.ejs/admin-setup-tasks.ejs's
+// git history - before this partial existed).
+%>
+<div class="view-tabs no-print">
+  <a class="view-tab<%= activeSetupTab === 'assignments' ? ' active' : '' %>" href="/admin/setup/<%= day %>/assignments">Setup/Cleanup Assignments</a>
+  <a class="view-tab<%= activeSetupTab === 'teams' ? ' active' : '' %>" href="/admin/setup/<%= day %>/manage">Setup/Cleanup Teams</a>
+  <a class="view-tab<%= activeSetupTab === 'tasks' ? ' active' : '' %>" href="/admin/setup/<%= day %>/tasks">Task List</a>
+  <a class="view-tab<%= activeSetupTab === 'archive' ? ' active' : '' %>" href="/admin/setup/<%= day %>/archive">Archive</a>
+</div>
