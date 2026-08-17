@@ -164,22 +164,42 @@
     return Math.max(minFontSize, Math.round(scaled * 10) / 10);
   }
 
+  // A bound field's value is normally a plain string (one line). The one
+  // exception is a field like setupCleanupDays (utils/nameTagData.js's
+  // setupCleanupJobLabels) that hands back an ARRAY of lines - a real
+  // request: a parent's Monday and Wednesday setup/cleanup jobs should
+  // "share a text space" (one shared element/box) instead of sitting as
+  // two separately-positioned elements, while still reading as two
+  // distinct, individually labeled lines rather than being smashed onto
+  // one. renderTextEl below treats every field uniformly as "however many
+  // lines it hands back" (1 for everything else, 2 here) rather than
+  // having a separate code path just for this one field.
+  function textLines(el, data) {
+    var value = el.field === 'custom' ? (el.text || '') : (data && data[el.field]);
+    if (Array.isArray(value)) return value.length ? value : [''];
+    return [value || ''];
+  }
+
   function renderTextEl(el, data) {
-    var raw = el.field === 'custom' ? (el.text || '') : ((data && data[el.field]) || '');
-    var value = esc(raw);
+    var lines = textLines(el, data);
+    var multiline = lines.length > 1;
     var valign = VALIGN_FLEX[el.valign] || 'center';
     var align = el.align || 'center';
     var deco = [];
     if (el.underline) deco.push('underline');
     if (el.strikethrough) deco.push('line-through');
     var fontFamily = el.fontFamily ? "'" + String(el.fontFamily).replace(/'/g, '') + "', sans-serif" : 'inherit';
-    var style = elementBaseStyle(el) + ' display:flex; align-items:' + valign + '; font-family:' + fontFamily + ';';
+    // A single-line field centers itself vertically within the box
+    // (align-items on the flex row); a multi-line field instead stacks
+    // its lines top-to-bottom (flex-direction:column) and centers/aligns
+    // that whole stack, same valign meaning either way.
+    var style = elementBaseStyle(el) + ' display:flex; font-family:' + fontFamily + ';' +
+      (multiline ? ' flex-direction:column; justify-content:' + valign + ';' : ' align-items:' + valign + ';');
     // Auto-shrink is opt-in per element (autoFitText) - a name/phone
     // field wants a single balanced line that always fits the template's
     // box; a longer free-text field (Class Description, etc.) still
     // wraps normally instead of shrinking down to near-nothing.
     var autoFit = !!el.autoFitText;
-    var fontSize = autoFit ? fitFontSize(raw, el) : num(el.fontSize, 14);
     // autoFitText's whole point is "stay on one line, never clip" - a
     // wrapped second line would just get cut off by this element's own
     // overflow:hidden (see public/css/styles.css's .badge-el-text) since
@@ -194,25 +214,33 @@
     var wrapStyle = autoFit
       ? ' white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'
       : ' overflow-wrap: break-word;';
-    var spanStyle =
-      'display:block; width:100%; font-size:' + fontSize + 'px; color:' + (el.color || '#1c2530') + ';' +
-      ' font-weight:' + (el.bold ? 700 : 400) + ';' +
-      ' font-style:' + (el.italic ? 'italic' : 'normal') + ';' +
-      ' text-decoration:' + (deco.length ? deco.join(' ') : 'none') + ';' +
-      ' letter-spacing:' + num(el.letterSpacing, 0) + 'px;' +
-      ' line-height:' + num(el.lineHeight, 1.15) + ';' +
-      ' text-align:' + align + ';' +
-      ' text-transform:' + (el.textCase || 'none') + ';' +
-      wrapStyle;
-    // badge-autofit.js's real-measurement pass needs to know the fontSize
-    // fitFontSize actually settled on (its own search starts from there,
-    // shrinking further only if still too wide) - reading it back off the
-    // rendered font-size style itself isn't reliable once that pass has
-    // already run once (see badge-autofit.js's own comment on why a
-    // React-less el.style.fontSize = '' reset falls back to nothing
-    // useful here, unlike a plain CSS class default).
-    var autoFitAttr = autoFit ? ' data-autofit="1" data-base-font-size="' + fontSize + '"' : '';
-    return '<div class="badge-el badge-el-text" data-id="' + esc(el.id) + '" data-type="text"' + autoFitAttr + ' style="' + style + '"><span class="badge-el-text-inner" style="' + spanStyle + '">' + value + '</span></div>';
+    var spans = lines.map(function (lineText) {
+      var fontSize = autoFit ? fitFontSize(lineText, el) : num(el.fontSize, 14);
+      var spanStyle =
+        'display:block; width:100%; font-size:' + fontSize + 'px; color:' + (el.color || '#1c2530') + ';' +
+        ' font-weight:' + (el.bold ? 700 : 400) + ';' +
+        ' font-style:' + (el.italic ? 'italic' : 'normal') + ';' +
+        ' text-decoration:' + (deco.length ? deco.join(' ') : 'none') + ';' +
+        ' letter-spacing:' + num(el.letterSpacing, 0) + 'px;' +
+        ' line-height:' + num(el.lineHeight, 1.15) + ';' +
+        ' text-align:' + align + ';' +
+        ' text-transform:' + (el.textCase || 'none') + ';' +
+        wrapStyle;
+      // badge-autofit.js's real-measurement pass needs to know the
+      // fontSize fitFontSize actually settled on for THIS line (its own
+      // search starts from there, shrinking further only if still too
+      // wide) - stamped per-span (not per-box) so a multi-line field's two
+      // lines, which can each need a different amount of shrinking, are
+      // corrected independently rather than sharing one value.
+      var lineAttr = autoFit ? ' data-base-font-size="' + fontSize + '"' : '';
+      return '<span class="badge-el-text-inner"' + lineAttr + ' style="' + spanStyle + '">' + esc(lineText) + '</span>';
+    });
+    // data-autofit="1" stays on the outer box (badge-autofit.js's own
+    // document.querySelectorAll('[data-autofit="1"]') entry point finds
+    // boxes, then shrinks every .badge-el-text-inner line inside - see
+    // that file's own comment).
+    var autoFitAttr = autoFit ? ' data-autofit="1"' : '';
+    return '<div class="badge-el badge-el-text" data-id="' + esc(el.id) + '" data-type="text"' + autoFitAttr + ' style="' + style + '">' + spans.join('') + '</div>';
   }
 
   function renderShapeEl(el) {

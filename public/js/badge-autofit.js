@@ -68,10 +68,18 @@
     return width;
   }
 
-  function shrinkToFit(box) {
-    var inner = box.querySelector('.badge-el-text-inner');
-    if (!inner) return;
-    var baseFontSize = parseFloat(box.dataset.baseFontSize);
+  // A box normally has exactly one .badge-el-text-inner line, but a
+  // multi-line field (name-tag-render-core.js's renderTextEl - currently
+  // just the combined Monday/Wednesday setup-cleanup job field, which
+  // shares one box between two independently-labeled lines rather than
+  // using two separate positioned elements) can have more than one, each
+  // stamped with its OWN data-base-font-size since two lines of different
+  // lengths can each need a different amount of shrinking. Shrinking each
+  // independently (rather than the box as a whole) is what actually keeps
+  // both lines legible instead of the longer one dragging the shorter
+  // one's font size down with it for no reason.
+  function shrinkLineToFit(box, inner) {
+    var baseFontSize = parseFloat(inner.dataset.baseFontSize);
     if (isNaN(baseFontSize)) baseFontSize = parseFloat(getComputedStyle(inner).fontSize);
     var fontSize = baseFontSize;
     inner.style.fontSize = fontSize + 'px';
@@ -88,6 +96,11 @@
       fontSize -= STEP_PX;
       inner.style.fontSize = fontSize + 'px';
     }
+  }
+
+  function shrinkToFit(box) {
+    var inners = box.querySelectorAll('.badge-el-text-inner');
+    for (var i = 0; i < inners.length; i++) shrinkLineToFit(box, inners[i]);
   }
 
   function runBadgeAutoFit(root) {

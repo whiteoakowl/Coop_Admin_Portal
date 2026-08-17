@@ -27,8 +27,16 @@ const FIELDS_BY_TYPE = {
   parent: [
     { field: 'name', label: 'Name' },
     { field: 'cleanupTeam', label: 'Cleanup Team (Both Days)' },
-    { field: 'mondaySetupCleanup', label: 'Monday Setup/Cleanup Job' },
-    { field: 'wednesdaySetupCleanup', label: 'Wednesday Setup/Cleanup Job' },
+    // One shared field/element for both days (utils/nameTagData.js's
+    // setupCleanupJobLabels hands back the two lines as an array) - a
+    // real request: Monday's and Wednesday's jobs should "share a text
+    // space" instead of being two separately-positioned elements. The old
+    // mondaySetupCleanup/wednesdaySetupCleanup fields still render fine
+    // (badgeDataForMember/badgeDataForMembers still populate them) for any
+    // already-saved layout that references them directly, but aren't
+    // offered here anymore so a fresh "Add Element" always gets the
+    // shared shape.
+    { field: 'setupCleanupDays', label: 'Monday & Wednesday Setup/Cleanup Jobs' },
     { field: 'memberCode', label: 'Member ID' },
   ],
   setupCleanup: [
@@ -85,7 +93,12 @@ const DEFAULT_LAYOUTS = {
       { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 148, y: 4, width: 40, height: 40 },
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 50, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 70, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
-      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 100, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      // A real bug report: a longer grade_level value ("Kindergarten",
+      // once badgeDataForMember started appending "Grade" to the ordinal
+      // ones too - see utils/nameTagData.js's gradeLevelLabel) could clip
+      // the same way an unshrunk long name used to - same autoFitText
+      // treatment as name above.
+      { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 100, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'barcode', type: 'barcode', x: 68, y: 154, width: 200, height: 55 },
     ],
   },
@@ -98,14 +111,15 @@ const DEFAULT_LAYOUTS = {
       // "both days smashed into one line" cleanupTeam field below) needs
       // to be the first thing on the badge - front-and-center, above even
       // the logo/name, so it's the first thing anyone (the parent
-      // themselves, or whoever's checking) sees. mondaySetupCleanup/
-      // wednesdaySetupCleanup (utils/nameTagData.js) already come back
-      // pre-labeled ("Monday: Chairs & Tables" / "Wednesday: —") - see
-      // that file's own comment on why the label is baked into the
-      // string rather than a separate static text element, matching
-      // primaryParentPhone's own convention.
-      { id: 'monday-job', type: 'text', field: 'mondaySetupCleanup', x: 8, y: 4, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
-      { id: 'wednesday-job', type: 'text', field: 'wednesdaySetupCleanup', x: 8, y: 20, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      // themselves, or whoever's checking) sees. Both days now share ONE
+      // element/text space (setupCleanupDays - utils/nameTagData.js's
+      // setupCleanupJobLabels hands back the two pre-labeled lines,
+      // "Monday: Chairs & Tables" / "Wednesday: —", as an array) instead
+      // of two separately-positioned elements - name-tag-render-core.js's
+      // renderTextEl stacks an array field's lines top-to-bottom within
+      // the one box, each still individually labeled and individually
+      // shrunk to fit (see public/js/badge-autofit.js's shrinkToFit).
+      { id: 'setup-cleanup-days', type: 'text', field: 'setupCleanupDays', x: 8, y: 4, width: 320, height: 32, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
       { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 38, width: 32, height: 32 },
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 74, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 92, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },

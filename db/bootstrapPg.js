@@ -154,10 +154,16 @@ async function backfillNameTagLogo(db) {
 // flag from a fresh DEFAULT_LAYOUTS swap either) kept clipping a longer
 // name ("Carson Bell") instead of shrinking it to fit, on both the design
 // editor and the actual printed tag, since both render through the same
-// shared core. Every OTHER text field (grade, allergies, cleanup team,
-// custom text, ...) is left exactly as saved - shrink-to-fit only ever
-// made sense as the default for the one field every name tag actually
-// needs to stay legible regardless of how long a person's name is.
+// shared core. Also covers gradeLevel for the same reason - a real
+// follow-up request, since a long grade_level value (utils/nameTagData.js's
+// gradeLevelLabel appends "Grade" to every ordinal grade, e.g.
+// "Kindergarten" or "12th Grade") can clip exactly the same way an
+// unshrunk long name used to. Every OTHER text field (allergies, cleanup
+// team, custom text, ...) is left exactly as saved - shrink-to-fit only
+// ever made sense as the default for fields whose length genuinely varies
+// member to member.
+const AUTOFIT_BACKFILL_FIELDS = ['name', 'gradeLevel'];
+
 async function backfillNameTagAutoFit(db) {
   const rows = await db.prepare('SELECT member_type, layout_json FROM name_tag_templates').all();
   for (const row of rows) {
@@ -171,7 +177,7 @@ async function backfillNameTagAutoFit(db) {
 
     let changed = false;
     const elements = layout.elements.map((el) => {
-      if (el.type === 'text' && el.field === 'name' && !el.autoFitText) {
+      if (el.type === 'text' && AUTOFIT_BACKFILL_FIELDS.includes(el.field) && !el.autoFitText) {
         changed = true;
         return { ...el, autoFitText: true };
       }
@@ -181,6 +187,46 @@ async function backfillNameTagAutoFit(db) {
 
     await db.prepare('UPDATE name_tag_templates SET layout_json = ? WHERE member_type = ?').run(JSON.stringify({ ...layout, elements }), row.member_type);
   }
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// 'parent' name_tag_templates row, converting the OLD two-separate-
+// element Monday/Wednesday setup-cleanup layout (monday-job +
+// wednesday-job, added by backfillParentSetupCleanupDays below) into ONE
+// shared element bound to setupCleanupDays - a real follow-up request:
+// the two lines should "share a text space" rather than sit as two
+// disconnected boxes. Only fires when the old fields are present and the
+// new merged field isn't yet (so an install already migrated, or one
+// where an admin deliberately customized the layout away from either
+// shape, is left alone) - replaces just those two elements, in place at
+// the position of whichever is found first, leaving every other
+// customization (logo position, memberCode styling, ...) untouched. Runs
+// after backfillParentSetupCleanupDays in db/index.js's db.ready chain,
+// so by the time this fires every parent template already has at least
+// the old two-element shape to migrate from (either it always did, or
+// that backfill just added it).
+async function backfillParentSetupCleanupMerge(db) {
+  const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'setupCleanupDays')) return;
+
+  const oldIndex = layout.elements.findIndex((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup');
+  if (oldIndex === -1) return;
+
+  const merged = DEFAULT_LAYOUTS.parent.elements.find((el) => el.field === 'setupCleanupDays');
+  if (!merged) return;
+
+  const elements = layout.elements.filter((el) => el.field !== 'mondaySetupCleanup' && el.field !== 'wednesdaySetupCleanup');
+  elements.splice(oldIndex, 0, { ...merged });
+
+  await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
@@ -251,6 +297,53 @@ async function backfillScheduleCardAllergy(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// schedule_card_templates row, saved before autoFitText existed on its
+// allergy/phone fields (utils/scheduleCardBadge.js's own DEFAULT_LAYOUT) -
+// same class of bug as backfillNameTagAutoFit above: a row created by
+// backfillScheduleCardAllergy itself (or seeded fresh) before that flag
+// was added to the default never picks it up again on its own, so a
+// longer allergy note ("Peanut, tree nut, and dairy allergy") could clip
+// on the printed Schedule Card instead of shrinking to fit. Every OTHER
+// element (the day tables, their labels, ...) is left exactly as saved.
+const SCHEDULE_CARD_AUTOFIT_FIELDS = ['allergy', 'primaryParentPhone'];
+
+async function backfillScheduleCardAutoFit(db) {
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+
+  let changed = false;
+  const elements = layout.elements.map((el) => {
+    if (el.type === 'text' && SCHEDULE_CARD_AUTOFIT_FIELDS.includes(el.field) && !el.autoFitText) {
+      changed = true;
+      return { ...el, autoFitText: true };
+    }
+    return el;
+  });
+  if (!changed) return;
+
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
+}
+
+// The split shape this backfill installs - NOT sourced from
+// DEFAULT_LAYOUTS.parent, which now holds the later merged setupCleanupDays
+// shape instead (see backfillParentSetupCleanupMerge below). Kept as its
+// own historical constant so this backfill still does exactly what it did
+// when it first shipped, regardless of how the current default has since
+// evolved - the merge backfill is what carries a template the rest of the
+// way from here to the current shape.
+const LEGACY_PARENT_SETUP_CLEANUP_DAY_ELEMENTS = [
+  { id: 'monday-job', type: 'text', field: 'mondaySetupCleanup', x: 8, y: 4, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+  { id: 'wednesday-job', type: 'text', field: 'wednesdaySetupCleanup', x: 8, y: 20, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+];
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // 'parent' name_tag_templates row, saved before the Monday/Wednesday
 // setup/cleanup job fields existed (utils/nameTagData.js's
 // setupCleanupJobLabels) - seedIfMissing only ever inserts a member type's
@@ -263,8 +356,13 @@ async function backfillScheduleCardAllergy(db) {
 // core.js's own comment) rather than appended at the end, so this lands
 // them there even for a heavily customized layout, not just a still-
 // default one. Only adds them when the saved layout has neither field at
-// all, leaving every other customization (including someone who
-// deliberately removed the old cleanupTeam field) untouched.
+// all (nor the later merged setupCleanupDays field either - see
+// backfillParentSetupCleanupMerge below; a fresh install seeded straight
+// from the current DEFAULT_LAYOUTS.parent has ONLY that merged field, and
+// without this check would otherwise look like it "predates the
+// feature" and get the old split fields wrongly re-added on top of it),
+// leaving every other customization (including someone who deliberately
+// removed the old cleanupTeam field) untouched.
 async function backfillParentSetupCleanupDays(db) {
   const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
   if (!row) return;
@@ -275,10 +373,9 @@ async function backfillParentSetupCleanupDays(db) {
     return;
   }
   if (!layout || !Array.isArray(layout.elements)) return;
-  if (layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup')) return;
+  if (layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup' || el.field === 'setupCleanupDays')) return;
 
-  const newDefaults = DEFAULT_LAYOUTS.parent.elements.filter((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup');
-  const elements = [...newDefaults.map((el) => ({ ...el })), ...layout.elements];
+  const elements = [...LEGACY_PARENT_SETUP_CLEANUP_DAY_ELEMENTS.map((el) => ({ ...el })), ...layout.elements];
 
   await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
 }
@@ -319,6 +416,8 @@ module.exports = {
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
   backfillScheduleCardAllergy,
+  backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,
+  backfillParentSetupCleanupMerge,
   backfillTaskItemBarcodes,
 };

@@ -17,7 +17,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createTestDb } = require('./pgTestDb');
-const { backfillMiscBadgeBarcode, backfillScheduleCardAllergy } = require('../db/bootstrapPg');
+const { backfillMiscBadgeBarcode, backfillScheduleCardAllergy, backfillScheduleCardAutoFit } = require('../db/bootstrapPg');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { DEFAULT_LAYOUT: SCHEDULE_CARD_DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 
@@ -137,4 +137,47 @@ test('backfillScheduleCardAllergy still fixes a template stored in the old bare-
   const layout = JSON.parse(row.layout_json);
   assert.ok(!layout.elements.some((el) => el.field === 'name'), 'the leftover name element must be gone even from the legacy bare-array shape');
   assert.ok(layout.elements.some((el) => el.field === 'allergy'), 'an allergy element must have been added even from the legacy bare-array shape');
+});
+
+// A real follow-up request: a Schedule Card's allergy note kept clipping
+// instead of shrinking to fit, on an already-deployed row saved (or
+// backfilled by backfillScheduleCardAllergy above) before autoFitText
+// existed on that field - same class of bug as
+// nameTagAutoFitBackfill.test.js's coverage for the name-tag side.
+test('backfillScheduleCardAutoFit adds autoFitText to allergy/primaryParentPhone fields that lack it, leaving other elements untouched', async () => {
+  const db = await createTestDb();
+  const preAutoFit = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'allergy', type: 'text', field: 'allergy', x: 8, y: 5, width: 210, height: 14, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle' },
+      { id: 'parent-phone', type: 'text', field: 'primaryParentPhone', x: 222, y: 5, width: 106, height: 14, fontSize: 8, color: '#5b6b7c', bold: false, align: 'right', valign: 'middle' },
+      { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
+      { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+    ],
+  };
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify(preAutoFit));
+
+  await backfillScheduleCardAutoFit(db);
+
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  const layout = JSON.parse(row.layout_json);
+  assert.equal(layout.elements.find((el) => el.id === 'allergy').autoFitText, true);
+  assert.equal(layout.elements.find((el) => el.id === 'parent-phone').autoFitText, true);
+  assert.equal(layout.elements.find((el) => el.id === 'mon-label').autoFitText, undefined, 'a non-allergy/phone field must be left exactly as saved');
+  assert.deepEqual(
+    layout.elements.filter((el) => el.id !== 'allergy' && el.id !== 'parent-phone'),
+    preAutoFit.elements.filter((el) => el.id !== 'allergy' && el.id !== 'parent-phone'),
+    'every other element must be untouched'
+  );
+});
+
+test('backfillScheduleCardAutoFit is a no-op for a fresh install already seeded with autoFitText', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+
+  await backfillScheduleCardAutoFit(db);
+
+  const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  assert.equal(after.layout_json, before.layout_json);
 });

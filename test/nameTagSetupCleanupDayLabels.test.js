@@ -43,7 +43,7 @@ const app = require('../server');
 const db = require('../db');
 const { createTestDb } = require('./pgTestDb');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
-const { backfillParentSetupCleanupDays } = require('../db/bootstrapPg');
+const { backfillParentSetupCleanupDays, backfillParentSetupCleanupMerge } = require('../db/bootstrapPg');
 const { badgeDataForMember, badgeDataForMembers } = require('../utils/nameTagData');
 
 test.before(() => app.ready);
@@ -54,13 +54,16 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-test('the parent default layout leads with Monday/Wednesday setup/cleanup job fields, ahead of the logo/name', () => {
+test('the parent default layout leads with ONE shared Monday/Wednesday setup/cleanup job field, ahead of the logo/name', () => {
   const elements = DEFAULT_LAYOUTS.parent.elements;
-  assert.equal(elements[0].field, 'mondaySetupCleanup', 'Monday job should be the very first element');
-  assert.equal(elements[1].field, 'wednesdaySetupCleanup', 'Wednesday job should be second');
-  assert.ok(elements[0].autoFitText && elements[1].autoFitText, 'both should shrink to fit rather than clip');
+  // A real follow-up request: the two days should "share a text space"
+  // instead of sitting as two separately-positioned elements - see
+  // utils/nameTagBadge.js's own comment on setupCleanupDays.
+  assert.equal(elements[0].field, 'setupCleanupDays', 'the combined Monday/Wednesday job field should be the very first element');
+  assert.ok(elements[0].autoFitText, 'it should shrink to fit rather than clip');
+  assert.ok(!elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup'), 'the old split fields should not appear on the current default');
   const logoIdx = elements.findIndex((el) => el.type === 'image');
-  assert.ok(logoIdx > 1, 'the logo (and everything else) should come after both job lines');
+  assert.ok(logoIdx > 0, 'the logo (and everything else) should come after the combined job field');
 });
 
 test('badgeDataForMember: a parent on a Monday-only team gets a real Monday line and a placeholder Wednesday line', async () => {
@@ -72,6 +75,11 @@ test('badgeDataForMember: a parent on a Monday-only team gets a real Monday line
   const data = await badgeDataForMember(parent);
   assert.equal(data.mondaySetupCleanup, 'Monday: Chairs & Tables');
   assert.equal(data.wednesdaySetupCleanup, 'Wednesday: —');
+  // setupCleanupDays is the same two lines as an array - the shape the
+  // current default's shared element (id: setup-cleanup-days) actually
+  // binds to, kept in sync with the two string fields above rather than
+  // computed separately.
+  assert.deepEqual(data.setupCleanupDays, ['Monday: Chairs & Tables', 'Wednesday: —']);
 
   // Batch version has to agree exactly - this is the same query result
   // just grouped differently, and a keying bug here would silently swap
@@ -148,4 +156,87 @@ test('backfillParentSetupCleanupDays leaves an already-current parent template (
   await backfillParentSetupCleanupDays(testDb);
   const after = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
   assert.equal(after.layout_json, before.layout_json);
+});
+
+// A real follow-up request: the two lines should "share a text space"
+// instead of sitting as two disconnected boxes. backfillParentSetupCleanupMerge
+// migrates an already-deployed template still on the OLD two-element
+// shape (whether it always was, or backfillParentSetupCleanupDays just
+// added it above) onto the new shared setupCleanupDays element.
+test('backfillParentSetupCleanupMerge replaces the old split monday-job/wednesday-job elements with one shared setupCleanupDays element, in place', async () => {
+  const testDb = await createTestDb();
+  const oldShape = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'monday-job', type: 'text', field: 'mondaySetupCleanup', x: 8, y: 4, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'wednesday-job', type: 'text', field: 'wednesdaySetupCleanup', x: 8, y: 20, width: 320, height: 15, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 152, y: 38, width: 32, height: 32 },
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 92, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+    ],
+  };
+  await testDb.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify(oldShape));
+
+  await backfillParentSetupCleanupMerge(testDb);
+
+  const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.ok(!layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup'), 'the old split fields must be gone');
+  assert.equal(layout.elements[0].field, 'setupCleanupDays', 'the merged field should land at the position of the first old element');
+  assert.equal(layout.elements[0].autoFitText, true);
+  // Everything else (logo, name) survives untouched, in order.
+  assert.equal(layout.elements[1].id, 'logo');
+  assert.equal(layout.elements[2].field, 'name');
+
+  // Running it again is a no-op, not a second replace.
+  await backfillParentSetupCleanupMerge(testDb);
+  const rowAgain = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  assert.deepEqual(JSON.parse(rowAgain.layout_json), layout);
+});
+
+test('backfillParentSetupCleanupMerge leaves an already-current parent template (fresh install, already on setupCleanupDays) alone', async () => {
+  const testDb = await createTestDb();
+  const before = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  await backfillParentSetupCleanupMerge(testDb);
+  const after = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  assert.equal(after.layout_json, before.layout_json);
+});
+
+test('backfillParentSetupCleanupMerge is a no-op when neither the old nor new fields exist at all (nothing to migrate)', async () => {
+  const testDb = await createTestDb();
+  const neither = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [{ id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true }],
+  };
+  await testDb.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify(neither));
+
+  await backfillParentSetupCleanupMerge(testDb);
+
+  const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  assert.deepEqual(JSON.parse(row.layout_json), neither);
+});
+
+// Composability check: on a truly ancient database (has neither the old
+// split fields nor the new merged one), running BOTH backfills in the
+// db/index.js order they're actually wired in (Days, then Merge) still
+// ends up on the current merged shape - not stuck on the intermediate
+// split shape forever.
+test('backfillParentSetupCleanupDays followed by backfillParentSetupCleanupMerge lands a pre-feature template on the current merged shape', async () => {
+  const testDb = await createTestDb();
+  const preFeature = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [{ id: 'name', type: 'text', field: 'name', x: 8, y: 56, width: 320, height: 28, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true }],
+  };
+  await testDb.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify(preFeature));
+
+  await backfillParentSetupCleanupDays(testDb);
+  await backfillParentSetupCleanupMerge(testDb);
+
+  const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
+  const layout = JSON.parse(row.layout_json);
+  assert.equal(layout.elements[0].field, 'setupCleanupDays');
+  assert.equal(layout.elements[1].field, 'name');
+  assert.ok(!layout.elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup'));
 });

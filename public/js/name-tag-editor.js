@@ -60,6 +60,7 @@
       cleanupTeam: 'Chairs & Tables, Snack Table',
       mondaySetupCleanup: 'Monday: Chairs & Tables',
       wednesdaySetupCleanup: 'Wednesday: Snack Table',
+      setupCleanupDays: ['Monday: Chairs & Tables', 'Wednesday: Snack Table'],
       memberCode: 'ID#012345',
       barcodeValue: '0123456789',
     },

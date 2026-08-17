@@ -35,7 +35,9 @@ const {
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
   backfillScheduleCardAllergy,
+  backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,
+  backfillParentSetupCleanupMerge,
   backfillTaskItemBarcodes,
 } = require('./bootstrapPg');
 
@@ -96,7 +98,11 @@ db.ready = schemaReady
   .then(() => backfillNameTagAutoFit(db))
   .then(() => backfillMiscBadgeBarcode(db))
   .then(() => backfillScheduleCardAllergy(db))
+  .then(() => backfillScheduleCardAutoFit(db))
   .then(() => backfillParentSetupCleanupDays(db))
+  // Must run AFTER backfillParentSetupCleanupDays - see that backfill's
+  // own comment on why this one depends on it having already run.
+  .then(() => backfillParentSetupCleanupMerge(db))
   .then(() => backfillTaskItemBarcodes(db));
 // A failure here (bad DATABASE_URL, unreachable database, a schema file
 // that doesn't parse) means the app can never serve a correct response -

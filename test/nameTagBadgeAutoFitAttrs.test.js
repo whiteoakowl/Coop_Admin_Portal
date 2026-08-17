@@ -63,3 +63,57 @@ test('data-base-font-size reflects fitFontSize\'s own shrink for a name too long
   const m = /data-base-font-size="([\d.]+)"/.exec(html);
   assert.ok(Number(m[1]) < 18, 'a name that overflows a narrow box should have already been shrunk below the configured 18px by the server estimate');
 });
+
+// Coverage for a real follow-up request: a parent's Monday and Wednesday
+// setup/cleanup jobs should "share a text space" - ONE element/box -
+// instead of sitting as two separately-positioned elements, while each
+// line stays individually labeled and individually shrunk to fit. A
+// field whose data value is an ARRAY of lines (utils/nameTagData.js's
+// setupCleanupJobLabels returns setupCleanupDays that way) renders as one
+// .badge-el-text box containing one .badge-el-text-inner span per line,
+// each stamped with its OWN data-base-font-size (see public/js/badge-
+// autofit.js's shrinkToFit, which now shrinks every line in a box
+// independently rather than assuming exactly one).
+function multilineEl(overrides) {
+  return {
+    id: 'setup-cleanup-days', type: 'text', field: 'setupCleanupDays', x: 8, y: 4, width: 320, height: 32,
+    fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle',
+    autoFitText: true,
+    ...overrides,
+  };
+}
+
+test('an array-valued field renders one .badge-el-text-inner span per line, each in its own single box', () => {
+  const html = NameTagRenderCore.renderElement(multilineEl(), { setupCleanupDays: ['Monday: Chairs & Tables', 'Wednesday: —'] });
+  const boxOpenTags = html.match(/<div class="badge-el badge-el-text"/g) || [];
+  assert.equal(boxOpenTags.length, 1, 'both lines must share ONE box, not two separate elements');
+  const spans = html.match(/<span class="badge-el-text-inner"/g) || [];
+  assert.equal(spans.length, 2, 'each line gets its own inner span');
+  assert.match(html, /Monday: Chairs &amp; Tables/);
+  assert.match(html, /Wednesday: —/);
+});
+
+test('a multi-line box stacks its lines (flex-direction:column) instead of centering one line on a flex row', () => {
+  const html = NameTagRenderCore.renderElement(multilineEl(), { setupCleanupDays: ['Monday: Chairs & Tables', 'Wednesday: —'] });
+  assert.match(html, /flex-direction:column/);
+});
+
+test('each line in a multi-line autoFitText box gets its own data-base-font-size, shrunk independently', () => {
+  // A long Monday line and a short Wednesday placeholder - if they shared
+  // one font-size search, the long line would drag the short one down
+  // with it for no reason.
+  const html = NameTagRenderCore.renderElement(
+    multilineEl({ width: 100 }),
+    { setupCleanupDays: ['Monday: Chairs & Tables, Snack Duty, Setup Crew', 'Wednesday: —'] }
+  );
+  const sizes = [...html.matchAll(/data-base-font-size="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.equal(sizes.length, 2, 'both lines should be marked for auto-fit');
+  assert.ok(sizes[0] < sizes[1], 'the longer Monday line should have been shrunk further than the short Wednesday placeholder');
+});
+
+test('a single-string field (the normal case) is unaffected - still exactly one span, no flex-direction:column', () => {
+  const html = NameTagRenderCore.renderElement(autoFitTextEl(), { name: 'Jessica Adema' });
+  const spans = html.match(/<span class="badge-el-text-inner"/g) || [];
+  assert.equal(spans.length, 1);
+  assert.doesNotMatch(html, /flex-direction:column/);
+});

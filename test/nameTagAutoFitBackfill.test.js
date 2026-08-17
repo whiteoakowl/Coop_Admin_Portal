@@ -7,15 +7,15 @@
 // the same shared core (public/js/name-tag-render-core.js's fitFontSize).
 // Fixed with a genuine one-time backfill (backfillNameTagAutoFit, wired
 // into db/index.js's db.ready chain right after backfillNameTagLogo) that
-// adds autoFitText: true to just the "name" field of an existing saved
-// row, leaving every other element (grade, allergies, cleanup team, custom
-// text, ...) exactly as saved.
+// adds autoFitText: true to the "name" and (a later follow-up request)
+// "gradeLevel" fields of an existing saved row, leaving every other
+// element (allergies, cleanup team, custom text, ...) exactly as saved.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createTestDb } = require('./pgTestDb');
 const { backfillNameTagAutoFit } = require('../db/bootstrapPg');
 
-test('backfillNameTagAutoFit adds autoFitText to a "name" field that lacks it, leaving other elements untouched', async () => {
+test('backfillNameTagAutoFit adds autoFitText to "name" and "gradeLevel" fields that lack it, leaving other elements untouched', async () => {
   const db = await createTestDb();
   const customized = {
     background: '#fdf0d5',
@@ -24,6 +24,7 @@ test('backfillNameTagAutoFit adds autoFitText to a "name" field that lacks it, l
       { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 6, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'name', type: 'text', field: 'name', x: 8, y: 26, width: 320, height: 28, fontSize: 18, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
       { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 56, width: 320, height: 20, fontSize: 12, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'allergies', type: 'text', field: 'allergies', x: 8, y: 80, width: 320, height: 20, fontSize: 11, color: '#dc2626', bold: false, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 110, width: 200, height: 55 },
     ],
   };
@@ -37,10 +38,12 @@ test('backfillNameTagAutoFit adds autoFitText to a "name" field that lacks it, l
   const nameEl = layout.elements.find((el) => el.id === 'name');
   assert.equal(nameEl.autoFitText, true, 'the name field should be flagged for auto-fit');
   const gradeEl = layout.elements.find((el) => el.id === 'grade');
-  assert.equal(gradeEl.autoFitText, undefined, 'a non-name field must be left exactly as saved');
+  assert.equal(gradeEl.autoFitText, true, 'the gradeLevel field should also be flagged for auto-fit');
+  const allergiesEl = layout.elements.find((el) => el.id === 'allergies');
+  assert.equal(allergiesEl.autoFitText, undefined, 'a non-name/gradeLevel field must be left exactly as saved');
   assert.deepEqual(
-    layout.elements.filter((el) => el.id !== 'name'),
-    customized.elements.filter((el) => el.id !== 'name'),
+    layout.elements.filter((el) => el.id !== 'name' && el.id !== 'grade'),
+    customized.elements.filter((el) => el.id !== 'name' && el.id !== 'grade'),
     'every other element must be untouched'
   );
 });
@@ -78,7 +81,7 @@ test('backfillNameTagAutoFit still fixes a template stored in the old bare-eleme
   assert.equal(nameEl.autoFitText, true, 'the name field should be flagged for auto-fit even from the legacy bare-array shape');
 });
 
-test('backfillNameTagAutoFit only touches text elements whose field is "name", not any other field named similarly', async () => {
+test('backfillNameTagAutoFit only touches text elements whose field is "name" or "gradeLevel", not any other field named similarly', async () => {
   const db = await createTestDb();
   const customized = {
     background: '#ffffff',

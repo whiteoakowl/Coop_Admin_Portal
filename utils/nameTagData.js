@@ -56,21 +56,46 @@ async function cleanupTeamsForParents(memberIds) {
 // to show on their name tag, day by day (not the old cleanupTeam field's
 // "both days smashed into one comma list" - a parent on Chairs Monday and
 // Snacks Wednesday couldn't tell which team was which day from that
-// alone). The "Monday: "/"Wednesday: " label is baked directly into the
-// returned string, the same convention scheduleCardData.js's
-// primaryParentPhone already uses ("Parent Phone: 555-1234") - so the
-// default parent layout's field elements don't need their own separate
-// static label text element alongside them. "—" for a day the parent
-// isn't on any team, matching this app's own established "blank schedule
-// cell" convention (see public/js/name-tag-render-core.js's table
-// renderer) rather than leaving the line looking broken/cut off.
+// alone). The "Monday: "/"Wednesday: " label is baked directly into each
+// string, the same convention scheduleCardData.js's primaryParentPhone
+// already uses ("Parent Phone: 555-1234") - so the default parent
+// layout's field element(s) don't need their own separate static label
+// text alongside them. "—" for a day the parent isn't on any team,
+// matching this app's own established "blank schedule cell" convention
+// (see public/js/name-tag-render-core.js's table renderer) rather than
+// leaving the line looking broken/cut off.
+//
+// setupCleanupDays hands the SAME two lines back as an array - the
+// current default badge layout (utils/nameTagBadge.js) binds one shared
+// element to this field so both days "share a text space" instead of
+// sitting in two separately-positioned elements (name-tag-render-core.js's
+// renderTextEl renders an array field as one stacked line per entry).
+// mondaySetupCleanup/wednesdaySetupCleanup are kept alongside it, not
+// replaced, so an already-saved layout that still references either one
+// directly (from before this field existed) keeps rendering correctly.
 function setupCleanupJobLabels(teamRows) {
   const byDay = { monday: [], wednesday: [] };
   for (const row of teamRows) if (byDay[row.day]) byDay[row.day].push(row.title);
+  const mondayLine = 'Monday: ' + (byDay.monday.length ? byDay.monday.join(', ') : '—');
+  const wednesdayLine = 'Wednesday: ' + (byDay.wednesday.length ? byDay.wednesday.join(', ') : '—');
   return {
-    mondaySetupCleanup: 'Monday: ' + (byDay.monday.length ? byDay.monday.join(', ') : '—'),
-    wednesdaySetupCleanup: 'Wednesday: ' + (byDay.wednesday.length ? byDay.wednesday.join(', ') : '—'),
+    mondaySetupCleanup: mondayLine,
+    wednesdaySetupCleanup: wednesdayLine,
+    setupCleanupDays: [mondayLine, wednesdayLine],
   };
+}
+
+// A student's grade_level is picked from utils/classSchedule.js's
+// GRADE_LEVELS list - either an ordinal number ("1st".."12th") or a named
+// early-childhood level (Infant, Toddler, Preschool, PreK, Kindergarten)
+// that already reads fine on its own. A real request: the ordinal ones
+// read ambiguously alone on a badge ("3rd" - third grade? third place?) -
+// append "Grade" so it's unambiguous ("3rd Grade"), leaving the named
+// levels untouched since "Kindergarten Grade" doesn't make sense.
+function gradeLevelLabel(gradeLevel) {
+  const trimmed = (gradeLevel || '').trim();
+  if (!trimmed) return '';
+  return /^\d+(st|nd|rd|th)$/i.test(trimmed) ? `${trimmed} Grade` : trimmed;
 }
 
 // member_code is the permanent 6-digit ID assigned at creation (see
@@ -96,7 +121,7 @@ async function badgeDataForMember(member) {
   }
   return {
     name: member.name,
-    gradeLevel: member.grade_level || '',
+    gradeLevel: gradeLevelLabel(member.grade_level),
     allergies: member.medical_notes || '',
     memberCode,
     barcodeValue: member.barcode,
@@ -125,7 +150,7 @@ async function badgeDataForMembers(members) {
         barcodeValue: member.barcode,
       };
     } else {
-      result[member.id] = { name: member.name, gradeLevel: member.grade_level || '', allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
+      result[member.id] = { name: member.name, gradeLevel: gradeLevelLabel(member.grade_level), allergies: member.medical_notes || '', memberCode, barcodeValue: member.barcode };
     }
   }
   return result;
@@ -145,4 +170,4 @@ async function getTemplate(memberType) {
   }
 }
 
-module.exports = { badgeDataForMember, badgeDataForMembers, getTemplate, cleanupTeamsForParent, cleanupTeamsForParents };
+module.exports = { badgeDataForMember, badgeDataForMembers, getTemplate, cleanupTeamsForParent, cleanupTeamsForParents, gradeLevelLabel };
