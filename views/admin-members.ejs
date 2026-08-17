@@ -38,15 +38,66 @@
           <% } %>
         </select>
       </div>
+      <%# Edit mode's Select All + Delete/Archive/Restore Selected controls
+          - hidden until the "Edit" toggle button below is clicked (see
+          public/js/archive-select-toggle.js, reused as-is from the Class/
+          Student/Parent Schedule archive grids). %>
+      <div class="class-schedule-archive-controls" data-archive-controls="members-bulk-form" hidden>
+        <label class="checkbox-option class-schedule-select-all">
+          <input type="checkbox" data-select-all-for="members-bulk-form" />
+          Select All
+        </label>
+        <button
+          type="submit"
+          form="members-bulk-form"
+          data-bulk-action="/admin/members/bulk-delete"
+          class="roster-action-btn roster-action-btn-danger"
+          data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
+          data-bulk-confirm-yes-label="Yes, Delete"
+        >Delete Selected</button>
+        <% if (showArchived) { %>
+          <button
+            type="submit"
+            form="members-bulk-form"
+            data-bulk-action="/admin/members/bulk-unarchive"
+            class="roster-action-btn"
+            data-bulk-confirm="Restore the selected member(s) to the active Members list?"
+            data-bulk-confirm-yes-label="Yes, Restore"
+            data-bulk-confirm-safe="1"
+          >Restore Selected</button>
+        <% } else { %>
+          <button
+            type="submit"
+            form="members-bulk-form"
+            data-bulk-action="/admin/members/bulk-archive"
+            class="roster-action-btn"
+            data-bulk-confirm="Archive the selected member(s)? They'll be hidden from the active Members list, but nothing is deleted."
+            data-bulk-confirm-yes-label="Yes, Archive"
+            data-bulk-confirm-safe="1"
+          >Archive Selected</button>
+        <% } %>
+      </div>
       <div class="roster-btn-row">
         <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-families-dialog').showModal()">Edit Families</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('mass-import-dialog').showModal()">Mass Import Families</button>
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
+        <a
+          class="roster-action-btn"
+          href="/admin/members?<%= typeFilter ? 'type=' + typeFilter + '&' : '' %><%= familyFilter ? 'family=' + familyFilter + '&' : '' %><%= showArchived ? '' : 'archived=1' %>"
+        ><%= showArchived ? 'View Active' : 'View Archived' %></a>
       </div>
     </div>
+
+    <form
+      id="members-bulk-form"
+      method="POST"
+      action="/admin/members/bulk-delete"
+    ></form>
 
     <dialog id="add-family-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/members/families/new">
@@ -60,6 +111,42 @@
           <button type="submit" class="primary-btn">Add Family</button>
         </div>
       </form>
+    </dialog>
+
+    <%# Rename or delete a family "name" itself - distinct from the
+        per-member "Choose a Family" dropdown on the Add/Edit Member form,
+        which only assigns/clears one member's own family_id. Deleting a
+        family here only ungroups its members (families.id has ON DELETE
+        SET NULL on members.family_id) - it never deletes a member. %>
+    <dialog id="edit-families-dialog" class="member-picker-dialog">
+      <h3>Edit Families</h3>
+      <% if (families.length === 0) { %>
+        <p class="hint">No families added yet.</p>
+      <% } else { %>
+        <ul class="edit-families-list">
+          <% families.forEach(function(f) { %>
+            <li class="edit-families-row">
+              <form method="POST" action="/admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
+                <input type="text" name="name" value="<%= f.name %>" required aria-label="Rename &quot;<%= f.name %>&quot; family" />
+                <button type="submit" class="btn-secondary">Save</button>
+              </form>
+              <span class="hint"><%= f.memberCount %> member<%= f.memberCount == 1 ? '' : 's' %></span>
+              <form
+                method="POST"
+                action="/admin/members/families/<%= f.id %>/delete"
+                class="inline-block-form"
+                data-confirm="Delete the &quot;<%= f.name %>&quot; family? <%= f.memberCount %> member(s) will no longer be grouped under it, but no member is deleted."
+                data-confirm-yes-label="Yes, Delete"
+              >
+                <button type="submit" class="icon-btn" aria-label="Delete &quot;<%= f.name %>&quot; family" title="Delete Family"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </form>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
     </dialog>
 
     <dialog id="import-dialog" class="member-picker-dialog">
@@ -90,6 +177,7 @@
       <table class="roster-table members-table members-list-table">
         <thead>
           <tr>
+            <th class="no-print"><span class="sr-only">Select</span></th>
             <th class="members-col-photo"><span class="sr-only">Photo</span></th>
             <th>Name</th>
             <th>Type</th>
@@ -101,6 +189,9 @@
         <tbody>
           <% members.forEach(function(m) { %>
             <tr class="<%= m.is_primary_parent ? 'row-primary-parent' : '' %>" data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>">
+              <td class="no-print">
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
+              </td>
               <td class="members-col-photo">
                 <% if (m.photo_path) { %>
                   <img class="member-thumb" src="<%= photoUrl(m.photo_path) %>" alt="" />
@@ -183,6 +274,23 @@
       </table>
     </div>
 
+    <%
+      // "Select All" (public/js/archive-select-toggle.js) only ever checks
+      // checkboxes actually present in the DOM, and this table only
+      // renders one page's worth of members at a time (see the route's
+      // own pagination) - without these, Select All on a multi-page list
+      // would silently reach just the current page. Carries the rest of
+      // allMembersForPrint (every member matching the current type/family/
+      // archived filter, unpaginated) so Select All can reach every page,
+      // same pattern as admin-schedule.ejs's own off-page checkboxes.
+      var pageIds = members.map(function (m) { return m.id; });
+    %>
+    <% allMembersForPrint.forEach(function(m) { %>
+      <% if (pageIds.indexOf(m.id) === -1) { %>
+        <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-offpage-checkbox" aria-hidden="true" hidden />
+      <% } %>
+    <% }); %>
+
     <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
 
     <%# Printing shows this plain grid instead of the interactive table
@@ -221,5 +329,7 @@
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/members-dialogs.js"></script>
   <script src="/js/members-family-collapse.js"></script>
+  <script src="/js/archive-select-toggle.js"></script>
+  <script src="/js/members-bulk-actions.js"></script>
 </body>
 </html>

@@ -3884,6 +3884,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-picker-dialog h3 { margin: 0 0 0.75rem; }
 .member-picker-dialog .hint { margin: 0 0 0.5rem; }
 
+/* Edit Families dialog (#edit-families-dialog) - one row per family: an
+   inline rename form (text input + Save), its live member count, and a
+   delete button, all on one line so renaming/deleting reads as one quick
+   scan down the list rather than needing its own separate dialog per
+   family. */
+.edit-families-list { list-style: none; margin: 0 0 1rem; padding: 0; max-height: 50vh; overflow-y: auto; }
+.edit-families-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.edit-families-row:last-child { border-bottom: none; }
+.edit-families-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
+.edit-families-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.edit-families-row .hint { flex: 0 0 auto; white-space: nowrap; margin: 0; }
+
 /* Create/Edit Class popup - wider than the default member-picker-dialog
    since it carries a full field set (name/day/hour/room/color/times/
    grades/staff/description), styled to a specific reference design: a

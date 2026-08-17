@@ -100,26 +100,45 @@ async function attendanceHistoryForMember(memberId) {
 router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
+  // "Archive" (see /members/bulk-archive below) sets active = 0 on a
+  // member rather than deleting them - a soft, undoable removal from the
+  // active list, unlike the "Delete Selected" button which is permanent.
+  // membersWithDetails itself doesn't filter by active (it's used
+  // elsewhere for full lookups that need every member regardless), so the
+  // default/archived split happens here instead - same "one boolean flag,
+  // two mutually exclusive views" shape as nameTagSubmissions'
+  // showArchived above.
+  const showArchived = req.query.archived === '1';
   // Cards/Schedule dialog content (badge HTML, schedule-card HTML,
   // getMemberSchedule()) used to be computed here for every member on
   // every page load - two renderBadgeElements() calls and a DB query
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const withRosters = (await membersWithDetails(typeFilter, familyFilter)).map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
+  const withRosters = (await membersWithDetails(typeFilter, familyFilter))
+    .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
+    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
   // whole list regardless of which page happened to be open on screen.
+  // The Members page's own "Select All" (public/js/archive-select-toggle.js)
+  // also reaches into this same full list for its off-page checkboxes -
+  // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
   const pagination = paginate(withRosters, parsePage(req.query.page));
   res.render('admin-members', {
     title: 'Members',
     members: pagination.items,
     allMembersForPrint: withRosters,
     pagination,
-    baseHref: '/admin/members?' + (typeFilter ? `type=${typeFilter}&` : '') + (familyFilter ? `family=${familyFilter}&` : ''),
+    baseHref:
+      '/admin/members?' +
+      (typeFilter ? `type=${typeFilter}&` : '') +
+      (familyFilter ? `family=${familyFilter}&` : '') +
+      (showArchived ? `archived=1&` : ''),
     typeFilter,
     familyFilter,
+    showArchived,
     families: await allFamilies(),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -1028,17 +1047,90 @@ router.get('/members/:id/cards/print', async (req, res) => {
   });
 });
 
-router.post('/members/:id/delete', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+// Shared by the single-row Delete button and the bulk "Delete Selected"
+// action below - permanently removes one member (ON DELETE CASCADE
+// handles every other table referencing them) and cleans up their stored
+// photo, which isn't a foreign key the database can clean up on its own.
+// Returns the deleted row (or null if id didn't match anything, e.g. a
+// stale bulk selection for a member someone else already deleted).
+async function deleteMemberById(id) {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  if (!member) return null;
   await db.prepare('DELETE FROM members WHERE id = ?').run(id);
-  // ON DELETE CASCADE handles every other table referencing this member,
-  // but a stored photo isn't a foreign key the database can clean up on
-  // its own - without this, "Delete" leaves an actual photo of a real
-  // person behind indefinitely, with no way to remove it from the app.
-  if (member) await deletePhotoFile(member.photo_path);
+  await deletePhotoFile(member.photo_path);
+  return member;
+}
+
+router.post('/members/:id/delete', async (req, res) => {
+  const member = await deleteMemberById(parseInt(req.params.id, 10));
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
+  );
+});
+
+function memberIdsFromBody(body) {
+  return [...new Set([].concat(body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean))];
+}
+
+// --- Members page bulk actions (Edit mode's Select All + Delete/Archive/
+// Restore Selected - see admin-members.ejs's own comment and
+// public/js/archive-select-toggle.js, reused as-is from the Class/
+// Student/Parent Schedule archive grids' identical Select-All-across-
+// every-page mechanics). ---
+
+router.post('/members/bulk-delete', async (req, res) => {
+  const memberIds = memberIdsFromBody(req.body);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one member to delete.'));
+  }
+  let count = 0;
+  for (const id of memberIds) {
+    if (await deleteMemberById(id)) count++;
+  }
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Deleted ${count} member(s).`));
+});
+
+router.post('/members/bulk-archive', async (req, res) => {
+  const memberIds = memberIdsFromBody(req.body);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one member to archive.'));
+  }
+  const placeholders = memberIds.map(() => '?').join(',');
+  await db.prepare(`UPDATE members SET active = 0 WHERE id IN (${placeholders})`).run(...memberIds);
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Archived ${memberIds.length} member(s).`));
+});
+
+router.post('/members/bulk-unarchive', async (req, res) => {
+  const memberIds = memberIdsFromBody(req.body);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/members?archived=1&error=' + encodeURIComponent('Select at least one member to restore.'));
+  }
+  const placeholders = memberIds.map(() => '?').join(',');
+  await db.prepare(`UPDATE members SET active = 1 WHERE id IN (${placeholders})`).run(...memberIds);
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Restored ${memberIds.length} member(s).`));
+});
+
+// --- Edit Families dialog (rename or delete a family "name" itself,
+// distinct from adding/removing individual members from one - see
+// families.name's own uniqueness constraint and members.family_id's ON
+// DELETE SET NULL, so deleting a family here only ungroups its members,
+// it never deletes the members themselves). ---
+
+router.post('/members/families/:id/rename', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/admin/members?error=' + encodeURIComponent('Family name is required.'));
+  const clash = await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?) AND id != ?').get(name, id);
+  if (clash) return res.redirect('/admin/members?error=' + encodeURIComponent(`"${name}" family already exists.`));
+  await db.prepare('UPDATE families SET name = ? WHERE id = ?').run(name, id);
+  res.redirect('/admin/members?notice=' + encodeURIComponent('Family renamed.'));
+});
+
+router.post('/members/families/:id/delete', async (req, res) => {
+  const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(parseInt(req.params.id, 10));
+  await db.prepare('DELETE FROM families WHERE id = ?').run(parseInt(req.params.id, 10));
+  res.redirect(
+    '/admin/members?notice=' + encodeURIComponent(family ? `Deleted "${family.name}" family.` : 'Family deleted.')
   );
 });
 
