@@ -3349,11 +3349,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-card-icon { display: inline-flex; flex-shrink: 0; }
 .floater-card-icon .icon { width: 16px; height: 16px; }
 
-/* Setup/Cleanup Assignments' own Edit/Cancel/Save controls - pushed to
-   the header's far right (margin-left: auto), wrapping onto their own
-   row on a narrow card rather than squeezing the team title. */
-.floater-card-header-actions { display: flex; gap: 0.4rem; margin-left: auto; }
-
 .floater-card-blue .floater-card-header { background: var(--brand-soft); color: var(--brand-dark); }
 .floater-card-green .floater-card-header { background: var(--green-bg); color: var(--green); }
 .floater-card-orange .floater-card-header { background: var(--orange-bg); color: var(--orange); }
@@ -3398,30 +3393,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
 .setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 32%; }
 .setup-assignment-table th { white-space: normal; }
-
-/* A card starts frozen (static text, no dropdown) - public/js/setup-
-   assignment-cards.js's Edit button adds .setup-card-editing to flip
-   which half of this pair shows. Both are always in the DOM (see the
-   partial's own comment on why) so print/no-JS still renders a real
-   value instead of an empty toggled-off state. */
-.setup-task-select { display: none; width: 100%; }
-.setup-card-editing .setup-task-select { display: block; }
-.setup-card-editing .setup-task-static { display: none; }
-.floater-card-header-actions [data-cancel-card],
-.floater-card-header-actions [data-save-card] { display: none; }
-.setup-card-editing .floater-card-header-actions [data-edit-card] { display: none; }
-.setup-card-editing .floater-card-header-actions [data-cancel-card],
-.setup-card-editing .floater-card-header-actions [data-save-card] { display: inline-flex; }
-
-@media print {
-  /* Whatever edit state a card happened to be in right before Print was
-     hit, the printed page always shows the frozen/static view - a live
-     <select> control has no business on a printed page, and Edit/Cancel/
-     Save are already .no-print (see the partial), this just covers the
-     text/select half of the same pair. */
-  .setup-task-select { display: none !important; }
-  .setup-task-static { display: inline !important; }
-}
 
 .floater-card-footer {
   display: flex;
@@ -3554,6 +3525,51 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-assign-btn:hover { background: var(--brand-darker); }
 .floater-assign-btn-unassign { background: var(--red); }
 .floater-assign-btn-unassign:hover { background: #b91c1c; }
+
+/* Setup/Cleanup Assignments' locked-slot label (partials/setup-
+   assignment-cards.ejs) - takes the same flex space as the select it
+   replaces once a slot is Assigned, so the Unassign button lands in the
+   same spot the Assign button did instead of the row visibly reflowing. */
+.setup-task-static { flex: 1; min-width: 0; font-size: 0.78rem; overflow-wrap: break-word; }
+
+/* A real bug report, live-reproduced at a phone width: a multi-word
+   position name ("Classroom Hallway Supervisor") wrapped into 6+ single-
+   word lines, its header row ("ROOM"/"FLOATER") ran together with no gap
+   between them, and worst of all, a longer Setup/Cleanup task
+   description wrapped to ONE CHARACTER PER LINE - not just "several
+   lines" but functionally unreadable. That last one traces to the
+   Assign/Unassign row itself: .floater-assign-form's text side (flex:1;
+   min-width:0) only gets whatever the column has left AFTER the same-row
+   button's own width is subtracted, and on a narrow phone card a button
+   can eat most of an already-tight column, leaving the text side just a
+   few px to wrap into - exactly the character-by-character pattern
+   overflow-wrap: break-word produces once there's less width than even
+   one letter's natural line box would prefer to avoid breaking. Smaller
+   type buys some room; stacking the button under the text/select instead
+   of beside it is what actually ends the pathological wrap, since the
+   text then gets the column's FULL width instead of column-minus-button. */
+@media (max-width: 640px) {
+  .floater-card-table { font-size: 0.7rem; }
+  /* Base .floater-card-table th is white-space: nowrap (fine at desktop
+     widths, where "Position"/"Room"/"Floater" all fit their columns) -
+     on a narrow phone card that same nowrap is what let "ROOM" visibly
+     run into "FLOATER" instead of wrapping onto its own second line
+     (.setup-assignment-table already opts out of nowrap for this same
+     reason - this brings the Floater Chart's own header in line with it). */
+  .floater-card-table th { font-size: 0.6rem; padding: 0.25rem 0.3rem; white-space: normal; }
+  .floater-card-table td { padding: 0.35rem 0.3rem; }
+  .floater-chart-table th:nth-child(1) { width: 30%; }
+  .floater-chart-table th:nth-child(2) { width: 16%; }
+  .floater-chart-table th:nth-child(3) { width: 54%; }
+  .setup-assignment-table th:nth-child(1), .setup-assignment-table td:nth-child(1) { width: 28%; }
+  .setup-assignment-table th:nth-child(2), .setup-assignment-table td:nth-child(2),
+  .setup-assignment-table th:nth-child(3), .setup-assignment-table td:nth-child(3) { width: 36%; }
+
+  .floater-assign-form { flex-direction: column; align-items: stretch; gap: 0.3rem; }
+  .floater-assign-form select,
+  .setup-task-static { width: 100%; font-size: 0.7rem; }
+  .floater-assign-btn { align-self: flex-end; font-size: 0.68rem; }
+}
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
 
@@ -3795,12 +3811,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
 .medical-flag .icon { width: 0.95em; height: 0.95em; }
 .team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
-/* Setup/Cleanup Assignments' per-member task-suggestion dropdown
-   (partials/setup-assignment-cards.ejs) - same auto-submit-on-change
-   pattern as .team-member-rank-select above, but needs real width since
-   its options are full task descriptions ("#3 — Wipe down tables"), not
-   a short rank word. */
-.setup-task-select { font-size: 0.78rem; padding: 0.25rem 0.4rem; width: 100%; max-width: 100%; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
 .grid-box {

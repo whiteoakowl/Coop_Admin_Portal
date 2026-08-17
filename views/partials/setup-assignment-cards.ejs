@@ -1,22 +1,23 @@
 <%
 // One card per Setup/Cleanup team, listing its members and (editable
-// mode only) which of that team's own linked task list items each one
-// should do - mirrors partials/floater-assignment-cards.ejs's per-hour
-// card look, just per-team instead. Shared by the live Assignments page
-// (editable, day+date passed for the save form's action) and the
-// read-only Archive fragment/print for a past date (editable=false,
-// plain text instead of a dropdown - matches floater-assignment-
-// cards.ejs's own "reassigning happens on the live tab, not here" rule).
+// mode only) an Assign/Unassign control per member per task slot -
+// mirrors partials/floater-assignment-cards.ejs's per-hour card look,
+// just per-team instead. Shared by the live Assignments page (editable,
+// day+date passed for each slot's own form action) and the read-only
+// Archive fragment/print for a past date (editable=false, plain text
+// instead of a control - matches floater-assignment-cards.ejs's own
+// "reassigning happens on the live tab, not here" rule).
 //
-// A real request: a card starts FROZEN (plain "Task 1"/"Task 2" text,
-// no dropdowns) - clicking its own "Edit" button (public/js/setup-
-// assignment-cards.js) is what reveals the dropdowns for every member on
-// THAT card, "Save" submits all of them together in one request (routes/
-// admin-setup.js's .../team/:teamId/save), "Cancel" resets the form
-// (and hides the dropdowns again) without saving anything. Both the
-// static text and the <select> for every slot are always in the DOM -
-// the JS just toggles a class on the card - rather than building either
-// with client-side fetch, so print/no-JS still shows a real value.
+// A real request: this should "look and work like Floater Assignments" -
+// a suggested-task dropdown next to an Assign button; clicking Assign
+// posts immediately and locks that ONE slot (plain text + an Unassign
+// button takes the dropdown's place), clicking Unassign frees it back up
+// for a different, not-yet-taken pick. Both directions post to routes/
+// admin-setup.js's same /assignments/:memberId/task route Floater's own
+// assign/unassign pair mirrors - Assign with a real taskItemId, Unassign
+// with none. No whole-card Edit/Save step and no client-side JS at all,
+// same as Floater's own floater-chart-cards.ejs - every action is its own
+// small form that round-trips on submit.
 //
 // Locals: cards (routes/admin-setup.js's assignmentCardsForDate), day,
 // selectedDate, editable (defaults true).
@@ -33,30 +34,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
           <h3><%= team.title %></h3>
-          <% if (isEditable) { %>
-            <%
-              // Deliberately NOT using the plain `hidden` HTML attribute
-              // here for the initially-hidden Cancel/Save buttons -
-              // Chromium's own UA stylesheet applies [hidden] as if
-              // !important, which beats even a higher-specificity author
-              // rule trying to override it once .setup-card-editing is
-              // added (confirmed live: the class landed correctly, but
-              // getComputedStyle still reported display:none). CSS alone
-              // (.floater-card-header-actions [data-save-card] below)
-              // does the showing/hiding instead, with no attribute to
-              // fight with.
-            %>
-            <div class="floater-card-header-actions no-print">
-              <button type="button" class="condensed-btn" data-edit-card>Edit</button>
-              <button type="button" class="condensed-btn btn-secondary" data-cancel-card>Cancel</button>
-              <button type="submit" form="setup-card-form-<%= team.id %>" class="condensed-btn" data-save-card>Save</button>
-            </div>
-          <% } %>
         </div>
-        <% if (isEditable) { %>
-          <form method="POST" action="/admin/setup/<%= day %>/assignments/team/<%= team.id %>/save" id="setup-card-form-<%= team.id %>">
-            <input type="hidden" name="date" value="<%= selectedDate %>" />
-        <% } %>
         <table class="floater-card-table setup-assignment-table">
           <thead>
             <tr><th>Member</th><th>Task 1</th><th>Task 2</th></tr>
@@ -70,29 +48,42 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                 <td class="floater-card-position"><%= m.name %></td>
                 <%
                   var slots = [
-                    { num: 1, taskItemId: m.taskItemId, taskDescription: m.taskDescription, options: m.slot1Options },
-                    { num: 2, taskItemId: m.taskItemId2, taskDescription: m.taskDescription2, options: m.slot2Options },
+                    { num: 1, taskItemId: m.taskItemId, taskNumber: m.taskNumber, taskDescription: m.taskDescription, options: m.slot1Options },
+                    { num: 2, taskItemId: m.taskItemId2, taskNumber: m.taskNumber2, taskDescription: m.taskDescription2, options: m.slot2Options },
                   ];
                 %>
                 <% slots.forEach(function(slot) { %>
-                  <td>
-                    <% if (isEditable) { %>
-                      <span class="setup-task-static"><%= slot.taskDescription || '—' %></span>
-                      <select
-                        name="task_<%= slot.num %>_<%= m.id %>"
-                        class="setup-task-select"
-                        form="setup-card-form-<%= team.id %>"
-                      >
-                        <option value="">&mdash; No suggestion &mdash;</option>
-                        <% slot.options.forEach(function(item) { %>
-                          <option value="<%= item.id %>" <%= slot.taskItemId === item.id ? 'selected' : '' %>>#<%= item.number %> &mdash; <%= item.description %></option>
-                        <% }); %>
+                  <td data-slot-cell="<%= m.id %>-<%= slot.num %>">
+                    <% if (!isEditable) { %>
+                      <% if (slot.taskDescription) { %>
+                        <%= slot.taskDescription %>
+                      <% } else { %>
+                        <span class="floater-card-unassigned">No suggestion</span>
+                      <% } %>
+                    <% } else if (slot.taskItemId) { %>
+                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task">
+                        <input type="hidden" name="date" value="<%= selectedDate %>" />
+                        <input type="hidden" name="slot" value="<%= slot.num %>" />
+                        <input type="hidden" name="taskItemId" value="" />
+                        <span class="setup-task-static">#<%= slot.taskNumber %> &mdash; <%= slot.taskDescription %></span>
+                        <button type="submit" class="floater-assign-btn floater-assign-btn-unassign">Unassign</button>
+                      </form>
+                    <% } else if (slot.options.length === 0) { %>
+                      <select disabled class="floater-select-noavail" aria-label="No tasks available for <%= m.name %>">
+                        <option>No tasks available</option>
                       </select>
                       <% if (slot.num === 1 && team.taskOptions.length === 0) { %><p class="hint">No task list linked to this team yet.</p><% } %>
-                    <% } else if (slot.taskDescription) { %>
-                      <%= slot.taskDescription %>
                     <% } else { %>
-                      <span class="floater-card-unassigned">No suggestion</span>
+                      <form method="POST" class="floater-assign-form" action="/admin/setup/<%= day %>/assignments/<%= m.id %>/task">
+                        <input type="hidden" name="date" value="<%= selectedDate %>" />
+                        <input type="hidden" name="slot" value="<%= slot.num %>" />
+                        <select name="taskItemId">
+                          <% slot.options.forEach(function(item) { %>
+                            <option value="<%= item.id %>">#<%= item.number %> &mdash; <%= item.description %></option>
+                          <% }); %>
+                        </select>
+                        <button type="submit" class="floater-assign-btn">Assign</button>
+                      </form>
                     <% } %>
                   </td>
                 <% }); %>
@@ -100,7 +91,6 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
             <% }); %>
           </tbody>
         </table>
-        <% if (isEditable) { %></form><% } %>
         <div class="floater-card-footer">
           <svg class="icon"><use href="#icon-users"/></svg>
           <%= team.members.length %> Member<%= team.members.length === 1 ? '' : 's' %>
@@ -108,7 +98,4 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
       </div>
     <% }); %>
   </div>
-  <% if (isEditable) { %>
-    <script src="/js/setup-assignment-cards.js"></script>
-  <% } %>
 <% } %>

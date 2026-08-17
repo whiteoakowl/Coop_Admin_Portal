@@ -215,6 +215,8 @@ async function assignmentCardsForDate(day, date) {
         name: m.name,
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
+        taskNumber: taskItem ? taskItem.number : null,
+        taskNumber2: taskItem2 ? taskItem2.number : null,
         taskDescription: taskItem ? taskItem.description : null,
         taskDescription2: taskItem2 ? taskItem2.description : null,
       };
@@ -262,10 +264,20 @@ router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (r
   res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
 });
 
-// The suggestion dropdown auto-submits on change (onchange="this.form.
-// requestSubmit()", same pattern as a Floater Teams rank select) -
-// redirects back to whichever date was open, not always the earliest
-// upcoming one.
+// A real request: Setup/Cleanup should "look and work like Floater
+// Assignments" - a suggested-task dropdown next to an Assign button;
+// clicking Assign locks the slot in place (plain text + an Unassign
+// button takes the dropdown's place), clicking Unassign frees it back up
+// for a different pick. Both directions post here (see partials/setup-
+// assignment-cards.ejs) - Assign with a real taskItemId, Unassign with
+// none - mirroring routes/admin-volunteers.js's own assign/unassign pair
+// for the Floater Chart, just as one route instead of two since there's
+// no separate "no one available" state to special-case here. Replaced
+// the old whole-card Edit/Cancel/Save + batch-save-the-team flow this
+// same route used to just feed on a plain onchange - that batching made
+// sense for a many-field form-at-once save, but per-slot assign/unassign
+// (like Floater's own per-row Accept/Unassign) is a closer match to how
+// an admin actually works the page: one member, one job, right now.
 router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const memberId = parseInt(req.params.memberId, 10);
@@ -274,35 +286,6 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
   if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, slot, taskItemId);
   res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
-});
-
-// A real request: each card should stay frozen (plain text, no
-// dropdowns) until "Edit" is clicked, then save every member's Task 1/
-// Task 2 pick for that ONE card together via a single "Save" - not the
-// old one-dropdown-auto-submits-by-itself flow the route above still
-// serves (kept working, just no longer what the UI drives). Every
-// member on the team gets processed, including ones with no field
-// submitted at all (an admin removing every member's selection while
-// editing still needs those cleared, not silently left as whatever they
-// were before) - taskItemId falsy correctly clears that slot (see
-// setTaskAssignment's own comment). Member ids come from the team's own
-// roster (membersForTeam), never trusted off the request body, so a
-// crafted extra field can't touch some other team's assignment row.
-router.post('/setup/:day/assignments/team/:teamId/save', requireAdmin, requireDay, async (req, res) => {
-  const day = req.params.day;
-  const teamId = parseInt(req.params.teamId, 10);
-  const date = req.body.date;
-  if (!date || !isValidISODate(date)) {
-    return res.redirect(`/admin/setup/${day}/assignments?error=` + encodeURIComponent('Pick a date first.'));
-  }
-  const members = await membersForTeam(teamId);
-  for (const m of members) {
-    const slot1 = parseInt(req.body[`task_1_${m.id}`], 10) || null;
-    const slot2 = parseInt(req.body[`task_2_${m.id}`], 10) || null;
-    await setTaskAssignment(day, m.id, date, 1, slot1);
-    await setTaskAssignment(day, m.id, date, 2, slot2);
-  }
-  res.redirect(`/admin/setup/${day}/assignments?date=${encodeURIComponent(date)}&notice=` + encodeURIComponent('Assignments saved.'));
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {

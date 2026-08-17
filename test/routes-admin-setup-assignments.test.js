@@ -42,6 +42,17 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// Pulls just one member+slot's own <td> out of the page (partials/setup-
+// assignment-cards.ejs stamps data-slot-cell="{memberId}-{slotNum}" on
+// each one specifically so tests can target the right slot without
+// tripping over the other member/slot cells that share the same
+// "/assignments/:memberId/task" form action.
+function extractSlotCell(html, memberId, slot) {
+  const match = new RegExp(`data-slot-cell="${memberId}-${slot}"[^]*?</td>`).exec(html);
+  assert.ok(match, `expected a data-slot-cell="${memberId}-${slot}" cell in the page`);
+  return match[0];
+}
+
 test('GET /admin/setup redirects to Assignments, not Teams, as the first of the 4 tabs', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/setup').set('Cookie', cookie);
@@ -81,7 +92,7 @@ test('Setup/Cleanup Assignments', async (t) => {
     assert.doesNotMatch(page.text, /No upcoming session dates/);
   });
 
-  await t.test('setting a member\'s suggested task persists and shows selected on reload', async () => {
+  await t.test('setting a member\'s suggested task persists and shows locked (static text + Unassign) on reload', async () => {
     const res = await request(app)
       .post(`/admin/setup/monday/assignments/${member.lastInsertRowid}/task`)
       .set('Cookie', cookie)
@@ -90,7 +101,10 @@ test('Setup/Cleanup Assignments', async (t) => {
     assert.equal(res.status, 302);
 
     const page = await request(app).get('/admin/setup/monday/assignments?date=2026-08-24').set('Cookie', cookie);
-    assert.match(page.text, new RegExp(`<option value="${item.lastInsertRowid}" selected>`));
+    const cell = extractSlotCell(page.text, member.lastInsertRowid, 1);
+    assert.match(cell, /#1 &mdash; Wipe down counters/);
+    assert.match(cell, /Unassign/);
+    assert.doesNotMatch(cell, /<select/, 'a locked slot shows static text, not a dropdown');
 
     const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', member.lastInsertRowid, '2026-08-24');
     assert.equal(row.task_item_id, item.lastInsertRowid);
@@ -263,7 +277,7 @@ test('Setup/Cleanup Archive', async (t) => {
   });
 });
 
-test('Setup/Cleanup Assignments: mutual exclusion + batch card save', async (t) => {
+test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Floater Assignments\' own Accept/Unassign)', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Exclusion Crew')").run();
@@ -276,36 +290,60 @@ test('Setup/Cleanup Assignments: mutual exclusion + batch card save', async (t) 
   await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, bob.lastInsertRowid);
   await request(app).post('/admin/setup/monday/dates/add').set('Cookie', cookie).type('form').send({ dates: '2026-09-14', _csrf: csrfToken });
 
-  await t.test('a task already assigned to one member no longer appears as an option for another member on the same team', async () => {
-    await request(app)
+  await t.test('Assign locks the slot (static text + Unassign) and removes it from other members\' dropdown options', async () => {
+    const res = await request(app)
       .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
       .set('Cookie', cookie)
       .type('form')
       .send({ date: '2026-09-14', slot: '1', taskItemId: String(item1.lastInsertRowid), _csrf: csrfToken });
+    assert.equal(res.status, 302);
 
     const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
     assert.equal(page.status, 200);
-    // Alice's own slot 1 still shows her current pick (Vacuum).
-    const aliceSlot1 = new RegExp(`name="task_1_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+
+    // Alice's own slot 1 is now locked: static text, no dropdown, an Unassign button.
+    const aliceSlot1 = extractSlotCell(page.text, alice.lastInsertRowid, 1);
     assert.match(aliceSlot1, /#1 &mdash; Vacuum/);
-    // Bob's slot 1 dropdown must NOT offer Vacuum - it's taken.
-    const bobSlot1 = new RegExp(`name="task_1_${bob.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
+    assert.match(aliceSlot1, /Unassign/);
+    assert.doesNotMatch(aliceSlot1, /<select/);
+
+    // Bob's slot 1 is still an Assign dropdown, and it must NOT offer Vacuum - it's taken.
+    const bobSlot1 = extractSlotCell(page.text, bob.lastInsertRowid, 1);
+    assert.match(bobSlot1, /<select/);
+    assert.match(bobSlot1, /Assign/);
     assert.doesNotMatch(bobSlot1, /Vacuum/, 'a task already assigned to Alice must not be offered to Bob');
     assert.match(bobSlot1, /Mop/, 'Mop is still unassigned, so it should still be offered');
   });
 
-  await t.test('a member\'s own slot 1 and slot 2 can\'t both offer the same task they already hold in the other slot', async () => {
-    await request(app)
+  await t.test('a member\'s own OTHER slot dropdown also excludes whatever they already hold', async () => {
+    // Alice's own slot 2 dropdown must not offer Vacuum a second time - she
+    // already holds it in slot 1.
+    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const aliceSlot2 = extractSlotCell(page.text, alice.lastInsertRowid, 2);
+    assert.match(aliceSlot2, /<select/);
+    assert.doesNotMatch(aliceSlot2, /Vacuum/, 'slot 2 must not also offer whatever Alice already holds in slot 1');
+    assert.match(aliceSlot2, /Mop/);
+  });
+
+  await t.test('Unassign frees the slot back up for everyone - the dropdown reappears and offers the task again', async () => {
+    const res = await request(app)
       .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
       .set('Cookie', cookie)
       .type('form')
-      .send({ date: '2026-09-14', slot: '2', taskItemId: String(item2.lastInsertRowid), _csrf: csrfToken });
+      .send({ date: '2026-09-14', slot: '1', taskItemId: '', _csrf: csrfToken });
+    assert.equal(res.status, 302);
 
     const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
-    const aliceSlot1 = new RegExp(`name="task_1_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
-    assert.doesNotMatch(aliceSlot1, /Mop/, 'slot 1 must not also offer whatever Alice already holds in slot 2');
-    const aliceSlot2 = new RegExp(`name="task_2_${alice.lastInsertRowid}"[^]*?</select>`).exec(page.text)[0];
-    assert.doesNotMatch(aliceSlot2, /Vacuum/, 'slot 2 must not also offer whatever Alice already holds in slot 1');
+    const aliceSlot1 = extractSlotCell(page.text, alice.lastInsertRowid, 1);
+    assert.match(aliceSlot1, /<select/, 'unassigning should bring the dropdown back');
+    assert.match(aliceSlot1, /Assign/);
+    assert.match(aliceSlot1, /Vacuum/, 'freed by Unassign, Vacuum is offered again');
+
+    const bobSlot1 = extractSlotCell(page.text, bob.lastInsertRowid, 1);
+    assert.match(bobSlot1, /Vacuum/, 'and it\'s available to Bob too, not just Alice');
+
+    const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', alice.lastInsertRowid, '2026-09-14');
+    assert.equal(row, undefined, 'Alice had no other slot set, so Unassign should have deleted the row entirely');
   });
 
   await t.test('the Task 1/Task 2 column headers replace the old "Suggested Task" labels', async () => {
@@ -314,37 +352,13 @@ test('Setup/Cleanup Assignments: mutual exclusion + batch card save', async (t) 
     assert.doesNotMatch(page.text, /Suggested Task/);
   });
 
-  await t.test('saving a whole card at once (the Edit/Save flow\'s own route) updates every member on that team together', async () => {
+  await t.test('the old whole-card batch-save route is gone - Assign/Unassign replaced it, not just the UI on top of it', async () => {
     const res = await request(app)
       .post(`/admin/setup/monday/assignments/team/${team.lastInsertRowid}/save`)
       .set('Cookie', cookie)
       .type('form')
-      .send({
-        date: '2026-09-14',
-        [`task_1_${alice.lastInsertRowid}`]: '',
-        [`task_2_${alice.lastInsertRowid}`]: String(item1.lastInsertRowid),
-        [`task_1_${bob.lastInsertRowid}`]: String(item2.lastInsertRowid),
-        _csrf: csrfToken,
-      });
-    assert.equal(res.status, 302);
-    assert.match(decodeURIComponent(res.headers.location), /Assignments saved/);
-
-    const aliceRow = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', alice.lastInsertRowid, '2026-09-14');
-    assert.equal(aliceRow.task_item_id, null, 'Alice\'s slot 1 was submitted blank, clearing her previous Vacuum pick');
-    assert.equal(aliceRow.task_item_id_2, item1.lastInsertRowid, 'Alice\'s slot 2 now holds Vacuum (freed up since her own slot 1 was cleared)');
-
-    const bobRow = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', bob.lastInsertRowid, '2026-09-14');
-    assert.equal(bobRow.task_item_id, item2.lastInsertRowid, 'Bob now holds Mop');
-  });
-
-  await t.test('a batch save with no date redirects with an error instead of a bare crash', async () => {
-    const res = await request(app)
-      .post(`/admin/setup/monday/assignments/team/${team.lastInsertRowid}/save`)
-      .set('Cookie', cookie)
-      .type('form')
-      .send({ date: '', _csrf: csrfToken });
-    assert.equal(res.status, 302);
-    assert.match(decodeURIComponent(res.headers.location), /Pick a date first/);
+      .send({ date: '2026-09-14', [`task_1_${bob.lastInsertRowid}`]: String(item2.lastInsertRowid), _csrf: csrfToken });
+    assert.equal(res.status, 404);
   });
 });
 

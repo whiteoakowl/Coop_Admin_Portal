@@ -69,16 +69,22 @@
   }
 
   // A box normally has exactly one .badge-el-text-inner line, but a
-  // multi-line field (name-tag-render-core.js's renderTextEl - currently
-  // just the combined Monday/Wednesday setup-cleanup job field, which
-  // shares one box between two independently-labeled lines rather than
-  // using two separate positioned elements) can have more than one, each
-  // stamped with its OWN data-base-font-size since two lines of different
-  // lengths can each need a different amount of shrinking. Shrinking each
-  // independently (rather than the box as a whole) is what actually keeps
-  // both lines legible instead of the longer one dragging the shorter
-  // one's font size down with it for no reason.
-  function shrinkLineToFit(box, inner) {
+  // multi-line field (name-tag-render-core.js's renderTextEl - the
+  // combined Monday/Wednesday setup-cleanup job field, and now also a
+  // stacked first/last name or stacked grade-ordinal/"Grade" word) can
+  // have more than one, each stamped with its OWN data-base-font-size.
+  // A real bug report from live badges: shrinking each line to its own
+  // independent best-fit width (the previous behavior here) let a short
+  // line (e.g. "Gina") stay large while its longer partner line (e.g.
+  // "Aquino") shrank to fit the same box width - two very different font
+  // sizes stacked on top of each other, which the taller line then
+  // visibly bled into whatever sits above/below the box. "The same size
+  // for first and last name" is the actual requirement: this now
+  // computes what EACH line would need on its own, then applies the
+  // smallest of those to every line in the box, so the whole stack reads
+  // as one consistent size instead of the shorter line calling attention
+  // to how much bigger it could have stayed.
+  function computeLineFontSize(box, inner) {
     var baseFontSize = parseFloat(inner.dataset.baseFontSize);
     if (isNaN(baseFontSize)) baseFontSize = parseFloat(getComputedStyle(inner).fontSize);
     var fontSize = baseFontSize;
@@ -96,6 +102,7 @@
       fontSize -= STEP_PX;
       inner.style.fontSize = fontSize + 'px';
     }
+    return fontSize;
   }
 
   // The per-line width pass above never looks at the box's HEIGHT, so a
@@ -137,7 +144,16 @@
 
   function shrinkToFit(box) {
     var inners = box.querySelectorAll('.badge-el-text-inner');
-    for (var i = 0; i < inners.length; i++) shrinkLineToFit(box, inners[i]);
+    if (inners.length === 0) return;
+    // Compute what each line needs on its own first, then apply the
+    // smallest of those to every line - see computeLineFontSize's own
+    // comment for why a shared size (not each line's own independent
+    // best fit) is what "same size for first and last name" requires.
+    var minFontSize = Infinity;
+    for (var i = 0; i < inners.length; i++) {
+      minFontSize = Math.min(minFontSize, computeLineFontSize(box, inners[i]));
+    }
+    for (var j = 0; j < inners.length; j++) inners[j].style.fontSize = minFontSize + 'px';
     if (inners.length > 1) shrinkLinesToFitHeight(box, inners);
   }
 
