@@ -3660,8 +3660,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Setup/Cleanup Assignments' locked-slot label (partials/setup-
    assignment-cards.ejs) - takes the same flex space as the select it
    replaces once a slot is Assigned, so the Unassign button lands in the
-   same spot the Assign button did instead of the row visibly reflowing. */
-.setup-task-static { flex: 1; min-width: 0; font-size: 0.78rem; overflow-wrap: break-word; }
+   same spot the Assign button did instead of the row visibly reflowing.
+   overflow-wrap: normal explicitly, rather than relying on the mobile
+   .floater-card-table td override below to cascade down - a long task
+   description should wrap at whole words, never split one mid-letter
+   ("all words should be formatted to be on the same row"), and this
+   label is the one place in that table most likely to hold long text. */
+.setup-task-static { flex: 1; min-width: 0; font-size: 0.78rem; overflow-wrap: normal; }
 
 /* A real bug report, live-reproduced at a phone width: a multi-word
    position name ("Classroom Hallway Supervisor") wrapped into 6+ single-
@@ -3688,7 +3693,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      (.setup-assignment-table already opts out of nowrap for this same
      reason - this brings the Floater Chart's own header in line with it). */
   .floater-card-table th { font-size: 0.6rem; padding: 0.25rem 0.3rem; white-space: normal; }
-  .floater-card-table td { padding: 0.35rem 0.3rem; }
+  /* overflow-wrap: normal overrides the base .floater-card-table td rule's
+     break-word - fine at desktop's wide columns, but at a phone-width
+     column even a single position/member name or task description can be
+     too narrow for break-word's default behavior to stay readable
+     ("all words should be formatted to be on the same row"). */
+  .floater-card-table td { padding: 0.35rem 0.3rem; overflow-wrap: normal; }
   .floater-chart-table th:nth-child(1) { width: 30%; }
   .floater-chart-table th:nth-child(2) { width: 16%; }
   .floater-chart-table th:nth-child(3) { width: 54%; }
@@ -4411,7 +4421,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    the NEXT card over in the neighboring table column. Wrapping drops the
    buttons to their own line, staying inside this card, instead. */
 .class-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; min-width: 0; overflow-wrap: break-word; }
+/* overflow-wrap: normal (the default - no forced break-word here) is
+   deliberate: a real bug report on a narrow mobile column found titles
+   like "Brain Games and Logic" broken ONE CHARACTER PER LINE ("Brai" /
+   "n" / "Ga" / "mes" / ...) - break-word lets the browser split inside a
+   word whenever the column is too narrow for it, and at this card's
+   mobile width even short words didn't fit. Whole words wrapping at
+   their own natural spaces (or, worst case, one word overflowing its own
+   box - safely contained by .class-schedule-cell's own overflow: hidden
+   below, not bleeding into the neighbor) reads far better than
+   fragmented text - "all words should be formatted to be on the same
+   row." */
+.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; min-width: 0; }
 /* Belt-and-suspenders for the same bug: even with the wrap fix above,
    nothing clips a card that somehow still renders wider than its cell
    (e.g. a single unbroken class name longer than the column) - the
