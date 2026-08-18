@@ -6,7 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel, formatTime, ageFromBirthday } = require('../utils/dates');
+const { formatDateLabel, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { createStorageClient } = require('../utils/storage');
 const { saveUpload, removeUpload } = require('../utils/uploadBackend');
@@ -444,6 +444,34 @@ router.get('/members/import-template.xlsx', (req, res) => {
   res.send(buffer);
 });
 
+// Same "registered before /members/:id so this literal path never gets
+// shadowed" reasoning as import-template.xlsx just above - see routes/
+// admin-members.js's POST /members/import-birthdays (further down) for
+// what actually processes an uploaded copy of this template.
+router.get('/members/import-birthdays-template.xlsx', (req, res) => {
+  const buffer = buildTemplateWorkbook(['First Name', 'Last Name', 'Birthday'], [['Alice', 'Smith', '2015-04-12']]);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="import-birthdays-template.xlsx"');
+  res.send(buffer);
+});
+
+// utils/spreadsheetWorker.js reads every cell with raw:false, i.e. its
+// FORMATTED display text - a genuine Excel/Sheets Date-typed cell (what
+// actually typing a birthdate into a spreadsheet produces) comes back
+// as something like "4/12/2015" in whatever locale format the sheet
+// used, not the ISO "2015-04-12" the birthday column is stored as and
+// isValidISODate expects. Accepts both: already-ISO text as-is, or a
+// U.S.-style M/D/YYYY (the overwhelming common case for a Date cell)
+// normalized into ISO.
+function normalizeBirthdayToISO(value) {
+  if (isValidISODate(value)) return value;
+  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(String(value).trim());
+  if (!match) return null;
+  const [, m, d, y] = match;
+  const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  return isValidISODate(iso) ? iso : null;
+}
+
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 
 // Clicking a member's name anywhere lands here - a read-only profile with
@@ -772,6 +800,67 @@ router.post('/members/import/confirm', async (req, res) => {
   }
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
+});
+
+// --- Import Birthdays: a real request for a narrower, single-purpose
+// import than the full-profile one above - just First/Last Name +
+// Birthday, matched against EXISTING members only (never creates a new
+// one), and - unlike the full-profile import's "never overwrite what's
+// already set" merge rule - always sets the birthday to whatever the
+// sheet says, since correcting/backfilling birthdays in bulk is this
+// import's entire purpose. Reuses normalizeImportRow (its firstName/
+// lastName/birthday parsing is exactly this row shape already) even
+// though the sheet only has 3 of its many possible columns - every
+// other field just comes back undefined and is ignored. Birthday is
+// only ever shown/edited on a STUDENT's profile (see partials/member-
+// form-fields.ejs's data-student-only) - matching that, a row that
+// resolves to a parent is skipped rather than writing to a field
+// nothing in the UI ever surfaces for them. The GET template route
+// lives up by /members/import-template.xlsx (before /members/:id) for
+// the same reason that one does - see its own comment. ---
+
+router.post('/members/import-birthdays', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
+  }
+
+  let rows;
+  try {
+    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.name && r.birthday);
+  } catch (err) {
+    return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
+
+  let updated = 0;
+  let invalidDate = 0;
+  let notFound = 0;
+  let notAStudent = 0;
+
+  for (const r of rows) {
+    const birthday = normalizeBirthdayToISO(r.birthday);
+    if (!birthday) {
+      invalidDate++;
+      continue;
+    }
+    const existing = await db.prepare('SELECT id, member_type FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(r.name);
+    if (!existing) {
+      notFound++;
+      continue;
+    }
+    if (existing.member_type !== 'student') {
+      notAStudent++;
+      continue;
+    }
+    await db.prepare('UPDATE members SET birthday = ? WHERE id = ?').run(birthday, existing.id);
+    updated++;
+  }
+
+  const parts = [`${updated} birthday(s) updated`];
+  if (notFound) parts.push(`${notFound} name(s) not found`);
+  if (notAStudent) parts.push(`${notAStudent} matched a parent (birthdays only apply to students)`);
+  if (invalidDate) parts.push(`${invalidDate} row(s) had an unreadable date`);
+
+  res.redirect('/admin/members?notice=' + encodeURIComponent(parts.join(', ') + '.'));
 });
 
 // --- Mass Import: one row = one whole household (up to 2 parents + 8

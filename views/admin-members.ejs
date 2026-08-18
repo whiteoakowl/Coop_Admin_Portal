@@ -83,6 +83,7 @@
         <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-families-dialog').showModal()">Edit Families</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('mass-import-dialog').showModal()">Mass Import Families</button>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-birthdays-dialog').showModal()">Import Birthdays</button>
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
@@ -175,6 +176,22 @@
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Import Families</button>
+        </div>
+      </form>
+    </dialog>
+
+    <%# First/Last Name + Birthday only - matched against existing
+        members and always overwrites whatever birthday they already
+        have, unlike Import's own "never overwrite" merge rule above. %>
+    <dialog id="import-birthdays-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/members/import-birthdays" enctype="multipart/form-data">
+        <h3>Import Birthdays</h3>
+        <p class="hint">Matches existing students by First/Last Name and sets their birthday - it won't create new members.</p>
+        <a class="btn-secondary import-sample-link" href="/admin/members/import-birthdays-template.xlsx">Download Sample File</a>
+        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import Birthdays</button>
         </div>
       </form>
     </dialog>
