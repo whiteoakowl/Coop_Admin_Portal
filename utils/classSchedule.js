@@ -1,6 +1,6 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
-const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection } = require('./volunteers');
+const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -1259,6 +1259,14 @@ async function autoAssignFloatersForDay(day) {
   const { positionRanges, ownPositionsByMember, windowByFamily } = await ownPositionsAndFamilyWindowsForDay(day);
   if (!Object.keys(ownPositionsByMember).length) return;
 
+  // A real bug report: an admin removing someone from a floater hour
+  // (routes/admin-volunteers.js's own remove route) wasn't sticking - the
+  // very next call to this function, which syncDayMemberRosters always
+  // makes on its way to rebuilding the day's rosters, re-derived the same
+  // eligibility from scratch and put them right back. excludedPairs is
+  // that removal's own memory - see removeMemberFromSection's comment.
+  const excludedPairs = await excludedFloaterPairsForList(list.id);
+
   // Only the family's designated primary parent gets auto-floated - a
   // family with 2 parents shouldn't end up with both of them
   // individually placed on every blank hour.
@@ -1272,6 +1280,7 @@ async function autoAssignFloatersForDay(day) {
       if (ownPositions.has(position)) continue;
       const section = sectionByPosition[position];
       if (!section) continue;
+      if (excludedPairs.has(`${parentId}-${section.id}`)) continue;
       const overlapsWindow = range.startMin < window.end && range.endMin > window.start;
       if (!overlapsWindow) continue;
       await addMemberToSection(list.id, parentId, section.id);

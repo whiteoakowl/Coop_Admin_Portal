@@ -83,17 +83,34 @@ async function setSectionRank(listId, memberId, sectionId, rank) {
 }
 
 // Removes a member from just one hour (Floater Teams card's trash can) -
-// unlike remove-member elsewhere, which drops them from the whole list.
+// unlike remove-member elsewhere, which drops them from the whole list. A
+// real bug report: this removal wasn't sticking - the DELETE below always
+// worked, but the very next syncDayMemberRosters (routes/admin-volunteers.
+// js's remove route calls it right after, to keep the day's rosters in
+// sync) re-runs utils/classSchedule.js's autoAssignFloatersForDay first,
+// which re-derives eligibility from scratch and put the same primary
+// parent right back in, all within that same request. The explicit
+// exclusion row below is what makes the removal actually stick - see its
+// own table comment (supabase/migrations/*_volunteer_floater_exclusions.
+// sql) and autoAssignFloatersForDay's own skip check.
 async function removeMemberFromSection(listId, memberId, sectionId) {
   await db.prepare('DELETE FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
     listId,
     memberId,
     sectionId
   );
+  await db
+    .prepare('INSERT INTO volunteer_floater_exclusions (volunteer_list_id, member_id, section_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING')
+    .run(listId, memberId, sectionId);
 }
 
-// Adds a member to one hour section (Floater Teams "+ Add Member" popup) -
-// default rank 'sometimes', same as the day list's own quick-add.
+// Adds a member to one hour section (Floater Teams "+ Add Member" popup,
+// and the CSV import) - default rank 'sometimes', same as the day list's
+// own quick-add. A deliberate add always wins over a past removal, so this
+// also clears any exclusion row removeMemberFromSection left behind for
+// this exact (member, section) pair - otherwise re-adding someone by hand
+// right after removing them would look like it worked (the row's back)
+// but silently vanish again the next time anything re-syncs the day.
 async function addMemberToSection(listId, memberId, sectionId) {
   await db
     .prepare(
@@ -101,6 +118,20 @@ async function addMemberToSection(listId, memberId, sectionId) {
        ON CONFLICT (volunteer_list_id, member_id, section_id) DO NOTHING`
     )
     .run(listId, memberId, sectionId);
+  await db.prepare('DELETE FROM volunteer_floater_exclusions WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').run(
+    listId,
+    memberId,
+    sectionId
+  );
+}
+
+// Every (member, section) pair explicitly removed from this list and not
+// since re-added - autoAssignFloatersForDay's own "don't put them back"
+// check. A Set of "memberId-sectionId" strings, cheap to build once per
+// sync call and check in a loop rather than a query per candidate.
+async function excludedFloaterPairsForList(listId) {
+  const rows = await db.prepare('SELECT member_id AS "memberId", section_id AS "sectionId" FROM volunteer_floater_exclusions WHERE volunteer_list_id = ?').all(listId);
+  return new Set(rows.map((r) => `${r.memberId}-${r.sectionId}`));
 }
 
 // Builds { sections: [{...section, members: [{member, cells:[{date,position,room}]}]}], dates, dateLabels }
@@ -162,5 +193,6 @@ module.exports = {
   setSectionRank,
   removeMemberFromSection,
   addMemberToSection,
+  excludedFloaterPairsForList,
   buildListGrid,
 };
