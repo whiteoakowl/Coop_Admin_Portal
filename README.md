@@ -63,11 +63,11 @@ A SQLite database is created automatically at `data/attendance.db` on first run,
 | Setup/Cleanup | Setup/Cleanup teams and task lists |
 | Schedules | Classes, hours, rooms, and enrollment/staffing - see "Setting up rosters & members" below |
 | Logs | Absence/late submissions, check-in/out history, the allergy/medical log, and name tag requests |
-| Members | The full member list (add, import, delete) |
+| Members | The full member list (add, import, delete). Member Type is Parent/Student/Admin - Admin is for co-op staff/leaders and adds an optional Admin Position dropdown (populated from Settings → Admin & Leaders) |
 | Library | Checkout/checkin for library items |
 | Documents | Uploaded PDFs/Word docs shown on the public Documents page |
-| Design/Print | Name tag and schedule card design, badge printing |
-| Settings | Username/password, Quick Links, Install App, Documents, and Backup/Restore |
+| Design/Print | Name tag (Student/Parent/Admin) and schedule card design, badge printing, and printing library barcodes (category dropdown → Avery labels, Print tab) |
+| Settings | Username/password, Class Check-In PIN, Admin & Leaders (the admin position list), Quick Links, Install App, and Documents |
 
 ## Admin access model
 

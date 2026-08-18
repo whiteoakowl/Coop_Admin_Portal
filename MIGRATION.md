@@ -1002,3 +1002,36 @@ things worth knowing:
 3. `scripts/migrate-to-supabase.js` still exists, dry-run-verified but never
    run for real (there was never any real data to migrate) - it's there if
    a future need for it comes up.
+
+## Post-migration note: `db/schema.sql` is stale documentation, not a second source of truth
+
+Confirmed while adding a later feature (the `admin_positions` table/
+`members.admin_position_id` column, `supabase/migrations/
+20260818010000_admin_positions.sql`) that `db/schema.sql` has fallen behind
+`supabase/migrations/*.sql` by several migrations already - it has none of
+`setup_cleanup_assignments`, `setup_second_task_slot`,
+`volunteer_floater_exclusions`, or this session's `admin_positions`. That's
+consistent with this doc's own earlier note ("deliberately left in place,
+unread by any code now") - nothing applies `db/schema.sql` anywhere
+(`db/index.js` only ever reads `supabase/migrations/*.sql`, see that file's
+own `allMigrationSql()`), so its comments can still be useful color on the
+*original* SQLite design of an older table, but don't trust it for a
+table/column's *current* shape, and don't bother hand-editing it to keep it
+in sync when adding a new migration - that's extra effort spent maintaining
+a file nothing reads, and partial updates would just make it a less honest
+version of "stale" than leaving it alone entirely. `supabase/migrations/
+*.sql` (the whole directory, applied in filename order) is the only real
+schema source, for both a fresh PGlite instance and a real Supabase
+project - see `db/index.js`'s own comment on why every file in that
+directory gets applied, not just the initial one.
+
+Adding a migration is otherwise routine: drop a new
+`supabase/migrations/<timestamp>_<name>.sql` file in with a later timestamp
+than the last one (`YYYYMMDDHHMMSS_name.sql` - the exact value doesn't have
+to be a real timestamp, just sortable-after the previous file), and both
+`db/index.js`'s PGlite bootstrap and a real `supabase db push` pick it up
+automatically. If the new table needs first-boot seed data, add it to
+`db/bootstrapPg.js`'s `seedIfMissing()` (guard it with an existence check,
+same as every other block there) rather than baking it into the migration
+file itself, matching how `name_tag_templates`/`misc_badge_templates`/etc.
+already do it.
