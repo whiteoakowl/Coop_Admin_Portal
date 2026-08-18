@@ -67,6 +67,11 @@ test('GET /admin/members/import-birthdays-template.xlsx has just the 3 requested
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
   assert.deepEqual(rows[0], ['First Name', 'Last Name', 'Birthday']);
+  // Real request: the sample's own Birthday example should read
+  // MM/DD/YYYY, the shape an admin typing a date directly into Excel/
+  // Sheets naturally produces - not the ISO shape the column is
+  // actually stored as internally.
+  assert.equal(rows[1][2], '04/12/2015');
 });
 
 test('POST /admin/members/import-birthdays sets/overwrites a matched student, skips a parent match, an unknown name, and a bad date', async () => {

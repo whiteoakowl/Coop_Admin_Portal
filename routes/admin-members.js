@@ -466,7 +466,13 @@ router.get('/members/import-template.xlsx', (req, res) => {
 // admin-members.js's POST /members/import-birthdays (further down) for
 // what actually processes an uploaded copy of this template.
 router.get('/members/import-birthdays-template.xlsx', (req, res) => {
-  const buffer = buildTemplateWorkbook(['First Name', 'Last Name', 'Birthday'], [['Alice', 'Smith', '2015-04-12']]);
+  // A real request: the sample's own Birthday example should read
+  // MM/DD/YYYY ("06/06/2026"), not the ISO shape the column is actually
+  // stored as internally - normalizeBirthdayToISO below already accepts
+  // both, but MM/DD/YYYY is what an admin typing a date directly into
+  // Excel/Sheets naturally produces, and showing that shape in the
+  // sample is what makes the expected format obvious at a glance.
+  const buffer = buildTemplateWorkbook(['First Name', 'Last Name', 'Birthday'], [['Alice', 'Smith', '04/12/2015']]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="import-birthdays-template.xlsx"');
   res.send(buffer);
