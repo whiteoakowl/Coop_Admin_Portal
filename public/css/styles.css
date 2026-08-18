@@ -1158,21 +1158,50 @@ body.public-page .roster-empty {
 
 .logout-form { margin: 0; }
 
-/* Full Screen toggle - sits at the top-right of every admin page (desktop),
-   independent of whichever page/panel is open, instead of living inside the
-   sidebar or one page's own content. position: absolute (not fixed) so it
-   scrolls away with the page's own content instead of staying pinned over
-   the viewport and overlapping each page's <h1> as the page scrolls - only
-   .admin-sidebar itself needs to stay glued to the viewport. Hidden below
-   the mobile-topbar breakpoint, where its twin lives inline in the
-   topbar's own top-right icon row instead (see admin-nav.ejs). */
-.admin-page-corner-actions { position: absolute; top: 1rem; right: 1.25rem; z-index: 55; display: flex; align-items: center; gap: 0.6rem; }
+/* Search + Full Screen toggle - a real bug report: as a plain
+   position:absolute corner overlay, this used to scroll away WITH the
+   page's own content (by design, per this rule's old comment) but that
+   meant it could just as easily land ON TOP of whatever heading/toolbar
+   happened to be sitting under its fixed top-right corner on a shorter
+   page, or on any page once scrolled - "should not float and overlap onto
+   the information on each page... should be an orange bar at the top of
+   the page that freezes and is still visible as you scroll." position:
+   sticky (not fixed) is what makes this "no overlap" rather than just
+   "always visible": sticky keeps the header in normal document flow -
+   .admin-main and every other sibling on the page still reserves real
+   space for it, the same way this exact pattern already works for
+   .admin-mobile-topbar below - and only pins it to the viewport top once
+   the page would otherwise scroll it away. Desktop/tablet only ("This is
+   a desktop and tablet view issue only" - a real request) - hidden below
+   the mobile-topbar breakpoint, where its own sticky top bar (with the
+   same search + Full Screen controls folded into its icon row) already
+   does this correctly. margin-left clears the fixed sidebar, same offset
+   .admin-main itself uses. */
+.admin-page-corner-actions {
+  position: sticky;
+  top: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-left: 220px;
+  padding: 0.65rem 1.25rem;
+  background: var(--accent);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
 
-/* Same fixed placement, but the corner button's plain white pill would sit
-   uncomfortably light against the (still fixed) sidebar's darker panel -
-   nudge it visually distinct without changing the shared .admin-corner-link
-   look used on the public landing page. */
-.admin-page-corner-actions .admin-corner-link { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+/* White-on-orange variant of the shared pill controls (.admin-corner-link/
+   .admin-corner-search are also used unscoped elsewhere - the public
+   landing page, the kiosk homepage - on a light background, and must keep
+   their own default look there), scoped to just this bar. */
+.admin-page-corner-actions .admin-corner-link,
+.admin-page-corner-actions .admin-corner-search {
+  background: rgba(255,255,255,0.95);
+  border-color: transparent;
+  box-shadow: none;
+}
+.admin-page-corner-actions .admin-corner-link:hover { background: #fff; }
 
 /* Settings + Log out live at the bottom of the sidebar on desktop, pinned
    there via margin-top:auto; folded into the mobile topbar's right side
