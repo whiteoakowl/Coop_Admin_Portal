@@ -10,18 +10,17 @@
       <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= cls.class_name %>&quot;? This cannot be undone.">
         <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
       </form>
-      <button type="button" class="roster-action-btn" data-edit-class-btn>Edit</button>
+      <%# autofocus here, not the Delete button that comes first in DOM order
+          above - a view dialog opening with keyboard focus already on its
+          most destructive action is one accidental Enter press away from a
+          delete confirmation. %>
+      <button type="button" class="roster-action-btn" data-edit-class-btn autofocus>Edit</button>
     </div>
     <div class="class-view-footer-edit" hidden>
       <button type="button" class="roster-action-btn" data-cancel-edit-btn>Cancel</button>
       <button type="submit" class="roster-action-btn" form="class-view-form-<%= cls.id %>">Save</button>
     </div>
   </div>
-  <%# autofocus, not the Delete button that happens to come first in DOM
-      order above - a view dialog opening with keyboard focus already on
-      its most destructive action is one accidental Enter press away from
-      a delete confirmation. %>
-  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close" autofocus><svg class="icon"><use href="#icon-x-circle"/></svg></button>
 </div>
 
 <div class="class-manage-layout">

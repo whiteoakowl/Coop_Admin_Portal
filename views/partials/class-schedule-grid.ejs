@@ -269,9 +269,9 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                           type="button"
                           class="icon-btn class-card-view-btn no-print"
                           data-view-class="<%= cls.id %>"
-                          aria-label="View <%= cls.class_name %> details"
-                          title="View class details/roster"
-                        ><svg class="icon"><use href="#icon-maximize"/></svg></button>
+                          aria-label="Edit <%= cls.class_name %> details"
+                          title="View/edit class details/roster"
+                        ><svg class="icon"><use href="#icon-edit"/></svg></button>
                       <% } %>
                     </div>
                     <%# Grade/teacher/assistant only - no student roster here;
