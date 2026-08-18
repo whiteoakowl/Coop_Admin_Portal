@@ -3324,6 +3324,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-editor-actions .btn-secondary,
 .name-tag-editor-actions .primary-btn { width: auto; text-align: center; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
+/* Reset to Default / Copy Design to All Name Tags are .btn-secondary,
+   which is purple everywhere else on the site (Cancel, etc.) - that read
+   as mismatched next to the orange Save Template button right beside it.
+   Scoped to this toolbar only, so the sitewide purple .btn-secondary
+   convention elsewhere is untouched; matches Save's own --btn-bg/
+   --btn-bg-hover fill exactly so all three read as one balanced set. */
+.name-tag-editor-actions .btn-secondary {
+  color: var(--ink);
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+}
+.name-tag-editor-actions .btn-secondary:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
+  color: var(--ink);
+}
+
+/* At phone widths this row (already wrapping to its own line below the
+   type-select/undo/zoom controls) still packed all 3 buttons into one
+   cramped row, each column narrow enough to force 2-3 lines of text at
+   different heights per button - "Reset to Default" 2 lines, "Copy
+   Design to All Name Tags" 3, "Save Template" 2, a jagged, unbalanced
+   result. Stacking them full-width instead gives every button the whole
+   row to lay out its own text evenly. */
+@media (max-width: 640px) {
+  .name-tag-editor-actions { flex-direction: column; align-items: stretch; width: 100%; }
+  .name-tag-editor-actions .btn-secondary,
+  .name-tag-editor-actions .primary-btn { width: 100%; }
+  .name-tag-editor-actions #save-status { text-align: center; }
+}
+
 /* Crop tool - a fixed-aspect frame (locked to the image element's own
    box ratio) the user pans by dragging and resizes via a zoom slider. */
 .name-tag-crop-frame {
