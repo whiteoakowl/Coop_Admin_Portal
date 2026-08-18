@@ -3873,8 +3873,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      suggested"). Higher specificity than the plain .floater-assign-form
      rule above wins this regardless of source order. */
   .floater-chart-table .floater-assign-form { flex-direction: row; align-items: center; }
-  .floater-chart-table .floater-assign-form select { width: auto; }
-  .floater-chart-table .floater-assign-btn { align-self: center; }
+  /* A real bug report, live-reproduced at a phone width: the dropdown
+     itself ran off the edge of the card, crowding out (or fully hiding)
+     the Assign/Unassign button beside it. Root cause: switching back to
+     a row layout above dropped the base rule's own flex:1;min-width:0
+     (see .floater-assign-form select, non-mobile, further up) without
+     replacing it - a flex item's min-width defaults to `auto`, not `0`,
+     which for a <select> means "at least as wide as my longest option's
+     text" ("Alexandria Rodriguez-Martinez (Available, infant)" and
+     similar easily out-measure a narrow phone card). flex:1;min-width:0
+     lets it shrink to whatever room the button leaves, and the
+     text-overflow rule keeps the truncated closed-state value readable
+     instead of letting the browser just clip mid-character. */
+  .floater-chart-table .floater-assign-form select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+  .floater-chart-table .floater-assign-btn { align-self: center; flex-shrink: 0; }
 }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
