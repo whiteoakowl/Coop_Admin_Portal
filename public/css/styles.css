@@ -4457,6 +4457,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    own scroll/pan gesture from hijacking a touch drag, same reasoning as
    the name tag/schedule card design editors' draggable elements. */
 .room-row-drag-handle { display: inline-flex; cursor: grab; touch-action: none; color: var(--muted); vertical-align: middle; margin-right: 0.3rem; }
+
+/* Grid/List view toggle (public/js/class-schedule-view-toggle.js) - a
+   real request: "these are simply small square icon buttons," so it's
+   just a tight pair of the sitewide .icon-btn, no extra chrome. */
+.class-schedule-view-toggle { display: flex; align-items: center; gap: 0.3rem; }
+
+/* List view - one flat row per class instead of the room x hour grid
+   above, sorted alphabetically. Reuses .roster-table's base styling; the
+   swatch mirrors the grid card's own left-border color accent so a class
+   still reads the same color at a glance in either view. */
+.class-schedule-list-table th { background: var(--brand-soft); text-align: left; font-size: 0.85rem; }
+.class-schedule-list-name-col { font-weight: 700; }
+.class-schedule-list-swatch { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle; }
 .room-row-drag-handle .icon { width: 0.9rem; height: 0.9rem; }
 .room-row-drag-handle:active { cursor: grabbing; }
 .class-schedule-room-grid tr.room-row-dragging { opacity: 0.55; background: var(--brand-soft); }

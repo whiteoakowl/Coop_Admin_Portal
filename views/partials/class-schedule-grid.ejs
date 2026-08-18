@@ -22,6 +22,37 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         onchange="window.location = '<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : '')"
       />
     </div>
+    <div class="category-filter">
+      <label for="class-schedule-hour-select-<%= day %>">Hour</label>
+      <select id="class-schedule-hour-select-<%= day %>" data-class-schedule-hour-filter="<%= day %>">
+        <option value="">All Hours</option>
+        <% hours.forEach(function(h) { %><option value="<%= h.position %>"><%= h.label %></option><% }); %>
+      </select>
+    </div>
+    <%# Grid view already lays every hour out as its own column, so this
+        filter's only real effect is on List view's flat row-per-class
+        table below - kept visible in both views (a real request) rather
+        than hidden away when Grid is active. %>
+    <div class="class-schedule-view-toggle" role="group" aria-label="Grid or list view">
+      <button
+        type="button"
+        class="icon-btn icon-btn-active"
+        data-class-schedule-view-btn="grid"
+        data-class-schedule-day="<%= day %>"
+        aria-pressed="true"
+        aria-label="Grid view"
+        title="Grid view"
+      ><svg class="icon"><use href="#icon-grid"/></svg></button>
+      <button
+        type="button"
+        class="icon-btn"
+        data-class-schedule-view-btn="list"
+        data-class-schedule-day="<%= day %>"
+        aria-pressed="false"
+        aria-label="List view"
+        title="List view"
+      ><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
+    </div>
     <% if (!gridReadOnly) { %>
       <div class="class-schedule-archive-controls" id="class-schedule-archive-controls-<%= day %>" data-archive-controls="class-archive-form-<%= day %>" hidden>
         <label class="checkbox-option class-schedule-select-all">
@@ -222,7 +253,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 </dialog>
 <% } %>
 
-<div class="roster-scroll">
+<div class="roster-scroll" data-class-schedule-view="grid" data-class-schedule-day="<%= day %>">
   <table class="roster-table class-schedule-room-grid"<% if (!gridReadOnly) { %> data-room-reorder-day="<%= day %>"<% } %>>
     <thead>
       <tr>
@@ -298,6 +329,59 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     </tbody>
   </table>
 </div>
+
+<%
+  // List view - a real request: "grid view and list view... when you
+  // click list view it shows all of the classes in alphabetical order."
+  // Flattened straight from roomGrid.rows/cells rather than a separate
+  // query - it's the exact same class set the grid above already has,
+  // just laid out as one flat row per class instead of a room x hour
+  // matrix.
+  var allClasses = [];
+  roomGrid.rows.forEach(function(row) {
+    row.cells.forEach(function(cell) {
+      cell.classes.forEach(function(cls) {
+        allClasses.push(Object.assign({}, cls, { room: row.room }));
+      });
+    });
+  });
+  allClasses.sort(function(a, b) { return a.class_name.localeCompare(b.class_name, undefined, { sensitivity: 'base' }); });
+  var hourLabelByPosition = {};
+  roomGrid.hours.forEach(function(h) { hourLabelByPosition[h.position] = h.label; });
+%>
+<div class="roster-scroll" data-class-schedule-view="list" data-class-schedule-day="<%= day %>" hidden>
+  <table class="roster-table class-schedule-list-table">
+    <thead>
+      <tr>
+        <th>Class</th>
+        <th>Hour</th>
+        <th>Room</th>
+        <th>Grade</th>
+        <th>Teacher</th>
+        <th>Assistant</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (allClasses.length === 0) { %>
+        <tr><td colspan="6" class="roster-empty">No classes yet.</td></tr>
+      <% } %>
+      <% allClasses.forEach(function(cls) { %>
+        <tr data-class-schedule-hour="<%= cls.hour_position %>">
+          <td class="class-schedule-list-name-col">
+            <span class="class-schedule-list-swatch" style="background: <%= cls.color %>;"></span>
+            <%= cls.class_name %>
+          </td>
+          <td><%= hourLabelByPosition[cls.hour_position] || cls.hour_position %></td>
+          <td><%= cls.room %></td>
+          <td><%= cls.gradeLabel || '—' %></td>
+          <td><%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></td>
+          <td><%= cls.assistantNames.length ? cls.assistantNames.join(', ') : '—' %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<script src="/js/class-schedule-view-toggle.js"></script>
 
 <% if (!gridReadOnly) { %>
 <dialog id="class-view-dialog" class="class-view-dialog"></dialog>
