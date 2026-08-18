@@ -72,6 +72,14 @@ router.get('/design', async (req, res) => {
   // list is (allClassesList's own ORDER BY), so the picker reads in a
   // predictable, alphabetical order rather than day-then-hour.
   const classesForQr = await allClassesList();
+  // Distinct room values across those classes, for the Filter popup's Room
+  // dropdown - a real request: "Class QR code printing filter should be
+  // filter by day and room number, remove hour filter." Room is free text
+  // (unlike hour_position's fixed 1-4), so the dropdown's own options are
+  // whatever rooms are actually in use rather than a hardcoded list.
+  const qrRoomOptions = [...new Set(classesForQr.map((c) => c.room).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
   // Requests tab data - only meaningful when tab === 'requests', but
   // computed unconditionally (same eager-compute style as members/badges
@@ -100,6 +108,7 @@ router.get('/design', async (req, res) => {
     initialType,
     members,
     classesForQr,
+    qrRoomOptions,
     libraryItems: await allLibraryItems(),
     libraryTypes: await allLibraryTypes(),
     error: req.query.error || null,

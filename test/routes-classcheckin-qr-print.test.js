@@ -42,7 +42,7 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-test('Class Check-In QR Codes picker lists every class, with no description text and a Day/Hour filter popup', async () => {
+test('Class Check-In QR Codes picker lists every class, with no description text, a Room column, and a Day/Room filter popup', async () => {
   const { cookie } = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'QR Picker Class', room: 'Room 1' });
 
@@ -52,17 +52,24 @@ test('Class Check-In QR Codes picker lists every class, with no description text
   assert.match(res.text, new RegExp(`name="classIds" value="${classId}"`));
   assert.match(res.text, /QR Picker Class/);
   assert.doesNotMatch(res.text, /One QR code per selected class/);
+  // The Print button now sits in the same top row as Select All/Select
+  // None/Filter, not a separate row below the picker list - a real
+  // request: "the print button should be moved to the top right of the
+  // page with the other buttons."
+  assert.match(res.text, /id="classcheckin-qr-filter-btn"[\s\S]*?name-tag-bulk-submit"[\s\S]*?Print/);
 
-  // Filter button + popup (Day/Hour selects, Save button) that narrows the
-  // class list - a real request: "add a filter button. when clicking the
-  // filter button you get a popup window to select day and hour ... this
-  // narrow the list of class choices to choose from."
+  // Filter button + popup (Day/Room selects, Save button) that narrows the
+  // class list - a real request: "Class QR code printing filter should be
+  // filter by day and room number, remove hour filter."
   assert.match(res.text, /id="classcheckin-qr-filter-btn"/);
   assert.match(res.text, /id="classcheckin-qr-filter-dialog"/);
   assert.match(res.text, /id="classcheckin-qr-filter-day-select"/);
-  assert.match(res.text, /id="classcheckin-qr-filter-hour-select"/);
+  assert.match(res.text, /id="classcheckin-qr-filter-room-select"/);
+  assert.doesNotMatch(res.text, /id="classcheckin-qr-filter-hour-select"/);
   assert.match(res.text, /id="classcheckin-qr-filter-save-btn"/);
-  assert.match(res.text, new RegExp(`class="qr-picker-row" data-day="monday" data-hour="1"[\\s\\S]*?value="${classId}"`));
+  assert.match(res.text, new RegExp(`class="qr-picker-row" data-day="monday" data-room="Room 1"[\\s\\S]*?value="${classId}"`));
+  // Room column in the picker table itself, alongside Class/Day/Time.
+  assert.match(res.text, /<th>Room<\/th>/);
 });
 
 test('printing with no classes selected redirects with an error', async () => {
@@ -104,5 +111,17 @@ test('the print sheet paginates 4 classes per page, each with an absolute QR lin
   await t.test('the QR rendering script and vendored library are both loaded', async () => {
     assert.match(res.text, /<script src="\/js\/vendor\/qrcode\.min\.js"><\/script>/);
     assert.match(res.text, /<script src="\/js\/classcheckin-qr-print\.js"><\/script>/);
+  });
+
+  // A real bug report: "The print preview shows 4 nice class cards on one
+  // page ... When you go to the printer it is on two pages." Root cause:
+  // @page's own non-zero margin, stacked on top of .qr-sheet-page's own
+  // identical-sized 8.5in x 11in box (with its own padding as the visual
+  // margin), shrank the printable area enough that the bottom of the page
+  // had nowhere to go but a second physical page - see styles.css's
+  // .qr-sheet-page comment for the full explanation. margin: 0 here is
+  // what makes the div's box exactly match the physical page again.
+  await t.test('@page has no margin of its own - only .qr-sheet-page\'s own padding provides one', async () => {
+    assert.match(res.text, /@page\s*\{\s*size:\s*letter portrait;\s*margin:\s*0;\s*\}/);
   });
 });

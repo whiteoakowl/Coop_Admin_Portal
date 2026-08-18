@@ -1406,11 +1406,40 @@ body.public-page .roster-empty {
      unreadably-narrow line - a right border between the two items in
      each row, a bottom border between the two rows. */
   .totals-card { grid-template-columns: repeat(3, 1fr); }
-  .totals-item { padding: 0.75rem 0.4rem; border-bottom: 1px solid var(--border); }
+  .totals-item { padding: 0.75rem 0.4rem; border-bottom: 1px solid var(--border); min-width: 0; }
   .totals-item:nth-child(3n) { border-right: none; }
   .totals-item:nth-child(n+4) { border-bottom: none; }
   .totals-item .stat-value { font-size: 1.4rem; }
   .totals-item .stat-label { font-size: 0.7rem; }
+}
+
+/* A real bug report: "On mobile view, shrink dashboard panel font so that
+   a slide bar is not necessary." Narrower than the 720px breakpoint above
+   (which only gets the totals grid down to 3 columns) - on a genuinely
+   narrow phone, a 3-digit stat ("124 of 128") or a 2-digit trend delta
+   ("▲ +12") next to it is enough to push .analytics-stat-grid's own 2-
+   column row past the screen's own width, forcing the whole page to
+   scroll sideways to read the rest of the card. Shrinking these panels'
+   own font sizes (not just the totals grid's) at this width keeps every
+   number readable without ever needing that slide. min-width: 0 on each
+   grid item is the actual structural fix underneath the font shrink - a
+   grid item's default min-width is its own content's natural size, which
+   for a nowrap number+label pairing can be wider than the 1fr track it's
+   sitting in, forcing the whole grid (and the page) wider than the
+   viewport even before considering font size at all; 0 lets it shrink
+   and wrap instead. */
+@media (max-width: 480px) {
+  .totals-item .stat-value { font-size: 1.15rem; }
+  .totals-item .stat-label { font-size: 0.62rem; }
+  .analytics-stat-grid { gap: 0.5rem; }
+  .analytics-stat { padding: 0.55rem 0.6rem; min-width: 0; }
+  .analytics-stat-label { font-size: 0.68rem; }
+  .analytics-stat-value { font-size: 1.15rem; }
+  .analytics-stat-of { font-size: 0.75rem; }
+  .trend-badge { font-size: 0.62rem; }
+  .alert-log-day { font-size: 0.68rem; }
+  .alert-log-message { font-size: 0.9rem; }
+  .alert-log-body { min-width: 0; }
 }
 
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
@@ -3458,8 +3487,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-crop-actions .primary-btn { flex: 1; width: auto; margin-top: 0; padding: 0.55rem 0.9rem; font-size: 0.9rem; }
 
 .name-tag-bulk-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.25rem; }
-.name-tag-bulk-submit-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.name-tag-bulk-submit { margin-top: 1rem; }
+/* A real request: "the print button should be moved to the top right of
+   the page with the other buttons" - the bulk print pickers under
+   Design/Print (Name Tags, Cards Both/Duplex, Barcodes, Barcode Labels,
+   Class Check-In QR Codes, Library Barcodes) used to submit from a
+   .name-tag-bulk-submit-row sitting BELOW the whole scrollable picker
+   list, separate from the Select All/Select None/Filter row above it.
+   Print is now the last control in .name-tag-bulk-filter itself -
+   margin-left: auto pins it (and any sibling submit button, e.g. "Print
+   Barcodes Only") to the row's right edge, same corner every other
+   toolbar's own action row already uses (.roster-btn-row). */
+.name-tag-bulk-filter .name-tag-bulk-submit { margin-left: auto; }
+.name-tag-bulk-filter .name-tag-bulk-submit + .name-tag-bulk-submit { margin-left: 0; }
 
 @media (max-width: 720px) {
   .name-tag-editor-body { grid-template-columns: 1fr; }

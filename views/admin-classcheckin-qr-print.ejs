@@ -2,7 +2,20 @@
 <html lang="en">
 <head>
   <%- include('partials/head', { title }) %>
-  <style>@page { size: letter portrait; margin: 0.5in; }</style>
+  <%# A real bug report: "The print preview shows 4 nice class cards on one
+      page ... When you go to the printer it is on two pages." Root cause:
+      this @page rule's own 0.5in margin shrinks the browser's actual
+      printable area to 7.5in x 10in, but .qr-sheet-page (styles.css) is
+      sized to a full, un-shrunk 8.5in x 11in with its OWN 0.5in padding
+      providing the visual margin - stacking both margins meant the page's
+      bottom 0.5in of content had nowhere to go but a second physical page,
+      even though the on-screen preview (which doesn't apply @page at all)
+      looked like one page. margin: 0 here matches every other bulk print
+      page in this app that sizes its own sheet div to the full 8.5x11in
+      (see admin-name-tag-bulk-print.ejs, admin-schedule-print.ejs, etc.) -
+      .qr-sheet-page's own padding is the only margin now, so the div's box
+      exactly matches the physical page and both preview and printer agree. %>
+  <style>@page { size: letter portrait; margin: 0; }</style>
 </head>
 <body class="admin-page">
   <%- include('partials/admin-nav') %>

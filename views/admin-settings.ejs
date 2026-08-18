@@ -95,7 +95,7 @@
       <% } else if (activeTab === 'documents') { %>
         <div class="manage-section">
           <h2>Upload Document</h2>
-          <p class="hint">Add a PDF or Word document to show as a button on the <a href="/admin/documents">Documents</a> page.</p>
+          <p class="hint">Add a PDF or Word document to show as a button on the <a href="/admin/documents">Documents</a> page. Max file size: 5MB.</p>
           <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
             <label for="docTitle">Title</label>
             <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />

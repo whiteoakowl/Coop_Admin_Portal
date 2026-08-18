@@ -27,11 +27,46 @@ const DOCUMENTS_BUCKET = 'documents';
 const DOCUMENT_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
 if (!createStorageClient() && !fs.existsSync(DOCUMENT_DIR)) fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
 
+// 5MB, not the 20MB this used to allow - a real bug report: "When
+// uploading documents on the admin side. It times out and says something
+// went wrong. File doesn't upload." This app is deployed as one Netlify
+// Function (see netlify.toml) - Netlify's own request-body ceiling for a
+// standard function is ~6MB, well under the old 20MB limit, so any
+// document even a bit over that either got rejected by the platform
+// before ever reaching this route, or ran the Supabase Storage upload
+// call (utils/storage.js's uploadFile) right up against the function's
+// execution timeout on a slow connection - both read to an admin as
+// "times out." 5MB matches every other upload route in this app
+// (member/child photos, name tag/schedule card design images all use the
+// same limit - see routes/admin-members.js, admin-name-tag.js,
+// membership.js), already tuned for this exact platform ceiling.
+const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: MAX_DOCUMENT_BYTES },
   fileFilter: documentFileFilter,
 });
+
+// A file over the limit above makes multer.single() itself throw a
+// MulterError (LIMIT_FILE_SIZE) - unlike documentFileFilter rejecting a
+// wrong file TYPE (which just leaves req.file undefined for the route's
+// own "Please choose a PDF or Word file" branch to catch below), this
+// error was never caught anywhere, so it fell all the way through to
+// server.js's generic catch-all error handler and rendered the generic
+// 500 page ("Something went wrong") - the exact text in the bug report -
+// instead of the same friendly, specific redirect every other upload
+// failure on this route already gets.
+function uploadDocument(req, res, next) {
+  upload.single('file')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(
+        '/admin/settings?tab=documents&error=' +
+          encodeURIComponent(`That file is too large - documents are limited to ${MAX_DOCUMENT_BYTES / (1024 * 1024)}MB.`)
+      );
+    }
+    next(err);
+  });
+}
 
 router.get('/documents', async (req, res) => {
   const documents = await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all();
@@ -70,7 +105,7 @@ router.get('/documents/:id/file', async (req, res) => {
   res.send(buffer);
 });
 
-router.post('/documents/upload', upload.single('file'), async (req, res) => {
+router.post('/documents/upload', uploadDocument, async (req, res) => {
   if (!req.file) {
     return res.redirect(
       '/admin/settings?tab=documents&error=' +

@@ -181,12 +181,12 @@
       });
     }
 
-    // Filter button -> Day/Hour popup -> Save narrows the list to that one
-    // day+hour combination (both left on "All ..." shows every class again).
+    // Filter button -> Day/Room popup -> Save narrows the list to that one
+    // day+room combination (both left on "All ..." shows every class again).
     const qrFilterBtn = document.getElementById('classcheckin-qr-filter-btn');
     const qrFilterDialog = document.getElementById('classcheckin-qr-filter-dialog');
     const qrFilterDaySelect = document.getElementById('classcheckin-qr-filter-day-select');
-    const qrFilterHourSelect = document.getElementById('classcheckin-qr-filter-hour-select');
+    const qrFilterRoomSelect = document.getElementById('classcheckin-qr-filter-room-select');
     const qrFilterSaveBtn = document.getElementById('classcheckin-qr-filter-save-btn');
     if (qrFilterBtn && qrFilterDialog) {
       qrFilterBtn.addEventListener('click', () => qrFilterDialog.showModal());
@@ -194,9 +194,9 @@
     if (qrFilterSaveBtn && qrFilterDialog) {
       qrFilterSaveBtn.addEventListener('click', () => {
         const day = qrFilterDaySelect ? qrFilterDaySelect.value : '';
-        const hour = qrFilterHourSelect ? qrFilterHourSelect.value : '';
+        const room = qrFilterRoomSelect ? qrFilterRoomSelect.value : '';
         qrList.querySelectorAll('.qr-picker-row').forEach((row) => {
-          const matches = (!day || row.dataset.day === day) && (!hour || row.dataset.hour === hour);
+          const matches = (!day || row.dataset.day === day) && (!room || row.dataset.room === room);
           row.style.display = matches ? '' : 'none';
         });
         qrFilterDialog.close();
