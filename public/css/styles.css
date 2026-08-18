@@ -2729,10 +2729,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-card-print-block h2 { text-align: center; margin: 0 0 0.5rem; color: var(--muted); font-size: 1rem; font-weight: 700; }
 
 /* Print preview pages (Name Tag / Schedule Card / Class Schedule print
-   views): the Print button sits directly under the title instead of
-   beside it, and both are centered above the preview content below. */
-.print-preview-header { margin-bottom: 1.5rem; text-align: center; }
-.print-preview-header h1 { margin-bottom: 0.75rem; }
+   views, every *-print.ejs route): the Print button sits top-right next
+   to the title instead of centered underneath it - a real request: it
+   should be immediately visible/reachable without scrolling past
+   however many pages of preview content sit below, the same "primary
+   action pinned top-right" convention the rest of the admin already
+   uses (roster toolbars, the class view dialog's Edit/Save, etc.).
+   `order` (not DOM position) drives layout here rather than reordering
+   markup in all ~18 print-preview views individually: h1 first, button
+   second, and an optional third element (only admin-cards-duplex-
+   print.ejs's own .hint instructions paragraph uses this today) forced
+   onto its own full-width row below via flex-basis so it doesn't crowd
+   the title/button row on the one page that has one. */
+.print-preview-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; margin-bottom: 1.5rem; text-align: left; }
+.print-preview-header h1 { order: 1; flex: 1 1 auto; min-width: 0; margin: 0; }
+.print-preview-header .print-action-btn { order: 2; flex-shrink: 0; }
+.print-preview-header .hint { order: 3; flex-basis: 100%; margin: 0; }
 
 /* Each .badge-sheet-page is sized and inset exactly like the physical US
    Letter sheet it prints onto (see the matching @page rule in the two
