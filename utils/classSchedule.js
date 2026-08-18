@@ -1,6 +1,7 @@
 const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
+const { byLastName } = require('./members');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -147,26 +148,29 @@ async function saveHourLabel(day, position, label) {
 }
 
 async function studentsForClass(classId) {
-  return db
-    .prepare(
-      `SELECT m.*, f.name AS family_name FROM class_enrollments ce
-       JOIN members m ON m.id = ce.student_id
-       LEFT JOIN families f ON f.id = m.family_id
-       WHERE ce.class_id = ? AND m.active = 1
-       ORDER BY LOWER(m.name)`
-    )
-    .all(classId);
+  return (
+    await db
+      .prepare(
+        `SELECT m.*, f.name AS family_name FROM class_enrollments ce
+         JOIN members m ON m.id = ce.student_id
+         LEFT JOIN families f ON f.id = m.family_id
+         WHERE ce.class_id = ? AND m.active = 1`
+      )
+      .all(classId)
+  ).sort(byLastName);
 }
 
 async function staffForClass(classId) {
-  return db
+  const rows = await db
     .prepare(
       `SELECT m.*, cs.role FROM class_staff cs
        JOIN members m ON m.id = cs.member_id
-       WHERE cs.class_id = ? AND m.active = 1
-       ORDER BY cs.role, LOWER(m.name)`
+       WHERE cs.class_id = ? AND m.active = 1`
     )
     .all(classId);
+  // Same role-then-name order the old ORDER BY cs.role, LOWER(m.name) gave -
+  // just with the name tiebreak swapped for last-name.
+  return rows.sort((a, b) => a.role.localeCompare(b.role) || byLastName(a, b));
 }
 
 // One class, fully hydrated with its enrolled students and staff - used by
@@ -657,7 +661,7 @@ async function removeStaff(classId, memberId) {
 
 // Active students, for the enrollment picker.
 async function activeStudents() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student' ORDER BY LOWER(name)").all();
+  return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student'").all()).sort(byLastName);
 }
 
 // Active parents AND students, for the teacher/assistant picker - a
@@ -670,7 +674,9 @@ async function activeStudents() {
 // member_type so a picker can label a student option distinctly from a
 // parent one with the same or a similar name.
 async function activeMembersForStaff() {
-  return db.prepare("SELECT id, name, member_type FROM members WHERE active = 1 AND member_type IN ('parent', 'student') ORDER BY LOWER(name)").all();
+  return (
+    await db.prepare("SELECT id, name, member_type FROM members WHERE active = 1 AND member_type IN ('parent', 'student')").all()
+  ).sort(byLastName);
 }
 
 // Every class on this day whose ASSIGNED teacher and/or assistant is

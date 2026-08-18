@@ -8,7 +8,7 @@ const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { classesAtRiskForDay } = require('../utils/classSchedule');
 const { substituteBoard } = require('../utils/substitutes');
-const { membersWithMedicalNotes } = require('../utils/members');
+const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
 const { paginate, parsePage } = require('../utils/pagination');
 
 const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
@@ -32,7 +32,7 @@ async function allAbsenceSubmissions(dateFilter) {
     sql += ' AND a.session_date = ?';
     params.push(dateFilter);
   }
-  sql += ' ORDER BY a.session_date DESC, LOWER(m.name)';
+  sql += ' ORDER BY a.session_date DESC';
 
   return (await db
     .prepare(sql)
@@ -40,11 +40,21 @@ async function allAbsenceSubmissions(dateFilter) {
     .map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
+      date: r.date,
       dateLabel: formatDateLabel(r.date),
       statusLabel: r.status === 'late' ? 'Late' : 'Absent',
       reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
       description: r.reasonText || '—',
-    }));
+    }))
+    // Date desc stays the primary sort (newest submissions first) - last
+    // name only breaks ties within the same date, same as everywhere else
+    // member names sort ("ABC order according to the last name").
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
+        a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
+    );
 }
 
 async function absenceSubmissionDates() {

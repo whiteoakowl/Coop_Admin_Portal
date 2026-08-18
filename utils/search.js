@@ -24,6 +24,7 @@
 // small, already-indexed-by-member_id queries is negligible next to the
 // readability of keeping each concern separate.
 const db = require('../db');
+const { byLastName } = require('./members');
 
 const MAX_RESULTS = 20;
 
@@ -32,7 +33,7 @@ function matches(haystack, q) {
 }
 
 async function searchMembers(q) {
-  const all = await db.prepare('SELECT id, name, member_type, barcode FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  const all = (await db.prepare('SELECT id, name, member_type, barcode FROM members WHERE active = 1').all()).sort(byLastName);
   const matched = all.filter((m) => matches(m.name, q) || matches(m.barcode, q)).slice(0, MAX_RESULTS);
   const results = [];
   for (const m of matched) {

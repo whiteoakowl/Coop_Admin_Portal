@@ -68,7 +68,7 @@ async function findMemberByName(name, memberType) {
 // Every active parent-type member - the picker list on the public
 // Absence/Late and Name Tag Request forms.
 async function activeParentOptions() {
-  return db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent' ORDER BY LOWER(name)").all();
+  return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all()).sort(byLastName);
 }
 
 // Every other active member sharing memberId's family_id (any type -
@@ -77,7 +77,7 @@ async function activeParentOptions() {
 async function familyOf(memberId) {
   const self = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(memberId);
   if (!self || self.family_id == null) return [];
-  return db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY LOWER(name)').all(self.family_id, memberId);
+  return (await db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1').all(self.family_id, memberId)).sort(byLastName);
 }
 
 // True if any of memberId's family members is 2 years old or younger -
@@ -96,7 +96,7 @@ async function hasInfantChild(memberId) {
 // "children only" restriction now that family is a symmetric group
 // rather than a parent->child link).
 async function familyGroupsByParent() {
-  const parents = await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all();
+  const parents = (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all()).sort(byLastName);
   const byParent = {};
   for (const p of parents) {
     byParent[p.id] = (await familyOf(p.id)).map((m) => ({ id: m.id, name: m.name }));
@@ -166,13 +166,14 @@ async function setPrimaryParent(memberId, isPrimary) {
 // Medical Notes - the Allergies/Medical log's one data source, shared by
 // the Logs tab and the popup button on roster/class view pages.
 async function membersWithMedicalNotes() {
-  return db
-    .prepare(
-      `SELECT id, name, member_type, grade_level, medical_notes FROM members
-       WHERE active = 1 AND medical_notes IS NOT NULL AND TRIM(medical_notes) != ''
-       ORDER BY LOWER(name)`
-    )
-    .all();
+  return (
+    await db
+      .prepare(
+        `SELECT id, name, member_type, grade_level, medical_notes FROM members
+         WHERE active = 1 AND medical_notes IS NOT NULL AND TRIM(medical_notes) != ''`
+      )
+      .all()
+  ).sort(byLastName);
 }
 
 async function rostersForMember(memberId) {

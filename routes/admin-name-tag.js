@@ -18,6 +18,7 @@ const { saveUpload } = require('../utils/uploadBackend');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { jsonScriptSafe } = require('../utils/json');
 const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
+const { byLastName } = require('../utils/members');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
@@ -76,7 +77,7 @@ router.get('/name-tag', async (req, res) => {
     await db.prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`).all(showArchived ? 1 : 0)
   ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
 
-  const members = await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  const members = (await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1').all()).sort(byLastName);
 
   res.render('admin-name-tag', {
     title: 'Name Tags',
@@ -202,7 +203,7 @@ router.post('/name-tag/print', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
   const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
   // Every parent's cleanup team membership computed in ONE query, not one
@@ -236,7 +237,7 @@ router.post('/name-tag/print-barcodes', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
+  const members = (await db.prepare(`SELECT id, name, barcode FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
   res.render('admin-name-tag-barcode-print', {
     title: 'Print Barcodes',
@@ -256,9 +257,9 @@ router.post('/name-tag/print-barcode-labels', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db
-    .prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`)
-    .all(...memberIds);
+  const members = (
+    await db.prepare(`SELECT id, name, barcode, member_code FROM members WHERE id IN (${placeholders})`).all(...memberIds)
+  ).sort(byLastName);
 
   res.render('admin-name-tag-barcode-labels-print', {
     title: 'Print Barcode Labels',

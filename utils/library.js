@@ -1,5 +1,6 @@
 const db = require('../db');
 const { todayISO, formatFriendlyTimestamp, formatDateLabel } = require('./dates');
+const { lastNameOf } = require('./members');
 
 async function findMemberByBarcode(barcode) {
   return db.prepare('SELECT * FROM members WHERE barcode = ? AND active = 1').get(barcode);
@@ -80,7 +81,7 @@ async function membersWithActiveCheckouts() {
        JOIN members m ON m.id = lc.member_id
        JOIN library_items li ON li.id = lc.item_id
        WHERE lc.checked_in_at IS NULL
-       ORDER BY LOWER(m.name), lc.checked_out_at`
+       ORDER BY lc.checked_out_at`
     )
     .all();
 
@@ -99,7 +100,16 @@ async function membersWithActiveCheckouts() {
       overdue: !!row.due_date && row.due_date < today,
     });
   }
-  return Array.from(byMember.values());
+  // Sorted here (rather than in the SQL) because the row order above drives
+  // each member's own items list (oldest checkout first) - re-sorting that
+  // same array by last name would scramble it. member/lastNameOf import
+  // note: byLastName itself expects a `.name` field; these grouped records
+  // carry `memberName` instead, so the comparator is inlined.
+  return Array.from(byMember.values()).sort(
+    (a, b) =>
+      lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
+      a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
+  );
 }
 
 module.exports = {

@@ -7,6 +7,7 @@ const {
   liveMemberScheduleRowsForDay,
   minutesToClockLabelLocal,
 } = require('./classSchedule');
+const { byLastName } = require('./members');
 
 const CLASS_NUMBERS = [1, 2, 3, 4];
 
@@ -171,7 +172,7 @@ const STATUS_LABELS = { none: 'No Schedule', partial: 'Incomplete', complete: 'C
 // Class Schedules table. Filters are all optional/AND-combined.
 async function scheduleList(filters) {
   filters = filters || {};
-  let members = await db.prepare('SELECT * FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  let members = (await db.prepare('SELECT * FROM members WHERE active = 1').all()).sort(byLastName);
 
   if (filters.search) {
     const q = filters.search.toLowerCase();

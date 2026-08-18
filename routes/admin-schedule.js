@@ -448,9 +448,7 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db
-    .prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`)
-    .all(...memberIds);
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
   const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);

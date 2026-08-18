@@ -5,7 +5,7 @@
 const db = require('../db');
 const { DEFAULT_LAYOUT } = require('./scheduleCardBadge');
 const { getMemberSchedule } = require('./schedule');
-const { familyOf } = require('./members');
+const { familyOf, byLastName } = require('./members');
 
 // Converts a day's 4 { class_number, time, class_name, room, teacher }
 // rows (the schedule module's shape) into the { time, className, room }
@@ -41,9 +41,11 @@ async function primaryParentsFor(members) {
   const parentsByFamily = {};
   if (familyIds.length > 0) {
     const familyPlaceholders = familyIds.map(() => '?').join(',');
-    const parents = await db
-      .prepare(`SELECT * FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type = 'parent' AND active = 1 ORDER BY LOWER(name)`)
-      .all(...familyIds);
+    const parents = (
+      await db
+        .prepare(`SELECT * FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type = 'parent' AND active = 1`)
+        .all(...familyIds)
+    ).sort(byLastName);
     for (const p of parents) {
       if (!parentsByFamily[p.family_id]) parentsByFamily[p.family_id] = [];
       parentsByFamily[p.family_id].push(p);

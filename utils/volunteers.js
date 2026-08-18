@@ -1,6 +1,7 @@
 const db = require('../db');
 const { formatDateLabel } = require('./dates');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
+const { byLastName } = require('./members');
 
 async function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
@@ -46,7 +47,7 @@ async function membersForList(listId) {
     }
     byMemberId[row.id].sectionIds.push(row.sectionId);
   }
-  return order.map((id) => byMemberId[id]);
+  return order.map((id) => byMemberId[id]).sort(byLastName);
 }
 
 // Writes rank to every one of memberId's section rows on this list, so a
@@ -62,14 +63,15 @@ async function setMemberRank(listId, memberId, rank) {
 // differ hour to hour (Floater Teams tab), so this reads/writes exactly
 // one (list, member, section) row instead of every one of a member's rows.
 async function membersForSection(listId, sectionId) {
-  return db
-    .prepare(
-      `SELECT m.*, vm.rank AS rank FROM members m
-       JOIN volunteer_members vm ON vm.member_id = m.id
-       WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1
-       ORDER BY LOWER(m.name)`
-    )
-    .all(listId, sectionId);
+  return (
+    await db
+      .prepare(
+        `SELECT m.*, vm.rank AS rank FROM members m
+         JOIN volunteer_members vm ON vm.member_id = m.id
+         WHERE vm.volunteer_list_id = ? AND vm.section_id = ? AND m.active = 1`
+      )
+      .all(listId, sectionId)
+  ).sort(byLastName);
 }
 
 async function setSectionRank(listId, memberId, sectionId, rank) {
