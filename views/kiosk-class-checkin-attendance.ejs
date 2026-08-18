@@ -5,73 +5,75 @@
 </head>
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
-  <main id="main-content" tabindex="-1" class="form-wrap">
-    <div class="class-checkin-attendance-header">
-      <a href="/kiosk/class-checkin/classes/<%= cls.day %>" class="kiosk-home kiosk-home-inline">&larr; Back to <%= cls.dayLabel %> Classes</a>
-      <div class="class-checkin-actions">
-        <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkin">
-          <svg class="icon"><use href="#icon-check"/></svg> Check In
-        </a>
-        <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkout">
-          <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
-        </a>
+  <main id="main-content" tabindex="-1" class="form-wrap form-wrap-roster">
+    <div class="form-outer-panel">
+      <div class="class-checkin-attendance-header">
+        <a href="/kiosk/class-checkin/classes/<%= cls.day %>" class="kiosk-home kiosk-home-inline">&larr; Back to <%= cls.dayLabel %> Classes</a>
+        <div class="class-checkin-actions">
+          <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkin">
+            <svg class="icon"><use href="#icon-check"/></svg> Check In
+          </a>
+          <a class="class-checkin-btn" href="/kiosk/class-checkin/classes/<%= cls.id %>/scan?mode=checkout">
+            <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
+          </a>
+        </div>
       </div>
-    </div>
-    <h1><%= cls.class_name %> Attendance</h1>
-    <p class="subtitle"><%= dateLabel %></p>
+      <h1><%= cls.class_name %> Attendance</h1>
+      <p class="subtitle"><%= dateLabel %></p>
 
-    <% if (rows.length === 0) { %>
-      <p class="roster-empty">No students are enrolled in this class.</p>
-    <% } else { %>
-      <div class="legend">
-        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
-        <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
-        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
-      </div>
-      <div class="roster-scroll">
-        <table class="roster-table roster-table-detailed">
-          <thead>
-            <tr>
-              <th class="roster-name-col">Name</th>
-              <th>Status</th>
-              <th>Checked In</th>
-              <th>Checked Out</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% rows.forEach(function(row) { %>
-              <% var cell = row.cells[0]; %>
+      <% if (rows.length === 0) { %>
+        <p class="roster-empty">No students are enrolled in this class.</p>
+      <% } else { %>
+        <div class="legend">
+          <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+          <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+          <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+        </div>
+        <div class="roster-scroll">
+          <table class="roster-table roster-table-detailed">
+            <thead>
               <tr>
-                <td class="roster-name-col"><%= row.member.name %></td>
-                <td><span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '—' %></span></td>
-                <td><%= cell.checkInTime || '—' %></td>
-                <td><%= cell.checkOutTime || '—' %></td>
+                <th class="roster-name-col">Name</th>
+                <th>Status</th>
+                <th>Checked In</th>
+                <th>Checked Out</th>
               </tr>
-            <% }); %>
-          </tbody>
-          <tfoot>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Present</td>
-              <td><span class="summary-badge summary-present"><%= summary.present %></span></td>
-              <td></td>
-              <td></td>
-            </tr>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Late</td>
-              <td><span class="summary-badge summary-late"><%= summary.late %></span></td>
-              <td></td>
-              <td></td>
-            </tr>
-            <tr class="roster-summary-row">
-              <td class="roster-summary-label">Absent</td>
-              <td><span class="summary-badge summary-absent"><%= summary.absent %></span></td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    <% } %>
+            </thead>
+            <tbody>
+              <% rows.forEach(function(row) { %>
+                <% var cell = row.cells[0]; %>
+                <tr>
+                  <td class="roster-name-col"><%= row.member.name %></td>
+                  <td><span class="cell-tag cell-<%= cell.tag === 'P' ? 'present' : cell.tag === 'L' ? 'late' : cell.tag === 'A' ? 'absent' : 'blank' %>"><%= cell.tag || '—' %></span></td>
+                  <td><%= cell.checkInTime || '—' %></td>
+                  <td><%= cell.checkOutTime || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+            <tfoot>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Present</td>
+                <td><span class="summary-badge summary-present"><%= summary.present %></span></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Late</td>
+                <td><span class="summary-badge summary-late"><%= summary.late %></span></td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr class="roster-summary-row">
+                <td class="roster-summary-label">Absent</td>
+                <td><span class="summary-badge summary-absent"><%= summary.absent %></span></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      <% } %>
+    </div>
   </main>
 </body>
 </html>

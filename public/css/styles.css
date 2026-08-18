@@ -933,6 +933,13 @@ textarea:focus-visible,
 
 .form-wrap { max-width: 560px; margin: 0 auto; }
 .form-wrap-narrow { max-width: 400px; }
+/* Class Check-In kiosk roster (attendance) page - the plain .form-wrap
+   560px cap reads cramped for a 4-column data table, wide enough now that
+   its content sits inside one .form-outer-panel instead of floating
+   directly on the page's blue background (see that class's own comment -
+   a real request: "class check in roster pages all need clean white
+   backgrounds instead of boxes floating on the blue"). */
+.form-wrap-roster { max-width: 760px; }
 .form-logo { height: var(--logo-xs); width: var(--logo-xs); margin-bottom: 0.75rem; border-radius: 50%; }
 
 .login-wrap { text-align: center; }
@@ -3720,6 +3727,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .floater-chart-table td:nth-child(2) { color: var(--muted); }
   .floater-chart-table td:nth-child(2)::before { content: "\00b7\0020"; }
   .floater-chart-table td:nth-child(3) { flex: 1 1 100%; }
+
+  /* Position + Room moved to their own line above, so the Floater column
+     now has the card's FULL width to itself instead of a cramped third of
+     it - undoing .floater-assign-form's general column-stack (needed
+     above only because the button used to eat width out of an already-
+     tight shared column) just for this table, so the suggested name's
+     select and its Assign/Unassign button go back to sitting side by side
+     on one line, the same pattern desktop uses ("each line should still
+     have the assign/unassign button pattern next to the member name
+     suggested"). Higher specificity than the plain .floater-assign-form
+     rule above wins this regardless of source order. */
+  .floater-chart-table .floater-assign-form { flex-direction: row; align-items: center; }
+  .floater-chart-table .floater-assign-form select { width: auto; }
+  .floater-chart-table .floater-assign-btn { align-self: center; }
 }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */

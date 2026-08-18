@@ -198,6 +198,15 @@ test('Class Check-In day and hour navigation', async (t) => {
     assert.match(res.text, new RegExp(`href="/kiosk/class-checkin/classes/${classId}/scan\\?mode=checkin"`));
     assert.match(res.text, new RegExp(`href="/kiosk/class-checkin/classes/${classId}/scan\\?mode=checkout"`));
     assert.match(res.text, /class-checkin-btn/);
+    // A real bug report: the roster's header/legend/table sat directly on
+    // the kiosk's blue page background, each looking like its own
+    // disconnected white box - wrapping them all in one .form-outer-panel
+    // (the site's existing "unify boxes on a public page" pattern) fixes
+    // it. class="form-wrap form-wrap-roster" (wider than the default
+    // public-form column - a 4-column table needs the room) confirms the
+    // page opted into the wider panel too.
+    assert.match(res.text, /class="form-wrap form-wrap-roster"/);
+    assert.match(res.text, /<div class="form-outer-panel">/);
   });
 
   await t.test('an unknown class id 404s on attendance and on scan', async () => {
