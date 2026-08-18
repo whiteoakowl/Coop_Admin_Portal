@@ -32,7 +32,7 @@ const {
   taskSectionForTeam,
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { activeParentOptions } = require('../utils/members');
+const { activeParentOptions, hasInfantChild } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -51,7 +51,14 @@ async function teamsWithMembers(day) {
   const teams = await teamsForDay(day);
   const result = [];
   for (const t of teams) {
-    result.push({ ...t, members: await membersForTeam(t.id), taskSection: await taskSectionForTeam(t.id) });
+    const members = await membersForTeam(t.id);
+    // Same "(infant)" flag Floater Teams/Assignments already show next to
+    // a parent's name (routes/admin-volunteers.js's own hasInfantChild
+    // usage) - a real request to extend it to Setup/Cleanup's own team
+    // list and assignment cards too, so a team lead knows at a glance
+    // who might need different coverage.
+    for (const m of members) m.infant = await hasInfantChild(m.id);
+    result.push({ ...t, members, taskSection: await taskSectionForTeam(t.id) });
   }
   return result;
 }
@@ -248,6 +255,7 @@ async function assignmentCardsForDate(day, date) {
       return {
         id: m.id,
         name: m.name,
+        infant: !!m.infant,
         absent: absentIds.has(m.id),
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
@@ -264,10 +272,24 @@ async function assignmentCardsForDate(day, date) {
     // dropdowns first then filling task 2 if out of spots."
     const slot1Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId', 'slot1Options');
     const slot2Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId2', 'slot2Options');
+    // A real request: the card should also list, at its own bottom, every
+    // task from this team's linked list that no one currently holds in
+    // EITHER slot - actual assignments only, a suggested-but-not-yet-
+    // clicked-Assign task still counts as unassigned. Recomputed fresh
+    // from current assignments every render, so a task simply disappears
+    // from this list the moment someone is assigned it, with nothing
+    // further to track.
+    const assignedTaskIds = new Set();
+    for (const m of members) {
+      if (m.taskItemId) assignedTaskIds.add(m.taskItemId);
+      if (m.taskItemId2) assignedTaskIds.add(m.taskItemId2);
+    }
+    const unassignedTasks = allOptions.filter((item) => !assignedTaskIds.has(item.id));
     return {
       id: t.id,
       title: t.title,
       taskOptions: allOptions,
+      unassignedTasks,
       members: membersWithOptions.map((m) => ({
         ...m,
         suggestedTaskItemId: slot1Suggestions[m.id] || null,

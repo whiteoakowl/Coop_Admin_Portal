@@ -3564,6 +3564,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .floater-card-footer .icon { width: 14px; height: 14px; }
 
+/* Unassigned Tasks - a real request: the card should also list, at its
+   own bottom, every task from the team's linked list no one currently
+   holds, so at a glance an admin can see what's still left to hand out
+   without cross-checking the Task 1/Task 2 columns above one by one.
+   Recomputed fresh every render (routes/admin-setup.js's
+   assignmentCardsForDate), so a task simply drops off this list the
+   moment it's assigned - nothing here tracks that itself. Kept neutral
+   (not tied to the red "needs attention" convention .setup-assignment-
+   row-absent uses) since an unassigned task mid-planning is the normal,
+   expected state, not an error. */
+.setup-unassigned-tasks { padding: 0.5rem 0.75rem 0.65rem; border-top: 1px solid var(--border); }
+.setup-unassigned-tasks h4 { margin: 0 0 0.3rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.01em; color: var(--muted); font-weight: 700; }
+.setup-unassigned-tasks ul { margin: 0; padding-left: 1.1rem; font-size: 0.78rem; }
+.setup-unassigned-tasks li { margin-bottom: 0.15rem; }
+.setup-unassigned-tasks li:last-child { margin-bottom: 0; }
+
 /* Archive popup (fetched fragment shown in #volunteer-archive-view-dialog) -
    wide enough for the card grid to lay out multiple columns instead of
    stacking single-file. */

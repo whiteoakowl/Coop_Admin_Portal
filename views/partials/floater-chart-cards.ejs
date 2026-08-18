@@ -47,7 +47,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
                       <select name="memberId" <%= isApproved ? 'disabled' : '' %>>
                         <% slot.candidates.forEach(function(c) { %>
                           <option value="<%= c.id %>" <%= slot.assigned && slot.assigned.id === c.id ? 'selected' : '' %>>
-                            <%= c.name %> (<%= c.rankLabel || 'Available' %><% if (c.infant) { %>, child &le;2<% } %>)
+                            <%= c.name %> (<%= c.rankLabel || 'Available' %><% if (c.infant) { %>, infant<% } %>)
                           </option>
                         <% }); %>
                       </select>

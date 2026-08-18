@@ -46,7 +46,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
             <% team.members.forEach(function(m) { %>
               <tr<%= isEditable && m.absent ? ' class="setup-assignment-row-absent"' : '' %>>
                 <td class="floater-card-position">
-                  <%= m.name %><% if (isEditable && m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
+                  <%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (isEditable && m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
                 </td>
                 <%
                   var slots = [
@@ -105,6 +105,16 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
           <svg class="icon"><use href="#icon-users"/></svg>
           <%= team.members.length %> Member<%= team.members.length === 1 ? '' : 's' %>
         </div>
+        <% if (team.unassignedTasks && team.unassignedTasks.length > 0) { %>
+          <div class="setup-unassigned-tasks">
+            <h4>Unassigned Tasks</h4>
+            <ul>
+              <% team.unassignedTasks.forEach(function(item) { %>
+                <li>#<%= item.number %> &mdash; <%= item.description %></li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
       </div>
     <% }); %>
   </div>
