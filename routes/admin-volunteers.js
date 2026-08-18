@@ -33,6 +33,7 @@ const {
   jobAssignmentGrid,
   dailyAssignmentCardsWithLabels,
   archivedDateSummaries,
+  groupedPermanentJobsForDay,
 } = require('../utils/substitutes');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -127,6 +128,8 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
     });
   });
 
+  const positionGroups = await groupedPermanentJobsForDay(day);
+
   res.render('admin-volunteers', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
     tab: 'floater',
@@ -138,6 +141,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
     upcomingDates: upcomingDates.map((d) => ({ date: d, label: formatDateLong(d) })),
     selectedDate,
     hourSections,
+    positionGroups,
     openDialog: dialogParam(req),
     allParents,
     infantByMemberId,

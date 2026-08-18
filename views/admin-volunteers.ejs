@@ -41,7 +41,7 @@
         <h2><%= dayLabel %> Floater Assignments</h2>
         <div class="roster-btn-row no-print">
           <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-          <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add Position</button>
+          <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Position</button>
         </div>
       </div>
 
@@ -95,25 +95,60 @@
       </div>
     </dialog>
 
-    <dialog id="add-job-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/new">
-        <h3>Add Position</h3>
-        <p class="hint">Add one position to as many hours as it runs - each hour gets its own row on the chart.</p>
-        <input type="hidden" name="date" value="<%= selectedDate %>" />
-        <input type="text" name="title" placeholder="Position title (e.g. Front Desk)" required />
-        <input type="text" name="room" placeholder="Room # (optional)" />
-        <span class="class-card-pill-label">Hours:</span>
-        <div class="checkbox-row">
-          <% hours.forEach(function(h) { %>
-            <label class="checkbox-option">
-              <input type="checkbox" name="hourPositions" value="<%= h.position %>" />
-              <%= h.label %>
-            </label>
-          <% }); %>
+    <%# A real request: "Add position button should say add/edit position.
+        When you click it will show a list of the permanent positions
+        added and stacked underneath the position it will say what hours
+        have been selected with check boxes. Should be able to change
+        name of positions, room number and check or uncheck boxes as
+        necessary. Orange save button top right closes the window and
+        applies the changes." One form posts every group at once (see
+        routes/admin-substitutes.js's /permanent-jobs/save-groups) rather
+        than each position having its own Save, so unchecking hours on
+        several positions and adding a brand new one all lands in a
+        single request. %>
+    <dialog id="add-job-dialog" class="volunteer-edit-dialog position-editor-dialog">
+      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/save-groups?dialog=job">
+        <div class="qr-filter-dialog-header">
+          <h3>Add/Edit Position</h3>
+          <div class="qr-filter-dialog-actions">
+            <button type="submit" class="primary-btn">Save</button>
+            <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+          </div>
         </div>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add Position</button>
+        <p class="hint">Add one position to as many hours as it runs - each hour gets its own row on the chart. Uncheck every hour (or clear its title) to remove a position entirely.</p>
+        <input type="hidden" name="date" value="<%= selectedDate %>" />
+        <div class="roster-scroll position-group-list">
+          <% positionGroups.forEach(function(g) { %>
+            <div class="position-group">
+              <div class="position-group-fields">
+                <input type="text" name="groups[<%= g.keyId %>][title]" value="<%= g.title %>" placeholder="Position title" />
+                <input type="text" name="groups[<%= g.keyId %>][room]" value="<%= g.room %>" placeholder="Room # (optional)" />
+              </div>
+              <div class="checkbox-row">
+                <% hours.forEach(function(h) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="groups[<%= g.keyId %>][hours][]" value="<%= h.position %>" <%= g.hours.includes(h.position) ? 'checked' : '' %> />
+                    <%= h.label %>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+          <div class="position-group">
+            <span class="class-card-pill-label">Add New Position</span>
+            <div class="position-group-fields">
+              <input type="text" name="groups[new][title]" placeholder="Position title (e.g. Front Desk)" />
+              <input type="text" name="groups[new][room]" placeholder="Room # (optional)" />
+            </div>
+            <div class="checkbox-row">
+              <% hours.forEach(function(h) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="groups[new][hours][]" value="<%= h.position %>" />
+                  <%= h.label %>
+                </label>
+              <% }); %>
+            </div>
+          </div>
         </div>
       </form>
     </dialog>

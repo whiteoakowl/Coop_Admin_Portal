@@ -3460,6 +3460,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .volunteer-edit-dialog .hint { margin: 0 0 0.75rem; }
 .volunteer-edit-dialog .roster-scroll { max-height: min(340px, 50vh); }
 
+/* Add/Edit Position dialog - a real request: "it will show a list of the
+   permanent positions added and stacked underneath the position it will
+   say what hours have been selected with check boxes." Reuses
+   .qr-filter-dialog-header/.qr-filter-dialog-actions for the title-left/
+   Save-top-right header (same shape as the QR filter popup) and
+   .volunteer-edit-dialog's own .roster-scroll for the stacked, scrollable
+   list - just widened, since each position's title+room fields need more
+   room than a single-line table row. */
+.position-editor-dialog { width: min(640px, 92vw); }
+.position-group-list { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.9rem; }
+.position-group { border-bottom: 1px solid var(--border); padding-bottom: 0.9rem; }
+.position-group:last-child { border-bottom: none; padding-bottom: 0; }
+.position-group-fields { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.3rem 0 0.5rem; }
+.position-group-fields input[type="text"] { flex: 1 1 160px; min-width: 0; }
+
 .volunteer-sections-form { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
 
 .pending-approvals-list { list-style: none; margin: 0 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }

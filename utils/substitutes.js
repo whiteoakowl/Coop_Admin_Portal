@@ -59,6 +59,61 @@ async function deletePermanentJob(id) {
   await db.prepare('DELETE FROM permanent_jobs WHERE id = ?').run(id);
 }
 
+// Groups permanentJobsForDay's per-hour rows into one entry per distinct
+// title - the shape the Add/Edit Position dialog edits (see
+// createPermanentJob's own comment: one "position" spanning several hours
+// really is several rows, one per hour, all sharing the same title/room,
+// so an admin editing "Front Desk" needs to see and change all of them at
+// once, not one row at a time). keyId is just the first row's own id
+// encountered for that title - stable enough to use as this group's own
+// form-field key; savePositionGroup below looks its siblings back up by
+// day+title at save time, not by this id specifically, so it doesn't need
+// to be any particular row.
+async function groupedPermanentJobsForDay(day) {
+  const jobs = await permanentJobsForDay(day);
+  const groups = new Map();
+  for (const job of jobs) {
+    if (!groups.has(job.title)) groups.set(job.title, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
+    groups.get(job.title).hours.push(job.hour_position);
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+// Applies one edited (or brand new) position group from the Add/Edit
+// Position dialog. keyId null means "this is the blank Add New Position
+// row at the bottom of the dialog", not an edit of an existing group -
+// only creates rows there, and only if a title was actually given.
+// Otherwise, title/room apply to every hour still checked; any hour that
+// was previously part of this group but is no longer checked gets its own
+// row deleted (this is also how a position is removed entirely - uncheck
+// every hour, or clear its title, which forces every hour off the same
+// way); any newly-checked hour gets a new row. Existing rows for hours
+// that stay checked are updated in place rather than deleted+recreated,
+// so their own floater list (permanent_job_floaters, set separately via
+// setJobFloaters) isn't wiped out just because the title or room changed.
+async function savePositionGroup(day, keyId, title, room, hours) {
+  if (keyId == null) {
+    if (!title || hours.length === 0) return;
+    for (const hourPosition of hours) await createPermanentJob({ day, hourPosition, title, room });
+    return;
+  }
+  const anchor = await getPermanentJob(keyId);
+  if (!anchor) return;
+  const desiredHours = title ? hours : [];
+  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND title = ?').all(day, anchor.title);
+  const existingHours = new Set(siblings.map((r) => r.hour_position));
+  for (const row of siblings) {
+    if (desiredHours.includes(row.hour_position)) {
+      await updatePermanentJob(row.id, { hourPosition: row.hour_position, title, room });
+    } else {
+      await deletePermanentJob(row.id);
+    }
+  }
+  for (const hourPosition of desiredHours) {
+    if (!existingHours.has(hourPosition)) await createPermanentJob({ day, hourPosition, title, room });
+  }
+}
+
 async function setJobFloaters(jobId, memberIds) {
   await db.prepare('DELETE FROM permanent_job_floaters WHERE job_id = ?').run(jobId);
   const link = db.prepare('INSERT INTO permanent_job_floaters (job_id, member_id) VALUES (?, ?) ON CONFLICT (job_id, member_id) DO NOTHING');
@@ -380,6 +435,8 @@ async function pendingApprovalsForToday() {
 module.exports = {
   HOUR_POSITIONS,
   permanentJobsForDay,
+  groupedPermanentJobsForDay,
+  savePositionGroup,
   getPermanentJob,
   floaterIdsForJob,
   createPermanentJob,

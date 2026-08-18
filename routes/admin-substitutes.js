@@ -9,6 +9,7 @@ const {
   createPermanentJob,
   updatePermanentJob,
   deletePermanentJob,
+  savePositionGroup,
   setJobFloaters,
   setAssignment,
   approveAssignment,
@@ -47,6 +48,31 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/new', requireAdmin, req
   for (const hourPosition of hourPositions) await createPermanentJob({ day, hourPosition, title, room });
   const hourNote = hourPositions.length > 1 ? `Hours ${hourPositions.join(', ')}` : `Hour ${hourPositions[0]}`;
   res.redirect(subUrl(day, { date: req.body.date, notice: `"${title}" added (${hourNote}).` }));
+});
+
+// The Add/Edit Position dialog's one Save button - unlike /new above (one
+// title -> N brand-new rows), this applies every group in the dialog at
+// once: existing positions' title/room/checked-hours plus whatever was
+// filled into the blank "Add New Position" row at the bottom. Each
+// group's own field names are `groups[<key>][title/room/hours]` - `<key>`
+// is the group's own keyId (a permanent_jobs.id - see
+// groupedPermanentJobsForDay) for an existing position, or the literal
+// string 'new' for the blank row, matching savePositionGroup's own
+// keyId-is-null-means-new contract.
+router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const groups = req.body.groups && typeof req.body.groups === 'object' ? req.body.groups : {};
+  for (const [key, group] of Object.entries(groups)) {
+    const title = ((group && group.title) || '').trim();
+    const room = ((group && group.room) || '').trim();
+    const hours = [].concat((group && group.hours) || [])
+      .map((v) => parseInt(v, 10))
+      .filter((p) => HOUR_POSITIONS.includes(p));
+    const keyId = key === 'new' ? null : parseInt(key, 10);
+    if (keyId !== null && Number.isNaN(keyId)) continue;
+    await savePositionGroup(day, keyId, title, room, hours);
+  }
+  res.redirect(subUrl(day, { date: req.body.date, notice: 'Positions saved.' }));
 });
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, async (req, res) => {
