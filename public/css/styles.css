@@ -4313,7 +4313,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   background: var(--brand-soft);
   font-size: 0.85rem;
 }
-.class-schedule-cell { background: #fff; }
+.class-schedule-cell { background: #fff; overflow: hidden; }
 /* Grabbing this handle and moving up/down reorders the room rows (see
    public/js/room-row-reorder.js) - touch-action: none stops the browser's
    own scroll/pan gesture from hijacking a touch drag, same reasoning as
@@ -4334,8 +4334,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.55rem 0.65rem;
   box-shadow: var(--shadow-sm);
 }
-.class-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; }
+/* flex-wrap: wrap is the actual fix for a real bug report - on a narrow
+   mobile column the title + both action buttons didn't fit on one nowrap
+   row, and a flex item's default min-width: auto let the h3 impose its
+   own full-width minimum on the row instead of shrinking, so the buttons
+   were pushed out past the card's own right edge and rendered on top of
+   the NEXT card over in the neighboring table column. Wrapping drops the
+   buttons to their own line, staying inside this card, instead. */
+.class-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.class-card-header h3 { margin: 0; font-size: 0.92rem; flex: 1; min-width: 0; overflow-wrap: break-word; }
+/* Belt-and-suspenders for the same bug: even with the wrap fix above,
+   nothing clips a card that somehow still renders wider than its cell
+   (e.g. a single unbroken class name longer than the column) - the
+   .class-schedule-cell overflow: hidden set above keeps that contained
+   to its own cell instead of bleeding into the next one. */
 .class-card-checkbox { width: 1rem; height: 1rem; accent-color: var(--brand); flex-shrink: 0; margin-top: 0.1rem; }
 /* Grade/Teacher/Assistant - each its own line, stacked cleanly, no
    student roster (that's what View is for). */
@@ -4359,10 +4371,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid th { font-size: 0.7rem; }
   .class-schedule-room-grid .class-schedule-room-col { width: 72px; font-size: 0.7rem; }
   .class-schedule-room-grid .class-card { padding: 0.35rem 0.4rem; }
+  .class-schedule-room-grid .class-card-header { gap: 0.3rem; }
   .class-schedule-room-grid .class-card-header h3 { font-size: 0.76rem; }
   .class-schedule-room-grid .class-card-line { font-size: 0.66rem; }
   .class-schedule-room-grid .class-card-pill-label,
   .class-schedule-room-grid .class-card .badge-pill { font-size: 0.62rem; }
+  /* Smaller still on a phone - the pair only needs to be big enough to
+     tap accurately, not full icon-btn/desktop size, and every bit of
+     width saved here is width the title gets back before wrapping. */
+  .class-schedule-room-grid .class-card-view-btn,
+  .class-schedule-room-grid .class-card-quicklink-btn { width: 1.3rem; height: 1.3rem; font-size: 0.7rem; }
 }
 
 /* Create/Edit Class form - the form itself takes 1/3 of the page, the
@@ -4383,19 +4401,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-manage-form-col { min-width: 0; }
 }
 
-/* "View" button on each class card, and the popup it opens (fetched as
-   an HTML fragment - see public/js/class-schedule-view.js) - reuses the
-   Create Class dialog's header treatment, just wider to fit the details
-   form + roster side by side. */
-.class-card-view-btn { flex-shrink: 0; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
-
-/* Class Check-In quick link - opens that one class's own kiosk attendance
-   screen (Check In/Check Out live there) in a new tab, skipping the
-   kiosk's own day-picker/hour-search a teacher or sub would otherwise
-   click through. .icon-btn's default 2rem square reads oversized next to
-   this card's own compact 0.78rem View button, so it's scaled down to
-   match. */
-.class-card-quicklink-btn { flex-shrink: 0; width: 1.6rem; height: 1.6rem; font-size: 0.78rem; }
+/* "View" button on each class card, and the Class Check-In quick link
+   next to it - both small square icon buttons (a real request: "change
+   the view button to a small square icon like the check in link icon"),
+   so they read as one matched pair instead of a text pill next to an
+   icon. View opens the class's own popup (fetched as an HTML fragment -
+   see public/js/class-schedule-view.js); the quick link opens that
+   class's kiosk attendance screen (Check In/Check Out) in a new tab,
+   skipping the kiosk's own day-picker/hour-search. .icon-btn's default
+   2rem square reads oversized on this compact card, so both are scaled
+   down to match. */
+.class-card-view-btn,
+.class-card-quicklink-btn { flex-shrink: 0; width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
 .class-view-dialog {
   width: min(1100px, 95vw);
   max-height: 90vh;
