@@ -29,6 +29,7 @@
           <option value="/admin/members" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
           <option value="/admin/members?type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
           <option value="/admin/members?type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="/admin/members?type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
           <% if (families.length > 0) { %>
             <optgroup label="Family">
               <% families.forEach(function(f) { %>
@@ -231,7 +232,7 @@
                   </span>
                 <% } %>
               </td>
-              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyName || '—' %></td>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
@@ -337,7 +338,7 @@
         <% allMembersForPrint.forEach(function(m) { %>
           <tr>
             <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
-            <td><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+            <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
             <td><%= m.familyName || '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
             <td><%= m.grade_level || '—' %></td>

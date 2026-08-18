@@ -2155,6 +2155,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    (no override needed) so every orange element on this form matches. */
 .member-form-header-icon .icon { width: 1.35rem; height: 1.35rem; }
 .member-form-header-student .member-form-header-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.member-form-header-admin .member-form-header-icon { background: var(--purple-soft); color: var(--purple); }
 .member-form-header-text { flex: 1; min-width: 180px; }
 .member-form-header-text h3 { margin: 0; font-size: 1.25rem; }
 .member-form-header-text p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.85rem; }
@@ -2350,6 +2351,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-form-checklist-checkbox { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .member-form-section-green { border-color: var(--btn-bg); background: var(--orange-bg); }
 .member-form-section-green h2 { color: var(--orange); }
+.member-form-section-purple { border-color: var(--btn-purple); background: var(--purple-soft); }
+.member-form-section-purple h2 { color: var(--purple); }
 
 .member-form-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; min-width: 0; }
 .member-form-footer-view,

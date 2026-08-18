@@ -39,6 +39,16 @@ const FIELDS_BY_TYPE = {
     { field: 'setupCleanupDays', label: 'Monday & Wednesday Setup/Cleanup Jobs' },
     { field: 'memberCode', label: 'Member ID' },
   ],
+  // A real request: "an admin name tag... logo, name, barcode, id number
+  // and the admin position" - co-op staff/leaders (member_type === 'admin',
+  // see members.member_type's own schema comment). adminPosition is the
+  // Settings-managed admin_positions list title (utils/adminPositions.js),
+  // optionally chosen on the member form.
+  admin: [
+    { field: 'name', label: 'Name' },
+    { field: 'adminPosition', label: 'Admin Position' },
+    { field: 'memberCode', label: 'Member ID' },
+  ],
   setupCleanup: [
     { field: 'badgeNumber', label: 'Badge Number' },
     { field: 'title', label: 'Title' },
@@ -143,6 +153,20 @@ const DEFAULT_LAYOUTS = {
       // element's own comment.
       { id: 'name', type: 'text', field: 'name', x: 8, y: 90, width: 320, height: 40, fontSize: 20, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
+    ],
+  },
+  admin: {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'logo', type: 'image', src: '/img/logo-owl.png', x: 148, y: 4, width: 40, height: 40 },
+      { id: 'memberCode', type: 'text', field: 'memberCode', x: 8, y: 50, width: 320, height: 18, fontSize: 12, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      // Same first-name-over-last-name stacking as the student/parent
+      // badges above (utils/nameTagData.js's splitNameLines) - see the
+      // student badge's own comment for why.
+      { id: 'name', type: 'text', field: 'name', x: 8, y: 68, width: 320, height: 40, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'position', type: 'text', field: 'adminPosition', x: 8, y: 110, width: 320, height: 36, fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'barcode', type: 'barcode', x: 68, y: 154, width: 200, height: 55 },
     ],
   },
   setupCleanup: {

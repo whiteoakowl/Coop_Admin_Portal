@@ -6,10 +6,14 @@
 //
 // locals: member, mode ('create'|'edit'), families (with memberCount),
 // memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
-// gradeLevels
+// gradeLevels, adminPositions
 const isParent = member.member_type === 'parent';
+// 'admin' - co-op staff/leaders who mainly just need a printable badge
+// (see members.member_type's own schema comment) - a real request added
+// this as a 3rd member type alongside the original Parent/Student toggle.
+const isAdmin = member.member_type === 'admin';
 const uid = 'mf-' + mode + '-' + (member.id || 'new');
-const typeLabel = isParent ? 'Parent' : 'Student';
+const typeLabel = isAdmin ? 'Admin' : isParent ? 'Parent' : 'Student';
 const US_STATES = [
   ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
   ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['DC','District of Columbia'],
@@ -24,13 +28,13 @@ const US_STATES = [
   ['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
 ];
 %>
-<div class="class-form-dialog-header member-form-header member-form-header-<%= isParent ? 'parent' : 'student' %>" data-member-form-header>
+<div class="class-form-dialog-header member-form-header member-form-header-<%= isAdmin ? 'admin' : isParent ? 'parent' : 'student' %>" data-member-form-header>
   <span class="class-form-dialog-icon member-form-header-icon">
-    <svg class="icon"><use href="#icon-<%= isParent ? 'users' : 'graduation-cap' %>"/></svg>
+    <svg class="icon"><use href="#icon-<%= isAdmin ? 'badge' : isParent ? 'users' : 'graduation-cap' %>"/></svg>
   </span>
   <div class="member-form-header-text">
     <h3><%= typeLabel %> Membership Form</h3>
-    <p>Create or update a <%= isParent ? 'parent/guardian' : 'student' %> membership profile.</p>
+    <p>Create or update a <%= isAdmin ? 'co-op admin/leader' : isParent ? 'parent/guardian' : 'student' %> membership profile.</p>
   </div>
   <div class="member-type-toggle" role="group" aria-label="Member type">
     <label class="member-type-toggle-btn member-type-toggle-parent">
@@ -38,8 +42,12 @@ const US_STATES = [
       <svg class="icon"><use href="#icon-user"/></svg> Parent
     </label>
     <label class="member-type-toggle-btn member-type-toggle-student">
-      <input type="radio" name="memberType" value="student" <%= !isParent ? 'checked' : '' %> />
+      <input type="radio" name="memberType" value="student" <%= (!isParent && !isAdmin) ? 'checked' : '' %> />
       <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
+    </label>
+    <label class="member-type-toggle-btn member-type-toggle-admin">
+      <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> />
+      <svg class="icon"><use href="#icon-badge"/></svg> Admin
     </label>
   </div>
 </div>
@@ -123,7 +131,7 @@ const US_STATES = [
       <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes"><%= member.medical_notes || '' %></textarea>
     </div>
   </div>
-  <div class="class-form-row" data-student-only style="<%= !isParent ? '' : 'display:none;' %>">
+  <div class="class-form-row" data-student-only style="<%= (!isParent && !isAdmin) ? '' : 'display:none;' %>">
     <div class="class-form-field">
       <span class="class-form-field-label required">Birthday</span>
       <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
@@ -136,6 +144,20 @@ const US_STATES = [
           <option value="<%= g %>" <%= member.grade_level === g ? 'selected' : '' %>><%= g %></option>
         <% }); %>
       </select>
+    </div>
+  </div>
+  <div class="class-form-row" data-admin-only style="<%= isAdmin ? '' : 'display:none;' %>">
+    <div class="class-form-field">
+      <span class="class-form-field-label">Admin Position</span>
+      <select name="adminPositionId">
+        <option value="">None</option>
+        <% adminPositions.forEach(function(p) { %>
+          <option value="<%= p.id %>" <%= member.admin_position_id === p.id ? 'selected' : '' %>><%= p.title %></option>
+        <% }); %>
+      </select>
+      <% if (adminPositions.length === 0) { %>
+        <span class="hint">No positions added yet - add some under <a href="/admin/settings?tab=leaders">Settings &gt; Admin &amp; Leaders</a>.</span>
+      <% } %>
     </div>
   </div>
 </div>

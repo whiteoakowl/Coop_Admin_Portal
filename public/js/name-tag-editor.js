@@ -18,7 +18,7 @@
   // Description, not member fields - see utils/nameTagBadge.js's
   // FIELDS_BY_TYPE comment), so copying between those and student/parent
   // wouldn't carry over anything meaningful.
-  const NAME_TAG_TYPES = ['student', 'parent'];
+  const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
 
   function cloneLayout(layout) {
     return JSON.parse(JSON.stringify(layout || {}));
@@ -49,6 +49,7 @@
   const layouts = {
     student: cloneLayout(seed.templates.student),
     parent: cloneLayout(seed.templates.parent),
+    admin: cloneLayout(seed.templates.admin),
     setupCleanup: cloneLayout(seed.templates.setupCleanup),
     custom: cloneLayout(seed.templates.custom),
   };
@@ -64,6 +65,7 @@
       memberCode: 'ID#012345',
       barcodeValue: '0123456789',
     },
+    admin: { name: 'Sam Admin', adminPosition: 'President', memberCode: 'ID#012345', barcodeValue: '0123456789' },
     setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
@@ -1441,9 +1443,15 @@
 
     if (copyDesignBtn) {
       copyDesignBtn.addEventListener('click', async () => {
-        const otherType = NAME_TAG_TYPES.find((t) => t !== currentType);
-        if (!otherType) return;
-        if (!confirm('Copy the ' + currentType + ' name tag\'s design to the ' + otherType + ' name tag? This overwrites the ' + otherType + ' design (saved and unsaved) with a copy of this one.')) return;
+        // "Copy design to all name tags" - with a 3rd type (Admin) added
+        // alongside Student/Parent, "all" now genuinely means every OTHER
+        // type, not just a single one, so this loops rather than picking
+        // one via .find() the way it did back when there were only ever
+        // two types.
+        const otherTypes = NAME_TAG_TYPES.filter((t) => t !== currentType);
+        if (otherTypes.length === 0) return;
+        const otherLabel = otherTypes.join(' and ');
+        if (!confirm('Copy the ' + currentType + ' name tag\'s design to the ' + otherLabel + ' name tag(s)? This overwrites their design (saved and unsaved) with a copy of this one.')) return;
 
         saveStatus.textContent = 'Saving…';
         try {
@@ -1455,16 +1463,20 @@
           if (!currentSave.ok) { saveStatus.textContent = 'Could not save.'; return; }
 
           const copied = cloneLayout(currentTemplate());
-          layouts[otherType] = copied;
-          // Reset the other type's undo/redo history to start fresh from
-          // this copy, same shape historyFor() lazily creates - otherwise
-          // switching to it and hitting Undo would jump back to whatever
-          // it looked like before the copy.
-          history[otherType] = { stack: [cloneLayout(copied)], index: 0 };
+          let allOk = true;
+          for (const otherType of otherTypes) {
+            layouts[otherType] = cloneLayout(copied);
+            // Reset the other type's undo/redo history to start fresh from
+            // this copy, same shape historyFor() lazily creates - otherwise
+            // switching to it and hitting Undo would jump back to whatever
+            // it looked like before the copy.
+            history[otherType] = { stack: [cloneLayout(copied)], index: 0 };
 
-          const otherSave = await saveTemplateToServer(otherType, copied);
-          if (otherSave.expired) { saveStatus.textContent = 'Session expired - please refresh and log in again.'; return; }
-          saveStatus.textContent = otherSave.ok ? 'Copied to ' + otherType + '!' : 'Could not save the copy.';
+            const otherSave = await saveTemplateToServer(otherType, cloneLayout(copied));
+            if (otherSave.expired) { saveStatus.textContent = 'Session expired - please refresh and log in again.'; return; }
+            if (!otherSave.ok) allOk = false;
+          }
+          saveStatus.textContent = allOk ? 'Copied to ' + otherLabel + '!' : 'Could not save every copy.';
         } catch (err) {
           saveStatus.textContent = 'Connection error.';
         }

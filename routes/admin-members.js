@@ -31,11 +31,16 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { listAdminPositions } = require('../utils/adminPositions');
 
 router.use(requireFullAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
-const MEMBER_TYPES = ['student', 'parent'];
+// 'admin' is co-op staff/leaders who mainly just need a printable badge
+// (see members.member_type's own schema comment) - no family/grade/setup
+// team fields, just an optional Admin Position (see memberFormFields below
+// and views/partials/member-form-fields.ejs's 3-way toggle).
+const MEMBER_TYPES = ['student', 'parent', 'admin'];
 
 // Member profile photos - go to Supabase Storage when configured, local
 // disk otherwise (see utils/uploadBackend.js and MIGRATION.md). multer
@@ -154,7 +159,7 @@ router.get('/members', async (req, res) => {
 router.get('/members/:id/cards-fragment', async (req, res) => {
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(parseInt(req.params.id, 10));
   if (!member) return res.status(404).send('Not found');
-  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
   const badgeLayout = templates[member.member_type] || templates.student;
   const scheduleCardTemplate = await getScheduleCardTemplate();
   res.render('member-cards-fragment', {
@@ -239,6 +244,7 @@ router.get('/members/export.csv', async (req, res) => {
 function memberFormFields(req) {
   const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
   const familyIdRaw = parseInt(req.body.familyId, 10);
+  const adminPositionIdRaw = parseInt(req.body.adminPositionId, 10);
   return {
     name: (req.body.name || '').trim(),
     memberType,
@@ -260,6 +266,12 @@ function memberFormFields(req) {
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
         : null,
+    // Optional regardless of type (a real request: "Add an optional
+    // dropdown menu for choosing an admin position" - not gated to
+    // member_type === 'admin' at the data layer, even though that's the
+    // only type the form currently shows the dropdown for), same
+    // "unselected means null" shape as familyId above.
+    adminPositionId: Number.isInteger(adminPositionIdRaw) ? adminPositionIdRaw : null,
   };
 }
 
@@ -369,12 +381,14 @@ router.get('/members/new', async (req, res) => {
       grade_level: '',
       medical_notes: '',
       is_primary_parent: 0,
+      admin_position_id: null,
     },
     families: await allFamilies(),
     memberFamilyId: null,
     gradeLevels: GRADE_LEVELS,
     setupTeams: await allSetupTeams(),
     memberCleanupTeamIds: [],
+    adminPositions: await listAdminPositions(),
     error: req.query.error || null,
   });
 });
@@ -402,8 +416,8 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
   const info = await db
     .prepare(
       `INSERT INTO members
-         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes, admin_position_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       f.name,
@@ -419,7 +433,8 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
       photoPath,
       f.birthday,
       f.gradeLevel,
-      f.medicalNotes
+      f.medicalNotes,
+      f.adminPositionId
     );
   await syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
   await setMemberFamily(info.lastInsertRowid, f.familyId);
@@ -540,6 +555,7 @@ router.get('/members/:id/edit', async (req, res) => {
     gradeLevels: GRADE_LEVELS,
     setupTeams: await allSetupTeams(),
     memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
+    adminPositions: await listAdminPositions(),
     error: req.query.error || null,
   });
 });
@@ -571,7 +587,7 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
   await db.prepare(
     `UPDATE members SET
        name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
-       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
+       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?, admin_position_id = ?
      WHERE id = ?`
   ).run(
     f.name,
@@ -586,6 +602,7 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
     f.birthday,
     f.gradeLevel,
     f.medicalNotes,
+    f.adminPositionId,
     id
   );
   await syncCleanupTeams(id, f.cleanupTeamIds);

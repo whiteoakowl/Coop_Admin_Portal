@@ -128,6 +128,30 @@ function memberCodeLabel(member) {
   return member.member_code ? `ID#${member.member_code}` : '';
 }
 
+// An admin member's admin_position_id is just a foreign key - the badge
+// needs the position's own title text (utils/adminPositions.js manages the
+// Settings-side list it points at). Optional (a real request: "Add an
+// optional dropdown menu"), so no position selected is simply a blank
+// field, same as every other optional badge field in this file.
+async function adminPositionTitle(adminPositionId) {
+  if (!adminPositionId) return '';
+  const row = await db.prepare('SELECT title FROM admin_positions WHERE id = ?').get(adminPositionId);
+  return row ? row.title : '';
+}
+
+// Batch version for badgeDataForMembers below - one query for every admin
+// member's position instead of one per member, the same N+1 shape
+// cleanupTeamRowsForParents already avoids for parents.
+async function adminPositionTitlesByIds(ids) {
+  const uniqueIds = [...new Set(ids.filter((id) => id != null))];
+  if (uniqueIds.length === 0) return {};
+  const placeholders = uniqueIds.map(() => '?').join(',');
+  const rows = await db.prepare(`SELECT id, title FROM admin_positions WHERE id IN (${placeholders})`).all(...uniqueIds);
+  const byId = {};
+  for (const r of rows) byId[r.id] = r.title;
+  return byId;
+}
+
 // The field values a badge template can place on a member's tag.
 async function badgeDataForMember(member) {
   const memberCode = memberCodeLabel(member);
@@ -137,6 +161,17 @@ async function badgeDataForMember(member) {
       name: splitNameLines(member.name),
       cleanupTeam: teamRows.map((r) => r.title).join(', '),
       ...setupCleanupJobLabels(teamRows),
+      memberCode,
+      barcodeValue: member.barcode,
+    };
+  }
+  // A real request: "an admin name tag... logo, name, barcode, id number
+  // and the admin position" - co-op staff/leaders (member_type === 'admin'),
+  // no grade/allergies (those are student-only concepts).
+  if (member.member_type === 'admin') {
+    return {
+      name: splitNameLines(member.name),
+      adminPosition: await adminPositionTitle(member.admin_position_id),
       memberCode,
       barcodeValue: member.barcode,
     };
@@ -153,12 +188,15 @@ async function badgeDataForMember(member) {
 // Batch version of badgeDataForMember for a bulk print flow (Design/
 // Print's own Name Tags print, and utils/cardPairs.js's Name Tags +
 // Schedule Cards / Front & Back Duplex) - computes every parent's cleanup
-// team membership in ONE query instead of one per parent, the same N+1
-// shape that made a real ~800-member bulk print time out. Returns
+// team membership (and every admin's position title) in ONE query each
+// instead of one per member, the same N+1 shape that made a real
+// ~800-member bulk print time out. Returns
 // { [memberId]: <same shape badgeDataForMember returns> }.
 async function badgeDataForMembers(members) {
   const parentIds = members.filter((m) => m.member_type === 'parent').map((m) => m.id);
   const teamRowsByParent = await cleanupTeamRowsForParents(parentIds);
+  const adminIds = members.filter((m) => m.member_type === 'admin').map((m) => m.admin_position_id);
+  const positionTitleById = await adminPositionTitlesByIds(adminIds);
   const result = {};
   for (const member of members) {
     const memberCode = memberCodeLabel(member);
@@ -168,6 +206,13 @@ async function badgeDataForMembers(members) {
         name: splitNameLines(member.name),
         cleanupTeam: teamRows.map((r) => r.title).join(', '),
         ...setupCleanupJobLabels(teamRows),
+        memberCode,
+        barcodeValue: member.barcode,
+      };
+    } else if (member.member_type === 'admin') {
+      result[member.id] = {
+        name: splitNameLines(member.name),
+        adminPosition: positionTitleById[member.admin_position_id] || '',
         memberCode,
         barcodeValue: member.barcode,
       };

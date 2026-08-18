@@ -2,11 +2,14 @@
 const MEMBER_TYPE_META = {
   student: { icon: 'graduation-cap', title: 'Student Membership Form', subtitle: 'Create or update a student membership profile.', headerClass: 'member-form-header-student', boxClass: 'member-form-section-blue' },
   parent: { icon: 'users', title: 'Parent Membership Form', subtitle: 'Create or update a parent/guardian membership profile.', headerClass: 'member-form-header-parent', boxClass: 'member-form-section-green' },
+  admin: { icon: 'badge', title: 'Admin Membership Form', subtitle: 'Create or update a co-op admin/leader membership profile.', headerClass: 'member-form-header-admin', boxClass: 'member-form-section-purple' },
 };
+const ALL_HEADER_CLASSES = Object.values(MEMBER_TYPE_META).map((m) => m.headerClass);
+const ALL_BOX_CLASSES = Object.values(MEMBER_TYPE_META).map((m) => m.boxClass);
 
-// Toggles the Student-only / Parent-only sections and re-themes the header
-// + Family box (blue for Student, green for Parent) when the
-// Parent/Student/Admin toggle changes.
+// Toggles the Student-only / Parent-only / Admin-only sections and re-themes
+// the header + Family box (blue for Student, green for Parent, purple for
+// Admin) when the Parent/Student/Admin toggle changes.
 function updateMemberFormForType(form) {
   const checked = form.querySelector('input[name="memberType"]:checked');
   const type = checked ? checked.value : 'student';
@@ -14,10 +17,11 @@ function updateMemberFormForType(form) {
 
   form.querySelectorAll('[data-student-only]').forEach((el) => { el.style.display = type === 'student' ? '' : 'none'; });
   form.querySelectorAll('[data-parent-only]').forEach((el) => { el.style.display = type === 'parent' ? '' : 'none'; });
+  form.querySelectorAll('[data-admin-only]').forEach((el) => { el.style.display = type === 'admin' ? '' : 'none'; });
 
   const header = form.querySelector('[data-member-form-header]');
   if (header) {
-    header.classList.remove('member-form-header-student', 'member-form-header-parent');
+    header.classList.remove(...ALL_HEADER_CLASSES);
     header.classList.add(meta.headerClass);
     const iconUse = header.querySelector('.member-form-header-icon use');
     if (iconUse) iconUse.setAttribute('href', '#icon-' + meta.icon);
@@ -29,7 +33,7 @@ function updateMemberFormForType(form) {
 
   const familyBox = form.querySelector('[data-family-box]');
   if (familyBox) {
-    familyBox.classList.remove('member-form-section-blue', 'member-form-section-green');
+    familyBox.classList.remove(...ALL_BOX_CLASSES);
     familyBox.classList.add(meta.boxClass);
   }
 }

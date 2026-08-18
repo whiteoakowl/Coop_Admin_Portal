@@ -88,7 +88,7 @@ router.get('/name-tag', async (req, res) => {
     showArchived,
     members,
     nameTagDataJson: jsonScriptSafe({
-      templates: { student: await getTemplate('student'), parent: await getTemplate('parent') },
+      templates: { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') },
       defaultLayouts: DEFAULT_LAYOUTS,
       fieldsByType: FIELDS_BY_TYPE,
       shapeTypes: SHAPE_TYPES,
@@ -132,7 +132,7 @@ router.post('/name-tag/:id/unarchive', async (req, res) => {
   res.redirect('/admin/name-tag?tab=archived');
 });
 
-const NAME_TAG_TYPES = ['student', 'parent'];
+const NAME_TAG_TYPES = ['student', 'parent', 'admin'];
 
 // This same save endpoint is shared by the Setup/Cleanup and Custom badge
 // types (they use the same editor - see public/js/name-tag-editor.js) -
@@ -205,7 +205,7 @@ router.post('/name-tag/print', async (req, res) => {
   const placeholders = memberIds.map(() => '?').join(',');
   const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
-  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
   // Every parent's cleanup team membership computed in ONE query, not one
   // per parent - a real bug report: printing ~800 cards timed out, the
   // same N+1 shape already fixed for Schedule Cards (routes/admin-

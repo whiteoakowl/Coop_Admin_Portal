@@ -10,6 +10,7 @@ const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin } = require('../utils/classCheckinPin');
 const { computeTrend } = require('../utils/dashboardTrends');
+const { listAdminPositions, addAdminPosition, deleteAdminPosition } = require('../utils/adminPositions');
 
 // --- Auth ---
 
@@ -236,14 +237,15 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'classcheckin', 'quicklinks', 'install', 'documents'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'documents'];
+const SETTINGS_TABS = ['account', 'classcheckin', 'leaders', 'quicklinks', 'install', 'documents'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'leaders', 'documents'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links and Install App here - Username/Password manages the
-  // single master admin account, and Documents is full-Admin-only.
+  // single master admin account, and Documents/Admin & Leaders are
+  // full-Admin-only.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
   if (FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
@@ -252,6 +254,7 @@ async function renderSettings(req, res, error, success, activeTab) {
     isFullAdmin,
     activeTab: tab,
     documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
+    adminPositions: await listAdminPositions(),
     error,
     success,
   });
@@ -319,6 +322,23 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
   }
   await setClassCheckinPin(newPin);
   await renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
+});
+
+// Admin & Leaders: a plain list of position titles ("President",
+// "Treasurer", ...) an admin member can optionally be assigned on the
+// member form (views/partials/member-form-fields.ejs's Admin Position
+// dropdown) and that then prints on their Admin name tag (utils/
+// nameTagData.js's adminPositionLabel).
+router.post('/settings/admin-positions', requireAdmin, requireFullAdmin, async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return renderSettings(req, res, 'Position title is required.', null, 'leaders');
+  await addAdminPosition(title);
+  await renderSettings(req, res, null, `Added "${title}".`, 'leaders');
+});
+
+router.post('/settings/admin-positions/:id/delete', requireAdmin, requireFullAdmin, async (req, res) => {
+  await deleteAdminPosition(parseInt(req.params.id, 10));
+  await renderSettings(req, res, null, 'Position removed.', 'leaders');
 });
 
 module.exports = router;

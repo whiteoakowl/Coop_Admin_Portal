@@ -51,7 +51,7 @@ async function seedIfMissing(db) {
     }
   }
 
-  for (const memberType of ['student', 'parent']) {
+  for (const memberType of ['student', 'parent', 'admin']) {
     const existing = await db.prepare('SELECT member_type FROM name_tag_templates WHERE member_type = ?').get(memberType);
     if (existing) continue;
     await db

@@ -44,7 +44,7 @@
           <%= m.name %><%- include('medical-flag', { member: m }) %>
           <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
         </td>
-        <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : 'Student' %></span></td>
+        <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
         <td class="members-col-parent"><%= m.familyName || '—' %></td>
         <td class="members-col-rosters">
           <% if (m.rosters.length === 0) { %>

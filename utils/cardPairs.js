@@ -11,7 +11,7 @@ const { schedulesForMembers } = require('./schedule');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 async function buildCardPairs(members) {
-  const nameTagTemplates = { student: await getTemplate('student'), parent: await getTemplate('parent') };
+  const nameTagTemplates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
   const scheduleCardTemplate = await getScheduleCardTemplate();
   const scheduleCardBgCss = NameTagRenderCore.backgroundCss(scheduleCardTemplate.background, scheduleCardTemplate.backgroundOpacity);
 
