@@ -74,7 +74,7 @@ test('Class Check-In PIN gate', async (t) => {
   await t.test('the day picker redirects to the PIN page when not unlocked', async () => {
     const res = await request(app).get('/kiosk/class-checkin/classes');
     assert.equal(res.status, 302);
-    assert.equal(res.headers.location, '/kiosk/class-checkin');
+    assert.equal(res.headers.location, '/kiosk/class-checkin?next=%2Fkiosk%2Fclass-checkin%2Fclasses');
   });
 
   await t.test('an incorrect PIN is rejected and does not unlock', async () => {
@@ -102,6 +102,61 @@ test('Class Check-In PIN gate', async (t) => {
     await agent.post('/kiosk/class-checkin/lock');
     const res = await agent.get('/kiosk/class-checkin/classes');
     assert.equal(res.status, 302, 'locked out again after Done');
+  });
+});
+
+// A real request: every class gets its own "quick link" straight to its
+// attendance sheet (views/partials/class-schedule-grid.ejs), but this
+// whole surface is PIN-gated - hitting that link locked has to land back
+// on the SAME class after the PIN, not just the day picker a generic
+// unlock would otherwise always send you to.
+test('Class Check-In quick link (?next=) round-trip through the PIN gate', async (t) => {
+  const { classId } = await setUpClassWithStudent();
+  const targetPath = `/kiosk/class-checkin/classes/${classId}/attendance`;
+
+  await t.test('hitting a class quick link while locked redirects to the PIN page with ?next set to it', async () => {
+    const res = await request(app).get(targetPath);
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, `/kiosk/class-checkin?next=${encodeURIComponent(targetPath)}`);
+  });
+
+  await t.test('the PIN page carries that class along as a hidden field', async () => {
+    const res = await request(app).get(`/kiosk/class-checkin?next=${encodeURIComponent(targetPath)}`);
+    assert.equal(res.status, 200);
+    assert.match(res.text, new RegExp(`name="next" value="${targetPath.replace(/\//g, '\\/')}"`));
+  });
+
+  await t.test('the correct PIN redirects straight to that class\'s attendance page, not the day picker', async () => {
+    const agent = request.agent(app);
+    const res = await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000', next: targetPath });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, targetPath);
+    const attendanceRes = await agent.get(targetPath);
+    assert.equal(attendanceRes.status, 200, 'already unlocked, the class page itself now loads');
+  });
+
+  await t.test('a wrong PIN re-renders with the same next still carried, so a second correct attempt still lands there', async () => {
+    const agent = request.agent(app);
+    const wrongRes = await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '9999', next: targetPath });
+    assert.match(wrongRes.text, new RegExp(`name="next" value="${targetPath.replace(/\//g, '\\/')}"`));
+
+    const res = await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000', next: targetPath });
+    assert.equal(res.headers.location, targetPath);
+  });
+
+  await t.test('an absolute/external next is ignored, not honored as an open redirect', async () => {
+    const agent = request.agent(app);
+    const res = await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000', next: 'https://evil.example/phish' });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, '/kiosk/class-checkin/classes', 'falls back to the normal day picker instead of an external URL');
+  });
+
+  await t.test('already unlocked, visiting the PIN page with ?next redirects straight there too', async () => {
+    const agent = request.agent(app);
+    await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000' });
+    const res = await agent.get(`/kiosk/class-checkin?next=${encodeURIComponent(targetPath)}`);
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, targetPath);
   });
 });
 

@@ -39,9 +39,25 @@ const classScanLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 4
 
 const SCAN_MODES = ['checkin', 'checkout'];
 
+// A real request: a class card's own "quick link" (views/partials/class-
+// schedule-grid.ejs) points straight at that one class's attendance
+// sheet - but this whole surface is PIN-gated, so hitting it locked
+// used to just bounce to the day picker, same as if you'd started from
+// scratch, throwing away which class you actually meant to land on.
+// isSafeNextPath keeps this to a same-origin path under this router's
+// own mount point (never an absolute/external URL an attacker could
+// smuggle through the PIN form as an open redirect), and the PIN gate/
+// form below thread it through end to end: requireUnlocked stamps the
+// original URL on as ?next= when it bounces someone to the PIN screen,
+// the PIN screen carries it as a hidden field, and /unlock redirects
+// there instead of the day picker once the PIN checks out.
+function isSafeNextPath(next) {
+  return typeof next === 'string' && next.startsWith('/kiosk/class-checkin/') && !next.startsWith('//');
+}
+
 function requireUnlocked(req, res, next) {
   if (req.session && req.session.classCheckinUnlocked) return next();
-  res.redirect('/kiosk/class-checkin');
+  res.redirect('/kiosk/class-checkin?next=' + encodeURIComponent(req.originalUrl));
 }
 
 // Loads a class with the same computed display fields (timeLabel,
@@ -55,25 +71,28 @@ async function findClassWithLabels(id) {
 }
 
 router.get('/', (req, res) => {
-  if (req.session && req.session.classCheckinUnlocked) return res.redirect('/kiosk/class-checkin/classes');
-  res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: null });
+  const next = isSafeNextPath(req.query.next) ? req.query.next : null;
+  if (req.session && req.session.classCheckinUnlocked) return res.redirect(next || '/kiosk/class-checkin/classes');
+  res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: null, next });
 });
 
 router.post('/unlock', async (req, res) => {
+  const next = isSafeNextPath(req.body.next) ? req.body.next : null;
   if (pinLimiter.isRateLimited(req.ip)) {
     return res.render('kiosk-class-checkin-pin', {
       title: 'Class Check-In',
       error: 'Too many attempts. Please wait a few minutes and try again.',
+      next,
     });
   }
   const pin = (req.body.pin || '').trim();
   if (!(await verifyClassCheckinPin(pin))) {
     pinLimiter.recordFailure(req.ip);
-    return res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: 'Incorrect PIN.' });
+    return res.render('kiosk-class-checkin-pin', { title: 'Class Check-In', error: 'Incorrect PIN.', next });
   }
   pinLimiter.recordSuccess(req.ip);
   req.session.classCheckinUnlocked = true;
-  res.redirect('/kiosk/class-checkin/classes');
+  res.redirect(next || '/kiosk/class-checkin/classes');
 });
 
 router.post('/lock', (req, res) => {

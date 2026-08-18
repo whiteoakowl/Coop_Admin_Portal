@@ -4264,6 +4264,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    Create Class dialog's header treatment, just wider to fit the details
    form + roster side by side. */
 .class-card-view-btn { flex-shrink: 0; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+
+/* Class Check-In quick link - opens that one class's own kiosk attendance
+   screen (Check In/Check Out live there) in a new tab, skipping the
+   kiosk's own day-picker/hour-search a teacher or sub would otherwise
+   click through. .icon-btn's default 2rem square reads oversized next to
+   this card's own compact 0.78rem View button, so it's scaled down to
+   match. */
+.class-card-quicklink-btn { flex-shrink: 0; width: 1.6rem; height: 1.6rem; font-size: 0.78rem; }
 .class-view-dialog {
   width: min(1100px, 95vw);
   max-height: 90vh;

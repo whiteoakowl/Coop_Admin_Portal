@@ -15,6 +15,7 @@
     <% } %>
 
     <form method="POST" action="/kiosk/class-checkin/unlock" class="stack-form">
+      <% if (next) { %><input type="hidden" name="next" value="<%= next %>" /><% } %>
       <label for="pin">PIN</label>
       <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required />
 

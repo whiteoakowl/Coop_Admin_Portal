@@ -258,6 +258,13 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                       <% } %>
                       <h3><%= cls.class_name %></h3>
                       <% if (!gridReadOnly) { %>
+                        <a
+                          class="icon-btn class-card-quicklink-btn no-print"
+                          href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance"
+                          target="_blank"
+                          aria-label="Class Check-In quick link for <%= cls.class_name %>"
+                          title="Class Check-In quick link - opens this class's check-in/out kiosk screen in a new tab"
+                        ><svg class="icon"><use href="#icon-user-check"/></svg></a>
                         <button type="button" class="btn-secondary class-card-view-btn no-print" data-view-class="<%= cls.id %>">View</button>
                       <% } %>
                     </div>
