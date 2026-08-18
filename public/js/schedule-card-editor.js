@@ -45,6 +45,17 @@
 
   const PLACEHOLDER_DATA = {
     name: 'Alex Student',
+    // Matches utils/scheduleCardData.js's allergyLabel() format - a real
+    // bug report: this field was missing here entirely, so the allergy
+    // text element (see utils/scheduleCardBadge.js's DEFAULT_LAYOUT)
+    // rendered with no text at all in the editor - its red (#dc2626)
+    // color was visible on its properties panel swatch and its box still
+    // occupied real canvas space, but with nothing inside to actually
+    // see or select by clicking its text. The printed card was never
+    // affected - utils/scheduleCardData.js's allergyLabel() computes the
+    // real per-member value there, this object only feeds the editor's
+    // own WYSIWYG preview.
+    allergy: 'Allergies/Medical: Peanut allergy',
     primaryParentPhone: 'Parent Phone: (555) 123-4567',
     mondaySchedule: [
       { time: '9:00 - 9:45 AM', className: 'Math', room: 'Room 12' },
