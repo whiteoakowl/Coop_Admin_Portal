@@ -68,8 +68,8 @@ test('site root: mobile grid/action bar and desktop/tablet top menu/columns both
     const [leftColumn, rightColumn] = groupMatch[1].split('<div class="landing-column">').slice(1);
     assert.match(leftColumn, /<a class="landing-card landing-card-green landing-card-wide" href="\/kiosk\/checkin">/);
     assert.match(leftColumn, /<a class="landing-card landing-card-green landing-card-wide" href="\/kiosk\/checkout">/);
-    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/volunteers\//);
-    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/setup\//);
+    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/volunteers">/);
+    assert.match(rightColumn, /<a class="landing-card landing-card-purple landing-card-wide" href="\/setup">/);
   });
 
   await t.test('the mobile-only grid has exactly 4 cards, in order Check In, Check Out (green), Floater Assignments, Setup/Cleanup Teams (purple) - Name Tag Form/Absence/Late Form live in the bottom bar instead', () => {
@@ -79,8 +79,8 @@ test('site root: mobile grid/action bar and desktop/tablet top menu/columns both
     assert.deepEqual(labels, ['Check In', 'Check Out', 'Floater Assignments', 'Setup/Cleanup Teams']);
     assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkin">/);
     assert.match(groupMatch[1], /<a class="landing-card landing-card-green" href="\/kiosk\/checkout">/);
-    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/volunteers\//);
-    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup\//);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/volunteers">/);
+    assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup">/);
   });
 
   await t.test('Full Screen View is unaffected, still in its own top-right corner group at every viewport width', () => {

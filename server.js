@@ -80,8 +80,6 @@ bootReady.catch((err) => {
   if (IS_MAIN_PROCESS) process.exit(1);
 });
 
-const { defaultDay } = require('./utils/days');
-
 const kioskRouter = require('./routes/kiosk');
 const checkoutRouter = require('./routes/checkout');
 const kioskClassCheckinRouter = require('./routes/kiosk-class-checkin');
@@ -248,7 +246,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-  res.render('index', { title: 'SH Check-In / Check-Out', error: null, defaultDay: defaultDay() });
+  res.render('index', { title: 'SH Check-In / Check-Out', error: null });
 });
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
