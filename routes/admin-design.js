@@ -13,7 +13,7 @@ const { buildDuplexPages } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { paginate, parsePage } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { allClassesList } = require('../utils/classSchedule');
 
 router.use(requireFullAdmin);
@@ -90,7 +90,8 @@ router.get('/design', async (req, res) => {
       .prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
       .all(showArchived ? 1 : 0)
   ).map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
-  const requestsPagination = paginate(allSubmissions, parsePage(req.query.page));
+  const requestsPageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const requestsPagination = paginate(allSubmissions, parsePage(req.query.page), requestsPageSize);
 
   res.render('admin-design', {
     title: 'Design / Print',
@@ -106,6 +107,7 @@ router.get('/design', async (req, res) => {
     submissions: requestsPagination.items,
     allSubmissions,
     pagination: requestsPagination,
+    viewingAll: requestsPageSize === Infinity,
     baseHref: `/admin/design?tab=requests${showArchived ? '&archived=1' : ''}${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
     dates: requestDates,
     dateFilter,

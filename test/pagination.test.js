@@ -5,7 +5,7 @@
 // returning an empty slice, and never dividing by zero on an empty list.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { paginate, parsePage, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 test('parsePage', async (t) => {
   await t.test('parses a valid positive integer string', () => {
@@ -83,5 +83,32 @@ test('paginate', async (t) => {
     const page = paginate(bigList, 1);
     assert.equal(page.items.length, DEFAULT_PAGE_SIZE);
     assert.equal(page.totalPages, 2);
+  });
+
+  // A real request: "a view all button." pageSize=Infinity (what
+  // parsePageSize below resolves ?pageSize=all to) needs no special-
+  // casing here - the math already degrades correctly on its own.
+  await t.test('pageSize=Infinity returns every item as a single page', () => {
+    const page = paginate(items, 1, Infinity);
+    assert.deepEqual(page.items, items);
+    assert.equal(page.totalPages, 1);
+    assert.equal(page.currentPage, 1);
+    assert.equal(page.hasPrev, false);
+    assert.equal(page.hasNext, false);
+    assert.equal(page.startIndex, 1);
+    assert.equal(page.endIndex, 25);
+  });
+});
+
+test('parsePageSize', async (t) => {
+  await t.test('resolves the literal "all" to Infinity', () => {
+    assert.equal(parsePageSize('all', DEFAULT_PAGE_SIZE), Infinity);
+  });
+
+  await t.test('falls back to the given default for anything else - missing, garbage, or a spoofed number', () => {
+    assert.equal(parsePageSize(undefined, DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE);
+    assert.equal(parsePageSize('', DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE);
+    assert.equal(parsePageSize('200', DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE);
+    assert.equal(parsePageSize('Infinity', DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE);
   });
 });

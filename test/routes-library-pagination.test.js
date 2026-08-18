@@ -60,7 +60,11 @@ test('Library Catalog tab pagination', async (t) => {
     assert.equal(res.status, 200);
     assert.equal(countOccurrences(res.text, '<td>Library Book'), 50);
     assert.match(res.text, /Showing 1&ndash;50 of 65/);
-    assert.match(res.text, /Page 1 of 2/);
+    // The old static "Page N of M" text is now an interactive dropdown
+    // (a real request: "a drop down to choose page number") - option 1
+    // selected, "of 2" trailing it.
+    assert.match(res.text, /<option value="1" selected>1<\/option>/);
+    assert.match(res.text, /of 2\s*<\/label>/);
   });
 
   await t.test('page 2 shows the remaining 15 items', async () => {
@@ -73,7 +77,7 @@ test('Library Catalog tab pagination', async (t) => {
   await t.test('an out-of-range page clamps to the last real page', async () => {
     const res = await request(app).get('/admin/library?tab=titles&page=999').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /Page 2 of 2/);
+    assert.match(res.text, /<option value="2" selected>2<\/option>/);
   });
 
   await t.test('the Next link preserves the active type filter', async () => {

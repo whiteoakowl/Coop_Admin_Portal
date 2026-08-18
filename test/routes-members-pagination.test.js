@@ -58,7 +58,11 @@ test('Members list pagination', async (t) => {
     // table's per-row aria-labels/dialogs that also mention each name.
     assert.equal(countOccurrences(res.text, '<td>Pagination Kid'), 65, 'print table always shows every filtered member');
     assert.match(res.text, /Showing 1&ndash;50 of 65/);
-    assert.match(res.text, /Page 1 of 2/);
+    // The old static "Page N of M" text is now an interactive dropdown
+    // (a real request: "a drop down to choose page number") - option 1
+    // selected, "of 2" trailing it.
+    assert.match(res.text, /<option value="1" selected>1<\/option>/);
+    assert.match(res.text, /of 2\s*<\/label>/);
   });
 
   await t.test('page 2 shows the remaining 15 on screen, still all 65 in the print table', async () => {
@@ -72,7 +76,7 @@ test('Members list pagination', async (t) => {
   await t.test('a page past the end clamps to the last real page rather than rendering empty', async () => {
     const res = await request(app).get('/admin/members?page=999').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /Page 2 of 2/);
+    assert.match(res.text, /<option value="2" selected>2<\/option>/);
     assert.equal(countOccurrences(res.text, 'member-name-link'), 15);
   });
 
@@ -85,5 +89,21 @@ test('Members list pagination', async (t) => {
     const res = await request(app).get('/admin/members?type=parent').set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.doesNotMatch(res.text, /pagination-bar/);
+  });
+
+  await t.test('the View All link is offered', async () => {
+    const res = await request(app).get('/admin/members').set('Cookie', cookie);
+    assert.match(res.text, /href="\/admin\/members\?pageSize=all">View All<\/a>/);
+  });
+
+  await t.test('?pageSize=all shows every member on one page, with a Show Pages link back instead of Prev\\/Next\\/View All', async () => {
+    const res = await request(app).get('/admin/members?pageSize=all').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.equal(countOccurrences(res.text, 'member-name-link'), 65, 'every member renders on one page');
+    assert.match(res.text, /Showing 1&ndash;65 of 65/);
+    assert.match(res.text, /href="\/admin\/members\?page=1">Show Pages<\/a>/);
+    assert.doesNotMatch(res.text, /&larr; Prev/);
+    assert.doesNotMatch(res.text, /Next &rarr;/);
+    assert.doesNotMatch(res.text, />View All<\/a>/);
   });
 });

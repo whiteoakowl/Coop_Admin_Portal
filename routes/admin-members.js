@@ -30,7 +30,7 @@ const {
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages } = require('../utils/duplexPrint');
-const { paginate, parsePage } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requireFullAdmin);
 
@@ -125,12 +125,14 @@ router.get('/members', async (req, res) => {
   // The Members page's own "Select All" (public/js/archive-select-toggle.js)
   // also reaches into this same full list for its off-page checkboxes -
   // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
-  const pagination = paginate(withRosters, parsePage(req.query.page));
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
   res.render('admin-members', {
     title: 'Members',
     members: pagination.items,
     allMembersForPrint: withRosters,
     pagination,
+    viewingAll: pageSize === Infinity,
     baseHref:
       '/admin/members?' +
       (typeFilter ? `type=${typeFilter}&` : '') +

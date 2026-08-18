@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { isValidISODate } = require('../utils/dates');
-const { paginate, parsePage } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 router.use(requireFullAdmin);
 
@@ -35,12 +35,14 @@ router.get('/library', async (req, res) => {
   // at all (grep views/admin-library.ejs) - nothing to duplicate into a
   // separate always-full print table, so a plain paginated `items` is
   // the whole change.
-  const pagination = paginate(await allItems(typeFilter), parsePage(req.query.page));
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(await allItems(typeFilter), parsePage(req.query.page), pageSize);
   res.render('admin-library', {
     title: 'Library',
     tab,
     items: pagination.items,
     pagination,
+    viewingAll: pageSize === Infinity,
     baseHref: `/admin/library?tab=titles${typeFilter ? `&type=${encodeURIComponent(typeFilter)}` : ''}&`,
     types: await allLibraryTypes(),
     typeFilter,

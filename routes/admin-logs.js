@@ -9,7 +9,7 @@ const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
 const { classesAtRiskForDay } = require('../utils/classSchedule');
 const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
-const { paginate, parsePage } = require('../utils/pagination');
+const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
 const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
 
@@ -121,13 +121,15 @@ router.get('/logs', requireAdmin, async (req, res) => {
       checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : '—',
       number: r.number ?? '—',
     }));
-    const pagination = paginate(allRows, parsePage(req.query.page));
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    const pagination = paginate(allRows, parsePage(req.query.page), pageSize);
     return res.render('admin-logs', {
       title: 'Check In/Out Log',
       tab,
       rows: pagination.items,
       allRows,
       pagination,
+      viewingAll: pageSize === Infinity,
       baseHref: `/admin/logs?tab=checkinout${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
       dates: await checkinoutLogDates(),
       dateFilter,
@@ -150,13 +152,15 @@ router.get('/logs', requireAdmin, async (req, res) => {
       .prepare(`SELECT DISTINCT date(created_at)::text AS d FROM name_tag_requests WHERE archived = ? ORDER BY d DESC`)
       .all(showArchived ? 1 : 0))
       .map((r) => ({ date: r.d, label: formatDateLabel(r.d) }));
-    const pagination = paginate(allSubmissions, parsePage(req.query.page));
+    const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+    const pagination = paginate(allSubmissions, parsePage(req.query.page), pageSize);
     return res.render('admin-logs', {
       title: 'Name Tag Requests',
       tab,
       submissions: pagination.items,
       allSubmissions,
       pagination,
+      viewingAll: pageSize === Infinity,
       baseHref: `/admin/logs?tab=nametag${showArchived ? '&archived=1' : ''}${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
       dates,
       dateFilter,
@@ -207,13 +211,15 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 
   const allSubmissions = await allAbsenceSubmissions(dateFilter);
-  const pagination = paginate(allSubmissions, parsePage(req.query.page));
+  const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const pagination = paginate(allSubmissions, parsePage(req.query.page), pageSize);
   res.render('admin-logs', {
     title: 'Absence/Late Log',
     tab,
     submissions: pagination.items,
     allSubmissions,
     pagination,
+    viewingAll: pageSize === Infinity,
     baseHref: `/admin/logs?tab=absence${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
     dates: await absenceSubmissionDates(),
     dateFilter,

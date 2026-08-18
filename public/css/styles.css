@@ -1738,7 +1738,19 @@ body.public-page .roster-empty {
 .pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 0.85rem; }
 .pagination-summary { color: var(--muted); font-size: 0.85rem; }
 .pagination-nav { display: flex; align-items: center; gap: 0.75rem; }
-.pagination-page-label { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+/* Replaces the old static "Page N of M" text - a real request: "a drop
+   down to choose page number... this is more customizable than clicking
+   next over and over." */
+.pagination-page-select-label { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.pagination-page-select {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--btn-purple);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-weight: 600;
+  color: var(--purple);
+  background: var(--surface);
+}
 .pagination-btn {
   padding: var(--control-padding-compact);
   border: 1px solid var(--btn-purple);

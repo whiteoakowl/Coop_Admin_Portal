@@ -19,6 +19,17 @@ function parsePage(raw) {
   return Number.isInteger(n) && n > 0 ? n : 1;
 }
 
+// "View All" (a real request: "a view all button... more customizable
+// than clicking next over and over") is just pageSize=Infinity handed to
+// paginate() below - Math.ceil(totalItems / Infinity) is 0, clamped by
+// the existing Math.max(1, ...) to a single page. This only recognizes
+// the literal ?pageSize=all query value; anything else (missing,
+// garbage) falls back to defaultSize, the same "invalid input is a safe
+// default, not a 400" convention parsePage above already follows.
+function parsePageSize(raw, defaultSize) {
+  return raw === 'all' ? Infinity : defaultSize;
+}
+
 // Slices `items` to the requested page, clamping to the last real page if
 // the request is past the end (e.g. a bookmarked ?page=9 after the list
 // shrank) rather than returning an empty page.
@@ -26,7 +37,12 @@ function paginate(items, requestedPage, pageSize = DEFAULT_PAGE_SIZE) {
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = Math.min(Math.max(1, requestedPage), totalPages);
-  const start = (currentPage - 1) * pageSize;
+  // (currentPage - 1) * pageSize, guarded: with pageSize=Infinity (View
+  // All) currentPage is always 1 here (totalPages above collapses to 1),
+  // so this "start of page" is always 0 - but 0 * Infinity is NaN in
+  // JS, not 0, so the naive multiplication has to be skipped rather than
+  // relied on to just work out.
+  const start = pageSize === Infinity ? 0 : (currentPage - 1) * pageSize;
   return {
     items: items.slice(start, start + pageSize),
     currentPage,
@@ -40,4 +56,4 @@ function paginate(items, requestedPage, pageSize = DEFAULT_PAGE_SIZE) {
   };
 }
 
-module.exports = { paginate, parsePage, DEFAULT_PAGE_SIZE };
+module.exports = { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE };
