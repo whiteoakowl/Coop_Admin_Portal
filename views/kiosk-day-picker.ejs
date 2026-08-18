@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap">
+    <div class="kiosk-inline-header">
+      <a href="/kiosk" class="kiosk-home kiosk-home-inline">&larr; Home</a>
+    </div>
+    <h1><%= heading %></h1>
+    <p class="subtitle">Choose a day to view.</p>
+
+    <div class="landing-grid landing-grid-two">
+      <a class="landing-card landing-card-purple" href="<%= basePath %>/monday">
+        <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
+        <span class="landing-label">Monday</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="<%= basePath %>/wednesday">
+        <span class="landing-icon"><svg class="icon"><use href="#<%= icon %>"/></svg></span>
+        <span class="landing-label">Wednesday</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

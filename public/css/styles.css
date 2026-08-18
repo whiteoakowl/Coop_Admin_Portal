@@ -469,6 +469,12 @@ textarea:focus-visible,
 .kiosk-header .kiosk-logo,
 .kiosk-header .form-logo { margin-bottom: 0; flex-shrink: 0; }
 .kiosk-header h1 { margin: 0; }
+/* Optional second line under the title (e.g. "the closest date coming
+   up") - a real request for the public Floater Assignments/Setup-
+   Cleanup pages, which now fall forward to the nearest upcoming date
+   instead of just going blank on a day with nothing scheduled today. */
+.kiosk-header-text { display: flex; flex-direction: column; gap: 0.2rem; }
+.kiosk-subhead { margin: 0; color: var(--muted); font-size: 1rem; font-weight: 600; }
 
 /* At 2.4rem, a longer title (e.g. "Anatomy & Physiology · Check In") wraps
    to 3-4 lines on a phone, made worse by the non-shrinking logo (see

@@ -66,7 +66,7 @@
       barcodeValue: '0123456789',
     },
     admin: { name: 'Sam Admin', adminPosition: 'President', memberCode: 'ID#012345', barcodeValue: '0123456789' },
-    setupCleanup: { badgeNumber: '12', title: 'Snack Table', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
+    setupCleanup: { day: 'Monday', title: 'Snack Table', leaderLabel: 'Leader: Jordan Parent', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
 

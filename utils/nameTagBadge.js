@@ -49,10 +49,19 @@ const FIELDS_BY_TYPE = {
     { field: 'adminPosition', label: 'Admin Position' },
     { field: 'memberCode', label: 'Member ID' },
   ],
+  // A real bug report: "Setup/cleanup task cards are a mess... The only
+  // information that should be included on each setup/cleanup badge is
+  // day, team name, leader, task and the barcode" - badgeNumber (the old
+  // big scannable digits at top, redundant with the barcode itself) and
+  // the generic "Title"/"Description" labels are gone; title/description
+  // still bind to the same misc_badges columns, just repurposed (see
+  // utils/taskList.js's upsertTaskBadge) to actually mean Team Name/Task
+  // now, and day/leaderLabel are genuinely new fields.
   setupCleanup: [
-    { field: 'badgeNumber', label: 'Badge Number' },
-    { field: 'title', label: 'Title' },
-    { field: 'description', label: 'Description' },
+    { field: 'day', label: 'Day' },
+    { field: 'title', label: 'Team Name' },
+    { field: 'leaderLabel', label: 'Leader' },
+    { field: 'description', label: 'Task' },
   ],
   custom: [
     { field: 'badgeNumber', label: 'Badge Number' },
@@ -169,19 +178,29 @@ const DEFAULT_LAYOUTS = {
       { id: 'barcode', type: 'barcode', x: 68, y: 154, width: 200, height: 55 },
     ],
   },
+  // A real bug report: "Setup/cleanup task cards are a mess... Make sure
+  // text/font fit the spaces. The only information that should be
+  // included on each setup/cleanup badge is day, team name, leader, task
+  // and the barcode." Root cause of the old mess: none of these elements
+  // had autoFitText, so a long task description (or team name) just
+  // overflowed its fixed box and visibly overlapped the line below it -
+  // every text element here gets the same shrink-to-fit treatment the
+  // student/parent/admin name tags already use for their own
+  // longest-running fields (see public/js/badge-autofit.js). Task gets
+  // the tallest box since it's reliably the longest-running text.
   setupCleanup: {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
-      { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
-      { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 24, width: 320, height: 30, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
-      { id: 'title', type: 'text', field: 'title', x: 8, y: 56, width: 320, height: 22, fontSize: 15, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
-      { id: 'description', type: 'text', field: 'description', x: 8, y: 80, width: 320, height: 56, fontSize: 11, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'team', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'leader', type: 'text', field: 'leaderLabel', x: 8, y: 58, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
       // barcodeValue is this task's own code (misc_badges.barcode, set by
       // utils/taskList.js's upsertTaskBadge) - lets a parent scan the
       // physical badge at checkout to confirm which task they completed
       // (see routes/checkout.js's new step 2).
-      { id: 'barcode', type: 'barcode', x: 68, y: 140, width: 200, height: 55 },
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
     ],
   },
   custom: {

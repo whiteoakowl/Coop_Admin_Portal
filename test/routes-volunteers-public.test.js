@@ -42,10 +42,29 @@ test('GET /volunteers/:day', async (t) => {
     assert.equal(res.status, 404);
   });
 
-  await t.test('a valid day with no floater list scheduled today shows the muted "no assignments" panel', async () => {
+  await t.test('a valid day with no upcoming floater dates shows the muted "no assignments" panel', async () => {
     const res = await request(app).get('/volunteers/monday');
     assert.equal(res.status, 200);
-    assert.match(res.text, /No floater assignments for today\./);
+    assert.match(res.text, /No upcoming floater assignments\./);
+  });
+
+  await t.test('a day picker is offered at the bare /volunteers route, linking into both days', async () => {
+    const res = await request(app).get('/volunteers');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /href="\/volunteers\/monday"/);
+    assert.match(res.text, /href="\/volunteers\/wednesday"/);
+  });
+
+  await t.test('a real request: with nothing scheduled today but a date coming up, shows that date\'s chart instead of going blank', async () => {
+    const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
+    // Any date strictly after today - real value doesn't matter, only
+    // that it's in the future and there's nothing scheduled today.
+    const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, future);
+
+    const res = await request(app).get('/volunteers/monday');
+    assert.equal(res.status, 200);
+    assert.doesNotMatch(res.text, /No upcoming floater assignments\./);
   });
 
   await t.test('a missing volunteer_lists row for an otherwise-valid day 404s instead of crashing', async () => {

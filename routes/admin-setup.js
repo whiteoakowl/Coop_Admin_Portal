@@ -8,15 +8,15 @@ const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
 const {
   teamsForDay,
-  membersForTeam,
   setTeamLeader,
   updateTeam,
   datesForDay,
   addSetupDates,
   removeSetupDate,
-  taskAssignmentsForDate,
   setTaskAssignment,
   splitDatesByToday,
+  teamsWithMembers,
+  assignmentCardsForDate,
 } = require('../utils/setup');
 const {
   taskListSectionsForDay,
@@ -29,10 +29,9 @@ const {
   updateItem,
   deleteItem,
   swapItemPosition,
-  taskSectionForTeam,
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { activeParentOptions, hasInfantChild } = require('../utils/members');
+const { activeParentOptions } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -43,25 +42,6 @@ const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize
 router.get('/setup', requireAdmin, (req, res) => res.redirect(`/admin/setup/${defaultDay()}/assignments`));
 
 // --- Manage page: create/edit/delete teams, add/remove members per team ---
-
-// Each team's own linked task list (if any - see task_list_sections.team_id)
-// rides along so its numbered tasks can print right on that team's card
-// (item 31).
-async function teamsWithMembers(day) {
-  const teams = await teamsForDay(day);
-  const result = [];
-  for (const t of teams) {
-    const members = await membersForTeam(t.id);
-    // Same "(infant)" flag Floater Teams/Assignments already show next to
-    // a parent's name (routes/admin-volunteers.js's own hasInfantChild
-    // usage) - a real request to extend it to Setup/Cleanup's own team
-    // list and assignment cards too, so a team lead knows at a glance
-    // who might need different coverage.
-    for (const m of members) m.infant = await hasInfantChild(m.id);
-    result.push({ ...t, members, taskSection: await taskSectionForTeam(t.id) });
-  }
-  return result;
-}
 
 router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
@@ -171,133 +151,6 @@ router.get('/setup/:day/export.csv', requireAdmin, requireDay, async (req, res) 
 // Mirrors Floater Assignments' manage/dates/archive shape (see
 // routes/admin-volunteers.js), just simpler - no hours/positions/rooms,
 // one flat per-member suggestion instead. ---
-
-// A real request: once a task's been picked for one member, it shouldn't
-// still show up as a pickable option for anyone else on the same team
-// that same date - two people showing up expecting to do the identical
-// job is exactly the kind of double-booking this suggestion list is
-// meant to prevent. Tasks only ever mean anything within their own
-// team's own linked list (see utils/taskList.js's taskSectionForTeam), so
-// "someone else" means someone else on THIS team, not site-wide. Returns
-// { [memberId]: { slot1Options, slot2Options } } - each member's own
-// current slot1/slot2 value is always kept available in ITS OWN
-// dropdown (so a saved value still shows what it is), even though that
-// same value is excluded from every other member's dropdowns; a
-// member's own two slots also can't both point at the same task, so
-// each slot additionally excludes whatever the OTHER slot on that same
-// member currently holds.
-function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
-  const byMember = {};
-  for (const m of members) {
-    const takenByOthers = new Set();
-    for (const other of members) {
-      if (other.id === m.id) continue;
-      if (other.taskItemId) takenByOthers.add(other.taskItemId);
-      if (other.taskItemId2) takenByOthers.add(other.taskItemId2);
-    }
-    byMember[m.id] = {
-      slot1Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId2),
-      slot2Options: allOptions.filter((item) => !takenByOthers.has(item.id) && item.id !== m.taskItemId),
-    };
-  }
-  return byMember;
-}
-
-// Defaults a DIFFERENT task per member's dropdown instead of every still-
-// unassigned member's <select> silently defaulting to the same first
-// option in the list (a real request: "each drop down menu next to
-// members should suggest a different task from the list until there
-// aren't any left"). Walks members in team order, handing out the next
-// not-yet-suggested task from allOptions (wrapping back to the start once
-// every distinct task has been suggested once, rather than leaving later
-// members with nothing) - skipping anyone already assigned in this slot
-// (nothing to suggest, they're locked) or absent (see the caller: "no
-// tasks should be suggested for that member"). Only ever picks from that
-// member's OWN options list (optionsKey) so a member-specific exclusion -
-// their other slot's own value - is still respected. Returns
-// { [memberId]: taskItemId }.
-function suggestDistinctTasks(members, allOptions, assignedKey, optionsKey) {
-  const suggestions = {};
-  const n = allOptions.length;
-  if (n === 0) return suggestions;
-  let pointer = 0;
-  for (const m of members) {
-    if (m.absent || m[assignedKey]) continue;
-    const options = m[optionsKey] || [];
-    if (options.length === 0) continue;
-    for (let i = 0; i < n; i++) {
-      const candidate = allOptions[(pointer + i) % n];
-      if (options.some((o) => o.id === candidate.id)) {
-        suggestions[m.id] = candidate.id;
-        pointer = (pointer + i + 1) % n;
-        break;
-      }
-    }
-  }
-  return suggestions;
-}
-
-// One card per team for a given date - each member's currently-suggested
-// task (if any) plus the list of tasks their team's own linked task list
-// offers, i.e. what the suggestion dropdown's own options are. Shared by
-// the live Assignments page (editable) and the read-only Archive view/
-// print/export for a past date - same data, just rendered differently.
-async function assignmentCardsForDate(day, date) {
-  const teams = await teamsWithMembers(day);
-  const assignments = date ? await taskAssignmentsForDate(day, date) : {};
-  const absentIds = await absentMemberIdsForDate(date);
-  return teams.map((t) => {
-    const allOptions = t.taskSection ? t.taskSection.items : [];
-    const members = t.members.map((m) => {
-      const a = assignments[m.id] || {};
-      const taskItem = a.taskItemId && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId) : null;
-      const taskItem2 = a.taskItemId2 && t.taskSection ? t.taskSection.items.find((i) => i.id === a.taskItemId2) : null;
-      return {
-        id: m.id,
-        name: m.name,
-        infant: !!m.infant,
-        absent: absentIds.has(m.id),
-        taskItemId: a.taskItemId || null,
-        taskItemId2: a.taskItemId2 || null,
-        taskNumber: taskItem ? taskItem.number : null,
-        taskNumber2: taskItem2 ? taskItem2.number : null,
-        taskDescription: taskItem ? taskItem.description : null,
-        taskDescription2: taskItem2 ? taskItem2.description : null,
-      };
-    });
-    const availableOptionsByMember = taskOptionsExcludingAssignedElsewhere(allOptions, members);
-    const membersWithOptions = members.map((m) => ({ ...m, ...availableOptionsByMember[m.id] }));
-    // Every Task 1 dropdown gets its own distinct suggestion before Task 2
-    // dropdowns get theirs - a real request: "filling all the task one
-    // dropdowns first then filling task 2 if out of spots."
-    const slot1Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId', 'slot1Options');
-    const slot2Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId2', 'slot2Options');
-    // A real request: the card should also list, at its own bottom, every
-    // task from this team's linked list that no one currently holds in
-    // EITHER slot - actual assignments only, a suggested-but-not-yet-
-    // clicked-Assign task still counts as unassigned. Recomputed fresh
-    // from current assignments every render, so a task simply disappears
-    // from this list the moment someone is assigned it, with nothing
-    // further to track.
-    const assignedTaskIds = new Set();
-    for (const m of members) {
-      if (m.taskItemId) assignedTaskIds.add(m.taskItemId);
-      if (m.taskItemId2) assignedTaskIds.add(m.taskItemId2);
-    }
-    const unassignedTasks = allOptions.filter((item) => !assignedTaskIds.has(item.id));
-    return {
-      id: t.id,
-      title: t.title,
-      taskOptions: allOptions,
-      unassignedTasks,
-      members: membersWithOptions.map((m) => ({
-        ...m,
-        suggestedTaskItemId: slot1Suggestions[m.id] || null,
-        suggestedTaskItemId2: slot2Suggestions[m.id] || null,
-      })),
-    };
-  });
-}
 
 router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;

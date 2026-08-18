@@ -34,6 +34,8 @@ const {
   backfillNameTagLogo,
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
+  backfillSetupCleanupBadgeLayout,
+  backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,
@@ -99,6 +101,7 @@ db.ready = schemaReady
   .then(() => backfillNameTagLogo(db))
   .then(() => backfillNameTagAutoFit(db))
   .then(() => backfillMiscBadgeBarcode(db))
+  .then(() => backfillSetupCleanupBadgeLayout(db))
   .then(() => backfillScheduleCardAllergy(db))
   .then(() => backfillScheduleCardAutoFit(db))
   .then(() => backfillParentSetupCleanupDays(db))
@@ -111,6 +114,10 @@ db.ready = schemaReady
   .then(() => backfillParentRemoveLegacyCleanupTeamElement(db))
   .then(() => backfillNameTagStackedSizing(db))
   .then(() => backfillTaskItemBarcodes(db))
+  // Must run AFTER backfillTaskItemBarcodes - it reads each task item's
+  // OWN barcode column back onto its badge row, so any item that didn't
+  // have one yet needs that backfill's INSERT to have run first.
+  .then(() => backfillSetupCleanupBadgeFields(db))
   // Lazily required (not imported at the top of this file, unlike every
   // other backfill above) - utils/classSchedule.js itself does
   // `require('../db')`, and this whole file IS '../db' from that

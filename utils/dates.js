@@ -108,6 +108,20 @@ function ageFromBirthday(iso) {
   return age >= 0 ? age : null;
 }
 
+// Picks "today, or the closest date coming up" out of an unsorted list of
+// ISO dates - a real request for the public kiosk Floater Assignments/
+// Setup-Cleanup pages, which used to only ever show something on the
+// exact day a session date landed on and went blank every other day.
+// Never looks backward (a past date is stale, not "closest") - returns
+// null when nothing in `dates` is today or later, so the caller can fall
+// back to its own "nothing scheduled" message. `today` is injectable for
+// tests; defaults to the real today.
+function closestUpcomingDate(dates, today) {
+  const ref = today || todayISO();
+  const upcoming = dates.filter((d) => d >= ref).sort();
+  return upcoming[0] || null;
+}
+
 module.exports = {
   todayISO,
   addDays,
@@ -120,4 +134,5 @@ module.exports = {
   formatTimestamp,
   formatFriendlyTimestamp,
   ageFromBirthday,
+  closestUpcomingDate,
 };

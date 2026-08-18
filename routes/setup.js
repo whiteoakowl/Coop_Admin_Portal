@@ -1,27 +1,39 @@
 const express = require('express');
 const router = express.Router();
-const { isValidDay, DAY_LABELS, defaultDateFor } = require('../utils/days');
-const { absentMemberIdsForDate } = require('../utils/classSchedule');
-const { teamsForDay, membersForTeam } = require('../utils/setup');
+const { isValidDay, DAY_LABELS } = require('../utils/days');
+const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
+const { datesForDay, assignmentCardsForDate } = require('../utils/setup');
 
-// Public, no-login view-only page: shows every Setup/Cleanup team for a day.
+// A real request: the kiosk homepage's Setup/Cleanup button used to jump
+// straight to a single auto-picked day - now it shows Monday/Wednesday
+// choice buttons first, same "pick a day" step Class Check-In's own kiosk
+// flow already uses, and lands on that day's assignment cards (below)
+// after.
+router.get('/setup', (req, res) => {
+  res.render('kiosk-day-picker', { title: 'Setup/Cleanup Assignments', heading: 'Setup/Cleanup Assignments', basePath: '/setup', icon: 'icon-broom' });
+});
+
+// Public, no-login kiosk-style view: a real request - "the member view of
+// the assignment cards for the current day or the closest date coming
+// up" - the same per-team, per-member Task 1/Task 2 assignment cards the
+// admin Setup/Cleanup Assignments tab shows (partials/setup-assignment-
+// cards.ejs, editable: false here - read-only, same "reassigning happens
+// on the live/admin tab, not here" rule as the Floater Assignments public
+// page), not the standing Teams roster this route used to show instead.
 router.get('/setup/:day', async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
-  const dayTeams = await teamsForDay(day);
-  const teams = [];
-  for (const t of dayTeams) teams.push({ ...t, members: await membersForTeam(t.id) });
+  const date = closestUpcomingDate(await datesForDay(day));
+  const cards = date ? await assignmentCardsForDate(day, date) : [];
 
   res.render('setup-public', {
-    title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
+    title: `${DAY_LABELS[day]} Setup/Cleanup Assignments`,
+    day,
     dayLabel: DAY_LABELS[day],
-    teams,
-    // Same "only means anything on today's own day" reasoning as the
-    // admin manage page (routes/admin-setup.js) - kiosk-home always links
-    // here with today's own day already (/setup/<%= defaultDay %>), so in
-    // practice this is just "who's absent today".
-    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
+    date,
+    dateLabel: date ? formatDateLabel(date) : null,
+    cards,
   });
 });
 

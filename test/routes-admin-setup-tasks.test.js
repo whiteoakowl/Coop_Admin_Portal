@@ -135,15 +135,19 @@ test('Setup/Cleanup Task List', async (t) => {
     assert.ok(item.barcode, 'a barcode should be generated');
     assert.match(item.barcode, /^\d{6}$/);
 
+    // title/description hold team name/task text (not the other way
+    // around) - see utils/taskList.js's upsertTaskBadge comment on the
+    // deliberate column-meaning swap this badge redesign made.
     const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.id);
     assert.ok(badge, 'a linked Setup/Cleanup badge should be created');
     assert.equal(badge.badge_type, 'setupCleanup');
-    assert.equal(badge.title, 'Barcode Task');
-    assert.equal(badge.description, 'Barcode List');
+    assert.equal(badge.title, 'Barcode List');
+    assert.equal(badge.description, 'Barcode Task');
+    assert.equal(badge.day, 'monday');
     assert.equal(badge.barcode, item.barcode);
   });
 
-  await t.test('editing a task keeps its barcode and updates the linked badge title', async () => {
+  await t.test('editing a task keeps its barcode and updates the linked badge task text (not its team name)', async () => {
     const section = await db.prepare("SELECT * FROM task_list_sections WHERE day = 'monday' AND title = 'Barcode List'").get();
     const item = await db.prepare('SELECT * FROM task_list_items WHERE section_id = ? AND description = ?').get(section.id, 'Barcode Task');
 
@@ -157,7 +161,8 @@ test('Setup/Cleanup Task List', async (t) => {
     assert.equal(updated.barcode, item.barcode, 'barcode should stay stable across an edit');
 
     const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.id);
-    assert.equal(badge.title, 'Renamed Task');
+    assert.equal(badge.description, 'Renamed Task');
+    assert.equal(badge.title, 'Barcode List', "the team name shouldn't change just because the task text did");
   });
 
   await t.test('deleting a task also deletes its linked badge, via cascade', async () => {

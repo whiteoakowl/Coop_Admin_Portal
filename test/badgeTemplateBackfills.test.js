@@ -17,7 +17,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createTestDb } = require('./pgTestDb');
-const { backfillMiscBadgeBarcode, backfillScheduleCardAllergy, backfillScheduleCardAutoFit } = require('../db/bootstrapPg');
+const {
+  backfillMiscBadgeBarcode,
+  backfillSetupCleanupBadgeLayout,
+  backfillSetupCleanupBadgeFields,
+  backfillScheduleCardAllergy,
+  backfillScheduleCardAutoFit,
+} = require('../db/bootstrapPg');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { DEFAULT_LAYOUT: SCHEDULE_CARD_DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 
@@ -180,4 +186,114 @@ test('backfillScheduleCardAutoFit is a no-op for a fresh install already seeded 
 
   const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
   assert.equal(after.layout_json, before.layout_json);
+});
+
+// Coverage for a third, later redesign of the Setup/Cleanup badge - a real
+// bug report, with a screenshot: task text overlapping the team name and
+// badge number on the printed card. See DEFAULT_LAYOUTS.setupCleanup's own
+// comment and utils/taskList.js's upsertTaskBadge comment for the full
+// story on the field-set/column-meaning change these two backfills exist
+// to carry an already-deployed database through.
+test('backfillSetupCleanupBadgeLayout replaces a pre-redesign template wholesale with the current default', async () => {
+  const db = await createTestDb();
+  const oldShape = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'org', type: 'text', field: 'custom', text: 'Setup / Cleanup', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 24, width: 320, height: 30, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'title', type: 'text', field: 'title', x: 8, y: 56, width: 320, height: 22, fontSize: 15, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+      { id: 'description', type: 'text', field: 'description', x: 8, y: 80, width: 320, height: 56, fontSize: 11, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
+    ],
+  };
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(oldShape));
+
+  await backfillSetupCleanupBadgeLayout(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.deepEqual(JSON.parse(row.layout_json), DEFAULT_LAYOUTS.setupCleanup, 'the whole layout should be replaced with the current default');
+});
+
+test('backfillSetupCleanupBadgeLayout still fixes a template stored in the old bare-elements-array shape (no wrapping object)', async () => {
+  const db = await createTestDb();
+  const bareArray = [
+    { id: 'number', type: 'text', field: 'badgeNumber', x: 8, y: 24, width: 320, height: 30, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+    { id: 'title', type: 'text', field: 'title', x: 8, y: 56, width: 320, height: 22, fontSize: 15, color: '#1c2530', bold: true, align: 'center', valign: 'middle' },
+  ];
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(bareArray));
+
+  await backfillSetupCleanupBadgeLayout(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.deepEqual(JSON.parse(row.layout_json), DEFAULT_LAYOUTS.setupCleanup);
+});
+
+test('backfillSetupCleanupBadgeLayout is a no-op for a layout that already has a day-field element', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+
+  await backfillSetupCleanupBadgeLayout(db);
+
+  const after = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.equal(after.layout_json, before.layout_json, 'a fresh install seeded with the current default should be untouched');
+});
+
+test('backfillSetupCleanupBadgeLayout never touches the \'custom\' badge type, which was never part of this redesign', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'custom'").get();
+
+  await backfillSetupCleanupBadgeLayout(db);
+
+  const after = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'custom'").get();
+  assert.equal(after.layout_json, before.layout_json);
+});
+
+test('backfillSetupCleanupBadgeFields re-stamps an already-saved task\'s badge with the current title/description meaning plus day/leader', async () => {
+  const db = await createTestDb();
+  const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Snack Table')").run();
+  const section = await db
+    .prepare('INSERT INTO task_list_sections (day, title, team_id, position) VALUES (\'monday\', \'Snack Table\', ?, 0)')
+    .run(team.lastInsertRowid);
+  const item = await db
+    .prepare("INSERT INTO task_list_items (section_id, description, position, barcode) VALUES (?, 'Set up the snack table', 0, '000111')")
+    .run(section.lastInsertRowid);
+  // Simulate a row saved before this redesign shipped - old meaning
+  // (title: task text, description: section title), day/leader_name
+  // both still NULL.
+  await db
+    .prepare("INSERT INTO misc_badges (badge_type, badge_number, title, description, barcode, task_item_id) VALUES ('setupCleanup', '000111', 'Set up the snack table', 'Snack Table', '000111', ?)")
+    .run(item.lastInsertRowid);
+
+  await backfillSetupCleanupBadgeFields(db);
+
+  const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.lastInsertRowid);
+  assert.equal(badge.title, 'Snack Table', 'title should now hold the team name');
+  assert.equal(badge.description, 'Set up the snack table', 'description should now hold the task text');
+  assert.equal(badge.day, 'monday');
+  assert.equal(badge.leader_name, null, 'the team has no leader set, so leader_name should stay null');
+  assert.equal(badge.barcode, '000111', 'barcode should be untouched');
+});
+
+test('backfillSetupCleanupBadgeFields picks up the team\'s current leader name', async () => {
+  const db = await createTestDb();
+  const member = await db.prepare("INSERT INTO members (name, member_type, barcode, active) VALUES ('Jordan Parent', 'parent', '999888', 1)").run();
+  const team = await db
+    .prepare("INSERT INTO setup_teams (day, title, leader_id) VALUES ('wednesday', 'Chairs & Tables', ?)")
+    .run(member.lastInsertRowid);
+  const section = await db
+    .prepare('INSERT INTO task_list_sections (day, title, team_id, position) VALUES (\'wednesday\', \'Chairs & Tables\', ?, 0)')
+    .run(team.lastInsertRowid);
+  const item = await db
+    .prepare("INSERT INTO task_list_items (section_id, description, position, barcode) VALUES (?, 'Fold the tables', 0, '000222')")
+    .run(section.lastInsertRowid);
+
+  await backfillSetupCleanupBadgeFields(db);
+
+  const badge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(item.lastInsertRowid);
+  assert.ok(badge, 'a badge row should be created even if one never existed');
+  assert.equal(badge.title, 'Chairs & Tables');
+  assert.equal(badge.description, 'Fold the tables');
+  assert.equal(badge.day, 'wednesday');
+  assert.equal(badge.leader_name, 'Jordan Parent');
 });

@@ -300,6 +300,107 @@ async function backfillMiscBadgeBarcode(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// misc_badge_templates 'setupCleanup' row - a second, later redesign of
+// the same badge. A real bug report, with a screenshot: task text
+// overlapping the team name and badge number on the printed card. Fixed
+// by dropping the standalone scannable badge_number and the static
+// "Setup / Cleanup" org line in favor of day/team name/leader/task, each
+// with autoFitText (see DEFAULT_LAYOUTS.setupCleanup's own comment) -
+// but that only changes what a BRAND NEW install's row gets seeded with.
+// Unlike backfillMiscBadgeBarcode just above (which only ADDS one
+// missing element to an otherwise-untouched layout), this replaces the
+// WHOLE saved layout - the field set itself changed (day/leaderLabel are
+// new; badgeNumber/the static org text are gone), so there's no old
+// element positioning left worth preserving once the fields it was
+// built around no longer exist on this badge. Detects "still on the old
+// shape" by the new day-field element's absence, same as any other
+// already-migrated check in this file. 'custom' badges were never part
+// of this redesign and are untouched.
+async function backfillSetupCleanupBadgeLayout(db) {
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'day')) return;
+
+  await db
+    .prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'")
+    .run(JSON.stringify(DEFAULT_LAYOUTS.setupCleanup));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// misc_badges rows for setupCleanup tasks - the redesign above didn't
+// just change the template's layout, it SWAPPED what the underlying
+// title/description columns mean for these rows (title: task text ->
+// team name, description: section title -> task text - see
+// upsertTaskBadge's own comment) and added two genuinely new columns,
+// day/leader_name, both NULL on any row inserted before this shipped.
+// Anything saved before this redesign is stuck showing the OLD meaning
+// in the NEW columns - a "Team Name" field showing task text, a "Task"
+// field showing a section title - with day/leader always blank.
+// Re-stamps every task item's badge from its section's CURRENT team
+// link/title, the same derivation utils/taskList.js's own
+// badgeContextForSection makes on every real edit - safe to run every
+// boot even once already up to date, since it always re-derives from
+// the section/team, never from admin-entered badge data (there isn't
+// any for these rows - they're wholly computed, unlike a
+// misc_badge_templates layout, which a real admin might hand-customize
+// and backfillSetupCleanupBadgeLayout above deliberately only touches
+// once). Deliberately reimplements that derivation with raw SQL against
+// the `db` PARAMETER, rather than requiring utils/taskList.js and calling
+// its exported helpers - those are bound to the app's own global db
+// singleton (utils/taskList.js's own `require('../db')`), which is
+// exactly what every other test in this suite passes in here as `db`
+// EXCEPT the ones creating their own isolated test database
+// (test/pgTestDb.js's createTestDb) - calling through to the global
+// singleton from inside a function that's supposed to operate on a
+// caller-supplied db would silently read/write the wrong database
+// there, not this backfill's own target.
+async function backfillSetupCleanupBadgeFields(db) {
+  const items = await db.prepare('SELECT id, description, section_id, barcode FROM task_list_items').all();
+  if (items.length === 0) return;
+  const sectionContext = new Map();
+  for (const item of items) {
+    if (!sectionContext.has(item.section_id)) {
+      const section = await db.prepare('SELECT * FROM task_list_sections WHERE id = ?').get(item.section_id);
+      let ctx = { day: null, teamName: null, leaderName: null };
+      if (section && !section.team_id) {
+        ctx = { day: section.day, teamName: section.title, leaderName: null };
+      } else if (section) {
+        const team = await db
+          .prepare(
+            `SELECT st.title, st.day, m.name AS "leaderName" FROM setup_teams st
+             LEFT JOIN members m ON m.id = st.leader_id AND m.active = 1
+             WHERE st.id = ?`
+          )
+          .get(section.team_id);
+        ctx = team ? { day: team.day, teamName: team.title, leaderName: team.leaderName || null } : { day: section.day, teamName: section.title, leaderName: null };
+      }
+      sectionContext.set(item.section_id, ctx);
+    }
+    const ctx = sectionContext.get(item.section_id);
+    const existing = await db.prepare('SELECT id FROM misc_badges WHERE task_item_id = ?').get(item.id);
+    if (existing) {
+      await db
+        .prepare('UPDATE misc_badges SET title = ?, description = ?, day = ?, leader_name = ? WHERE id = ?')
+        .run(ctx.teamName, item.description, ctx.day, ctx.leaderName, existing.id);
+      continue;
+    }
+    await db
+      .prepare(
+        `INSERT INTO misc_badges (badge_type, badge_number, title, description, day, leader_name, barcode, task_item_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run('setupCleanup', item.barcode, ctx.teamName, item.description, ctx.day, ctx.leaderName, item.barcode, item.id);
+  }
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // schedule_card_templates row (id=1) - seedIfMissing only ever inserts
 // this row once, the first time the app boots against a brand new
 // database, so an install whose row was already seeded before "remove
@@ -502,6 +603,8 @@ module.exports = {
   backfillNameTagLogo,
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
+  backfillSetupCleanupBadgeLayout,
+  backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
   backfillParentSetupCleanupDays,

@@ -5,6 +5,7 @@
 // shape stays untouched.
 const db = require('../db');
 const { DEFAULT_LAYOUTS } = require('./nameTagBadge');
+const { DAY_LABELS } = require('./days');
 
 const MISC_BADGE_TYPES = ['setupCleanup', 'custom'];
 
@@ -55,8 +56,20 @@ async function deleteMiscBadge(id) {
 // barcodeValue is only ever set on a 'setupCleanup' row (see misc_badges'
 // own task_item_id schema comment) - always empty for 'custom', which has
 // no barcode element on its default layout and isn't meant to be scanned.
+// day/leaderLabel are the same - only ever populated for 'setupCleanup'
+// rows (utils/taskList.js's upsertTaskBadge); a 'custom' row's own day/
+// leader_name columns are always null, so both come back blank here,
+// which is exactly right since the default 'custom' layout has no
+// elements bound to either field anyway.
 function miscBadgeRowData(row) {
-  return { badgeNumber: row.badge_number || '', title: row.title || '', description: row.description || '', barcodeValue: row.barcode || '' };
+  return {
+    badgeNumber: row.badge_number || '',
+    title: row.title || '',
+    description: row.description || '',
+    barcodeValue: row.barcode || '',
+    day: row.day ? DAY_LABELS[row.day] || row.day : '',
+    leaderLabel: row.leader_name ? `Leader: ${row.leader_name}` : '',
+  };
 }
 
 module.exports = {

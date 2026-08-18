@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-const { defaultDay } = require('../utils/days');
 const { familyOf } = require('../utils/members');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
@@ -27,7 +26,7 @@ const findParentLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 
 // not the site's homepage anymore (that's now the member/staff login),
 // reached via the "Full Kiosk Screen" quick link in admin Settings.
 router.get('/', (req, res) => {
-  res.render('kiosk-home', { title: 'Kiosk', defaultDay: defaultDay() });
+  res.render('kiosk-home', { title: 'Kiosk' });
 });
 
 // --- Check-in kiosk ---

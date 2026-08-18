@@ -20,18 +20,59 @@ async function generateTaskCode() {
 // Creates (or, on an update, keeps in sync) this task's own printable
 // Setup/Cleanup badge - see misc_badges.task_item_id's own schema
 // comment on why these are no longer a separately admin-imported deck.
-// title is the task's own description (what actually needs scanning at
-// checkout); description carries the list/section title for context on
-// the printed card.
-async function upsertTaskBadge(itemId, description, sectionTitle, barcode) {
+// A real bug report: "The only information that should be included on
+// each setup/cleanup badge is day, team name, leader, task and the
+// barcode" - title/description are repurposed here (team name/task text,
+// swapped from their old task-text/section-title meaning) rather than
+// adding yet more columns for two fields that already had a natural
+// home; day/leader_name are genuinely new (see the migration that added
+// them).
+async function upsertTaskBadge(itemId, taskText, day, teamName, leaderName, barcode) {
   const existing = await db.prepare('SELECT id FROM misc_badges WHERE task_item_id = ?').get(itemId);
   if (existing) {
-    await db.prepare('UPDATE misc_badges SET title = ?, description = ? WHERE id = ?').run(description, sectionTitle, existing.id);
+    await db
+      .prepare('UPDATE misc_badges SET title = ?, description = ?, day = ?, leader_name = ? WHERE id = ?')
+      .run(teamName, taskText, day, leaderName, existing.id);
     return;
   }
   await db
-    .prepare('INSERT INTO misc_badges (badge_type, badge_number, title, description, barcode, task_item_id) VALUES (?, ?, ?, ?, ?, ?)')
-    .run('setupCleanup', barcode, description, sectionTitle, barcode, itemId);
+    .prepare(
+      `INSERT INTO misc_badges (badge_type, badge_number, title, description, day, leader_name, barcode, task_item_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run('setupCleanup', barcode, teamName, taskText, day, leaderName, barcode, itemId);
+}
+
+// Resolves the day/team name/leader a task list section's badges should
+// print - the section's own linked setup_teams row when it has one
+// (task_list_sections.team_id), falling back to the section's own
+// day/title when it isn't linked to a team at all (a task list is
+// allowed to exist unlinked - see createSection's own teamId being
+// optional).
+async function badgeContextForSection(section) {
+  if (!section) return { day: null, teamName: null, leaderName: null };
+  if (!section.team_id) return { day: section.day, teamName: section.title, leaderName: null };
+  const team = await db
+    .prepare(
+      `SELECT st.title, st.day, m.name AS "leaderName" FROM setup_teams st
+       LEFT JOIN members m ON m.id = st.leader_id AND m.active = 1
+       WHERE st.id = ?`
+    )
+    .get(section.team_id);
+  return team ? { day: team.day, teamName: team.title, leaderName: team.leaderName || null } : { day: section.day, teamName: section.title, leaderName: null };
+}
+
+// Re-stamps every badge under a team's linked task list with that team's
+// CURRENT name/leader - without this, renaming a team or reassigning its
+// leader would leave every already-printed-from item's badge silently
+// showing the old value until that one item happened to be edited again.
+// A no-op when the team has no linked task list section yet.
+async function refreshBadgesForTeam(teamId) {
+  const section = await db.prepare('SELECT * FROM task_list_sections WHERE team_id = ?').get(teamId);
+  if (!section) return;
+  const ctx = await badgeContextForSection(section);
+  const items = await db.prepare('SELECT id, description, barcode FROM task_list_items WHERE section_id = ?').all(section.id);
+  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
 }
 
 // Every task list section for a day, each with its own ordered task
@@ -78,6 +119,13 @@ async function createSection(day, title, teamId) {
 
 async function updateSection(id, fields) {
   await db.prepare('UPDATE task_list_sections SET title = ?, team_id = ? WHERE id = ?').run(fields.title, fields.teamId || null, id);
+  // A section's own title (unlinked) or its team link can both change
+  // what a badge under it should print - re-stamp every item's badge
+  // rather than leaving them showing whatever was true before this edit.
+  const section = await getSection(id);
+  const ctx = await badgeContextForSection(section);
+  const items = await db.prepare('SELECT id, description, barcode FROM task_list_items WHERE section_id = ?').all(id);
+  for (const item of items) await upsertTaskBadge(item.id, item.description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
 }
 
 async function deleteSection(id) {
@@ -108,8 +156,8 @@ async function addItem(sectionId, description) {
     .prepare('INSERT INTO task_list_items (section_id, description, position, barcode) VALUES (?, ?, ?, ?)')
     .run(sectionId, description, await nextItemPosition(sectionId), barcode);
   const itemId = info.lastInsertRowid;
-  const section = await getSection(sectionId);
-  await upsertTaskBadge(itemId, description, section ? section.title : null, barcode);
+  const ctx = await badgeContextForSection(await getSection(sectionId));
+  await upsertTaskBadge(itemId, description, ctx.day, ctx.teamName, ctx.leaderName, barcode);
   return itemId;
 }
 
@@ -117,8 +165,8 @@ async function updateItem(id, description) {
   await db.prepare('UPDATE task_list_items SET description = ? WHERE id = ?').run(description, id);
   const item = await db.prepare('SELECT * FROM task_list_items WHERE id = ?').get(id);
   if (!item) return;
-  const section = await getSection(item.section_id);
-  await upsertTaskBadge(id, description, section ? section.title : null, item.barcode);
+  const ctx = await badgeContextForSection(await getSection(item.section_id));
+  await upsertTaskBadge(id, description, ctx.day, ctx.teamName, ctx.leaderName, item.barcode);
 }
 
 async function deleteItem(id) {
@@ -175,4 +223,5 @@ module.exports = {
   swapItemPosition,
   taskSectionForTeam,
   findTaskItemByBarcode,
+  refreshBadgesForTeam,
 };
