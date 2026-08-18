@@ -15,10 +15,11 @@ const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { allClassesList } = require('../utils/classSchedule');
+const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
 router.use(requireFullAdmin);
 
-const DESIGN_TYPES = ['student', 'parent', 'scheduleCard', 'setupCleanup', 'custom'];
+const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
 const TABS = ['design', 'print', 'requests'];
 
 const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
@@ -99,6 +100,8 @@ router.get('/design', async (req, res) => {
     initialType,
     members,
     classesForQr,
+    libraryItems: await allLibraryItems(),
+    libraryTypes: await allLibraryTypes(),
     error: req.query.error || null,
     initialPrintPanel: ['setupCleanupBadges', 'customBadges'].includes(req.query.print) ? req.query.print : null,
     notice: req.query.notice || null,
@@ -116,6 +119,7 @@ router.get('/design', async (req, res) => {
       templates: {
         student: await getTemplate('student'),
         parent: await getTemplate('parent'),
+        admin: await getTemplate('admin'),
         setupCleanup: await getMiscTemplate('setupCleanup'),
         custom: await getMiscTemplate('custom'),
       },
@@ -259,6 +263,31 @@ router.post('/design/print-classcheckin-qr', async (req, res) => {
   res.render('admin-classcheckin-qr-print', {
     title: 'Print Class Check-In QR Codes',
     pages,
+  });
+});
+
+// Library Barcodes: a real request - "Under printing add printing library
+// barcodes. Drop down menu shows category choices. After selecting a
+// category it shows a list of library catalog items in that category to
+// print avery labels. Use the same template as the barcode only badges for
+// members." Reuses the exact Avery 08160-style label sheet layout the
+// member barcode-labels print already uses (admin-name-tag-barcode-labels-
+// print.ejs / .avery-label-sheet-page in styles.css) - see admin-library-
+// barcodes-print.ejs, the item-flavored twin of that same template.
+router.post('/design/print-library-barcodes', async (req, res) => {
+  const itemIds = [].concat(req.body.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (itemIds.length === 0) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one library item to print.'));
+  }
+
+  const placeholders = itemIds.map(() => '?').join(',');
+  const items = (await db.prepare(`SELECT * FROM library_items WHERE id IN (${placeholders})`).all(...itemIds)).sort((a, b) =>
+    a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+  );
+
+  res.render('admin-library-barcodes-print', {
+    title: 'Print Library Barcodes',
+    items,
   });
 });
 

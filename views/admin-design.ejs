@@ -96,17 +96,19 @@
           <select class="name-tag-type-select" id="design-type-select">
             <option value="student" <%= initialType === 'student' ? 'selected' : '' %>>Student Name Tag</option>
             <option value="parent" <%= initialType === 'parent' ? 'selected' : '' %>>Parent Name Tag</option>
+            <option value="admin" <%= initialType === 'admin' ? 'selected' : '' %>>Admin Name Tag</option>
             <option value="scheduleCard" <%= initialType === 'scheduleCard' ? 'selected' : '' %>>Schedule Card</option>
             <option value="setupCleanup" <%= initialType === 'setupCleanup' ? 'selected' : '' %>>Setup/Cleanup Badge</option>
             <option value="custom" <%= initialType === 'custom' ? 'selected' : '' %>>Custom Badge</option>
           </select>
           <!-- name-tag-editor.js reads/drives this select directly; the
                visible control above delegates into it (see design-print-hub.js)
-               so switching among Student/Parent/Setup-Cleanup/Custom
+               so switching among Student/Parent/Admin/Setup-Cleanup/Custom
                still uses the editor's own type-switch logic unmodified. -->
           <select id="name-tag-type-select" hidden>
             <option value="student">Student</option>
             <option value="parent">Parent</option>
+            <option value="admin">Admin</option>
             <option value="setupCleanup">Setup/Cleanup</option>
             <option value="custom">Custom</option>
           </select>
@@ -238,6 +240,7 @@
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
             <option value="schedules">Schedules</option>
             <option value="classCheckinQr">Class Check-In QR Codes</option>
+            <option value="libraryBarcodes">Library Barcodes</option>
             <option value="logs">Logs</option>
           </select>
         </div>
@@ -272,6 +275,7 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
@@ -300,6 +304,7 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
@@ -328,6 +333,7 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
@@ -355,6 +361,7 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
@@ -383,6 +390,7 @@
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
                 <option value="parent">Parents Only</option>
+                <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
               <label class="checkbox-option name-tag-select-all">
@@ -476,6 +484,59 @@
               </select>
             </div>
           </dialog>
+        </div>
+
+        <%# Library Barcodes: a real request - "Under printing add printing
+            library barcodes. Drop down menu shows category choices. After
+            selecting a category it shows a list of library catalog items
+            in that category to print avery labels. Use the same template
+            as the barcode only badges for members." Category dropdown
+            filters the picker below client-side (same pattern as the Name
+            Tags/Barcodes panels' type filter, just keyed off a library
+            item's own `type` instead of member_type); the actual print
+            (routes/admin-design.js's /design/print-library-barcodes)
+            renders admin-library-barcodes-print.ejs, the item-flavored
+            twin of the member barcode-labels Avery sheet. %>
+        <div id="print-libraryBarcodes-section" hidden>
+          <form method="POST" action="/admin/design/print-library-barcodes" target="_blank" id="library-barcodes-print-form">
+            <div class="name-tag-bulk-filter">
+              <select class="name-tag-bulk-filter-select" id="library-barcodes-filter-select">
+                <option value="all">All Categories</option>
+                <% libraryTypes.forEach(function(t) { %>
+                  <option value="<%= t %>"><%= t %></option>
+                <% }); %>
+              </select>
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="library-barcodes-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="library-barcodes-select-none-checkbox" />
+                Select None
+              </label>
+            </div>
+            <% if (libraryItems.length === 0) { %>
+              <p class="roster-empty">No library items yet &mdash; add one on the <a href="/admin/library?tab=titles">Library</a> page.</p>
+            <% } else { %>
+              <div class="roster-scroll print-picker-scroll">
+                <table class="roster-table members-table condensed-table" id="library-barcodes-list">
+                  <thead><tr><th></th><th>Title</th><th>Category</th></tr></thead>
+                  <tbody>
+                    <% libraryItems.forEach(function(item) { %>
+                      <tr class="library-picker-row" data-type="<%= item.type || '' %>">
+                        <td><input type="checkbox" name="itemIds" value="<%= item.id %>" /></td>
+                        <td><%= item.title %></td>
+                        <td><%= item.type || '—' %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+              <div class="name-tag-bulk-submit-row">
+                <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              </div>
+            <% } %>
+          </form>
         </div>
 
         <div id="print-schedules-section" class="manage-section" hidden>

@@ -48,6 +48,7 @@
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
     classCheckinQr: document.getElementById('print-classCheckinQr-section'),
+    libraryBarcodes: document.getElementById('print-libraryBarcodes-section'),
     logs: document.getElementById('print-logs-section'),
   };
 
@@ -199,6 +200,43 @@
           row.style.display = matches ? '' : 'none';
         });
         qrFilterDialog.close();
+      });
+    }
+  }
+
+  // Library Barcodes picker: category filter + select-all/select-none over
+  // .library-picker-row (library items, not members - its own class for
+  // the same reason .qr-picker-row above is its own class, so it's never
+  // swept up by wireBulkMemberList's member-list clone step).
+  const libraryList = document.getElementById('library-barcodes-list');
+  if (libraryList) {
+    const libraryFilterSelect = document.getElementById('library-barcodes-filter-select');
+    if (libraryFilterSelect) {
+      libraryFilterSelect.addEventListener('change', () => {
+        const filter = libraryFilterSelect.value;
+        libraryList.querySelectorAll('.library-picker-row').forEach((row) => {
+          row.style.display = filter === 'all' || row.dataset.type === filter ? '' : 'none';
+        });
+      });
+    }
+    const librarySelectAll = document.getElementById('library-barcodes-select-all-checkbox');
+    if (librarySelectAll) {
+      librarySelectAll.addEventListener('change', () => {
+        libraryList.querySelectorAll('.library-picker-row').forEach((row) => {
+          if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = librarySelectAll.checked;
+        });
+      });
+    }
+    const librarySelectNone = document.getElementById('library-barcodes-select-none-checkbox');
+    if (librarySelectNone) {
+      librarySelectNone.addEventListener('change', () => {
+        if (librarySelectNone.checked) {
+          libraryList.querySelectorAll('.library-picker-row').forEach((row) => {
+            if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = false;
+          });
+          if (librarySelectAll) librarySelectAll.checked = false;
+          librarySelectNone.checked = false;
+        }
       });
     }
   }
