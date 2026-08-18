@@ -12,22 +12,50 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <div class="print-page">
-      <div class="print-header">
-        <img src="/img/logo.png" alt="" />
-        <div>
-          <p class="print-header-title">Sanford Homeschoolers</p>
-          <p class="print-header-sub"><%= dayLabel %> Attendance Archive &mdash; <%= archive.archivedAtLabel %></p>
+    <%
+      // A real bug report: with a term's worth of session dates and a
+      // full roster, this used to render every section (Parent, Student,
+      // each class) stacked inside ONE .print-page, with no shrink-to-fit
+      // at all - columns and rows spilled across however many physical
+      // pages the browser's own page-break happened to land on, in the
+      // middle of a table, mid-row. Each section now gets its own page,
+      // sized and shrunk independently - a big Parent roster and a small
+      // 4-student class roster each land on exactly one physical page of
+      // their own, at whatever font size that actually takes, instead of
+      // sharing one fixed size that only ever really fits the smallest of
+      // them.
+      var sections = [
+        { heading: archive.parent.label, grid: archive.parent },
+        { heading: archive.student.label, grid: archive.student },
+      ].concat(archive.classes.map(function(c) { return { heading: `${c.className} (${c.hourLabel})`, grid: c }; }));
+    %>
+    <% sections.forEach(function(section) { %>
+      <div class="print-page roster-archive-print-page">
+        <div class="print-header">
+          <img src="/img/logo.png" alt="" />
+          <div>
+            <p class="print-header-title">Sanford Homeschoolers</p>
+            <p class="print-header-sub"><%= dayLabel %> Attendance Archive &mdash; <%= archive.archivedAtLabel %></p>
+          </div>
+        </div>
+        <%
+          // print-shrink-to-fit.js scales exactly ONE element - wrap.
+          // firstElementChild - so the section's own heading has to live
+          // INSIDE the shrink wrapper alongside its table (matching
+          // partials/roster-archive-grid-table's own single .grid-box
+          // shape) rather than sitting outside it next to the page
+          // header, unlike the per-class roster print's header/info block
+          // (which stays full-size on purpose there since it never grows
+          // with roster size the way a table does) - a section heading
+          // here is cheap to shrink a hair too if it ever needs to.
+        %>
+        <div class="roster-archive-print-fit" data-shrink-to-fit>
+          <%- include('partials/roster-archive-grid-table', { heading: section.heading, grid: section.grid }) %>
         </div>
       </div>
-
-      <%- include('partials/roster-archive-grid-table', { heading: archive.parent.label, grid: archive.parent }) %>
-      <%- include('partials/roster-archive-grid-table', { heading: archive.student.label, grid: archive.student }) %>
-      <% archive.classes.forEach(function(c) { %>
-        <%- include('partials/roster-archive-grid-table', { heading: `${c.className} (${c.hourLabel})`, grid: c }) %>
-      <% }); %>
-    </div>
+    <% }); %>
   </main>
+  <script src="/js/print-shrink-to-fit.js"></script>
   <script src="/js/print-auto.js"></script>
 </body>
 </html>

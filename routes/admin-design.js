@@ -8,12 +8,13 @@ const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_T
 const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
-const { membersWithDetails } = require('../utils/members');
+const { membersWithDetails, byLastName } = require('../utils/members');
 const { buildDuplexPages } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage } = require('../utils/pagination');
+const { allClassesList } = require('../utils/classSchedule');
 
 router.use(requireFullAdmin);
 
@@ -65,6 +66,12 @@ router.get('/design', async (req, res) => {
   // name-only table.
   const members = (await membersWithDetails()).filter((m) => m.active);
 
+  // Class Check-In QR Codes picker (Print tab) - every class across both
+  // days, sorted the same way the Attendance page's own Class Rosters
+  // list is (allClassesList's own ORDER BY), so the picker reads in a
+  // predictable, alphabetical order rather than day-then-hour.
+  const classesForQr = await allClassesList();
+
   // Requests tab data - only meaningful when tab === 'requests', but
   // computed unconditionally (same eager-compute style as members/badges
   // above) rather than branching the render call in two.
@@ -90,6 +97,7 @@ router.get('/design', async (req, res) => {
     tab,
     initialType,
     members,
+    classesForQr,
     error: req.query.error || null,
     initialPrintPanel: ['setupCleanupBadges', 'customBadges'].includes(req.query.print) ? req.query.print : null,
     notice: req.query.notice || null,
@@ -171,7 +179,7 @@ router.post('/design/print-both', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
   res.render('admin-name-tag-both-print', {
     title: 'Print Name Tags + Schedule Cards',
@@ -195,7 +203,7 @@ router.post('/design/print-duplex', async (req, res) => {
   }
 
   const placeholders = memberIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) ORDER BY LOWER(name)`).all(...memberIds);
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
 
   const { frontPages, backPages } = buildDuplexPages(await buildCardPairs(members));
 
@@ -207,6 +215,48 @@ router.post('/design/print-duplex', async (req, res) => {
     badgeHeight: BADGE_HEIGHT,
     cardWidth: CARD_WIDTH,
     cardHeight: CARD_HEIGHT,
+  });
+});
+
+// Class Check-In QR Codes: a real request - "add printing QR sheets to
+// scan for quick links to class check in/out kiosk for teachers." Each
+// selected class gets one QR code encoding an ABSOLUTE URL to that
+// class's own Class Check-In quick link (the same /kiosk/class-checkin/
+// classes/:id/attendance page every class card's own quick link opens -
+// see views/partials/class-schedule-grid.ejs) - absolute, unlike every
+// other link this app hands out, because a QR code is scanned by a
+// phone's camera with no browsing context of its own to resolve a
+// relative path against, unlike every other "opens in a new tab" link
+// here that's always clicked from inside this same site.
+router.post('/design/print-classcheckin-qr', async (req, res) => {
+  const classIds = [].concat(req.body.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (classIds.length === 0) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one class to print.'));
+  }
+
+  const allClasses = await allClassesList();
+  const idSet = new Set(classIds);
+  // Keep allClassesList's own sort order rather than whatever order the
+  // submitted checkboxes happened to arrive in (checkbox form fields
+  // don't reliably preserve on-page order across browsers).
+  const classes = allClasses.filter((c) => idSet.has(c.id));
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const pages = [];
+  for (let i = 0; i < classes.length; i += 4) {
+    pages.push(
+      classes.slice(i, i + 4).map((c) => ({
+        className: c.class_name,
+        dayLabel: c.dayLabel,
+        timeLabel: c.timeLabel,
+        checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
+      }))
+    );
+  }
+
+  res.render('admin-classcheckin-qr-print', {
+    title: 'Print Class Check-In QR Codes',
+    pages,
   });
 });
 

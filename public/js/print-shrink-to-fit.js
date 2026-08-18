@@ -37,11 +37,43 @@
     }
   }
 
+  function resetOne(wrap) {
+    const inner = wrap.firstElementChild;
+    if (inner) inner.style.zoom = 1;
+  }
+
   function fitAll() {
     document.querySelectorAll('[data-shrink-to-fit]').forEach(fitOne);
   }
 
+  // A [data-shrink-to-fit-on-print] wrapper lives on an otherwise ordinary,
+  // interactively-used page (e.g. the live Attendance roster grid, which
+  // needs its own horizontal scrollbar on screen for a wide date range) -
+  // unlike [data-shrink-to-fit] above, which only ever appears on a
+  // dedicated print-preview page where "shaped like one physical page" IS
+  // the on-screen look too. Fitting it on 'load'/'resize' the way that one
+  // does would fight the on-screen scrollbar: the wrapper's clientWidth is
+  // *supposed* to be narrower than the table's real scrollWidth on screen
+  // (that's what makes the scrollbar necessary), so fitOne would zoom the
+  // whole interactive grid out to "fix" something that was never actually
+  // a problem. Scoped tightly to the beforeprint/afterprint pair instead -
+  // the CSS that gives the wrapper a real, bounded height/width in the
+  // first place is itself scoped to @media print, so outside of an actual
+  // print pass it's never a meaningfully bounded box to shrink into, and
+  // afterprint zooms back out so a cancelled print dialog doesn't leave
+  // the on-screen page looking shrunk.
+  function fitAllForPrint() {
+    document.querySelectorAll('[data-shrink-to-fit-on-print]').forEach(fitOne);
+  }
+  function resetAllForPrint() {
+    document.querySelectorAll('[data-shrink-to-fit-on-print]').forEach(resetOne);
+  }
+
   window.addEventListener('load', fitAll);
-  window.addEventListener('beforeprint', fitAll);
   window.addEventListener('resize', fitAll);
+  window.addEventListener('beforeprint', function () {
+    fitAll();
+    fitAllForPrint();
+  });
+  window.addEventListener('afterprint', resetAllForPrint);
 })();

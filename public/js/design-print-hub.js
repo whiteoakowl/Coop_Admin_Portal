@@ -47,6 +47,7 @@
     setupCleanupBadges: document.getElementById('print-setupCleanupBadges-section'),
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
+    classCheckinQr: document.getElementById('print-classCheckinQr-section'),
     logs: document.getElementById('print-logs-section'),
   };
 
@@ -150,6 +151,57 @@
   wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
   wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
   wireBulkMemberList('barcode-labels-bulk-list', 'barcode-labels-bulk-filter-select', 'barcode-labels-select-all-checkbox', 'barcode-labels-select-none-checkbox');
+
+  // Class Check-In QR Codes picker: select-all/select-none plus a Day/Hour
+  // filter popup, all over .qr-picker-row (classes, not members - a
+  // separate class from wireBulkMemberList's own .print-picker-row so it
+  // never gets swept up by that function's clone-from-schedule-list step
+  // above, which only ever targets the member lists by id).
+  const qrList = document.getElementById('classcheckin-qr-list');
+  if (qrList) {
+    const qrSelectAll = document.getElementById('classcheckin-qr-select-all-checkbox');
+    if (qrSelectAll) {
+      qrSelectAll.addEventListener('change', () => {
+        qrList.querySelectorAll('.qr-picker-row').forEach((row) => {
+          if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = qrSelectAll.checked;
+        });
+      });
+    }
+    const qrSelectNone = document.getElementById('classcheckin-qr-select-none-checkbox');
+    if (qrSelectNone) {
+      qrSelectNone.addEventListener('change', () => {
+        if (qrSelectNone.checked) {
+          qrList.querySelectorAll('.qr-picker-row').forEach((row) => {
+            if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = false;
+          });
+          if (qrSelectAll) qrSelectAll.checked = false;
+          qrSelectNone.checked = false;
+        }
+      });
+    }
+
+    // Filter button -> Day/Hour popup -> Save narrows the list to that one
+    // day+hour combination (both left on "All ..." shows every class again).
+    const qrFilterBtn = document.getElementById('classcheckin-qr-filter-btn');
+    const qrFilterDialog = document.getElementById('classcheckin-qr-filter-dialog');
+    const qrFilterDaySelect = document.getElementById('classcheckin-qr-filter-day-select');
+    const qrFilterHourSelect = document.getElementById('classcheckin-qr-filter-hour-select');
+    const qrFilterSaveBtn = document.getElementById('classcheckin-qr-filter-save-btn');
+    if (qrFilterBtn && qrFilterDialog) {
+      qrFilterBtn.addEventListener('click', () => qrFilterDialog.showModal());
+    }
+    if (qrFilterSaveBtn && qrFilterDialog) {
+      qrFilterSaveBtn.addEventListener('click', () => {
+        const day = qrFilterDaySelect ? qrFilterDaySelect.value : '';
+        const hour = qrFilterHourSelect ? qrFilterHourSelect.value : '';
+        qrList.querySelectorAll('.qr-picker-row').forEach((row) => {
+          const matches = (!day || row.dataset.day === day) && (!hour || row.dataset.hour === hour);
+          row.style.display = matches ? '' : 'none';
+        });
+        qrFilterDialog.close();
+      });
+    }
+  }
 
   // Setup/Cleanup + Custom badge lists (partials/misc-badge-print-panel):
   // one Select All checkbox per form, wired the same way as the schedule

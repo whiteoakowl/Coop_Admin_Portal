@@ -2879,10 +2879,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .avery-label-sheet-page:not(:last-child) { page-break-after: always; }
 
+/* grid-template-rows: repeat(10, 1fr) + an explicit height (not
+   grid-auto-rows: 1in, what this used to be) - a real bug report: printed
+   sheets came out correct for the first several rows, then rows drifted
+   closer together, with text running off the bottom of the label lower
+   down the page. Ten tracks independently sized to a fixed length (1in
+   each) only sum to this container's own fixed height on paper - real
+   print rasterization (a different DPI than on-screen CSS px, rounded
+   per element) can compound a fraction-of-a-pixel error across 10 stacked
+   rows, same category of "the math works out exactly, real rendering
+   doesn't" surprise this app's badge/print shrink-to-fit scripts exist to
+   catch elsewhere. 1fr rows inside an explicitly-sized container can't
+   drift that way - the browser divides the container's own real,
+   already-fixed height into 10 equal parts by construction, so they sum
+   to exactly that height every time, regardless of DPI or rounding.
+   height: 100% of .avery-label-sheet-page's own content box, which
+   box-sizing: border-box + that page's 0.5in top/bottom padding already
+   pins to exactly 11in - 2*0.5in = 10in. */
 .avery-label-grid {
   display: grid;
   grid-template-columns: repeat(3, 2.625in);
-  grid-auto-rows: 1in;
+  grid-template-rows: repeat(10, 1fr);
+  height: 100%;
   column-gap: 0.125in;
   row-gap: 0;
 }
@@ -2914,6 +2932,96 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Class Check-In QR Codes sheet (views/admin-classcheckin-qr-
+   print.ejs) - one page per up-to-4 selected classes, portrait, evenly
+   spaced 2x2. Each cell's QR code encodes that one class's own Class
+   Check-In quick link (see routes/admin-design.js), rendered client-side
+   by public/js/classcheckin-qr-print.js. ---------- */
+.qr-sheet-page {
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  padding: 0.5in;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid rgba(28, 37, 48, 0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+}
+.qr-sheet-page:not(:last-child) { page-break-after: always; }
+
+/* 1fr rows/columns (not a fixed inch size, unlike .avery-label-grid,
+   which needs an exact printer-label match) - "evenly spaced" just means
+   the page's own remaining space divided equally among however many of
+   the up-to-4 cells this page actually has (a page with only 1-3 selected
+   classes still spaces them evenly rather than leaving the unused cells'
+   worth of blank space bunched in a corner). */
+.qr-sheet-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0.4in;
+  margin-top: 0.3in;
+}
+.qr-sheet-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15in;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3in;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-align: center;
+}
+/* The QR SVG itself (public/js/classcheckin-qr-print.js fills this with
+   qrcode-generator's own scalable output, which has no fixed pixel size
+   of its own - width/height here are what actually size it on the
+   sheet). Capped at 2.6in so it comfortably fits inside a quarter-page
+   cell alongside its own label text, even before any real content margin
+   is subtracted. */
+.qr-sheet-code { width: 100%; max-width: 2.6in; aspect-ratio: 1; }
+.qr-sheet-code svg { display: block; width: 100%; height: 100%; }
+.qr-sheet-class-name { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
+.qr-sheet-class-meta { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .qr-sheet-page { width: 100%; height: auto; min-height: 0; box-shadow: none; border: none; padding: 1rem; }
+  .qr-sheet-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 1rem; }
+}
+
+/* Class Check-In QR Codes picker's Day/Hour filter popup - a real request:
+   "add a filter button. when clicking the filter button you get a popup
+   window to select day and hour, orange save button top right corner of
+   popup." Small dialog, sized/chromed like .member-picker-dialog, with a
+   header row (title + Save/Close) instead of a footer action row so Save
+   reads as pinned to the corner rather than the bottom of a form. */
+.qr-filter-dialog {
+  width: min(360px, 90vw);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--card-padding);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.qr-filter-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.qr-filter-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+.qr-filter-dialog-header h2 { margin: 0; font-size: 1.15rem; }
+.qr-filter-dialog-actions { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+.qr-filter-dialog-actions .roster-action-btn { flex: 0 0 auto; min-width: 0; padding: 0.4rem 0.9rem; }
+/* Close normally pins itself absolute to its dialog's own top-right corner
+   (fine when nothing else shares that corner) - here it sits in the header's
+   own flex row next to Save instead, same override .class-view-header uses
+   for the same reason. */
+.qr-filter-dialog-header .class-form-dialog-close { position: static; }
+.qr-filter-dialog-body { display: flex; flex-direction: column; gap: 0.35rem; }
+.qr-filter-dialog-body label { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-top: 0.5rem; }
+.qr-filter-dialog-body label:first-child { margin-top: 0; }
 
 /* ---------- Name tag design editor ---------- */
 
@@ -3856,16 +3964,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    padding/font-size lets more rows show without scrolling as much either.
    The Archive tab's Arrival/Departure sticky offsets (.roster-secondary-col
    above) shrink by the same proportion so they still sit flush against the
-   narrower Name column instead of leaving a gap. */
+   narrower Name column instead of leaving a gap.
+   A real bug report: this narrower column kept the desktop rule's
+   white-space: nowrap + overflow: hidden (line 3837 above), so a longer
+   name just got clipped mid-word instead of shrinking to fit - there's no
+   font-size-based shrink-to-fit for a plain table cell the way badges/
+   print pages get one, so the only way for the FULL name to actually be
+   visible in a narrow column is to let it wrap onto a second line instead
+   of clipping. The rest of the grid shrinks a bit further here (smaller
+   secondary-col width, font-size, padding) to compensate and keep more of
+   a session's dates on screen at once despite the taller wrapped rows. */
 @media (max-width: 640px) {
-  .roster-view-page .roster-table-detailed .roster-name-col { width: 110px; min-width: 110px; max-width: 110px; }
-  .roster-view-page .roster-table-detailed .roster-secondary-col { width: 70px; min-width: 70px; max-width: 70px; }
-  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(2) { left: 110px; }
-  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 180px; }
+  .roster-view-page .roster-table-detailed .roster-name-col {
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: break-word;
+  }
+  .roster-view-page .roster-table-detailed .roster-secondary-col { width: 62px; min-width: 62px; max-width: 62px; }
+  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(2) { left: 96px; }
+  .roster-view-page .roster-table-detailed .roster-secondary-col:nth-child(3) { left: 158px; }
   .roster-table-detailed th,
-  .roster-table-detailed td { padding: 0.2rem 0.25rem; font-size: 0.72rem; }
+  .roster-table-detailed td { padding: 0.15rem 0.2rem; font-size: 0.68rem; }
   .roster-name-times { margin-top: 0.05rem; }
-  .roster-name-time { font-size: 0.62rem; }
+  .roster-name-time { font-size: 0.58rem; }
 }
 
 /* Public kiosk Floater Assignments view - same hour-card chart as the
@@ -4640,6 +4764,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-roster-print-fit { flex: 1; min-height: 0; overflow: hidden; }
 
+/* Attendance Archive print - one .print-page PER section (Parent,
+   Student, each class - see admin-rosters-archive-print.ejs's own
+   comment on why: sharing one page/one shrink pass across every section
+   only ever really fit the smallest of them). Same fixed-height-plus-
+   shrink-to-fit shape as .class-roster-print-page above, just with the
+   class applied directly to .print-page instead of via a body-level
+   ancestor, since this page repeats it once per section rather than
+   having exactly one printable page. */
+.roster-archive-print-page { height: 11in; min-height: 0; }
+.roster-archive-print-page:not(:last-child) { page-break-after: always; }
+.roster-archive-print-fit { flex: 1; min-height: 0; overflow: hidden; }
+
 /* Bulk "Name Tags + Schedule Cards" print - each member's two cards sit
    side by side, one member row per line, so a shared physical card
    design comparison (or just cutting both at once) doesn't require
@@ -4666,6 +4802,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .admin-main { max-width: none; margin-left: 0; padding: 0; }
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
+  /* A real bug report: with many session dates and/or a big roster, this
+     grid's columns and rows spilled across several physical pages instead
+     of shrinking to fit one. #grid-box-attendance becomes a fixed-height
+     flex column here so .roster-grid-print-fit (data-shrink-to-fit-on-
+     print - see print-shrink-to-fit.js) has a real, bounded box to
+     measure and zoom into, the same "give the shrink script a real
+     boundary" shape .class-roster-print-page/.class-roster-print-fit use
+     elsewhere. The height budget (8.5in of the page's ~10.2in usable
+     height after its own 0.4in @page margins) leaves room above it for
+     the print-header, "Attendance" h1, and this box's own header/legend -
+     generous on purpose, since the shrink script only ever shrinks
+     further from here, never grows past it. */
+  #grid-box-attendance { display: flex; flex-direction: column; height: 8.5in; }
+  .roster-grid-print-fit { flex: 1; min-height: 0; overflow: hidden; }
   .roster-name-col { position: static; }
   .roster-secondary-col { position: static; width: auto; min-width: 0; max-width: none; }
   .grid-box { box-shadow: none; border: none; }

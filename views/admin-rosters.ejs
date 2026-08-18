@@ -219,6 +219,19 @@
         <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
         <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
       </div>
+      <%
+        // A real bug report: with many session dates and/or a big roster,
+        // printing this grid (window.print() on this same live page - see
+        // the Print button above) spilled columns and rows across several
+        // physical pages instead of shrinking to fit one, the way this
+        // app's other print surfaces already do. data-shrink-to-fit-on-
+        // print (not the plain data-shrink-to-fit every OTHER print
+        // surface uses) is what makes that safe on a page that's also
+        // interactively used on screen with its own .roster-scroll
+        // horizontal scrollbar - see print-shrink-to-fit.js's own
+        // comment on why the two need different event wiring.
+      %>
+      <div class="roster-grid-print-fit" data-shrink-to-fit-on-print>
       <div class="roster-scroll">
         <table class="roster-table roster-table-detailed">
           <thead>
@@ -325,6 +338,7 @@
           <% } %>
         </table>
       </div>
+      </div>
     </div>
 
     <% if (!classId) { %>
@@ -387,5 +401,6 @@
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/allergy-log-popup.js"></script>
   <script src="/js/roster-archive-view.js"></script>
+  <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>

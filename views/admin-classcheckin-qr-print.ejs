@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter portrait; margin: 0.5in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Class Check-In QR Codes</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (pages.length === 0) { %>
+      <p class="roster-empty">No classes selected.</p>
+    <% } %>
+
+    <%
+      // Portrait, evenly spaced, up to 4 classes per page - a real
+      // request: "printing QR sheets to scan for quick links to class
+      // check in/out kiosk for teachers." Each QR code encodes that one
+      // class's own Class Check-In quick link (see routes/admin-design.js
+      // - the same /kiosk/class-checkin/classes/:id/attendance page every
+      // class card's own quick link opens), so a teacher can scan straight
+      // into their class's own attendance screen without touching the
+      // kiosk's own day-picker/hour-search.
+    %>
+    <% pages.forEach(function(pageClasses) { %>
+      <div class="qr-sheet-page">
+        <div class="print-header">
+          <img src="/img/logo.png" alt="" />
+          <div>
+            <p class="print-header-title">Sanford Homeschoolers</p>
+            <p class="print-header-sub">Class Check-In QR Codes</p>
+          </div>
+        </div>
+        <div class="qr-sheet-grid">
+          <% pageClasses.forEach(function(cls) { %>
+            <div class="qr-sheet-cell">
+              <div class="qr-sheet-code" data-qr-value="<%= cls.checkInUrl %>"></div>
+              <p class="qr-sheet-class-name"><%= cls.className %></p>
+              <p class="qr-sheet-class-meta"><%= cls.dayLabel %><% if (cls.timeLabel) { %> &middot; <%= cls.timeLabel %><% } %></p>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/qrcode.min.js"></script>
+  <script src="/js/classcheckin-qr-print.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

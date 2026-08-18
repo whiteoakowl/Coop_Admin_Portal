@@ -237,6 +237,7 @@
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
             <option value="schedules">Schedules</option>
+            <option value="classCheckinQr">Class Check-In QR Codes</option>
             <option value="logs">Logs</option>
           </select>
         </div>
@@ -408,6 +409,73 @@
 
         <div id="print-customBadges-section" hidden>
           <%- include('partials/misc-badge-print-panel', { type: 'custom', label: 'Custom', badges: customBadges }) %>
+        </div>
+
+        <div id="print-classCheckinQr-section" hidden>
+          <form method="POST" action="/admin/design/print-classcheckin-qr" target="_blank" id="classcheckin-qr-print-form">
+            <div class="name-tag-bulk-filter">
+              <label class="checkbox-option name-tag-select-all">
+                <input type="checkbox" id="classcheckin-qr-select-all-checkbox" />
+                Select All
+              </label>
+              <label class="checkbox-option name-tag-select-none">
+                <input type="checkbox" id="classcheckin-qr-select-none-checkbox" />
+                Select None
+              </label>
+              <button type="button" class="roster-action-btn" id="classcheckin-qr-filter-btn">Filter</button>
+            </div>
+            <% if (classesForQr.length === 0) { %>
+              <p class="roster-empty">No classes yet &mdash; add one on the <a href="/admin/schedule">Schedules</a> page.</p>
+            <% } else { %>
+              <div class="roster-scroll print-picker-scroll">
+                <table class="roster-table members-table condensed-table" id="classcheckin-qr-list">
+                  <thead><tr><th></th><th>Class</th><th>Day</th><th>Time</th></tr></thead>
+                  <tbody>
+                    <% classesForQr.forEach(function(c) { %>
+                      <tr class="qr-picker-row" data-day="<%= c.day %>" data-hour="<%= c.hour_position %>">
+                        <td><input type="checkbox" name="classIds" value="<%= c.id %>" /></td>
+                        <td><%= c.class_name %></td>
+                        <td><%= c.dayLabel %></td>
+                        <td><%= c.timeLabel || '—' %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+              <div class="name-tag-bulk-submit-row">
+                <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              </div>
+            <% } %>
+          </form>
+
+          <%# Narrows the picker above to one Day + Hour combination - a real
+              request: "add a filter button. when clicking the filter button
+              you get a popup window to select day and hour ... this narrow
+              the list of class choices to choose from." %>
+          <dialog id="classcheckin-qr-filter-dialog" class="qr-filter-dialog">
+            <div class="qr-filter-dialog-header">
+              <h2>Filter Classes</h2>
+              <div class="qr-filter-dialog-actions">
+                <button type="button" class="roster-action-btn" id="classcheckin-qr-filter-save-btn">Save</button>
+                <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+              </div>
+            </div>
+            <div class="qr-filter-dialog-body">
+              <label for="classcheckin-qr-filter-day-select">Day</label>
+              <select id="classcheckin-qr-filter-day-select">
+                <option value="">All Days</option>
+                <option value="monday">Monday</option>
+                <option value="wednesday">Wednesday</option>
+              </select>
+              <label for="classcheckin-qr-filter-hour-select">Hour</label>
+              <select id="classcheckin-qr-filter-hour-select">
+                <option value="">All Hours</option>
+                <% [1, 2, 3, 4].forEach(function(h) { %>
+                  <option value="<%= h %>">Hour <%= h %></option>
+                <% }); %>
+              </select>
+            </div>
+          </dialog>
         </div>
 
         <div id="print-schedules-section" class="manage-section" hidden>
