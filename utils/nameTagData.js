@@ -56,11 +56,12 @@ async function cleanupTeamsForParents(memberIds) {
 // to show on their name tag, day by day (not the old cleanupTeam field's
 // "both days smashed into one comma list" - a parent on Chairs Monday and
 // Snacks Wednesday couldn't tell which team was which day from that
-// alone). The "Monday: "/"Wednesday: " label is baked directly into each
-// string, the same convention scheduleCardData.js's primaryParentPhone
-// already uses ("Parent Phone: 555-1234") - so the default parent
-// layout's field element(s) don't need their own separate static label
-// text alongside them. "—" for a day the parent isn't on any team,
+// alone). The "Monday - "/"Wednesday - " label is baked directly into
+// each string, so the default parent layout's field element(s) don't
+// need their own separate static label text alongside them - a later
+// request specifically asked for a hyphen here ("Monday - Team 1"), not
+// scheduleCardData.js's own colon convention ("Parent Phone: 555-1234")
+// this originally matched. "—" for a day the parent isn't on any team,
 // matching this app's own established "blank schedule cell" convention
 // (see public/js/name-tag-render-core.js's table renderer) rather than
 // leaving the line looking broken/cut off.
@@ -76,8 +77,8 @@ async function cleanupTeamsForParents(memberIds) {
 function setupCleanupJobLabels(teamRows) {
   const byDay = { monday: [], wednesday: [] };
   for (const row of teamRows) if (byDay[row.day]) byDay[row.day].push(row.title);
-  const mondayLine = 'Monday: ' + (byDay.monday.length ? byDay.monday.join(', ') : '—');
-  const wednesdayLine = 'Wednesday: ' + (byDay.wednesday.length ? byDay.wednesday.join(', ') : '—');
+  const mondayLine = 'Monday - ' + (byDay.monday.length ? byDay.monday.join(', ') : '—');
+  const wednesdayLine = 'Wednesday - ' + (byDay.wednesday.length ? byDay.wednesday.join(', ') : '—');
   return {
     mondaySetupCleanup: mondayLine,
     wednesdaySetupCleanup: wednesdayLine,

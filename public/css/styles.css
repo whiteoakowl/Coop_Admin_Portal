@@ -1652,7 +1652,30 @@ body.public-page .roster-empty {
 }
 .badge-el { position: absolute; box-sizing: border-box; }
 .badge-el-text { overflow: hidden; }
-.badge-el-text-inner { outline: none; }
+/* flex-shrink: 0 is load-bearing, not cosmetic - a real bug report,
+   live-reproduced with Playwright: two short stacked name-tag lines
+   ("Josh"/"Ward", "Lily"/"Bell") clipped across their TOP even though
+   badge-autofit.js's own height check reported box.scrollHeight ===
+   box.clientHeight (i.e. "already fits," no shrink needed). Root cause:
+   .badge-el-text-inner (this class) sets its own overflow: hidden (see
+   name-tag-render-core.js's autoFitText wrapStyle) - and per the flexbox
+   spec, a flex item's AUTOMATIC minimum size (its default min-height in
+   this column-direction box) collapses to 0 the moment the item's own
+   overflow is anything but visible, instead of defaulting to the item's
+   content size. With that automatic floor gone, the browser was free to
+   compress each line's own box shorter than its text actually needs to
+   make both lines fit the parent's fixed height - the GLYPHS still
+   painted at their full, unshrunk font-size (only the line's BOX got
+   squeezed), so their tops stuck out past the now-too-short box and got
+   clipped by this same element's own overflow: hidden. Nothing ever
+   registered as overflow at the parent level (the compression happened
+   BEFORE that), so badge-autofit.js's real-measurement pass had no
+   signal to react to. flex-shrink: 0 refuses that compression - each
+   line always renders (and reports scrollHeight) at its true content
+   height, restoring the invariant every autofit measurement in badge-
+   autofit.js already assumes: font-size, not silent flex collapse, is
+   what controls how tall a line renders. */
+.badge-el-text-inner { outline: none; flex-shrink: 0; }
 .badge-el-image { overflow: hidden; }
 .badge-el-image img { display: block; }
 .badge-el-barcode { background: #fff; }

@@ -48,6 +48,16 @@ function formatDateLong(iso) {
   return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// A real request: a student's imported birthday showed on the Members
+// list as its own raw stored ISO value ("2026-02-03") - reads as a sort
+// key, not a birthday. MM/DD/YYYY, zero-padded, matches how every other
+// date-entry field in this app already displays to an admin (the
+// membership form's own <input type="date"> renders this way natively).
+function formatDateNumeric(iso) {
+  const d = parseISO(iso);
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
+}
+
 // epochMs comes straight from a Postgres bigint column (attendance.
 // check_in_time, checkouts.check_out_time) - the pg driver returns a
 // bigint as a STRING, not a number, to avoid silent precision loss on
@@ -129,6 +139,7 @@ module.exports = {
   isValidISODate,
   formatDateLabel,
   formatDateLong,
+  formatDateNumeric,
   formatTime,
   formatTimeOfDay,
   formatTimestamp,

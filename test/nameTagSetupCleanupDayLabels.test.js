@@ -73,13 +73,13 @@ test('badgeDataForMember: a parent on a Monday-only team gets a real Monday line
 
   const parent = await db.prepare('SELECT * FROM members WHERE id = ?').get(parentId);
   const data = await badgeDataForMember(parent);
-  assert.equal(data.mondaySetupCleanup, 'Monday: Chairs & Tables');
-  assert.equal(data.wednesdaySetupCleanup, 'Wednesday: —');
+  assert.equal(data.mondaySetupCleanup, 'Monday - Chairs & Tables');
+  assert.equal(data.wednesdaySetupCleanup, 'Wednesday - —');
   // setupCleanupDays is the same two lines as an array - the shape the
   // current default's shared element (id: setup-cleanup-days) actually
   // binds to, kept in sync with the two string fields above rather than
   // computed separately.
-  assert.deepEqual(data.setupCleanupDays, ['Monday: Chairs & Tables', 'Wednesday: —']);
+  assert.deepEqual(data.setupCleanupDays, ['Monday - Chairs & Tables', 'Wednesday - —']);
 
   // Batch version has to agree exactly - this is the same query result
   // just grouped differently, and a keying bug here would silently swap
@@ -97,8 +97,8 @@ test('badgeDataForMember: a parent on two different teams, one per day, gets bot
 
   const parent = await db.prepare('SELECT * FROM members WHERE id = ?').get(parentId);
   const data = await badgeDataForMember(parent);
-  assert.equal(data.mondaySetupCleanup, 'Monday: Chairs & Tables 2');
-  assert.equal(data.wednesdaySetupCleanup, 'Wednesday: Snack Table');
+  assert.equal(data.mondaySetupCleanup, 'Monday - Chairs & Tables 2');
+  assert.equal(data.wednesdaySetupCleanup, 'Wednesday - Snack Table');
   // The old combined field is untouched, still both days together - kept
   // selectable in the field picker for anyone who still wants it (see
   // utils/nameTagBadge.js's FIELDS_BY_TYPE.parent), just not on the
@@ -110,8 +110,8 @@ test('badgeDataForMember: a parent on no team at all gets placeholders for both 
   const parentId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Team Parent', 'no-team-parent', 'parent')").run()).lastInsertRowid;
   const parent = await db.prepare('SELECT * FROM members WHERE id = ?').get(parentId);
   const data = await badgeDataForMember(parent);
-  assert.equal(data.mondaySetupCleanup, 'Monday: —');
-  assert.equal(data.wednesdaySetupCleanup, 'Wednesday: —');
+  assert.equal(data.mondaySetupCleanup, 'Monday - —');
+  assert.equal(data.wednesdaySetupCleanup, 'Wednesday - —');
 });
 
 test('backfillParentSetupCleanupDays prepends the two new fields to an already-saved parent template that predates them', async () => {

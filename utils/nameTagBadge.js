@@ -149,7 +149,7 @@ const DEFAULT_LAYOUTS = {
       // themselves, or whoever's checking) sees. Both days now share ONE
       // element/text space (setupCleanupDays - utils/nameTagData.js's
       // setupCleanupJobLabels hands back the two pre-labeled lines,
-      // "Monday: Chairs & Tables" / "Wednesday: —", as an array) instead
+      // "Monday - Chairs & Tables" / "Wednesday - —", as an array) instead
       // of two separately-positioned elements - name-tag-render-core.js's
       // renderTextEl stacks an array field's lines top-to-bottom within
       // the one box, each still individually labeled and individually

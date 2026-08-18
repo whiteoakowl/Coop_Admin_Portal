@@ -125,3 +125,26 @@ test('a U.S.-style M/D/YYYY date string (what a real Excel Date cell reads back 
   const updated = await db.prepare('SELECT birthday FROM members WHERE id = ?').get(student.lastInsertRowid);
   assert.equal(updated.birthday, '2015-04-12');
 });
+
+// Real bug report: the imported birthday showed on the Members list as
+// its raw stored ISO value ("2015-04-12") - reads as a sort key, not a
+// birthday. The stored column itself stays ISO (every date comparison/
+// sort in this app depends on that sorting correctly as a plain string)
+// - only the printed/displayed value changes.
+test('an imported birthday displays on the Members print table as MM/DD/YYYY, not the raw stored ISO value', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+
+  await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Display Format Test Student', 'bday-display', 'student')")
+    .run();
+  const buffer = buildBuffer([['Display', 'Format Test Student', '2015-04-12']]);
+  await request(app)
+    .post('/admin/members/import-birthdays?_csrf=' + encodeURIComponent(csrfToken))
+    .set('Cookie', cookie)
+    .attach('file', buffer, 'birthdays.xlsx');
+
+  const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /04\/12\/2015/, 'the birthday should render as MM\\/DD\\/YYYY');
+  assert.doesNotMatch(page.text, /2015-04-12/, 'the raw ISO value should not appear on the page');
+});

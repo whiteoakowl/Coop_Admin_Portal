@@ -123,6 +123,19 @@
   // instead of width and correcting every line together (not per-line) so
   // the stack keeps a consistent size rather than each line settling on
   // its own independent font size.
+  // NOT the same "equal could still be overflowing" rounding concern
+  // computeLineFontSize's width check has - unlike that check (which
+  // measures a truly UNCONSTRAINED natural width via measureNaturalWidth),
+  // box.scrollHeight measured directly on this still-constrained,
+  // overflow:hidden box can never report less than box.clientHeight by
+  // definition (scrollHeight is always max(content height, client
+  // height)) - so "reported equal" here always simply means "content
+  // fits, however much room to spare," never a disguised near-miss. A
+  // margin subtracted from availableH would make this loop see every
+  // ALREADY-fitting box as still overflowing and shrink it all the way to
+  // MIN_FONT_SIZE_PX regardless of how much real headroom it had -
+  // confirmed live with Playwright while chasing this exact bug. Plain
+  // `>` is correct here.
   function shrinkLinesToFitHeight(box, inners) {
     var availableH = box.clientHeight;
     if (!availableH) return;

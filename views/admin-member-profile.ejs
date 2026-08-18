@@ -42,7 +42,7 @@
           <% if (member.phone) { %><dt>Phone</dt><dd><%= member.phone %></dd><% } %>
           <% if (member.email) { %><dt>Email</dt><dd><%= member.email %></dd><% } %>
           <% if (member.member_type !== 'parent') { %>
-            <% if (member.birthday) { %><dt>Birthday</dt><dd><%= member.birthday %></dd><% } %>
+            <% if (member.birthday) { %><dt>Birthday</dt><dd><%= member.birthdayLabel %></dd><% } %>
             <% if (member.grade_level) { %><dt>Grade Level</dt><dd><%= member.grade_level %></dd><% } %>
             <% if (member.medical_notes) { %><dt>Medical/Allergy Notes</dt><dd><%= member.medical_notes %></dd><% } %>
           <% } %>

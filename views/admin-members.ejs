@@ -342,7 +342,7 @@
             <td><%= m.familyName || '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
             <td><%= m.grade_level || '—' %></td>
-            <td><%= m.birthday || '—' %></td>
+            <td><%= m.birthdayLabel || '—' %></td>
           </tr>
         <% }); %>
       </tbody>

@@ -20,6 +20,7 @@ const {
   isValidISODate,
   formatDateLabel,
   formatDateLong,
+  formatDateNumeric,
   formatTime,
   formatTimeOfDay,
   formatTimestamp,
@@ -119,6 +120,15 @@ test('formatDateLabel / formatDateLong', async (t) => {
   await t.test('formatDateLong is the full "Weekday, Month D, YYYY" form', () => {
     assert.equal(formatDateLong('2024-06-15'), 'Sat, June 15, 2024');
   });
+});
+
+// Real request: a student's imported birthday showed on the Members list
+// as its raw stored ISO value ("2026-02-03") - MM/DD/YYYY, zero-padded,
+// reads as a birthday instead.
+test('formatDateNumeric is zero-padded MM/DD/YYYY', () => {
+  assert.equal(formatDateNumeric('2026-02-03'), '02/03/2026');
+  assert.equal(formatDateNumeric('2024-11-25'), '11/25/2024');
+  assert.equal(formatDateNumeric('2024-01-01'), '01/01/2024');
 });
 
 test('formatTime', async (t) => {

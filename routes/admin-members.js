@@ -6,7 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
-const { formatDateLabel, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
+const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { createStorageClient } = require('../utils/storage');
 const { saveUpload, removeUpload } = require('../utils/uploadBackend');
@@ -122,7 +122,7 @@ router.get('/members', async (req, res) => {
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
   const withRosters = (await membersWithDetails(typeFilter, familyFilter))
     .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
-    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday) }));
+    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -500,6 +500,7 @@ router.get('/members/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
+  member.birthdayLabel = member.birthday ? formatDateNumeric(member.birthday) : null;
   const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
 
   const family = await db
