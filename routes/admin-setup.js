@@ -196,6 +196,40 @@ function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
   return byMember;
 }
 
+// Defaults a DIFFERENT task per member's dropdown instead of every still-
+// unassigned member's <select> silently defaulting to the same first
+// option in the list (a real request: "each drop down menu next to
+// members should suggest a different task from the list until there
+// aren't any left"). Walks members in team order, handing out the next
+// not-yet-suggested task from allOptions (wrapping back to the start once
+// every distinct task has been suggested once, rather than leaving later
+// members with nothing) - skipping anyone already assigned in this slot
+// (nothing to suggest, they're locked) or absent (see the caller: "no
+// tasks should be suggested for that member"). Only ever picks from that
+// member's OWN options list (optionsKey) so a member-specific exclusion -
+// their other slot's own value - is still respected. Returns
+// { [memberId]: taskItemId }.
+function suggestDistinctTasks(members, allOptions, assignedKey, optionsKey) {
+  const suggestions = {};
+  const n = allOptions.length;
+  if (n === 0) return suggestions;
+  let pointer = 0;
+  for (const m of members) {
+    if (m.absent || m[assignedKey]) continue;
+    const options = m[optionsKey] || [];
+    if (options.length === 0) continue;
+    for (let i = 0; i < n; i++) {
+      const candidate = allOptions[(pointer + i) % n];
+      if (options.some((o) => o.id === candidate.id)) {
+        suggestions[m.id] = candidate.id;
+        pointer = (pointer + i + 1) % n;
+        break;
+      }
+    }
+  }
+  return suggestions;
+}
+
 // One card per team for a given date - each member's currently-suggested
 // task (if any) plus the list of tasks their team's own linked task list
 // offers, i.e. what the suggestion dropdown's own options are. Shared by
@@ -204,6 +238,7 @@ function taskOptionsExcludingAssignedElsewhere(allOptions, members) {
 async function assignmentCardsForDate(day, date) {
   const teams = await teamsWithMembers(day);
   const assignments = date ? await taskAssignmentsForDate(day, date) : {};
+  const absentIds = await absentMemberIdsForDate(date);
   return teams.map((t) => {
     const allOptions = t.taskSection ? t.taskSection.items : [];
     const members = t.members.map((m) => {
@@ -213,6 +248,7 @@ async function assignmentCardsForDate(day, date) {
       return {
         id: m.id,
         name: m.name,
+        absent: absentIds.has(m.id),
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
         taskNumber: taskItem ? taskItem.number : null,
@@ -222,11 +258,21 @@ async function assignmentCardsForDate(day, date) {
       };
     });
     const availableOptionsByMember = taskOptionsExcludingAssignedElsewhere(allOptions, members);
+    const membersWithOptions = members.map((m) => ({ ...m, ...availableOptionsByMember[m.id] }));
+    // Every Task 1 dropdown gets its own distinct suggestion before Task 2
+    // dropdowns get theirs - a real request: "filling all the task one
+    // dropdowns first then filling task 2 if out of spots."
+    const slot1Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId', 'slot1Options');
+    const slot2Suggestions = suggestDistinctTasks(membersWithOptions, allOptions, 'taskItemId2', 'slot2Options');
     return {
       id: t.id,
       title: t.title,
       taskOptions: allOptions,
-      members: members.map((m) => ({ ...m, ...availableOptionsByMember[m.id] })),
+      members: membersWithOptions.map((m) => ({
+        ...m,
+        suggestedTaskItemId: slot1Suggestions[m.id] || null,
+        suggestedTaskItemId2: slot2Suggestions[m.id] || null,
+      })),
     };
   });
 }

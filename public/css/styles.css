@@ -3537,8 +3537,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-toolbar-left { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 
 /* Archive print page: portrait, 2 cards per row (2 rows for a day's 4
-   hour cards) - the print page's own @page rule matches (see the view). */
+   hour cards) - the print page's own @page rule matches (see the view).
+   Higher specificity than .setup-assignment-cards-grid's own 3-column
+   rule below, so this still wins for a Setup/Cleanup archive print page
+   even though it shares .floater-cards-grid. */
 .volunteer-archive-print-page .floater-cards-grid { grid-template-columns: repeat(2, 1fr); }
+
+/* Setup/Cleanup Assignments' own team-card grid (partials/setup-
+   assignment-cards.ejs) - a real request: "desktop view of setup cleanup
+   assignments page should show 3 team cards to a row" instead of
+   .floater-cards-grid's own auto-fit column count (which varies with
+   however many teams exist / how wide the viewport is). Collapses to one
+   column under the same ~tablet breakpoint several other card grids in
+   this file already use, rather than squeezing 3 columns into a phone
+   width. */
+.setup-assignment-cards-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) {
+  .setup-assignment-cards-grid { grid-template-columns: 1fr; }
+}
 
 /* Archive popup (fetched fragment) - Export/Print sit top-right next to
    the close button instead of a separate bottom action bar. */
@@ -3677,6 +3693,33 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .floater-assign-form select,
   .setup-task-static { width: 100%; font-size: 0.7rem; }
   .floater-assign-btn { align-self: flex-end; font-size: 0.68rem; }
+
+  /* Floater Assignments chart, mobile only (desktop keeps the plain 3-
+     column table) - a real request: "each row should read position &
+     room next to each other with dropdown of suggested floater stacked
+     underneath neatly." Turns each <tr> into a flex row instead of a
+     table row: Position and Room sit side by side on the first line
+     (auto width, wrapping onto separate lines themselves only if a long
+     position name doesn't leave room), and the Floater
+     select+Assign/Unassign block - already its own stacked column from
+     the rule above - gets flex: 1 1 100% so it always starts a fresh
+     line below them instead of squeezing into a third column. */
+  .floater-chart-table, .floater-chart-table tbody { display: block; width: 100%; }
+  .floater-chart-table thead { display: none; }
+  .floater-chart-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.4rem;
+    row-gap: 0.3rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .floater-chart-table tbody tr:last-child { border-bottom: none; }
+  .floater-chart-table td { display: block; width: auto; padding: 0; border: none; }
+  .floater-chart-table td:nth-child(2) { color: var(--muted); }
+  .floater-chart-table td:nth-child(2)::before { content: "\00b7\0020"; }
+  .floater-chart-table td:nth-child(3) { flex: 1 1 100%; }
 }
 
 /* ---------- Team cards: Floater Teams + Setup/Cleanup share this look ---------- */
@@ -3897,6 +3940,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: 6px;
 }
 .team-member-row-absent .team-member-avatar { background: rgba(255,255,255,0.6); color: var(--red); }
+
+/* Same red flag, table-row version - Setup/Cleanup Assignments' own
+   per-member table row (partials/setup-assignment-cards.ejs) instead of
+   the Teams tab's card-list rows above. */
+.setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
 .team-member-avatar {
   width: 1.6rem;
   height: 1.6rem;

@@ -173,18 +173,34 @@ async function substituteBoard(day, date) {
   });
 
   const result = [];
+  // Tracks everyone auto-picked (or already assigned) at ANY earlier hour
+  // today, across the whole day - not reset per hour, unlike usedThisHour
+  // below. A real request: "suggest different floaters each hour. try to
+  // not suggested the same person different hours in a day unless
+  // necessary." Without this, every hour's own pickCandidate started fresh
+  // from the same rank-sorted pool and kept landing on the same
+  // alphabetically-first available person hour after hour.
+  const usedToday = new Set();
   for (const hourGroup of grid) {
     const hourPosition = hourGroup.position;
     const floaterPool = (await floaterMembersForHour(day, hourPosition)).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 
+    // Prefers whoever hasn't already been picked earlier today - only
+    // reuses someone from an earlier hour when that's the sole option left
+    // for this one (an empty rank tier, or a small floater pool).
+    function bestAvailable(list) {
+      const fresh = list.filter((m) => !usedToday.has(m.id));
+      return fresh.length > 0 ? fresh[0] : list[0] || null;
+    }
+
     function pickCandidate(preferredIds) {
       const preferred = rankSort(
         (preferredIds || []).map((id) => floaterPool.find((m) => m.id === id)).filter((m) => m && !usedThisHour.has(m.id))
       );
-      if (preferred.length > 0) return preferred[0];
-      return floaterPool.find((m) => !usedThisHour.has(m.id)) || null;
+      if (preferred.length > 0) return bestAvailable(preferred);
+      return bestAvailable(floaterPool.filter((m) => !usedThisHour.has(m.id)));
     }
 
     async function resolveSlot(slotType, slotId, preferredIds) {
@@ -196,7 +212,10 @@ async function substituteBoard(day, date) {
           existing = await assignmentFor(date, slotType, slotId);
         }
       }
-      if (existing) usedThisHour.add(existing.member_id);
+      if (existing) {
+        usedThisHour.add(existing.member_id);
+        usedToday.add(existing.member_id);
+      }
       return existing;
     }
 

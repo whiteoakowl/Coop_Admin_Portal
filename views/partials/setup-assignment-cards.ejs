@@ -27,7 +27,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
 <% if (cards.length === 0) { %>
   <p class="roster-empty">No teams yet &mdash; create one on the Setup/Cleanup Teams tab.</p>
 <% } else { %>
-  <div class="floater-cards-grid">
+  <div class="floater-cards-grid setup-assignment-cards-grid">
     <% cards.forEach(function(team, idx) { %>
       <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
       <div class="floater-card floater-card-<%= accent %>">
@@ -44,12 +44,14 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
               <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% team.members.forEach(function(m) { %>
-              <tr>
-                <td class="floater-card-position"><%= m.name %></td>
+              <tr<%= isEditable && m.absent ? ' class="setup-assignment-row-absent"' : '' %>>
+                <td class="floater-card-position">
+                  <%= m.name %><% if (isEditable && m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
+                </td>
                 <%
                   var slots = [
-                    { num: 1, taskItemId: m.taskItemId, taskNumber: m.taskNumber, taskDescription: m.taskDescription, options: m.slot1Options },
-                    { num: 2, taskItemId: m.taskItemId2, taskNumber: m.taskNumber2, taskDescription: m.taskDescription2, options: m.slot2Options },
+                    { num: 1, taskItemId: m.taskItemId, taskNumber: m.taskNumber, taskDescription: m.taskDescription, options: m.slot1Options, suggestedTaskItemId: m.suggestedTaskItemId },
+                    { num: 2, taskItemId: m.taskItemId2, taskNumber: m.taskNumber2, taskDescription: m.taskDescription2, options: m.slot2Options, suggestedTaskItemId: m.suggestedTaskItemId2 },
                   ];
                 %>
                 <% slots.forEach(function(slot) { %>
@@ -68,6 +70,13 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                         <span class="setup-task-static">#<%= slot.taskNumber %> &mdash; <%= slot.taskDescription %></span>
                         <button type="submit" class="floater-assign-btn floater-assign-btn-unassign">Unassign</button>
                       </form>
+                    <% } else if (m.absent) { %>
+                      <%# "no tasks should be suggested for that member" - absent
+                          and not already assigned, so nothing to suggest and
+                          nothing to hand-pick until they're marked present again. %>
+                      <select disabled class="floater-select-noavail" aria-label="<%= m.name %> is absent - no task suggested">
+                        <option>Absent - no task</option>
+                      </select>
                     <% } else if (slot.options.length === 0) { %>
                       <select disabled class="floater-select-noavail" aria-label="No tasks available for <%= m.name %>">
                         <option>No tasks available</option>
@@ -78,8 +87,9 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                         <input type="hidden" name="date" value="<%= selectedDate %>" />
                         <input type="hidden" name="slot" value="<%= slot.num %>" />
                         <select name="taskItemId">
+                          <% if (!slot.suggestedTaskItemId) { %><option value="" selected disabled>Select a task&hellip;</option><% } %>
                           <% slot.options.forEach(function(item) { %>
-                            <option value="<%= item.id %>">#<%= item.number %> &mdash; <%= item.description %></option>
+                            <option value="<%= item.id %>"<%= item.id === slot.suggestedTaskItemId ? ' selected' : '' %>>#<%= item.number %> &mdash; <%= item.description %></option>
                           <% }); %>
                         </select>
                         <button type="submit" class="floater-assign-btn">Assign</button>
