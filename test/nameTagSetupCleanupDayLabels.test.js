@@ -42,7 +42,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const app = require('../server');
 const db = require('../db');
 const { createTestDb } = require('./pgTestDb');
-const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
+const { DEFAULT_LAYOUTS, FIELDS_BY_TYPE } = require('../utils/nameTagBadge');
 const { backfillParentSetupCleanupDays, backfillParentSetupCleanupMerge, backfillParentRemoveLegacyCleanupTeamElement } = require('../db/bootstrapPg');
 const { badgeDataForMember, badgeDataForMembers } = require('../utils/nameTagData');
 
@@ -64,6 +64,16 @@ test('the parent default layout leads with ONE shared Monday/Wednesday setup/cle
   assert.ok(!elements.some((el) => el.field === 'mondaySetupCleanup' || el.field === 'wednesdaySetupCleanup'), 'the old split fields should not appear on the current default');
   const logoIdx = elements.findIndex((el) => el.type === 'image');
   assert.ok(logoIdx > 0, 'the logo (and everything else) should come after the combined job field');
+});
+
+// A real bug report: garbled team-name fragments kept bleeding onto a
+// parent's printed badge from a cleanupTeam element an admin had re-added
+// via this exact picker - setupCleanupDays (above) fully replaces what
+// cleanupTeam used to show, so there's no legitimate reason to offer it
+// here anymore (see backfillParentRemoveLegacyCleanupTeamElement, which
+// now also strips any that already exist on a saved template).
+test('cleanupTeam is not offered in the parent field picker anymore', () => {
+  assert.ok(!FIELDS_BY_TYPE.parent.some((f) => f.field === 'cleanupTeam'), 'cleanupTeam should not be an "Add Element" option for parent name tags');
 });
 
 test('badgeDataForMember: a parent on a Monday-only team gets a real Monday line and a placeholder Wednesday line', async () => {
@@ -99,10 +109,11 @@ test('badgeDataForMember: a parent on two different teams, one per day, gets bot
   const data = await badgeDataForMember(parent);
   assert.equal(data.mondaySetupCleanup, 'Monday - Chairs & Tables 2');
   assert.equal(data.wednesdaySetupCleanup, 'Wednesday - Snack Table');
-  // The old combined field is untouched, still both days together - kept
-  // selectable in the field picker for anyone who still wants it (see
-  // utils/nameTagBadge.js's FIELDS_BY_TYPE.parent), just not on the
-  // default layout anymore.
+  // The old combined field's data is still computed (cleanupTeamsForParent
+  // is still exported/used elsewhere) even though it's no longer offered
+  // in the field picker or allowed to survive on a saved parent template
+  // (see backfillParentRemoveLegacyCleanupTeamElement's test below) - this
+  // just confirms the underlying computation itself is untouched.
   assert.equal(data.cleanupTeam, 'Chairs & Tables 2, Snack Table');
 });
 
@@ -272,12 +283,23 @@ test('backfillParentRemoveLegacyCleanupTeamElement removes a stale id:"team" cle
   );
 });
 
-test('backfillParentRemoveLegacyCleanupTeamElement leaves a deliberately-added cleanupTeam element with a non-"team" id alone', async () => {
+// A real follow-up bug report: garbled team-name fragments were still
+// bleeding onto a parent's printed badge, invisible in the editor's own
+// preview, even after the fix above shipped - because THIS element had a
+// normal auto-generated id (an admin had re-added "Cleanup Team (Both
+// Days)" via the field picker at some point), which the backfill used to
+// deliberately leave alone on the theory that a non-"team" id could only
+// mean an admin wanted it there. cleanupTeam is no longer offered in the
+// field picker at all (utils/nameTagBadge.js's FIELDS_BY_TYPE.parent) -
+// setupCleanupDays fully replaces it - so this now removes every
+// cleanupTeam element unconditionally, any id.
+test('backfillParentRemoveLegacyCleanupTeamElement also removes a cleanupTeam element with a non-"team" id (an admin-re-added one)', async () => {
   const testDb = await createTestDb();
   const deliberate = {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
+      { id: 'setup-cleanup-days', type: 'text', field: 'setupCleanupDays', x: 8, y: 4, width: 320, height: 32, fontSize: 10, color: '#1c2530', bold: true, align: 'left', valign: 'middle', autoFitText: true },
       { id: 'text-abc123-7', type: 'text', field: 'cleanupTeam', x: 8, y: 150, width: 320, height: 20, fontSize: 10, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
     ],
   };
@@ -286,7 +308,9 @@ test('backfillParentRemoveLegacyCleanupTeamElement leaves a deliberately-added c
   await backfillParentRemoveLegacyCleanupTeamElement(testDb);
 
   const row = await testDb.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
-  assert.deepEqual(JSON.parse(row.layout_json), deliberate);
+  const layout = JSON.parse(row.layout_json);
+  assert.ok(!layout.elements.some((el) => el.field === 'cleanupTeam'), 'every cleanupTeam element must be gone, regardless of id');
+  assert.deepEqual(layout.elements, [deliberate.elements[0]], 'every non-cleanupTeam element must survive untouched');
 });
 
 test('backfillParentRemoveLegacyCleanupTeamElement is a no-op for a fresh install (no legacy element at all)', async () => {

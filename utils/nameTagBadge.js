@@ -26,7 +26,6 @@ const FIELDS_BY_TYPE = {
   ],
   parent: [
     { field: 'name', label: 'Name' },
-    { field: 'cleanupTeam', label: 'Cleanup Team (Both Days)' },
     // One shared field/element for both days (utils/nameTagData.js's
     // setupCleanupJobLabels hands back the two lines as an array) - a
     // real request: Monday's and Wednesday's jobs should "share a text
@@ -37,6 +36,18 @@ const FIELDS_BY_TYPE = {
     // offered here anymore so a fresh "Add Element" always gets the
     // shared shape.
     { field: 'setupCleanupDays', label: 'Monday & Wednesday Setup/Cleanup Jobs' },
+    // cleanupTeam (the old "both days smashed into one comma list, no day
+    // label" field) is deliberately NOT offered here anymore - a real bug
+    // report: an admin had re-added it via this picker at some point, at
+    // a position that ended up overlapping other elements once the badge
+    // was redesigned around setupCleanupDays above, showing garbled
+    // fragments of team text on the printed badge (invisible in the
+    // editor's own preview when a later, fully-opaque element happened to
+    // paint over it there). See db/bootstrapPg.js's
+    // backfillParentRemoveLegacyCleanupTeamElement, which now strips any
+    // cleanupTeam element unconditionally - setupCleanupDays already
+    // covers everything cleanupTeam did, day-by-day instead of smashed
+    // together, so there's no remaining reason to offer it here.
     { field: 'memberCode', label: 'Member ID' },
   ],
   // A real request: "an admin name tag... logo, name, barcode, id number

@@ -229,25 +229,33 @@ async function backfillParentSetupCleanupMerge(db) {
   await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
 }
 
-// Genuine one-time backfill for an already-deployed database's EXISTING
-// 'parent' name_tag_templates row - a real bug report: a parent's printed
-// badge showed team/assignment info TWICE, in two different spots, one of
-// them overlapping other elements. Root cause: DEFAULT_LAYOUTS.parent used
-// to have an { id: 'team', field: 'cleanupTeam' } element (the flat "both
-// days smashed into one line" view) positioned at y:86 - it was dropped
-// from the default when mondaySetupCleanup/wednesdaySetupCleanup shipped
-// (see backfillParentSetupCleanupDays's own comment), but nothing ever
-// removed it from an ALREADY-SAVED row, so it kept sitting there at its
-// old position (which the newer memberCode/name elements have since grown
-// into) showing the exact same team membership the new per-day field
-// already shows, just in a stale, overlapping spot. Safe to remove
-// unconditionally wherever found: the design editor's own id generator
-// (name-tag-editor.js's newId) never produces a bare "team" id - anything
-// with exactly that id can only be this old default leftover, never
-// something an admin created themselves through the editor. cleanupTeam
-// itself is untouched as a FIELDS_BY_TYPE picker option (utils/
-// nameTagBadge.js) for anyone who deliberately wants to add it back with
-// a fresh id/position of their own choosing.
+// Genuine one-time (well, repeat-safe - see below) backfill for an
+// already-deployed database's EXISTING 'parent' name_tag_templates row -
+// a real bug report: a parent's printed badge showed stray, overlapping
+// fragments of team/assignment text bleeding onto the name area, even
+// though nothing looked wrong in the design editor's own preview. Root
+// cause: this originally only matched the OLD default's exact
+// { id: 'team', field: 'cleanupTeam' } shape, deliberately leaving alone
+// any cleanupTeam element with a different id on the theory that a
+// different id could only mean an admin had deliberately re-added it via
+// the "Add Element" picker (utils/nameTagBadge.js's FIELDS_BY_TYPE) and
+// wanted it there. That theory is what actually broke here: an admin HAD
+// re-added it that way at some point (get a normal auto-generated id, not
+// "team"), at a position that predates later layout changes (setupCleanup-
+// Days moving to the front of the badge, etc.) and now overlaps whatever
+// element currently occupies that spot - invisible in the single-badge
+// editor preview when a later element in paint order fully covers it
+// there, but peeking out from underneath on a real printed badge once
+// that covering element's own autofit shrinks smaller for a particular
+// member's actual (shorter) text. cleanupTeam's whole ROLE - showing a
+// parent's team info on their badge - is now what setupCleanupDays does
+// instead, day-by-day and deduplicated ("Monday - Team 1" / "Wednesday -
+// Team 2"), so there's no longer a legitimate reason for a cleanupTeam
+// element to exist on a parent name tag at all: this now removes EVERY
+// element bound to that field, any id, unconditionally, and cleanupTeam
+// is dropped from FIELDS_BY_TYPE.parent (below) so "Add Element" can't
+// reintroduce it. Runs on every boot (like every backfill here), so it
+// also cleans up any future save that somehow reintroduces one.
 async function backfillParentRemoveLegacyCleanupTeamElement(db) {
   const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'parent'").get();
   if (!row) return;
@@ -258,9 +266,9 @@ async function backfillParentRemoveLegacyCleanupTeamElement(db) {
     return;
   }
   if (!layout || !Array.isArray(layout.elements)) return;
-  if (!layout.elements.some((el) => el.id === 'team' && el.field === 'cleanupTeam')) return;
+  if (!layout.elements.some((el) => el.field === 'cleanupTeam')) return;
 
-  const elements = layout.elements.filter((el) => !(el.id === 'team' && el.field === 'cleanupTeam'));
+  const elements = layout.elements.filter((el) => el.field !== 'cleanupTeam');
 
   await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'parent'").run(JSON.stringify({ ...layout, elements }));
 }

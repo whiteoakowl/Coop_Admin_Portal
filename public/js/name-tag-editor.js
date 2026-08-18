@@ -58,7 +58,10 @@
     student: { name: 'Alex Student', gradeLevel: '5th Grade', allergies: 'Peanut allergy', memberCode: 'ID#012345', barcodeValue: '0123456789' },
     parent: {
       name: 'Jordan Parent',
-      cleanupTeam: 'Chairs & Tables, Snack Table',
+      // No cleanupTeam entry here anymore - it's no longer an "Add
+      // Element" option (see utils/nameTagBadge.js's FIELDS_BY_TYPE.parent
+      // and its own comment), so no parent template element can ever bind
+      // to it again.
       mondaySetupCleanup: 'Monday - Chairs & Tables',
       wednesdaySetupCleanup: 'Wednesday - Snack Table',
       setupCleanupDays: ['Monday - Chairs & Tables', 'Wednesday - Snack Table'],
