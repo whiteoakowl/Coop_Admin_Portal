@@ -36,14 +36,22 @@ async function setTeamLeader(teamId, leaderId) {
   await refreshBadgesForTeam(teamId);
 }
 
-// The team card's Edit popup - title/description/leader all saved
-// together in one Save action (see routes/admin-setup.js), unlike the
-// old inline auto-submitting leader select this replaced.
+// The team card's Edit popup - title/description/leader/meeting time+
+// location all saved together in one Save action (see routes/admin-
+// setup.js), unlike the old inline auto-submitting leader select this
+// replaced. A real request: "setup/cleanup team cards should have a
+// space for time to meet and meeting location" - meetingTime/
+// meetingLocation are free text (same shape as description), not a
+// structured time/date picker - a team's own meeting time is usually
+// just "before drop-off" or "9:00am" prose, not a value that needs to be
+// compared or sorted anywhere.
 async function updateTeam(teamId, fields) {
-  await db.prepare('UPDATE setup_teams SET title = ?, description = ?, leader_id = ? WHERE id = ?').run(
+  await db.prepare('UPDATE setup_teams SET title = ?, description = ?, leader_id = ?, meeting_time = ?, meeting_location = ? WHERE id = ?').run(
     fields.title,
     fields.description || null,
     fields.leaderId || null,
+    fields.meetingTime || null,
+    fields.meetingLocation || null,
     teamId
   );
   // Same badge-freshness reasoning as setTeamLeader above - a team rename
@@ -274,6 +282,14 @@ async function assignmentCardsForDate(day, date) {
     return {
       id: t.id,
       title: t.title,
+      // A real request: "the leader, time, location, all those details
+      // should show on the kiosk side when you click the setup/cleanup
+      // button" - t already carries these (teamsForDay's own leaderName
+      // join, plus setup_teams.meeting_time/meeting_location), just
+      // hadn't been passed through this card shape before.
+      leaderName: t.leaderName || null,
+      meetingTime: t.meeting_time || null,
+      meetingLocation: t.meeting_location || null,
       taskOptions: allOptions,
       unassignedTasks,
       members: membersWithOptions.map((m) => ({

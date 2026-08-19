@@ -105,3 +105,48 @@ test('POST /admin/setup/:day/teams/:teamId/edit still saves title/description/le
     assert.equal(row.description, 'New description');
   });
 });
+
+// A real request: "setup/cleanup team cards should have a space for time
+// to meet and meeting location."
+test('Setup/Cleanup team card: create/edit save meeting time and location, and the card shows them once set', async (t) => {
+  const { cookie } = await loginAsAdmin();
+  const page = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
+  const csrfMatch = /name="csrf-token" content="([^"]*)"/.exec(page.text);
+  const csrfToken = csrfMatch ? csrfMatch[1] : null;
+
+  await t.test('the Create New Team dialog offers meeting time/location fields', () => {
+    assert.match(page.text, /<input type="text" name="meetingTime" placeholder="Meeting time \(optional\)" \/>/);
+    assert.match(page.text, /<input type="text" name="meetingLocation" placeholder="Meeting location \(optional\)" \/>/);
+  });
+
+  await t.test('creating a team saves meeting time/location', async () => {
+    const res = await request(app)
+      .post('/admin/setup/monday/teams')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ title: 'Snack Table', meetingTime: '9:00am', meetingLocation: 'Front Lobby', _csrf: csrfToken });
+    assert.equal(res.status, 302);
+    const row = await db.prepare("SELECT meeting_time AS \"meetingTime\", meeting_location AS \"meetingLocation\" FROM setup_teams WHERE title = 'Snack Table'").get();
+    assert.equal(row.meetingTime, '9:00am');
+    assert.equal(row.meetingLocation, 'Front Lobby');
+  });
+
+  await t.test('the team card shows a disabled meeting time/location field, pre-filled', async () => {
+    const managePage = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
+    assert.match(managePage.text, /<input type="text" name="meetingTime" class="team-info-meeting-input" value="9:00am" placeholder="Meeting time" disabled \/>/);
+    assert.match(managePage.text, /<input type="text" name="meetingLocation" class="team-info-meeting-input" value="Front Lobby" placeholder="Meeting location" disabled \/>/);
+  });
+
+  await t.test('editing a team updates meeting time/location', async () => {
+    const team = await db.prepare("SELECT id FROM setup_teams WHERE title = 'Snack Table'").get();
+    const res = await request(app)
+      .post(`/admin/setup/monday/teams/${team.id}/edit`)
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ title: 'Snack Table', leaderId: '', meetingTime: '9:30am', meetingLocation: 'Side Room', _csrf: csrfToken });
+    assert.equal(res.status, 302);
+    const row = await db.prepare("SELECT meeting_time AS \"meetingTime\", meeting_location AS \"meetingLocation\" FROM setup_teams WHERE id = ?").get(team.id);
+    assert.equal(row.meetingTime, '9:30am');
+    assert.equal(row.meetingLocation, 'Side Room');
+  });
+});

@@ -35,6 +35,17 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
           <h3><%= team.title %></h3>
         </div>
+        <%# A real request: "the leader, time, location, all those details
+            should show on the kiosk side when you click the setup/cleanup
+            button" - a team without any of the three set just omits this
+            row entirely rather than showing empty placeholders. %>
+        <% if (team.leaderName || team.meetingTime || team.meetingLocation) { %>
+          <div class="floater-card-meta">
+            <% if (team.leaderName) { %><span class="floater-card-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= team.leaderName %></span><% } %>
+            <% if (team.meetingTime) { %><span class="floater-card-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= team.meetingTime %></span><% } %>
+            <% if (team.meetingLocation) { %><span class="floater-card-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= team.meetingLocation %></span><% } %>
+          </div>
+        <% } %>
         <table class="floater-card-table setup-assignment-table">
           <thead>
             <tr><th>Member</th><th>Task 1</th><th>Task 2</th></tr>

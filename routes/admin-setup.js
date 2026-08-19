@@ -67,10 +67,16 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
   const leaderId = parseInt(req.body.leaderId, 10) || null;
+  // A real request: "setup/cleanup team cards should have a space for
+  // time to meet and meeting location."
+  const meetingTime = (req.body.meetingTime || '').trim();
+  const meetingLocation = (req.body.meetingLocation || '').trim();
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  await db.prepare('INSERT INTO setup_teams (day, title, description, leader_id) VALUES (?, ?, ?, ?)').run(day, title, description || null, leaderId);
+  await db
+    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
 });
 
@@ -85,18 +91,20 @@ router.post('/setup/:day/teams/:teamId/leader', requireAdmin, requireDay, async 
 });
 
 // Team cards are view-only until Edit is clicked - title/description/
-// leader all save together from that one popup, replacing the old
-// inline-editable card.
+// leader/meeting time+location all save together from that one popup,
+// replacing the old inline-editable card.
 router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const teamId = parseInt(req.params.teamId, 10);
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
   const leaderId = parseInt(req.body.leaderId, 10) || null;
+  const meetingTime = (req.body.meetingTime || '').trim();
+  const meetingLocation = (req.body.meetingLocation || '').trim();
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  await updateTeam(teamId, { title, description, leaderId });
+  await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation });
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
 });
 

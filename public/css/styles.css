@@ -3639,6 +3639,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-card-orange .floater-card-header { background: var(--orange-bg); color: var(--orange); }
 .floater-card-purple .floater-card-header { background: var(--purple-soft); color: var(--purple); }
 
+/* A real request: "the leader, time, location, all those details should
+   show on the kiosk side when you click the setup/cleanup button" - a
+   thin row of icon+label chips under the card header, wrapping onto its
+   own line(s) on a narrow kiosk screen rather than overflowing. Whichever
+   of leader/meeting time/meeting location this team actually has - a
+   team with none of the three renders no row at all (see partials/setup-
+   assignment-cards.ejs's own guard). */
+.floater-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; padding: 0 0.75rem 0.6rem; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.floater-card-meta-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.floater-card-meta-item .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+
 /* Fixed layout + explicit column widths so a long floater name wraps
    onto a second line instead of overflowing the card's fixed grid-track
    width - .floater-card's overflow:hidden (for the rounded header
@@ -4130,16 +4141,36 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-info-title-input { font-size: 0.95rem; font-weight: 800; }
 .team-info-desc-input { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
-/* Once unfrozen, give the three fields just enough of a visual edge that
-   they read as editable, without losing the card's compact centered
-   look - same "legible, not washed-out" idea as .class-view-form's
-   disabled-field treatment, just inverted (undisabled gets the
-   highlight here, since disabled is this card's default resting state). */
+/* A real request: "setup/cleanup team cards should have a space for time
+   to meet and meeting location" - same row shape as .team-info-leader
+   above (icon + text), just for a free-text input instead of a leader
+   select. Blank (no value, view mode) collapses to nothing rather than
+   showing an empty icon+placeholder row - a team without a fixed time/
+   place yet shouldn't visually claim it has one. */
+.team-info-meeting { display: flex; align-items: center; justify-content: center; gap: 0.35rem; font-size: 0.76rem; color: var(--muted); font-weight: 600; max-width: 100%; }
+.team-info-meeting .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.team-info-meeting-input {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  padding: 0;
+  min-width: 0;
+}
+.team-info-meeting-input:placeholder-shown:disabled { display: none; }
+/* Once unfrozen, give the fields just enough of a visual edge that they
+   read as editable, without losing the card's compact centered look -
+   same "legible, not washed-out" idea as .class-view-form's disabled-
+   field treatment, just inverted (undisabled gets the highlight here,
+   since disabled is this card's default resting state). */
 .team-info-title-input:not(:disabled),
-.team-info-desc-input:not(:disabled) {
+.team-info-desc-input:not(:disabled),
+.team-info-meeting-input:not(:disabled) {
   border-bottom: 1px dashed var(--border);
   cursor: text;
 }
+.team-info-meeting-input:not(:disabled) { display: inline-block; }
 .team-info-leader:has(.team-info-leader-select:not(:disabled)) { color: var(--ink); }
 
 .team-members-card {
@@ -5205,6 +5236,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .volunteer-cell-input,
   .team-info-title-input,
   .team-info-desc-input,
+  .team-info-meeting-input,
   .team-info-leader-select {
     border: none !important;
     background: none !important;

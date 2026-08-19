@@ -52,7 +52,10 @@ test('GET /setup/:day', async (t) => {
   });
 
   await t.test('with a past date and a future date, shows the closest UPCOMING one - never a stale past date', async () => {
-    const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Kitchen Crew')").run();
+    const leader = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Leader', 'setup-public-pat', 'parent')").run();
+    const team = await db
+      .prepare("INSERT INTO setup_teams (day, title, leader_id, meeting_time, meeting_location) VALUES ('monday', 'Kitchen Crew', ?, '9:00am', 'Front Lobby')")
+      .run(leader.lastInsertRowid);
     const section = await db
       .prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Kitchen Tasks', ?, 0)")
       .run(team.lastInsertRowid);
@@ -75,5 +78,14 @@ test('GET /setup/:day', async (t) => {
     // enforces for the Archive view.
     assert.doesNotMatch(res.text, /floater-assign-btn/);
     assert.match(res.text, /No suggestion/);
+
+    // A real request: "the leader, time, location, all those details
+    // should show on the kiosk side when you click the setup/cleanup
+    // button" - this is the actual no-login kiosk route, so this is the
+    // one place that request is truly verified end to end.
+    assert.match(res.text, /class="floater-card-meta"/);
+    assert.match(res.text, /Pat Leader/);
+    assert.match(res.text, /9:00am/);
+    assert.match(res.text, /Front Lobby/);
   });
 });
