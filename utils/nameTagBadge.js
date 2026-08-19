@@ -199,6 +199,20 @@ const DEFAULT_LAYOUTS = {
   // student/parent/admin name tags already use for their own
   // longest-running fields (see public/js/badge-autofit.js). Task gets
   // the tallest box since it's reliably the longest-running text.
+  //
+  // A real follow-up request: the task/description field specifically
+  // should NOT shrink its font to stay on one line - "do not reduce the
+  // font size to keep it all on one line. keep the same font size and
+  // simply continue the tasks description on the next line below it."
+  // autoFitText is dropped just for this one element (day/team/leader
+  // keep it - short single-line fields still benefit from never
+  // overlapping the line below) - renderTextEl (public/js/name-tag-
+  // render-core.js) only forces the single-line nowrap+shrink treatment
+  // when autoFitText is set, so without it this falls back to plain
+  // overflow-wrap: break-word at its own fixed 14px, wrapping across
+  // however many lines it needs within its own already-generous 78px-tall
+  // box (deliberately sized as the tallest field here for exactly this
+  // kind of longer text) instead of shrinking to fit one line.
   setupCleanup: {
     background: '#ffffff',
     backgroundOpacity: 1,
@@ -206,7 +220,7 @@ const DEFAULT_LAYOUTS = {
       { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
       { id: 'team', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'leader', type: 'text', field: 'leaderLabel', x: 8, y: 58, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: false, align: 'center', valign: 'middle', autoFitText: true },
-      { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
       // barcodeValue is this task's own code (misc_badges.barcode, set by
       // utils/taskList.js's upsertTaskBadge) - lets a parent scan the
       // physical badge at checkout to confirm which task they completed

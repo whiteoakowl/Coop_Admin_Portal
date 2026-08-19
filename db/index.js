@@ -34,6 +34,7 @@ const {
   backfillNameTagLogo,
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
+  backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
@@ -101,6 +102,7 @@ db.ready = schemaReady
   .then(() => backfillNameTagLogo(db))
   .then(() => backfillNameTagAutoFit(db))
   .then(() => backfillMiscBadgeBarcode(db))
+  .then(() => backfillSetupCleanupTaskWraps(db))
   .then(() => backfillSetupCleanupBadgeLayout(db))
   .then(() => backfillScheduleCardAllergy(db))
   .then(() => backfillScheduleCardAutoFit(db))

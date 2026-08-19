@@ -308,6 +308,39 @@ async function backfillMiscBadgeBarcode(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// 'setupCleanup' misc_badge_templates row - a real follow-up request: "the
+// description of the tasks, do not reduce the font size to keep it all on
+// one line. keep the same font size and simply continue the tasks
+// description on the next line below it." DEFAULT_LAYOUTS.setupCleanup's
+// own 'task'/description element no longer sets autoFitText (see its own
+// comment) so a FRESH install already wraps instead of shrinking, but an
+// already-saved template (including a customized one) keeps whatever
+// autoFitText value it was saved with - this flips it off wherever found,
+// leaving every other customization (position, size, color, font, the
+// day/team/leader elements' own autoFitText) untouched.
+async function backfillSetupCleanupTaskWraps(db) {
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (!layout.elements.some((el) => el.field === 'description' && el.autoFitText)) return;
+
+  const elements = layout.elements.map((el) => {
+    if (el.field !== 'description' || !el.autoFitText) return el;
+    const updated = { ...el };
+    delete updated.autoFitText;
+    return updated;
+  });
+
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // misc_badge_templates 'setupCleanup' row - a second, later redesign of
 // the same badge. A real bug report, with a screenshot: task text
 // overlapping the team name and badge number on the printed card. Fixed
@@ -611,6 +644,7 @@ module.exports = {
   backfillNameTagLogo,
   backfillNameTagAutoFit,
   backfillMiscBadgeBarcode,
+  backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,

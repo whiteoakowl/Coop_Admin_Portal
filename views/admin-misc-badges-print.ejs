@@ -30,6 +30,21 @@
       </div>
     <% }); %>
   </main>
+  <%# A real bug report: "the setup/cleanup cards when you click to print
+      them it does not show barcodes. you can see the barcode on the
+      design page, but not printing." Root cause: renderBarcodeEl (public/
+      js/name-tag-render-core.js) only ever emits an EMPTY <svg> stamped
+      with data-barcode-value - the actual bars are drawn client-side by
+      name-tag-render.js calling JsBarcode against every .badge-el-barcode
+      element, which needs the JsBarcode library itself (vendor/
+      jsbarcode.min.js) loaded first. Every other badge/name-tag print page
+      in this app already loads both (see admin-name-tag-print.ejs, admin-
+      name-tag-both-print.ejs, admin-cards-duplex-print.ejs, admin-member-
+      cards-print.ejs) - this page was the one left out, so its barcode
+      svgs sat empty while the Design tab's own preview (which does load
+      them) rendered fine. %>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
   <script src="/js/badge-autofit.js"></script>
   <script src="/js/print-auto.js"></script>
 </body>

@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const { createTestDb } = require('./pgTestDb');
 const {
   backfillMiscBadgeBarcode,
+  backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
@@ -92,6 +93,62 @@ test('backfillMiscBadgeBarcode still fixes a setupCleanup template stored in the
   const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
   const layout = JSON.parse(row.layout_json);
   assert.ok(layout.elements.some((el) => el.type === 'barcode'), 'a barcode element should have been added even from the legacy bare-array shape');
+});
+
+// A real follow-up request: "the description of the tasks, do not reduce
+// the font size to keep it all on one line. keep the same font size and
+// simply continue the tasks description on the next line below it."
+test('backfillSetupCleanupTaskWraps drops autoFitText from an already-saved template\'s task element, leaving everything else untouched', async () => {
+  const db = await createTestDb();
+  const withAutoFit = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'team', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'leader', type: 'text', field: 'leaderLabel', x: 8, y: 58, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true },
+      { id: 'barcode', type: 'barcode', x: 68, y: 156, width: 200, height: 55 },
+    ],
+  };
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(withAutoFit));
+
+  await backfillSetupCleanupTaskWraps(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  const layout = JSON.parse(row.layout_json);
+  const taskEl = layout.elements.find((el) => el.id === 'task');
+  assert.ok(!('autoFitText' in taskEl), 'the task element should no longer have autoFitText at all');
+  const { autoFitText: taskWasAutoFit, ...taskWithoutAutoFit } = withAutoFit.elements[3];
+  assert.deepEqual(taskEl, taskWithoutAutoFit, 'every other property of the task element should be untouched');
+  assert.ok(taskWasAutoFit, 'sanity check: the original fixture really did have autoFitText');
+  // day/team/leader/barcode keep whatever they already had.
+  assert.deepEqual(layout.elements.filter((el) => el.id !== 'task'), withAutoFit.elements.filter((el) => el.id !== 'task'));
+});
+
+test('backfillSetupCleanupTaskWraps is a no-op for a fresh install (task already has no autoFitText)', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+
+  await backfillSetupCleanupTaskWraps(db);
+
+  const after = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.equal(after.layout_json, before.layout_json);
+});
+
+test('backfillSetupCleanupTaskWraps only touches an element bound to field "description", not one that merely shares the "task" id', async () => {
+  const db = await createTestDb();
+  const custom = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [{ id: 'task', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true }],
+  };
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify(custom));
+
+  await backfillSetupCleanupTaskWraps(db);
+
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  assert.deepEqual(JSON.parse(row.layout_json), custom, 'an element bound to a different field should be untouched even if it happens to share the "task" id');
 });
 
 test('backfillScheduleCardAllergy removes a leftover "name" field element and adds the current default\'s allergy element', async () => {
