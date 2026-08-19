@@ -31,7 +31,7 @@
       <tr><td colspan="6" class="roster-empty">No members yet.</td></tr>
     <% } %>
     <% (skipRows ? [] : members).forEach(function(m) { %>
-      <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-name="<%= m.name.toLowerCase() %>">
+      <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-primary="<%= m.is_primary_parent ? '1' : '0' %>" data-name="<%= m.name.toLowerCase() %>">
         <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
         <td class="members-col-photo">
           <% if (m.photo_path) { %>

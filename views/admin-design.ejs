@@ -271,9 +271,15 @@
         <div id="print-name-tags-section" hidden>
           <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
             <div class="name-tag-bulk-filter">
+              <%# A real request: "we usually only need to print primary
+                  parent" - Primary Parents Only defaults selected here (the
+                  common case), with Parents Only (every parent, primary or
+                  not) still available for the rare time a full family print
+                  is actually wanted. %>
               <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
+                <option value="primaryParent" selected>Primary Parents Only</option>
                 <option value="parent">Parents Only</option>
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>

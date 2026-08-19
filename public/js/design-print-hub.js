@@ -113,17 +113,28 @@
     if (!bulkList) return;
     const filterSelect = document.getElementById(filterSelectId);
     if (filterSelect) {
-      filterSelect.addEventListener('change', () => {
+      const applyFilter = () => {
         const filter = filterSelect.value;
         bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
-          // "Teachers" is its own dataset (data-teacher) rather than a
-          // fourth member_type value - a teacher is still a parent-type
-          // member underneath (utils/members.js's teacherMemberIds), so
-          // it has to layer on top of, not replace, the type filter.
-          const matches = filter === 'all' || (filter === 'teacher' ? row.dataset.teacher === '1' : row.dataset.type === filter);
+          // "Teachers" and "Primary Parents" are their own dataset
+          // (data-teacher/data-primary) rather than their own member_type
+          // value - a teacher/primary parent is still a parent-type member
+          // underneath (utils/members.js's teacherMemberIds and members.
+          // is_primary_parent), so each has to layer on top of, not
+          // replace, the type filter.
+          const matches =
+            filter === 'all' ||
+            (filter === 'teacher' ? row.dataset.teacher === '1' : filter === 'primaryParent' ? row.dataset.primary === '1' : row.dataset.type === filter);
           row.style.display = matches ? '' : 'none';
         });
-      });
+      };
+      filterSelect.addEventListener('change', applyFilter);
+      // A real request: "we usually only need to print primary parent" -
+      // the Name Tags filter now defaults to Primary Parents Only (see
+      // admin-design.ejs), so the list has to start out already filtered
+      // to match what the select visibly shows, not wait for a 'change'
+      // event that a page load never fires on its own.
+      applyFilter();
     }
     const selectAllCheckbox = document.getElementById(selectAllId);
     if (selectAllCheckbox) {
