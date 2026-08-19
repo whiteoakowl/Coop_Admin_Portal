@@ -187,20 +187,15 @@ const DEFAULT_LAYOUTS = {
       { id: 'name', type: 'text', field: 'name', x: 8, y: 68, width: 320, height: 40, fontSize: 22, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       // A real bug report, live screenshot: a longer single position
       // ("Community Service Coordinator", "Parent Support Coordinator")
-      // wrapped onto 2-3 lines and got clipped at the box's own top edge -
-      // autoFitText alone forces a field onto ONE line (nowrap + shrink,
-      // see name-tag-render-core.js's renderTextEl), which is right for
-      // Name but wrong here: "the admin positions should never be more
-      // than two stacked text lines" is an explicit request for real wrap,
-      // not an ever-shrinking single line. autoFitWrap opts this field
-      // into that different mode - real CSS wrap plus real-browser
-      // height-correction (public/js/badge-autofit.js), the same
-      // mechanism already proven for 2+ actual stacked positions, just
-      // now also covering ONE long position's own internal wrap. Height
-      // bumped a little (36 -> 40) so a typical 2-line wrap fits at close
-      // to its full configured font size instead of needing to shrink
-      // right away.
-      { id: 'position', type: 'text', field: 'adminPosition', x: 8, y: 110, width: 320, height: 40, fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle', autoFitText: true, autoFitWrap: true },
+      // wrapped onto 2-3 lines and got clipped at the box's own top edge.
+      // Fixed at the rendering level, not with a flag here - adminPosition
+      // is a BOUND field, so name-tag-render-core.js's renderTextEl always
+      // gives it real wrap plus real-browser height-correction (public/js/
+      // badge-autofit.js) no matter what this element's own saved
+      // autoFitText/autoFitWrap say. Height bumped a little (36 -> 40) so
+      // a typical 2-line wrap fits at close to its full configured font
+      // size instead of needing to shrink right away.
+      { id: 'position', type: 'text', field: 'adminPosition', x: 8, y: 110, width: 320, height: 40, fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
       { id: 'barcode', type: 'barcode', x: 68, y: 154, width: 200, height: 55 },
     ],
   },

@@ -203,23 +203,53 @@
     // otherwise-avoidable clip.
     var style = elementBaseStyle(el) + ' display:flex; font-family:' + fontFamily + ';' +
       (multiline ? ' flex-direction:column; justify-content:' + valign + '; gap:4px;' : ' align-items:' + valign + ';');
-    // Auto-shrink is opt-in per element (autoFitText) - a name/phone
-    // field wants a single balanced line that always fits the template's
-    // box; a longer free-text field (Class Description, etc.) still
-    // wraps normally instead of shrinking down to near-nothing.
-    var autoFit = !!el.autoFitText;
-    // autoFitWrap is the third mode, opt-in on top of autoFitText: a real
-    // bug report, live screenshot - a long single Admin Position
-    // ("Community Service Coordinator") wrapped onto 2-3 lines and got
-    // clipped at the box's own top edge, because plain autoFitText forces
-    // a field onto ONE ever-shrinking line (right for Name, wrong here -
+    // A real request: "can we not update the template so these features
+    // of wrap text and shrink to fit will always work no matter what we
+    // create?" - autoFitText/autoFitWrap used to be per-element flags
+    // that had to be explicitly set (by hand, or by a one-time DB
+    // backfill) on every saved template - which is exactly why this kept
+    // recurring: a template saved before a flag existed, or a field
+    // nobody remembered to flag, silently clipped instead of shrinking.
+    // Every BOUND field (anything except the two exceptions below - see
+    // FIELDS_BY_TYPE in utils/nameTagBadge.js for the full list per badge
+    // type: name, adminPosition, gradeLevel, allergies, setupCleanupDays,
+    // memberCode, ...) now always gets autofit+wrap, derived from what the
+    // field IS rather than from data that can go stale - true for any
+    // current field, and for any future one added to FIELDS_BY_TYPE with
+    // zero extra work. Two fields keep the old opt-in toggle (see name-
+    // tag-editor.js's "Auto-fit text" checkbox, which now only shows for
+    // these) instead of being forced on:
+    //   - 'custom' text - an admin's own typed label/caption on the
+    //     canvas, not real member/badge data whose length varies member to
+    //     member, so a deliberately fixed size is a genuinely different
+    //     case from a data field.
+    //   - 'description' (the Setup/Cleanup badge's Task text, and the
+    //     Custom badge's own Description) - a real, EXPLICIT prior
+    //     request: "do not reduce the font size to keep it all on one
+    //     line... simply continue the task description on the next line
+    //     below it" (test/routes-admin-misc-badges-print.test.js). Unlike
+    //     every other field here, this one is genuinely long-form prose
+    //     where shrinking to force a fit can land on illegibly tiny text -
+    //     the deliberate choice for THIS field is "wrap at a fixed,
+    //     readable size, let the box grow instead" over "always fits, at
+    //     whatever size that takes."
+    var isBoundField = el.field !== 'custom' && el.field !== 'description';
+    var autoFit = isBoundField || !!el.autoFitText;
+    // autoFitWrap: lets the line actually wrap instead of forcing
+    // nowrap+ellipsis - the fix for a real bug report, live screenshot: a
+    // long single Admin Position ("Community Service Coordinator")
+    // wrapped onto 2-3 lines and got clipped at the box's own top edge,
+    // because plain autoFitText alone forces a field onto ONE
+    // ever-shrinking line (right for Name, wrong for a position title -
     // "the admin positions should never be more than two stacked text
-    // lines" is a request for real wrap, not endless shrinking). Lets the
-    // line actually wrap instead of forcing nowrap+ellipsis; public/js/
-    // badge-autofit.js's real-browser height correction (already proven
-    // for 2+ actual stacked positions) is what keeps however many lines
-    // it wraps to inside the box, shrinking the font until they fit.
-    var autoFitWrap = autoFit && !!el.autoFitWrap;
+    // lines" is a request for real wrap, not endless shrinking). Always on
+    // for a bound field for the same "no matter what we create" reason
+    // above; a 'custom' caption with autoFitText on can still opt into it
+    // via its own el.autoFitWrap. public/js/badge-autofit.js's real-
+    // browser height correction (already proven for 2+ actual stacked
+    // positions) is what keeps however many lines any of this wraps to
+    // inside the box, shrinking the font until they fit.
+    var autoFitWrap = isBoundField || (autoFit && !!el.autoFitWrap);
     // autoFitText's whole point (outside of autoFitWrap) is "stay on one
     // line, never clip" - a wrapped second line would just get cut off by
     // this element's own overflow:hidden (see public/css/styles.css's

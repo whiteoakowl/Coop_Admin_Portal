@@ -43,7 +43,6 @@ const {
   backfillParentSetupCleanupMerge,
   backfillParentRemoveLegacyCleanupTeamElement,
   backfillNameTagStackedSizing,
-  backfillAdminPositionAutoFitWrap,
   backfillTaskItemBarcodes,
 } = require('./bootstrapPg');
 
@@ -116,7 +115,6 @@ db.ready = schemaReady
   // element it removes predates both of them.
   .then(() => backfillParentRemoveLegacyCleanupTeamElement(db))
   .then(() => backfillNameTagStackedSizing(db))
-  .then(() => backfillAdminPositionAutoFitWrap(db))
   .then(() => backfillTaskItemBarcodes(db))
   // Must run AFTER backfillTaskItemBarcodes - it reads each task item's
   // OWN barcode column back onto its badge row, so any item that didn't

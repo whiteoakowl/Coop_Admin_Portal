@@ -716,19 +716,25 @@
     });
     propsPanel.appendChild(propRow('Font size', fontSize));
 
-    // Auto-shrinks this field's font size (down to a floor) whenever its
-    // actual text is too long to fit on one line at the size above - a
-    // long name doesn't get to overflow/wrap and throw off the layout.
-    const autoFit = document.createElement('input');
-    autoFit.type = 'checkbox';
-    autoFit.checked = !!el.autoFitText;
-    autoFit.addEventListener('change', () => {
-      el.autoFitText = autoFit.checked;
-      renderCanvas();
-      markUnsaved();
-      commitHistory();
-    });
-    propsPanel.appendChild(propRow('Auto-fit text', autoFit));
+    // A real request: "can we not update the template so these features
+    // of wrap text and shrink to fit will always work no matter what we
+    // create?" - every field except 'custom'/'description' now always
+    // shrinks/wraps to fit regardless of this flag (see name-tag-render-
+    // core.js's renderTextEl for both exceptions' own reasoning), so
+    // showing this checkbox for one of those would be misleading - it'd
+    // look toggleable but do nothing.
+    if (el.field === 'custom' || el.field === 'description') {
+      const autoFit = document.createElement('input');
+      autoFit.type = 'checkbox';
+      autoFit.checked = !!el.autoFitText;
+      autoFit.addEventListener('change', () => {
+        el.autoFitText = autoFit.checked;
+        renderCanvas();
+        markUnsaved();
+        commitHistory();
+      });
+      propsPanel.appendChild(propRow('Auto-fit text', autoFit));
+    }
 
     const color = document.createElement('input');
     color.type = 'color';
