@@ -82,53 +82,44 @@
     });
   }
 
-  // Schedule Cards list: name search + select-all (mirrors public/js/schedule.js).
-  const scheduleList = document.getElementById('schedule-print-list');
-  if (scheduleList) {
-    const searchInput = document.getElementById('schedule-print-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => {
-        const q = searchInput.value.trim().toLowerCase();
-        scheduleList.querySelectorAll('.print-picker-row').forEach((row) => {
-          row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none';
-        });
-      });
-    }
-    const scheduleSelectAll = document.getElementById('schedule-print-select-all-checkbox');
-    if (scheduleSelectAll) {
-      scheduleSelectAll.addEventListener('change', () => {
-        scheduleList.querySelectorAll('.print-picker-row').forEach((row) => {
-          if (row.style.display !== 'none') row.querySelector('input[type="checkbox"]').checked = scheduleSelectAll.checked;
-        });
-      });
-    }
-  }
-
-  // Member-type-filterable checkbox lists (Name Tags, Barcodes Only): type
-  // filter + select-all/select-none, mirrors the bulk print list wiring in
-  // name-tag-editor.js. Shared across both panels since they're the same
-  // member-picker-list markup with different id prefixes.
-  function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId) {
+  // Member-type-filterable checkbox lists (Name Tags, Cards Both/Duplex,
+  // Barcodes, Barcode Labels, and now Schedule Cards): type filter +
+  // optional name search + select-all/select-none, mirrors the bulk print
+  // list wiring in name-tag-editor.js. Shared across every panel since
+  // they're the same member-picker-list markup with different id
+  // prefixes - searchInputId is only passed for Schedule Cards (the one
+  // panel that had a search box before it ever got a type filter; a real
+  // request - "separate primary parent and parent in the dropdown menu of
+  // choices for printing any name tag, schedule card, or barcode" - is
+  // what gave it one), everyone else passes nothing and just gets type
+  // filtering.
+  function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId, searchInputId) {
     const bulkList = document.getElementById(listId);
     if (!bulkList) return;
     const filterSelect = document.getElementById(filterSelectId);
-    if (filterSelect) {
+    const searchInput = searchInputId ? document.getElementById(searchInputId) : null;
+    if (filterSelect || searchInput) {
       const applyFilter = () => {
-        const filter = filterSelect.value;
+        const filter = filterSelect ? filterSelect.value : 'all';
+        const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
         bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
           // "Teachers" and "Primary Parents" are their own dataset
           // (data-teacher/data-primary) rather than their own member_type
           // value - a teacher/primary parent is still a parent-type member
           // underneath (utils/members.js's teacherMemberIds and members.
           // is_primary_parent), so each has to layer on top of, not
-          // replace, the type filter.
-          const matches =
+          // replace, the type filter - and both layer on top of the name
+          // search the same way, a row only shows once it clears every
+          // active filter at once.
+          const typeMatches =
             filter === 'all' ||
             (filter === 'teacher' ? row.dataset.teacher === '1' : filter === 'primaryParent' ? row.dataset.primary === '1' : row.dataset.type === filter);
-          row.style.display = matches ? '' : 'none';
+          const searchMatches = !q || row.dataset.name.includes(q);
+          row.style.display = typeMatches && searchMatches ? '' : 'none';
         });
       };
-      filterSelect.addEventListener('change', applyFilter);
+      if (filterSelect) filterSelect.addEventListener('change', applyFilter);
+      if (searchInput) searchInput.addEventListener('input', applyFilter);
       // A real request: "we usually only need to print primary parent" -
       // the Name Tags filter now defaults to Primary Parents Only (see
       // admin-design.ejs), so the list has to start out already filtered
@@ -158,6 +149,7 @@
     }
   }
 
+  wireBulkMemberList('schedule-print-list', 'schedule-print-filter-select', 'schedule-print-select-all-checkbox', null, 'schedule-print-search-input');
   wireBulkMemberList('name-tag-bulk-list', 'name-tag-bulk-filter-select', 'name-tag-select-all-checkbox', 'name-tag-select-none-checkbox');
   wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
   wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');

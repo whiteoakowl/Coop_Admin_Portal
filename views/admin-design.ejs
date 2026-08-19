@@ -249,6 +249,22 @@
           <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form">
             <div class="roster-toolbar no-print">
               <div class="schedule-filters">
+                <%# A real request: "separate primary parent and parent in
+                    the dropdown menu of choices for printing any name tag,
+                    schedule card, or barcode" - this is the one member
+                    picker list that never had a type filter at all (search
+                    was the only narrowing tool), so it gets the same select
+                    every other bulk print panel already has, combined with
+                    its own existing search box (see design-print-hub.js's
+                    wireBulkMemberList). %>
+                <select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">
+                  <option value="all">All</option>
+                  <option value="student">Students Only</option>
+                  <option value="primaryParent">Primary Parents Only</option>
+                  <option value="parent">Parents Only</option>
+                  <option value="admin">Admins Only</option>
+                  <option value="teacher">Teachers Only</option>
+                </select>
                 <div class="category-filter schedule-search">
                   <label for="schedule-print-search-input">Search</label>
                   <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
@@ -307,6 +323,7 @@
               <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
+                <option value="primaryParent">Primary Parents Only</option>
                 <option value="parent">Parents Only</option>
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
@@ -334,6 +351,7 @@
               <select class="name-tag-bulk-filter-select" id="cards-duplex-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
+                <option value="primaryParent">Primary Parents Only</option>
                 <option value="parent">Parents Only</option>
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
@@ -360,6 +378,7 @@
               <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
+                <option value="primaryParent">Primary Parents Only</option>
                 <option value="parent">Parents Only</option>
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
@@ -387,6 +406,7 @@
               <select class="name-tag-bulk-filter-select" id="barcode-labels-bulk-filter-select">
                 <option value="all">All</option>
                 <option value="student">Students Only</option>
+                <option value="primaryParent">Primary Parents Only</option>
                 <option value="parent">Parents Only</option>
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>

@@ -49,6 +49,24 @@ test('Design/Print hub print tab marks primary parents with data-primary, and th
   const secondaryRow = new RegExp(`data-type="parent" data-teacher="0" data-primary="0"[^>]*data-name="sam secondary"`);
   assert.match(res.text, primaryRow, 'a primary parent gets data-primary="1"');
   assert.match(res.text, secondaryRow, 'a non-primary parent gets data-primary="0"');
-  assert.match(res.text, /<option value="primaryParent" selected>Primary Parents Only<\/option>/, 'Primary Parents Only should be the default selection');
+  assert.match(res.text, /<option value="primaryParent" selected>Primary Parents Only<\/option>/, 'Primary Parents Only should be the default selection on Name Tags');
   assert.match(res.text, /<option value="parent">Parents Only<\/option>/, 'Parents Only (every parent) should still be offered');
+});
+
+test('Design/Print hub offers Primary Parents Only on every member-based print panel, not just Name Tags', async () => {
+  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+  const cookie = loginRes.headers['set-cookie'];
+
+  const res = await request(app).get('/admin/design?tab=print').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+
+  // A real request: "did you finish separating primary parent and parent
+  // in the dropdown menu of choices for printing any name tag, schedule
+  // card, or barcode?" - Cards Both, Cards Duplex, Barcodes Only, and
+  // Barcode Mailing Labels all had a type filter already (just no primary-
+  // parent option); Schedule Cards had no type filter at all (search only)
+  // until now.
+  const primaryParentOptionCount = (res.text.match(/<option value="primaryParent"[^>]*>Primary Parents Only<\/option>/g) || []).length;
+  assert.equal(primaryParentOptionCount, 6, 'Schedule Cards, Name Tags, Cards Both, Cards Duplex, Barcodes Only, and Barcode Labels should each offer it');
+  assert.match(res.text, /<select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">/, 'Schedule Cards should now have its own type filter select');
 });
