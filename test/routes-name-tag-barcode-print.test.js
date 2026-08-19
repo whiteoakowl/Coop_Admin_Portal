@@ -12,10 +12,17 @@
 // barcode itself with a fixed bar width instead of using the shared
 // public/js/name-tag-render.js renderer (which is exactly right for the
 // name-tag designer's manually-sized elements, but wrong for a sheet that
-// wants every bar the same thickness) - then triggers window.print()
-// itself once both are done, since this page intentionally skips the
-// generic public/js/print-auto.js (a plain 'load'-based auto-print can't
-// guarantee it fires after rendering/shrinking have actually finished).
+// wants every bar the same thickness). Nothing here calls window.print()
+// itself (the page just waits for the visible Print button, same as every
+// other print-preview page) - see that script's own comment.
+//
+// public/js/print-auto.js IS included here (a real bug report, reproduced
+// from a mobile screenshot: this page's .badge-sheet-page sheet bled off
+// the edge of a phone-width screen) - it only shrinks the sheet to fit the
+// on-screen viewport now, on load/resize, never calling window.print()
+// itself, so it doesn't reintroduce the old "fires before rendering has
+// actually finished" auto-print timing bug this page's own font-ready-
+// gated shrink logic is written around.
 // This suite locks in that markup contract; the actual rendered
 // bar-width/shrink behavior was verified live via Playwright (real DOM
 // layout, not something a jsdom-free route test can meaningfully assert
@@ -68,8 +75,8 @@ test('barcode-only print sheet loads the shrink-to-fit script, not the generic a
     assert.match(res.text, /<script src="\/js\/barcode-print-shrink-name\.js">/);
   });
 
-  await t.test('the generic sitewide print-auto.js and shared name-tag-render.js are deliberately not included here', () => {
-    assert.doesNotMatch(res.text, /<script src="\/js\/print-auto\.js">/);
+  await t.test('print-auto.js (mobile viewport shrink-to-fit) is included; the shared name-tag-render.js is deliberately not', () => {
+    assert.match(res.text, /<script src="\/js\/print-auto\.js">/);
     assert.doesNotMatch(res.text, /<script src="\/js\/name-tag-render\.js">/);
   });
 

@@ -3,6 +3,7 @@
 // needs the constants at startup to seed default templates.
 const db = require('../db');
 const { DEFAULT_LAYOUTS } = require('./nameTagBadge');
+const { adminPositionTitlesForMember, adminPositionTitlesForMembers } = require('./adminPositions');
 
 // Every setup_team a parent belongs to, in { day, title } shape - the
 // single source both cleanupTeamsForParent's flat "both days" list and
@@ -129,29 +130,20 @@ function memberCodeLabel(member) {
   return member.member_code ? `ID#${member.member_code}` : '';
 }
 
-// An admin member's admin_position_id is just a foreign key - the badge
-// needs the position's own title text (utils/adminPositions.js manages the
-// Settings-side list it points at). Optional (a real request: "Add an
-// optional dropdown menu"), so no position selected is simply a blank
-// field, same as every other optional badge field in this file.
-async function adminPositionTitle(adminPositionId) {
-  if (!adminPositionId) return '';
-  const row = await db.prepare('SELECT title FROM admin_positions WHERE id = ?').get(adminPositionId);
-  return row ? row.title : '';
-}
-
-// Batch version for badgeDataForMembers below - one query for every admin
-// member's position instead of one per member, the same N+1 shape
-// cleanupTeamRowsForParents already avoids for parents.
-async function adminPositionTitlesByIds(ids) {
-  const uniqueIds = [...new Set(ids.filter((id) => id != null))];
-  if (uniqueIds.length === 0) return {};
-  const placeholders = uniqueIds.map(() => '?').join(',');
-  const rows = await db.prepare(`SELECT id, title FROM admin_positions WHERE id IN (${placeholders})`).all(...uniqueIds);
-  const byId = {};
-  for (const r of rows) byId[r.id] = r.title;
-  return byId;
-}
+// A real follow-up request: "ability to add unlimited admin positions to
+// a member profile ... if a member has two permission titles for their
+// name tag that they are stacked on top of each other." adminPosition
+// now hands back an ARRAY of every position title a member holds
+// (utils/adminPositions.js's adminPositionTitlesForMember(s), backed by
+// the member_admin_positions join table), the same "array means stacked
+// lines" convention setupCleanupDays/splitNameLines/gradeLevelLabel
+// already use (see public/js/name-tag-render-core.js's textLines) -
+// renderTextEl stacks them top-to-bottom in the one bound element,
+// individually shrunk to fit by public/js/badge-autofit.js exactly like
+// those other multi-line fields, no separate rendering path needed. Zero
+// positions selected is an empty array (renders as one blank line, same
+// "optional field, nothing selected" convention every other badge field
+// here already uses).
 
 // The field values a badge template can place on a member's tag.
 async function badgeDataForMember(member) {
@@ -172,7 +164,7 @@ async function badgeDataForMember(member) {
   if (member.member_type === 'admin') {
     return {
       name: splitNameLines(member.name),
-      adminPosition: await adminPositionTitle(member.admin_position_id),
+      adminPosition: await adminPositionTitlesForMember(member.id),
       memberCode,
       barcodeValue: member.barcode,
     };
@@ -196,8 +188,8 @@ async function badgeDataForMember(member) {
 async function badgeDataForMembers(members) {
   const parentIds = members.filter((m) => m.member_type === 'parent').map((m) => m.id);
   const teamRowsByParent = await cleanupTeamRowsForParents(parentIds);
-  const adminIds = members.filter((m) => m.member_type === 'admin').map((m) => m.admin_position_id);
-  const positionTitleById = await adminPositionTitlesByIds(adminIds);
+  const adminIds = members.filter((m) => m.member_type === 'admin').map((m) => m.id);
+  const positionTitlesByMember = await adminPositionTitlesForMembers(adminIds);
   const result = {};
   for (const member of members) {
     const memberCode = memberCodeLabel(member);
@@ -213,7 +205,7 @@ async function badgeDataForMembers(members) {
     } else if (member.member_type === 'admin') {
       result[member.id] = {
         name: splitNameLines(member.name),
-        adminPosition: positionTitleById[member.admin_position_id] || '',
+        adminPosition: positionTitlesByMember[member.id] || [],
         memberCode,
         barcodeValue: member.barcode,
       };

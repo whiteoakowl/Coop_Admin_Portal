@@ -24,7 +24,7 @@ const app = require('../server');
 const db = require('../db');
 const { DEFAULT_LAYOUTS, FIELDS_BY_TYPE } = require('../utils/nameTagBadge');
 const { badgeDataForMember, badgeDataForMembers } = require('../utils/nameTagData');
-const { addAdminPosition, listAdminPositions } = require('../utils/adminPositions');
+const { addAdminPosition, listAdminPositions, syncMemberAdminPositions } = require('../utils/adminPositions');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -70,54 +70,73 @@ test('badgeDataForMember/badgeDataForMembers: admin member gets name/adminPositi
   await db.ready;
   const positionId = await addAdminPosition('Vice President');
   const adminId = (
-    await db
-      .prepare("INSERT INTO members (name, barcode, member_code, member_type, admin_position_id) VALUES ('Sam Admin', '000333', '000333', 'admin', ?)")
-      .run(positionId)
+    await db.prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('Sam Admin', '000333', '000333', 'admin')").run()
   ).lastInsertRowid;
+  await syncMemberAdminPositions(adminId, [positionId]);
   const admin = await db.prepare('SELECT * FROM members WHERE id = ?').get(adminId);
 
   const single = await badgeDataForMember(admin);
   assert.deepEqual(single.name, ['Sam', 'Admin']);
-  assert.equal(single.adminPosition, 'Vice President');
+  // A real request: "ability to add unlimited admin positions to a member
+  // profile" - adminPosition is now always an array (possibly more than
+  // one title), stacked as multiple lines by the same array-value ->
+  // multiline convention public/js/name-tag-render-core.js's textLines
+  // already uses for setupCleanupDays/splitNameLines/gradeLevelLabel.
+  assert.deepEqual(single.adminPosition, ['Vice President']);
   assert.equal(single.memberCode, 'ID#000333');
   assert.equal(single.barcodeValue, '000333');
 
   const batch = await badgeDataForMembers([admin]);
-  assert.equal(batch[adminId].adminPosition, 'Vice President');
+  assert.deepEqual(batch[adminId].adminPosition, ['Vice President']);
 
-  // No position selected -> blank, not an error.
+  // Two positions -> both titles, in the Settings-managed list's own
+  // order, ready to render as two stacked lines.
+  const presidentId = await addAdminPosition('President');
+  await syncMemberAdminPositions(adminId, [positionId, presidentId]);
+  const adminTwo = await db.prepare('SELECT * FROM members WHERE id = ?').get(adminId);
+  assert.deepEqual((await badgeDataForMember(adminTwo)).adminPosition, ['Vice President', 'President']);
+
+  // No position selected -> empty array, not an error.
   const bareId = (
     await db.prepare("INSERT INTO members (name, barcode, member_code, member_type) VALUES ('No Position Admin', '000334', '000334', 'admin')").run()
   ).lastInsertRowid;
   const bare = await db.prepare('SELECT * FROM members WHERE id = ?').get(bareId);
-  assert.equal((await badgeDataForMember(bare)).adminPosition, '');
+  assert.deepEqual((await badgeDataForMember(bare)).adminPosition, []);
 });
 
-test('Member form: creating an Admin member with a position, and the position dropdown offers Settings-managed positions', async () => {
+test('Member form: creating an Admin member with positions, and the position picker offers Settings-managed positions', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   await addAdminPosition('President');
+  await addAdminPosition('Treasurer');
   const positions = await listAdminPositions();
   const presidentId = positions.find((p) => p.title === 'President').id;
+  const treasurerId = positions.find((p) => p.title === 'Treasurer').id;
 
   const newPage = await request(app).get('/admin/members/new').set('Cookie', cookie);
   assert.equal(newPage.status, 200);
   assert.match(newPage.text, /value="admin"/, 'expected an Admin option in the member type toggle');
-  assert.match(newPage.text, /President/, 'expected the Settings-managed position in the dropdown');
+  assert.match(newPage.text, /President/, 'expected the Settings-managed position in the picker');
 
+  // A real request: "ability to add unlimited admin positions to a member
+  // profile" - adminPositionIds is a checkbox multi-select now (see
+  // views/partials/member-form-fields.ejs's Admin Positions box), not the
+  // old single <select name="adminPositionId">.
   const createRes = await request(app)
     .post('/admin/members/new')
     .set('Cookie', cookie)
     .type('form')
-    .send({ name: 'Pat President', memberType: 'admin', adminPositionId: String(presidentId), _csrf: csrfToken });
+    .send({ name: 'Pat President', memberType: 'admin', adminPositionIds: [String(presidentId), String(treasurerId)], _csrf: csrfToken });
   assert.equal(createRes.status, 302);
 
   const member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
   assert.equal(member.member_type, 'admin');
-  assert.equal(member.admin_position_id, presidentId);
+  const linkedIds = (await db.prepare('SELECT admin_position_id AS "id" FROM member_admin_positions WHERE member_id = ?').all(member.id)).map((r) => r.id);
+  assert.deepEqual(new Set(linkedIds), new Set([presidentId, treasurerId]));
 
   const editPage = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);
   assert.equal(editPage.status, 200);
-  assert.match(editPage.text, new RegExp(`value="${presidentId}" selected`), 'the saved position should be pre-selected on the edit form');
+  assert.match(editPage.text, new RegExp(`value="${presidentId}" class="member-form-checklist-checkbox" checked`), 'President should be pre-checked on the edit form');
+  assert.match(editPage.text, new RegExp(`value="${treasurerId}" class="member-form-checklist-checkbox" checked`), 'Treasurer should be pre-checked on the edit form');
 });
 
 test('Design page: admin is offered as a name tag design type, and Print includes admin members with their badge', async () => {

@@ -6,7 +6,7 @@
 //
 // locals: member, mode ('create'|'edit'), families (with memberCount),
 // memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
-// gradeLevels, adminPositions
+// gradeLevels, adminPositions, memberAdminPositionIds
 const isParent = member.member_type === 'parent';
 // 'admin' - co-op staff/leaders who mainly just need a printable badge
 // (see members.member_type's own schema comment) - a real request added
@@ -146,20 +146,6 @@ const US_STATES = [
       </select>
     </div>
   </div>
-  <div class="class-form-row" data-admin-only style="<%= isAdmin ? '' : 'display:none;' %>">
-    <div class="class-form-field">
-      <span class="class-form-field-label">Admin Position</span>
-      <select name="adminPositionId">
-        <option value="">None</option>
-        <% adminPositions.forEach(function(p) { %>
-          <option value="<%= p.id %>" <%= member.admin_position_id === p.id ? 'selected' : '' %>><%= p.title %></option>
-        <% }); %>
-      </select>
-      <% if (adminPositions.length === 0) { %>
-        <span class="hint">No positions added yet - add some under <a href="/admin/settings?tab=leaders">Settings &gt; Admin &amp; Leaders</a>.</span>
-      <% } %>
-    </div>
-  </div>
 </div>
 
 <div class="member-form-boxes">
@@ -196,6 +182,36 @@ const US_STATES = [
             <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
             <span class="member-form-checklist-name"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></span>
             <span class="member-form-checklist-count"><%= t.memberCount %> member<%= t.memberCount === 1 ? '' : 's' %></span>
+          </label>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <%# A real request: "ability to add unlimited admin positions to a
+      member profile" - was a single <select> (member.admin_position_id),
+      now a proper multi-select, same picker-dropdown + checkbox-checklist
+      shape as the Setup/Cleanup Team box above (public/js/member-form.js's
+      initPickerChecklist wires both the same way). %>
+  <div class="manage-section member-form-section-box member-form-section-purple" id="admin-only-fields" data-admin-only style="<%= isAdmin ? '' : 'display:none;' %>">
+    <h2><svg class="icon"><use href="#icon-badge"/></svg> Admin Positions</h2>
+    <% if (adminPositions.length === 0) { %>
+      <p class="hint">No positions added yet - add some under <a href="/admin/settings?tab=leaders">Settings &gt; Admin &amp; Leaders</a>.</p>
+    <% } else { %>
+      <label class="member-form-full">Add a Position
+        <select data-position-picker>
+          <option value="">Choose from available positions</option>
+          <% adminPositions.forEach(function(p) { %>
+            <option value="<%= p.id %>"><%= p.title %></option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="member-form-checklist" data-position-checklist>
+        <% adminPositions.forEach(function(p) { %>
+          <label class="member-form-checklist-row<%= memberAdminPositionIds.includes(p.id) ? ' is-checked' : '' %>">
+            <input type="checkbox" name="adminPositionIds" value="<%= p.id %>" class="member-form-checklist-checkbox" <%= memberAdminPositionIds.includes(p.id) ? 'checked' : '' %> />
+            <span class="member-form-checklist-box"><svg class="icon"><use href="#icon-check"/></svg></span>
+            <span class="member-form-checklist-name"><%= p.title %></span>
           </label>
         <% }); %>
       </div>

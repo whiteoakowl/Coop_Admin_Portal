@@ -31,7 +31,7 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { listAdminPositions } = require('../utils/adminPositions');
+const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 
 router.use(requireFullAdmin);
 
@@ -244,7 +244,6 @@ router.get('/members/export.csv', async (req, res) => {
 function memberFormFields(req) {
   const memberType = MEMBER_TYPES.includes(req.body.memberType) ? req.body.memberType : 'student';
   const familyIdRaw = parseInt(req.body.familyId, 10);
-  const adminPositionIdRaw = parseInt(req.body.adminPositionId, 10);
   return {
     name: (req.body.name || '').trim(),
     memberType,
@@ -266,12 +265,15 @@ function memberFormFields(req) {
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
         : null,
-    // Optional regardless of type (a real request: "Add an optional
-    // dropdown menu for choosing an admin position" - not gated to
-    // member_type === 'admin' at the data layer, even though that's the
-    // only type the form currently shows the dropdown for), same
-    // "unselected means null" shape as familyId above.
-    adminPositionId: Number.isInteger(adminPositionIdRaw) ? adminPositionIdRaw : null,
+    // A real request: "ability to add unlimited admin positions to a
+    // member profile" - superseded the old single adminPositionId (a
+    // plain <select>) with a checkbox multi-select, same "array of ids,
+    // gated to the one member type that actually shows the field" shape
+    // as cleanupTeamIds just above.
+    adminPositionIds:
+      memberType === 'admin'
+        ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
+        : null,
   };
 }
 
@@ -381,7 +383,6 @@ router.get('/members/new', async (req, res) => {
       grade_level: '',
       medical_notes: '',
       is_primary_parent: 0,
-      admin_position_id: null,
     },
     families: await allFamilies(),
     memberFamilyId: null,
@@ -389,6 +390,7 @@ router.get('/members/new', async (req, res) => {
     setupTeams: await allSetupTeams(),
     memberCleanupTeamIds: [],
     adminPositions: await listAdminPositions(),
+    memberAdminPositionIds: [],
     error: req.query.error || null,
   });
 });
@@ -416,8 +418,8 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
   const info = await db
     .prepare(
       `INSERT INTO members
-         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes, admin_position_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       f.name,
@@ -433,10 +435,10 @@ router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
       photoPath,
       f.birthday,
       f.gradeLevel,
-      f.medicalNotes,
-      f.adminPositionId
+      f.medicalNotes
     );
   await syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
+  await syncMemberAdminPositions(info.lastInsertRowid, f.adminPositionIds);
   await setMemberFamily(info.lastInsertRowid, f.familyId);
   await setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
 
@@ -563,6 +565,7 @@ router.get('/members/:id/edit', async (req, res) => {
     setupTeams: await allSetupTeams(),
     memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
     adminPositions: await listAdminPositions(),
+    memberAdminPositionIds: await adminPositionIdsForMember(id),
     error: req.query.error || null,
   });
 });
@@ -594,7 +597,7 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
   await db.prepare(
     `UPDATE members SET
        name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
-       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?, admin_position_id = ?
+       photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ?
      WHERE id = ?`
   ).run(
     f.name,
@@ -609,10 +612,10 @@ router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) =
     f.birthday,
     f.gradeLevel,
     f.medicalNotes,
-    f.adminPositionId,
     id
   );
   await syncCleanupTeams(id, f.cleanupTeamIds);
+  await syncMemberAdminPositions(id, f.adminPositionIds);
   await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, f.familyId);
   await setPrimaryParent(id, f.isPrimaryParent);

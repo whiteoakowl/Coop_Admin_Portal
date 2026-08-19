@@ -68,7 +68,12 @@
       memberCode: 'ID#012345',
       barcodeValue: '0123456789',
     },
-    admin: { name: 'Sam Admin', adminPosition: 'President', memberCode: 'ID#012345', barcodeValue: '0123456789' },
+    // Two positions (not one) so the editor's own live preview shows the
+    // real stacked-with-a-gap, shrink-to-fit behavior by default, same
+    // "preview the harder multi-line case, not just the easy one"
+    // reasoning as parent's own two-line setupCleanupDays placeholder
+    // above.
+    admin: { name: 'Sam Admin', adminPosition: ['President', 'Fundraising Coordinator'], memberCode: 'ID#012345', barcodeValue: '0123456789' },
     setupCleanup: { day: 'Monday', title: 'Snack Table', leaderLabel: 'Leader: Jordan Parent', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
@@ -253,6 +258,29 @@
     zoomWrap.style.width = BADGE_WIDTH * zoom + 'px';
     zoomWrap.style.height = BADGE_HEIGHT * zoom + 'px';
     renderCanvas();
+  }
+
+  // A real bug report: on a phone-width screen the canvas's fixed
+  // BADGE_WIDTH (336px) can be wider than the column it sits in, bleeding
+  // off the edge of the mobile view - the Zoom dropdown already lets a
+  // desktop user shrink it, this just picks a sane starting point
+  // automatically instead of loading straight into a badge that overflows
+  // the screen. Runs once, at load only - a later reflow (rotating the
+  // phone, say) doesn't fight whatever zoom the person has since chosen,
+  // the same "don't re-fight a manual choice" restraint print-shrink-to-
+  // fit.js's own -on-print variant documents for the same reason.
+  function autoFitZoomToViewport() {
+    if (!zoomSelect || !zoomWrap.parentElement) return;
+    const available = zoomWrap.parentElement.clientWidth;
+    if (!available || available >= BADGE_WIDTH) return;
+    const options = Array.from(zoomSelect.options).map((o) => parseFloat(o.value)).filter((v) => !Number.isNaN(v));
+    if (!options.length) return;
+    const fits = options.filter((v) => BADGE_WIDTH * v <= available);
+    const best = fits.length ? Math.max(...fits) : Math.min(...options);
+    if (best === zoom) return;
+    zoomSelect.value = String(best);
+    zoom = best;
+    applyZoom();
   }
 
   // ---------- Move / resize / rotate ----------
@@ -1515,6 +1543,7 @@
 
     applyZoom();
     switchType('student');
+    autoFitZoomToViewport();
   }
 
   // --- Bulk print list filtering (Print tab) ---

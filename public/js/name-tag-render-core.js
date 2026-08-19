@@ -192,9 +192,17 @@
     // A single-line field centers itself vertically within the box
     // (align-items on the flex row); a multi-line field instead stacks
     // its lines top-to-bottom (flex-direction:column) and centers/aligns
-    // that whole stack, same valign meaning either way.
+    // that whole stack, same valign meaning either way. A real request
+    // (admin name tags with two stacked position titles): the stacked
+    // lines should read as visually distinct entries "with a space
+    // between," not touching - a small fixed gap rather than something
+    // font-size-relative, since public/js/badge-autofit.js's own height
+    // correction already measures box.scrollHeight (which includes this
+    // gap) as ground truth and shrinks further if the gap ever pushes a
+    // tight box past its own height, so a fixed value can't cause an
+    // otherwise-avoidable clip.
     var style = elementBaseStyle(el) + ' display:flex; font-family:' + fontFamily + ';' +
-      (multiline ? ' flex-direction:column; justify-content:' + valign + ';' : ' align-items:' + valign + ';');
+      (multiline ? ' flex-direction:column; justify-content:' + valign + '; gap:4px;' : ' align-items:' + valign + ';');
     // Auto-shrink is opt-in per element (autoFitText) - a name/phone
     // field wants a single balanced line that always fits the template's
     // box; a longer free-text field (Class Description, etc.) still

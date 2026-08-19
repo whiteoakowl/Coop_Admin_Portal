@@ -98,12 +98,16 @@ function initAddFamilyDialog(form) {
   });
 }
 
-// The Setup/Cleanup Team "Add a Team" dropdown is a quick-pick convenience
-// on top of the real multi-select checkbox list below it - picking an
-// option just checks that box, then resets itself.
-function initTeamPicker(form) {
-  const picker = form.querySelector('[data-team-picker]');
-  const checklist = form.querySelector('[data-team-checklist]');
+// The Setup/Cleanup Team "Add a Team" dropdown (and, the same shape, the
+// Admin Positions "Add a Position" dropdown - a real request: "ability to
+// add unlimited admin positions to a member profile") is a quick-pick
+// convenience on top of the real multi-select checkbox list below it -
+// picking an option just checks that box, then resets itself. Generic
+// over which picker/checklist pair so both boxes share one implementation
+// instead of two near-identical copies.
+function initPickerChecklist(form, pickerSelector, checklistSelector) {
+  const picker = form.querySelector(pickerSelector);
+  const checklist = form.querySelector(checklistSelector);
   if (!picker || !checklist) return;
 
   picker.addEventListener('change', () => {
@@ -126,7 +130,8 @@ function initTeamPicker(form) {
 
 function initMemberFormInteractions(form) {
   initAddFamilyDialog(form);
-  initTeamPicker(form);
+  initPickerChecklist(form, '[data-team-picker]', '[data-team-checklist]');
+  initPickerChecklist(form, '[data-position-picker]', '[data-position-checklist]');
 }
 
 (function () {

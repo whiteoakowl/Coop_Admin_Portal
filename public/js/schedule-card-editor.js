@@ -226,6 +226,28 @@
     renderCanvas();
   }
 
+  // A real bug report: on a phone-width screen the canvas's fixed
+  // CARD_WIDTH (336px) can be wider than the column it sits in, bleeding
+  // off the edge of the mobile view - the Zoom dropdown already lets a
+  // desktop user shrink it, this just picks a sane starting point
+  // automatically instead of loading straight into a card that overflows
+  // the screen. Runs once, at load only - a later reflow (rotating the
+  // phone, say) doesn't fight whatever zoom the person has since chosen.
+  // Mirrors public/js/name-tag-editor.js's own autoFitZoomToViewport.
+  function autoFitZoomToViewport() {
+    if (!zoomSelect || !zoomWrap.parentElement) return;
+    const available = zoomWrap.parentElement.clientWidth;
+    if (!available || available >= CARD_WIDTH) return;
+    const options = Array.from(zoomSelect.options).map((o) => parseFloat(o.value)).filter((v) => !Number.isNaN(v));
+    if (!options.length) return;
+    const fits = options.filter((v) => CARD_WIDTH * v <= available);
+    const best = fits.length ? Math.max(...fits) : Math.min(...options);
+    if (best === zoom) return;
+    zoomSelect.value = String(best);
+    zoom = best;
+    applyZoom();
+  }
+
   // ---------- Move / resize / rotate ----------
   function startDrag(e, el) {
     if (el.locked) return;
@@ -1407,5 +1429,6 @@
     applyZoom();
     renderProperties();
     refreshHistoryButtons();
+    autoFitZoomToViewport();
   }
 })();
