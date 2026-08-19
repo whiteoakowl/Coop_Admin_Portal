@@ -44,9 +44,37 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
               <tr><td colspan="3" class="roster-empty">No members yet.</td></tr>
             <% } %>
             <% team.members.forEach(function(m) { %>
-              <tr<%= isEditable && m.absent ? ' class="setup-assignment-row-absent"' : '' %>>
+              <%
+                // A real bug report (surfaced by test/routes-setup-absent-
+                // highlight.test.js failing on a real Wednesday): the
+                // absent-row highlight and "(absent)" label used to only
+                // ever render in editable mode - a leftover from before
+                // this partial was shared between the live Assignments
+                // page and the read-only kiosk/Archive views. m.absent
+                // itself (assignmentCardsForDate, utils/setup.js) is
+                // computed the same way regardless of editable, so there
+                // was never a real reason to hide it in read-only mode -
+                // if anything, "who's absent today" is exactly what a
+                // read-only kiosk viewer (or someone checking a past
+                // Archive date) needs to see, same as the admin page
+                // already shows. Only the Assign/Unassign CONTROLS below
+                // stay editable-only.
+              %>
+              <%# A real bug report: this used to build the whole
+                  ' class="..."' string inside an EJS OUTPUT tag (the
+                  HTML-escaping kind), which HTML-escapes its own double
+                  quotes into an entity - the row's class attribute
+                  rendered as literal, inert escaped text instead of a
+                  real attribute, so the CSS rule never matched. Plain
+                  control-flow tags (no dynamic text being escaped) avoid
+                  the whole problem, matching how neither m.absent here
+                  nor absentIds.has(m.id) in admin-setup.ejs's own
+                  equivalent has ever needed real escaping - only a
+                  literal, hardcoded class name is ever written either
+                  way. %>
+              <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } %>>
                 <td class="floater-card-position">
-                  <%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (isEditable && m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
+                  <%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
                 </td>
                 <%
                   var slots = [

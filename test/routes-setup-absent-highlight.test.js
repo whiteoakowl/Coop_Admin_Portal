@@ -3,19 +3,26 @@
 // kiosk-facing view (routes/setup.js) highlight a team member's whole row
 // red when they're marked absent that day (utils/classSchedule.js's
 // absentMemberIdsForDate, the same attendance-status source the Class
-// Schedule grid's own absent-student count already uses), via
-// utils/days.js's shared defaultDateFor.
+// Schedule grid's own absent-student count already uses).
 //
-// Setup/Cleanup teams are a standing weekly roster with no date picker of
-// their own (unlike the Class Schedule grid), so "absent that day" only
-// has anything to highlight when today's real weekday actually matches the
-// tab being viewed - defaultDateFor(day) returns '' otherwise, and
-// absentMemberIdsForDate('') is an empty set. Rather than hardcoding an
-// assumption about which day today is (the exact flakiness this session
-// already had to fix once, in the Logs day-toggle tests - see that
-// suite's own comment), every assertion below is computed relative to the
-// real weekday at run time, so this suite is never flaky and gives real
-// coverage on every day of the week, not just Mondays/Wednesdays.
+// The two pages resolve WHICH date to check absence against completely
+// differently, though - a real bug report caught by this suite's own
+// kiosk assertion actually failing on a real Wednesday (see the loop
+// below for the fix): the admin page uses utils/days.js's defaultDateFor,
+// which returns today's own date only when today's real weekday matches
+// the tab being viewed (Setup/Cleanup teams are a standing weekly roster
+// with no date picker of their own, unlike the Class Schedule grid) - the
+// kiosk page instead resolves the closest UPCOMING entry in the
+// setup_dates table (utils/setup.js's datesForDay/assignmentCardsForDate,
+// the same date-scoped "pick a session, suggest a task" model Floater
+// Assignments uses), which has no relationship to today's weekday at all
+// beyond whatever session dates an admin has actually added. Rather than
+// hardcoding an assumption about which day today is (the exact flakiness
+// this session already had to fix once, in the Logs day-toggle tests -
+// see that suite's own comment), every assertion below is computed
+// relative to the real weekday at run time, so this suite is never flaky
+// and gives real coverage on every day of the week, not just Mondays/
+// Wednesdays.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -33,7 +40,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { todayISO, weekdayOf } = require('../utils/dates');
+const { todayISO, weekdayOf, addDays } = require('../utils/dates');
 const { defaultDateFor } = require('../utils/days');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
 
@@ -108,6 +115,24 @@ test('Setup/Cleanup: admin + kiosk views highlight an absent member\'s whole row
 
     const isToday = weekdayOf(today) === DAY_WEEKDAY[day];
 
+    // The kiosk-facing public view (routes/setup.js) doesn't render the
+    // Teams roster directly - it shows per-session assignment cards for
+    // the closest upcoming setup_dates entry (utils/setup.js's
+    // datesForDay/assignmentCardsForDate), rendering "No upcoming Setup/
+    // Cleanup assignments" with nothing else on the page when there isn't
+    // one. A real bug report: this suite's own kiosk assertion below had
+    // never actually exercised that page with real cards on it without
+    // this - on a day that ISN'T today the doesNotMatch assertion passed
+    // anyway (nothing on an empty page matches anything), silently hiding
+    // that the "is today" case was failing for a completely different
+    // reason than the one it looked like it was testing. Only the tab
+    // that actually matches today's real weekday gets `today` itself as
+    // its upcoming session date - the other tab gets an unrelated date 30
+    // days out, so it still renders real (non-absence-affected) cards
+    // instead of the page's own empty state, which would make its own
+    // negative assertion below pass trivially no matter what.
+    await db.prepare('INSERT INTO setup_dates (day, session_date) VALUES (?, ?)').run(day, isToday ? today : addDays(today, 30));
+
     await t.test(`admin manage page for ${day} (${isToday ? 'is' : 'is not'} today)`, async () => {
       const res = await request(app).get(`/admin/setup/${day}/manage`).set('Cookie', cookie);
       assert.equal(res.status, 200);
@@ -120,14 +145,26 @@ test('Setup/Cleanup: admin + kiosk views highlight an absent member\'s whole row
       assert.doesNotMatch(res.text, /team-member-row-absent">\s*<span class="team-member-avatar">P<\/span>/);
     });
 
+    // Real markup (partials/setup-assignment-cards.ejs) shares nothing
+    // with admin-setup.ejs's own team-member-row/team-member-avatar shape
+    // above - it's a <tr class="setup-assignment-row-absent"> with a
+    // plain "(absent)" text label next to the member's name, not an
+    // avatar span. A real bug report: this row highlight/label used to
+    // only ever render in the partial's editable=true mode (the live
+    // Assignments page) - never on this read-only kiosk view, or the
+    // read-only Archive fragment/print, which both pass editable=false -
+    // even though the underlying m.absent flag (assignmentCardsForDate)
+    // was computed identically either way.
     await t.test(`kiosk public view for ${day} (${isToday ? 'is' : 'is not'} today)`, async () => {
       const res = await request(app).get(`/setup/${day}`);
       assert.equal(res.status, 200);
       if (isToday) {
-        assert.match(res.text, /team-member-row team-member-row-absent">\s*<span class="team-member-avatar">A<\/span>/);
+        assert.match(res.text, /<tr class="setup-assignment-row-absent">\s*<td class="floater-card-position">\s*Absent Volunteer <span class="floater-card-unassigned">\(absent\)<\/span>/);
       } else {
-        assert.doesNotMatch(res.text, /team-member-row-absent/);
+        assert.doesNotMatch(res.text, /setup-assignment-row-absent/);
       }
+      // The present member is never highlighted either way.
+      assert.doesNotMatch(res.text, /<tr class="setup-assignment-row-absent">\s*<td class="floater-card-position">\s*Present Volunteer/);
     });
   }
 });
