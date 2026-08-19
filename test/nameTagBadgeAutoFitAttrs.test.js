@@ -16,9 +16,21 @@
 // exactly why this kept recurring (a template saved before a flag
 // existed just clipped forever). Every BOUND field (name, adminPosition,
 // gradeLevel, allergies, setupCleanupDays, memberCode, ...) now always
-// gets autofit+wrap regardless of what's stored, derived from what the
-// field IS - see renderTextEl's own comment for the two exceptions
-// ('custom' and 'description') that keep the old opt-in toggle.
+// gets autofit regardless of what's stored, derived from what the field
+// IS - see renderTextEl's own comment for the two exceptions ('custom'
+// and 'description') that keep the old opt-in toggle.
+//
+// A real regression this caused the very next morning: 'name' and
+// 'gradeLevel' also got swept into the always-WRAP half of that rule,
+// even though both fields' values (splitNameLines/gradeLevelLabel) are
+// deliberately pre-split into short, single-word-ish lines meant to
+// SHRINK into a bigger single-line font, not wrap - wrap mode skips the
+// width pre-shrink entirely and relies only on the box's fixed height to
+// notice trouble, which let a single long name wrap mid-word and outgrow
+// its box worse than the old "just shrink it" behavior ever did. Name
+// and Grade Level are excluded from the always-wrap half of the rule for
+// that reason (see renderTextEl's own NEVER_WRAP_FIELDS) - they still
+// always get autofit (shrink), just never forced wrap.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -55,22 +67,44 @@ test('a bound field cannot opt out - autoFitText: false on the saved element is 
   assert.match(html, /data-autofit="1"/, 'a bound field must stay autofit regardless of a stale/explicit false flag in saved data');
 });
 
-test('a bound field wraps (overflow-wrap: break-word) rather than forcing a single ever-shrinking line with ellipsis', () => {
-  const html = NameTagRenderCore.renderElement(boundTextEl(), { name: 'Alexandria Montgomery-Whitfield' });
+test('a bound field (e.g. adminPosition) wraps (overflow-wrap: break-word) rather than forcing a single ever-shrinking line with ellipsis', () => {
+  const html = NameTagRenderCore.renderElement(adminPositionEl(), { adminPosition: 'Community Service Coordinator' });
   assert.match(html, /overflow-wrap: break-word/);
-  assert.doesNotMatch(html, /white-space: nowrap/, 'a bound field must not fall back to the old forced-single-line style');
+  assert.doesNotMatch(html, /white-space: nowrap/, 'a wrap-eligible bound field must not fall back to the old forced-single-line style');
   assert.doesNotMatch(html, /text-overflow: ellipsis/);
 });
 
-test('a bound field starts from its own configured fontSize, not a single-line width estimate (that job is now public/js/badge-autofit.js\'s real-browser height correction alone)', () => {
-  const html = NameTagRenderCore.renderElement(boundTextEl({ width: 140 }), { name: 'Alexandria Montgomery-Whitfield' });
+test('a wrap-eligible bound field starts from its own configured fontSize, not a single-line width estimate (that job is now public/js/badge-autofit.js\'s real-browser height correction alone)', () => {
+  const html = NameTagRenderCore.renderElement(adminPositionEl({ width: 140 }), { adminPosition: 'Community Service Coordinator' });
   const m = /data-base-font-size="([\d.]+)"/.exec(html);
-  assert.equal(Number(m[1]), 18, 'should be the element\'s own configured fontSize');
+  assert.equal(Number(m[1]), 16, 'should be the element\'s own configured fontSize');
 });
 
-test('a bound field is still marked data-autofit-wrap="1" so badge-autofit.js skips its width-only shrink pass for it', () => {
-  const html = NameTagRenderCore.renderElement(boundTextEl(), { name: 'Jessica Adema' });
+test('a wrap-eligible bound field is marked data-autofit-wrap="1" so badge-autofit.js skips its width-only shrink pass for it', () => {
+  const html = NameTagRenderCore.renderElement(adminPositionEl(), { adminPosition: 'Community Service Coordinator' });
   assert.match(html, /data-autofit-wrap="1"/);
+});
+
+// A real regression, the morning after wrap became the bound-field
+// default: 'name' and 'gradeLevel' got swept into it too, even though
+// both are deliberately pre-split (splitNameLines/gradeLevelLabel) into
+// short, single-word-ish lines meant to SHRINK into a bigger single-line
+// font, not wrap mid-word. See renderTextEl's own NEVER_WRAP_FIELDS
+// comment for the full story.
+test('name and gradeLevel stay autofit but are excluded from the always-wrap rule - still nowrap+ellipsis, still width-estimated by fitFontSize, same as before wrap mode existed', () => {
+  const nameHtml = NameTagRenderCore.renderElement(boundTextEl(), { name: 'Alexandria Montgomery-Whitfield' });
+  assert.match(nameHtml, /data-autofit="1"/, 'name should still be autofit');
+  assert.doesNotMatch(nameHtml, /data-autofit-wrap/, 'name should not be marked wrap-mode');
+  assert.match(nameHtml, /white-space: nowrap/);
+  assert.match(nameHtml, /text-overflow: ellipsis/);
+  const nameSize = Number(/data-base-font-size="([\d.]+)"/.exec(nameHtml)[1]);
+  assert.ok(nameSize < 18, 'a too-long name should already be shrunk by fitFontSize\'s width estimate, not left at the full configured fontSize');
+
+  const gradeEl = { id: 'grade', type: 'text', field: 'gradeLevel', x: 8, y: 110, width: 60, height: 36, fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle' };
+  const gradeHtml = NameTagRenderCore.renderElement(gradeEl, { gradeLevel: 'Kindergarten' });
+  assert.match(gradeHtml, /data-autofit="1"/, 'gradeLevel should still be autofit');
+  assert.doesNotMatch(gradeHtml, /data-autofit-wrap/, 'gradeLevel should not be marked wrap-mode');
+  assert.match(gradeHtml, /white-space: nowrap/);
 });
 
 test('the "description" field (Setup/Cleanup Task / Custom badge Description) is exempt from the always-on rule - it still wraps at a fixed size unless explicitly opted in, per a real prior request not to shrink it', () => {
@@ -157,7 +191,8 @@ test('a single-string field (the normal case) is unaffected - still exactly one 
 // real-browser height correction (already proven for 2+ actual stacked
 // positions) is what keeps however many lines it wraps to inside the box,
 // shrinking the font until they fit. Now the default for every bound
-// field, admin position included.
+// field except name/gradeLevel (see NEVER_WRAP_FIELDS), admin position
+// included.
 function adminPositionEl(overrides) {
   return {
     id: 'position', type: 'text', field: 'adminPosition', x: 8, y: 110, width: 320, height: 40,

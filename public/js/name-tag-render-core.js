@@ -242,14 +242,36 @@
     // because plain autoFitText alone forces a field onto ONE
     // ever-shrinking line (right for Name, wrong for a position title -
     // "the admin positions should never be more than two stacked text
-    // lines" is a request for real wrap, not endless shrinking). Always on
-    // for a bound field for the same "no matter what we create" reason
-    // above; a 'custom' caption with autoFitText on can still opt into it
-    // via its own el.autoFitWrap. public/js/badge-autofit.js's real-
+    // lines" is a request for real wrap, not endless shrinking).
+    //
+    // A real regression this caused, the very next morning: this used to
+    // read `isBoundField || ...`, forcing wrap onto EVERY bound field
+    // including 'name' and 'gradeLevel' - directly contradicting this
+    // comment's own "right for Name" reasoning two lines above. Both of
+    // those fields' values (utils/nameTagData.js's splitNameLines/
+    // gradeLevelLabel) are deliberately pre-split into short, single-word-
+    // ish lines ("Alexandria" / "Montgomery-Whitfield", "3rd" / "Grade")
+    // specifically so each line can grow into a BIGGER single-line font
+    // (see splitNameLines's own comment) - wrap mode instead starts each
+    // line at its full configured fontSize with NO width pre-shrink
+    // (badge-autofit.js's shrinkToFit skips computeLineFontSize for a
+    // wrap-mode box on purpose), relying entirely on the box's fixed
+    // HEIGHT to notice an overflow and shrink back down. For a name/grade
+    // box sized for exactly its normal 1-2 lines, a single long unbroken
+    // word wrapping mid-word inflates the line count before any shrink
+    // ever kicks in, and the result is worse, not better, than the old
+    // "just shrink it, one line, no matter how small" behavior these two
+    // fields were always designed around. Name and Grade Level are
+    // excluded here for that reason - every OTHER bound field (adminPosition,
+    // allergies, setupCleanupDays, memberCode, and any future field) keeps
+    // the "always wrap" default, same "no matter what we create" reasoning
+    // as above; a 'custom' caption with autoFitText on can still opt into
+    // wrap via its own el.autoFitWrap. public/js/badge-autofit.js's real-
     // browser height correction (already proven for 2+ actual stacked
     // positions) is what keeps however many lines any of this wraps to
     // inside the box, shrinking the font until they fit.
-    var autoFitWrap = isBoundField || (autoFit && !!el.autoFitWrap);
+    var NEVER_WRAP_FIELDS = { name: true, gradeLevel: true };
+    var autoFitWrap = (isBoundField && !NEVER_WRAP_FIELDS[el.field]) || (autoFit && !!el.autoFitWrap);
     // autoFitText's whole point (outside of autoFitWrap) is "stay on one
     // line, never clip" - a wrapped second line would just get cut off by
     // this element's own overflow:hidden (see public/css/styles.css's
