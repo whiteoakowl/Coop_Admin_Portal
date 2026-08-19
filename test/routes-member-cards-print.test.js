@@ -77,6 +77,13 @@ test('member Cards dialog print layouts', async (t) => {
     // slot left blank - see utils/duplexPrint.js's mirrorPage - so the
     // back page must contain exactly one blank filler.
     assert.match(res.text, /badge-canvas-blank/);
+    // A real bug report - "mirror back and front needs much better
+    // alignment for printing" - traced to this instruction telling
+    // admins to flip on the SHORT edge while mirrorPage's actual math
+    // (column-reversal within each row) is only correct for a LONG-edge
+    // flip. Must say "long edge" now, and never say "short edge" again.
+    assert.match(res.text, /flipping on the long edge/);
+    assert.doesNotMatch(res.text, /short edge/);
   });
 
   await t.test('an unrecognized layout falls back to nameTag rather than erroring', async () => {

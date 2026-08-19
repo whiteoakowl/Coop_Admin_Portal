@@ -5274,6 +5274,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     margin: 0;
     border: none;
     box-shadow: none;
+    /* A real bug report: name tags "drifting off the pages" / "nothing
+       lining up" on both mobile and desktop. public/js/print-auto.js
+       shrinks these boxes to fit a narrow on-screen viewport by setting
+       an inline `zoom` style, then resets it to 1 on the window's
+       `beforeprint` event and restores the shrink on `afterprint` - but
+       that reset is only as reliable as `beforeprint` firing at all,
+       and mobile browsers (and some in-app/embedded print flows) are
+       notoriously inconsistent about firing it before the print engine
+       actually paginates. When it doesn't fire in time, the shrunk zoom
+       leaks into the real printout - the whole 8.5in x 11in sheet
+       renders at a fraction of its true size, so the browser's print
+       pagination (working off unzoomed physical page dimensions) sees
+       far more "page" than the shrunk content actually needs, scattering
+       cards, leaving pages that look skipped/blank, and throwing off
+       exactly the row/column alignment front/back duplex printing
+       depends on. `!important` here is a hard CSS floor that always wins
+       over that inline style during the actual print render, regardless
+       of whether the JS reset ran - the screen-only shrink-to-fit
+       preview is unaffected (this rule is a `@media print` in the first
+       place). */
+    zoom: 1 !important;
   }
 
   /* Keep a hard, exactly-one-portrait-page box at actual print time too

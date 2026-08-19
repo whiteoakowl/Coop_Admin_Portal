@@ -15,19 +15,33 @@
 // A real duplex print job alternates front/back/front/back... one sheet
 // at a time (odd pages are fronts, even pages are backs), so laying out
 // [front, back, front, back, ...] pages in one document and printing it
-// double-sided (flip on the short edge - see the clarifying question this
-// was designed against) is enough to get each pair onto the same
-// physical sheet - no extra printer setup beyond "print both sides".
+// double-sided (flip on the LONG edge - a portrait Letter page's own
+// vertical edge, the standard default duplex setting for portrait
+// content in every major OS print dialog) is enough to get each pair
+// onto the same physical sheet - no extra printer setup beyond "print
+// both sides".
 //
-// The one piece that isn't automatic: flipping a sheet over to read its
-// back mirrors it left-to-right, so a schedule card printed in the same
-// DOM column as its member's name tag on the front would land under the
-// WRONG name tag once the sheet is turned over. Reversing each row's
-// column order on the back page (mirrorPage below) cancels that flip
-// out, so cutting along the row/column grid lines always separates one
-// member's matched front+back pair - including on a page's partial last
-// row, where the single card's mirrored slot is explicitly padded with a
-// blank rather than left to whatever the grid's auto-flow would do.
+// A real bug report - "mirror back and front needs much better
+// alignment for printing" - traced back to every user-facing print
+// instruction (this file used to say it here too) telling people to
+// flip on the SHORT edge instead, which physically mirrors top-to-bottom
+// (row order) rather than left-to-right (column order). mirrorPage below
+// has always reversed COLUMN order within each row - correct for a
+// long-edge flip - so the instructions and the actual math disagreed
+// with each other; whichever one a given admin's printer/driver actually
+// matched, the other was silently wrong. See views/admin-cards-duplex-
+// print.ejs and admin-design.ejs's own hint text, now corrected to match.
+//
+// The one piece that isn't automatic: flipping a sheet over its long
+// (vertical) edge to read its back mirrors it left-to-right, so a
+// schedule card printed in the same DOM column as its member's name tag
+// on the front would land under the WRONG name tag once the sheet is
+// turned over. Reversing each row's column order on the back page
+// (mirrorPage below) cancels that flip out, so cutting along the
+// row/column grid lines always separates one member's matched
+// front+back pair - including on a page's partial last row, where the
+// single card's mirrored slot is explicitly padded with a blank rather
+// than left to whatever the grid's auto-flow would do.
 const COLS_PER_ROW = 2;
 const CARDS_PER_PAGE = 8;
 
