@@ -610,6 +610,48 @@ async function backfillNameTagStackedSizing(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// 'admin' name_tag_templates row, saved before the Admin Position field
+// gained real wrap support - a real bug report, live screenshot: a longer
+// single position ("Community Service Coordinator", "Parent Support
+// Coordinator") wrapped onto 2-3 lines and got clipped at the box's own
+// top edge on an already-live co-op's badges, even after DEFAULT_LAYOUTS.
+// admin's own position element picked up autoFitWrap - exactly the same
+// class of "editing DEFAULT_LAYOUTS never reaches an already-saved row"
+// bug backfillNameTagAutoFit above exists to fix, just for this one
+// field/flag pair instead of autoFitText alone. "The admin positions
+// should never be more than two stacked text lines" is a hard requirement
+// for this one field, not something a saved template gets to opt back out
+// of - so unlike backfillNameTagAutoFit's fields (name/gradeLevel, which
+// only ever ADD the flag if genuinely missing), this always forces both
+// flags to true even if one was already present, and grows height up to
+// (never below) the current default the same way backfillNameTagStackedSizing
+// does, so an admin's own genuinely taller custom box survives untouched.
+async function backfillAdminPositionAutoFitWrap(db) {
+  const row = await db.prepare("SELECT layout_json FROM name_tag_templates WHERE member_type = 'admin'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+
+  const targetHeight = DEFAULT_LAYOUTS.admin.elements.find((el) => el.id === 'position').height;
+  let changed = false;
+  const elements = layout.elements.map((el) => {
+    if (el.id !== 'position' || el.type !== 'text') return el;
+    const height = Math.max(el.height, targetHeight);
+    if (el.autoFitText === true && el.autoFitWrap === true && height === el.height) return el;
+    changed = true;
+    return { ...el, autoFitText: true, autoFitWrap: true, height };
+  });
+  if (!changed) return;
+
+  await db.prepare("UPDATE name_tag_templates SET layout_json = ? WHERE member_type = 'admin'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // task_list_items rows, created before the barcode column existed -
 // nothing else ever revisits an old row once it's inserted (utils/
 // taskList.js's addItem only assigns a barcode to a NEW row), so without
@@ -653,5 +695,6 @@ module.exports = {
   backfillParentSetupCleanupMerge,
   backfillParentRemoveLegacyCleanupTeamElement,
   backfillNameTagStackedSizing,
+  backfillAdminPositionAutoFitWrap,
   backfillTaskItemBarcodes,
 };

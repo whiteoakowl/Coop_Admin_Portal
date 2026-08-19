@@ -208,22 +208,41 @@
     // box; a longer free-text field (Class Description, etc.) still
     // wraps normally instead of shrinking down to near-nothing.
     var autoFit = !!el.autoFitText;
-    // autoFitText's whole point is "stay on one line, never clip" - a
-    // wrapped second line would just get cut off by this element's own
-    // overflow:hidden (see public/css/styles.css's .badge-el-text) since
-    // the box height never grows to fit a wrap. Forcing nowrap here turns
-    // "wraps then gets silently clipped" into "browser measures it as
-    // still too wide" - the signal public/js/badge-autofit.js's real
-    // measurement pass (see its own comment) needs to correct fontSize
-    // further when this function's estimate above wasn't small enough;
-    // text-overflow: ellipsis is the static fallback if that JS doesn't
-    // run at all, same convention as the barcode-only sheet's
-    // .barcode-cell-name (see barcode-print-shrink-name.js).
-    var wrapStyle = autoFit
+    // autoFitWrap is the third mode, opt-in on top of autoFitText: a real
+    // bug report, live screenshot - a long single Admin Position
+    // ("Community Service Coordinator") wrapped onto 2-3 lines and got
+    // clipped at the box's own top edge, because plain autoFitText forces
+    // a field onto ONE ever-shrinking line (right for Name, wrong here -
+    // "the admin positions should never be more than two stacked text
+    // lines" is a request for real wrap, not endless shrinking). Lets the
+    // line actually wrap instead of forcing nowrap+ellipsis; public/js/
+    // badge-autofit.js's real-browser height correction (already proven
+    // for 2+ actual stacked positions) is what keeps however many lines
+    // it wraps to inside the box, shrinking the font until they fit.
+    var autoFitWrap = autoFit && !!el.autoFitWrap;
+    // autoFitText's whole point (outside of autoFitWrap) is "stay on one
+    // line, never clip" - a wrapped second line would just get cut off by
+    // this element's own overflow:hidden (see public/css/styles.css's
+    // .badge-el-text) since the box height never grows to fit a wrap.
+    // Forcing nowrap here turns "wraps then gets silently clipped" into
+    // "browser measures it as still too wide" - the signal public/js/
+    // badge-autofit.js's real measurement pass (see its own comment) needs
+    // to correct fontSize further when this function's estimate above
+    // wasn't small enough; text-overflow: ellipsis is the static fallback
+    // if that JS doesn't run at all, same convention as the barcode-only
+    // sheet's .barcode-cell-name (see barcode-print-shrink-name.js).
+    var wrapStyle = autoFit && !autoFitWrap
       ? ' white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'
       : ' overflow-wrap: break-word;';
     var spans = lines.map(function (lineText) {
-      var fontSize = autoFit ? fitFontSize(lineText, el) : num(el.fontSize, 14);
+      // fitFontSize's own estimate assumes a single line, so it isn't the
+      // right starting guess for a field that's meant to wrap - starting
+      // at the box's own configured fontSize and letting badge-autofit.js's
+      // real height measurement shrink it from there (same as a plain,
+      // non-autofit field's static size) is what actually lets it settle
+      // on 2 full-width lines instead of estimating itself down to fit
+      // one.
+      var fontSize = autoFit && !autoFitWrap ? fitFontSize(lineText, el) : num(el.fontSize, 14);
       var spanStyle =
         'display:block; width:100%; font-size:' + fontSize + 'px; color:' + (el.color || '#1c2530') + ';' +
         ' font-weight:' + (el.bold ? 700 : 400) + ';' +
@@ -246,8 +265,12 @@
     // data-autofit="1" stays on the outer box (badge-autofit.js's own
     // document.querySelectorAll('[data-autofit="1"]') entry point finds
     // boxes, then shrinks every .badge-el-text-inner line inside - see
-    // that file's own comment).
-    var autoFitAttr = autoFit ? ' data-autofit="1"' : '';
+    // that file's own comment). data-autofit-wrap="1" tells that same
+    // script to skip its normal per-line WIDTH shrink for this box (which
+    // assumes a single line and would just shrink the text down to fit
+    // ONE line's worth of width, defeating the point of letting it wrap)
+    // and rely on its height correction alone.
+    var autoFitAttr = autoFit ? ' data-autofit="1"' + (autoFitWrap ? ' data-autofit-wrap="1"' : '') : '';
     return '<div class="badge-el badge-el-text" data-id="' + esc(el.id) + '" data-type="text"' + autoFitAttr + ' style="' + style + '">' + spans.join('') + '</div>';
   }
 

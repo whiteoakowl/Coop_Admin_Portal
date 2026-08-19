@@ -117,3 +117,47 @@ test('a single-string field (the normal case) is unaffected - still exactly one 
   assert.equal(spans.length, 1);
   assert.doesNotMatch(html, /flex-direction:column/);
 });
+
+// Coverage for a live bug report, screenshot: a longer single Admin
+// Position ("Community Service Coordinator") wrapped onto 2-3 lines and
+// got clipped at the box's own top edge - plain autoFitText forces a
+// field onto ONE ever-shrinking line (right for Name, wrong here: "the
+// admin positions should never be more than two stacked text lines" is a
+// request for real wrap, not endless shrinking). autoFitWrap is the third
+// mode this opts a field into: real CSS wrap instead of nowrap+ellipsis,
+// still marked for public/js/badge-autofit.js to correct further (see
+// that file's own data-autofit-wrap handling).
+function autoFitWrapTextEl(overrides) {
+  return {
+    id: 'position', type: 'text', field: 'adminPosition', x: 8, y: 110, width: 320, height: 40,
+    fontSize: 16, color: '#1c2530', bold: false, align: 'center', valign: 'middle',
+    autoFitText: true, autoFitWrap: true,
+    ...overrides,
+  };
+}
+
+test('an autoFitWrap element wraps (overflow-wrap: break-word) instead of forcing nowrap+ellipsis', () => {
+  const html = NameTagRenderCore.renderElement(autoFitWrapTextEl(), { adminPosition: 'Community Service Coordinator' });
+  assert.match(html, /overflow-wrap: break-word/);
+  assert.doesNotMatch(html, /white-space: nowrap/);
+  assert.doesNotMatch(html, /text-overflow: ellipsis/);
+});
+
+test('an autoFitWrap element is still marked data-autofit="1" and additionally data-autofit-wrap="1"', () => {
+  const html = NameTagRenderCore.renderElement(autoFitWrapTextEl(), { adminPosition: 'Community Service Coordinator' });
+  assert.match(html, /data-autofit="1"/);
+  assert.match(html, /data-autofit-wrap="1"/);
+});
+
+test('an autoFitWrap element starts from its own configured fontSize (not fitFontSize\'s single-line estimate)', () => {
+  const html = NameTagRenderCore.renderElement(autoFitWrapTextEl(), { adminPosition: 'Community Service Coordinator' });
+  const m = /data-base-font-size="([\d.]+)"/.exec(html);
+  assert.ok(m, 'data-base-font-size should still be present so badge-autofit.js has a value to reset to');
+  assert.equal(Number(m[1]), 16, 'should be the box\'s own configured fontSize, not shrunk by a single-line width estimate');
+});
+
+test('a plain autoFitText element (no autoFitWrap) is unaffected - still nowrap, no data-autofit-wrap', () => {
+  const html = NameTagRenderCore.renderElement(autoFitTextEl(), { name: 'Jessica Adema' });
+  assert.match(html, /white-space: nowrap/);
+  assert.doesNotMatch(html, /data-autofit-wrap/);
+});

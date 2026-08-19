@@ -158,16 +158,42 @@
   function shrinkToFit(box) {
     var inners = box.querySelectorAll('.badge-el-text-inner');
     if (inners.length === 0) return;
-    // Compute what each line needs on its own first, then apply the
-    // smallest of those to every line - see computeLineFontSize's own
-    // comment for why a shared size (not each line's own independent
-    // best fit) is what "same size for first and last name" requires.
-    var minFontSize = Infinity;
-    for (var i = 0; i < inners.length; i++) {
-      minFontSize = Math.min(minFontSize, computeLineFontSize(box, inners[i]));
+    // data-autofit-wrap="1" (name-tag-render-core.js's renderTextEl) marks
+    // a field that's meant to WRAP across multiple lines within its own
+    // fixed width - e.g. one long Admin Position title - rather than stay
+    // on a single line. computeLineFontSize's width search below measures
+    // an UNCONSTRAINED natural width (measureNaturalWidth takes the line
+    // out of flex/wrap sizing entirely), which for a wrap-capable field
+    // would just shrink the font down until the WHOLE text fits on one
+    // line - exactly the single-line behavior wrap mode exists to avoid.
+    // Skip that pass here and start every line back at its own configured
+    // size instead (renderTextEl already stamped data-base-font-size with
+    // that, not a single-line estimate, for exactly this mode) - the
+    // height pass below does 100% of the real work, shrinking only as far
+    // as however tall the box's wrapped lines actually need to be.
+    if (box.dataset.autofitWrap === '1') {
+      for (var k = 0; k < inners.length; k++) {
+        var base = parseFloat(inners[k].dataset.baseFontSize);
+        if (!isNaN(base)) inners[k].style.fontSize = base + 'px';
+      }
+    } else {
+      // Compute what each line needs on its own first, then apply the
+      // smallest of those to every line - see computeLineFontSize's own
+      // comment for why a shared size (not each line's own independent
+      // best fit) is what "same size for first and last name" requires.
+      var minFontSize = Infinity;
+      for (var i = 0; i < inners.length; i++) {
+        minFontSize = Math.min(minFontSize, computeLineFontSize(box, inners[i]));
+      }
+      for (var j = 0; j < inners.length; j++) inners[j].style.fontSize = minFontSize + 'px';
     }
-    for (var j = 0; j < inners.length; j++) inners[j].style.fontSize = minFontSize + 'px';
-    if (inners.length > 1) shrinkLinesToFitHeight(box, inners);
+    // Always run, not just when there are 2+ lines - a single line that's
+    // free to wrap (autoFitWrap above) can itself render taller than the
+    // box even though inners.length === 1, the same class of overflow
+    // shrinkLinesToFitHeight already exists to catch. Harmless no-op for
+    // an ordinary single, non-wrapping line: box.scrollHeight can't exceed
+    // box.clientHeight there, so the loop's own condition never triggers.
+    shrinkLinesToFitHeight(box, inners);
   }
 
   function runBadgeAutoFit(root) {
