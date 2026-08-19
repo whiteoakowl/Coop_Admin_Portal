@@ -31,7 +31,7 @@ const {
   swapItemPosition,
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { activeParentOptions } = require('../utils/members');
+const { activeParentOptions, activeParentAndAdminOptions } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -51,7 +51,17 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
     day,
     dayLabel: DAY_LABELS[day],
     teams: await teamsWithMembers(day),
+    // availableParents: the Add Member dialog's member picker - a team's
+    // own MEMBERS stay parent-only, unchanged.
     availableParents: await activeParentOptions(),
+    // availableLeaders: the standing team card's own leader dropdown and
+    // the Create New Team dialog's leader dropdown - a real request:
+    // "for choosing a leader for setup/cleanup [team]s" should offer
+    // admins alongside parents, since admins regularly run a team
+    // themselves (see activeParentAndAdminOptions' own comment for why
+    // this is a separate function from the parent-only activeParentOptions
+    // the public Absence/Late and Name Tag Request forms still use).
+    availableLeaders: await activeParentAndAdminOptions(),
     // Only actually highlights anyone when today falls on this day - no
     // date picker here (teams are a standing weekly roster, not tied to a
     // specific date the admin chooses), so "absent that day" means "absent

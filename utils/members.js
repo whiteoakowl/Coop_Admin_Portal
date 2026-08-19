@@ -71,6 +71,20 @@ async function activeParentOptions() {
   return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all()).sort(byLastName);
 }
 
+// Same as activeParentOptions above, plus admin/leader members - a real
+// request: "admins and parents should show up in the dropdown menu for
+// setup/cleanup team member lists." Setup/Cleanup teams are co-op-staffed
+// (leader, member, and "add member" pickers alike), and admins are
+// regularly the ones actually running a team, so scoping this OUT of
+// activeParentOptions itself (rather than just adding 'admin' to that
+// function's own WHERE clause) keeps the public Absence/Late and Name Tag
+// Request forms parent-only, unaffected - those are the two call sites
+// activeParentOptions' own comment already documents, and neither should
+// suddenly start offering admin/staff accounts to the public.
+async function activeParentAndAdminOptions() {
+  return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()).sort(byLastName);
+}
+
 // Every other active member sharing memberId's family_id (any type -
 // family is symmetric and not restricted to parent/student). Empty if the
 // member isn't connected to anyone.
@@ -298,6 +312,7 @@ module.exports = {
   parseNamesFromUpload,
   findMemberByName,
   activeParentOptions,
+  activeParentAndAdminOptions,
   familyGroupsByParent,
   loadFamilyMember,
   familyOf,

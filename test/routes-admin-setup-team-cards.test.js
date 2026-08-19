@@ -150,3 +150,49 @@ test('Setup/Cleanup team card: create/edit save meeting time and location, and t
     assert.equal(row.meetingLocation, 'Side Room');
   });
 });
+
+// A real request: "admins and parents should show up in the dropdown
+// menu for setup/cleanup team member lists" - clarified afterward to
+// mean specifically "choosing a leader for setup/cleanup [team]s".
+// Admins regularly run a team themselves, so BOTH leader dropdowns (the
+// standing team card's own, and the Create New Team dialog's) now offer
+// admin members alongside parents (utils/members.js's
+// activeParentAndAdminOptions) - a team's actual MEMBER list (the Add
+// Member dialog's picker) stays parent-only, unchanged.
+test('Setup/Cleanup manage page: admins show up alongside parents when choosing a team leader, but not in the Add Member picker', async (t) => {
+  const { cookie } = await loginAsAdmin();
+
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Parent', 'Pat Parent', 'parent')").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Ashley Admin', 'Ashley Admin', 'admin')").run();
+  // A student is neither - should never show up in any of these pickers.
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Sam Student', 'Sam Student', 'student')").run();
+
+  const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+
+  await t.test('the Create New Team dialog\'s leader dropdown offers both parents and admins', () => {
+    const dialogMatch = /<dialog id="new-team-dialog"[\s\S]*?<\/dialog>/.exec(res.text);
+    assert.ok(dialogMatch, 'expected the Create New Team dialog');
+    assert.match(dialogMatch[0], /<option value="\d+">Pat Parent<\/option>/);
+    assert.match(dialogMatch[0], /<option value="\d+">Ashley Admin<\/option>/);
+    assert.doesNotMatch(dialogMatch[0], /Sam Student/);
+  });
+
+  await t.test('the Add Member dialog\'s member picker stays parent-only - no admins', () => {
+    const dialogMatch = /<dialog id="add-member-dialog"[\s\S]*?<\/dialog>/.exec(res.text);
+    assert.ok(dialogMatch, 'expected the Add Member dialog');
+    assert.match(dialogMatch[0], /<option value="\d+">Pat Parent<\/option>/);
+    assert.doesNotMatch(dialogMatch[0], /Ashley Admin/, 'a team\'s MEMBER list is unaffected by this request - only the leader picker widens');
+    assert.doesNotMatch(dialogMatch[0], /Sam Student/);
+  });
+
+  await t.test('an existing team card\'s own leader dropdown offers both parents and admins', async () => {
+    await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Snack Table 2')").run();
+    const managePage = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
+    const selectMatch = /<select name="leaderId" class="team-info-leader-select" disabled>[\s\S]*?<\/select>/.exec(managePage.text);
+    assert.ok(selectMatch, 'expected a team card leader <select>');
+    assert.match(selectMatch[0], /Pat Parent/);
+    assert.match(selectMatch[0], /Ashley Admin/);
+    assert.doesNotMatch(selectMatch[0], /Sam Student/);
+  });
+});
