@@ -8,15 +8,39 @@
 // reports its original, oversized height and would still overflow onto a
 // second page even though it visually looks smaller on screen.
 (function () {
-  var MAX_CORRECTIONS = 6;
-  var CORRECTION_STEP = 0.02;
+  var MAX_CORRECTIONS = 40;
+  var MIN_SCALE = 0.05;
 
   function fitOne(wrap) {
     const inner = wrap.firstElementChild;
     if (!inner) return;
     inner.style.zoom = 1;
+    // [data-shrink-to-fit-budget] (e.g. "9.8in") is for a wrapper that
+    // does NOT want a real, permanent CSS height of its own - unlike
+    // #grid-box-attendance, which genuinely needs a fixed height all the
+    // time (it's a real on-screen scroll box) - one team-per-page Setup/
+    // Cleanup printing (see .team-print-page-fit in styles.css) only
+    // needs a height *during this measurement*, to know how much room a
+    // busy team is allowed to shrink into. Confirmed live: giving the
+    // wrapper that same height permanently in the CSS (as a plain
+    // `height: 9.8in`, matching #grid-box-attendance's own pattern)
+    // produced a genuine extra blank page in real paginated print output
+    // for a team whose content was nowhere near that tall - a fixed-
+    // height block sized close to a full page, positioned via
+    // page-break-before, apparently confuses Chromium's real print
+    // pagination into reserving a page for "whatever comes after" even
+    // when nothing does, regardless of how much of that height the
+    // content actually uses. Applying the height only long enough to
+    // measure against it, then handing the wrapper back to `height:
+    // auto` (its own natural, content-driven size - small for a light
+    // team, ~the full budget for a team that genuinely needed the room)
+    // for the actual page layout fixed it: confirmed live the trailing
+    // blank page was gone once this collapsed back down afterward.
+    const budget = wrap.dataset.shrinkToFitBudget;
+    if (budget) wrap.style.height = budget;
     const availW = wrap.clientWidth;
     const availH = wrap.clientHeight;
+    if (budget) wrap.style.height = '';
     if (!availW || !availH) return;
     let scale = Math.min(1, availW / inner.scrollWidth, availH / inner.scrollHeight);
     inner.style.zoom = scale;
@@ -28,11 +52,45 @@
     // a 25-row class roster's very last row sat ~7px past the wrapper's
     // own bottom edge even though the computed scale looked right. Rather
     // than trust the one estimate, re-measure the ACTUAL post-zoom box
-    // and keep nudging down until it's genuinely inside - the same
+    // and keep correcting until it's genuinely inside - the same
     // "don't trust the estimate, verify for real" approach public/js/
     // badge-autofit.js uses for the identical class of problem.
-    for (let i = 0; i < MAX_CORRECTIONS && scale > 0 && (inner.scrollWidth > availW || inner.scrollHeight > availH); i++) {
-      scale = Math.max(0, scale - CORRECTION_STEP);
+    //
+    // getBoundingClientRect() specifically, NOT scrollWidth/scrollHeight,
+    // for that real measurement - confirmed live (a real bug this became
+    // once a much-larger-than-one-page case existed to expose it, see
+    // below): scrollWidth/scrollHeight report the element's UNZOOMED
+    // intrinsic size no matter what zoom is currently applied to it, so a
+    // "correction" loop comparing THOSE against availW/availH was
+    // comparing a constant against a constant every pass - it either never
+    // ran (already fit) or, once the natural size was ever bigger than
+    // available, could NEVER see itself as "fixed" no matter how far zoom
+    // shrank the box, since that comparison never reflected the zoom at
+    // all. getBoundingClientRect() is scaled by zoom exactly (confirmed:
+    // a 320px-tall box at zoom 0.5 reports rect.height 160, not 320), so
+    // it's the only one of the two that actually tells this loop the
+    // truth about where things stand after a correction.
+    //
+    // A real request extended this same mechanism to a case the original
+    // fixed-step version (a flat -2% nudge, up to 6 times - +/-12% total)
+    // was never sized for: "printing the setup cleanup teams should be
+    // one team per page[,] reduced to fit one whole team card per page" -
+    // a team with many more members than remotely fit needs a MUCH bigger
+    // correction than a few stray pixels of rounding drift, in one pass if
+    // possible. Each correction here is PROPORTIONAL - re-derive the scale
+    // from the actual post-zoom measurement each time (how far off it
+    // still is, not a fixed nudge) - so a near-miss still converges in
+    // essentially one extra pass same as before, while a drastically
+    // undersized box (order-of-magnitude too small) converges in a handful
+    // of passes instead of not converging at all. MIN_SCALE is a floor
+    // against shrinking to genuinely illegible/zero size for a truly
+    // extreme case (hundreds of rows) rather than looping toward 0 forever.
+    for (let i = 0; i < MAX_CORRECTIONS && scale > MIN_SCALE; i++) {
+      const rect = inner.getBoundingClientRect();
+      if (rect.width <= availW && rect.height <= availH) break;
+      const widthRatio = availW / rect.width;
+      const heightRatio = availH / rect.height;
+      scale = Math.max(MIN_SCALE, scale * Math.min(1, widthRatio, heightRatio));
       inner.style.zoom = scale;
     }
   }

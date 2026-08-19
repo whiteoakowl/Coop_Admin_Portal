@@ -4173,6 +4173,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-info-meeting-input:not(:disabled) { display: inline-block; }
 .team-info-leader:has(.team-info-leader-select:not(:disabled)) { color: var(--ink); }
 
+/* A real request: "header for each card in print should be more
+   organized with information reduced to balance equal rows" - the
+   screen card stacks Leader/Meeting time/Meeting location as three
+   separate centered lines (readable while editing, one field per row),
+   but on paper that reads as a tall, sparse header. Print swaps in this
+   one shared, wrapped row of icon+text chips instead - same look/pattern
+   as the kiosk-facing card's own .floater-card-meta - so Leader/Time/
+   Location balance across as few rows as actually fit, rather than
+   three guaranteed separate ones. display:none by default (built from
+   plain text, not the screen row's <input>s - nothing here is ever
+   editable) with the swap happening entirely in @media print below,
+   same convention as .members-print-table/.logs-print-table elsewhere
+   in this file. */
+.team-print-meta { display: none; }
+.team-print-meta-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.team-print-meta-item .icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+
 .team-members-card {
   min-width: 0;
   padding: 0.75rem 0.75rem 0.85rem;
@@ -5154,7 +5171,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      hide it outright here like every other screen-only nav element. */
   .skip-link { display: none !important; }
   html, body { background: #fff; }
-  .admin-main { max-width: none; margin-left: 0; padding: 0; }
+  /* min-height: 100vh (the screen rule, `.admin-main` above) is what
+     keeps a short admin page from looking cramped under a tall browser
+     window - meaningless on paper, and actively harmful there: confirmed
+     live it was the cause of a genuine extra blank page appearing after
+     a page-per-team Setup/Cleanup Teams printout (and even with no page
+     breaks at all) - Chromium's real paginated print resolves `vh`
+     against something taller than one physical page's content area, so
+     the "at least one viewport tall" minimum forces trailing empty space
+     past the actual last team card, spilling a nearly-blank final page.
+     Reset back to content-driven height for print. */
+  .admin-main { max-width: none; margin-left: 0; padding: 0; min-height: 0; }
 
   /* A real bug report: "printing setup cleanup team produces something
      different on the desktop then if you printed on mobile" - also true
@@ -5285,20 +5312,88 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .team-info-title-input { font-weight: 700; }
   .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
 
-  /* Setup/Cleanup and Floater Teams: always a clean 2-per-row grid on
-     paper (portrait, see the @page rule in each view) - "two cards on
-     top, two on the bottom" for Floater Teams' fixed 4 hour cards,
-     matching the on-screen layout, instead of Setup/Cleanup's wider
-     desktop column count (which doesn't fit a portrait page) or the
-     narrow-viewport horizontal-scroll layout either grid falls back to
+  /* Setup/Cleanup Teams print header reorganization (see .team-print-meta
+     itself for the full comment) - the screen's one-field-per-row Leader/
+     Meeting time/Meeting location swap for the single balanced chip row. */
+  .team-info-leader,
+  .team-info-meeting {
+    display: none;
+  }
+  .team-print-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.2rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #333;
+  }
+
+  /* Floater Teams: always a clean 2-per-row grid on paper (portrait, see
+     the @page rule in the view) - "two cards on top, two on the bottom"
+     for its fixed 4 hour cards, matching the on-screen layout, instead of
+     the narrow-viewport horizontal-scroll layout the grid falls back to
      under 1100px - print's page-width viewport is well under that
      breakpoint, so without this override the scrolling layout (useless
      on paper - there's no scrolling a printed page) would otherwise win. */
-  .setup-team-card-grid,
   .floater-team-card-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 0.5rem !important;
+  }
+
+  /* Setup/Cleanup Teams: a real request - "printing the setup cleanup
+     teams should be one team per page[, ]reduced to fit one whole team
+     card per page." Unlike Floater Teams' fixed 4 hour cards (always
+     exactly 2x2, predictable), Setup/Cleanup can have any number of
+     teams with any number of members each - the old 2-per-row grid let a
+     team with many members run long and clip against the row below it,
+     or split awkwardly across a page boundary mid-card. One column, one
+     team per physical page instead - .team-print-page-fit
+     (data-shrink-to-fit-on-print, public/js/print-shrink-to-fit.js) then
+     scales that one team's whole card down (never up) to guarantee it
+     fits its own page regardless of member-list length, the same
+     "bounded box + real-browser shrink" pattern the live Attendance
+     roster grid already uses for the identical problem. */
+  .setup-team-card-grid {
+    display: block !important;
+  }
+  .team-print-page-fit {
+    width: 100%;
+    /* Deliberately NO fixed `height` here - confirmed live (Playwright's
+       page.pdf({ preferCSSPageSize: true }), the only mode that actually
+       paginates rather than just applying print CSS to a continuous
+       scroll) that giving this wrapper a real, permanent CSS height -
+       even a generous, never-grow-into one matching #grid-box-
+       attendance's own pattern, and even for a light team whose content
+       used barely any of it - reliably produced a genuine extra BLANK
+       page in the real paginated output. A tall, mostly-empty fixed-
+       height block positioned via page-break-before appears to confuse
+       Chromium's real print pagination into reserving a page for
+       "whatever comes after" even when nothing does, independent of
+       break-before, of zoom, and of how much of that height the content
+       actually used - isolated one variable at a time until only
+       dropping the fixed height itself made the extra page go away.
+       max-height is a pure safety CAP instead (never triggers this bug
+       since the box's real height stays content-driven/auto right up
+       until it's clamped) - public/js/print-shrink-to-fit.js's fitOne()
+       reads [data-shrink-to-fit-budget] below to get the same "how much
+       room is a busy team allowed to shrink into" number this used to
+       get from `height`, but only applies it *during* that measurement,
+       then hands the wrapper straight back to its natural (now-shrunk)
+       size for the actual printed page - a light team's page stays
+       short instead of forcing a near-blank void to fill out a page it
+       never needed, and the fixed-height pagination bug never sees a
+       permanent tall empty box to trip over in the first place. 9.8in
+       (not the exact 10in of usable content height on an 11in letter
+       page with 0.5in @page margins) leaves a little slack for a truly
+       maxed-out team - invisible on paper since it was already being
+       shrunk to fit. */
+    max-height: 9.8in;
+    page-break-before: always;
+    break-before: page;
   }
 
   /* The on-screen "sheet of paper" chrome (drop shadow, border, the gap

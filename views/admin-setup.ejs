@@ -4,7 +4,8 @@
   <%- include('partials/head', { title }) %>
   <%# Explicit portrait, not left to whatever orientation the browser/
       printer last remembered - see .setup-team-card-grid's own @media
-      print override in styles.css for the matching 2-per-row layout. %>
+      print override in styles.css for the matching one-team-per-page
+      layout. %>
   <style>@page { size: letter portrait; margin: 0.5in; }</style>
 </head>
 <body class="admin-page setup-teams-print-page">
@@ -46,6 +47,21 @@
 
       <div class="team-card-grid setup-team-card-grid">
         <% teams.forEach(function(t, i) { %>
+          <%# A real request: "printing the setup cleanup teams should be
+              one team per page[,] reduced to fit one whole team card per
+              page." This wrapper is inert on screen (plain block, no
+              styling of its own there) - see .team-print-page-fit's own
+              @media print rule in styles.css for the one-page-per-card
+              layout, and public/js/print-shrink-to-fit.js's
+              data-shrink-to-fit-on-print handling for the real-browser
+              shrink that guarantees it, the same pattern the live
+              Attendance roster grid already uses for the identical
+              "always fit one page" problem. data-shrink-to-fit-budget
+              hands fitOne() the same "how much room to shrink a busy
+              team into" number as .team-print-page-fit's own max-height
+              (see that rule's own comment for why it's a measurement-
+              time budget rather than a permanent CSS height). %>
+          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.8in">
           <%# The whole card (info + members) is one edit-toggle .edit-
               section (public/js/edit-toggle.js) - clicking Edit unfreezes
               the title/description/leader fields in place and reveals the
@@ -102,6 +118,17 @@
                   <input type="text" name="meetingLocation" class="team-info-meeting-input" value="<%= t.meeting_location || '' %>" placeholder="Meeting location" disabled />
                 </div>
               </form>
+              <%# A real request: "header for each card in print should be
+                  more organized with information reduced to balance equal
+                  rows" - print-only balanced Leader/Time/Location row (see
+                  .team-print-meta's own comment in styles.css); the three
+                  stacked rows above stay for screen editing but hide for
+                  print. %>
+              <div class="team-print-meta">
+                <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
+                <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>
+                <% if (t.meeting_location) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= t.meeting_location %></span><% } %>
+              </div>
             </div>
             <div class="team-members-card">
               <h4>Members</h4>
@@ -130,6 +157,7 @@
                 </ol>
               </div>
             <% } %>
+          </div>
           </div>
         <% }); %>
       </div>
@@ -190,5 +218,6 @@
     </dialog>
   </main>
   <script src="/js/edit-toggle.js"></script>
+  <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>
