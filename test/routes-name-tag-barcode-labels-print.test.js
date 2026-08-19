@@ -50,6 +50,13 @@ test('POST /admin/name-tag/print-barcode-labels', async (t) => {
     assert.match(res.text, /<div class="barcode-cell-name">Riley Chen<\/div>/);
     assert.match(res.text, /<div class="barcode-cell-id">ID: 482913<\/div>/);
     assert.match(res.text, /class="avery-label-sheet-page"/);
+    // A real bug report - name tag print pages "drifting off the pages...
+    // mobile and desktop" - traced to .badge-sheet-page/.print-page's
+    // on-screen mobile-viewport shrink-to-fit (print-auto.js) not
+    // covering every physical-page-sized print sheet in the app.
+    // .avery-label-sheet-page (this page's own sheet class) is now one
+    // of its targets too, same as the badge/member print sheets.
+    assert.match(res.text, /<script src="\/js\/print-auto\.js">/);
   });
 
   await t.test('no members selected redirects with an error instead of rendering an empty sheet', async () => {

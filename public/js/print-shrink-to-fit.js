@@ -76,4 +76,22 @@
     fitAllForPrint();
   });
   window.addEventListener('afterprint', resetAllForPrint);
+
+  // Belt-and-suspenders, same reasoning as public/js/print-auto.js's own
+  // matchMedia fallback: [data-shrink-to-fit-on-print] (the live
+  // Attendance roster grid) ONLY ever gets its fit-to-one-page zoom
+  // applied inside the beforeprint handler above - unlike plain
+  // [data-shrink-to-fit], it deliberately has no load/resize fit (see
+  // fitAllForPrint's own comment on why that would fight the on-screen
+  // scrollbar). If beforeprint never fires (mobile browsers and some
+  // embedded print flows are inconsistent about it), that shrink simply
+  // never happens and a busy roster prints unshrunk, spilling rows onto
+  // extra pages instead of fitting one - matchMedia('print') is a second,
+  // independent way to catch the same transition.
+  if (window.matchMedia) {
+    const mql = window.matchMedia('print');
+    const onPrintChange = (e) => { if (e.matches) { fitAll(); fitAllForPrint(); } else { resetAllForPrint(); } };
+    if (mql.addEventListener) mql.addEventListener('change', onPrintChange);
+    else if (mql.addListener) mql.addListener(onPrintChange); // Safari <14
+  }
 })();

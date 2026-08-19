@@ -5155,6 +5155,44 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .skip-link { display: none !important; }
   html, body { background: #fff; }
   .admin-main { max-width: none; margin-left: 0; padding: 0; }
+
+  /* A real bug report: "printing setup cleanup team produces something
+     different on the desktop then if you printed on mobile" - also true
+     of the other 3 pages that print THEMSELVES directly the same way
+     (no dedicated print-preview route - .admin-main above IS the print
+     canvas): Setup/Cleanup Assignments, Floater Teams, Floater
+     Assignments. Desktop browsers lay out print content against the
+     PAPER's own content width (each page's own inline `@page {
+     margin: ... }`) regardless of the on-screen browser window's width -
+     real, standard CSS Paged Media behavior. Mobile Safari/Chrome's
+     print pipeline is documented to NOT reliably do that re-layout: it's
+     closer to "render at the phone's current on-screen viewport width,
+     then scale that whole rendered page up or down to fit the selected
+     paper" - so `.admin-main`'s plain `max-width: none` above still left
+     the actual WIDTH used for layout as whatever ambient viewport width
+     the device's print pipeline happened to pick (~390px on a phone) vs
+     a genuine ~816px desktop print pass. Same content, same 2-column
+     grid either way, but wildly different absolute proportions - a phone
+     print came out cramped/tiny where a desktop print looked normal,
+     verified live via Playwright (before this fix: identical
+     grid-template-columns math, but 172px-wide cards on a
+     390px-viewport print pass vs 677px-wide cards on a 1400px one; after:
+     337px on both). Pinning an EXPLICIT physical width - matching each
+     page's own @page margin, hence two variants below - makes the layout
+     deterministic instead of relying on the print engine to correctly
+     infer it, the same "don't trust ambient sizing, make it literal" fix
+     already applied to .badge-sheet-page/.print-page/.avery-label-sheet-
+     page elsewhere in this file. NOT applied to plain .admin-main itself
+     (only scoped here, per page) - other pages sharing that same class
+     (every .badge-sheet-page/.print-page bulk-print route, Members,
+     Logs, ...) either size their OWN print surface explicitly already,
+     or have no single, page-wide @page margin this box could safely
+     assume. */
+  .setup-teams-print-page .admin-main,
+  .floater-teams-print-page .admin-main { width: 7.5in; } /* @page margin: 0.5in */
+  .setup-assignments-print-page .admin-main,
+  .floater-assignments-print-page .admin-main { width: 7.7in; } /* @page margin: 0.4in */
+
   .roster-scroll { overflow: visible; border: none; }
   .roster-table { font-size: 11px; }
   /* A real bug report: with many session dates and/or a big roster, this
@@ -5294,6 +5332,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        of whether the JS reset ran - the screen-only shrink-to-fit
        preview is unaffected (this rule is a `@media print` in the first
        place). */
+    zoom: 1 !important;
+  }
+
+  /* .avery-label-sheet-page (Library Barcode Labels, Barcode Mailing
+     Labels) never got the same "strip the on-screen preview chrome"
+     treatment above - unlike .badge-sheet-page/.print-page, its border/
+     box-shadow used to print for real, faint but real lines at the
+     physical sheet's edge. Deliberately NOT reusing the width/height:auto
+     approach above, though - .avery-label-grid's 10 label rows are sized
+     off this box's own real, fixed 11in height (grid-template-rows:
+     repeat(10, 1fr) against height:100%, see that rule's own comment on
+     the exact row-drift bug that fixed-height dependency exists to
+     prevent) - swapping this to auto/100vh would make that height
+     percentage resolve against nothing and reintroduce the very bug that
+     rule was written to fix. Same zoom:1 safety net as above regardless,
+     in case this box is ever added to print-auto.js's shrink targets. */
+  .avery-label-sheet-page {
+    border: none;
+    box-shadow: none;
     zoom: 1 !important;
   }
 
