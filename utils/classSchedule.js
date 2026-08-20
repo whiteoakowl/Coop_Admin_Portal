@@ -1312,10 +1312,17 @@ async function primaryParentIdsByFamily(familyIds) {
   const ids = familyIds.filter((id) => id != null);
   if (!ids.length) return {};
   const placeholders = ids.map(() => '?').join(',');
+  // member_type IN ('parent', 'admin'), not just 'parent' - a real bug
+  // report: "admins should still be considered parents everywhere. they
+  // aren't being included in the monday/wednesday rosters." A family
+  // whose only adult member record is admin-typed (not a separate
+  // 'parent' record) has no representative here otherwise, so an admin's
+  // enrolled kid never puts them on the day's roster despite being at
+  // the co-op that day, same as any other parent would be.
   const allParents = await db
     .prepare(
       `SELECT id, family_id, is_primary_parent, name FROM members
-       WHERE active = 1 AND member_type = 'parent' AND family_id IN (${placeholders}) ORDER BY LOWER(name)`
+       WHERE active = 1 AND member_type IN ('parent', 'admin') AND family_id IN (${placeholders}) ORDER BY LOWER(name)`
     )
     .all(...ids);
   const byFamily = {};
@@ -1357,8 +1364,13 @@ async function removeNonPrimaryParentsFromFloaterTeams(day) {
   if (!allMemberIds.size) return 0;
 
   const placeholders = Array.from(allMemberIds).map(() => '?').join(',');
+  // 'admin' alongside 'parent' - matches primaryParentIdsByFamily below,
+  // which now recognizes an admin as a family's representative too. Keeps
+  // an admin on the team from being silently treated as "not a parent
+  // record, leave alone" and skipped even when they genuinely are (or
+  // aren't) this family's primary.
   const parents = await db
-    .prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders}) AND member_type = 'parent'`)
+    .prepare(`SELECT id, family_id FROM members WHERE id IN (${placeholders}) AND member_type IN ('parent', 'admin')`)
     .all(...allMemberIds);
   const familyIdByParent = {};
   parents.forEach((p) => { familyIdByParent[p.id] = p.family_id; });

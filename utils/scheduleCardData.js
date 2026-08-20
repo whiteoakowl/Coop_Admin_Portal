@@ -17,9 +17,13 @@ function toTableRows(dayRows) {
 // The family's designated primary parent (see is_primary_parent on
 // members - Members page), falling back to whichever parent in the
 // family comes first alphabetically if nobody's been marked primary yet.
+// Includes admin-typed family members too - a real bug report: "admins
+// should still be considered parents everywhere" - a family whose only
+// adult record is admin-typed otherwise never gets a phone number line
+// on their kid's schedule card.
 async function primaryParentFor(member) {
   const family = await familyOf(member.id);
-  const parents = family.filter((m) => m.member_type === 'parent');
+  const parents = family.filter((m) => m.member_type === 'parent' || m.member_type === 'admin');
   if (parents.length === 0) return null;
   return parents.find((p) => p.is_primary_parent) || parents[0];
 }
@@ -43,7 +47,7 @@ async function primaryParentsFor(members) {
     const familyPlaceholders = familyIds.map(() => '?').join(',');
     const parents = (
       await db
-        .prepare(`SELECT * FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type = 'parent' AND active = 1`)
+        .prepare(`SELECT * FROM members WHERE family_id IN (${familyPlaceholders}) AND member_type IN ('parent', 'admin') AND active = 1`)
         .all(...familyIds)
     ).sort(byLastName);
     for (const p of parents) {

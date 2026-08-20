@@ -130,7 +130,10 @@ router.post('/find-parent/scan', async (req, res) => {
     return res.json({ ok: false, message: `${student.name} isn't a student - scan a student's name tag.` });
   }
 
-  const parents = (await familyOf(student.id)).filter((m) => m.member_type === 'parent');
+  // 'admin', not just 'parent' - a real bug report: "admins should still
+  // be considered parents everywhere" - a family whose only adult member
+  // record is admin-typed otherwise never turns up on Find a Parent.
+  const parents = (await familyOf(student.id)).filter((m) => m.member_type === 'parent' || m.member_type === 'admin');
   if (parents.length === 0) {
     return res.json({ ok: true, studentName: student.name, parents: [], cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
   }
