@@ -194,7 +194,18 @@ async function clearAssignment(date, slotType, slotId) {
   await db.prepare('DELETE FROM substitute_assignments WHERE session_date = ? AND slot_type = ? AND slot_id = ?').run(date, slotType, slotId);
 }
 
-async function assignedInfo(existing) {
+// floaterPool (optional - only substituteBoard's own hour-scoped pool has
+// one to give) supplies `rank` so the Floater Assignments dropdown can
+// still show a correct "(Choose First)"/"(Sometimes)"/"(Backup Only)"
+// label for a slot's already-assigned floater even when suggestedFloaters
+// itself no longer lists them (they're excluded there once used this
+// hour - see resolveSlot) - routes/admin-volunteers.js unshifts this same
+// assigned person back into the dropdown's own candidate list precisely
+// because suggestedFloaters dropped them, so without this it silently
+// showed a generic "(Available)" instead of their real rank, most visibly
+// for a backup-only floater (the only tier this can ever silently misdi
+// as anything looking like a "better" rank).
+async function assignedInfo(existing, floaterPool) {
   if (!existing) return null;
   return {
     id: existing.member_id,
@@ -203,6 +214,7 @@ async function assignedInfo(existing) {
     status: existing.status,
     infant: await hasInfantChild(existing.member_id),
     updatedLabel: formatTimestamp(existing.created_at),
+    rank: floaterPool ? floaterPool.find((m) => m.id === existing.member_id)?.rank ?? null : null,
   };
 }
 
@@ -228,26 +240,50 @@ async function substituteBoard(day, date) {
   });
 
   const result = [];
-  // Tracks everyone auto-picked (or already assigned) at ANY earlier hour
-  // today, across the whole day - not reset per hour, unlike usedThisHour
-  // below. A real request: "suggest different floaters each hour. try to
-  // not suggested the same person different hours in a day unless
-  // necessary." Without this, every hour's own pickCandidate started fresh
-  // from the same rank-sorted pool and kept landing on the same
-  // alphabetically-first available person hour after hour.
-  const usedToday = new Set();
+  // Tracks WHEN (not just whether) everyone auto-picked or already
+  // assigned at any earlier hour today was last used, across the whole
+  // day - not reset per hour, unlike usedThisHour below. A real request:
+  // "suggest different floaters each hour. try to not suggested the same
+  // person different hours in a day unless necessary... exhaust the list
+  // all 4 hours and all positions before suggesting someone else again."
+  // A plain "have they been used today at all" boolean Set (the original
+  // fix for the first half of that request) only gets a pool through ONE
+  // pass before it's useless: once literally everyone's been used once,
+  // every remaining slot's "fresh" pool is empty, and the fallback below
+  // always fell back to the exact same rank/alphabetically-first person
+  // for the REST of the day - confirmed live with a 2-person pool and 4
+  // one-job hours: hour 1/2 correctly split Alpha/Beta, but hours 3 AND 4
+  // both landed back on Alpha, 3 assignments to Beta's 1, instead of
+  // continuing to alternate. lastUsedSeq (member id -> the sequence
+  // number they were used at) instead of a boolean lets bestAvailable
+  // below pick whoever's gone longest since their last turn - a real
+  // round-robin that keeps rotating through the whole pool for as many
+  // repeat passes as the day's slot count needs, not just one.
+  const lastUsedSeq = new Map();
+  let useSeq = 0;
   for (const hourGroup of grid) {
     const hourPosition = hourGroup.position;
     const floaterPool = (await floaterMembersForHour(day, hourPosition)).filter((m) => !missingById.has(m.id));
     const usedThisHour = new Set();
     const slots = [];
 
-    // Prefers whoever hasn't already been picked earlier today - only
-    // reuses someone from an earlier hour when that's the sole option left
-    // for this one (an empty rank tier, or a small floater pool).
+    // Whoever has gone longest without a turn today wins (never-used-yet
+    // counts as "longest," ahead of anyone with a real lastUsedSeq) -
+    // `list` arrives already rank-sorted, and scanning it in that order
+    // while only replacing on a STRICTLY lower key keeps rank as the
+    // tiebreak whenever recency is otherwise equal (i.e. everyone in
+    // contention is equally never-used-today), the same tiebreak the old
+    // rank-order fallback gave every time - the difference is this now
+    // keeps rotating through repeat passes too, instead of collapsing
+    // back to a single "favorite" the moment the pool's first pass ends.
     function bestAvailable(list) {
-      const fresh = list.filter((m) => !usedToday.has(m.id));
-      return fresh.length > 0 ? fresh[0] : list[0] || null;
+      let best = null;
+      let bestKey = Infinity;
+      for (const m of list) {
+        const key = lastUsedSeq.has(m.id) ? lastUsedSeq.get(m.id) : -1;
+        if (key < bestKey) { best = m; bestKey = key; }
+      }
+      return best;
     }
 
     function pickCandidate(preferredIds) {
@@ -269,7 +305,7 @@ async function substituteBoard(day, date) {
       }
       if (existing) {
         usedThisHour.add(existing.member_id);
-        usedToday.add(existing.member_id);
+        lastUsedSeq.set(existing.member_id, useSeq++);
       }
       return existing;
     }
@@ -299,7 +335,7 @@ async function substituteBoard(day, date) {
           detail: cls.room ? `Room ${cls.room}` : '',
           ageGroup: cls.age_group || '',
           reason: `${roleLabel} ${statusLabel}: ${person.name}`,
-          assigned: await assignedInfo(existing),
+          assigned: await assignedInfo(existing, floaterPool),
           overdue: await assignedIsOverdue(existing, date, hourGroup.label),
         });
       }
@@ -316,7 +352,7 @@ async function substituteBoard(day, date) {
         room: job.room || '',
         detail: 'Permanent Job',
         reason: 'Staffed every session',
-        assigned: await assignedInfo(existing),
+        assigned: await assignedInfo(existing, floaterPool),
       });
     }
 

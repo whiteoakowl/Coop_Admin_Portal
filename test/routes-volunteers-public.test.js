@@ -67,6 +67,43 @@ test('GET /volunteers/:day', async (t) => {
     assert.doesNotMatch(res.text, /No upcoming floater assignments\./);
   });
 
+  await t.test('a real request: floater cards only show a name once it is a confirmed (approved) assignment, not a still-pending suggestion', async () => {
+    const { createPermanentJob, setAssignment } = require('../utils/substitutes');
+    const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
+    // Closer than the earlier subtest's own future date, so
+    // closestUpcomingDate actually lands on THIS date - not the older
+    // one, which would leave this test's own assignments invisible.
+    const date = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, date);
+
+    const pendingJobId = await createPermanentJob({ day: 'monday', hourPosition: 1, title: 'Still Pending Job', room: 'Room P' });
+    const approvedJobId = await createPermanentJob({ day: 'monday', hourPosition: 1, title: 'Confirmed Job', room: 'Room A' });
+    const floater = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Kiosk Test Floater', 'kiosk-floater-1', 'parent')").run()).lastInsertRowid;
+
+    // 'pending' the way the real auto-suggest system leaves a slot until an
+    // admin approves it (utils/substitutes.js's own autoAssign - not
+    // exported, so this mirrors its INSERT directly).
+    await db.prepare(
+      `INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status) VALUES (?, 'job', ?, ?, 0, 'pending')`
+    ).run(date, pendingJobId, floater);
+    await setAssignment(date, 'job', approvedJobId, floater, false); // 'approved'
+
+    const res = await request(app).get('/volunteers/monday');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Confirmed Job/);
+    assert.match(res.text, /Still Pending Job/);
+    // The confirmed job's row shows the floater's real name...
+    const confirmedRowMatch = res.text.match(/Confirmed Job[\s\S]*?<\/tr>/);
+    assert.ok(confirmedRowMatch && /Kiosk Test Floater/.test(confirmedRowMatch[0]), 'approved assignment should show the floater\'s name');
+    // ...but the still-pending job's row must NOT - it should read
+    // "Unassigned" like a genuinely open slot, not leak the auto-
+    // suggested (not yet admin-approved) name to the public kiosk.
+    const pendingRowMatch = res.text.match(/Still Pending Job[\s\S]*?<\/tr>/);
+    assert.ok(pendingRowMatch, 'pending job row should be present');
+    assert.doesNotMatch(pendingRowMatch[0], /Kiosk Test Floater/, 'a still-pending (not yet approved) pick must not show on the public kiosk');
+    assert.match(pendingRowMatch[0], /Unassigned/);
+  });
+
   await t.test('a missing volunteer_lists row for an otherwise-valid day 404s instead of crashing', async () => {
     // Simulates the real startup-race bug this test file exists to lock
     // in: a request landing before db/bootstrapPg.js's first-boot seeding

@@ -138,7 +138,7 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
       // removed from the Floater List, or another slot's own resolution
       // already marked them "used" for this hour above.
       if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
-        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: null, infant: slot.assigned.infant });
+        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: RANK_LABELS[slot.assigned.rank] || null, infant: slot.assigned.infant });
       }
       slot.candidates = candidates;
       slot.noneAvailable = candidates.length === 0;

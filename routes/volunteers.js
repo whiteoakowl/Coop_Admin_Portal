@@ -34,7 +34,29 @@ router.get('/volunteers/:day', async (req, res) => {
   // why every invocation now awaits app.ready first to close that race).
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const date = closestUpcomingDate(await datesForList(list.id));
-  const cards = date ? await dailyAssignmentCardsWithLabels(day, date) : [];
+  const rawCards = date ? await dailyAssignmentCardsWithLabels(day, date) : [];
+  // A real request: "floater cards by hour should only show floaters who
+  // have a confirmed assigned position" - substituteBoard auto-picks a
+  // candidate for every open slot as soon as a date's board is first
+  // viewed (see its own comment), persisted 'pending' until an admin
+  // actually approves or overrides it - a suggestion, not a commitment.
+  // The admin-facing Chart tab already only offers 'approved' picks via
+  // its own separate candidates/dropdown machinery, but this public,
+  // no-login kiosk view had no such gate: dailyAssignmentCardsWithLabels
+  // (shared with the Archive tab's own read-only popup/print, where
+  // showing a since-passed date's pending pick as a record of what was
+  // suggested is fine) returns 'pending' assignments exactly the same
+  // shape as 'approved' ones, so a floater walking up to this screen
+  // could see themselves (or someone else) listed as confirmed for a
+  // position nobody had actually signed off on yet. Blanking out
+  // anything short of 'approved' - right here, not in the shared partial
+  // itself - keeps that distinction admin-only everywhere else this data
+  // is shown, while this one public-facing view only ever shows a name
+  // once it's real.
+  const cards = rawCards.map((hour) => ({
+    ...hour,
+    jobs: hour.jobs.map((job) => ({ ...job, assigned: job.assigned && job.assigned.status === 'approved' ? job.assigned : null })),
+  }));
 
   res.render('volunteers-public', {
     title: `${DAY_LABELS[day]} Floater Assignments`,
