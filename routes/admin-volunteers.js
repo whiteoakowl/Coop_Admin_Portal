@@ -4,7 +4,7 @@ const multer = require('multer');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const { isValidISODate, formatDateLabel, formatDateLong, todayISO, weekdayOf } = require('../utils/dates');
-const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentOptions } = require('../utils/members');
+const { parseNamesFromUpload, findMemberByName, hasInfantChild, activeParentAndAdminOptions } = require('../utils/members');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { defaultDay, requireDay } = require('../utils/days');
@@ -95,8 +95,11 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
   // Just an id -> hasInfantChild lookup for the candidate dropdowns built
   // below (every candidate there is a real Floater List member for that
   // hour, never "any active parent" - see that loop's own comment).
+  // activeParentAndAdminOptions, not activeParentOptions, so an admin
+  // added to a Floater Team still gets a real (not undefined/falsy-by-
+  // omission) entry in this lookup.
   const infantByMemberId = {};
-  for (const p of await activeParentOptions()) infantByMemberId[p.id] = await hasInfantChild(p.id);
+  for (const p of await activeParentAndAdminOptions()) infantByMemberId[p.id] = await hasInfantChild(p.id);
 
   // The chart itself is now the assign UI - every permanent job (whether
   // filled or not) plus any class whose teacher(s) are absent, one row
@@ -345,7 +348,11 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
     teams,
     ranks: RANKS,
     rankLabels: RANK_LABELS,
-    availableParents: await activeParentOptions(),
+    // Admins can be added to a Floater Team just like any other adult
+    // volunteer - a real bug/request: "admins should still be included
+    // in lists of members/parents etc. for selecting ANYTHING across
+    // the site."
+    availableParents: await activeParentAndAdminOptions(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -458,7 +465,7 @@ router.post('/volunteers/:day/import', requireAdmin, requireDay, upload.single('
   let added = 0;
   let notFound = 0;
   for (const name of names) {
-    const member = await findMemberByName(name, 'parent');
+    const member = await findMemberByName(name, ['parent', 'admin']);
     if (!member) { notFound++; continue; }
     await addMemberToSection(list.id, member.id, firstSection.id);
     added++;

@@ -54,12 +54,15 @@ async function parseNamesFromUpload(buffer, filename) {
 // Used everywhere except the Members page itself, which is the only place
 // new members get added to the system. An optional memberType restricts the
 // match to just 'student' or 'parent' profiles (e.g. Floater Assignments
-// and Setup/Cleanup only ever match parents).
+// and Setup/Cleanup only ever match parents) - or pass an array (e.g.
+// ['parent', 'admin']) to match any of several types at once.
 async function findMemberByName(name, memberType) {
   if (memberType) {
+    const types = Array.isArray(memberType) ? memberType : [memberType];
     return (
-      (await db.prepare('SELECT * FROM members WHERE active = 1 AND member_type = ? AND LOWER(name) = LOWER(?)').get(memberType, name)) ||
-      null
+      (await db
+        .prepare(`SELECT * FROM members WHERE active = 1 AND member_type IN (${types.map(() => '?').join(', ')}) AND LOWER(name) = LOWER(?)`)
+        .get(...types, name)) || null
     );
   }
   return (await db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(name)) || null;
@@ -104,13 +107,16 @@ async function hasInfantChild(memberId) {
   });
 }
 
-// Every other member of each parent's family group, keyed by parent id -
-// the public forms render the parent's own checkbox separately, then
+// Every other member of each parent's (or admin's - see
+// activeParentAndAdminOptions' own comment) family group, keyed by parent
+// id - the public forms render the parent's own checkbox separately, then
 // this list, so it deliberately excludes the parent themselves (no more
 // "children only" restriction now that family is a symmetric group
 // rather than a parent->child link).
 async function familyGroupsByParent() {
-  const parents = (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'parent'").all()).sort(byLastName);
+  const parents = (
+    await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()
+  ).sort(byLastName);
   const byParent = {};
   for (const p of parents) {
     byParent[p.id] = (await familyOf(p.id)).map((m) => ({ id: m.id, name: m.name }));
@@ -120,10 +126,12 @@ async function familyGroupsByParent() {
 
 // Confirms memberId is really part of parentId's family (themselves, or
 // anyone sharing their family_id) before letting a form submission touch
-// that record.
+// that record. parentId is whatever was picked from a parents-picker
+// dropdown (activeParentAndAdminOptions, familyGroupsByParent above) - an
+// admin, not just a literal 'parent'-type member, is a valid pick there.
 async function loadFamilyMember(memberId, parentId) {
   if (memberId === parentId) {
-    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type = 'parent'").get(parentId);
+    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type IN ('parent', 'admin')").get(parentId);
   }
   const parent = await db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
   if (!parent || parent.family_id == null) return null;

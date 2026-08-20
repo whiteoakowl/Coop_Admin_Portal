@@ -119,7 +119,12 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   // by side in alphabetical-by-last-name order. The old free-text search
   // is now a dropdown of every name in this tab, jumping straight to one
   // person's card via the memberId filter scheduleList already supports.
-  const memberType = tab === 'parents' ? 'parent' : 'student';
+  // Parent tab includes admin/leader members too - a real bug report:
+  // "when viewing parent schedules under parent tab it won't show
+  // admins. wherever there is a parent filter it should include admins
+  // too." Admins regularly teach/assist/floater/staff a team just like
+  // any other adult, so their own schedule belongs on this tab.
+  const memberType = tab === 'parents' ? ['parent', 'admin'] : 'student';
   const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
   const filters = { memberType, memberId: selectedMemberId || undefined };
 
@@ -150,7 +155,12 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   }));
   summarized.sort((a, b) => byLastName(a.member, b.member));
 
-  const allNames = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND member_type = ?').all(memberType)).sort(byLastName);
+  const memberTypes = Array.isArray(memberType) ? memberType : [memberType];
+  const allNames = (
+    await db
+      .prepare(`SELECT id, name FROM members WHERE active = 1 AND member_type IN (${memberTypes.map(() => '?').join(', ')})`)
+      .all(...memberTypes)
+  ).sort(byLastName);
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const totalPages = Math.max(1, Math.ceil(summarized.length / PAGE_SIZE));
@@ -538,7 +548,7 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
     monday,
     wednesday,
     dayLabels: DAY_LABELS,
-    returnTab: member.member_type === 'parent' ? 'parents' : 'students',
+    returnTab: member.member_type === 'parent' || member.member_type === 'admin' ? 'parents' : 'students',
   });
 });
 

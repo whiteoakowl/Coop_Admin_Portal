@@ -31,7 +31,7 @@ const {
   swapItemPosition,
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { activeParentOptions, activeParentAndAdminOptions } = require('../utils/members');
+const { activeParentAndAdminOptions } = require('../utils/members');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 
 const uploadTasks = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
@@ -51,9 +51,12 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
     day,
     dayLabel: DAY_LABELS[day],
     teams: await teamsWithMembers(day),
-    // availableParents: the Add Member dialog's member picker - a team's
-    // own MEMBERS stay parent-only, unchanged.
-    availableParents: await activeParentOptions(),
+    // availableParents: the Add Member dialog's member picker. Used to be
+    // parent-only by design, but a broader follow-up request widened
+    // that: "admins should still be included in lists of members/parents
+    // etc. for selecting ANYTHING across the site" - admins are regularly
+    // hands-on team members too, not just leaders.
+    availableParents: await activeParentAndAdminOptions(),
     // availableLeaders: the standing team card's own leader dropdown and
     // the Create New Team dialog's leader dropdown - a real request:
     // "for choosing a leader for setup/cleanup [team]s" should offer

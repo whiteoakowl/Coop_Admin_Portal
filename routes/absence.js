@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-const { activeParentOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
+const { activeParentAndAdminOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 // Generous cap for real use (a parent reporting for several kids, or
@@ -14,7 +14,7 @@ const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts:
 router.get('/absence', async (req, res) => {
   res.render('absence', {
     title: 'Absence/Late Form',
-    parents: await activeParentOptions(),
+    parents: await activeParentAndAdminOptions(),
     childrenByParent: await familyGroupsByParent(),
     result: null,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
@@ -25,7 +25,7 @@ router.post('/absence/submit', async (req, res) => {
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('absence', {
       title: 'Absence/Late Form',
-      parents: await activeParentOptions(),
+      parents: await activeParentAndAdminOptions(),
       childrenByParent: await familyGroupsByParent(),
       formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
@@ -40,7 +40,7 @@ router.post('/absence/submit', async (req, res) => {
   const reasonCategory = ['personal', 'medical'].includes(req.body.reasonCategory) ? req.body.reasonCategory : null;
   const reason = (req.body.reason || '').trim() || null;
 
-  const parents = await activeParentOptions();
+  const parents = await activeParentAndAdminOptions();
   const childrenByParent = await familyGroupsByParent();
   const formValues = {
     type,

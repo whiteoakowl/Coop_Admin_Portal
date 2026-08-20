@@ -113,10 +113,10 @@
                       <option value="">No leader</option>
                       <%# A real request: admins should show up alongside
                           parents when choosing a team leader - they
-                          regularly run a team themselves. availableLeaders
-                          (routes/admin-setup.js) is parent+admin; the Add
-                          Member dialog below stays availableParents
-                          (parent-only) - only a team's LEADER picker widens. %>
+                          regularly run a team themselves. Both
+                          availableLeaders and the Add Member dialog below
+                          (availableParents) are parent+admin now - see
+                          routes/admin-setup.js's own comment. %>
                       <% availableLeaders.forEach(function(p) { %>
                         <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
                       <% }); %>

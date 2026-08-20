@@ -563,10 +563,11 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
   // of rows, and each lookup is otherwise a separate round trip to a
   // remote Supabase/Postgres connection (unlike the old single local
   // SQLite file, network latency on every one of those adds up fast on a
-  // large file). Parents AND students, matching activeMembersForStaff's
-  // own "a teen can teach/assist too" scope for the picker.
+  // large file). Parents, admins, AND students, matching
+  // activeMembersForStaff's own "a teen can teach/assist too, and admins
+  // are still parents/leaders for this purpose too" scope for the picker.
   const activeStaffByName = new Map(
-    (await db.prepare("SELECT id, name FROM members WHERE member_type IN ('parent', 'student') AND active = 1").all()).map((p) => [p.name.toLowerCase(), p.id])
+    (await db.prepare("SELECT id, name FROM members WHERE member_type IN ('parent', 'admin', 'student') AND active = 1").all()).map((p) => [p.name.toLowerCase(), p.id])
   );
 
   let created = 0;

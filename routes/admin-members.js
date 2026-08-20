@@ -798,7 +798,7 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
     if (!r.parentName) continue;
     const studentId = nameToId[r.name.toLowerCase()];
     const parentRow = await db
-      .prepare("SELECT id FROM members WHERE active = 1 AND member_type = 'parent' AND LOWER(name) = LOWER(?)")
+      .prepare("SELECT id FROM members WHERE active = 1 AND member_type IN ('parent', 'admin') AND LOWER(name) = LOWER(?)")
       .get(r.parentName);
     const parentId = nameToId[r.parentName.toLowerCase()] || (parentRow ? parentRow.id : null);
     if (studentId && parentId && studentId !== parentId) {

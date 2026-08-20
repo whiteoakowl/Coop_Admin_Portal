@@ -194,7 +194,13 @@ async function scheduleList(filters) {
     members = members.filter((m) => m.family_id === filters.familyId);
   }
   if (filters.memberType) {
-    members = members.filter((m) => m.member_type === filters.memberType);
+    // Accepts either a single type or an array - the Schedules page's
+    // Parent tab passes ['parent', 'admin'] so admin/leader members show
+    // up there too (a real bug report: "when viewing parent schedules
+    // under parent tab it won't show admins" - wherever there's a parent
+    // filter site-wide, admins should still be included).
+    const types = Array.isArray(filters.memberType) ? filters.memberType : [filters.memberType];
+    members = members.filter((m) => types.includes(m.member_type));
   }
 
   // Computed once for the whole filtered list, not once per member -

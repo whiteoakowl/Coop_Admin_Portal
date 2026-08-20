@@ -189,13 +189,15 @@ test('Setup/Cleanup team card: Leader/Meeting time/Meeting location share one ba
 
 // A real request: "admins and parents should show up in the dropdown
 // menu for setup/cleanup team member lists" - clarified afterward to
-// mean specifically "choosing a leader for setup/cleanup [team]s".
-// Admins regularly run a team themselves, so BOTH leader dropdowns (the
-// standing team card's own, and the Create New Team dialog's) now offer
-// admin members alongside parents (utils/members.js's
-// activeParentAndAdminOptions) - a team's actual MEMBER list (the Add
-// Member dialog's picker) stays parent-only, unchanged.
-test('Setup/Cleanup manage page: admins show up alongside parents when choosing a team leader, but not in the Add Member picker', async (t) => {
+// mean specifically "choosing a leader for setup/cleanup [team]s", so
+// BOTH leader dropdowns (the standing team card's own, and the Create
+// New Team dialog's) picked up admin members alongside parents first
+// (utils/members.js's activeParentAndAdminOptions). A later, broader
+// request - "admins should still be included in lists of members/
+// parents etc. for selecting ANYTHING across the site" - widened the
+// Add Member dialog's own picker the same way: admins are regularly
+// hands-on team members too, not just leaders.
+test('Setup/Cleanup manage page: admins show up alongside parents both when choosing a team leader and in the Add Member picker', async (t) => {
   const { cookie } = await loginAsAdmin();
 
   await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Parent', 'Pat Parent', 'parent')").run();
@@ -214,11 +216,11 @@ test('Setup/Cleanup manage page: admins show up alongside parents when choosing 
     assert.doesNotMatch(dialogMatch[0], /Sam Student/);
   });
 
-  await t.test('the Add Member dialog\'s member picker stays parent-only - no admins', () => {
+  await t.test('the Add Member dialog\'s member picker also offers both parents and admins', () => {
     const dialogMatch = /<dialog id="add-member-dialog"[\s\S]*?<\/dialog>/.exec(res.text);
     assert.ok(dialogMatch, 'expected the Add Member dialog');
     assert.match(dialogMatch[0], /<option value="\d+">Pat Parent<\/option>/);
-    assert.doesNotMatch(dialogMatch[0], /Ashley Admin/, 'a team\'s MEMBER list is unaffected by this request - only the leader picker widens');
+    assert.match(dialogMatch[0], /<option value="\d+">Ashley Admin<\/option>/);
     assert.doesNotMatch(dialogMatch[0], /Sam Student/);
   });
 

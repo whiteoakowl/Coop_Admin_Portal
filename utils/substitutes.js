@@ -296,6 +296,24 @@ async function substituteBoard(day, date) {
 
     async function resolveSlot(slotType, slotId, preferredIds) {
       let existing = await assignmentFor(date, slotType, slotId);
+      // A real bug report: "the suggested floater name dropdown menus are
+      // not updating as the floater teams are updated." A still-'pending'
+      // pick (auto-suggested, never admin-approved) is just that - a
+      // suggestion - but nothing here ever re-checked one's own
+      // eligibility once written, so removing that exact person from the
+      // Floater Team (or them becoming newly absent for this date - see
+      // floaterPool's own missingById filter above) left the board still
+      // showing them as "currently assigned" indefinitely, since resolve
+      // Slot only ever auto-picks when NO row exists yet. Clearing a
+      // pending row here the moment its own person no longer belongs to
+      // this hour's pool makes the pickCandidate() call below immediately
+      // re-derive a fresh, still-eligible suggestion instead of leaving a
+      // stale name pinned in place. Never touches status:'approved' - an
+      // admin's own deliberate pick stands until THEY change it.
+      if (existing && existing.status === 'pending' && !floaterPool.some((m) => m.id === existing.member_id)) {
+        await clearAssignment(date, slotType, slotId);
+        existing = null;
+      }
       if (!existing && date) {
         const candidate = pickCandidate(preferredIds);
         if (candidate) {

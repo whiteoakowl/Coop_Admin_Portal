@@ -664,18 +664,21 @@ async function activeStudents() {
   return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type = 'student'").all()).sort(byLastName);
 }
 
-// Active parents AND students, for the teacher/assistant picker - a
-// homeschool co-op commonly has a teen student teaching or assisting a
-// younger class alongside (or instead of) a parent, so both member types
-// are eligible here. Deliberately unlike the Floater Assignments and
-// Setup/Cleanup pickers (utils/members.js's activeParentOptions), which
-// stay parent-only - those are specifically adult volunteer slots, not a
-// class staffing role a student can also fill. Each row carries its own
-// member_type so a picker can label a student option distinctly from a
-// parent one with the same or a similar name.
+// Active parents, admins, AND students, for the teacher/assistant picker -
+// a homeschool co-op commonly has a teen student teaching or assisting a
+// younger class alongside (or instead of) a parent, so student is eligible
+// here too. Admins are included alongside parents for the same reason
+// every other member/parent picker site-wide now is - "admins should
+// still be included in lists of members/parents etc. for selecting
+// ANYTHING across the site" - admins regularly teach or assist a class
+// themselves. Each row carries its own member_type so a picker can label
+// a student option distinctly from a parent/admin one with the same or a
+// similar name.
 async function activeMembersForStaff() {
   return (
-    await db.prepare("SELECT id, name, member_type FROM members WHERE active = 1 AND member_type IN ('parent', 'student')").all()
+    await db
+      .prepare("SELECT id, name, member_type FROM members WHERE active = 1 AND member_type IN ('parent', 'admin', 'student')")
+      .all()
   ).sort(byLastName);
 }
 
