@@ -131,6 +131,57 @@ test('a U.S.-style M/D/YYYY date string (what a real Excel Date cell reads back 
   assert.equal(updated.birthday, '2015-04-12');
 });
 
+// A real bug report: "importing birthdays comes in as NaN/NaN/NaN. Only
+// 1 row imported out of many." Traced to a genuine Excel Date cell, left
+// at Excel's own default short-date format instead of manually
+// reformatted to a 4-digit year, reading back through SheetJS's
+// raw:false as "4/12/15" - a 2-digit year - which the old regex
+// (requiring exactly 4 digits) silently rejected as unreadable. Built
+// via a real Date-typed cell (not a plain string), matching what
+// actually typing a birthdate into Excel/Sheets produces - see
+// check-birthday-import2.js's own live repro for why a plain string
+// wouldn't have caught this.
+test('a 2-digit-year date (a real Excel Date cell at its default short-date format) is accepted', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+
+  const recent = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Twodigit Recent Student', 'bday-2digit-recent', 'student')")
+    .run();
+  const older = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Twodigit Older Student', 'bday-2digit-older', 'student')")
+    .run();
+
+  const ws = XLSX.utils.aoa_to_sheet(
+    [
+      ['First Name', 'Last Name', 'Birthday'],
+      ['Twodigit Recent', 'Student', new Date(2015, 3, 12)],
+      ['Twodigit Older', 'Student', new Date(1978, 10, 3)],
+    ],
+    { cellDates: true }
+  );
+  // A real Excel Date cell's own default short-date format - no explicit
+  // 4-digit-year reformatting, exactly what the bug report's real
+  // spreadsheet looked like.
+  ['C2', 'C3'].forEach((addr) => { ws[addr].z = 'm/d/yy'; });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Import');
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  const res = await request(app)
+    .post('/admin/members/import-birthdays?_csrf=' + encodeURIComponent(csrfToken))
+    .set('Cookie', cookie)
+    .attach('file', buffer, 'birthdays.xlsx');
+
+  assert.equal(res.status, 302);
+  const notice = decodeURIComponent(/notice=([^&]*)/.exec(res.headers.location)[1]);
+  assert.match(notice, /2 birthday\(s\) updated/, `expected both rows to import, got: ${notice}`);
+
+  const updatedRecent = await db.prepare('SELECT birthday FROM members WHERE id = ?').get(recent.lastInsertRowid);
+  assert.equal(updatedRecent.birthday, '2015-04-12', '2-digit "15" should resolve to 2015, not 1915');
+  const updatedOlder = await db.prepare('SELECT birthday FROM members WHERE id = ?').get(older.lastInsertRowid);
+  assert.equal(updatedOlder.birthday, '1978-11-03', '2-digit "78" should resolve to 1978, not 2078');
+});
+
 // Real bug report: the imported birthday showed on the Members list as
 // its raw stored ISO value ("2015-04-12") - reads as a sort key, not a
 // birthday. The stored column itself stays ISO (every date comparison/

@@ -97,4 +97,66 @@ test('POST /admin/members/import', async (t) => {
     assert.ok(alice.family_id != null, 'Parent First/Last Name should have linked the student to a family');
     assert.equal(alice.family_id, jane.family_id);
   });
+
+  // A real bug report - "importing birthdays comes in as NaN/NaN/NaN" -
+  // traced (in part) to this route's CREATE-new-member branch: a
+  // Birthday cell used to go straight into the INSERT with no
+  // normalizeBirthdayToISO pass, so a genuine Excel Date cell's own
+  // formatted text ("4/12/2015") got stored completely unconverted -
+  // later rendering as literal "NaN/NaN/NaN" (formatDateNumeric's
+  // parseISO is a plain split('-'), which fails on non-ISO text). Built
+  // with a real Date-typed cell (not a plain string), matching what
+  // actually typing a birthdate into Excel/Sheets produces.
+  await t.test('a brand-new student\'s Birthday cell from a real Excel Date cell is normalized before it\'s stored', async () => {
+    const ws = XLSX.utils.aoa_to_sheet(
+      [IMPORT_HEADERS, ['Dana', 'Newcomer', 'Student', '', '', '', '', '', '', new Date(2016, 7, 3), '4th Grade', '', '', '']],
+      { cellDates: true }
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Import');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const res = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'newcomer.xlsx');
+    assert.equal(res.status, 302);
+
+    const dana = await db.prepare("SELECT birthday FROM members WHERE name = 'Dana Newcomer'").get();
+    assert.ok(dana);
+    assert.equal(dana.birthday, '2016-08-03', 'the raw Excel Date cell text should be normalized to ISO, not stored verbatim');
+  });
+
+  // Same bug, the merge-into-an-existing-member path: importing a row
+  // that matches an existing member with no birthday on file offers it
+  // as a mergeable field (mergeableFieldsFor) - confirming that merge
+  // used to write the raw, un-normalized cell text the same way the
+  // CREATE branch did.
+  await t.test('merging a Birthday from a real Excel Date cell into an existing member (via the confirm step) is normalized too', async () => {
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Merge Target', 'merge-target-1', 'student')").run();
+
+    const ws = XLSX.utils.aoa_to_sheet(
+      [IMPORT_HEADERS, ['Merge', 'Target', 'Student', '', '', '', '', '', '', new Date(2014, 11, 25), '', '', '', '']],
+      { cellDates: true }
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Import');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const importRes = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'merge.xlsx');
+    assert.equal(importRes.status, 200, 'a mergeable field should render the confirm-merge page, not redirect');
+    const memberIdMatch = /name="allMemberIds" value="(\d+)"/.exec(importRes.text);
+    assert.ok(memberIdMatch, 'expected a candidate row on the confirm page');
+    const payloadMatch = /name="payloads" value="([^"]*)"/.exec(importRes.text);
+    assert.ok(payloadMatch, 'expected the candidate\'s update payload');
+    const payload = payloadMatch[1].replace(/&#34;/g, '"');
+    assert.match(payload, /2014-12-25/, 'the confirm page\'s own payload should already be the normalized ISO value, not raw Excel text');
+
+    const confirmRes = await request(app)
+      .post('/admin/members/import/confirm?_csrf=' + encodeURIComponent(csrfToken))
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ memberIds: memberIdMatch[1], allMemberIds: memberIdMatch[1], payloads: payload });
+    assert.equal(confirmRes.status, 302);
+
+    const merged = await db.prepare("SELECT birthday FROM members WHERE name = 'Merge Target'").get();
+    assert.equal(merged.birthday, '2014-12-25');
+  });
 });

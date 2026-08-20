@@ -167,6 +167,43 @@ test('POST /admin/members/mass-import', async (t) => {
     assert.equal(await db.prepare("SELECT id FROM members WHERE name = 'Orphan Row Kid'").get(), undefined);
   });
 
+  // A real bug report - "importing birthdays comes in as NaN/NaN/NaN" -
+  // traced (in part) to this route: unlike the dedicated Import
+  // Birthdays route, a child's Birthday cell here used to go straight
+  // into the INSERT with no normalizeBirthdayToISO pass, so a genuine
+  // Excel Date cell's own formatted text ("4/12/2015", not the ISO
+  // "2015-04-12" this column is stored as) got written completely
+  // unconverted - formatDateNumeric's parseISO (a plain split('-')) then
+  // failed on it, rendering as literal "NaN/NaN/NaN" everywhere that
+  // child's birthday was shown. Built with a real Date-typed cell (not a
+  // plain string, which every other test in this file uses and which
+  // never exercised this bug), matching what actually typing a
+  // birthdate into Excel/Sheets produces.
+  await t.test('a child Birthday cell from a real Excel Date cell (not already ISO text) is normalized before it\'s stored', async () => {
+    const ws = XLSX.utils.aoa_to_sheet(
+      [MASS_IMPORT_HEADERS, padRow(['Sam', 'Nguyen', 'sam@example.com', '', '', '', '', '', '', '', '', 'Kid', 'Nguyen', new Date(2015, 3, 12), '5th Grade'])],
+      { cellDates: true }
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Import');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const res = await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'nguyen.xlsx');
+    assert.equal(res.status, 302);
+
+    const kid = await db.prepare("SELECT birthday FROM members WHERE name = 'Kid Nguyen'").get();
+    assert.ok(kid, 'expected the child to still be created even though the birthday needed normalizing');
+    assert.equal(kid.birthday, '2015-04-12', 'the raw Excel Date cell text should be normalized to ISO, not stored verbatim');
+
+    // The member profile page uses formatDateNumeric to display it - a
+    // stored non-ISO value renders as literal "NaN/NaN/NaN" there, which
+    // is exactly the symptom the bug report described.
+    const member = await db.prepare("SELECT id FROM members WHERE name = 'Kid Nguyen'").get();
+    const profile = await request(app).get(`/admin/members/${member.id}`).set('Cookie', cookie);
+    assert.match(profile.text, /04\/12\/2015/);
+    assert.doesNotMatch(profile.text, /NaN/);
+  });
+
   await t.test('re-uploading the same file a second time does not create duplicate members, only links them again', async () => {
     const buffer = buildImportBuffer([padRow(['Pat', 'Rivera', 'pat@example.com', '', '', '', '', '', '', '', '', 'Kid', 'Rivera', '2017-05-05', '3rd Grade'])]);
     await request(app).post('/admin/members/mass-import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'rivera-1.xlsx');

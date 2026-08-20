@@ -486,13 +486,29 @@ router.get('/members/import-birthdays-template.xlsx', (req, res) => {
 // as something like "4/12/2015" in whatever locale format the sheet
 // used, not the ISO "2015-04-12" the birthday column is stored as and
 // isValidISODate expects. Accepts both: already-ISO text as-is, or a
-// U.S.-style M/D/YYYY (the overwhelming common case for a Date cell)
+// U.S.-style M/D/Y (the overwhelming common case for a Date cell)
 // normalized into ISO.
+//
+// A real bug report - "importing birthdays comes in as NaN/NaN/NaN, only
+// 1 row imported out of many" - traced to the year group here requiring
+// exactly 4 digits (\d{4}). Confirmed live: a genuine Excel Date cell,
+// typed and left at Excel's own default short-date format rather than
+// explicitly reformatted to a 4-digit year, reads back through
+// SheetJS's raw:false as "4/12/15" - a 2-digit year - not "4/12/2015".
+// Every row shaped like that silently failed this regex and got counted
+// as an unreadable date instead of imported, which is exactly a "only
+// the one row I happened to type the full year out for by hand made it
+// through" result. \d{2,4} now accepts either; a 2-digit year picks
+// 2000s vs 1900s the same way spreadsheet apps themselves do (Excel's
+// own cutoff is 30, not tied to the current year, so this stays stable
+// as time passes rather than drifting) - correct either way for this
+// column's whole realistic range (a co-op member's child's birth year).
 function normalizeBirthdayToISO(value) {
   if (isValidISODate(value)) return value;
-  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(String(value).trim());
+  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(String(value).trim());
   if (!match) return null;
-  const [, m, d, y] = match;
+  const [, m, d, yRaw] = match;
+  const y = yRaw.length === 2 ? (Number(yRaw) < 30 ? `20${yRaw}` : `19${yRaw}`) : yRaw;
   const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   return isValidISODate(iso) ? iso : null;
 }
@@ -696,9 +712,21 @@ function mergeableFieldsFor(existingMember, row) {
   const updates = {};
   for (const [field] of IMPORT_MERGE_FIELDS) {
     const column = IMPORT_FIELD_COLUMNS[field];
-    const incoming = row[field];
+    let incoming = row[field];
     if (!incoming) continue;
     if (existingMember[column]) continue; // never overwrite a value that's already set
+    // Same "NaN/NaN/NaN" bug as the CREATE branch just below and Mass
+    // Import Families (see that route's own comment) - a raw spreadsheet
+    // cell's formatted text ("4/12/2015") isn't the ISO shape the
+    // birthday column is stored as, and this merge path writes whatever
+    // it's handed straight through on confirm with no read-time chance
+    // to fix it up first. An unreadable date is treated the same as one
+    // that was never provided - offering it as a mergeable field just to
+    // silently write garbage isn't better than leaving it blank.
+    if (field === 'birthday') {
+      incoming = normalizeBirthdayToISO(incoming);
+      if (!incoming) continue;
+    }
     updates[field] = incoming;
   }
   return updates;
@@ -751,7 +779,13 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
         r.zip || null,
         r.phone || null,
         r.email || null,
-        memberType === 'student' ? r.birthday || null : null,
+        // normalizeBirthdayToISO here for the same reason mergeableFieldsFor
+        // and the Mass Import Families loop both need it (see their own
+        // comments) - a raw spreadsheet cell's formatted text isn't
+        // automatically the ISO shape this column is stored as, and
+        // writing it unconverted is what produces a literal "NaN/NaN/NaN"
+        // everywhere that birthday is later displayed.
+        memberType === 'student' && r.birthday ? normalizeBirthdayToISO(r.birthday) : null,
         memberType === 'student' ? r.gradeLevel || null : null,
         r.medicalNotes || null
       );
@@ -1041,6 +1075,21 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
   let familiesCreated = 0;
   let membersCreated = 0;
   let membersLinked = 0;
+  // A real bug report - "importing birthdays comes in as NaN/NaN/NaN" -
+  // traced (in part) to here: unlike the dedicated Import Birthdays
+  // route below, this loop used to hand a child's birthday cell straight
+  // to createOrLinkFamilyMember with no normalizeBirthdayToISO pass at
+  // all, so a genuine Excel Date cell's own formatted text ("4/12/2015",
+  // or "4/12/15" at Excel's own default 2-digit-year short-date format)
+  // got written into the birthday column completely unconverted. Every
+  // later read of that value (formatDateNumeric's parseISO, which just
+  // splits on '-') then failed on the un-ISO'd text, rendering as
+  // literal "NaN/NaN/NaN" wherever that child's birthday was shown.
+  // Counted separately from the already-existing notAStudent/invalidDate
+  // counters below since this route creates brand-new members rather
+  // than matching existing ones - "skipped the birthday, still created
+  // the child" is a materially different outcome worth its own tally.
+  let invalidBirthdays = 0;
 
   for (const r of rows) {
     const familyId = await createFamilyFromLastName(r.primaryParentName);
@@ -1069,10 +1118,12 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
     }
 
     for (const child of r.children) {
+      const birthday = child.birthday ? normalizeBirthdayToISO(child.birthday) : null;
+      if (child.birthday && !birthday) invalidBirthdays++;
       const result = await createOrLinkFamilyMember(child.name, 'student', familyId, {
         ...shared,
         email: r.primaryParentEmail,
-        birthday: child.birthday,
+        birthday,
         gradeLevel: child.grade,
       });
       if (result.created) membersCreated++;
@@ -1080,9 +1131,10 @@ router.post('/members/mass-import', upload.single('file'), async (req, res) => {
     }
   }
 
-  const summary =
-    `Mass import complete: ${familiesCreated} famil${familiesCreated === 1 ? 'y' : 'ies'} created, ${membersCreated} new member(s) created` +
-    (membersLinked ? `, ${membersLinked} already-existing member(s) linked to their family.` : '.');
+  let summary = `Mass import complete: ${familiesCreated} famil${familiesCreated === 1 ? 'y' : 'ies'} created, ${membersCreated} new member(s) created`;
+  if (membersLinked) summary += `, ${membersLinked} already-existing member(s) linked to their family`;
+  summary += '.';
+  if (invalidBirthdays) summary += ` ${invalidBirthdays} child birthday(s) had an unreadable date and were left blank.`;
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
 });
