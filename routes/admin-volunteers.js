@@ -358,6 +358,40 @@ router.get('/volunteers/:day/teams', requireAdmin, requireDay, async (req, res) 
   });
 });
 
+// A real bug report: "floater team and setup cleanup teams should have a
+// print preview before going to print." (see admin-setup.js's own
+// matching route/comment for Setup/Cleanup Teams). This page's own Print
+// button used to call window.print() directly on itself with no review
+// step - lands on a dedicated read-only preview page instead, matching
+// every other print button site-wide.
+router.get('/volunteers/:day/teams/print', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const list = await getListByDay(day);
+  if (!list) return res.status(404).render('404', { title: 'Not Found' });
+  const sections = await sectionsForList(list.id);
+  const hours = await hoursForDay(day);
+  const hourLabelByPosition = {};
+  hours.forEach((h) => { hourLabelByPosition[h.position] = h.label; });
+
+  const teams = [];
+  for (const section of sections) {
+    const sectionMembers = [];
+    for (const m of await membersForSection(list.id, section.id)) sectionMembers.push({ ...m, infant: await hasInfantChild(m.id) });
+    teams.push({
+      section,
+      hourLabel: hourLabelByPosition[section.position] || section.label,
+      members: sectionMembers,
+    });
+  }
+
+  res.render('admin-volunteer-teams-print', {
+    title: `${DAY_LABELS[day]} Floater Teams`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    teams,
+  });
+});
+
 // Explicit, admin-triggered cleanup for floater team membership that
 // accumulated non-primary parents before/outside the "only the family's
 // primary parent gets auto-floated" rule - see

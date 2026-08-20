@@ -80,8 +80,12 @@
       </div>
       <div class="roster-btn-row">
         <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-family-dialog').showModal()">+ Add Family</button>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-families-dialog').showModal()">Edit Families</button>
+        <%# A real request: "add/edit families should be one button.
+            combine the feature." Used to be two separate buttons/dialogs
+            (+ Add Family, Edit Families) - one combined "Families" button
+            now opens one dialog with an "add new" row on top of the same
+            rename/delete list, see manage-families-dialog below. %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()">Families</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('mass-import-dialog').showModal()">Mass Import Families</button>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-birthdays-dialog').showModal()">Import Birthdays</button>
@@ -101,27 +105,25 @@
       action="/admin/members/bulk-delete"
     ></form>
 
-    <dialog id="add-family-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/members/families/new">
-        <h3>Add Family</h3>
-        <p class="hint">A family must be added here before it shows up on a member's "Choose a Family" dropdown.</p>
-        <label>Family Last Name
-          <input type="text" name="name" placeholder="e.g. Anderson" required />
+    <%# Combined Add/Rename/Delete Family dialog - a real request: "member
+        page. add/edit families should be one button. combine the
+        feature." Used to be two separate buttons/dialogs (+ Add Family,
+        Edit Families); the "add new" mini-form on top is unchanged
+        otherwise (still a real page navigation back to /admin/members on
+        submit, same as before). Rename or delete a family "name" itself
+        is distinct from the per-member "Choose a Family" dropdown on the
+        Add/Edit Member form, which only assigns/clears one member's own
+        family_id - deleting a family here only ungroups its members
+        (families.id has ON DELETE SET NULL on members.family_id), it
+        never deletes a member. %>
+    <dialog id="manage-families-dialog" class="member-picker-dialog">
+      <h3>Families</h3>
+      <form method="POST" action="/admin/members/families/new" class="manage-families-add-form">
+        <label>Add a New Family
+          <input type="text" name="name" placeholder="Family last name, e.g. Anderson" required />
         </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add Family</button>
-        </div>
+        <button type="submit" class="btn-secondary">+ Add</button>
       </form>
-    </dialog>
-
-    <%# Rename or delete a family "name" itself - distinct from the
-        per-member "Choose a Family" dropdown on the Add/Edit Member form,
-        which only assigns/clears one member's own family_id. Deleting a
-        family here only ungroups its members (families.id has ON DELETE
-        SET NULL on members.family_id) - it never deletes a member. %>
-    <dialog id="edit-families-dialog" class="member-picker-dialog">
-      <h3>Edit Families</h3>
       <% if (families.length === 0) { %>
         <p class="hint">No families added yet.</p>
       <% } else { %>

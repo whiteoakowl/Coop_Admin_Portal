@@ -75,6 +75,31 @@ router.get('/setup/:day/manage', requireAdmin, requireDay, async (req, res) => {
   });
 });
 
+// A real bug report: "floater team and setup cleanup teams should have a
+// print preview before going to print." The manage page's own Print
+// button used to call window.print() directly on itself, jumping straight
+// to the OS print dialog with no review step - every other print button
+// site-wide instead lands on a dedicated read-only preview page first
+// (see admin-setup-tasks-print.ejs) that the admin actually looks at
+// before clicking ITS OWN Print button. This route/view gives Setup/
+// Cleanup Teams the same pattern, reusing the exact same print-only CSS
+// classes (team-print-page-fit, team-print-meta, setup-team-card-grid)
+// the manage page's own @media print rules already relied on, so the
+// preview is guaranteed to look exactly like the real printout - same
+// markup, same shrink-to-fit script, just without any of the manage
+// page's editable form controls that a read-only preview has no business
+// showing.
+router.get('/setup/:day/teams/print', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  res.render('admin-setup-teams-print', {
+    title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
+    day,
+    dayLabel: DAY_LABELS[day],
+    teams: await teamsWithMembers(day),
+    absentIds: await absentMemberIdsForDate(defaultDateFor(day)),
+  });
+});
+
 router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const title = (req.body.title || '').trim();

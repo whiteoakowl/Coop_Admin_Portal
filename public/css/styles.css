@@ -2642,15 +2642,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    real bug report: that read as a slider/scrollbar the whole toolbar was
    hidden behind. A fixed 2-column grid was tried next, but a toolbar with
    more than 4 buttons (Attendance's Edit Dates/+Add Member/Print/
-   Allergies/Resync/Archive - 6) then spilled to 3+ rows instead of the
-   requested exactly 2. Every button (and .roster-btn-form, the same
-   toolbar slot as a <form> instead of a plain button) now always fills
-   its row's full width, split across exactly 2 rows regardless of count -
-   the column COUNT (how many buttons per row) is set inline by public/js/
-   roster-btn-row-grid.js as ceil(button count / 2), since pure CSS can't
-   compute "half of however many children this row has" - grid-auto-flow:
-   column would place items 1,3,5 on row 1, breaking reading order (see
-   that file's own comment for the full reasoning).
+   Allergies/Resync/Archive - 6) then spilled to 3+ rows instead of a
+   clean, even grid. Every button (and .roster-btn-form, the same toolbar
+   slot as a <form> instead of a plain button) now always fills its row's
+   full width, laid out in as few rows as it takes to keep every row at
+   4 columns or fewer - a real bug report: "no more than 4 buttons on a
+   row" - balanced evenly across those rows rather than cramming as many
+   as possible into the first ones. The column COUNT is set inline by
+   public/js/roster-btn-row-grid.js from the real button count, since
+   pure CSS can't compute "however many rows/columns keeps this balanced
+   and under a cap" - grid-auto-flow: column would place items 1,3,5 on
+   row 1, breaking reading order (see that file's own comment for the
+   full reasoning).
    Must come after .roster-btn-row/.roster-action-btn's own base
    (unscoped) rules above - equal-specificity selectors resolve by source
    order regardless of which one is inside a media query, so a copy
@@ -2678,12 +2681,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .roster-btn-row > form {
     display: contents;
   }
+  /* A real bug report: "fix all the buttons so that text fits inside or
+     the buttons clean." overflow:hidden + text-overflow:ellipsis on a
+     flex container (.roster-action-btn's own inline-flex icon+text
+     layout, base rules above) doesn't reliably ellipsis at all - text-
+     overflow only truncates a single inline content run, not a flex
+     container's separate icon/text flex items, so a longer label (Mass
+     Import Families, View Archived, Import Birthdays, ...) squeezed into
+     a narrow mobile column just got hard-clipped mid-character with no
+     "..." indicator, reading as broken rather than intentionally
+     shortened. Letting the label wrap onto a second line instead - grid's
+     own default align-items: stretch already evens every button in that
+     row up to match its tallest neighbor, so a wrapped 2-line button
+     doesn't look out of place next to shorter single-line ones. */
   .roster-action-btn {
-    padding: 0.5rem 0.4rem;
+    padding: 0.45rem 0.4rem;
     font-size: 0.72rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    line-height: 1.2;
   }
 }
 
@@ -4152,6 +4167,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .team-info-title-input { font-size: 0.95rem; font-weight: 800; }
 .team-info-desc-input { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+/* admin-setup-teams-print.ejs's plain (non-input) description text - the
+   dedicated Setup/Cleanup Teams print preview page has no editable form
+   controls at all (read-only by design), so it can't reuse .team-info-
+   desc-input itself, just the same size/weight/color it prints as. */
+.team-info-desc-print { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--muted); font-weight: 600; text-align: center; }
 /* A real request: "setup/cleanup team cards should have a space for time
    to meet and meeting location" - same row shape as .team-info-leader
    above (icon + text), just for a free-text input instead of a leader
@@ -4467,6 +4487,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .edit-families-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
 .edit-families-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
 .edit-families-row .hint { flex: 0 0 auto; white-space: nowrap; margin: 0; }
+/* admin-members.ejs's combined Families dialog - a real request: "add/
+   edit families should be one button. combine the feature." The "add
+   new" row on top of the same rename/delete list shares the rename
+   form's own input+button-inline layout above, with a bit of breathing
+   room under it to separate it visually from the list below. */
+.manage-families-add-form { display: flex; align-items: flex-end; gap: 0.4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.manage-families-add-form label { flex: 1 1 auto; min-width: 0; }
+.manage-families-add-form input[type="text"] { width: 100%; }
 
 /* Create/Edit Class popup - wider than the default member-picker-dialog
    since it carries a full field set (name/day/hour/room/color/times/
