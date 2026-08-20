@@ -127,11 +127,36 @@
     document.querySelectorAll('[data-shrink-to-fit-on-print]').forEach(resetOne);
   }
 
+  // See the big comment at the end of the setup-teams-print-page @media
+  // print block in styles.css ("Confirmed live via Playwright's
+  // page.pdf()...") for the full story - short version: `beforeprint` (and
+  // therefore this whole measure-and-shrink pass) is confirmed to fire
+  // BEFORE the browser has actually switched to the print media type in
+  // Chromium's real paginated print/PDF pipeline, so measuring "as normal"
+  // here sees the wrong (still-on-screen) box size/shape and freezes a
+  // zoom computed against it - by the time the page truly flips to print
+  // media a moment later, pagination has already been captured off that
+  // wrong measurement. `.print-measuring` is a small set of plain (non-
+  // @media) rules that mirror just the print-only layout changes that
+  // actually affect what gets measured here - toggling it synchronously
+  // around every measurement pass forces THIS pass to already see the true
+  // print-time layout, instead of hoping the ambient CSS media state caught
+  // up in time.
+  function withPrintMeasuring(fn) {
+    // On <body>, not <html> - the @media print rules this mirrors (see
+    // styles.css) are keyed off page-identifying classes that live on
+    // <body> (e.g. .setup-teams-print-page .admin-main), and a compound
+    // selector needs both classes on the SAME element to match.
+    document.body.classList.add('print-measuring');
+    fn();
+    document.body.classList.remove('print-measuring');
+  }
+
   window.addEventListener('load', fitAll);
   window.addEventListener('resize', fitAll);
   window.addEventListener('beforeprint', function () {
     fitAll();
-    fitAllForPrint();
+    withPrintMeasuring(fitAllForPrint);
   });
   window.addEventListener('afterprint', resetAllForPrint);
 
@@ -148,7 +173,7 @@
   // independent way to catch the same transition.
   if (window.matchMedia) {
     const mql = window.matchMedia('print');
-    const onPrintChange = (e) => { if (e.matches) { fitAll(); fitAllForPrint(); } else { resetAllForPrint(); } };
+    const onPrintChange = (e) => { if (e.matches) { fitAll(); withPrintMeasuring(fitAllForPrint); } else { resetAllForPrint(); } };
     if (mql.addEventListener) mql.addEventListener('change', onPrintChange);
     else if (mql.addListener) mql.addListener(onPrintChange); // Safari <14
   }

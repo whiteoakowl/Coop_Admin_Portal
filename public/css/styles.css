@@ -5423,12 +5423,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        size for the actual printed page - a light team's page stays
        short instead of forcing a near-blank void to fill out a page it
        never needed, and the fixed-height pagination bug never sees a
-       permanent tall empty box to trip over in the first place. 9.8in
-       (not the exact 10in of usable content height on an 11in letter
-       page with 0.5in @page margins) leaves a little slack for a truly
-       maxed-out team - invisible on paper since it was already being
-       shrunk to fit. */
-    max-height: 9.8in;
+       permanent tall empty box to trip over in the first place.
+       9.2in - not the exact 10in of usable content height on an 11in
+       letter page with 0.5in @page margins - leaves real slack for a
+       truly maxed-out team, not just a token amount: confirmed live
+       (same Playwright/page.pdf() harness, a single very busy team as
+       the only/last card on the page) that the "reserve an extra blank
+       page" quirk above ISN'T only triggered by a literal fixed `height`
+       - a break-before block whose real, auto/content-driven height
+       merely lands very close to the page's true usable height trips
+       the exact same Chromium pagination quirk, independent of zoom and
+       of how that height was arrived at. Binary-searched the actual
+       threshold on that harness: 9.6in - genuinely content-driven,
+       nothing fixed about it - still came out clean, 9.7in produced the
+       blank page again, so this is a real, sub-half-inch margin problem
+       (Chromium rounding right at the page edge), not a fluke. 9.2in
+       gives a real ~0.8in cushion below that threshold instead of
+       riding right up against it - a heavily-shrunk team's text is
+       already small at that point, the extra bit of shrink to land
+       inside 9.2in instead of 9.8in isn't a meaningfully different
+       reading experience, and it buys real margin against this same
+       quirk resurfacing for slightly different content/font-metrics. */
+    max-height: 9.2in;
     page-break-before: always;
     break-before: page;
   }
@@ -5509,6 +5525,53 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .member-card-pair-row { gap: 0; margin-bottom: 0; }
   .member-card-pair-item .badge-canvas { box-shadow: none; margin: 0; }
 }
+
+/* Confirmed live via Playwright's page.pdf({ preferCSSPageSize: true }) (the
+   only mode that actually paginates for real, as opposed to just applying
+   print CSS to a continuous scroll): a genuine trailing BLANK page still
+   showed up after a single, heavily-shrunk Setup/Cleanup team card even
+   with the max-height/data-shrink-to-fit-budget fix above in place (see
+   .team-print-page-fit's own comment). Root cause traced to event-ordering,
+   not the shrink math itself - instrumented the real print pass and found
+   `beforeprint` (where public/js/print-shrink-to-fit.js's fitOne() does its
+   one-shot measurement) fires BEFORE the UA has actually switched to the
+   print media type: `window.matchMedia('print').matches` was still false,
+   `.admin-main` was still its on-screen mobile width instead of the pinned
+   7.5in @media print width above, and `.team-info-meta-row`/`.team-print-
+   meta` were still showing their SCREEN content instead of print's swapped-
+   in compact chip row. fitOne() computed its shrink zoom against that
+   entirely-wrong (narrower, differently-shaped) box, then froze it - by the
+   time the UA's own internal print-media switch actually happened a moment
+   later (confirmed via a `matchMedia('print')` 'change' listener - the
+   existing "belt and suspenders" fallback a few lines up DOES fire a
+   second, correctly-measured pass once that switch lands), it was already
+   too late: Chromium's real PDF pagination had already captured its page-
+   break layout off the first (wrong) pass, so the second pass's more
+   accurate zoom never made it into the actual printed output. Rather than
+   race against exactly when the UA decides to flip @media print - not
+   reliably synchronized with `beforeprint` at all, per this - `.print-
+   measuring` mirrors, as a plain JS-toggled class (added right before
+   fitOne() runs in the `beforeprint`/`matchMedia` handlers below, removed
+   on `afterprint`), the handful of @media print rules above that actually
+   change this box's size/shape, so the FIRST measurement pass - the only
+   one guaranteed to land before Chromium's snapshot - already sees the
+   true print-time layout instead of a stale screen one. Keep this in sync
+   with the @media print rules it mirrors if either ever changes. */
+.print-measuring.setup-teams-print-page .admin-main,
+.print-measuring.floater-teams-print-page .admin-main { width: 7.5in; }
+.print-measuring .team-info-meta-row { display: none; }
+.print-measuring .team-print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #333;
+}
+.print-measuring .setup-team-card-grid { display: block !important; }
 
 /* ---------- Setup/Cleanup Task List tab (views/admin-setup-tasks.ejs) ----------
    Section cards stacked vertically, each a colored header band over a
