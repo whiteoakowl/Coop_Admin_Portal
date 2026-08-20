@@ -86,44 +86,63 @@
               <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
               <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/edit" id="team-edit-form-<%= t.id %>" class="team-info-edit-form">
                 <input type="text" name="title" class="team-info-title team-info-title-input" value="<%= t.title %>" required disabled />
-                <div class="team-info-leader">
-                  <svg class="icon"><use href="#icon-user"/></svg>
-                  Leader:
-                  <select name="leaderId" class="team-info-leader-select" disabled>
-                    <option value="">No leader</option>
-                    <%# A real request: admins should show up alongside
-                        parents when choosing a team leader - they
-                        regularly run a team themselves. availableLeaders
-                        (routes/admin-setup.js) is parent+admin; the Add
-                        Member dialog below stays availableParents
-                        (parent-only) - only a team's LEADER picker widens. %>
-                    <% availableLeaders.forEach(function(p) { %>
-                      <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
-                    <% }); %>
-                  </select>
-                </div>
                 <input type="text" name="description" class="team-info-desc-input" value="<%= t.description || '' %>" placeholder="Short description (optional)" disabled />
-                <%# A real request: "setup/cleanup team cards should have a
-                    space for time to meet and meeting location." Free text
-                    (same shape/treatment as description above, not a
-                    time/date picker) - same freeze/unfreeze-in-place
-                    editing, save together with everything else on this
-                    form. %>
-                <div class="team-info-meeting">
-                  <svg class="icon"><use href="#icon-clock"/></svg>
-                  <input type="text" name="meetingTime" class="team-info-meeting-input" value="<%= t.meeting_time || '' %>" placeholder="Meeting time" disabled />
-                </div>
-                <div class="team-info-meeting">
-                  <svg class="icon"><use href="#icon-map-pin"/></svg>
-                  <input type="text" name="meetingLocation" class="team-info-meeting-input" value="<%= t.meeting_location || '' %>" placeholder="Meeting location" disabled />
+                <%# A real report: "on the setup/cleanup team cards its
+                    showing the information circled twice... clean, professional...
+                    balanced" - Leader/Meeting time/Meeting location used to
+                    each get their own full-width stacked row, reading as a
+                    tall, sparse header on screen too (the same "three
+                    guaranteed separate rows" problem print already solved
+                    for - see .team-info-meta-row's own comment in
+                    styles.css). One flex-wrap row now, same balanced-chips
+                    look as the print-only .team-print-meta a few lines
+                    below, but still real editable form controls (a
+                    <select>, two <input>s) - not the read-only text print
+                    uses, since this row is what an admin actually edits. %>
+                <div class="team-info-meta-row">
+                  <%# "Leader:" as a spelled-out label (still how the Create
+                      New Team dialog's own <label> reads, and how the
+                      previous full-width stacked row read) doesn't fit
+                      three items onto one balanced row on a phone-width
+                      card - dropped here in favor of the same person-icon-
+                      only convention print's own .team-print-meta chip
+                      already uses successfully with no separate label. %>
+                  <div class="team-info-leader">
+                    <svg class="icon"><use href="#icon-user"/></svg>
+                    <select name="leaderId" class="team-info-leader-select" disabled>
+                      <option value="">No leader</option>
+                      <%# A real request: admins should show up alongside
+                          parents when choosing a team leader - they
+                          regularly run a team themselves. availableLeaders
+                          (routes/admin-setup.js) is parent+admin; the Add
+                          Member dialog below stays availableParents
+                          (parent-only) - only a team's LEADER picker widens. %>
+                      <% availableLeaders.forEach(function(p) { %>
+                        <option value="<%= p.id %>" <%= t.leader_id === p.id ? 'selected' : '' %>><%= p.name %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <%# A real request: "setup/cleanup team cards should have a
+                      space for time to meet and meeting location." Free text
+                      (same shape/treatment as description above, not a
+                      time/date picker) - same freeze/unfreeze-in-place
+                      editing, save together with everything else on this
+                      form. %>
+                  <div class="team-info-meeting">
+                    <svg class="icon"><use href="#icon-clock"/></svg>
+                    <input type="text" name="meetingTime" class="team-info-meeting-input" value="<%= t.meeting_time || '' %>" placeholder="Meeting time" disabled />
+                  </div>
+                  <div class="team-info-meeting">
+                    <svg class="icon"><use href="#icon-map-pin"/></svg>
+                    <input type="text" name="meetingLocation" class="team-info-meeting-input" value="<%= t.meeting_location || '' %>" placeholder="Meeting location" disabled />
+                  </div>
                 </div>
               </form>
               <%# A real request: "header for each card in print should be
                   more organized with information reduced to balance equal
                   rows" - print-only balanced Leader/Time/Location row (see
-                  .team-print-meta's own comment in styles.css); the three
-                  stacked rows above stay for screen editing but hide for
-                  print. %>
+                  .team-print-meta's own comment in styles.css); the row
+                  above stays for screen editing but hides for print. %>
               <div class="team-print-meta">
                 <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
                 <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>

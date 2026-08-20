@@ -151,6 +151,42 @@ test('Setup/Cleanup team card: create/edit save meeting time and location, and t
   });
 });
 
+// A real bug report: "on the setup/cleanup team cards its showing the
+// information circled twice. reduce and clean this up with a
+// professional looking layout, clean, balanced." Root cause was a stale
+// cached stylesheet on the reporting device (public/sw.js's own comment
+// covers that - not something an HTTP-level test can exercise), but the
+// screen layout itself also got tightened up while fixing this: Leader/
+// Meeting time/Meeting location now share one flex-wrap
+// .team-info-meta-row instead of three separate full-width stacked
+// rows, and the leader field dropped its spelled-out "Leader:" label in
+// favor of the same icon-only convention print's own .team-print-meta
+// chip already used.
+test('Setup/Cleanup team card: Leader/Meeting time/Meeting location share one balanced row, not three stacked ones', async (t) => {
+  const { cookie } = await loginAsAdmin();
+
+  const leader = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Row Leader', 'row-leader-1', 'parent')").run();
+  const withMeta = await db
+    .prepare("INSERT INTO setup_teams (day, title, meeting_time, meeting_location) VALUES ('monday', 'Row Team', '9:00am', 'Front Lobby')")
+    .run();
+  await db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(leader.lastInsertRowid, withMeta.lastInsertRowid);
+
+  const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+
+  await t.test('a team with a leader, time, and location has all three inside one .team-info-meta-row wrapper', () => {
+    const rowMatch = new RegExp(`team-edit-form-${withMeta.lastInsertRowid}"[\\s\\S]*?<div class="team-info-meta-row">([\\s\\S]*?)</div>\\s*</form>`).exec(res.text);
+    assert.ok(rowMatch, 'expected a .team-info-meta-row wrapping the leader/meeting fields');
+    assert.match(rowMatch[1], /team-info-leader/);
+    assert.match(rowMatch[1], /name="meetingTime"/);
+    assert.match(rowMatch[1], /name="meetingLocation"/);
+  });
+
+  await t.test('the leader field no longer spells out "Leader:" - icon + select only, matching the print chip\'s own convention', () => {
+    assert.doesNotMatch(res.text, />\s*Leader:\s*</);
+  });
+});
+
 // A real request: "admins and parents should show up in the dropdown
 // menu for setup/cleanup team member lists" - clarified afterward to
 // mean specifically "choosing a leader for setup/cleanup [team]s".

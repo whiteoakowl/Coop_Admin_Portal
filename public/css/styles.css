@@ -4129,6 +4129,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    needs its own border-less/background-less treatment to still read as
    plain title/description text while frozen. */
 .team-info-edit-form { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; max-width: 100%; }
+/* A real bug report: "on the setup/cleanup team cards its showing the
+   information circled twice... clean, professional... balanced" -
+   Leader/Meeting time/Meeting location used to each get their own
+   full-width stacked row (three separate flex-column children of
+   .team-info-edit-form above), reading as a tall, sparse header even
+   once the actual duplication bug (see public/sw.js's own comment - a
+   stale cached stylesheet, not this markup) was fixed. Grouping them
+   into one flex-wrap row instead - same balanced-chips look print
+   already uses for .team-print-meta, just still real <select>/<input>
+   controls here rather than print's read-only text. */
+.team-info-meta-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.25rem 0.85rem; width: 100%; }
 .team-info-title-input,
 .team-info-desc-input {
   border: none;
@@ -4157,8 +4168,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: center;
   padding: 0;
   min-width: 0;
+  /* Confirmed live: with no explicit width, a plain <input type="text">
+     falls back to the browser's native default text-field width (~182px
+     - the classic "20 characters" sizing every browser gives a bare text
+     input) regardless of how short its actual value is - "11:45am" and
+     "Fellowship Hall" both measured that exact same ~182px. Harmless
+     back when this input's own row spanned the card's full width
+     anyway, but it's what kept .team-info-meta-row (below) from ever
+     fitting more than one item per line even on a wide card - a ~7-
+     character value was silently claiming as much horizontal room as
+     the flex row itself. field-sizing: content (real 2024+ browser
+     support) sizes the box to its actual text instead; max-width is the
+     fallback ceiling for a browser that doesn't understand that
+     property yet, and stays as a legitimate cap either way, since an
+     admin can still type a much longer value while actively editing. */
+  field-sizing: content;
+  max-width: 10rem;
 }
 .team-info-meeting-input:placeholder-shown:disabled { display: none; }
+/* The comment just above says a blank meeting field "collapses to
+   nothing rather than showing an empty icon+placeholder row" - but the
+   :placeholder-shown:disabled rule right above only ever hid the
+   <input> itself, leaving its own .team-info-meeting wrapper (and the
+   icon inside it) still visible on its own with nothing next to it. A
+   team with no meeting time set showed a bare clock icon floating in
+   the meta row for exactly that reason - :has() lets the wrapper react
+   to its own child's state and actually collapse the whole thing, icon
+   included, matching what the row above already claimed to do. */
+.team-info-meeting:has(.team-info-meeting-input:placeholder-shown:disabled) { display: none; }
 /* Once unfrozen, give the fields just enough of a visual edge that they
    read as editable, without losing the card's compact centered look -
    same "legible, not washed-out" idea as .class-view-form's disabled-
@@ -5313,10 +5350,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
 
   /* Setup/Cleanup Teams print header reorganization (see .team-print-meta
-     itself for the full comment) - the screen's one-field-per-row Leader/
-     Meeting time/Meeting location swap for the single balanced chip row. */
-  .team-info-leader,
-  .team-info-meeting {
+     itself for the full comment) - the screen's editable Leader/Meeting
+     time/Meeting location row (.team-info-meta-row, styles.css) swaps
+     for print's own read-only, single balanced chip row instead. */
+  .team-info-meta-row {
     display: none;
   }
   .team-print-meta {

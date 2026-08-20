@@ -24,7 +24,19 @@
 // included. Bump it again any time a deployed static asset changes in a
 // way that matters (icons, manifest-referenced files) - a plain content
 // change at the same URL is invisible to this cache otherwise.
-const STATIC_CACHE = 'sh-static-v2';
+// A real bug report: "on the setup/cleanup team cards its showing the
+// information circled twice" - a device that had visited before the
+// print-only .team-print-meta row was added (and before it got its
+// `display: none` base rule) kept serving that STALE cached styles.css
+// forever per this same cache-first/no-expiry mechanism - the missing
+// rule meant the print-only summary row had no CSS hiding it on screen
+// at all, so it showed up as a plain visible block right underneath the
+// three already-visible Leader/Time/Location fields, reading as the
+// same info duplicated. The deployed HTML was already correct (pages
+// are never cached here); only the cached CSS was stale. Bumping this
+// forces every device to drop its old static cache and re-fetch
+// styles.css fresh on next load.
+const STATIC_CACHE = 'sh-static-v3';
 const STATIC_EXTENSIONS = ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico'];
 
 function isStaticAsset(url) {
