@@ -337,17 +337,47 @@
       try {
         const sourceMain = doc.getElementById('main-content');
         if (!sourceMain || !targetMain) continue;
+        // A real bug report: printing several hundred name tags "timed out,
+        // wouldn't load all the pages" - re-running the shared renderers
+        // over win.document (every batch reprocessing every earlier
+        // batch's already-finished content too, not just what's new) was
+        // never actually the "idempotent, just as safe" no-op the old
+        // comment here claimed. renderNameTagBarcodes redoes real SVG
+        // generation for every barcode again; worse, badge-autofit.js's
+        // shrink search always resets each field back to its own recorded
+        // full-size data-base-font-size before re-measuring - re-running it
+        // means redoing the ENTIRE shrink-to-fit search, forced-reflow
+        // measurements and all, for every already-fitted card on every
+        // later batch. That's O(total batches²) work, not O(n) - batch 5
+        // of a many-hundred-member print job was redoing 4 batches' worth
+        // of already-finished shrink searches on top of its own, and it
+        // only gets worse the bigger the co-op. Scoping both calls to just
+        // the newly-imported nodes fixes that: each batch now does exactly
+        // its own share of the work, regardless of how many batches came
+        // before it.
+        const imported = [];
         Array.from(sourceMain.children).forEach((child) => {
           if (child.classList.contains('no-print')) return; // the header/Print button - only the first batch's copy is kept.
-          targetMain.appendChild(win.document.importNode(child, true));
+          imported.push(targetMain.appendChild(win.document.importNode(child, true)));
         });
-        // Re-render whatever the newly-appended content needs (barcodes,
-        // shrink-to-fit label names) - both are idempotent on content
-        // that's already rendered, so re-running them over the whole tab
-        // on every batch is simpler, and just as safe, as tracking exactly
-        // what's new each time.
-        if (typeof win.renderNameTagBarcodes === 'function') win.renderNameTagBarcodes(win.document);
-        win.dispatchEvent(new win.Event('beforeprint'));
+        let handledDirectly = false;
+        if (typeof win.renderNameTagBarcodes === 'function') {
+          imported.forEach((node) => win.renderNameTagBarcodes(node));
+          handledDirectly = true;
+        }
+        if (typeof win.runBadgeAutoFit === 'function') {
+          imported.forEach((node) => win.runBadgeAutoFit(node));
+          handledDirectly = true;
+        }
+        // Barcode Only / Barcode Mailing Labels sheets (public/js/barcode-
+        // print-shrink-name.js) expose neither function above - a
+        // synthetic beforeprint is the only hook they listen for, and that
+        // script's own work (re-running JsBarcode + a plain scrollWidth
+        // shrink loop, no forced-reflow search) is cheap enough per badge
+        // that re-running it over the whole tab hasn't shown the same
+        // blowup, so it's left as-is rather than adding scoped support
+        // for a page type that isn't the one actually timing out.
+        if (!handledDirectly) win.dispatchEvent(new win.Event('beforeprint'));
       } catch (err) {
         // One bad batch shouldn't take down the rest of an otherwise-fine
         // print job - the remaining batches still get appended.
