@@ -113,7 +113,7 @@
               <%
                 const videoBlocked = selected.lesson_type_snapshot === 'video' && selected.video_completed !== 1;
               %>
-              <button type="submit" class="primary-btn" id="training-complete-btn" <%= videoBlocked ? 'disabled' : '' %>><%= videoBlocked ? 'Watch the video to continue' : 'Mark Complete &amp; Continue' %></button>
+              <button type="submit" class="primary-btn" id="training-complete-btn" <%= videoBlocked ? 'disabled' : '' %>><%= videoBlocked ? 'Watch the video to continue' : 'Mark Complete & Continue' %></button>
             </form>
           <% } %>
         <% } %>
