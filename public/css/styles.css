@@ -5518,6 +5518,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        reading experience, and it buys real margin against this same
        quirk resurfacing for slightly different content/font-metrics. */
     max-height: 9.2in;
+  }
+  /* page-break-before on EVERY .team-print-page-fit - including the very
+     first one - forced a genuine leading blank page: nothing prints the
+     .print-header (logo/title) onto its own page first, so a break before
+     team #1 just reserves an empty page ahead of it, then team 1 lands on
+     physical page 2, team 2 on page 3, and so on - a real bug report
+     confirmed exactly this ("making the first page blank... team 1 and 2
+     fit to one page each like they should") once the fields above were
+     visible enough to actually notice it. :not(:first-child) keeps every
+     LATER team starting its own fresh page (that part was always
+     correct) while letting the first team share page 1 with the header
+     instead of being pushed off it. */
+  .team-print-page-fit:not(:first-child) {
     page-break-before: always;
     break-before: page;
   }

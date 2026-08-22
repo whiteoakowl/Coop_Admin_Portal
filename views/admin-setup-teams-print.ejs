@@ -31,8 +31,26 @@
             why data-shrink-to-fit-budget exists. Deliberately no editable
             form controls here at all (no <input>, no <select>, no edit/
             delete/remove buttons) - this page is read-only by design, so
-            there's nothing for @media print to have to hide. %>
-        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
+            there's nothing for @media print to have to hide.
+
+            Team 1 only (i === 0) shares its physical page with
+            .print-header above (see styles.css's .team-print-page-fit
+            comment on why every OTHER team still gets a page fully to
+            itself via page-break-before) - a real bug report: "the first
+            page blank... team 1 and 2 fit to one page each" turned out to
+            mean the header, alone on its own page ahead of every team,
+            just LOOKED blank/wasted (a small logo + two lines of text on
+            an otherwise empty 8.5x11 sheet). Giving team 1's own budget
+            the same 9.2in as every other team once it's no longer alone
+            on its page is wrong, though - confirmed live: a busy team 1
+            (many members) genuinely spilled onto a second page, since the
+            header (measured ~0.79in tall, logo + two lines + margin) was
+            never subtracted from what team 1 actually has left to shrink
+            into. 8.2in leaves real margin below the measured ~8.4in that
+            would just barely fit, same "don't ride right up against the
+            threshold" cushion .team-print-page-fit's own 9.2in already
+            uses. %>
+        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="<%= i === 0 ? '8.2in' : '9.2in' %>">
           <div class="team-col">
             <div class="team-info-card team-accent-<%= i % 5 %>">
               <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
