@@ -10,6 +10,9 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (training.status !== 'published') { %>
+      <div class="alert alert-error">This training is still <strong><%= training.status %></strong> - members won't see it on their My Training page until you <a href="/admin/training/<%= training.id %>/builder">publish it</a>.</div>
+    <% } %>
 
     <div class="roster-toolbar">
       <div class="roster-btn-row">

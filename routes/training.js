@@ -48,7 +48,7 @@ router.get('/training', async (req, res) => {
     const member = await db.prepare('SELECT id FROM members WHERE id = ? AND active = 1').get(req.session.trainingMemberId);
     if (member) return res.redirect('/training/mine');
   }
-  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort((a, b) => a.name.localeCompare(b.name));
+  const members = await T.activeAssignableMembers();
   res.render('training-identify', { title: 'My Training', members, error: req.query.error || null });
 });
 
