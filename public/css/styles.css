@@ -4864,6 +4864,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media (max-width: 640px) {
   .class-view-header { flex-wrap: wrap; row-gap: 0.5rem; }
   .class-view-header-actions { flex-basis: 100%; }
+  /* Close (a normal flow sibling of .class-view-header-actions, not one of
+     its children - see the comment on that selector below) has nothing
+     left to sit next to once Delete/Edit/Cancel/Save claim the full row
+     above it, so it wraps onto its own line. margin-left: auto pushes it
+     to that line's right edge instead of leaving it stranded on the left,
+     keeping it under Edit/Save where a thumb expects to find it. */
+  .class-view-header .class-form-dialog-close { margin-left: auto; }
 }
 .class-view-swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; flex-shrink: 0; }
 
