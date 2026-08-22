@@ -36,7 +36,20 @@
 // are never cached here); only the cached CSS was stale. Bumping this
 // forces every device to drop its old static cache and re-fetch
 // styles.css fresh on next load.
-const STATIC_CACHE = 'sh-static-v3';
+// Bumped again: two more real bug reports ("name tag printing is timing
+// out, won't load all the pages" and "setup/cleanup cards are still
+// drifting") turned out to be the exact same stale-cache mechanism -
+// both fixes (public/js/design-print-hub.js's chunked-merge scoping,
+// and styles.css's .badge-sheet-page/.print-page `zoom: 1 !important`
+// print floor) were already live on the server, but every device that
+// had ever loaded the old JS/CSS kept serving its own cached copy
+// forever with no expiry, so the fix was invisible to anyone who wasn't
+// starting from a completely fresh browser profile. This cache-first-
+// with-no-expiry design means ANY static JS/CSS change needs this bump
+// to actually reach devices that have visited before - easy to forget
+// (see the two bug reports above), so: if you're editing public/js/** or
+// public/css/**, bump this too, in the same change.
+const STATIC_CACHE = 'sh-static-v4';
 const STATIC_EXTENSIONS = ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico'];
 
 function isStaticAsset(url) {
