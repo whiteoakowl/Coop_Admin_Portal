@@ -104,6 +104,8 @@ const adminScheduleRouter = require('./routes/admin-schedule');
 const adminClassScheduleRouter = require('./routes/admin-class-schedule');
 const contactAdminsRouter = require('./routes/contact-admins');
 const membershipRouter = require('./routes/membership');
+const trainingRouter = require('./routes/training');
+const adminTrainingRouter = require('./routes/admin-training');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -216,6 +218,12 @@ const memberPhotosClient = createStorageClient();
 function photoUrl(key) {
   return urlForUpload({ client: memberPhotosClient, bucket: 'member-photos', webDir: '/uploads/members', key });
 }
+// Training lesson resource images (routes/admin-training.js) - same
+// client works for any bucket, so this reuses memberPhotosClient rather
+// than standing up a second one.
+function trainingResourceUrl(key) {
+  return urlForUpload({ client: memberPhotosClient, bucket: 'training-resources', webDir: '/uploads/training', key });
+}
 
 // Available in every EJS view (including partials/admin-nav) without each
 // route having to pass it explicitly. True only for the single master Admin
@@ -228,6 +236,7 @@ app.use((req, res, next) => {
   const isAdmin = !!(req.session && req.session.adminId);
   res.locals.isFullAdmin = isAdmin;
   res.locals.photoUrl = photoUrl;
+  res.locals.trainingResourceUrl = trainingResourceUrl;
   if (isAdmin) {
     if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
     res.locals.csrfToken = req.session.csrfToken;
@@ -257,6 +266,7 @@ app.use('/', volunteersRouter);
 app.use('/', setupRouter);
 app.use('/', contactAdminsRouter);
 app.use('/', membershipRouter);
+app.use('/', trainingRouter);
 // Order matters here: several of these routers gate themselves with a
 // blanket `router.use(requireFullAdmin)` (no path), which - because Express
 // matches on the shared '/admin' mount prefix, not on that router's own
@@ -273,6 +283,7 @@ app.use('/admin', adminLogsRouter);
 app.use('/admin', adminVolunteersRouter);
 app.use('/admin', adminSubstitutesRouter);
 app.use('/admin', adminSetupRouter);
+app.use('/admin', adminTrainingRouter);
 app.use('/admin', adminScheduleRouter);
 app.use('/admin', adminClassScheduleRouter);
 app.use('/admin', adminDocumentsRouter);

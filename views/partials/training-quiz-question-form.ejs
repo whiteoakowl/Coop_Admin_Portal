@@ -1,0 +1,34 @@
+<%# Shared Add/Edit Quiz Question form. q is null for "add", or an
+    existing question (with its own .options already loaded) for "edit" -
+    always renders at least 2 option rows so there's always something to
+    fill in/pick from; "+ Add Option" (public/js/training-builder.js)
+    appends more in place, no page reload. The radio group is what
+    enforces "exactly one correct answer" for this multiple_choice
+    question type - see utils/training.js's own comment on why future
+    question types (true/false, multiple-answer) would each need their
+    own different validation/markup here rather than reusing this one. %>
+<form method="POST" action="<%= action %>" class="training-question-form">
+  <h3><%= q ? 'Edit Question' : 'Add Question' %></h3>
+  <label>Question
+    <textarea name="question" rows="2" required><%= q ? q.question : '' %></textarea>
+  </label>
+  <label>Points
+    <input type="number" name="points" min="1" value="<%= q ? q.points : 1 %>" required style="width: 5rem;" />
+  </label>
+  <div class="training-question-options" data-question-options>
+    <%
+      const rows = q ? q.options : [{ option_text: '', is_correct: 1 }, { option_text: '', is_correct: 0 }];
+    %>
+    <% rows.forEach(function(o, i) { %>
+      <div class="training-question-option-row">
+        <input type="radio" name="correctIndex" value="<%= i %>" <%= o.is_correct ? 'checked' : '' %> required aria-label="Mark option <%= i + 1 %> correct" />
+        <input type="text" name="optionText" value="<%= o.option_text %>" placeholder="Answer option" required />
+      </div>
+    <% }); %>
+  </div>
+  <button type="button" class="btn-secondary" data-add-option>+ Add Option</button>
+  <div class="notes-dialog-actions">
+    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+    <button type="submit" class="primary-btn">Save</button>
+  </div>
+</form>

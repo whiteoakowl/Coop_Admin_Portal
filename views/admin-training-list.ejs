@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Training</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-training-dialog').showModal()">+ New Training</button>
+      </div>
+    </div>
+
+    <% if (trainings.length === 0) { %>
+      <p class="roster-empty">No trainings yet &mdash; create one above.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% trainings.forEach(function(t) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+            <h3 class="team-info-title"><a href="/admin/training/<%= t.id %>/builder"><%= t.title %></a></h3>
+            <span class="badge-pill badge-pill-<%= t.status === 'published' ? 'green' : t.status === 'archived' ? 'gray' : 'orange' %>"><%= t.status.charAt(0).toUpperCase() + t.status.slice(1) %></span>
+            <p class="hint"><%= t.lessonCount %> lesson<%= t.lessonCount == 1 ? '' : 's' %> &bull; <%= t.assignmentCount %> assigned &bull; passing <%= t.passing_score %>%</p>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/admin/training/<%= t.id %>/builder">Edit</a>
+              <a class="roster-action-btn" href="/admin/training/<%= t.id %>/assign">Assign</a>
+              <a class="roster-action-btn" href="/admin/training/<%= t.id %>/report">Report</a>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <dialog id="new-training-dialog" class="member-picker-dialog">
+      <form method="POST" action="/admin/training">
+        <h3>New Training</h3>
+        <label>Title
+          <input type="text" name="title" placeholder="e.g. New Employee Orientation" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3" placeholder="Short description (optional)"></textarea>
+        </label>
+        <label>Estimated Time (minutes)
+          <input type="number" name="estimatedMinutes" min="1" placeholder="45" />
+        </label>
+        <label>Passing Score (%)
+          <input type="number" name="passingScore" min="0" max="100" value="80" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

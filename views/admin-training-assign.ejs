@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Assign &mdash; <%= training.title %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/admin/training/<%= training.id %>/builder">&larr; Back to Builder</a>
+        <a class="roster-action-btn" href="/admin/training/<%= training.id %>/report">View Report</a>
+      </div>
+    </div>
+
+    <form method="POST" action="/admin/training/<%= training.id %>/assign" class="manage-section">
+      <label class="member-form-full">Due Date <span class="hint">(optional)</span>
+        <input type="date" name="dueAt" />
+      </label>
+      <div class="member-form-full">
+        <label class="roster-checkbox-label">Members</label>
+        <div class="grade-pill-grid">
+          <% members.forEach(function(m) { %>
+            <label class="grade-pill">
+              <input type="checkbox" name="memberIds" value="<%= m.id %>" <%= alreadyAssigned.has(m.id) ? 'checked disabled' : '' %> />
+              <%= m.name %><%= alreadyAssigned.has(m.id) ? ' (already assigned)' : '' %>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+      <button type="submit" class="primary-btn">Assign Training</button>
+    </form>
+  </main>
+</body>
+</html>

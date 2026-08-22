@@ -1,0 +1,23 @@
+<%
+// Shared assignment-status -> label/color mapping, used by the admin
+// report table, assignment detail drill-down, and the member "My
+// Training" dashboard - one place so a status never reads or colors
+// differently depending on which page happens to render it.
+const STATUS_LABELS = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  passed: 'Passed',
+  failed: 'Failed',
+  retry_required: 'Retry Required',
+  expired: 'Expired',
+};
+const STATUS_COLORS = {
+  not_started: 'gray',
+  in_progress: 'orange',
+  passed: 'green',
+  failed: 'red',
+  retry_required: 'red',
+  expired: 'gray',
+};
+%>
+<span class="badge-pill badge-pill-<%= STATUS_COLORS[status] || 'gray' %>"><%= STATUS_LABELS[status] || status %></span>

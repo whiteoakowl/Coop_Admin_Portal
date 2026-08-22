@@ -1,0 +1,33 @@
+<%# Shared Add/Edit Lesson form - used inside both the "+ Add Lesson"
+    dialog and each lesson's own "Edit" dialog (views/admin-training-
+    builder.ejs). Video URL and Content fields show/hide by the selected
+    type via public/js/training-builder.js's own small onchange handler,
+    same "toggle a field block by another field's value" pattern this
+    app already uses (Setup/Cleanup's Add Member dialog role radios). %>
+<form method="POST" action="<%= action %>" class="training-lesson-form" data-lesson-type-form>
+  <h3><%= heading %></h3>
+  <label>Lesson Title
+    <input type="text" name="title" value="<%= lesson ? lesson.title : '' %>" required />
+  </label>
+  <label>Description <span class="hint">(optional, shown above the lesson content)</span>
+    <input type="text" name="description" value="<%= lesson ? (lesson.description || '') : '' %>" />
+  </label>
+  <label>Type
+    <select name="type" data-lesson-type-select>
+      <% LESSON_TYPES.forEach(function(t) { %>
+        <option value="<%= t %>" <%= (lesson ? lesson.type : 'video') === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
+      <% }); %>
+    </select>
+  </label>
+  <label data-lesson-field="video">Video URL
+    <input type="url" name="videoUrl" value="<%= lesson ? (lesson.video_url || '') : '' %>" placeholder="https://example.com/video.mp4" />
+  </label>
+  <label data-lesson-field="video,text">Content <span class="hint">(instructions/reading, optional on a video lesson)</span>
+    <textarea name="content" rows="5"><%= lesson ? (lesson.content || '') : '' %></textarea>
+  </label>
+  <label class="grade-pill"><input type="checkbox" name="required" <%= !lesson || lesson.required ? 'checked' : '' %> /> Required to complete this training</label>
+  <div class="notes-dialog-actions">
+    <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+    <button type="submit" class="primary-btn"><%= lesson ? 'Save' : 'Add Lesson' %></button>
+  </div>
+</form>

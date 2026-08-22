@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1><%= training.title %></h1>
+      <span class="badge-pill badge-pill-<%= training.status === 'published' ? 'green' : training.status === 'archived' ? 'gray' : 'orange' %>"><%= training.status.charAt(0).toUpperCase() + training.status.slice(1) %></span>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/admin/training">&larr; All Training</a>
+        <a class="roster-action-btn" href="/admin/training/<%= training.id %>/assign">Assign</a>
+        <a class="roster-action-btn" href="/admin/training/<%= training.id %>/report">Report</a>
+        <% if (training.status !== 'published') { %>
+          <form method="POST" action="/admin/training/<%= training.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="published" />
+            <button type="submit" class="roster-action-btn">Publish</button>
+          </form>
+        <% } %>
+        <% if (training.status !== 'archived') { %>
+          <form method="POST" action="/admin/training/<%= training.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="archived" />
+            <button type="submit" class="roster-action-btn">Archive</button>
+          </form>
+        <% } else { %>
+          <form method="POST" action="/admin/training/<%= training.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="draft" />
+            <button type="submit" class="roster-action-btn">Move to Draft</button>
+          </form>
+        <% } %>
+        <% if (training.status === 'draft') { %>
+          <form method="POST" action="/admin/training/<%= training.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= training.title %>&quot;? This cannot be undone.">
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Settings</h2></div>
+      <form method="POST" action="/admin/training/<%= training.id %>/update" class="member-form-grid">
+        <label class="member-form-full">Title
+          <input type="text" name="title" value="<%= training.title %>" required />
+        </label>
+        <label class="member-form-full">Description
+          <textarea name="description" rows="2"><%= training.description || '' %></textarea>
+        </label>
+        <label>Estimated Time (minutes)
+          <input type="number" name="estimatedMinutes" min="1" value="<%= training.estimated_minutes || '' %>" />
+        </label>
+        <label>Passing Score (%)
+          <input type="number" name="passingScore" min="0" max="100" value="<%= training.passing_score %>" required />
+        </label>
+
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Completion Requirements</label>
+          <label class="grade-pill"><input type="checkbox" name="requireVideoCompletion" data-video-completion-toggle <%= training.require_video_completion === 1 ? 'checked' : '' %> /> Watch all required videos</label>
+          <label class="grade-pill">Video completion threshold
+            <input type="number" name="videoCompletionThreshold" min="1" max="100" value="<%= training.video_completion_threshold %>" style="width: 5rem;" /> %
+          </label>
+          <label class="grade-pill"><input type="checkbox" name="requireRetakeAfterFailure" <%= training.require_retake_after_failure === 1 ? 'checked' : '' %> /> Require retake after failure</label>
+          <label class="grade-pill"><input type="checkbox" name="sequentialLessons" <%= training.sequential_lessons === 1 ? 'checked' : '' %> /> Lessons must be completed in order</label>
+          <label class="grade-pill"><input type="checkbox" name="allowSkippingLessons" <%= training.allow_skipping_lessons === 1 ? 'checked' : '' %> /> Allow skipping lessons</label>
+          <label class="grade-pill"><input type="checkbox" name="requireManagerApproval" <%= training.require_manager_approval === 1 ? 'checked' : '' %> /> Require manager approval after completion</label>
+        </div>
+
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Lessons (<%= training.lessons.length %>)</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-lesson-dialog').showModal()">+ Add Lesson</button>
+      </div>
+
+      <% if (training.lessons.length === 0) { %>
+        <p class="roster-empty">No lessons yet &mdash; add one above.</p>
+      <% } %>
+
+      <div class="training-lesson-list">
+        <% training.lessons.forEach(function(lesson, i) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <span class="training-lesson-num"><%= i + 1 %></span>
+              <svg class="icon"><use href="#icon-<%= lesson.type === 'video' ? 'camera' : lesson.type === 'quiz' ? 'clipboard-list' : 'file-text' %>"/></svg>
+              <div class="training-lesson-info">
+                <strong><%= lesson.title %></strong>
+                <span class="hint"><%= lesson.type.charAt(0).toUpperCase() + lesson.type.slice(1) %><%= lesson.required ? '' : ' &middot; Optional' %><% if (lesson.type === 'quiz') { %> &middot; <%= lesson.questions.length %> question<%= lesson.questions.length == 1 ? '' : 's' %><% } %></span>
+              </div>
+              <div class="training-lesson-actions">
+                <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/move" class="inline-block-form">
+                  <input type="hidden" name="direction" value="up" />
+                  <button type="submit" class="icon-btn" <%= i === 0 ? 'disabled' : '' %> aria-label="Move up" title="Move up">&uarr;</button>
+                </form>
+                <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/move" class="inline-block-form">
+                  <input type="hidden" name="direction" value="down" />
+                  <button type="submit" class="icon-btn" <%= i === training.lessons.length - 1 ? 'disabled' : '' %> aria-label="Move down" title="Move down">&darr;</button>
+                </form>
+                <button type="button" class="icon-btn" onclick="document.getElementById('edit-lesson-dialog-<%= lesson.id %>').showModal()" aria-label="Edit <%= lesson.title %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/delete" class="inline-block-form" data-confirm="Delete lesson &quot;<%= lesson.title %>&quot;? This cannot be undone.">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= lesson.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+
+            <% if (lesson.type === 'quiz') { %>
+              <div class="training-quiz-question-list">
+                <% lesson.questions.forEach(function(q, qi) { %>
+                  <div class="training-quiz-question-row">
+                    <span class="hint">Q<%= qi + 1 %> (<%= q.points %> pt<%= q.points == 1 ? '' : 's' %>)</span>
+                    <span><%= q.question %></span>
+                    <span class="training-quiz-question-actions">
+                      <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/questions/<%= q.id %>/move" class="inline-block-form">
+                        <input type="hidden" name="direction" value="up" />
+                        <button type="submit" class="icon-btn" <%= qi === 0 ? 'disabled' : '' %> aria-label="Move question up">&uarr;</button>
+                      </form>
+                      <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/questions/<%= q.id %>/move" class="inline-block-form">
+                        <input type="hidden" name="direction" value="down" />
+                        <button type="submit" class="icon-btn" <%= qi === lesson.questions.length - 1 ? 'disabled' : '' %> aria-label="Move question down">&darr;</button>
+                      </form>
+                      <button type="button" class="icon-btn" onclick="document.getElementById('edit-question-dialog-<%= q.id %>').showModal()" aria-label="Edit question"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                      <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/questions/<%= q.id %>/delete" class="inline-block-form" data-confirm="Delete this question?">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete question"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </span>
+                  </div>
+                <% }); %>
+              </div>
+              <button type="button" class="roster-action-btn training-add-question-btn" onclick="document.getElementById('add-question-dialog-<%= lesson.id %>').showModal()">+ Add Question</button>
+
+              <dialog id="add-question-dialog-<%= lesson.id %>" class="member-picker-dialog">
+                <%- include('partials/training-quiz-question-form', { action: `/admin/training/${training.id}/lessons/${lesson.id}/questions`, q: null }) %>
+              </dialog>
+              <% lesson.questions.forEach(function(q) { %>
+                <dialog id="edit-question-dialog-<%= q.id %>" class="member-picker-dialog">
+                  <%- include('partials/training-quiz-question-form', { action: `/admin/training/${training.id}/lessons/${lesson.id}/questions/${q.id}/update`, q }) %>
+                </dialog>
+              <% }); %>
+            <% } %>
+
+            <% if (lesson.resources.length > 0) { %>
+              <div class="training-lesson-resources">
+                <% lesson.resources.forEach(function(r) { %>
+                  <span class="training-resource-thumb">
+                    <img src="<%= trainingResourceUrl(r.file_path) %>" alt="<%= r.original_name || '' %>" />
+                    <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/resources/<%= r.id %>/delete" class="inline-block-form" data-confirm="Remove this image?">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Remove image"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </span>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+
+          <dialog id="edit-lesson-dialog-<%= lesson.id %>" class="member-picker-dialog">
+            <%- include('partials/training-lesson-form', { training, lesson, LESSON_TYPES, action: `/admin/training/${training.id}/lessons/${lesson.id}/update`, heading: 'Edit Lesson' }) %>
+            <% if (lesson.type !== 'quiz') { %>
+              <form method="POST" action="/admin/training/<%= training.id %>/lessons/<%= lesson.id %>/resources" enctype="multipart/form-data" class="training-resource-upload-form">
+                <label>Add an Image
+                  <input type="file" name="file" accept="image/*" />
+                </label>
+                <button type="submit" class="btn-secondary">Upload</button>
+              </form>
+            <% } %>
+          </dialog>
+        <% }); %>
+      </div>
+    </div>
+
+    <dialog id="add-lesson-dialog" class="member-picker-dialog">
+      <%- include('partials/training-lesson-form', { training, lesson: null, LESSON_TYPES, action: `/admin/training/${training.id}/lessons`, heading: 'Add Lesson' }) %>
+    </dialog>
+  </main>
+  <script src="/js/training-builder.js"></script>
+</body>
+</html>
