@@ -4257,6 +4257,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-print-meta-item { display: inline-flex; align-items: center; gap: 0.3rem; }
 .team-print-meta-item .icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
 
+/* A real bug report: the dedicated print-PREVIEW page (admin-setup-teams-
+   print.ejs, .team-print-preview-page) has no editable .team-info-meta-row
+   of its own to show Leader/Time/Location on screen the way the live
+   manage page does - .team-print-meta above is its ONLY markup for those
+   fields, and that's display:none until @media print. Someone just looking
+   at the preview (never actually completing a print/PDF - confirmed by a
+   real report: "the mobile print button... did not show the leader name,
+   location, or time", which turned out to mean the preview screen itself,
+   not the print/PDF output, which was already correct) would see the card
+   with no leader/time/location at all. Forcing it visible unconditionally
+   here, scoped to the preview page only, makes what's on screen actually
+   match what @media print produces - the whole point of having a preview
+   page in the first place. Does NOT affect the live manage page, which
+   shares .team-print-meta's markup but has its own real .team-info-meta-
+   row for on-screen display and must keep .team-print-meta hidden there
+   until its own @media print. */
+.team-print-preview-page .team-print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #333;
+}
+
 .team-members-card {
   min-width: 0;
   padding: 0.75rem 0.75rem 0.85rem;
