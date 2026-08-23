@@ -65,13 +65,16 @@
               hands fitOne() the same "how much room to shrink a busy
               team into" number as .team-print-page-fit's own max-height
               (see that rule's own comment for why it's a measurement-
-              time budget rather than a permanent CSS height).
-              data-shrink-to-fit-group="teams" (same group name as the
-              dedicated print page's own team cards) makes every team's
-              page level down to whichever one team needed the most
-              shrinking, so a light team's page doesn't print at a
-              visibly different font size than a busy team's. %>
-          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-group="teams" data-shrink-to-fit-budget="9.2in">
+              time budget rather than a permanent CSS height). No
+              data-shrink-to-fit-group here (see admin-setup-teams-
+              print.ejs's own comment for why - a real bug report: one
+              genuinely oversized team was dragging every other, normal-
+              sized team's page down to its own tiny scale, wasting most
+              of a light team's page on blank space). Every card's own
+              font size is fixed at 12pt/18pt (styles.css), so pages
+              already read consistently for the common case without any
+              cross-page leveling. %>
+          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
           <%# The whole card (info + members) is one edit-toggle .edit-
               section (public/js/edit-toggle.js) - clicking Edit unfreezes
               the title/description/leader fields in place and reveals the

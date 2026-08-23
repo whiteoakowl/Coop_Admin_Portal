@@ -34,13 +34,23 @@
             print-shrink-to-fit.js's fitOne() shrinks exactly ONE element
             - wrap.firstElementChild - so header and card have to be that
             same single child to shrink as one unit together.
-            data-shrink-to-fit-group="teams" is a real request: "all pages
-            should have the same font size" - without it, a light team
-            barely shrinks while a busy team shrinks a lot, so pages read
-            at visibly different sizes; the shared group name makes every
-            team's page level down to whichever one team needed the most
-            shrinking, so all pages match. %>
-        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-group="teams" data-shrink-to-fit-budget="9.2in">
+            No data-shrink-to-fit-group here (there used to be one, "all
+            pages should have the same font size" - leveling every team's
+            page down to whichever ONE team needed the most shrinking) -
+            a real follow-up report: "team print pages are still very
+            small font. the text and card should fill one page." One
+            genuinely oversized team on a day was dragging every OTHER,
+            perfectly normal-sized team on that same day down to its own
+            tiny scale, wasting most of a light team's page on blank
+            space instead of filling it. Since every card's own font size
+            is now fixed at 12pt/18pt in the first place (see styles.css's
+            .setup-team-card-grid rules below), pages already read
+            consistently for the common case - any team whose content
+            fits the 9.2in budget at that fixed size prints at exactly
+            that size, full stop - independent fitOne() only shrinks a
+            page BELOW that when its own content genuinely doesn't fit,
+            without touching any other team's page. %>
+        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
           <div class="team-print-page-inner">
             <div class="print-header">
               <img src="/img/logo.png" alt="" />
