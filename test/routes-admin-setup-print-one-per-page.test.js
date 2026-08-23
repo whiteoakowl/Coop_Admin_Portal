@@ -55,8 +55,8 @@ test('Setup/Cleanup Teams manage page: one-team-per-page print wrapper + shrink 
   const res = await request(app).get('/admin/setup/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  await t.test('every team is wrapped in .team-print-page-fit with a print-time shrink budget', () => {
-    const wrapperMatches = res.text.match(/<div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="[^"]+">/g) || [];
+  await t.test('every team is wrapped in .team-print-page-fit with a print-time shrink budget, grouped so every page levels to the same font size', () => {
+    const wrapperMatches = res.text.match(/<div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="[^"]+" data-shrink-to-fit-group="teams">/g) || [];
     assert.equal(wrapperMatches.length, 2, 'expected one .team-print-page-fit wrapper per team');
   });
 

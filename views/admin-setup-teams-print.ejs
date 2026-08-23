@@ -34,23 +34,25 @@
             print-shrink-to-fit.js's fitOne() shrinks exactly ONE element
             - wrap.firstElementChild - so header and card have to be that
             same single child to shrink as one unit together.
-            No data-shrink-to-fit-group here (there used to be one, "all
-            pages should have the same font size" - leveling every team's
-            page down to whichever ONE team needed the most shrinking) -
-            a real follow-up report: "team print pages are still very
-            small font. the text and card should fill one page." One
-            genuinely oversized team on a day was dragging every OTHER,
-            perfectly normal-sized team on that same day down to its own
-            tiny scale, wasting most of a light team's page on blank
-            space instead of filling it. Since every card's own font size
-            is now fixed at 12pt/18pt in the first place (see styles.css's
-            .setup-team-card-grid rules below), pages already read
-            consistently for the common case - any team whose content
-            fits the 9.2in budget at that fixed size prints at exactly
-            that size, full stop - independent fitOne() only shrinks a
-            page BELOW that when its own content genuinely doesn't fit,
-            without touching any other team's page. %>
-        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
+            data-shrink-to-fit-group="teams" levels every team's page on
+            this day down to whichever ONE team needed the most shrinking
+            - a real request, twice over: first "all pages should have
+            the same font size" (which is why this existed originally),
+            then removed after a follow-up report that a light team's
+            page was left "mostly blank" once leveled down to match one
+            genuinely oversized team, then a further follow-up report -
+            with two screenshots, one clearly larger font than the other
+            - that independent per-team sizing looked WORSE: "printing
+            setup cleanup team pages are still two different font sizes
+            ... they should all be the same font size and fit on one
+            page." Consistency across every page in the same print job
+            wins over a given page using its own full available room -
+            back to group leveling. Every card's own font size is still
+            fixed at 12pt/18pt as a starting point (styles.css's
+            .setup-team-card-grid rules below) - fitGroup (public/js/
+            print-shrink-to-fit.js) only ever shrinks BELOW that shared
+            starting point, per the day's busiest team, never per-page. %>
+        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in" data-shrink-to-fit-group="teams">
           <div class="team-print-page-inner">
             <div class="print-header">
               <img src="/img/logo.png" alt="" />
