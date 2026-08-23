@@ -67,14 +67,39 @@
           <% } %>
 
           <% if (selected.lesson_type_snapshot === 'video' && lessonRow) { %>
-            <video
-              id="training-video"
-              src="<%= lessonRow.video_url %>"
-              controls
-              data-assignment-id="<%= state.assignment.id %>"
-              data-lesson-id="<%= selected.lesson_id %>"
-              data-resume-seconds="<%= selected.video_max_watched_seconds || 0 %>"
-            ></video>
+            <%# A pasted youtube.com/youtu.be link (youtubeId, computed in
+                routes/training.js) gets a real YouTube embed instead of a
+                plain <video> element, which can only ever play a direct
+                video file URL, not a YouTube page - see utils/training.js's
+                own header comment for the full bug report. Both paths
+                report watch progress through the exact same /video-
+                progress endpoint (public/js/training-player.js). %>
+            <% if (youtubeId) { %>
+              <%# Wrapped in its own sized container rather than styling
+                  #training-youtube-player directly - the YouTube IFrame
+                  API replaces that div with a real <iframe> in place, and
+                  doesn't reliably carry the id (or any class) over onto
+                  it, so CSS has nothing stable to target on the
+                  replacement element itself. %>
+              <div class="training-youtube-wrap">
+                <div
+                  id="training-youtube-player"
+                  data-assignment-id="<%= state.assignment.id %>"
+                  data-lesson-id="<%= selected.lesson_id %>"
+                  data-resume-seconds="<%= selected.video_max_watched_seconds || 0 %>"
+                  data-video-id="<%= youtubeId %>"
+                ></div>
+              </div>
+            <% } else { %>
+              <video
+                id="training-video"
+                src="<%= lessonRow.video_url %>"
+                controls
+                data-assignment-id="<%= state.assignment.id %>"
+                data-lesson-id="<%= selected.lesson_id %>"
+                data-resume-seconds="<%= selected.video_max_watched_seconds || 0 %>"
+              ></video>
+            <% } %>
             <p class="hint" id="training-video-percent">Watched: <%= selected.video_percent %>%</p>
           <% } %>
 

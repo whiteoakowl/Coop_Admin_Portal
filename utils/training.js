@@ -23,10 +23,19 @@
 //
 //   - No video hosting/streaming infrastructure exists anywhere in this
 //     app (see utils/uploads.js/utils/storage.js - image and document
-//     uploads only). Rather than build one from scratch, a video lesson
-//     stores a direct link to an externally-hosted video file and the
-//     Training Player plays it with a plain <video> element - real
-//     browser playback, real timeupdate events, no new dependency.
+//     uploads only). A video lesson just stores a link - either a direct
+//     file URL, played with a plain <video> element (real browser
+//     playback, real timeupdate events, no new dependency), or a
+//     youtube.com/youtu.be link (a real bug report: pasting one rendered
+//     nothing but a black box, since a YouTube page is an HTML document,
+//     not a playable video file a <video src> can ever load). youtubeVideoId
+//     below is what tells the Training Player (views/training-play.ejs)
+//     which of the two to render - a YouTube link gets the YouTube IFrame
+//     Player API instead (public/js/training-player.js), polling
+//     getCurrentTime()/getDuration() to report progress through the exact
+//     same /video-progress endpoint and watch-threshold gate as native
+//     <video> playback, since a cross-origin iframe has no timeupdate
+//     events of its own to listen for.
 //
 //   - This app has no per-admin identity (a single shared Admin login -
 //     see requireAdmin.js's own comment) and no member login/portal at
@@ -55,6 +64,46 @@ const { byLastName } = require('./members');
 const LESSON_TYPES = ['video', 'text', 'quiz'];
 const TRAINING_STATUSES = ['draft', 'published', 'archived'];
 const ASSIGNMENT_STATUSES = ['not_started', 'in_progress', 'passed', 'failed', 'retry_required', 'expired'];
+
+// Extracts the 11-character video id from any of the URL shapes someone
+// is realistically going to paste into a video lesson's Video URL field -
+// a plain watch page (with or without other query params like a
+// playlist's own ?list=... coming first), a shortened youtu.be link, an
+// existing /embed/ or /shorts/ URL, the privacy-enhanced youtube-nocookie.com
+// domain, and the www./m. subdomain variants of any of those. Returns
+// null for anything else (a direct video file URL, a Vimeo link, ...) -
+// exactly the signal training-play.ejs uses to decide which player to
+// render (see this file's own header comment). Tolerates a URL pasted
+// without a leading scheme (people often paste "youtube.com/watch?v=..."
+// straight out of an address bar), but is otherwise a real URL parse, not
+// a regex guessing at the whole string - far less brittle against the
+// query-param ordering/extra-param variety real YouTube links come in.
+function youtubeVideoId(rawUrl) {
+  if (!rawUrl) return null;
+  const trimmed = String(rawUrl).trim();
+  let u;
+  try {
+    u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+  } catch (err) {
+    return null;
+  }
+  const host = u.hostname.replace(/^(www|m)\./, '');
+  const isYouTubeId = (id) => /^[A-Za-z0-9_-]{11}$/.test(id || '');
+
+  if (host === 'youtu.be') {
+    const id = u.pathname.slice(1).split('/')[0];
+    return isYouTubeId(id) ? id : null;
+  }
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    if (u.pathname === '/watch') {
+      const id = u.searchParams.get('v');
+      return isYouTubeId(id) ? id : null;
+    }
+    const embedMatch = /^\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/.exec(u.pathname);
+    if (embedMatch) return embedMatch[1];
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------
 // Trainings (admin Training Builder)
@@ -851,6 +900,7 @@ module.exports = {
   LESSON_TYPES,
   TRAINING_STATUSES,
   ASSIGNMENT_STATUSES,
+  youtubeVideoId,
   listTrainings,
   getTraining,
   getTrainingWithContent,

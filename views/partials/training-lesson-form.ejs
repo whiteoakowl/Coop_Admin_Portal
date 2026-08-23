@@ -19,8 +19,8 @@
       <% }); %>
     </select>
   </label>
-  <label data-lesson-field="video">Video URL
-    <input type="url" name="videoUrl" value="<%= lesson ? (lesson.video_url || '') : '' %>" placeholder="https://example.com/video.mp4" />
+  <label data-lesson-field="video">Video URL <span class="hint">(a YouTube link, or a direct video file URL)</span>
+    <input type="url" name="videoUrl" value="<%= lesson ? (lesson.video_url || '') : '' %>" placeholder="https://www.youtube.com/watch?v=... or https://example.com/video.mp4" />
   </label>
   <label data-lesson-field="video,text">Content <span class="hint">(instructions/reading, optional on a video lesson)</span>
     <textarea name="content" rows="5"><%= lesson ? (lesson.content || '') : '' %></textarea>

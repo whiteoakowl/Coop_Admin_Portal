@@ -5860,6 +5860,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .training-lesson-panel { border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
 .training-lesson-panel video { width: 100%; border-radius: 8px; background: #000; }
+
+/* A YouTube-embedded video lesson (utils/training.js's youtubeVideoId) -
+   the IFrame API replaces #training-youtube-player with a real <iframe>
+   in place, without reliably carrying its id/class over, so the fixed-
+   aspect-ratio sizing lives on this stable wrapper instead and just
+   targets whatever iframe lands inside it. */
+.training-youtube-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+.training-youtube-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .training-lesson-panel .training-lesson-resources { margin-left: 0; }
 
 .training-grade-panel { text-align: center; padding: 1.5rem; }

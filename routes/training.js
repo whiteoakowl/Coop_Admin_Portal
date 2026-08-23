@@ -109,6 +109,12 @@ router.get('/training/:assignmentId/play', requireTrainingIdentity, async (req, 
     lessonRow = await db.prepare('SELECT * FROM training_lessons WHERE id = ?').get(selected.lesson_id);
     if (lessonRow) resources = await db.prepare('SELECT * FROM training_lesson_resources WHERE lesson_id = ? ORDER BY position, id').all(lessonRow.id);
   }
+  // A real bug report: a video lesson whose Video URL was a pasted
+  // youtube.com/youtu.be link rendered a black, non-playing box - a plain
+  // <video src> can't play an HTML page. training-play.ejs uses this to
+  // pick between that <video> element and a YouTube IFrame embed instead
+  // (see utils/training.js's own header comment for the full story).
+  const youtubeId = lessonRow && lessonRow.video_url ? T.youtubeVideoId(lessonRow.video_url) : null;
 
   res.render('training-play', {
     title: state.assignment.title,
@@ -116,6 +122,7 @@ router.get('/training/:assignmentId/play', requireTrainingIdentity, async (req, 
     state,
     selected,
     lessonRow,
+    youtubeId,
     resources,
     questions,
     error: req.query.error || null,
