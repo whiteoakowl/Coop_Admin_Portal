@@ -21,6 +21,17 @@
       <button type="submit" class="roster-action-btn" form="class-view-form-<%= cls.id %>">Save</button>
     </div>
   </div>
+  <%# A real request: "on edit event the top buttons should be edit,
+      delete and close. close should close the window. buttons should be
+      top right." styles.css's own .class-view-header .class-form-dialog-
+      close rule already accounted for this exact button living right
+      here - a normal flow item after .class-view-header-actions, not the
+      absolute-positioned corner button every other dialog uses - but the
+      button itself was never actually added to this template. Always
+      visible (not nested inside either .class-view-footer-view/-edit),
+      so it stays reachable in both view and edit mode - closing shouldn't
+      require canceling out of an edit first. %>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
 </div>
 
 <div class="class-manage-layout">
