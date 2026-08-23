@@ -77,4 +77,64 @@ test('POST /name-tag/submit', async (t) => {
     assert.match(res.text, /Please select at least one name/);
     assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM name_tag_requests').get()).c), before);
   });
+
+  // A real request: "the drop down of names should show all members,
+  // admins, primary parents, parents and students" - a student or admin
+  // picking THEMSELVES as the submitter (not just as a family member on
+  // someone else's list) is the actual behavior change under test here.
+  await t.test('a student can submit for themselves, not just via a parent\'s family list', async () => {
+    const { lastInsertRowid: studentId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Solo Student', 'Solo Student', 'student')")
+      .run();
+
+    const res = await request(app)
+      .post('/name-tag/submit')
+      .type('form')
+      .send({ parentId: String(studentId), memberIds: [String(studentId)], requestType: 'lost_tag', day: 'monday' });
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Request submitted for Solo Student/);
+
+    const row = await db.prepare('SELECT member_id FROM name_tag_requests WHERE member_id = ?').get(studentId);
+    assert.ok(row, 'expected a request row for the student who submitted for themselves');
+  });
+
+  await t.test('an admin can submit for themselves', async () => {
+    const { lastInsertRowid: adminId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Solo Admin', 'Solo Admin', 'admin')")
+      .run();
+
+    const res = await request(app)
+      .post('/name-tag/submit')
+      .type('form')
+      .send({ parentId: String(adminId), memberIds: [String(adminId)], requestType: 'lost_tag', day: 'monday' });
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Request submitted for Solo Admin/);
+  });
+});
+
+test('GET /name-tag lists every active member type in the picker, correctly labeled', async (t) => {
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Admin', 'Label Admin', 'admin')").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Parent', 'Label Parent', 'parent')").run();
+  const { lastInsertRowid: studentId2 } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Student', 'Label Student', 'student')")
+    .run();
+
+  await t.test('admins, parents, and students all appear in the dropdown with their real type', async () => {
+    const res = await request(app).get('/name-tag');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Label Admin \(Admin\)/);
+    assert.match(res.text, /Label Parent \(Parent\)/);
+    assert.match(res.text, /Label Student \(Student\)/);
+  });
+
+  await t.test('a student picked as the submitter shows their own checkbox group with their real type', async () => {
+    const res = await request(app).get('/name-tag');
+    // Every member's own self-checkbox is rendered (all groups render,
+    // only the matching one is unhidden client-side) - the student's own
+    // group should show their real type, not a hardcoded "(Parent)".
+    const groupStart = res.text.indexOf(`data-parent-id="${studentId2}"`);
+    assert.ok(groupStart !== -1, 'expected a member group for the student');
+    const groupHtml = res.text.slice(groupStart, groupStart + 500);
+    assert.match(groupHtml, /Label Student \(Student\)/);
+  });
 });

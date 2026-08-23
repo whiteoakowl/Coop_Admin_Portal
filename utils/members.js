@@ -88,6 +88,20 @@ async function activeParentAndAdminOptions() {
   return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()).sort(byLastName);
 }
 
+// Every active member of ANY type - the Name Tag Request form's own
+// picker specifically. A real request: "the drop down of names should
+// show all members, admins, primary parents, parents and students" -
+// unlike the two narrower pickers above (which deliberately stay
+// parent/admin-only for Absence/Late and Setup/Cleanup, where a student
+// picking themselves as the submitter doesn't make sense), a name tag
+// request is just as legitimately made by a student themselves as by a
+// parent or admin. member_type is included so the view can label each
+// option/checkbox with its real type instead of assuming every pick is a
+// parent.
+async function activeMemberOptions() {
+  return (await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1').all()).sort(byLastName);
+}
+
 // Every other active member sharing memberId's family_id (any type -
 // family is symmetric and not restricted to parent/student). Empty if the
 // member isn't connected to anyone.
@@ -107,31 +121,38 @@ async function hasInfantChild(memberId) {
   });
 }
 
-// Every other member of each parent's (or admin's - see
-// activeParentAndAdminOptions' own comment) family group, keyed by parent
-// id - the public forms render the parent's own checkbox separately, then
-// this list, so it deliberately excludes the parent themselves (no more
-// "children only" restriction now that family is a symmetric group
-// rather than a parent->child link).
-async function familyGroupsByParent() {
-  const parents = (
-    await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()
-  ).sort(byLastName);
-  const byParent = {};
-  for (const p of parents) {
-    byParent[p.id] = (await familyOf(p.id)).map((m) => ({ id: m.id, name: m.name }));
+// Every other member of each member's own family group, keyed by that
+// member's own id - the public forms render the top-level pick's own
+// checkbox separately, then this list, so it deliberately excludes them
+// (no more "children only" restriction now that family is a symmetric
+// group rather than a parent->child link). Keyed by EVERY active member,
+// not just parent/admin, so the Name Tag Request form's broader
+// activeMemberOptions() picker (any member, including a student, as the
+// "who is this for" submitter) always has a matching family list ready.
+// Absence/Late's own top-level list stays parent/admin-only
+// (activeParentAndAdminOptions), so the extra student-keyed entries here
+// are simply never looked up there - not a behavior change for that form.
+async function familyGroupsByMember() {
+  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
+  const byMember = {};
+  for (const m of members) {
+    byMember[m.id] = (await familyOf(m.id)).map((fm) => ({ id: fm.id, name: fm.name, member_type: fm.member_type }));
   }
-  return byParent;
+  return byMember;
 }
 
 // Confirms memberId is really part of parentId's family (themselves, or
 // anyone sharing their family_id) before letting a form submission touch
-// that record. parentId is whatever was picked from a parents-picker
-// dropdown (activeParentAndAdminOptions, familyGroupsByParent above) - an
-// admin, not just a literal 'parent'-type member, is a valid pick there.
+// that record. parentId is whatever was picked from a top-level picker
+// dropdown (activeParentAndAdminOptions, activeMemberOptions,
+// familyGroupsByMember above) - no member_type restriction on the self
+// case: Absence/Late and Setup/Cleanup's own pickers never actually offer
+// a student id as parentId (their own top-level lists stay parent/admin-
+// only), so this only ever matters for the Name Tag Request form, where a
+// student legitimately can be the submitter picking themselves.
 async function loadFamilyMember(memberId, parentId) {
   if (memberId === parentId) {
-    return db.prepare("SELECT * FROM members WHERE id = ? AND active = 1 AND member_type IN ('parent', 'admin')").get(parentId);
+    return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(parentId);
   }
   const parent = await db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
   if (!parent || parent.family_id == null) return null;
@@ -321,7 +342,8 @@ module.exports = {
   findMemberByName,
   activeParentOptions,
   activeParentAndAdminOptions,
-  familyGroupsByParent,
+  activeMemberOptions,
+  familyGroupsByMember,
   loadFamilyMember,
   familyOf,
   hasInfantChild,

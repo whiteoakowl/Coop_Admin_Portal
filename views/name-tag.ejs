@@ -17,13 +17,21 @@
     <% } %>
 
     <form method="POST" action="/name-tag/submit" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
+      <%
+        // activeMemberOptions (routes/name-tag.js) offers every active
+        // member - parent, admin, or student - not just parents, so each
+        // row's own label reflects its real type instead of assuming
+        // everyone picked is a parent.
+        var TYPE_LABELS = { parent: 'Parent', admin: 'Admin', student: 'Student' };
+        function typeLabel(m) { return TYPE_LABELS[m.member_type] || 'Member'; }
+      %>
       <div class="form-section">
-        <h2>Parent Name</h2>
+        <h2>Your Name</h2>
         <div class="stack-form">
           <select id="parentId" name="parentId" required>
             <option value="">Select your name&hellip;</option>
             <% parents.forEach(function(p) { %>
-              <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
+              <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %> (<%= typeLabel(p) %>)</option>
             <% }); %>
           </select>
         </div>
@@ -36,12 +44,12 @@
               <div class="checkbox-group">
                 <label class="checkbox-option">
                   <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= formValues.memberIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
-                  <%= p.name %> (Parent)
+                  <%= p.name %> (<%= typeLabel(p) %>)
                 </label>
                 <% kids.forEach(function(k) { %>
                   <label class="checkbox-option">
                     <input type="checkbox" name="memberIds" value="<%= k.id %>" <%= formValues.memberIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
-                    <%= k.name %>
+                    <%= k.name %><% if (k.member_type !== 'student') { %> (<%= typeLabel(k) %>)<% } %>
                   </label>
                 <% }); %>
               </div>

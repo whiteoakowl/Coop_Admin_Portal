@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { isValidISODate, formatDateLabel } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-const { activeParentAndAdminOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
+const { activeParentAndAdminOptions, familyGroupsByMember, loadFamilyMember } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 // Generous cap for real use (a parent reporting for several kids, or
@@ -15,7 +15,7 @@ router.get('/absence', async (req, res) => {
   res.render('absence', {
     title: 'Absence/Late Form',
     parents: await activeParentAndAdminOptions(),
-    childrenByParent: await familyGroupsByParent(),
+    childrenByParent: await familyGroupsByMember(),
     result: null,
     formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
   });
@@ -26,7 +26,7 @@ router.post('/absence/submit', async (req, res) => {
     return res.render('absence', {
       title: 'Absence/Late Form',
       parents: await activeParentAndAdminOptions(),
-      childrenByParent: await familyGroupsByParent(),
+      childrenByParent: await familyGroupsByMember(),
       formValues: { type: 'absence', parentId: '', studentIds: [], sessionDate: '', reasonCategory: '', reason: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
     });
@@ -41,7 +41,7 @@ router.post('/absence/submit', async (req, res) => {
   const reason = (req.body.reason || '').trim() || null;
 
   const parents = await activeParentAndAdminOptions();
-  const childrenByParent = await familyGroupsByParent();
+  const childrenByParent = await familyGroupsByMember();
   const formValues = {
     type,
     parentId: req.body.parentId || '',

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { activeParentAndAdminOptions, familyGroupsByParent, loadFamilyMember } = require('../utils/members');
+const { activeMemberOptions, familyGroupsByMember, loadFamilyMember } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 const REQUEST_TYPES = ['lost_tag', 'schedule_change'];
@@ -14,8 +14,8 @@ const submitLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts:
 router.get('/name-tag', async (req, res) => {
   res.render('name-tag', {
     title: 'Name Tag Form',
-    parents: await activeParentAndAdminOptions(),
-    childrenByParent: await familyGroupsByParent(),
+    parents: await activeMemberOptions(),
+    childrenByParent: await familyGroupsByMember(),
     result: null,
     formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
   });
@@ -25,8 +25,8 @@ router.post('/name-tag/submit', async (req, res) => {
   if (submitLimiter.isLimited(req.ip)) {
     return res.render('name-tag', {
       title: 'Name Tag Form',
-      parents: await activeParentAndAdminOptions(),
-      childrenByParent: await familyGroupsByParent(),
+      parents: await activeMemberOptions(),
+      childrenByParent: await familyGroupsByMember(),
       formValues: { parentId: '', memberIds: [], requestType: '', day: '', description: '' },
       result: { ok: false, message: 'Too many submissions from this device. Please wait a few minutes and try again.' },
     });
@@ -39,8 +39,8 @@ router.post('/name-tag/submit', async (req, res) => {
   const day = DAYS.includes(req.body.day) ? req.body.day : null;
   const description = (req.body.description || '').trim() || null;
 
-  const parents = await activeParentAndAdminOptions();
-  const childrenByParent = await familyGroupsByParent();
+  const parents = await activeMemberOptions();
+  const childrenByParent = await familyGroupsByMember();
   const formValues = {
     parentId: req.body.parentId || '',
     memberIds,
