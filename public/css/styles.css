@@ -5483,6 +5483,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        reading experience, and it buys real margin against this same
        quirk resurfacing for slightly different content/font-metrics. */
     max-height: 9.2in;
+  }
+  /* :not(:first-child) - a real bug report: "the 1st page is still
+     blank." Every card (first one included) forcing page-break-before
+     pushed the very first team onto a second page, leaving only
+     whatever print-only content preceded the grid (now just the
+     repeated-per-card .print-header below, moved inside each card
+     specifically so this doesn't reintroduce the same problem) alone on
+     page 1. Breaking BEFORE every card but the first is equivalent for
+     every later boundary (a break still separates every pair of
+     consecutive teams) without ever asking the print engine to break
+     before the very first thing in the document. */
+  .team-print-page-fit:not(:first-child) {
     page-break-before: always;
     break-before: page;
   }

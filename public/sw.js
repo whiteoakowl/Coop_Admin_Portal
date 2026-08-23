@@ -49,7 +49,7 @@
 // to actually reach devices that have visited before - easy to forget
 // (see the two bug reports above), so: if you're editing public/js/** or
 // public/css/**, bump this too, in the same change.
-const STATIC_CACHE = 'sh-static-v4';
+const STATIC_CACHE = 'sh-static-v5';
 const STATIC_EXTENSIONS = ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.ico'];
 
 function isStaticAsset(url) {

@@ -12,14 +12,6 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Teams</p>
-      </div>
-    </div>
-
     <% if (teams.length === 0) { %>
       <p class="roster-empty">No teams yet.</p>
     <% } %>
@@ -31,43 +23,62 @@
             why data-shrink-to-fit-budget exists. Deliberately no editable
             form controls here at all (no <input>, no <select>, no edit/
             delete/remove buttons) - this page is read-only by design, so
-            there's nothing for @media print to have to hide. %>
+            there's nothing for @media print to have to hide.
+            print-header is repeated inside every card's own wrapper
+            (a real request: "the logo header should be on every page")
+            rather than once at the top of the document - one team per
+            physical page means a single top-level header would only
+            ever land on whichever page happens to hold it, not every
+            page. Wrapped together with .team-col in one inner div (not
+            as separate siblings of .team-print-page-fit) because
+            print-shrink-to-fit.js's fitOne() shrinks exactly ONE element
+            - wrap.firstElementChild - so header and card have to be that
+            same single child to shrink as one unit together. %>
         <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
-          <div class="team-col">
-            <div class="team-info-card team-accent-<%= i % 5 %>">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <h3 class="team-info-title"><%= t.title %></h3>
-              <% if (t.description) { %><p class="team-info-desc-print"><%= t.description %></p><% } %>
-              <div class="team-print-meta">
-                <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
-                <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>
-                <% if (t.meeting_location) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= t.meeting_location %></span><% } %>
+          <div class="team-print-page-inner">
+            <div class="print-header">
+              <img src="/img/logo.png" alt="" />
+              <div>
+                <p class="print-header-title">Sanford Homeschoolers</p>
+                <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Teams</p>
               </div>
             </div>
-            <div class="team-members-card">
-              <h4>Members</h4>
-              <div class="team-card-members">
-                <% if (t.members.length === 0) { %>
-                  <p class="team-card-empty">No members yet.</p>
-                <% } %>
-                <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
-                    <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
-                  </div>
-                <% }); %>
+            <div class="team-col">
+              <div class="team-info-card team-accent-<%= i % 5 %>">
+                <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+                <h3 class="team-info-title"><%= t.title %></h3>
+                <% if (t.description) { %><p class="team-info-desc-print"><%= t.description %></p><% } %>
+                <div class="team-print-meta">
+                  <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
+                  <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>
+                  <% if (t.meeting_location) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= t.meeting_location %></span><% } %>
+                </div>
               </div>
-            </div>
-            <% if (t.taskSection && t.taskSection.items.length > 0) { %>
-              <div class="team-tasks-card">
-                <h4>Tasks</h4>
-                <ol class="team-tasks-list">
-                  <% t.taskSection.items.forEach(function(item) { %>
-                    <li><%= item.description %></li>
+              <div class="team-members-card">
+                <h4>Members</h4>
+                <div class="team-card-members">
+                  <% if (t.members.length === 0) { %>
+                    <p class="team-card-empty">No members yet.</p>
+                  <% } %>
+                  <% t.members.forEach(function(m) { %>
+                    <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
+                      <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                      <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
+                    </div>
                   <% }); %>
-                </ol>
+                </div>
               </div>
-            <% } %>
+              <% if (t.taskSection && t.taskSection.items.length > 0) { %>
+                <div class="team-tasks-card">
+                  <h4>Tasks</h4>
+                  <ol class="team-tasks-list">
+                    <% t.taskSection.items.forEach(function(item) { %>
+                      <li><%= item.description %></li>
+                    <% }); %>
+                  </ol>
+                </div>
+              <% } %>
+            </div>
           </div>
         </div>
       <% }); %>

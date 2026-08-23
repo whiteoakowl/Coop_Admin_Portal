@@ -282,6 +282,34 @@
     return out;
   }
 
+  // Mirrors utils/members.js's lastNameOf exactly (final whitespace-
+  // separated token) - every print route sorts its own request's members
+  // by last name server-side (byLastName), but that sort only ever sees
+  // ONE batch's worth of ids at a time here. A real bug report: "select
+  // all" on Barcodes Only "still separates the names into different
+  // groups when printing" - the checkbox rows themselves are in the
+  // Design/Print picker's own family-grouped order (utils/members.js's
+  // sortMembersByFamily, via membersWithDetails), not alphabetical, so
+  // chunking split that family-grouped order into batches and each
+  // batch's own from-scratch alphabetical sort read as several separate
+  // A-Z runs back to back instead of one continuous list. Sorting the
+  // full selection by last name BEFORE chunking means every batch is
+  // already a correctly-ordered slice of one single alphabetical run -
+  // each batch's own server-side sort then has nothing left to do.
+  function lastNameOf(fullName) {
+    const parts = (fullName || '').trim().split(/\s+/);
+    return parts.length > 0 ? parts[parts.length - 1] : '';
+  }
+
+  function sortCheckboxesByLastName(checkboxes) {
+    return checkboxes.slice().sort((a, b) => {
+      const nameA = (a.closest('tr') && a.closest('tr').dataset.name) || '';
+      const nameB = (b.closest('tr') && b.closest('tr').dataset.name) || '';
+      return lastNameOf(nameA).localeCompare(lastNameOf(nameB), undefined, { sensitivity: 'base' }) ||
+        nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+  }
+
   async function fetchChunkDocument(action, memberIds) {
     const body = new URLSearchParams();
     memberIds.forEach((id) => body.append('memberIds', id));
@@ -306,7 +334,8 @@
   // template ends up with more than one of that same container back to
   // back, which prints identically to one continuous one.
   async function printInChunks(form) {
-    const checkedIds = Array.from(form.querySelectorAll('input[name="memberIds"]:checked')).map((cb) => cb.value);
+    const checkedBoxes = sortCheckboxesByLastName(Array.from(form.querySelectorAll('input[name="memberIds"]:checked')));
+    const checkedIds = checkedBoxes.map((cb) => cb.value);
     const win = window.open('', '_blank');
     if (!win) return; // Popup blocked - nothing more to do client-side; reducing the selection below MAX_PRINT_CHUNK still works the normal way.
     win.document.write('<!doctype html><title>Preparing print job&hellip;</title><body style="font: 16px sans-serif; padding: 2rem;">Preparing your print job&hellip; this tab will fill in automatically once ready.</body>');
