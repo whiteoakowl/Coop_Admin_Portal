@@ -14,7 +14,9 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { allClassesList, UNASSIGNED_ROOM } = require('../utils/classSchedule');
+const { allClassesList, UNASSIGNED_ROOM, HOUR_POSITIONS } = require('../utils/classSchedule');
+const { DAYS, DAY_LABELS } = require('../utils/days');
+const { playgroundHourLabel } = require('../utils/playground');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
 router.use(requireFullAdmin);
@@ -297,6 +299,36 @@ router.post('/design/print-classcheckin-qr', async (req, res) => {
 
   res.render('admin-classcheckin-qr-print', {
     title: 'Print Class Check-In QR Codes',
+    pages,
+  });
+});
+
+// Playground Check-In QR Codes: a real request - "create qr codes for the
+// playground check in link." Unlike Class Check-In QR Codes above, there's
+// nothing to pick - the playground always has exactly the same 8
+// (day, hour) slots (utils/playground.js) - so this always prints all of
+// them, one page per day with the same 2x2 grid the class QR sheets use.
+// Each QR code encodes that one hour's own Playground Check-In quick link
+// (/kiosk/class-checkin/playground/:day/:hour/attendance) - absolute, for
+// the same reason the class QR codes are: a QR code is scanned by a
+// phone's camera with no browsing context to resolve a relative path
+// against.
+router.get('/design/print-playground-qr', async (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const pages = [];
+  for (const day of DAYS) {
+    const hours = [];
+    for (const hour of HOUR_POSITIONS) {
+      hours.push({
+        hourLabel: await playgroundHourLabel(day, hour),
+        checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+      });
+    }
+    pages.push({ dayLabel: DAY_LABELS[day], hours });
+  }
+
+  res.render('admin-playground-qr-print', {
+    title: 'Print Playground Check-In QR Codes',
     pages,
   });
 });

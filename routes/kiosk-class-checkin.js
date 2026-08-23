@@ -27,6 +27,7 @@ const { allClassesList, ensureDayRoster, HOUR_POSITIONS } = require('../utils/cl
 const { buildRosterGridData } = require('../utils/rosterGrid');
 const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
+const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
 const pinLimiter = require('../utils/classCheckinPinRateLimit');
 const { createRateLimiter } = require('../utils/rateLimit');
 
@@ -159,9 +160,11 @@ router.get('/classes/:id/scan', requireUnlocked, async (req, res) => {
   const mode = SCAN_MODES.includes(req.query.mode) ? req.query.mode : 'checkin';
   res.render('kiosk-class-checkin-scan', {
     title: `${mode === 'checkout' ? 'Check Out' : 'Check In'} - ${cls.class_name}`,
-    cls,
     mode,
     dateLabel: formatDateLong(todayISO()),
+    heading: cls.class_name,
+    scanBaseUrl: `/kiosk/class-checkin/classes/${cls.id}`,
+    completeUrl: `/kiosk/class-checkin/classes/${cls.id}/attendance`,
   });
 });
 
@@ -289,6 +292,173 @@ router.post('/classes/:id/scan/checkout', requireUnlocked, async (req, res) => {
     .run(member.id, cls.roster_id, today, Date.now());
 
   res.json({ ok: true, name: member.name, message: `${member.name} checked out of ${cls.class_name}.` });
+});
+
+// --- Playground Check-In --------------------------------------------------
+// A real request: "we need to add a playground check in and out and log.
+// anybody can check in and out of the playground. it doesn't have a set
+// roster." Shares this same PIN-gated kiosk surface with Class Check-In
+// above (same trust model: on-site staff, not the general public) and the
+// same scan view/script (kiosk-class-checkin-scan.ejs/.js, genericized to
+// take scanBaseUrl/completeUrl/heading instead of a hardcoded class id).
+// The one real difference from a class: there's no roster to browse into
+// (see utils/playground.js) or enroll against - a QR code (routes/
+// admin-design.js's print-playground-qr) or this router's own day/hour
+// picker both go straight to one (day, hour) slot's own attendance/scan
+// screens, and resolvePlaygroundScan below never checks enrollment at all.
+
+function requirePlaygroundHour(req, res, next) {
+  const day = req.params.day;
+  const hour = parseInt(req.params.hour, 10);
+  if (!isValidDay(day) || !HOUR_POSITIONS.includes(hour)) return res.status(404).render('404', { title: 'Not Found' });
+  req.playgroundDay = day;
+  req.playgroundHour = hour;
+  next();
+}
+
+router.get('/playground', requireUnlocked, (req, res) => {
+  res.render('kiosk-playground-days', { title: 'Playground Check-In' });
+});
+
+router.get('/playground/:day', requireUnlocked, async (req, res) => {
+  const day = req.params.day;
+  if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
+  const hours = [];
+  for (const h of HOUR_POSITIONS) hours.push({ position: h, label: await playgroundHourLabel(day, h) });
+  res.render('kiosk-playground-hours', { title: 'Playground Check-In', day, dayLabel: DAY_LABELS[day], hours });
+});
+
+// Read-only, today-only log plus the Check In/Check Out buttons - same
+// scope reasoning as a class's own attendance screen above (see that
+// route's own comment): reachable by anyone with the shared PIN, so it
+// only ever shows "who's here right now", not a term's history.
+router.get('/playground/:day/:hour/attendance', requireUnlocked, requirePlaygroundHour, async (req, res) => {
+  const day = req.playgroundDay;
+  const hour = req.playgroundHour;
+  const rosterId = await ensurePlaygroundRoster(day, hour);
+  const hourLabel = await playgroundHourLabel(day, hour);
+  const today = todayISO();
+  res.render('kiosk-playground-attendance', {
+    title: `Playground - ${hourLabel}`,
+    day,
+    hour,
+    dayLabel: DAY_LABELS[day],
+    hourLabel,
+    dateLabel: formatDateLong(today),
+    log: await playgroundLogForDate(rosterId, today),
+  });
+});
+
+router.get('/playground/:day/:hour/scan', requireUnlocked, requirePlaygroundHour, async (req, res) => {
+  const day = req.playgroundDay;
+  const hour = req.playgroundHour;
+  const mode = SCAN_MODES.includes(req.query.mode) ? req.query.mode : 'checkin';
+  const hourLabel = await playgroundHourLabel(day, hour);
+  res.render('kiosk-class-checkin-scan', {
+    title: `${mode === 'checkout' ? 'Check Out' : 'Check In'} - Playground`,
+    mode,
+    dateLabel: formatDateLong(todayISO()),
+    heading: `Playground · ${hourLabel}`,
+    scanBaseUrl: `/kiosk/class-checkin/playground/${day}/${hour}`,
+    completeUrl: `/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+  });
+});
+
+// Shared setup for both playground scan actions below - unlike class
+// check-in's own resolveScan, there's no roster_members enrollment check
+// at all: "anybody can check in and out of the playground" is the entire
+// point of this feature.
+async function resolvePlaygroundScan(day, hour, req, res) {
+  const rosterId = await ensurePlaygroundRoster(day, hour);
+  const { member, ambiguous } = await findMemberByBarcodeOrName(req.body.barcode);
+  if (ambiguous) {
+    res.json({ ok: false, message: 'More than one member has that name - please scan a barcode instead.' });
+    return null;
+  }
+  if (!member) {
+    res.json({ ok: false, message: 'Not recognized. Please see an attendant.' });
+    return null;
+  }
+
+  const today = todayISO();
+  const studentRosterId = await ensureDayRoster(day, 'student');
+  const inSessionToday = await db
+    .prepare('SELECT 1 FROM roster_dates WHERE roster_id = ? AND session_date = ?')
+    .get(studentRosterId, today);
+  if (!inSessionToday) {
+    res.json({ ok: false, message: `${DAY_LABELS[day]} isn't in session today.` });
+    return null;
+  }
+
+  return { rosterId, member, today };
+}
+
+router.post('/playground/:day/:hour/scan/checkin', requireUnlocked, requirePlaygroundHour, async (req, res) => {
+  if (classScanLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  classScanLimiter.recordAttempt(req.ip);
+
+  const ctx = await resolvePlaygroundScan(req.playgroundDay, req.playgroundHour, req, res);
+  if (!ctx) return;
+  const { rosterId, member, today } = ctx;
+
+  const existing = await db
+    .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+    .get(member.id, rosterId, today);
+  if (existing && existing.status === 'present') {
+    return res.json({
+      ok: true,
+      alreadyChecked: true,
+      name: member.name,
+      message: `${member.name} is already checked in to the Playground.`,
+    });
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time, source)
+       VALUES (?, ?, ?, 'present', ?, 'kiosk_playground')
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk_playground', recorded_at = now_text()`
+    )
+    .run(member.id, rosterId, today, Date.now());
+
+  res.json({ ok: true, name: member.name, message: `Welcome, ${member.name}!` });
+});
+
+router.post('/playground/:day/:hour/scan/checkout', requireUnlocked, requirePlaygroundHour, async (req, res) => {
+  if (classScanLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
+  }
+  classScanLimiter.recordAttempt(req.ip);
+
+  const ctx = await resolvePlaygroundScan(req.playgroundDay, req.playgroundHour, req, res);
+  if (!ctx) return;
+  const { rosterId, member, today } = ctx;
+
+  const existing = await db
+    .prepare('SELECT check_out_time FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+    .get(member.id, rosterId, today);
+  if (existing) {
+    return res.json({
+      ok: true,
+      alreadyChecked: true,
+      name: member.name,
+      message: `${member.name} is already checked out of the Playground.`,
+    });
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO checkouts (member_id, roster_id, session_date, number, check_out_time)
+       VALUES (?, ?, ?, NULL, ?)
+       ON CONFLICT(member_id, roster_id, session_date)
+       DO UPDATE SET check_out_time = excluded.check_out_time, recorded_at = now_text()`
+    )
+    .run(member.id, rosterId, today, Date.now());
+
+  res.json({ ok: true, name: member.name, message: `${member.name} checked out of the Playground.` });
 });
 
 module.exports = router;

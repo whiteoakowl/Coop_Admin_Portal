@@ -48,6 +48,7 @@
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
     classCheckinQr: document.getElementById('print-classCheckinQr-section'),
+    playgroundQr: document.getElementById('print-playgroundQr-section'),
     libraryBarcodes: document.getElementById('print-libraryBarcodes-section'),
     logs: document.getElementById('print-logs-section'),
   };

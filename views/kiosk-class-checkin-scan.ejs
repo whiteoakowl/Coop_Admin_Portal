@@ -3,13 +3,13 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="kiosk kiosk-checkin" data-class-id="<%= cls.id %>" data-mode="<%= mode %>">
+<body class="kiosk kiosk-checkin" data-scan-base-url="<%= scanBaseUrl %>" data-complete-url="<%= completeUrl %>" data-mode="<%= mode %>">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="kiosk-wrap">
-    <a href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Back to <%= cls.class_name %></a>
+    <a href="<%= completeUrl %>" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Back to <%= heading %></a>
     <div class="kiosk-header">
       <img class="kiosk-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
-      <h1><%= cls.class_name %> &middot; <%= mode === 'checkout' ? 'Check Out' : 'Check In' %></h1>
+      <h1><%= heading %> &middot; <%= mode === 'checkout' ? 'Check Out' : 'Check In' %></h1>
     </div>
     <p class="kiosk-date"><%= dateLabel %></p>
 

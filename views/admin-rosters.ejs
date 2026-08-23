@@ -11,7 +11,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'archive' ? 'Attendance Archive' : tabLabel %> &mdash; Attendance Spreadsheet</p>
+        <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'archive' ? 'Attendance Archive' : view === 'playgroundList' ? 'Playground' : view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : tabLabel %> &mdash; Attendance Spreadsheet</p>
       </div>
     </div>
     <h1>Attendance</h1>
@@ -23,6 +23,7 @@
       <a class="view-tab<%= topTab === 'monday' ? ' active' : '' %>" href="/admin/rosters?tab=monday-student">Monday</a>
       <a class="view-tab<%= topTab === 'wednesday' ? ' active' : '' %>" href="/admin/rosters?tab=wednesday-student">Wednesday</a>
       <a class="view-tab<%= topTab === 'classes' ? ' active' : '' %>" href="/admin/rosters?tab=classes">Classes</a>
+      <a class="view-tab<%= topTab === 'playground' ? ' active' : '' %>" href="/admin/rosters?tab=playground">Playground</a>
       <a class="view-tab<%= topTab === 'archive' ? ' active' : '' %>" href="/admin/rosters?tab=archive">Archive</a>
     </div>
 
@@ -69,6 +70,70 @@
             <% }); %>
           </div>
         <% } %>
+      </div>
+    <% } else if (view === 'playgroundList') { %>
+      <div class="view-tab-panel">
+        <p class="hint">Anybody can check in and out of the playground &mdash; there's no fixed roster. Pick an hour to see who's checked in and out for a session date.</p>
+        <% [['monday', 'Monday'], ['wednesday', 'Wednesday']].forEach(function(pair) { %>
+          <h3 class="class-schedule-hour-label"><%= pair[1] %></h3>
+          <div class="class-roster-list">
+            <% playgroundEntries.filter(function(e) { return e.day === pair[0]; }).forEach(function(e) { %>
+              <a class="class-roster-row-btn" href="/admin/rosters?tab=playground-<%= e.day %>-<%= e.hour %>">
+                <span class="class-roster-row-name"><%= e.hourLabel %></span>
+                <span class="class-roster-row-meta"><span><%= e.dayLabel %> Playground</span></span>
+              </a>
+            <% }); %>
+          </div>
+        <% }); %>
+      </div>
+    <% } else if (view === 'playgroundLog') { %>
+      <div class="view-tab-panel">
+        <p class="subtitle no-print"><a href="/admin/rosters?tab=playground">&larr; All Playground Hours</a></p>
+        <div class="roster-toolbar no-print">
+          <div class="category-filter" style="margin: 0;">
+            <label for="playground-date-select">Session Date</label>
+            <select id="playground-date-select" onchange="window.location = '/admin/rosters?tab=playground-<%= pgDay %>-<%= pgHour %>' + (this.value ? '&date=' + this.value : '')">
+              <% if (pgDates.length === 0) { %>
+                <option value="">No session dates yet</option>
+              <% } %>
+              <% pgDates.forEach(function(d) { %>
+                <option value="<%= d.date %>" <%= d.date === selectedDate ? 'selected' : '' %>><%= d.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        </div>
+
+        <div class="grid-box roster-grid-col">
+          <div class="grid-box-header">
+            <h2><%= pgDayLabel %> Playground &mdash; <%= pgHourLabel %></h2>
+          </div>
+          <div class="roster-scroll">
+            <table class="roster-table roster-table-detailed">
+              <thead>
+                <tr>
+                  <th class="roster-name-col">Name</th>
+                  <th>Checked In</th>
+                  <th>Checked Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!selectedDate) { %>
+                  <tr><td colspan="3" class="roster-empty">No session dates yet for <%= pgDayLabel %> &mdash; add one under the <%= pgDayLabel %> Student roster's Edit Dates.</td></tr>
+                <% } else if (log.length === 0) { %>
+                  <tr><td colspan="3" class="roster-empty">Nobody has checked in to the playground on <%= selectedDateLabel %> yet.</td></tr>
+                <% } %>
+                <% log.forEach(function(row) { %>
+                  <tr>
+                    <td class="roster-name-col"><%= row.name %></td>
+                    <td><%= row.checkInTime || '—' %></td>
+                    <td><%= row.checkOutTime || '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     <% } else if (view === 'archive') { %>
       <div class="view-tab-panel">
