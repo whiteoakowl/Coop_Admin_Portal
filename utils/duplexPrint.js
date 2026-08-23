@@ -56,12 +56,15 @@ const CARDS_PER_PAGE = 8;
 // against its name tag front) down by this factor - see partials/
 // name-tag-badge.ejs's safeInset for how - leaving real blank paper
 // margin on every side so a few points of registration drift lands in
-// that margin instead of cutting into real content. 0.92 was picked to
-// be clearly more forgiving than the ~2-4% of the card's own
-// width/height the tightest default schedule-card field already sits
-// from an edge (see utils/scheduleCardBadge.js's DEFAULT_LAYOUT), without
-// shrinking the card's actual content enough to hurt readability.
-const SCHEDULE_CARD_SAFE_INSET = 0.92;
+// that margin instead of cutting into real content. A real follow-up
+// request - "shrink everything on the schedule card to 75% to give even
+// more [border] space" - moved this down from the original 0.92 (a more
+// modest cushion over the ~2-4% margin the tightest default schedule-card
+// field already sat from an edge, see utils/scheduleCardBadge.js's
+// DEFAULT_LAYOUT) to a deliberately generous one, trading real card
+// content size for a border wide enough to comfortably absorb a
+// noticeably-off registration, not just a few stray points of it.
+const SCHEDULE_CARD_SAFE_INSET = 0.75;
 
 function chunk(arr, size) {
   const out = [];
