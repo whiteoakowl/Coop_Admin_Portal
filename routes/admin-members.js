@@ -1173,6 +1173,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
       badgeHeight: BADGE_HEIGHT,
       cardWidth: CARD_WIDTH,
       cardHeight: CARD_HEIGHT,
+      SCHEDULE_CARD_SAFE_INSET,
     });
   }
 
@@ -1215,6 +1216,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
     title: `Cards - ${member.name}`,
     memberName: member.name,
     cards,
+    SCHEDULE_CARD_SAFE_INSET,
   });
 });
 

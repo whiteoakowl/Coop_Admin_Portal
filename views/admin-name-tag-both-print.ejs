@@ -25,7 +25,7 @@
           </div>
           <div class="member-card-pair-item">
             <h2 class="no-print"><%= p.name %> &mdash; Schedule Card</h2>
-            <%- include('partials/name-tag-badge', { html: p.scheduleCard.html, bgCss: p.scheduleCard.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+            <%- include('partials/name-tag-badge', { html: p.scheduleCard.html, bgCss: p.scheduleCard.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight, safeInset: SCHEDULE_CARD_SAFE_INSET }) %>
           </div>
         </div>
       <% }); %>

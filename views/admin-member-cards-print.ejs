@@ -16,7 +16,7 @@
       <% cards.forEach(function(c) { %>
         <div class="member-card-print-block">
           <h2 class="no-print"><%= c.heading %></h2>
-          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: c.width, badgeHeight: c.height }) %>
+          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: c.width, badgeHeight: c.height, safeInset: c.heading === 'Schedule Card' ? SCHEDULE_CARD_SAFE_INSET : null }) %>
         </div>
       <% }); %>
     </div>

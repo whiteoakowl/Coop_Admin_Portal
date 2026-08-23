@@ -203,6 +203,7 @@ router.post('/design/print-both', async (req, res) => {
     badgeHeight: BADGE_HEIGHT,
     cardWidth: CARD_WIDTH,
     cardHeight: CARD_HEIGHT,
+    SCHEDULE_CARD_SAFE_INSET,
   });
 });
 
