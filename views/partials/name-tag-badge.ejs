@@ -5,7 +5,34 @@
 // module the design editor uses to draw its live canvas, so print always
 // matches design (one rendering implementation, not two hand-kept-in-sync
 // copies).
+//
+// safeInset (optional): a real request - "name tags and schedule cards
+// front and back they aren't lining up just right... give the schedule
+// cards a little bit more blank border so information doesn't get cut
+// off even if it's a little off." Front/back duplex alignment (see
+// utils/duplexPrint.js) is already pixel-exact in software - both sides
+// share the identical fixed .badge-sheet grid, with nothing about either
+// side's content able to shift that grid - so residual drift is real
+// physical printer/paper-feed registration error on the second pass,
+// which no amount of CSS can eliminate. Rather than re-editing every
+// element's saved x/y/width/height (which would only fix THIS default
+// layout, not whatever an admin has already customized in the Design
+// editor), scaling the whole rendered card down and letting it center
+// itself in its own unchanged-size box adds real blank paper margin on
+// every side regardless of the underlying template - exactly the
+// fallback asked for. Only ever passed for the schedule-card side of
+// admin-cards-duplex-print.ejs (the one physically flipped against its
+// name tag front) - every other use of this partial (plain name tag
+// prints, the side-by-side "both" printout with no physical alignment
+// need, this same badge shown standalone in the Design editor/Cards
+// dialog) renders full-size as before.
 %>
 <div class="badge-canvas" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; background:<%= bgCss %>;">
-  <%- html %>
+  <% if (typeof safeInset !== 'undefined' && safeInset) { %>
+    <div class="badge-canvas-safe-inset" style="width:<%= badgeWidth %>px; height:<%= badgeHeight %>px; transform: scale(<%= safeInset %>);">
+      <%- html %>
+    </div>
+  <% } else { %>
+    <%- html %>
+  <% } %>
 </div>

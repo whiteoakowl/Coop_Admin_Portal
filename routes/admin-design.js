@@ -9,7 +9,7 @@ const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
 const { membersWithDetails, byLastName } = require('../utils/members');
-const { buildDuplexPages } = require('../utils/duplexPrint');
+const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
@@ -230,6 +230,7 @@ router.post('/design/print-duplex', async (req, res) => {
     badgeHeight: BADGE_HEIGHT,
     cardWidth: CARD_WIDTH,
     cardHeight: CARD_HEIGHT,
+    SCHEDULE_CARD_SAFE_INSET,
   });
 });
 

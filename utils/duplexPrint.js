@@ -45,6 +45,24 @@
 const COLS_PER_ROW = 2;
 const CARDS_PER_PAGE = 8;
 
+// A real bug report: "name tags and schedule cards front and back
+// they aren't lining up just right... off by height a little bit" -
+// front/back page geometry is already pixel-exact (both sides share this
+// same fixed grid, see mirrorPage above for the one piece that isn't
+// automatic), so residual drift is real physical printer/paper-feed
+// registration error on the second duplex pass, not anything fixable in
+// CSS. Per that same report's own fallback ask, views/admin-cards-duplex-
+// print.ejs scales the schedule card (the side physically flipped
+// against its name tag front) down by this factor - see partials/
+// name-tag-badge.ejs's safeInset for how - leaving real blank paper
+// margin on every side so a few points of registration drift lands in
+// that margin instead of cutting into real content. 0.92 was picked to
+// be clearly more forgiving than the ~2-4% of the card's own
+// width/height the tightest default schedule-card field already sits
+// from an edge (see utils/scheduleCardBadge.js's DEFAULT_LAYOUT), without
+// shrinking the card's actual content enough to hurt readability.
+const SCHEDULE_CARD_SAFE_INSET = 0.92;
+
 function chunk(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -75,4 +93,4 @@ function buildDuplexPages(pairs) {
   return { frontPages, backPages };
 }
 
-module.exports = { buildDuplexPages, mirrorPage, CARDS_PER_PAGE, COLS_PER_ROW };
+module.exports = { buildDuplexPages, mirrorPage, CARDS_PER_PAGE, COLS_PER_ROW, SCHEDULE_CARD_SAFE_INSET };

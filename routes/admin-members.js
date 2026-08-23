@@ -29,7 +29,7 @@ const {
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
-const { buildDuplexPages } = require('../utils/duplexPrint');
+const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 
@@ -1186,6 +1186,7 @@ router.get('/members/:id/cards/print', async (req, res) => {
       badgeHeight: BADGE_HEIGHT,
       cardWidth: CARD_WIDTH,
       cardHeight: CARD_HEIGHT,
+      SCHEDULE_CARD_SAFE_INSET,
     });
   }
 
