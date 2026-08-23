@@ -116,13 +116,31 @@ router.post('/documents/upload', uploadDocument, async (req, res) => {
   const ext = path.extname(req.file.originalname).toLowerCase();
   const mimeType = DOCUMENT_MIME_BY_EXT[ext] || req.file.mimetype;
 
+  // A real bug report: "when i try to upload documents... it goes to an
+  // error page. nothing uploads." uploadFile() (utils/storage.js) throws
+  // a plain Error on any Supabase Storage failure - a missing/misnamed
+  // bucket, a bad SUPABASE_SERVICE_ROLE_KEY, whatever - and an uncaught
+  // throw here fell straight through to server.js's generic catch-all
+  // (Express 5 forwards a rejected async handler there automatically),
+  // landing an admin on the same unhelpful "Something went wrong" page
+  // regardless of what actually failed - not even the redirect-with-a-
+  // reason every other failure on this exact route already gets (see
+  // uploadDocument's own LIMIT_FILE_SIZE handling above). Wrapping this
+  // in try/catch surfaces the real underlying message instead - "Bucket
+  // not found" now reads as exactly that, not a blank crash.
   const client = createStorageClient();
   let key;
-  if (client) {
-    key = await uploadFile(client, DOCUMENTS_BUCKET, req.file.buffer, req.file.originalname, mimeType);
-  } else {
-    key = generateKey(req.file.originalname);
-    fs.writeFileSync(path.join(DOCUMENT_DIR, key), req.file.buffer);
+  try {
+    if (client) {
+      key = await uploadFile(client, DOCUMENTS_BUCKET, req.file.buffer, req.file.originalname, mimeType);
+    } else {
+      key = generateKey(req.file.originalname);
+      fs.writeFileSync(path.join(DOCUMENT_DIR, key), req.file.buffer);
+    }
+  } catch (err) {
+    return res.redirect(
+      '/admin/settings?tab=documents&error=' + encodeURIComponent(`Upload failed: ${err.message}`)
+    );
   }
 
   await db.prepare(
