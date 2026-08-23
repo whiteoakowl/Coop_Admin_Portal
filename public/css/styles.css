@@ -4321,6 +4321,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    per-member table row (partials/setup-assignment-cards.ejs) instead of
    the Teams tab's card-list rows above. */
 .setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
+
+/* A member row staged for removal (public/js/team-member-remove-toggle.js)
+   but not yet saved - a real request: "allow for multiple deletes and
+   then click save before refreshing." Dimmed + struck-through so it's
+   obvious which rows will disappear once Save is clicked, without
+   actually removing anything from the page (or the database) until then;
+   Cancel clears this back off every row in the card. */
+.team-member-row-removed { opacity: 0.5; }
+.team-member-row-removed .team-member-name { text-decoration: line-through; }
 .team-member-avatar {
   width: 1.6rem;
   height: 1.6rem;

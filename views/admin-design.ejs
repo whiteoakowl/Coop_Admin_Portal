@@ -247,7 +247,7 @@
         </div>
 
         <div id="print-schedule-cards-section">
-          <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form">
+          <form method="POST" action="/admin/schedule/print-cards" target="_blank" id="schedule-print-form" data-bulk-print-refresh>
             <div class="roster-toolbar no-print">
               <div class="schedule-filters">
                 <%# A real request: "separate primary parent and parent in
@@ -286,7 +286,7 @@
         </div>
 
         <div id="print-name-tags-section" hidden>
-          <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
+          <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form" data-bulk-print-refresh>
             <div class="name-tag-bulk-filter">
               <%# A real request: "we usually only need to print primary
                   parent" - Primary Parents Only defaults selected here (the
@@ -318,7 +318,7 @@
         </div>
 
         <div id="print-cardsBoth-section" hidden>
-          <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form">
+          <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form" data-bulk-print-refresh>
             <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
@@ -346,7 +346,7 @@
         </div>
 
         <div id="print-cardsDuplex-section" hidden>
-          <form method="POST" action="/admin/design/print-duplex" target="_blank" id="cards-duplex-print-form">
+          <form method="POST" action="/admin/design/print-duplex" target="_blank" id="cards-duplex-print-form" data-bulk-print-refresh>
             <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the long edge) and cut apart for two-sided cards.</p>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="cards-duplex-bulk-filter-select">
@@ -374,7 +374,7 @@
         </div>
 
         <div id="print-barcodes-section" hidden>
-          <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form">
+          <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form" data-bulk-print-refresh>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
                 <option value="all">All</option>
@@ -401,7 +401,7 @@
         </div>
 
         <div id="print-barcodeLabels-section" hidden>
-          <form method="POST" action="/admin/name-tag/print-barcode-labels" target="_blank" id="barcode-labels-print-form">
+          <form method="POST" action="/admin/name-tag/print-barcode-labels" target="_blank" id="barcode-labels-print-form" data-bulk-print-refresh>
             <p class="hint">Barcode, name, and ID number per label - sized for Avery 08160-style address label sheets (1in x 2-5/8in, 30 per sheet).</p>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="barcode-labels-bulk-filter-select">
@@ -437,7 +437,7 @@
         </div>
 
         <div id="print-classCheckinQr-section" hidden>
-          <form method="POST" action="/admin/design/print-classcheckin-qr" target="_blank" id="classcheckin-qr-print-form">
+          <form method="POST" action="/admin/design/print-classcheckin-qr" target="_blank" id="classcheckin-qr-print-form" data-bulk-print-refresh>
             <div class="name-tag-bulk-filter">
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="classcheckin-qr-select-all-checkbox" />
@@ -528,7 +528,7 @@
             renders admin-library-barcodes-print.ejs, the item-flavored
             twin of the member barcode-labels Avery sheet. %>
         <div id="print-libraryBarcodes-section" hidden>
-          <form method="POST" action="/admin/design/print-library-barcodes" target="_blank" id="library-barcodes-print-form">
+          <form method="POST" action="/admin/design/print-library-barcodes" target="_blank" id="library-barcodes-print-form" data-bulk-print-refresh>
             <div class="name-tag-bulk-filter">
               <select class="name-tag-bulk-filter-select" id="library-barcodes-filter-select">
                 <option value="all">All Categories</option>
@@ -590,6 +590,7 @@
         </div>
 
         <script src="/js/design-print-hub.js"></script>
+        <script src="/js/bulk-print-refresh.js"></script>
       <% } %>
     </div>
   </main>

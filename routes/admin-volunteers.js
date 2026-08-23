@@ -437,8 +437,24 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
     return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Team not found.'));
   }
   await saveHourLabel(day, section.position, req.body.label);
+
+  // Batched member removals staged by the card's own trash icons - a real
+  // request: "when deleting floaters ... it should allow for multiple
+  // deletes and then click save before refreshing." Each removal used to
+  // be its own immediate POST/reload; removeMemberIds now piggybacks on
+  // this same Save submission (see admin-volunteer-teams.ejs's hidden,
+  // form-attribute-linked checkboxes) so the label and any number of
+  // pending removals all land in one request/one page load. Reuses the
+  // exact same removeMemberFromSection + syncDayMemberRosters pairing the
+  // standalone .../members/:memberId/remove route below already proved
+  // out (a real bug report: without the sync, an auto-floated member's
+  // removal didn't stick past the next unrelated sync).
+  const removeIds = [].concat(req.body.removeMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  for (const memberId of removeIds) await removeMemberFromSection(list.id, memberId, sectionId);
+  if (removeIds.length) await syncDayMemberRosters(day);
+
   await syncMemberSchedulesForDay(day);
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Hour renamed.'));
+  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(removeIds.length ? `Hour updated. Removed ${removeIds.length} member(s).` : 'Hour renamed.'));
 });
 
 router.post('/volunteers/:day/teams/:sectionId/members/:memberId/rank', requireAdmin, requireDay, async (req, res) => {

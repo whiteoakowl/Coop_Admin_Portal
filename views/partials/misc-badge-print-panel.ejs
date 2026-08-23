@@ -10,7 +10,7 @@
 // for 'custom', which is still its own independent imported list.
 const isTaskDerived = type === 'setupCleanup';
 %>
-<form method="POST" action="/admin/design/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form">
+<form method="POST" action="/admin/design/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form" data-bulk-print-refresh>
   <div class="roster-toolbar no-print">
     <div class="schedule-filters">
       <label class="checkbox-option schedule-print-select-all">

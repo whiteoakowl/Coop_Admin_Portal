@@ -169,12 +169,21 @@
                   <p class="team-card-empty">No members yet.</p>
                 <% } %>
                 <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
+                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                     <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
-                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from this team?">
-                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
+                    <%# A real request: "when deleting ... cleanup/signup
+                        members from lists it should allow for multiple
+                        deletes and then click save before refreshing."
+                        This trash icon no longer submits its own form
+                        immediately - it flips a same-named hidden
+                        checkbox tied (via form="...") to the card's own
+                        team-edit-form, so any number of pending removals
+                        ride along with that form's single Save submission
+                        instead of each causing its own round trip/page
+                        reload (public/js/team-member-remove-toggle.js). %>
+                    <input type="checkbox" name="removeMemberIds" value="<%= m.id %>" form="team-edit-form-<%= t.id %>" hidden data-member-remove-checkbox />
+                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-remove-btn aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </div>
                 <% }); %>
               </div>
@@ -250,6 +259,7 @@
     </dialog>
   </main>
   <script src="/js/edit-toggle.js"></script>
+  <script src="/js/team-member-remove-toggle.js"></script>
   <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>

@@ -143,7 +143,22 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (r
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
   await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation });
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
+
+  // Batched member removals staged by the card's own trash icons - a real
+  // request: "when deleting ... cleanup/signup members from lists it
+  // should allow for multiple deletes and then click save before
+  // refreshing." Each removal used to be its own immediate POST/reload;
+  // removeMemberIds now piggybacks on this same Save submission (see
+  // admin-setup.ejs's hidden, form-attribute-linked checkboxes) so the
+  // card's other edits and any number of pending removals all land in one
+  // request/one page load.
+  const removeIds = [].concat(req.body.removeMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  if (removeIds.length) {
+    const placeholders = removeIds.map(() => '?').join(',');
+    await db.prepare(`DELETE FROM setup_team_members WHERE team_id = ? AND member_id IN (${placeholders})`).run(teamId, ...removeIds);
+  }
+
+  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(removeIds.length ? `"${title}" updated. Removed ${removeIds.length} member(s).` : `"${title}" updated.`));
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async (req, res) => {

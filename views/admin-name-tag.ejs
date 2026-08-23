@@ -83,7 +83,7 @@
           </div>
         </div>
       <% } else if (tab === 'print') { %>
-        <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form">
+        <form method="POST" action="/admin/name-tag/print" target="_blank" id="bulk-print-form" data-bulk-print-refresh>
           <div class="name-tag-bulk-filter">
             <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
               <option value="all">All</option>
@@ -172,5 +172,6 @@
   <script src="/js/name-tag-render.js"></script>
   <script src="/js/badge-autofit.js"></script>
   <script src="/js/name-tag-editor.js"></script>
+  <script src="/js/bulk-print-refresh.js"></script>
 </body>
 </html>

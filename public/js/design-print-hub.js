@@ -414,6 +414,15 @@
         console.error('Bulk print: failed to merge one batch into the print tab', err);
       }
     }
+
+    // A real request: "after any bulk printing the page should refresh on
+    // its own." This path bypasses the form's own native submission
+    // entirely (preventDefault above), so bulk-print-refresh.js's generic
+    // submit listener never sees a chance to fire for it - reload here
+    // instead, once every batch has actually finished landing in the
+    // print tab, rather than on that script's fixed short delay (which
+    // could easily fire before a many-hundred-member job is done).
+    window.location.reload();
   }
 
   function wireChunkedSubmit(formId) {
