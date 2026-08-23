@@ -1691,6 +1691,20 @@ body.public-page .roster-empty {
 }
 .badge-el { position: absolute; box-sizing: border-box; }
 .badge-el-text { overflow: hidden; }
+/* views/partials/name-tag-badge.ejs's optional safeInset wrapper - see
+   that partial's own comment for why. Same size as .badge-canvas itself
+   (so the absolutely-positioned .badge-el children inside still measure
+   their percentage/pixel positions against the card's real, un-shrunk
+   dimensions) with `transform: scale()` doing the actual shrink -
+   transform is purely visual (unlike the `zoom` this codebase uses
+   elsewhere for print-shrink-to-fit, which deliberately DOES resize the
+   real layout box so pagination sees it) and defaults to scaling from
+   its own center, so the whole rendered card shrinks toward the middle
+   of its box, landing equal blank margin on all four sides without
+   needing `position: relative` here - .badge-canvas above already is
+   one, and that's the only ancestor the .badge-el children position
+   against. */
+.badge-canvas-safe-inset { transform-origin: center center; }
 /* flex-shrink: 0 is load-bearing, not cosmetic - a real bug report,
    live-reproduced with Playwright: two short stacked name-tag lines
    ("Josh"/"Ward", "Lily"/"Bell") clipped across their TOP even though
@@ -5404,6 +5418,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     font-size: 0.76rem;
     font-weight: 600;
     color: #333;
+  }
+
+  /* A real request: "all setup/cleanup cards should print in 12 point
+     font for the cards. 18 point font for header." Every piece of card
+     text below used to keep its own separate, unrelated on-screen rem
+     size (team title 0.95rem, member names 0.78rem, task list 0.82rem,
+     meta row 0.76rem, ...) - fine for a compact on-screen card, but reads
+     as a visibly inconsistent jumble of sizes once printed. One flat,
+     explicit point size for every piece of card text instead - hierarchy
+     still comes through the existing bold weights on the title/section
+     labels, not through size - and a second, larger explicit size just
+     for the org header repeated on every page (.team-print-page-inner's
+     own .print-header, not the shared .print-header other print pages
+     site-wide still use their own on-screen size for - scoping to
+     .team-print-page-inner keeps this Setup/Cleanup-only). Both are still
+     subject to print-shrink-to-fit.js's per-team, per-day-leveled zoom
+     exactly as before (see .team-print-page-fit and its data-shrink-to-
+     fit-group="teams" above) - a team busy enough to need shrinking still
+     shrinks proportionally down from these sizes, same as always. */
+  .setup-team-card-grid .team-info-title,
+  .setup-team-card-grid .team-info-desc-print,
+  .setup-team-card-grid .team-print-meta,
+  .setup-team-card-grid .team-members-card h4,
+  .setup-team-card-grid .team-member-name,
+  .setup-team-card-grid .team-member-flag,
+  .setup-team-card-grid .team-tasks-card h4,
+  .setup-team-card-grid .team-tasks-list {
+    font-size: 12pt;
+  }
+  .team-print-page-inner .print-header-title {
+    font-size: 18pt;
+  }
+  .team-print-page-inner .print-header-sub {
+    font-size: 14pt;
   }
 
   /* Floater Teams: always a clean 2-per-row grid on paper (portrait, see
