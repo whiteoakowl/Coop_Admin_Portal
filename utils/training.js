@@ -59,7 +59,7 @@
 //     scoped to the session-derived assignment id, not the client's own
 //     assertions. See each function's own comment for specifics.
 const db = require('../db');
-const { byLastName } = require('./members');
+const { byLastName, teacherMemberIds } = require('./members');
 
 const LESSON_TYPES = ['video', 'text', 'quiz'];
 const TRAINING_STATUSES = ['draft', 'published', 'archived'];
@@ -437,9 +437,16 @@ async function deleteLessonResource(resourceId) {
 // as applying to any adult volunteer, and nothing rules out a student-
 // facing training either), so this deliberately doesn't reuse the
 // parent-only/parent+admin picker helpers utils/members.js already
-// exports for those other features.
+// exports for those other features. is_primary_parent/isTeacher ride
+// along (not just id/name/member_type) so the Assign page's own picker
+// can offer the same Primary Parents/Teachers Only filters the Design/
+// Print hub's bulk print pickers already do - a real request: "should
+// have a filter option like bulk printing. primary parents, parents,
+// students, admins" (teachers added as a follow-up to that same request).
 async function activeAssignableMembers() {
-  return (await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1').all()).sort(byLastName);
+  const members = (await db.prepare('SELECT id, name, member_type, is_primary_parent FROM members WHERE active = 1').all()).sort(byLastName);
+  const teacherIds = await teacherMemberIds();
+  return members.map((m) => ({ ...m, isTeacher: teacherIds.has(m.id) }));
 }
 
 // Creates (or leaves alone, if it already exists) a training_assignments

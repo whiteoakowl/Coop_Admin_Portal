@@ -355,6 +355,7 @@ module.exports = {
   rostersByMemberIds,
   sortMembersByFamily,
   membersWithDetails,
+  teacherMemberIds,
   lastNameOf,
   byLastName,
   generateMemberCode,

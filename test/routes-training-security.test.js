@@ -165,6 +165,20 @@ test('the public /training name picker only lists real active members, and does 
   assert.match(res.text, /Publicly Listed/);
 });
 
+// A real request: "when members go to the training link and choose their
+// name from the drop down menu it should be alphabetical according to
+// last name" - the picker used to sort by first name.
+test('the public /training name picker is sorted by last name, not first name', async () => {
+  await makeMember('Zed Anderson', 'lastname-order-1');
+  await makeMember('Amy Baxter', 'lastname-order-2');
+  const res = await request(app).get('/training');
+  assert.equal(res.status, 200);
+  const zedPos = res.text.indexOf('>Zed Anderson<');
+  const amyPos = res.text.indexOf('>Amy Baxter<');
+  assert.ok(zedPos !== -1 && amyPos !== -1);
+  assert.ok(zedPos < amyPos, 'Anderson should sort before Baxter by last name, even though "Amy" sorts before "Zed" by first name');
+});
+
 test('the Training Builder Publish/Assign/Delete actions require a valid admin CSRF token, same as every other admin form', async () => {
   const agent = await loginAsAdmin();
   const listPage = await agent.get('/admin/training');

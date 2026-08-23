@@ -24,17 +24,57 @@
       </label>
       <div class="member-form-full">
         <label class="roster-checkbox-label">Members</label>
-        <div class="grade-pill-grid">
-          <% members.forEach(function(m) { %>
-            <label class="grade-pill">
-              <input type="checkbox" name="memberIds" value="<%= m.id %>" <%= alreadyAssigned.has(m.id) ? 'checked disabled' : '' %> />
-              <%= m.name %><%= alreadyAssigned.has(m.id) ? ' (already assigned)' : '' %>
-            </label>
-          <% }); %>
+        <%# A real request: "should have a filter option like bulk
+            printing. primary parents, parents, students, admins" (later
+            joined by "add filter option for training for teachers") -
+            same filter dropdown + Select All/Select None interaction as
+            the Design/Print hub's bulk print pickers (public/js/design-
+            print-hub.js's wireBulkMemberList), standalone here since this
+            page doesn't otherwise load that script (public/js/training-
+            assign-picker.js). members is already sorted by last name
+            (utils/training.js's activeAssignableMembers - a real
+            request: "should be in alphabetical order according to last
+            name"). %>
+        <div class="name-tag-bulk-filter">
+          <select class="name-tag-bulk-filter-select" id="training-assign-filter-select">
+            <option value="all">All</option>
+            <option value="student">Students Only</option>
+            <option value="primaryParent">Primary Parents Only</option>
+            <option value="parent">Parents Only</option>
+            <option value="admin">Admins Only</option>
+            <option value="teacher">Teachers Only</option>
+          </select>
+          <label class="checkbox-option name-tag-select-all">
+            <input type="checkbox" id="training-assign-select-all-checkbox" />
+            Select All
+          </label>
+          <label class="checkbox-option name-tag-select-none">
+            <input type="checkbox" id="training-assign-select-none-checkbox" />
+            Select None
+          </label>
         </div>
+        <% if (members.length === 0) { %>
+          <p class="roster-empty">No active members yet.</p>
+        <% } else { %>
+          <div class="roster-scroll print-picker-scroll">
+            <table class="roster-table members-table condensed-table" id="training-assign-list">
+              <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
+              <tbody>
+                <% members.forEach(function(m) { %>
+                  <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-primary="<%= m.is_primary_parent ? '1' : '0' %>">
+                    <td><input type="checkbox" name="memberIds" value="<%= m.id %>" <%= alreadyAssigned.has(m.id) ? 'checked disabled' : '' %> /></td>
+                    <td><%= m.name %><%= alreadyAssigned.has(m.id) ? ' (already assigned)' : '' %></td>
+                    <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
       </div>
       <button type="submit" class="primary-btn">Assign Training</button>
     </form>
   </main>
+  <script src="/js/training-assign-picker.js"></script>
 </body>
 </html>

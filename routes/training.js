@@ -25,6 +25,7 @@ const express = require('express');
 const router = express.Router();
 const T = require('../utils/training');
 const db = require('../db');
+const { byLastName } = require('../utils/members');
 
 // Every route below this point needs a picked identity except the picker
 // itself and the identify action - redirect to the picker instead of
@@ -48,7 +49,12 @@ router.get('/training', async (req, res) => {
     const member = await db.prepare('SELECT id FROM members WHERE id = ? AND active = 1').get(req.session.trainingMemberId);
     if (member) return res.redirect('/training/mine');
   }
-  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort((a, b) => a.name.localeCompare(b.name));
+  // A real request: "when members go to the training link and choose
+  // their name from the drop down menu it should be alphabetical
+  // according to last name" - matches every other member picker
+  // sitewide's own sort (utils/members.js's byLastName), not a plain
+  // first-name string compare.
+  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
   res.render('training-identify', { title: 'My Training', members, error: req.query.error || null });
 });
 
