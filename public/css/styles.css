@@ -3151,7 +3151,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .qr-sheet-class-name { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
 .qr-sheet-class-meta { margin: 0; font-size: 0.85rem; color: var(--muted); }
 
-@media (max-width: 900px) {
+/* `screen and` - a real bug report: "the qr code layout is not correct.
+   it should be 2 cards stacked over two cards on ONE page." Without a
+   media TYPE qualifier, a plain `(max-width: 900px)` query matches
+   during real printing too, not just a narrow on-screen browser window -
+   Chromium evaluates it against the @page content box's own width, and
+   this page's is 8.5in - 2 x 0.5in padding = 7.5in (~720px), comfortably
+   under 900px. So the actual printed sheet was silently falling back to
+   this single-column mobile layout even on a full-size desktop print,
+   while the on-screen preview (a normal, much-wider browser window)
+   never showed the problem - the two-column grid this page needs on
+   paper only ever really needs to respond to a genuinely narrow SCREEN,
+   never to print. */
+@media screen and (max-width: 900px) {
   .qr-sheet-page { width: 100%; height: auto; min-height: 0; box-shadow: none; border: none; padding: 1rem; }
   .qr-sheet-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 1rem; }
 }

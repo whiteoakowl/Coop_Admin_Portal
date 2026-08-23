@@ -30,26 +30,28 @@
     <% } %>
 
     <%
-      // Portrait, evenly spaced, up to 4 classes per page - a real
+      // Portrait, evenly spaced, one page per (day, room) - a real
       // request: "printing QR sheets to scan for quick links to class
-      // check in/out kiosk for teachers." Each QR code encodes that one
-      // class's own Class Check-In quick link (see routes/admin-design.js
-      // - the same /kiosk/class-checkin/classes/:id/attendance page every
-      // class card's own quick link opens), so a teacher can scan straight
-      // into their class's own attendance screen without touching the
-      // kiosk's own day-picker/hour-search.
+      // check in/out kiosk for teachers", later refined to "each page
+      // should be all of the class qr codes for that classroom, that day"
+      // (see routes/admin-design.js for how `pages` is grouped). Each QR
+      // code encodes that one class's own Class Check-In quick link (the
+      // same /kiosk/class-checkin/classes/:id/attendance page every class
+      // card's own quick link opens), so a teacher can scan straight into
+      // their class's own attendance screen without touching the kiosk's
+      // own day-picker/hour-search.
     %>
-    <% pages.forEach(function(pageClasses) { %>
+    <% pages.forEach(function(page) { %>
       <div class="qr-sheet-page">
         <div class="print-header">
           <img src="/img/logo.png" alt="" />
           <div>
             <p class="print-header-title">Sanford Homeschoolers</p>
-            <p class="print-header-sub">Class Check-In QR Codes</p>
+            <p class="print-header-sub"><%= page.room %> &middot; <%= page.dayLabel %></p>
           </div>
         </div>
         <div class="qr-sheet-grid">
-          <% pageClasses.forEach(function(cls) { %>
+          <% page.classes.forEach(function(cls) { %>
             <div class="qr-sheet-cell">
               <div class="qr-sheet-code" data-qr-value="<%= cls.checkInUrl %>"></div>
               <p class="qr-sheet-class-name"><%= cls.className %></p>

@@ -14,7 +14,7 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { allClassesList } = require('../utils/classSchedule');
+const { allClassesList, UNASSIGNED_ROOM } = require('../utils/classSchedule');
 const { allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 
 router.use(requireFullAdmin);
@@ -244,6 +244,22 @@ router.post('/design/print-duplex', async (req, res) => {
 // phone's camera with no browsing context of its own to resolve a
 // relative path against, unlike every other "opens in a new tab" link
 // here that's always clicked from inside this same site.
+//
+// A real follow-up request: "Each page should be all of the class qr
+// codes for that classroom, that day... Each page should have 4 equal
+// spots." Used to just chunk the selection 4-at-a-time in whatever order
+// allClassesList's own alphabetical sort put them in, mixing rooms/days
+// freely across a page and reading in an order with no relation to
+// either. Grouped by (day, room) instead, one page per combination, each
+// page's classes sorted by hour_position - db/schema.sql's own CHECK
+// constraint caps hour_position at 1-4, so a single room can never need
+// more than 4 slots on a given day, meaning every group already fits on
+// one page with no further chunking needed. .qr-sheet-grid's fixed 2x2
+// CSS grid (styles.css) already reserves the full 4-cell layout no
+// matter how many of a page's up-to-4 classes actually exist - a room
+// that only teaches 2 classes that day still gets the same evenly-spaced
+// 2x2 page shape, just with 2 of the 4 grid cells left empty, rather than
+// stretching to fill the space.
 router.post('/design/print-classcheckin-qr', async (req, res) => {
   const classIds = [].concat(req.body.classIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (classIds.length === 0) {
@@ -252,23 +268,31 @@ router.post('/design/print-classcheckin-qr', async (req, res) => {
 
   const allClasses = await allClassesList();
   const idSet = new Set(classIds);
-  // Keep allClassesList's own sort order rather than whatever order the
-  // submitted checkboxes happened to arrive in (checkbox form fields
-  // don't reliably preserve on-page order across browsers).
   const classes = allClasses.filter((c) => idSet.has(c.id));
 
   const origin = `${req.protocol}://${req.get('host')}`;
-  const pages = [];
-  for (let i = 0; i < classes.length; i += 4) {
-    pages.push(
-      classes.slice(i, i + 4).map((c) => ({
-        className: c.class_name,
-        dayLabel: c.dayLabel,
-        timeLabel: c.timeLabel,
-        checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
-      }))
-    );
+  const groups = new Map();
+  for (const c of classes) {
+    const room = c.room && c.room.trim() ? c.room.trim() : UNASSIGNED_ROOM;
+    const key = `${c.day}|${room}`;
+    if (!groups.has(key)) groups.set(key, { day: c.day, dayLabel: c.dayLabel, room, classes: [] });
+    groups.get(key).classes.push(c);
   }
+
+  const pages = Array.from(groups.values())
+    .sort((a, b) => a.day.localeCompare(b.day) || a.room.localeCompare(b.room))
+    .map((g) => ({
+      dayLabel: g.dayLabel,
+      room: g.room,
+      classes: g.classes
+        .sort((a, b) => a.hour_position - b.hour_position)
+        .map((c) => ({
+          className: c.class_name,
+          dayLabel: c.dayLabel,
+          timeLabel: c.timeLabel,
+          checkInUrl: `${origin}/kiosk/class-checkin/classes/${c.id}/attendance`,
+        })),
+    }));
 
   res.render('admin-classcheckin-qr-print', {
     title: 'Print Class Check-In QR Codes',

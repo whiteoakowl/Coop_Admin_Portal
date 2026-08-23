@@ -1729,6 +1729,7 @@ module.exports = {
   isValidDay,
   defaultDay,
   HOUR_POSITIONS,
+  UNASSIGNED_ROOM,
   COLOR_PALETTE,
   GRADE_LEVELS,
   ageGroupList,
