@@ -33,8 +33,14 @@
             as separate siblings of .team-print-page-fit) because
             print-shrink-to-fit.js's fitOne() shrinks exactly ONE element
             - wrap.firstElementChild - so header and card have to be that
-            same single child to shrink as one unit together. %>
-        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in">
+            same single child to shrink as one unit together.
+            data-shrink-to-fit-group="teams" is a real request: "all pages
+            should have the same font size" - without it, a light team
+            barely shrinks while a busy team shrinks a lot, so pages read
+            at visibly different sizes; the shared group name makes every
+            team's page level down to whichever one team needed the most
+            shrinking, so all pages match. %>
+        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-group="teams" data-shrink-to-fit-budget="9.2in">
           <div class="team-print-page-inner">
             <div class="print-header">
               <img src="/img/logo.png" alt="" />

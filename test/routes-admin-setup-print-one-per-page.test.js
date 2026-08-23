@@ -56,7 +56,7 @@ test('Setup/Cleanup Teams manage page: one-team-per-page print wrapper + shrink 
   assert.equal(res.status, 200);
 
   await t.test('every team is wrapped in .team-print-page-fit with a print-time shrink budget', () => {
-    const wrapperMatches = res.text.match(/<div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="[^"]+">/g) || [];
+    const wrapperMatches = res.text.match(/<div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-group="[^"]+" data-shrink-to-fit-budget="[^"]+">/g) || [];
     assert.equal(wrapperMatches.length, 2, 'expected one .team-print-page-fit wrapper per team');
   });
 

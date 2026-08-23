@@ -100,8 +100,50 @@
     if (inner) inner.style.zoom = 1;
   }
 
+  // A real request: Setup/Cleanup team printing, one team per page - "all
+  // pages should have the same font size." Each [data-shrink-to-fit-group]
+  // wrapper still runs fitOne() to find what scale THAT one page needs on
+  // its own (a light team barely shrinks, a busy team shrinks a lot), but
+  // then every wrapper sharing the same group name gets leveled down to
+  // the SMALLEST scale any of them needed - so a light team's page prints
+  // at the same size as the busiest team's page instead of each page
+  // reading its own, different font size. Shrinking a light team further
+  // than it strictly needs is always safe (it still fits, just with a bit
+  // more blank space) - the only failure mode to avoid is a page ending up
+  // LARGER than what it was actually measured to fit, which this never does.
+  function fitGroup(wraps) {
+    let minScale = 1;
+    wraps.forEach((wrap) => {
+      fitOne(wrap);
+      const inner = wrap.firstElementChild;
+      if (!inner) return;
+      const zoom = parseFloat(inner.style.zoom);
+      if (!Number.isNaN(zoom) && zoom < minScale) minScale = zoom;
+    });
+    wraps.forEach((wrap) => {
+      const inner = wrap.firstElementChild;
+      if (inner) inner.style.zoom = minScale;
+    });
+  }
+
+  // Elements sharing a data-shrink-to-fit-group name are leveled together
+  // via fitGroup(); everything else keeps the old independent-per-element
+  // behavior (e.g. the single-wrapper Attendance roster grid, where there's
+  // only ever one such element on the page and "leveling" would be a no-op
+  // anyway).
+  function fitAllGrouped(selector) {
+    const grouped = new Map();
+    document.querySelectorAll(selector).forEach((wrap) => {
+      const group = wrap.dataset.shrinkToFitGroup;
+      if (!group) { fitOne(wrap); return; }
+      if (!grouped.has(group)) grouped.set(group, []);
+      grouped.get(group).push(wrap);
+    });
+    grouped.forEach(fitGroup);
+  }
+
   function fitAll() {
-    document.querySelectorAll('[data-shrink-to-fit]').forEach(fitOne);
+    fitAllGrouped('[data-shrink-to-fit]');
   }
 
   // A [data-shrink-to-fit-on-print] wrapper lives on an otherwise ordinary,
@@ -121,7 +163,7 @@
   // afterprint zooms back out so a cancelled print dialog doesn't leave
   // the on-screen page looking shrunk.
   function fitAllForPrint() {
-    document.querySelectorAll('[data-shrink-to-fit-on-print]').forEach(fitOne);
+    fitAllGrouped('[data-shrink-to-fit-on-print]');
   }
   function resetAllForPrint() {
     document.querySelectorAll('[data-shrink-to-fit-on-print]').forEach(resetOne);
