@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
 const { isValidDay, getListByDay, DAY_LABELS, datesForList } = require('../utils/volunteers');
-const { dailyAssignmentCardsWithLabels } = require('../utils/substitutes');
+const { publicFloaterCardsForDate } = require('../utils/substitutes');
 
 // A real request: the kiosk homepage's Floater Assignments button used to
 // jump straight to a single auto-picked day - now it shows Monday/
@@ -34,29 +34,16 @@ router.get('/volunteers/:day', async (req, res) => {
   // why every invocation now awaits app.ready first to close that race).
   if (!list) return res.status(404).render('404', { title: 'Not Found' });
   const date = closestUpcomingDate(await datesForList(list.id));
-  const rawCards = date ? await dailyAssignmentCardsWithLabels(day, date) : [];
-  // A real request: "floater cards by hour should only show floaters who
-  // have a confirmed assigned position" - substituteBoard auto-picks a
-  // candidate for every open slot as soon as a date's board is first
-  // viewed (see its own comment), persisted 'pending' until an admin
-  // actually approves or overrides it - a suggestion, not a commitment.
-  // The admin-facing Chart tab already only offers 'approved' picks via
-  // its own separate candidates/dropdown machinery, but this public,
-  // no-login kiosk view had no such gate: dailyAssignmentCardsWithLabels
-  // (shared with the Archive tab's own read-only popup/print, where
-  // showing a since-passed date's pending pick as a record of what was
-  // suggested is fine) returns 'pending' assignments exactly the same
-  // shape as 'approved' ones, so a floater walking up to this screen
-  // could see themselves (or someone else) listed as confirmed for a
-  // position nobody had actually signed off on yet. Blanking out
-  // anything short of 'approved' - right here, not in the shared partial
-  // itself - keeps that distinction admin-only everywhere else this data
-  // is shown, while this one public-facing view only ever shows a name
-  // once it's real.
-  const cards = rawCards.map((hour) => ({
-    ...hour,
-    jobs: hour.jobs.map((job) => ({ ...job, assigned: job.assigned && job.assigned.status === 'approved' ? job.assigned : null })),
-  }));
+  // A real bug report: this used to be built from dailyAssignmentCards
+  // (permanent jobs only, shared with the admin Chart tab/Archive) - a
+  // class's own missing-teacher/assistant coverage, assigned from the
+  // separate Substitutes Needed board, never showed up here at all even
+  // once approved. publicFloaterCardsForDate (utils/substitutes.js) folds
+  // both position types together, read-only, and already only ever shows
+  // an 'approved' assignment (a still-'pending' auto-suggestion blanks to
+  // "Unassigned" there) - the same "only a confirmed position" guarantee
+  // this route used to apply itself with an extra map() step here.
+  const cards = date ? await publicFloaterCardsForDate(day, date) : [];
 
   res.render('volunteers-public', {
     title: `${DAY_LABELS[day]} Floater Assignments`,

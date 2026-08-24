@@ -152,6 +152,7 @@ function archiveRow(row) {
       checkOutTime: c.checkOutTime,
       number: c.number,
       cleanupTaskNumber: c.cleanupTaskNumber,
+      cleanupTeamName: c.cleanupTeamName,
     })),
   };
 }

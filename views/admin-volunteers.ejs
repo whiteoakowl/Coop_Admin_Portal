@@ -115,7 +115,7 @@
             <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
           </div>
         </div>
-        <p class="hint">Add one position to as many hours as it runs - each hour gets its own row on the chart. Uncheck every hour (or clear its title) to remove a position entirely.</p>
+        <p class="hint">Add one position to as many hours as it runs - each hour gets its own row on the chart. Uncheck every hour (or clear its title) to remove a position entirely, or use the trash icon to delete it right away.</p>
         <input type="hidden" name="date" value="<%= selectedDate %>" />
         <div class="roster-scroll position-group-list">
           <% positionGroups.forEach(function(g) { %>
@@ -123,6 +123,23 @@
               <div class="position-group-fields">
                 <input type="text" name="groups[<%= g.keyId %>][title]" value="<%= g.title %>" placeholder="Position title" />
                 <input type="text" name="groups[<%= g.keyId %>][room]" value="<%= g.room %>" placeholder="Room # (optional)" />
+                <%# A real request: "next to each position in that pop up
+                    there should be a trashcan symbol to remove that
+                    position." formaction/formmethod override this one
+                    submit button's target to the group-delete route
+                    instead of the enclosing form's own Save action
+                    (save-groups) - no separate <form> needed (dialogs
+                    can't nest forms), same technique admin-name-tag.ejs's
+                    "Print Barcodes Only" button already uses. %>
+                <button
+                  type="submit"
+                  formaction="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/group/<%= g.keyId %>/delete?dialog=job"
+                  formmethod="POST"
+                  formnovalidate
+                  class="icon-btn icon-btn-danger"
+                  aria-label="Delete <%= g.title %>"
+                  title="Delete Position"
+                ><svg class="icon"><use href="#icon-trash"/></svg></button>
               </div>
               <div class="checkbox-row">
                 <% hours.forEach(function(h) { %>
@@ -153,8 +170,18 @@
       </form>
     </dialog>
 
+    <%# Reopens the dialog a redirect (Save, or a position's own trash-icon
+        delete below) just came back from, instead of leaving the admin at
+        a closed manage page. Dialog ids aren't uniform ("dates" ->
+        edit-dates-dialog, but "job" -> add-job-dialog, matching the "+
+        Add/Edit Position" button's own onclick target above) - a real bug
+        this session found while wiring the delete button's own reopen: the
+        old guessed id (interpolating "job" into an edit-<name>-dialog
+        pattern) silently found nothing and .showModal() on null threw, so
+        Save never actually reopened the position dialog either. %>
     <% if (openDialog) { %>
-      <script>document.getElementById('edit-<%= openDialog %>-dialog').showModal();</script>
+      <% const dialogIds = { dates: 'edit-dates-dialog', job: 'add-job-dialog' }; %>
+      <script>document.getElementById('<%= dialogIds[openDialog] %>').showModal();</script>
     <% } %>
   </main>
   <script src="/js/date-list.js"></script>

@@ -114,6 +114,23 @@ async function savePositionGroup(day, keyId, title, room, hours) {
   }
 }
 
+// A real bug report: "next to each position in that pop up there should
+// be a trashcan symbol to remove that position. once you click the trash
+// can the position is deleted." Before this, removing a position was only
+// possible implicitly via savePositionGroup (uncheck every hour, then
+// Save). keyId is a group's own anchor job id (see groupedPermanentJobsForDay);
+// a group can be several permanent_jobs rows (one per hour it runs), all
+// sharing day+title, so every sibling row - not just the anchor - has to
+// go. Returns the deleted group's title (for the notice message), or null
+// if keyId didn't resolve to a real job (already deleted/stale form).
+async function deletePositionGroup(day, keyId) {
+  const anchor = await getPermanentJob(keyId);
+  if (!anchor) return null;
+  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE day = ? AND title = ?').all(day, anchor.title);
+  for (const row of siblings) await deletePermanentJob(row.id);
+  return anchor.title;
+}
+
 async function setJobFloaters(jobId, memberIds) {
   await db.prepare('DELETE FROM permanent_job_floaters WHERE job_id = ?').run(jobId);
   const link = db.prepare('INSERT INTO permanent_job_floaters (job_id, member_id) VALUES (?, ?) ON CONFLICT (job_id, member_id) DO NOTHING');
@@ -436,6 +453,71 @@ async function dailyAssignmentCardsWithLabels(day, date) {
   return (await dailyAssignmentCards(day, date)).map((hour) => ({ ...hour, label: hourLabelByPosition[hour.position] || `Hour ${hour.position}` }));
 }
 
+// Public kiosk view's own combined per-hour position list - a real bug
+// report: "when a member clicks on the floater assignment button on the
+// kiosk page it only show[s] permanent positions with floater
+// assignments. it's not showing the floater assignments for classes that
+// have a missing teacher or assistant. it did allow me to assign
+// floaters to missing teacher positions but it isn't showing up on
+// member kiosk view." dailyAssignmentCards (the admin Chart tab/Archive's
+// own data) only ever reads permanent_jobs - a class's own missing-
+// teacher/assistant slot (substituteBoard's slot_type='class', the
+// Substitutes Needed board an admin actually assigns those from) was
+// never part of it at all, so an approved class-coverage assignment had
+// nowhere on the kiosk to ever show up. Deliberately does NOT reuse
+// substituteBoard itself - that function auto-picks and PERSISTS a
+// 'pending' candidate for every open slot as a side effect of being
+// called, which is exactly right for the admin board (an admin is about
+// to review/approve those suggestions) but wrong for this public,
+// no-login, view-only kiosk screen: a member just glancing at the chart
+// must never itself be the trigger that writes new suggested assignments
+// into the database. This only ever READS existing substitute_assignments
+// rows (assignmentFor, same as jobAssignmentGrid's own permanent-job
+// reads) and only ever shows one once its status is 'approved' - a
+// still-'pending' suggestion is blanked to "Unassigned" here, same
+// distinction the route already drew for permanent jobs before this
+// existed.
+async function publicFloaterCardsForDate(day, date) {
+  const missingById = await missingMemberIdsForDate(date);
+  const grid = await gridForDay(day);
+  const jobs = await permanentJobsForDay(day);
+  const jobsByHour = {};
+  jobs.forEach((j) => {
+    if (!jobsByHour[j.hour_position]) jobsByHour[j.hour_position] = [];
+    jobsByHour[j.hour_position].push(j);
+  });
+
+  const result = [];
+  for (const hourGroup of grid) {
+    const positions = [];
+
+    for (const cls of hourGroup.classes) {
+      for (const person of cls.staff) {
+        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+        if (!missingById.has(person.id)) continue;
+        const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+        positions.push({
+          title: cls.class_name,
+          room: cls.room || '',
+          assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+        });
+      }
+    }
+
+    for (const job of jobsByHour[hourGroup.position] || []) {
+      const existing = await assignmentFor(date, 'job', job.id);
+      positions.push({
+        title: job.title,
+        room: job.room || '',
+        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+      });
+    }
+
+    if (positions.length > 0) result.push({ position: hourGroup.position, label: hourGroup.label, jobs: positions });
+  }
+  return result;
+}
+
 // Archive tab: one row per date that's already passed, with how many of
 // that day's permanent-job positions ended up with an approved floater -
 // same underlying data as dailyAssignmentCards, just counted instead of
@@ -488,9 +570,11 @@ async function pendingApprovalsForToday() {
 
 module.exports = {
   HOUR_POSITIONS,
+  classStaffSlotId,
   permanentJobsForDay,
   groupedPermanentJobsForDay,
   savePositionGroup,
+  deletePositionGroup,
   getPermanentJob,
   floaterIdsForJob,
   createPermanentJob,
@@ -506,6 +590,7 @@ module.exports = {
   jobAssignmentGrid,
   dailyAssignmentCards,
   dailyAssignmentCardsWithLabels,
+  publicFloaterCardsForDate,
   archivedDateSummaries,
   pendingApprovalsForToday,
 };
