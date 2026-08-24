@@ -209,6 +209,19 @@ async function findTaskItemByBarcode(barcode) {
     .get(barcode);
 }
 
+// A real request: "make an admin setup/cleanup card with a barcode. if
+// someone doesn't have a setup cleanup card to scan the admin setup/
+// cleanup card can be scanned to bypass the checkout demand for a setup/
+// cleanup card... this card isn't linked to any specific member. its
+// just a general bypass card." routes/checkout.js's task-scan step
+// checks this AFTER findTaskItemByBarcode comes up empty - the seeded
+// bypass badge (db/bootstrapPg.js's seedIfMissing) is the one 'setupCleanup'
+// misc_badges row with no task_item_id, unlike every other row of that
+// type, which is always auto-created 1:1 from a real task.
+async function findSetupCleanupBypassBadge(barcode) {
+  return db.prepare("SELECT * FROM misc_badges WHERE badge_type = 'setupCleanup' AND task_item_id IS NULL AND barcode = ?").get(barcode);
+}
+
 module.exports = {
   taskListSectionsForDay,
   itemsForSection,
@@ -223,5 +236,6 @@ module.exports = {
   swapItemPosition,
   taskSectionForTeam,
   findTaskItemByBarcode,
+  findSetupCleanupBypassBadge,
   refreshBadgesForTeam,
 };

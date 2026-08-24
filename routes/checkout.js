@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-const { findTaskItemByBarcode } = require('../utils/taskList');
+const { findTaskItemByBarcode, findSetupCleanupBypassBadge } = require('../utils/taskList');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 // Same reasoning as routes/kiosk.js's checkinLimiter - both scan endpoints
@@ -72,6 +72,16 @@ router.post('/checkout/scan', async (req, res) => {
 
 // Step 2 (parents only): scan the Setup/Cleanup badge for the task just
 // completed, recorded across every roster the parent is scheduled on today.
+// A real request: "if someone doesn't have a setup cleanup card to scan
+// the admin setup/cleanup card can be scanned to bypass the checkout
+// demand for a setup/cleanup card." When the scanned barcode isn't a
+// real task, findSetupCleanupBypassBadge checks for that one general,
+// not-member-linked bypass badge (seeded once - db/bootstrapPg.js's
+// seedIfMissing, printable from Design > Print > Setup/Cleanup Badges)
+// before finally giving up - an attendant scans it in place of whichever
+// task badge the member doesn't have. Records the same as a genuinely
+// unrecognized/no task scan (taskItemId null - see recordCheckout's own
+// comment), since a bypass isn't tied to any specific task either.
 router.post('/checkout/task-scan', async (req, res) => {
   if (checkoutLimiter.isLimited(req.ip)) {
     return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
@@ -92,7 +102,8 @@ router.post('/checkout/task-scan', async (req, res) => {
   }
 
   const task = await findTaskItemByBarcode(barcode);
-  if (!task) {
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
@@ -101,7 +112,7 @@ router.post('/checkout/task-scan', async (req, res) => {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }
 
-  await recordCheckout(member, rosters, today, task.id);
+  await recordCheckout(member, rosters, today, task ? task.id : null);
   res.json({ ok: true, name: member.name, message: `Have a great day, ${member.name}!` });
 });
 

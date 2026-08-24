@@ -74,6 +74,40 @@ async function seedIfMissing(db) {
       .run(JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT));
   }
 
+  // A real request: "make an admin setup/cleanup card with a barcode. if
+  // someone doesn't have a setup cleanup card to scan the admin setup/
+  // cleanup card can be scanned to bypass the checkout demand for a
+  // setup/cleanup card... this card isn't linked to any specific member.
+  // its just a general bypass card." A real 'setupCleanup' misc_badges
+  // row (see routes/checkout.js's findSetupCleanupBypassBadge use of it)
+  // but with task_item_id left NULL - every other row of that badge_type
+  // is auto-created 1:1 from a real task_list_items row (utils/
+  // taskList.js's upsertTaskBadge), so a NULL task_item_id row is never
+  // produced any other way and safely doubles as this row's own marker.
+  // Seeded once, like the default admin account/PIN above - not part of
+  // the admin-imported/task-derived deck lifecycle (replaceMiscBadges is
+  // blocked for 'setupCleanup' server-side - see routes/admin-misc-
+  // badges.js), so nothing else ever recreates or touches it once it
+  // exists. Shows up in Design > Print > Setup/Cleanup Badges for free,
+  // right alongside every real task's own badge.
+  const bypassBadgeExists = await db.prepare("SELECT 1 FROM misc_badges WHERE badge_type = 'setupCleanup' AND task_item_id IS NULL").get();
+  if (!bypassBadgeExists) {
+    const existsCode = db.prepare('SELECT 1 FROM task_list_items WHERE barcode = ?');
+    let code;
+    do {
+      code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    } while (await existsCode.get(code));
+    await db
+      .prepare('INSERT INTO misc_badges (badge_type, title, description, barcode) VALUES (?, ?, ?, ?)')
+      .run(
+        'setupCleanup',
+        'Setup/Cleanup Bypass Card',
+        "Scan this instead of a member's own Setup/Cleanup badge at checkout when they don't have theirs to scan. Not tied to any specific member or task.",
+        code
+      );
+    console.log('Seeded a general Setup/Cleanup bypass badge for checkout (Design > Print > Setup/Cleanup Badges).');
+  }
+
   const leadershipCount = (await db.prepare('SELECT COUNT(*) AS c FROM leadership_contacts').get()).c;
   if (Number(leadershipCount) === 0) {
     const roles = ['Director', 'Assistant Director', 'Co-op Classes', 'Finance Team', 'Events Coordinator', 'Yearbook Team'];
