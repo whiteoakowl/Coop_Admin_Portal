@@ -4,6 +4,8 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { familyOf } = require('../utils/members');
+const { memberScansTaskAtCheckin } = require('../utils/setup');
+const { findTaskItemByBarcode, findSetupCleanupBypassBadge } = require('../utils/taskList');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -95,6 +97,73 @@ router.post('/checkin/scan', async (req, res) => {
   );
   for (const r of rosters) {
     await upsert.run(member.id, r.id, today, now);
+  }
+
+  // A real request: "add a dropdown menu to each setup/cleanup team list
+  // that asks, log on check in or log on check out ... if team 1 is, log
+  // on check in, those members will click check in, scan their name tag,
+  // then will be asked to scan their setup/cleanup card." Students never
+  // scan one either way (member_type check below), same as at checkout.
+  // day is derived from whichever roster(s) this member is actually
+  // scheduled on today (schedule_day), not a separately re-derived
+  // "today's real weekday" - rosters can include a class roster
+  // alongside the day's own Parent/Student one, but they all share the
+  // same day.
+  if (member.member_type !== 'student') {
+    const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+    if (day && (await memberScansTaskAtCheckin(member.id, day))) {
+      return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
+    }
+  }
+
+  res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });
+});
+
+// Step 2 ("log on check in" members only): scan the Setup/Cleanup badge
+// for the task about to be done. Writes onto the SAME attendance row(s)
+// step 1 just created/updated (task_item_id/task_scanned_at - see the
+// migration adding them) rather than a separate table, so
+// routes/checkout.js's own /checkout/scan can tell this member already
+// logged their task here and skip asking again at checkout, carrying
+// the same task_item_id into the checkouts row it creates then. Mirrors
+// /checkout/task-scan almost exactly, including the same bypass-badge
+// fallback (findSetupCleanupBypassBadge) for a member with no card of
+// their own to scan.
+router.post('/checkin/task-scan', async (req, res) => {
+  if (checkinLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  checkinLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const now = Date.now();
+  const taskItemId = task ? task.id : null;
+  const update = db.prepare('UPDATE attendance SET task_item_id = ?, task_scanned_at = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  for (const r of rosters) {
+    await update.run(taskItemId, now, member.id, r.id, today);
   }
 
   res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });

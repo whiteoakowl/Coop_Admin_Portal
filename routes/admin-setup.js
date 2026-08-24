@@ -109,12 +109,16 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
   // time to meet and meeting location."
   const meetingTime = (req.body.meetingTime || '').trim();
   const meetingLocation = (req.body.meetingLocation || '').trim();
+  // A real request: "add a dropdown menu to each setup/cleanup team list
+  // that asks, log on check in or log on check out." Defaults to
+  // 'checkout' (today's original behavior) for anything else submitted.
+  const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
   await db
-    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null);
+    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location, task_scan_timing) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
 });
 
@@ -139,10 +143,11 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (r
   const leaderId = parseInt(req.body.leaderId, 10) || null;
   const meetingTime = (req.body.meetingTime || '').trim();
   const meetingLocation = (req.body.meetingLocation || '').trim();
+  const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation });
+  await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation, taskScanTiming });
 
   // Batched member removals staged by the card's own trash icons - a real
   // request: "when deleting ... cleanup/signup members from lists it

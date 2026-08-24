@@ -148,6 +148,23 @@
                     <svg class="icon"><use href="#icon-map-pin"/></svg>
                     <input type="text" name="meetingLocation" class="team-info-meeting-input" value="<%= t.meeting_location || '' %>" placeholder="Meeting location" disabled />
                   </div>
+                  <%# A real request: "add a dropdown menu to each setup/
+                      cleanup team list that asks, log on check in or log
+                      on check out. choosing one or the other will
+                      determine when a member is asked to scan their
+                      setup/cleanup card." Same freeze/unfreeze-in-place
+                      editing as the rest of this row - saves together
+                      with everything else on this form. Still only ever
+                      asked of parents/admins either way - students never
+                      scan a Setup/Cleanup badge (routes/checkout.js,
+                      routes/kiosk.js). %>
+                  <div class="team-info-leader">
+                    <svg class="icon"><use href="#icon-barcode"/></svg>
+                    <select name="taskScanTiming" class="team-info-leader-select" disabled>
+                      <option value="checkout" <%= t.task_scan_timing !== 'checkin' ? 'selected' : '' %>>Log on check out</option>
+                      <option value="checkin" <%= t.task_scan_timing === 'checkin' ? 'selected' : '' %>>Log on check in</option>
+                    </select>
+                  </div>
                 </div>
               </form>
               <%# A real request: "header for each card in print should be
@@ -216,6 +233,12 @@
             <% availableLeaders.forEach(function(p) { %>
               <option value="<%= p.id %>"><%= p.name %></option>
             <% }); %>
+          </select>
+        </label>
+        <label>Setup/Cleanup badge scan
+          <select name="taskScanTiming">
+            <option value="checkout" selected>Log on check out</option>
+            <option value="checkin">Log on check in</option>
           </select>
         </label>
         <div class="notes-dialog-actions">

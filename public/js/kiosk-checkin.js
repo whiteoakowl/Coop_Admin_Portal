@@ -1,7 +1,7 @@
 /* global keepInputFocused, initIdKeypad, initKioskMethodChooser */
 (function () {
-  const form = document.getElementById('scan-form');
-  if (!form) return; // no session today
+  const scanForm = document.getElementById('scan-form');
+  if (!scanForm) return; // no session today
 
   const input = document.getElementById('barcode-input');
   const result = document.getElementById('kiosk-result');
@@ -10,11 +10,36 @@
   const icon = status.querySelector('.kiosk-status-icon');
   const manualSubmitBtn = document.getElementById('manual-submit-btn');
 
-  keepInputFocused(input);
-  initIdKeypad(document.getElementById('id-keypad'), input, form);
-  const chooser = initKioskMethodChooser(document.getElementById('main-content'));
+  const stepScan = document.getElementById('step-scan');
+  const stepTask = document.getElementById('step-task');
+  const memberNameEl = document.getElementById('member-name');
+  const cancelBtn = document.getElementById('cancel-btn');
 
-  manualSubmitBtn.addEventListener('click', () => form.requestSubmit());
+  const taskForm = document.getElementById('task-scan-form');
+  const taskInput = document.getElementById('task-barcode-input');
+  const taskResult = document.getElementById('task-kiosk-result');
+  const taskStatus = document.getElementById('task-kiosk-status');
+  const taskInstructions = document.getElementById('task-kiosk-instructions');
+  const taskIcon = taskStatus.querySelector('.kiosk-status-icon');
+  const taskManualSubmitBtn = document.getElementById('task-manual-submit-btn');
+
+  keepInputFocused(input);
+  initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
+  // Each step scopes its own chooser to its own panel - mirrors
+  // kiosk-checkout.js's own comment: step-scan and step-task both have a
+  // `.kiosk-method-choice` and matching `[data-method-panel]` pair, and
+  // initKioskMethodChooser only looks within the root it's given, so the
+  // two steps' identical panel names never cross-toggle each other.
+  const chooser = initKioskMethodChooser(stepScan);
+
+  keepInputFocused(taskInput);
+  initIdKeypad(document.getElementById('task-id-keypad'), taskInput, taskForm);
+  const taskChooser = initKioskMethodChooser(stepTask);
+
+  manualSubmitBtn.addEventListener('click', () => scanForm.requestSubmit());
+  taskManualSubmitBtn.addEventListener('click', () => taskForm.requestSubmit());
+
+  let currentMemberId = null;
 
   function setState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
@@ -22,20 +47,40 @@
     instructions.textContent = message;
   }
 
-  form.addEventListener('submit', async (e) => {
+  function setTaskState(state, message, iconId) {
+    taskStatus.className = 'kiosk-status kiosk-status-' + state;
+    taskIcon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
+    taskInstructions.textContent = message;
+  }
+
+  function resetToScan() {
+    currentMemberId = null;
+    stepTask.classList.add('kiosk-hidden');
+    stepScan.classList.remove('kiosk-hidden');
+    result.hidden = true;
+    chooser.showChooser();
+    taskResult.hidden = true;
+    taskInput.value = '';
+    taskChooser.showChooser();
+  }
+
+  // Step 1: scan the member's own name tag. Most members are checked in
+  // immediately (see setState('success', ...) below); a member on a
+  // Setup/Cleanup team set to "log on check in" (see step-task below,
+  // and routes/kiosk.js's own comment) moves on to step-task to scan
+  // their badge for the task they're about to do instead.
+  scanForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const barcode = input.value.trim();
     input.value = '';
     if (!barcode) return;
 
-    // The method panel that was active when this submission started - if
-    // it fails, that's the screen to return the person to, not the
-    // button-choice row (they already told us how they wanted to check
-    // in; an unrecognized scan/ID shouldn't make them pick again).
-    const activePanel = document.querySelector('[data-method-panel]:not([hidden])');
+    // The method panel active when this submission started - if it
+    // fails, that's the screen to return to, not the button-choice row.
+    const activePanel = stepScan.querySelector('[data-method-panel]:not([hidden])');
     const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
 
-    document.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
     result.hidden = false;
     setState('loading', 'Checking…', 'loader');
 
@@ -46,16 +91,26 @@
         body: 'barcode=' + encodeURIComponent(barcode),
       });
       const data = await res.json();
-      if (data.ok) {
-        setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'info-circle' : 'check-circle');
-        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+      if (!data.ok) {
+        setState('error', data.message, 'x-circle');
+        setTimeout(() => {
+          result.hidden = true;
+          chooser.showPanel(activeMethod);
+        }, 2500);
         return;
       }
-      setState('error', data.message, 'x-circle');
-      setTimeout(() => {
+
+      if (data.memberType === 'parent-taskscan') {
+        currentMemberId = data.memberId;
+        memberNameEl.textContent = data.name;
         result.hidden = true;
-        chooser.showPanel(activeMethod);
-      }, 2500);
+        stepScan.classList.add('kiosk-hidden');
+        stepTask.classList.remove('kiosk-hidden');
+        return;
+      }
+
+      setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'info-circle' : 'check-circle');
+      setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
     } catch (err) {
       setState('error', 'Connection error. Please try again.', 'x-circle');
       setTimeout(() => {
@@ -64,4 +119,47 @@
       }, 2500);
     }
   });
+
+  // Step 2 ("log on check in" members only): scan the Setup/Cleanup
+  // badge for the task about to be done.
+  taskForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const barcode = taskInput.value.trim();
+    taskInput.value = '';
+    if (!barcode || !currentMemberId) return;
+
+    const activePanel = stepTask.querySelector('[data-method-panel]:not([hidden])');
+    const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
+
+    stepTask.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    taskResult.hidden = false;
+    setTaskState('loading', 'Checking…', 'loader');
+
+    try {
+      const res = await fetch('/kiosk/checkin/task-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'memberId=' + encodeURIComponent(currentMemberId) + '&barcode=' + encodeURIComponent(barcode),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTaskState('success', data.message, 'check-circle');
+        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+        return;
+      }
+      setTaskState('error', data.message, 'x-circle');
+      setTimeout(() => {
+        taskResult.hidden = true;
+        taskChooser.showPanel(activeMethod);
+      }, 2500);
+    } catch (err) {
+      setTaskState('error', 'Connection error. Please try again.', 'x-circle');
+      setTimeout(() => {
+        taskResult.hidden = true;
+        taskChooser.showPanel(activeMethod);
+      }, 2500);
+    }
+  });
+
+  cancelBtn.addEventListener('click', resetToScan);
 })();

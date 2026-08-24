@@ -46,17 +46,41 @@ async function setTeamLeader(teamId, leaderId) {
 // just "before drop-off" or "9:00am" prose, not a value that needs to be
 // compared or sorted anywhere.
 async function updateTeam(teamId, fields) {
-  await db.prepare('UPDATE setup_teams SET title = ?, description = ?, leader_id = ?, meeting_time = ?, meeting_location = ? WHERE id = ?').run(
+  await db.prepare('UPDATE setup_teams SET title = ?, description = ?, leader_id = ?, meeting_time = ?, meeting_location = ?, task_scan_timing = ? WHERE id = ?').run(
     fields.title,
     fields.description || null,
     fields.leaderId || null,
     fields.meetingTime || null,
     fields.meetingLocation || null,
+    fields.taskScanTiming === 'checkin' ? 'checkin' : 'checkout',
     teamId
   );
   // Same badge-freshness reasoning as setTeamLeader above - a team rename
   // shouldn't leave stale badges behind either.
   await refreshBadgesForTeam(teamId);
+}
+
+// A real request: "add a dropdown menu to each setup/cleanup team list
+// that asks, log on check in or log on check out. choosing one or the
+// other will determine when a member is asked to scan their setup/
+// cleanup card." Every parent/admin used to always be asked to scan
+// their Setup/Cleanup badge at CHECK OUT (routes/checkout.js) with no
+// team-level choice at all - true here means their own team (for that
+// day) opted into asking at CHECK IN instead (routes/kiosk.js). Not on
+// any team, or only on 'checkout' team(s), keeps that original always-
+// ask-at-checkout behavior. A member on more than one team for the same
+// day (unusual, but not disallowed) only needs ONE of them set to
+// 'checkin' to be asked at check-in.
+async function memberScansTaskAtCheckin(memberId, day) {
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM setup_team_members stm
+       JOIN setup_teams st ON st.id = stm.team_id
+       WHERE stm.member_id = ? AND st.day = ? AND st.task_scan_timing = 'checkin'
+       LIMIT 1`
+    )
+    .get(memberId, day);
+  return !!row;
 }
 
 // --- Setup/Cleanup Assignments (date-scoped, unlike the standing team
@@ -306,6 +330,7 @@ module.exports = {
   membersForTeam,
   setTeamLeader,
   updateTeam,
+  memberScansTaskAtCheckin,
   datesForDay,
   addSetupDates,
   removeSetupDate,

@@ -67,6 +67,26 @@ router.post('/checkout/scan', async (req, res) => {
     return res.json({ ok: true, memberType: 'student', name: member.name, message: `Have a great day, ${member.name}!` });
   }
 
+  // A real request: "add a dropdown menu to each setup/cleanup team list
+  // that asks, log on check in or log on check out ... then if it is
+  // marked log on check out, check out requires members to scan name tag
+  // then scan setup/cleanup card." A member whose team logs at CHECK IN
+  // instead (routes/kiosk.js's own /checkin/task-scan) already has their
+  // task recorded on today's attendance row - checkout for them is then
+  // as simple as a student's, carrying that same task_item_id over
+  // instead of asking again. task_scanned_at (not just task_item_id
+  // being non-null) is the actual "already logged" signal - task_item_id
+  // legitimately stays null for a bypass-badge scan too (see
+  // findSetupCleanupBypassBadge's own comment), which must still count
+  // as logged.
+  const alreadyLogged = await db
+    .prepare('SELECT task_item_id FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
+    .get(member.id, today);
+  if (alreadyLogged) {
+    await recordCheckout(member, rosters, today, alreadyLogged.task_item_id);
+    return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Have a great day, ${member.name}!` });
+  }
+
   res.json({ ok: true, memberType: 'parent', memberId: member.id, name: member.name });
 });
 

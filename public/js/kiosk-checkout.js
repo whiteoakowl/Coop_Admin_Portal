@@ -98,7 +98,11 @@
         return;
       }
 
-      if (data.memberType === 'student') {
+      // 'parent-already-logged' - a member whose team logs at check-in
+      // instead (see public/js/kiosk-checkin.js) already scanned their
+      // Setup/Cleanup badge there; checkout is then a single scan just
+      // like a student's, not the two-step flow below.
+      if (data.memberType === 'student' || data.memberType === 'parent-already-logged') {
         setState('success', data.message, 'check-circle');
         setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
         return;
