@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
-const { findTaskItemByBarcode, findSetupCleanupBypassBadge } = require('../utils/taskList');
+const { findTaskItemByBarcode, findSetupCleanupBypassBadge, taskAlreadyLoggedByAnotherMember } = require('../utils/taskList');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 // Same reasoning as routes/kiosk.js's checkinLimiter - both scan endpoints
@@ -125,6 +125,13 @@ router.post('/checkout/task-scan', async (req, res) => {
   const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
   if (!task && !bypass) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  // A real request: "don't allow each setup/cleanup badge to be scanned
+  // more than once in a day" - only real tasks (never the bypass badge,
+  // which is meant to be reused by anyone without their own card).
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
   }
 
   const rosters = await getMemberRostersForDate(member.id, today);

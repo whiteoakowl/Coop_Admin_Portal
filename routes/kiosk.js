@@ -5,7 +5,7 @@ const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { familyOf } = require('../utils/members');
 const { memberScansTaskAtCheckin } = require('../utils/setup');
-const { findTaskItemByBarcode, findSetupCleanupBypassBadge } = require('../utils/taskList');
+const { findTaskItemByBarcode, findSetupCleanupBypassBadge, taskAlreadyLoggedByAnotherMember } = require('../utils/taskList');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -152,6 +152,16 @@ router.post('/checkin/task-scan', async (req, res) => {
   const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
   if (!task && !bypass) {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  // A real request: "don't allow each setup/cleanup badge to be scanned
+  // more than once in a day" - only real tasks (never the bypass badge,
+  // which is meant to be reused by anyone without their own card). Same
+  // check routes/checkout.js's own task-scan step uses, so a task
+  // already logged at check-in by someone else is caught here too, and
+  // vice versa.
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
   }
 
   const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
