@@ -130,11 +130,10 @@ router.get('/classes/:day', requireUnlocked, async (req, res) => {
 
 // Picking a class goes straight to its attendance sheet - Check In and
 // Check Out live here now (no separate class-detail page in between).
-// Read-only, today-only - not the full multi-week admin grid
-// (routes/admin-rosters.js), deliberately: this screen is reachable by
-// anyone with the shared PIN, not just a logged-in admin, so it only
-// ever shows the one day that matters for "who's checked into this class
-// right now" rather than a term's worth of history.
+// Today-only, not the full multi-week admin grid (routes/admin-
+// rosters.js) - this screen only ever shows the one day that matters for
+// "who's checked into this class right now" rather than a term's worth
+// of history.
 router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
   const cls = await findClassWithLabels(parseInt(req.params.id, 10));
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
@@ -152,6 +151,48 @@ router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
     rows: grid.rows,
     summary: grid.summary[0] || { present: 0, late: 0, absent: 0 },
   });
+});
+
+// A real request: "class attendance should allow for manually changing
+// P, L, A just like the Monday/Wednesday attendance. it should then save
+// automatically." Mirrors admin-rosters.js's own POST /rosters/:tab/
+// attendance almost exactly - same status:<memberId>:<date> body-key
+// convention (so public/js/attendance-grid.js's client-side auto-save
+// drives both screens unmodified, just pointed at a different
+// data-endpoint), same upsert-or-clear/source='manual' write. Gated by
+// the same shared-PIN requireUnlocked as every other route on this
+// surface, not a logged-in admin session - this screen is reachable by
+// whichever staff member is running the class that hour, same trust
+// level Check In/Check Out scanning already has here.
+router.post('/classes/:id/attendance', requireUnlocked, async (req, res) => {
+  const cls = await findClassWithLabels(parseInt(req.params.id, 10));
+  if (!cls) return res.status(404).send('Not found');
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
+  if (!roster) return res.status(404).send('Not found');
+
+  const upsert = db.prepare(
+    `INSERT INTO attendance (member_id, roster_id, session_date, status, source)
+     VALUES (?, ?, ?, ?, 'manual')
+     ON CONFLICT(member_id, roster_id, session_date) DO UPDATE SET
+       status = excluded.status,
+       source = 'manual'`
+  );
+  const clear = db.prepare('DELETE FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+
+  for (const key of Object.keys(req.body)) {
+    const match = /^status:(\d+):(\d{4}-\d{2}-\d{2})$/.exec(key);
+    if (!match) continue;
+    const [, memberId, date] = match;
+    const value = (req.body[key] || '').trim();
+    if (value === 'present' || value === 'late' || value === 'absent') {
+      await upsert.run(parseInt(memberId, 10), roster.id, date, value);
+    } else {
+      await clear.run(parseInt(memberId, 10), roster.id, date);
+    }
+  }
+
+  if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
+  res.redirect(`/kiosk/class-checkin/classes/${cls.id}/attendance`);
 });
 
 router.get('/classes/:id/scan', requireUnlocked, async (req, res) => {

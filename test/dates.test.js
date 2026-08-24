@@ -138,9 +138,23 @@ test('formatTime', async (t) => {
     assert.equal(formatTime(undefined), null);
   });
 
-  await t.test('formats a real epoch timestamp as h:mm AM/PM', () => {
+  // A real bug report: "check in and out times should read Eastern Time
+  // (ET)." formatTime always renders in America/New_York regardless of
+  // the server's own OS timezone (Netlify Functions run in UTC) - this
+  // epoch is 14:30 UTC in June (EDT, UTC-4), so it should read 10:30 AM,
+  // not the server-local "2:30 PM" a bare toLocaleTimeString would give
+  // on a UTC host.
+  await t.test('formats a real epoch timestamp as h:mm AM/PM, in Eastern Time regardless of server timezone', () => {
     const epoch = new Date('2024-06-15T14:30:00Z').getTime();
-    assert.equal(formatTime(epoch), '2:30 PM');
+    assert.equal(formatTime(epoch), '10:30 AM');
+  });
+
+  // Same conversion, but in January (EST, UTC-5, no daylight saving) -
+  // proves this uses the real America/New_York IANA zone (which already
+  // knows the EST/EDT boundary) rather than a fixed UTC-4/-5 offset.
+  await t.test('accounts for standard time (EST, UTC-5) in winter, not just daylight time', () => {
+    const epoch = new Date('2024-01-15T14:30:00Z').getTime();
+    assert.equal(formatTime(epoch), '9:30 AM');
   });
 
   // Coverage for a live bug report: attendance.check_in_time/checkouts.
@@ -156,7 +170,7 @@ test('formatTime', async (t) => {
   // Logs > Check In/Out tab, member profile history, CSV exports).
   await t.test('formats correctly even when epochMs arrives as a numeric STRING (Postgres bigint-as-string)', () => {
     const epoch = new Date('2024-06-15T14:30:00Z').getTime();
-    assert.equal(formatTime(String(epoch)), '2:30 PM');
+    assert.equal(formatTime(String(epoch)), '10:30 AM');
   });
 
   await t.test('returns null (not "Invalid Date") for a falsy/zero value that arrives as a string too', () => {

@@ -70,10 +70,17 @@ function formatDateNumeric(iso) {
 // bigint as a plain number. Number(epochMs) is a no-op when it's already
 // a number (PGlite, or any caller passing one directly, per this
 // function's own tests), so this is safe for both backends.
+// A real bug report: "check in and out times should read Eastern Time
+// (ET)." With no explicit timeZone, toLocaleTimeString renders in
+// whatever OS timezone the Node process itself is running in - fine
+// locally, but Netlify Functions run in UTC, so every check-in/check-out
+// time showed hours ahead of the co-op's actual (Eastern) time once
+// deployed. 'America/New_York' is a real IANA zone, so this already
+// accounts for EST/EDT automatically rather than needing a fixed offset.
 function formatTime(epochMs) {
   const ms = Number(epochMs);
   if (!ms) return null;
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 }
 
 // Formats a plain "HH:MM" (24-hour, from an <input type="time">) as a

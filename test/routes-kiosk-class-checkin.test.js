@@ -217,6 +217,89 @@ test('Class Check-In day and hour navigation', async (t) => {
   });
 });
 
+// A real request: "class attendance should allow for manually changing
+// P, L, A just like the Monday/Wednesday attendance. it should then save
+// automatically." Covers the same POST /classes/:id/attendance route
+// admin-rosters.js's own attendance test suite covers for the day
+// rosters - same status:<memberId>:<date> body-key convention, same
+// upsert-or-clear/source='manual' write, just PIN-gated instead of
+// requiring a logged-in admin.
+test('Class Check-In manual P/L/A editing on the attendance sheet', async (t) => {
+  const agent = request.agent(app);
+  await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000' });
+
+  await t.test('the attendance sheet renders an editable P/L/A select for each student, pointed at this class\'s own endpoint', async () => {
+    const { classId, memberId } = await setUpClassWithStudent();
+    const res = await agent.get(`/kiosk/class-checkin/classes/${classId}/attendance`);
+    assert.equal(res.status, 200);
+    assert.match(
+      res.text,
+      new RegExp(`<select class="roster-cell-select roster-cell-select-blank" data-endpoint="/kiosk/class-checkin/classes/${classId}/attendance" data-member="${memberId}"`)
+    );
+  });
+
+  await t.test('marking a student present via the select writes a manual attendance row on the class roster and reflects back on reload', async () => {
+    const { classId, classRosterId, memberId, today } = await setUpClassWithStudent();
+
+    const res = await agent
+      .post(`/kiosk/class-checkin/classes/${classId}/attendance`)
+      .type('form')
+      .send({ [`status:${memberId}:${today}`]: 'present' });
+    assert.equal(res.status, 302, 'a plain form POST (no X-Requested-With) redirects back to the attendance page');
+
+    const row = await db.prepare('SELECT status, source FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(memberId, classRosterId, today);
+    assert.equal(row.status, 'present');
+    assert.equal(row.source, 'manual', 'distinguishable from a real kiosk scan');
+
+    const reload = await agent.get(`/kiosk/class-checkin/classes/${classId}/attendance`);
+    assert.match(reload.text, new RegExp(`data-member="${memberId}"[^>]*data-date="${today}" data-original="present"`));
+  });
+
+  await t.test('the fetch()-based auto-save path (X-Requested-With) returns JSON instead of redirecting', async () => {
+    const { classId, memberId, today } = await setUpClassWithStudent();
+    const res = await agent
+      .post(`/kiosk/class-checkin/classes/${classId}/attendance`)
+      .set('X-Requested-With', 'fetch')
+      .type('form')
+      .send({ [`status:${memberId}:${today}`]: 'late' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { ok: true });
+  });
+
+  await t.test('clearing the select (blank option) removes the attendance row entirely, not just marks it blank', async () => {
+    const { classId, classRosterId, memberId, today } = await setUpClassWithStudent();
+    await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'admin')").run(memberId, classRosterId, today);
+
+    await agent
+      .post(`/kiosk/class-checkin/classes/${classId}/attendance`)
+      .type('form')
+      .send({ [`status:${memberId}:${today}`]: '' });
+
+    const row = await db.prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(memberId, classRosterId, today);
+    assert.equal(row, undefined);
+  });
+
+  await t.test('manually editing one class does not touch the day-level Student roster or a different class', async () => {
+    const { classId, memberId, studentRosterId, today } = await setUpClassWithStudent();
+    const other = await setUpClassWithStudent();
+
+    await agent
+      .post(`/kiosk/class-checkin/classes/${classId}/attendance`)
+      .type('form')
+      .send({ [`status:${memberId}:${today}`]: 'present' });
+
+    const dayRosterRow = await db.prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(memberId, studentRosterId, today);
+    assert.equal(dayRosterRow, undefined, 'writing to the class roster must not also write to the day Student roster');
+    const otherClassRow = await db.prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ?').get(other.memberId, other.classRosterId);
+    assert.equal(otherClassRow, undefined, 'a different class\'s roster is untouched');
+  });
+
+  await t.test('an unknown class id 404s on the POST too', async () => {
+    const res = await agent.post('/kiosk/class-checkin/classes/999999/attendance').type('form').send({ 'status:1:2026-01-01': 'present' });
+    assert.equal(res.status, 404);
+  });
+});
+
 test('Class Check-In check-in writes only to the class roster', async (t) => {
   const agent = request.agent(app);
   await agent.post('/kiosk/class-checkin/unlock').type('form').send({ pin: '0000' });
