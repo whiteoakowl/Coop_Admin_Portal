@@ -15,6 +15,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const store = require('../utils/store');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_store'));
 
@@ -80,7 +81,9 @@ router.post('/:id/status', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const product = await store.getProduct(req.params.id);
   await store.deleteProduct(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'product_deleted', 'store_product', req.params.id, product?.name);
   res.redirect('/main-admin/store?notice=' + encodeURIComponent('Product deleted.'));
 });
 
@@ -140,6 +143,7 @@ router.post('/orders/:id/fulfill', async (req, res) => {
 
 router.post('/orders/:id/cancel', async (req, res) => {
   await store.cancelOrder(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'order_cancelled', 'store_order', req.params.id, null);
   res.redirect('/main-admin/store/orders/all?notice=' + encodeURIComponent('Order cancelled.'));
 });
 

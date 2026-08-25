@@ -11,6 +11,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const directory = require('../utils/directory');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_directory'));
 
@@ -59,6 +60,7 @@ router.post('/:id/status', async (req, res) => {
   const status = req.body.status;
   if (!['pending', 'active', 'archived'].includes(status)) return res.redirect('/main-admin/directory');
   await directory.setListingStatus(req.params.id, status, req.portalAccount.id);
+  await auditLog.record(req.portalAccount.id, 'listing_status_changed', 'directory_listing', req.params.id, status);
   res.redirect('/main-admin/directory?notice=' + encodeURIComponent(status === 'active' ? 'Approved.' : `Marked ${status}.`));
 });
 

@@ -28,33 +28,42 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Submissions &mdash; <%= form.title %></h1>
+    <h1>Audit Log</h1>
+    <p class="hint">Financial changes, deletions, and moderation actions across the app - see Forums' own Moderation Log for forum-specific moderation.</p>
 
-    <div class="roster-toolbar">
-      <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/builder">&larr; Back to Form</a>
-        <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/submissions/export">Export CSV</a>
-      </div>
-    </div>
+    <form method="GET" action="/main-admin/audit-log" class="inline-block-form">
+      <label>Filter by type
+        <select name="targetType" onchange="this.form.submit()">
+          <option value="">All</option>
+          <% targetTypes.forEach(function(t) { %>
+            <option value="<%= t %>" <%= targetType === t ? 'selected' : '' %>><%= t %></option>
+          <% }); %>
+        </select>
+      </label>
+    </form>
 
-    <% if (submissions.length === 0) { %>
-      <p class="roster-empty">No submissions yet.</p>
+    <% if (entries.length === 0) { %>
+      <p class="roster-empty">No audit entries yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
-              <th>Member</th>
-              <th>Submitted</th>
-              <th></th>
+              <th>When</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Detail</th>
             </tr>
           </thead>
           <tbody>
-            <% submissions.forEach(function(s) { %>
+            <% entries.forEach(function(e) { %>
               <tr>
-                <td class="roster-name-col"><%= s.memberName %></td>
-                <td><%= s.submitted_at %></td>
-                <td><a href="/main-admin/forms/<%= form.id %>/submissions/<%= s.id %>">View</a></td>
+                <td><%= e.created_at %></td>
+                <td><%= e.actor_email || 'Unknown' %></td>
+                <td><%= e.action %></td>
+                <td><%= e.target_type %><% if (e.target_id != null) { %> #<%= e.target_id %><% } %></td>
+                <td><%= e.detail || '' %></td>
               </tr>
             <% }); %>
           </tbody>

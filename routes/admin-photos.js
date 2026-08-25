@@ -18,6 +18,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const photos = require('../utils/photos');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_publications'));
 
@@ -70,6 +71,7 @@ router.post('/:id/delete', async (req, res) => {
     }
   }
   await photos.deleteAlbum(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'photo_album_deleted', 'photo_album', req.params.id, album?.title);
   res.redirect('/main-admin/photos?notice=' + encodeURIComponent('Album deleted.'));
 });
 

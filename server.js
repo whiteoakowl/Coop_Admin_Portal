@@ -173,6 +173,10 @@ const photosRouter = require('./routes/photos');
 const adminPhotosRouter = require('./routes/admin-photos');
 const publicationsRouter = require('./routes/publications');
 const adminPublicationsRouter = require('./routes/admin-publications');
+// Item 13: Audit Log at /main-admin/audit-log (view_audit_log - a new,
+// dedicated permission, separate from every action it records). No
+// member-facing router - this is Main Admin-only.
+const adminAuditLogRouter = require('./routes/admin-audit-log');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -374,6 +378,7 @@ app.use('/photos', photosRouter);
 app.use('/main-admin/photos', adminPhotosRouter);
 app.use('/publications', publicationsRouter);
 app.use('/main-admin/publications', adminPublicationsRouter);
+app.use('/main-admin/audit-log', adminAuditLogRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

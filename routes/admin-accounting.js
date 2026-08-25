@@ -11,6 +11,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const payments = require('../utils/payments');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -56,6 +57,7 @@ router.post('/charges/:id/payments', async (req, res) => {
     return res.redirect(`/main-admin/accounting/members/${charge.member_id}?error=` + encodeURIComponent('Enter a nonzero amount.'));
   }
   await payments.recordPayment(charge.id, amountCents, 'manual', req.portalAccount.id, (req.body.note || '').trim());
+  await auditLog.record(req.portalAccount.id, isRefund ? 'refund_recorded' : 'payment_recorded', 'payment_charge', charge.id, `${payments.formatCents(Math.abs(amountCents))}${req.body.note ? ' - ' + req.body.note.trim() : ''}`);
   res.redirect(`/main-admin/accounting/members/${charge.member_id}?notice=` + encodeURIComponent(isRefund ? 'Refund recorded.' : 'Payment recorded.'));
 });
 
@@ -63,6 +65,7 @@ router.post('/charges/:id/cancel', async (req, res) => {
   const charge = await payments.getCharge(req.params.id);
   if (!charge) return res.status(404).render('404', { title: 'Not Found' });
   await payments.cancelCharge(charge.id);
+  await auditLog.record(req.portalAccount.id, 'charge_cancelled', 'payment_charge', charge.id, charge.description);
   res.redirect(`/main-admin/accounting/members/${charge.member_id}?notice=` + encodeURIComponent('Charge cancelled.'));
 });
 

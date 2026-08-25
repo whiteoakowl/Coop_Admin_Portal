@@ -11,6 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const notifications = require('../utils/notifications');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_communications'));
 
@@ -20,7 +21,9 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/:key/auto-send', async (req, res) => {
-  await notifications.setAutoSend(req.params.key, req.body.enabled === '1');
+  const enabled = req.body.enabled === '1';
+  await notifications.setAutoSend(req.params.key, enabled);
+  await auditLog.record(req.portalAccount.id, 'notification_auto_send_toggled', 'notification_type', null, `${req.params.key}: ${enabled ? 'on' : 'off'}`);
   res.redirect('/main-admin/notifications?notice=' + encodeURIComponent('Saved.'));
 });
 

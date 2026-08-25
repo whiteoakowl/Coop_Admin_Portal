@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const publications = require('../utils/publications');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_publications'));
 
@@ -49,7 +50,9 @@ router.post('/:id/unpublish', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const item = await publications.getPublication(req.params.id);
   await publications.deletePublication(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'publication_deleted', 'publication', req.params.id, item?.title);
   res.redirect('/main-admin/publications?notice=' + encodeURIComponent('Deleted.'));
 });
 

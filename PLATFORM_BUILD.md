@@ -537,15 +537,55 @@ real dependency runs the opposite direction from the numbering.
 - Reciprocal "Photos"/"Publications" nav links added across every other
   Track B admin view.
 
+## Community & Commerce track — Audit Log (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825130000_audit_log.sql`: a single
+  `audit_log` table (actor, action, target type/id, detail, timestamp).
+  Deliberately does not duplicate Forums' own `forum_moderation_log`
+  (item 6, with its own per-thread/post context and admin view) - this
+  table covers the other meaningful actions across features that had no
+  trail yet. Role/permission changes (also called out in the handoff as
+  worth auditing) live in `routes/main-admin.js`, off-limits to this
+  track.
+- `utils/auditLog.js`: `record()` is called directly from admin route
+  handlers right after the real action already succeeded - not from
+  inside every `utils/*.js` mutation function - so this stays a thin,
+  honest record of what an admin actually did rather than a generic hook
+  fired on every write. Threaded through 10 real call sites, not bolted
+  on generically: `routes/admin-accounting.js` (payment recorded, refund
+  recorded, charge cancelled), `routes/admin-store.js` (product deleted,
+  order cancelled), `routes/admin-custom-forms.js` (form deleted),
+  `routes/admin-events.js` (event deleted), `routes/admin-directory.js` /
+  `routes/admin-classifieds.js` (listing status changed - moderation),
+  `routes/admin-newsletter.js` (issue deleted), `routes/admin-photos.js`
+  (album deleted), `routes/admin-publications.js` (article deleted),
+  `routes/admin-notifications.js` (a type's auto-send toggled).
+- `routes/admin-audit-log.js` (`/main-admin/audit-log`,
+  `view_audit_log` — a new, dedicated permission, separate from every
+  action it records, since who did what financially or moderation-wise
+  is more sensitive than any single feature's own management
+  permission): read-only, filterable by target type.
+- 1 new view and `test/routes-audit-log.test.js` (6 tests: sign-in
+  required, recording a payment/refund/cancellation each create a real
+  entry tied to the real charge id, deleting a store product records the
+  product's own name as the detail, deleting a newsletter issue records
+  an entry, toggling a notification type's auto-send records an entry,
+  the audit log page's own target-type filter actually filters).
+- Reciprocal "Audit Log" nav link added across every other Track B admin
+  view.
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Audit log and
-global search — Track B scope, next up after Events/Volunteer/Donation
-signups, Business Directory/Classifieds, Member Directory, Forums, Custom
-Forms, Accounting/Payments, Store, Weekly Newsletter, the SMS/notification
-framework, and Photos/Albums + Publications/Articles above.
+simple per-class open/closed toggle) — all Track A scope. Global search —
+Track B scope, genuinely last (per the handoff's own framing — "there's
+nothing to search until the rest exists"), next up after Events/Volunteer/
+Donation signups, Business Directory/Classifieds, Member Directory,
+Forums, Custom Forms, Accounting/Payments, Store, Weekly Newsletter, the
+SMS/notification framework, Photos/Albums + Publications/Articles, and the
+Audit Log above.
 Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two

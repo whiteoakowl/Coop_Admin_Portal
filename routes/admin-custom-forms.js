@@ -9,6 +9,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const customForms = require('../utils/customForms');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forms'));
 
@@ -61,7 +62,9 @@ router.post('/:id/status', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const form = await customForms.getForm(req.params.id);
   await customForms.deleteForm(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'form_deleted', 'custom_form', req.params.id, form?.title);
   res.redirect('/main-admin/forms?notice=' + encodeURIComponent('Form deleted.'));
 });
 

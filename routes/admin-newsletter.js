@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const newsletter = require('../utils/newsletter');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_communications'));
 
@@ -61,7 +62,9 @@ router.post('/:id/send', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const issue = await newsletter.getIssue(req.params.id);
   await newsletter.deleteIssue(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'newsletter_issue_deleted', 'newsletter_issue', req.params.id, issue?.subject);
   res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Issue deleted.'));
 });
 

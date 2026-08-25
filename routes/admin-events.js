@@ -14,6 +14,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const events = require('../utils/events');
+const auditLog = require('../utils/auditLog');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
 
@@ -115,7 +116,9 @@ router.post('/:id/status', async (req, res) => {
 });
 
 router.post('/:id/delete', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
   await events.deleteEvent(req.params.id);
+  await auditLog.record(req.portalAccount.id, 'event_deleted', 'event', req.params.id, event?.title);
   res.redirect('/main-admin/events?notice=' + encodeURIComponent('Event deleted.'));
 });
 

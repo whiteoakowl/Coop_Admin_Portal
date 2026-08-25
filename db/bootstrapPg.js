@@ -150,6 +150,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_publications', label: 'Manage Publications', description: 'Write and publish articles, publications, and photo albums.' },
   { key: 'manage_directory', label: 'Manage Directory', description: 'Manage the member and business directories.' },
   { key: 'manage_communications', label: 'Manage Communications', description: 'Assemble/send the weekly newsletter and control SMS/notification settings.' },
+  { key: 'view_audit_log', label: 'View Audit Log', description: 'View the record of financial changes, moderation, and deletions across the app.' },
 ];
 
 async function seedPortalPlatform(db) {
