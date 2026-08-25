@@ -21,40 +21,33 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Registrations &mdash; <%= event.title %></h1>
+    <h1>Submissions &mdash; <%= form.title %></h1>
 
     <div class="roster-toolbar">
       <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">&larr; Back to Event</a>
+        <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/builder">&larr; Back to Form</a>
+        <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/submissions/export">Export CSV</a>
       </div>
     </div>
 
-    <% if (registrations.length === 0) { %>
-      <p class="roster-empty">No one has registered yet.</p>
+    <% if (submissions.length === 0) { %>
+      <p class="roster-empty">No submissions yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Registered</th>
+              <th>Member</th>
+              <th>Submitted</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <% registrations.forEach(function(r) { %>
+            <% submissions.forEach(function(s) { %>
               <tr>
-                <td class="roster-name-col"><%= r.memberName %></td>
-                <td>
-                  <% if (r.status === 'confirmed') { %>
-                    <span class="badge-pill badge-pill-green">Confirmed</span>
-                  <% } else if (r.status === 'waitlisted') { %>
-                    <span class="badge-pill badge-pill-orange">Waitlisted</span>
-                  <% } else { %>
-                    <span class="badge-pill badge-pill-gray">Cancelled</span>
-                  <% } %>
-                </td>
-                <td><%= r.created_at %></td>
+                <td class="roster-name-col"><%= s.memberName %></td>
+                <td><%= s.submitted_at %></td>
+                <td><a href="/main-admin/forms/<%= form.id %>/submissions/<%= s.id %>">View</a></td>
               </tr>
             <% }); %>
           </tbody>

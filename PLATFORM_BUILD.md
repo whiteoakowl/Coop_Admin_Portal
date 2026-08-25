@@ -270,16 +270,59 @@ extend it.
   control, non-main_admin moderation + audit log entry, locked-thread
   reply denial).
 
+## Community & Commerce track — Custom Forms (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825070000_custom_forms.sql`: `custom_forms`,
+  `custom_form_fields`, `custom_form_field_options` (a choice field's
+  options are their own child table, same pattern the existing Training
+  module already uses for quiz options — not a JSON blob column),
+  `custom_form_assignments` ("specific people or groups" — a group is an
+  existing portal role, reusing the RBAC model rather than a second
+  grouping concept; zero assignment rows means the form is open to any
+  signed-in account once published), `custom_form_submissions` (one per
+  form+member, filled out on behalf of any member of the submitting
+  account's own family), `custom_form_answers` +
+  `custom_form_answer_choices` (the latter only for `multiple_choice`,
+  since it can have more than one selected option).
+- `utils/customForms.js`: one generic system for every field type
+  (`short_text`/`long_text`/`number`/`date`/`single_choice`/
+  `multiple_choice`/`dropdown`/`checkbox`/`file`) — per the handoff's own
+  explicit instruction, no one-off form tables. `canAccessForm` mirrors
+  Forums' own `canAccessCategory` shape (family + role-holding check).
+- `routes/admin-custom-forms.js` (`/main-admin/forms`, `manage_forms`):
+  field builder, assignments, submissions list/detail, and a CSV export
+  reusing the existing `utils/spreadsheet.js` helper rather than a new
+  one.
+- `routes/custom-forms.js` (`/forms`, members-only): browsing/filling/
+  viewing-own-submission, plus an authenticated file-answer download
+  route. A real bug caught before it shipped: that download route
+  (`/forms/files/:answerId`) has to be registered *before* the generic
+  `/forms/:id` route or Express would match "files" itself as an `:id`
+  first — route matching is definition order, not specificity. File
+  uploads go to a private bucket whose local-disk fallback deliberately
+  lives *outside* `public/` (unlike `admin-documents.js`'s own local
+  fallback under `public/uploads/documents`, which is therefore directly
+  fetchable by anyone who knows/guesses the key, since `express.static`
+  serves all of `public/` unconditionally) — proxied exclusively through
+  that authenticated route instead.
+- 7 new views and `test/routes-custom-forms.test.js` (7 tests: sign-in
+  required, an open form's simple field types all store correctly,
+  multiple_choice multi-select + required-field validation, assigned-to-
+  a-specific-member hides it from everyone else, assigned-to-a-role opens
+  it to every holder, resubmission redirects instead of duplicating, and
+  cross-family submission denial).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Custom Forms,
-Store, Accounting/Payments, weekly newsletter, SMS/notification
-framework, Photos/Albums + Publications/Articles, audit log, and global
-search — Track B scope, next up after Events/Volunteer/Donation signups,
-Business Directory/Classifieds, Member Directory, and Forums above. Also
-still missing: Diplomas, Transcripts, Library parent-facing integration,
+simple per-class open/closed toggle) — all Track A scope. Store,
+Accounting/Payments, weekly newsletter, SMS/notification framework,
+Photos/Albums + Publications/Articles, audit log, and global search —
+Track B scope, next up after Events/Volunteer/Donation signups, Business
+Directory/Classifieds, Member Directory, Forums, and Custom Forms above.
+Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.

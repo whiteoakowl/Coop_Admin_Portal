@@ -21,37 +21,24 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Forum Moderation Log</h1>
-    <p><a href="/main-admin/forums">&larr; Forums</a></p>
+    <h1><%= submission.memberName %></h1>
+    <p class="hint">Submitted <%= submission.submitted_at %></p>
+    <p><a href="/main-admin/forms/<%= form.id %>/submissions">&larr; All Submissions</a></p>
 
-    <% if (entries.length === 0) { %>
-      <p class="roster-empty">No moderation actions yet.</p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Moderator</th>
-              <th>Action</th>
-              <th>Target</th>
-              <th>Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% entries.forEach(function(e) { %>
-              <tr>
-                <td><%= e.created_at %></td>
-                <td><%= e.memberName || 'Unknown' %></td>
-                <td><%= e.action %></td>
-                <td><%= e.target_type %> #<%= e.target_id %></td>
-                <td><%= e.detail || '' %></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+    <% answers.forEach(function(a) { %>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2><%= a.fieldLabel %></h2></div>
+        <% if (a.fieldType === 'multiple_choice') { %>
+          <p><%= a.choiceLabels.length ? a.choiceLabels.join(', ') : '(no selection)' %></p>
+        <% } else if (a.fieldType === 'checkbox') { %>
+          <p><%= a.value_text === '1' ? 'Yes' : 'No' %></p>
+        <% } else if (a.fieldType === 'file') { %>
+          <% if (a.value_text) { %><p><a href="/forms/files/<%= a.id %>">Download File</a></p><% } else { %><p class="hint">No file uploaded.</p><% } %>
+        <% } else { %>
+          <p><%= a.value_text || '(blank)' %></p>
+        <% } %>
       </div>
-    <% } %>
+    <% }); %>
   </main>
 </body>
 </html>

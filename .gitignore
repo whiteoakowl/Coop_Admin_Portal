@@ -4,3 +4,4 @@ data/
 *.log
 public/uploads/
 public/uploads-restore-pending/
+private-uploads/

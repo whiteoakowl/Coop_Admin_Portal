@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1><%= form.title %></h1>
+      <span class="badge-pill badge-pill-<%= form.status === 'published' ? 'green' : form.status === 'closed' ? 'gray' : 'orange' %>"><%= form.status.charAt(0).toUpperCase() + form.status.slice(1) %></span>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/main-admin/forms">&larr; All Forms</a>
+        <a class="roster-action-btn" href="/main-admin/forms/<%= form.id %>/submissions">Submissions</a>
+        <% if (form.status !== 'published') { %>
+          <form method="POST" action="/main-admin/forms/<%= form.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="published" />
+            <button type="submit" class="roster-action-btn">Publish</button>
+          </form>
+        <% } %>
+        <% if (form.status !== 'closed') { %>
+          <form method="POST" action="/main-admin/forms/<%= form.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="closed" />
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Close</button>
+          </form>
+        <% } else { %>
+          <form method="POST" action="/main-admin/forms/<%= form.id %>/status" class="inline-block-form">
+            <input type="hidden" name="status" value="draft" />
+            <button type="submit" class="roster-action-btn">Move to Draft</button>
+          </form>
+        <% } %>
+        <form method="POST" action="/main-admin/forms/<%= form.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= form.title %>&quot;? This removes every field, assignment, and submission. This cannot be undone.">
+          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Settings</h2></div>
+      <form method="POST" action="/main-admin/forms/<%= form.id %>" class="member-form-grid">
+        <label class="member-form-full">Title
+          <input type="text" name="title" value="<%= form.title %>" required />
+        </label>
+        <label class="member-form-full">Description
+          <textarea name="description" rows="2"><%= form.description || '' %></textarea>
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Fields (<%= fields.length %>)</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-field-dialog').showModal()">+ Add Field</button>
+      </div>
+
+      <% if (fields.length === 0) { %>
+        <p class="roster-empty">No fields yet &mdash; add one above.</p>
+      <% } %>
+
+      <div class="training-lesson-list">
+        <% fields.forEach(function(field) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <svg class="icon"><use href="#icon-file-text"/></svg>
+              <div class="training-lesson-info">
+                <strong><%= field.label %></strong>
+                <span class="hint">
+                  <%= fieldTypes.find(function(t) { return t.key === field.field_type; }).label %>
+                  <% if (field.is_required == 1) { %> &middot; Required<% } %>
+                </span>
+                <% if (field.options.length) { %>
+                  <span class="hint">Options: <%= field.options.map(function(o) { return o.label; }).join(', ') %></span>
+                <% } %>
+              </div>
+              <div class="training-lesson-actions">
+                <button type="button" class="icon-btn" onclick="document.getElementById('edit-field-dialog-<%= field.id %>').showModal()" aria-label="Edit <%= field.label %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></button>
+                <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/delete" class="inline-block-form" data-confirm="Remove field &quot;<%= field.label %>&quot;?">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= field.label %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <dialog id="edit-field-dialog-<%= field.id %>" class="member-picker-dialog">
+            <form method="POST" action="/main-admin/forms/<%= form.id %>/fields/<%= field.id %>/update">
+              <h3>Edit Field</h3>
+              <label>Label
+                <input type="text" name="label" value="<%= field.label %>" required />
+              </label>
+              <label>Help Text
+                <input type="text" name="helpText" value="<%= field.help_text || '' %>" />
+              </label>
+              <% if (choiceTypes.indexOf(field.field_type) !== -1) { %>
+                <label>Options (one per line)
+                  <textarea name="options" rows="4"><%= field.options.map(function(o) { return o.label; }).join('\n') %></textarea>
+                </label>
+              <% } %>
+              <label class="grade-pill"><input type="checkbox" name="isRequired" <%= field.is_required == 1 ? 'checked' : '' %> /> Required</label>
+              <div class="notes-dialog-actions">
+                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                <button type="submit" class="primary-btn">Save</button>
+              </div>
+            </form>
+          </dialog>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Assign To (<%= assignments.length %>)</h2></div>
+      <p class="hint">Leave unassigned to make this form open to any signed-in member once published.</p>
+      <div class="training-lesson-list">
+        <% assignments.forEach(function(a) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <svg class="icon"><use href="#icon-<%= a.member_id ? 'user' : 'users' %>"/></svg>
+              <div class="training-lesson-info">
+                <strong><%= a.memberName || a.roleLabel %></strong>
+              </div>
+              <div class="training-lesson-actions">
+                <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments/<%= a.id %>/delete" class="inline-block-form">
+                  <button type="submit" class="icon-btn icon-btn-danger" aria-label="Remove" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+      <form method="POST" action="/main-admin/forms/<%= form.id %>/assignments" class="roster-btn-row" style="margin-top: 0.75rem;">
+        <select name="memberId">
+          <option value="">Assign a specific person&hellip;</option>
+          <% members.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+        </select>
+        <span class="hint">or</span>
+        <select name="roleId">
+          <option value="">Assign a group&hellip;</option>
+          <% roles.forEach(function(r) { %><option value="<%= r.id %>"><%= r.label %></option><% }); %>
+        </select>
+        <button type="submit" class="roster-action-btn">Assign</button>
+      </form>
+    </div>
+
+    <dialog id="add-field-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/forms/<%= form.id %>/fields">
+        <h3>Add Field</h3>
+        <label>Field Type
+          <select name="fieldType" onchange="document.getElementById('new-field-options').style.display = <%- JSON.stringify(choiceTypes) %>.indexOf(this.value) !== -1 ? '' : 'none';">
+            <% fieldTypes.forEach(function(t) { %><option value="<%= t.key %>"><%= t.label %></option><% }); %>
+          </select>
+        </label>
+        <label>Label
+          <input type="text" name="label" required />
+        </label>
+        <label>Help Text
+          <input type="text" name="helpText" />
+        </label>
+        <label id="new-field-options" style="display: none;">Options (one per line)
+          <textarea name="options" rows="4"></textarea>
+        </label>
+        <label class="grade-pill"><input type="checkbox" name="isRequired" /> Required</label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Forms',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/forms', icon: 'clipboard-list', label: 'Forms' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1><%= form.title %></h1>
+    <p><a href="/forms">&larr; All Forms</a></p>
+    <% if (form.description) { %><p class="hint"><%= form.description %></p><% } %>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/forms/<%= form.id %>/submit" enctype="multipart/form-data" class="member-form-grid">
+      <label class="member-form-full">Who is this for?
+        <select name="memberId" required>
+          <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+        </select>
+      </label>
+
+      <% fields.forEach(function(field) { %>
+        <div class="member-form-full">
+          <label><%= field.label %><% if (field.is_required == 1) { %> *<% } %></label>
+          <% if (field.help_text) { %><p class="hint"><%= field.help_text %></p><% } %>
+
+          <% if (field.field_type === 'short_text') { %>
+            <input type="text" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
+          <% } else if (field.field_type === 'long_text') { %>
+            <textarea name="field_<%= field.id %>" rows="3" <%= field.is_required == 1 ? 'required' : '' %>></textarea>
+          <% } else if (field.field_type === 'number') { %>
+            <input type="number" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
+          <% } else if (field.field_type === 'date') { %>
+            <input type="date" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
+          <% } else if (field.field_type === 'single_choice') { %>
+            <% field.options.forEach(function(o) { %>
+              <label class="grade-pill"><input type="radio" name="field_<%= field.id %>" value="<%= o.label %>" <%= field.is_required == 1 ? 'required' : '' %> /> <%= o.label %></label>
+            <% }); %>
+          <% } else if (field.field_type === 'multiple_choice') { %>
+            <% field.options.forEach(function(o) { %>
+              <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="<%= o.id %>" /> <%= o.label %></label>
+            <% }); %>
+          <% } else if (field.field_type === 'dropdown') { %>
+            <select name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %>>
+              <option value="">Choose one&hellip;</option>
+              <% field.options.forEach(function(o) { %><option value="<%= o.label %>"><%= o.label %></option><% }); %>
+            </select>
+          <% } else if (field.field_type === 'checkbox') { %>
+            <label class="grade-pill"><input type="checkbox" name="field_<%= field.id %>" value="1" /> Yes</label>
+          <% } else if (field.field_type === 'file') { %>
+            <input type="file" name="field_<%= field.id %>" <%= field.is_required == 1 ? 'required' : '' %> />
+          <% } %>
+        </div>
+      <% }); %>
+
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Submit</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

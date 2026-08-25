@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Forms',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/forms', icon: 'clipboard-list', label: 'Forms' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Forms</h1>
+
+    <% if (forms.length === 0) { %>
+      <p class="roster-empty">No forms are open for you right now.</p>
+    <% } else { %>
+      <div class="team-card-grid">
+        <% forms.forEach(function(f) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+              <h3 class="team-info-title"><a href="/forms/<%= f.id %>"><%= f.title %></a></h3>
+              <% if (f.description) { %><p class="hint"><%= f.description %></p><% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

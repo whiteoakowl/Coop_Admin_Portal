@@ -133,6 +133,10 @@ const adminMemberDirectoryRouter = require('./routes/admin-member-directory');
 // /main-admin/forums.
 const forumsRouter = require('./routes/forums');
 const adminForumsRouter = require('./routes/admin-forums');
+// Item 7: Custom Forms at /forms (members-only; open unless targeted at
+// specific people/roles), builder admin at /main-admin/forms.
+const customFormsRouter = require('./routes/custom-forms');
+const adminCustomFormsRouter = require('./routes/admin-custom-forms');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -320,6 +324,8 @@ app.use('/member-directory', memberDirectoryRouter);
 app.use('/main-admin/member-directory', adminMemberDirectoryRouter);
 app.use('/forums', forumsRouter);
 app.use('/main-admin/forums', adminForumsRouter);
+app.use('/forms', customFormsRouter);
+app.use('/main-admin/forms', adminCustomFormsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not
