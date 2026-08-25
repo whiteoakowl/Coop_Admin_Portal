@@ -162,6 +162,17 @@ const adminNewsletterRouter = require('./routes/admin-newsletter');
 // utils/notifications.js's own header comment.
 const notificationsRouter = require('./routes/notifications');
 const adminNotificationsRouter = require('./routes/admin-notifications');
+// Item 12: Photos/Albums at /photos and Publications/Articles at
+// /publications - both default to visibility='members', 'public' is a
+// deliberate, separate admin choice (never the default, given photo
+// privacy) - see supabase/migrations/20260825120000_photos_publications.sql's
+// own header comment. Admin at /main-admin/photos and
+// /main-admin/publications (both manage_publications, already
+// pre-seeded).
+const photosRouter = require('./routes/photos');
+const adminPhotosRouter = require('./routes/admin-photos');
+const publicationsRouter = require('./routes/publications');
+const adminPublicationsRouter = require('./routes/admin-publications');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -359,6 +370,10 @@ app.use('/newsletter', newsletterRouter);
 app.use('/main-admin/newsletter', adminNewsletterRouter);
 app.use('/notifications', notificationsRouter);
 app.use('/main-admin/notifications', adminNotificationsRouter);
+app.use('/photos', photosRouter);
+app.use('/main-admin/photos', adminPhotosRouter);
+app.use('/publications', publicationsRouter);
+app.use('/main-admin/publications', adminPublicationsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

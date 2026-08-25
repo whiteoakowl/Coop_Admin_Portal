@@ -17,10 +17,9 @@ function escapeHtml(value) {
 // Every section pulls straight from its own table's live rows - Events
 // and Directory read from Track A/Track B's own utils rather than
 // re-querying here, so this stays a single source of truth for "what
-// counts as upcoming/active" as those modules evolve. Publications
-// (handoff item 12) isn't built yet - its section is simply omitted
-// rather than rendered as an empty placeholder, until that module
-// exists to fill it.
+// counts as upcoming/active" as those modules evolve. Any section with
+// nothing to show is simply omitted rather than rendered as an empty
+// placeholder.
 async function assembleContent() {
   const parts = [];
 
@@ -60,6 +59,14 @@ async function assembleContent() {
   const listings = await db.prepare("SELECT * FROM business_directory_listings WHERE status = 'active' ORDER BY created_at DESC LIMIT 5").all();
   if (listings.length) {
     parts.push('<h2>Business Directory</h2><ul>' + listings.map((l) => `<li><strong>${escapeHtml(l.business_name)}</strong>${l.category ? ' - ' + escapeHtml(l.category) : ''}</li>`).join('') + '</ul>');
+  }
+
+  // Only public publications - a members-only article summarized in an
+  // email a signed-out family member might see would defeat its own
+  // visibility setting.
+  const publications = await db.prepare("SELECT * FROM publications WHERE status = 'published' AND visibility = 'public' ORDER BY published_at DESC LIMIT 5").all();
+  if (publications.length) {
+    parts.push('<h2>Publications</h2><ul>' + publications.map((p) => `<li><strong>${escapeHtml(p.title)}</strong></li>`).join('') + '</ul>');
   }
 
   return sanitizePostBody(parts.join('\n') || '<p>Nothing new to share this week.</p>');

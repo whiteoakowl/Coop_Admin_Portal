@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <h1>Photos</h1>
+
+        <% if (albums.length === 0) { %>
+          <p class="roster-empty">No albums yet.</p>
+        <% } else { %>
+          <div class="event-card-grid">
+            <% albums.forEach(function(a) { %>
+              <a class="event-card" href="/photos/<%= a.id %>">
+                <% if (a.cover_image_key) { %>
+                  <div class="event-card-image"><img src="/photos/<%= a.id %>/cover" alt="" /></div>
+                <% } %>
+                <div class="event-card-body">
+                  <h3><%= a.title %></h3>
+                  <% if (a.description) { %><p class="event-card-location"><%= a.description %></p><% } %>
+                </div>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

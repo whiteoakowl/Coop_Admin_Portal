@@ -27,43 +27,41 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Accounting</h1>
-    <p class="hint">Members with any charge history below. To add a first charge for someone new, find them here.</p>
+    <div class="grid-box-header">
+      <h1>Publications</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-pub-dialog').showModal()">+ New Article</button>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/members/' + id;" class="roster-btn-row" style="margin-bottom: 1rem;">
-      <select name="memberId">
-        <option value="">Find a member&hellip;</option>
-        <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
-      </select>
-      <button type="submit" class="roster-action-btn">Go</button>
-    </form>
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr><th>Title</th><th>Status</th><th>Visibility</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% items.forEach(function(i) { %>
+          <tr>
+            <td><a href="/main-admin/publications/<%= i.id %>/edit"><%= i.title %></a></td>
+            <td><span class="badge-pill badge-pill-<%= i.status === 'published' ? 'green' : 'gray' %>"><%= i.status.charAt(0).toUpperCase() + i.status.slice(1) %></span></td>
+            <td><%= i.visibility === 'public' ? 'Public' : 'Members Only' %></td>
+            <td><a class="roster-action-btn" href="/main-admin/publications/<%= i.id %>/edit">Edit</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
 
-    <% if (members.length === 0) { %>
-      <p class="roster-empty">No charges recorded yet.</p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <thead>
-            <tr>
-              <th>Member</th>
-              <th>Balance</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% members.forEach(function(m) { %>
-              <tr>
-                <td class="roster-name-col"><%= m.name %></td>
-                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
-                <td><a href="/main-admin/accounting/members/<%= m.id %>">View</a></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
+    <dialog id="new-pub-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/publications">
+        <h3>New Article</h3>
+        <label>Title
+          <input type="text" name="title" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create Draft</button>
+        </div>
+      </form>
+    </dialog>
   </main>
 </body>
 </html>

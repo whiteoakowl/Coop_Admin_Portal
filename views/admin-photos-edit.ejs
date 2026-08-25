@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
+      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/photos">&larr; All Albums</a></p>
+    <h1><%= album.title %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Details</h2></div>
+      <form method="POST" action="/main-admin/photos/<%= album.id %>" class="member-form-grid">
+        <label class="member-form-full">Title
+          <input type="text" name="title" value="<%= album.title %>" required />
+        </label>
+        <label class="member-form-full">Description
+          <textarea name="description" rows="2"><%= album.description || '' %></textarea>
+        </label>
+        <label>Visibility
+          <select name="visibility">
+            <option value="members" <%= album.visibility === 'members' ? 'selected' : '' %>>Members Only</option>
+            <option value="public" <%= album.visibility === 'public' ? 'selected' : '' %>>Public</option>
+          </select>
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+      <form method="POST" action="/main-admin/photos/<%= album.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= album.title %>&quot; and all its photos? This cannot be undone.">
+        <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Album</button>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Add Photos</h2></div>
+      <form method="POST" action="/main-admin/photos/<%= album.id %>/photos" enctype="multipart/form-data" class="member-form-grid">
+        <label class="member-form-full">Images (JPG/PNG, up to 20 at once)
+          <input type="file" name="images" accept="image/*" multiple required />
+        </label>
+        <label class="member-form-full">Caption (applied to all uploaded in this batch)
+          <input type="text" name="caption" />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Upload</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Photos</h2></div>
+      <% if (photos.length === 0) { %>
+        <p class="roster-empty">No photos yet.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% photos.forEach(function(p) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <img src="/photos/<%= album.id %>/image/<%= p.id %>" alt="<%= p.caption || '' %>" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+                <% if (p.caption) { %><p class="hint"><%= p.caption %></p><% } %>
+                <% if (album.cover_image_key === p.image_key) { %><span class="badge-pill badge-pill-green">Cover</span><% } %>
+                <div class="roster-btn-row">
+                  <% if (album.cover_image_key !== p.image_key) { %>
+                    <form method="POST" action="/main-admin/photos/<%= album.id %>/photos/<%= p.id %>/cover" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Set as Cover</button>
+                    </form>
+                  <% } %>
+                  <form method="POST" action="/main-admin/photos/<%= album.id %>/photos/<%= p.id %>/delete" class="inline-block-form">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
+      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/publications">&larr; Back</a></p>
+    <div class="grid-box-header">
+      <h1><%= item.title %></h1>
+      <span class="badge-pill badge-pill-<%= item.status === 'published' ? 'green' : 'gray' %>"><%= item.status.charAt(0).toUpperCase() + item.status.slice(1) %></span>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="/main-admin/publications/<%= item.id %>" class="member-form-grid">
+      <label class="member-form-full">Title
+        <input type="text" name="title" value="<%= item.title %>" required />
+      </label>
+      <label>Visibility
+        <select name="visibility">
+          <option value="members" <%= item.visibility === 'members' ? 'selected' : '' %>>Members Only</option>
+          <option value="public" <%= item.visibility === 'public' ? 'selected' : '' %>>Public</option>
+        </select>
+      </label>
+      <div class="member-form-full" data-forum-editor>
+        <label>Content</label>
+        <%- include('partials/forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"><%- item.body_html %></div>
+        <input type="hidden" name="bodyHtml" data-forum-body-input />
+      </div>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+    <script src="/js/forum-editor.js"></script>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Actions</h2></div>
+      <% if (item.status === 'draft') { %>
+        <form method="POST" action="/main-admin/publications/<%= item.id %>/publish" class="inline-block-form">
+          <button type="submit" class="roster-action-btn">Publish</button>
+        </form>
+      <% } else { %>
+        <p class="hint">Published <%= item.published_at %>.</p>
+        <form method="POST" action="/main-admin/publications/<%= item.id %>/unpublish" class="inline-block-form">
+          <button type="submit" class="roster-action-btn">Move Back to Draft</button>
+        </form>
+      <% } %>
+      <form method="POST" action="/main-admin/publications/<%= item.id %>/delete" class="inline-block-form">
+        <button type="submit" class="roster-action-btn roster-action-btn-danger" onclick="return confirm('Delete this article?')">Delete</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

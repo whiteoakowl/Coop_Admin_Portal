@@ -485,15 +485,67 @@ real dependency runs the opposite direction from the numbering.
   admin view; also caught and fixed `admin-store-list.ejs` missing its
   own "Newsletter" link from the previous feature.
 
+## Community & Commerce track — Photos/Albums and Publications/Articles
+   (done — Track B, branch `platform-community-commerce`)
+
+- `supabase/migrations/20260825120000_photos_publications.sql`:
+  `photo_albums` (`visibility` defaults to `'members'`; `'public'` is a
+  deliberate, separate admin choice, never the default — a photo with
+  children in it must never become public just because it was uploaded,
+  per the handoff's own instruction), `photo_album_photos`,
+  `publications` (same `visibility` column and reasoning).
+- Photo files are stored in a PRIVATE bucket/local-disk-outside-`public/`
+  — the same pattern `routes/custom-forms.js`'s own file answers already
+  established — and proxied exclusively through an authenticated
+  `/photos/:albumId/image/:photoId` route (public albums included, so
+  the check is "does this album's own visibility allow it," not "is
+  there a session"). A public bucket URL would have let anyone fetch a
+  `'members'` album's photos directly regardless of the album's own
+  setting, the same gap `admin-documents.js`'s local-disk fallback has
+  that Custom Forms already chose not to repeat.
+- `routes/admin-photos.js` (`/main-admin/photos`, `manage_publications`
+  — already covers "photo albums" per its own seeded description) and
+  `routes/admin-publications.js` (`/main-admin/publications`, same
+  permission): album/article CRUD, multi-file photo upload, cover-photo
+  selection, publish/unpublish. Publications reuse Forums' own rich-text
+  editor and sanitizer.
+- `routes/photos.js` and `routes/publications.js` (`/photos`,
+  `/publications` — public browsing for `'public'` items, sign-in
+  required for `'members'` ones, same public/member split Events already
+  established, using the same public `site-header` Events/Directory/
+  Classifieds render for signed-out visitors rather than the members-
+  only portal sidebar). Only `status='published'` publications are ever
+  queried by the member-facing router — a draft 404s even by direct URL.
+- `utils/newsletter.js`'s `assembleContent()` now has a Publications
+  section (only `'public'` publications — a members-only article
+  summarized in a newsletter a signed-out family member might see would
+  defeat its own visibility setting), and its own header comment no
+  longer says Publications "isn't built yet."
+- Added a missing `icon-bell` symbol to `partials/icon-sprite.ejs` — the
+  previous feature (Notifications) referenced it without it actually
+  existing in the sprite; caught while wiring these features' own nav
+  icons, not by inspection of the Notifications work itself.
+- 8 new views and `test/routes-photos-publications.test.js` (9 tests:
+  sign-in required for both admin routers, a `'members'` album and its
+  photo 404/redirect-to-login for a signed-out visitor but are viewable
+  by any signed-in member, a `'public'` album and its photo are viewable
+  signed-out, a new album defaults to members-only, a draft publication
+  404s even by direct URL and publishing (with sanitized HTML, a
+  `<script>` tag stripped) makes it visible, a `'members'` publication
+  still requires sign-in once published and is excluded from the public
+  listing, unpublishing removes it from the listing again).
+- Reciprocal "Photos"/"Publications" nav links added across every other
+  Track B admin view.
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Photos/Albums +
-Publications/Articles, audit log, and global search — Track B scope, next
-up after Events/Volunteer/Donation signups, Business Directory/
-Classifieds, Member Directory, Forums, Custom Forms, Accounting/Payments,
-Store, Weekly Newsletter, and the SMS/notification framework above.
+simple per-class open/closed toggle) — all Track A scope. Audit log and
+global search — Track B scope, next up after Events/Volunteer/Donation
+signups, Business Directory/Classifieds, Member Directory, Forums, Custom
+Forms, Accounting/Payments, Store, Weekly Newsletter, the SMS/notification
+framework, and Photos/Albums + Publications/Articles above.
 Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two

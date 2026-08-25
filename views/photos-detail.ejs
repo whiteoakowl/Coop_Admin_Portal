@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/photos">&larr; All Albums</a></p>
+        <h1><%= album.title %></h1>
+        <% if (album.description) { %><p><%= album.description %></p><% } %>
+
+        <% if (photos.length === 0) { %>
+          <p class="roster-empty">No photos in this album yet.</p>
+        <% } else { %>
+          <div class="team-card-grid">
+            <% photos.forEach(function(p) { %>
+              <div class="team-col">
+                <div class="team-info-card">
+                  <img src="/photos/<%= album.id %>/image/<%= p.id %>" alt="<%= p.caption || '' %>" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius);" />
+                  <% if (p.caption) { %><p class="hint"><%= p.caption %></p><% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
