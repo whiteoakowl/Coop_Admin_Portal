@@ -21,6 +21,21 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { todayISO, addDays, weekdayOf } = require('../utils/dates');
+
+// A real bug: this test used to hardcode a specific far-future date
+// string as its session date - safely in the future when written, but a
+// literal calendar date eventually stops being "future" as real time
+// passes (exactly what happened here). Computed fresh relative to the
+// real clock every run instead - always a real Monday, always at least
+// 3 weeks out, so it stays valid indefinitely. Both tests in this file
+// call this and get the SAME date back (same real "now", same math),
+// which the second test's own comment already relies on.
+function futureMonday() {
+  let d = addDays(todayISO(), 21);
+  while (weekdayOf(d) !== 1) d = addDays(d, 1);
+  return d;
+}
 
 test.before(() => app.ready);
 test.after(() => {
@@ -53,7 +68,7 @@ test('unassigned tasks are listed at the bottom of the card and drop off once as
   const member = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Uma Ellis', 'unassigned-uma', 'parent')").run();
   await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, member.lastInsertRowid);
 
-  const date = '2026-08-24'; // a Monday
+  const date = futureMonday();
   await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('monday', ?)").run(date);
 
   const before = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
@@ -97,7 +112,7 @@ test('the Unassigned Tasks block is omitted entirely once every task is assigned
   // Same session date the previous test already added for 'monday' -
   // setup_dates has no per-row id (just a day+session_date pair), and
   // this file's two tests share one DB, so it's already there.
-  const date = '2026-08-24';
+  const date = futureMonday();
 
   const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];

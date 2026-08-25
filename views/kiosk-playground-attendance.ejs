@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap form-wrap-roster">
+    <div class="class-checkin-attendance-header">
+      <a href="/kiosk/class-checkin/playground/<%= day %>" class="kiosk-home kiosk-home-inline">&larr; Back to <%= dayLabel %> Playground</a>
+      <div class="class-checkin-actions">
+        <a class="class-checkin-btn" href="/kiosk/class-checkin/playground/<%= day %>/<%= hour %>/scan?mode=checkin">
+          <svg class="icon"><use href="#icon-check"/></svg> Check In
+        </a>
+        <a class="class-checkin-btn" href="/kiosk/class-checkin/playground/<%= day %>/<%= hour %>/scan?mode=checkout">
+          <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
+        </a>
+      </div>
+    </div>
+    <h1>Playground &middot; <%= hourLabel %></h1>
+    <p class="subtitle"><%= dateLabel %></p>
+
+    <% if (log.length === 0) { %>
+      <p class="roster-empty">Nobody has checked in to the playground yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table roster-table-detailed">
+          <thead>
+            <tr>
+              <th class="roster-name-col">Name</th>
+              <th>Checked In</th>
+              <th>Checked Out</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% log.forEach(function(row) { %>
+              <tr>
+                <td class="roster-name-col"><%= row.name %></td>
+                <td><%= row.checkInTime || '—' %></td>
+                <td><%= row.checkOutTime || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

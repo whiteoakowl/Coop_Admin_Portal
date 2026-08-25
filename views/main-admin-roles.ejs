@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Roles &amp; Permissions</h1>
+    <p class="hint">Each role grants access to its own portal, plus whichever capabilities are checked below. Main Admin's own permissions are locked to everything - it's the platform's control center.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="main-admin-role-list">
+      <% roles.forEach(function(role) { %>
+        <section class="portal-dashboard-card">
+          <h2><%= role.label %> <span class="hint">&middot; portal key: <%= role.key %></span></h2>
+          <% if (role.description) { %><p class="hint"><%= role.description %></p><% } %>
+          <% if (role.key === 'main_admin') { %>
+            <p class="hint">Main Admin always has every permission.</p>
+          <% } else { %>
+            <form method="POST" action="/main-admin/roles/<%= role.id %>/permissions" class="stack-form">
+              <div class="permission-checkbox-grid">
+                <% permissions.forEach(function(perm) { %>
+                  <label class="checkbox-option" title="<%= perm.description || '' %>">
+                    <input type="checkbox" name="permissionIds" value="<%= perm.id %>" <%= grantedKey.indexOf(role.id + ':' + perm.id) !== -1 ? 'checked' : '' %> />
+                    <%= perm.label %>
+                  </label>
+                <% }); %>
+              </div>
+              <button type="submit" class="roster-action-btn">Save Permissions for <%= role.label %></button>
+            </form>
+          <% } %>
+        </section>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

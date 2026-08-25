@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Main Admin</h1>
+    <p class="hint">The control center for the whole platform - users, roles/permissions, and public website content.</p>
+
+    <div class="totals-card">
+      <div class="totals-item">
+        <span class="stat-value"><%= pendingCount %></span>
+        <span class="stat-label">Pending Accounts</span>
+      </div>
+      <div class="totals-item">
+        <span class="stat-value"><%= activeCount %></span>
+        <span class="stat-label">Active Accounts</span>
+      </div>
+    </div>
+
+    <% if (pendingCount > 0) { %>
+      <div class="alert alert-info">
+        <%= pendingCount %> account<%= pendingCount === 1 ? '' : 's' %> awaiting approval.
+        <a href="/main-admin/users">Review now &rarr;</a>
+      </div>
+    <% } %>
+
+    <section class="portal-dashboard-section">
+      <h2>Accounts by Role</h2>
+      <% if (roleCounts.length === 0) { %>
+        <p class="roster-empty">No roles have been granted yet.</p>
+      <% } else { %>
+        <div class="totals-card">
+          <% roleCounts.forEach(function(r) { %>
+            <div class="totals-item">
+              <span class="stat-value"><%= r.c %></span>
+              <span class="stat-label"><%= r.label %></span>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+
+    <div class="portal-dashboard-grid">
+      <section class="portal-dashboard-card">
+        <h2>Users</h2>
+        <p class="hint">Approve pending registrations, create accounts directly, and assign portal roles.</p>
+        <a class="roster-action-btn" href="/main-admin/users">Manage Users</a>
+      </section>
+      <section class="portal-dashboard-card">
+        <h2>Roles &amp; Permissions</h2>
+        <p class="hint">Control which capabilities each role grants.</p>
+        <a class="roster-action-btn" href="/main-admin/roles">Manage Roles</a>
+      </section>
+      <section class="portal-dashboard-card">
+        <h2>Website</h2>
+        <p class="hint">Edit the public homepage copy, announcements, and FAQs.</p>
+        <a class="roster-action-btn" href="/main-admin/website">Manage Website</a>
+      </section>
+      <section class="portal-dashboard-card">
+        <h2>Co-op Admin Portal</h2>
+        <p class="hint">Operational co-op tools: check-in/out, scheduling, floaters, setup/cleanup.</p>
+        <a class="roster-action-btn" href="/admin">Open Co-op Admin</a>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

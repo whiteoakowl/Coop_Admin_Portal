@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap">
+    <div class="kiosk-inline-header">
+      <a href="/kiosk/class-checkin/playground" class="kiosk-home kiosk-home-inline">&larr; Back to Days</a>
+      <form method="POST" action="/kiosk/class-checkin/lock">
+        <button type="submit" class="btn-secondary">Done</button>
+      </form>
+    </div>
+    <h1><%= dayLabel %> Playground</h1>
+    <p class="subtitle">Choose an hour to check in or out.</p>
+
+    <div class="class-roster-list">
+      <% hours.forEach(function(h) { %>
+        <a class="class-roster-row-btn" href="/kiosk/class-checkin/playground/<%= day %>/<%= h.position %>/attendance">
+          <span class="class-roster-row-name"><%= h.label %></span>
+        </a>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

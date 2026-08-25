@@ -7,7 +7,7 @@
   <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow">
     <h1>403</h1>
     <p><%= typeof message !== 'undefined' && message ? message : "Your account doesn't have access to this section." %></p>
-    <a href="/admin" class="primary-btn">Back to Dashboard</a>
+    <a href="<%= typeof backHref !== 'undefined' && backHref ? backHref : '/admin' %>" class="primary-btn"><%= typeof backLabel !== 'undefined' && backLabel ? backLabel : 'Back to Dashboard' %></a>
   </main>
 </body>
 </html>

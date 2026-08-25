@@ -109,12 +109,16 @@ router.post('/setup/:day/teams', requireAdmin, requireDay, async (req, res) => {
   // time to meet and meeting location."
   const meetingTime = (req.body.meetingTime || '').trim();
   const meetingLocation = (req.body.meetingLocation || '').trim();
+  // A real request: "add a dropdown menu to each setup/cleanup team list
+  // that asks, log on check in or log on check out." Defaults to
+  // 'checkout' (today's original behavior) for anything else submitted.
+  const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
   await db
-    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null);
+    .prepare('INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location, task_scan_timing) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(day, title, description || null, leaderId, meetingTime || null, meetingLocation || null, taskScanTiming);
   res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`Team "${title}" created.`));
 });
 
@@ -139,11 +143,27 @@ router.post('/setup/:day/teams/:teamId/edit', requireAdmin, requireDay, async (r
   const leaderId = parseInt(req.body.leaderId, 10) || null;
   const meetingTime = (req.body.meetingTime || '').trim();
   const meetingLocation = (req.body.meetingLocation || '').trim();
+  const taskScanTiming = req.body.taskScanTiming === 'checkin' ? 'checkin' : 'checkout';
   if (!title) {
     return res.redirect(`/admin/setup/${day}/manage?error=` + encodeURIComponent('Team title is required.'));
   }
-  await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation });
-  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(`"${title}" updated.`));
+  await updateTeam(teamId, { title, description, leaderId, meetingTime, meetingLocation, taskScanTiming });
+
+  // Batched member removals staged by the card's own trash icons - a real
+  // request: "when deleting ... cleanup/signup members from lists it
+  // should allow for multiple deletes and then click save before
+  // refreshing." Each removal used to be its own immediate POST/reload;
+  // removeMemberIds now piggybacks on this same Save submission (see
+  // admin-setup.ejs's hidden, form-attribute-linked checkboxes) so the
+  // card's other edits and any number of pending removals all land in one
+  // request/one page load.
+  const removeIds = [].concat(req.body.removeMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  if (removeIds.length) {
+    const placeholders = removeIds.map(() => '?').join(',');
+    await db.prepare(`DELETE FROM setup_team_members WHERE team_id = ? AND member_id IN (${placeholders})`).run(teamId, ...removeIds);
+  }
+
+  res.redirect(`/admin/setup/${day}/manage?notice=` + encodeURIComponent(removeIds.length ? `"${title}" updated. Removed ${removeIds.length} member(s).` : `"${title}" updated.`));
 });
 
 router.post('/setup/:day/teams/:teamId/delete', requireAdmin, requireDay, async (req, res) => {
@@ -251,8 +271,15 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
   const date = req.body.date;
   const slot = req.body.slot === '2' ? 2 : 1;
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
-  if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, slot, taskItemId);
-  res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
+  const back = `/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : '');
+  if (date && isValidISODate(date)) {
+    try {
+      await setTaskAssignment(day, memberId, date, slot, taskItemId);
+    } catch (e) {
+      return res.redirect(back + (date ? '&' : '?') + 'error=' + encodeURIComponent(e.message));
+    }
+  }
+  res.redirect(back);
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {

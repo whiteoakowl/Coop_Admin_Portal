@@ -35,11 +35,14 @@ test.after(() => {
 
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
-  return loginRes.headers['set-cookie'];
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/membership').set('Cookie', cookie);
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
+  return { cookie, csrfToken };
 }
 
 test('POST /membership', async (t) => {
-  const cookie = await loginAsAdmin();
+  const { cookie, csrfToken } = await loginAsAdmin();
 
   await t.test('a submission with two children saves the request and both children, in order', async () => {
     const res = await request(app)
@@ -54,6 +57,7 @@ test('POST /membership', async (t) => {
         'children[0][lastName]': 'Kid',
         'children[1][firstName]': 'Second',
         'children[1][lastName]': 'Kid',
+        _csrf: csrfToken,
       });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
@@ -75,7 +79,7 @@ test('POST /membership', async (t) => {
       .post('/membership')
       .set('Cookie', cookie)
       .type('form')
-      .send({ parent1FirstName: '', parent1LastName: 'Guardian', parent1Email: 'x@example.com' });
+      .send({ parent1FirstName: '', parent1LastName: 'Guardian', parent1Email: 'x@example.com', _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
     assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);
@@ -87,7 +91,7 @@ test('POST /membership', async (t) => {
       .post('/membership')
       .set('Cookie', cookie)
       .type('form')
-      .send({ parent1FirstName: 'Pat', parent1LastName: 'Guardian', parent1Email: 'nokids@example.com' });
+      .send({ parent1FirstName: 'Pat', parent1LastName: 'Guardian', parent1Email: 'nokids@example.com', _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
     assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);

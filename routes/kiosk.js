@@ -4,6 +4,8 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { familyOf } = require('../utils/members');
+const { memberScansTaskAtCheckin } = require('../utils/setup');
+const { findTaskItemByBarcode, findSetupCleanupBypassBadge, taskAlreadyLoggedByAnotherMember } = require('../utils/taskList');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -79,6 +81,26 @@ router.post('/checkin/scan', async (req, res) => {
   }
 
   if (alreadyPresent) {
+    // A real bug: a "log on check-in" member who scanned their name tag
+    // (step 1, above) but never completed step 2 (their Setup/Cleanup
+    // task scan) - closed the browser, walked away, connection dropped -
+    // used to hit this flat "already checked in" reply on their next
+    // scan and never get re-offered step 2, silently pushing them into
+    // checkout's own task-scan fallback instead of the check-in-time
+    // flow their team is configured for. Re-checks the same
+    // memberScansTaskAtCheckin gate step 1 uses below before accepting
+    // "already checked in" as the final word.
+    if (member.member_type !== 'student') {
+      const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+      if (day && (await memberScansTaskAtCheckin(member.id, day))) {
+        const alreadyTaskScanned = await db
+          .prepare('SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
+          .get(member.id, today);
+        if (!alreadyTaskScanned) {
+          return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
+        }
+      }
+    }
     return res.json({
       ok: true,
       alreadyChecked: true,
@@ -95,6 +117,83 @@ router.post('/checkin/scan', async (req, res) => {
   );
   for (const r of rosters) {
     await upsert.run(member.id, r.id, today, now);
+  }
+
+  // A real request: "add a dropdown menu to each setup/cleanup team list
+  // that asks, log on check in or log on check out ... if team 1 is, log
+  // on check in, those members will click check in, scan their name tag,
+  // then will be asked to scan their setup/cleanup card." Students never
+  // scan one either way (member_type check below), same as at checkout.
+  // day is derived from whichever roster(s) this member is actually
+  // scheduled on today (schedule_day), not a separately re-derived
+  // "today's real weekday" - rosters can include a class roster
+  // alongside the day's own Parent/Student one, but they all share the
+  // same day.
+  if (member.member_type !== 'student') {
+    const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+    if (day && (await memberScansTaskAtCheckin(member.id, day))) {
+      return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
+    }
+  }
+
+  res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });
+});
+
+// Step 2 ("log on check in" members only): scan the Setup/Cleanup badge
+// for the task about to be done. Writes onto the SAME attendance row(s)
+// step 1 just created/updated (task_item_id/task_scanned_at - see the
+// migration adding them) rather than a separate table, so
+// routes/checkout.js's own /checkout/scan can tell this member already
+// logged their task here and skip asking again at checkout, carrying
+// the same task_item_id into the checkouts row it creates then. Mirrors
+// /checkout/task-scan almost exactly, including the same bypass-badge
+// fallback (findSetupCleanupBypassBadge) for a member with no card of
+// their own to scan.
+router.post('/checkin/task-scan', async (req, res) => {
+  if (checkinLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  checkinLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  // A real request: "don't allow each setup/cleanup badge to be scanned
+  // more than once in a day" - only real tasks (never the bypass badge,
+  // which is meant to be reused by anyone without their own card). Same
+  // check routes/checkout.js's own task-scan step uses, so a task
+  // already logged at check-in by someone else is caught here too, and
+  // vice versa.
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const now = Date.now();
+  const taskItemId = task ? task.id : null;
+  const update = db.prepare('UPDATE attendance SET task_item_id = ?, task_scanned_at = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  for (const r of rosters) {
+    await update.run(taskItemId, now, member.id, r.id, today);
   }
 
   res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });

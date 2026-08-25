@@ -209,6 +209,45 @@ async function findTaskItemByBarcode(barcode) {
     .get(barcode);
 }
 
+// A real request: "make an admin setup/cleanup card with a barcode. if
+// someone doesn't have a setup cleanup card to scan the admin setup/
+// cleanup card can be scanned to bypass the checkout demand for a setup/
+// cleanup card... this card isn't linked to any specific member. its
+// just a general bypass card." routes/checkout.js's task-scan step
+// checks this AFTER findTaskItemByBarcode comes up empty - the seeded
+// bypass badge (db/bootstrapPg.js's seedIfMissing) is the one 'setupCleanup'
+// misc_badges row with no task_item_id, unlike every other row of that
+// type, which is always auto-created 1:1 from a real task.
+async function findSetupCleanupBypassBadge(barcode) {
+  return db.prepare("SELECT * FROM misc_badges WHERE badge_type = 'setupCleanup' AND task_item_id IS NULL AND barcode = ?").get(barcode);
+}
+
+// A real request: "don't allow each setup/cleanup badge to be scanned
+// more than once in a day." A task can be logged at either check-in or
+// checkout depending on the scanning member's own team's
+// task_scan_timing (routes/kiosk.js's /checkin/task-scan, routes/
+// checkout.js's /checkout/task-scan) - both scan points call this so
+// the same physical task can't be credited to two different people the
+// same day no matter which order they happen to scan in. Excludes the
+// scanning member's own already-recorded pick, so re-scanning to
+// correct yourself still works (the existing "most recent scan wins"
+// behavior). Only real tasks are scoped this way - the general bypass
+// badge (findSetupCleanupBypassBadge, task_item_id null) is
+// deliberately reusable by anyone without their own card, any number of
+// times a day, so callers should only invoke this for a real
+// findTaskItemByBarcode result, never for a bypass scan.
+async function taskAlreadyLoggedByAnotherMember(taskItemId, date, memberId) {
+  const row = await db
+    .prepare(
+      `SELECT member_id FROM attendance WHERE task_item_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL AND member_id != ?
+       UNION
+       SELECT member_id FROM checkouts WHERE task_item_id = ? AND session_date = ? AND member_id != ?
+       LIMIT 1`
+    )
+    .get(taskItemId, date, memberId, taskItemId, date, memberId);
+  return !!row;
+}
+
 module.exports = {
   taskListSectionsForDay,
   itemsForSection,
@@ -223,5 +262,7 @@ module.exports = {
   swapItemPosition,
   taskSectionForTeam,
   findTaskItemByBarcode,
+  findSetupCleanupBypassBadge,
+  taskAlreadyLoggedByAnotherMember,
   refreshBadgesForTeam,
 };

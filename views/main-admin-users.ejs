@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar">
+      <h1>Users</h1>
+      <a class="primary-btn" href="/main-admin/users/new">+ Create Account</a>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Roles</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% accounts.forEach(function(a) { %>
+            <tr>
+              <td class="roster-name-col"><%= a.memberName %></td>
+              <td><%= a.email %></td>
+              <td>
+                <% if (a.status === 'pending') { %><span class="badge-pill badge-pill-pending">Pending</span>
+                <% } else if (a.status === 'active') { %><span class="badge-pill badge-pill-present">Active</span>
+                <% } else { %><span class="badge-pill badge-pill-absent">Suspended</span><% } %>
+              </td>
+              <td><%= a.roleLabels.length ? a.roleLabels.join(', ') : '—' %></td>
+              <td><%= a.last_login_at ? a.last_login_at : 'Never' %></td>
+              <td class="actions-cell">
+                <div class="actions-btn-row">
+                  <% if (a.status === 'pending') { %>
+                    <form method="POST" action="/main-admin/users/<%= a.id %>/approve" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Approve</button>
+                    </form>
+                  <% } %>
+                  <button type="button" class="icon-btn" onclick="document.getElementById('roles-dialog-<%= a.id %>').showModal()" aria-label="Manage roles for <%= a.memberName %>" title="Roles">
+                    <svg class="icon"><use href="#icon-sliders"/></svg>
+                  </button>
+                  <% if (a.status === 'suspended') { %>
+                    <form method="POST" action="/main-admin/users/<%= a.id %>/reactivate" class="inline-block-form">
+                      <button type="submit" class="icon-btn" aria-label="Reactivate" title="Reactivate"><svg class="icon"><use href="#icon-check"/></svg></button>
+                    </form>
+                  <% } else if (a.status === 'active') { %>
+                    <form method="POST" action="/main-admin/users/<%= a.id %>/suspend" class="inline-block-form" data-confirm="Suspend <%= a.memberName %>'s account? They won't be able to log in until reactivated.">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Suspend" title="Suspend"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+                    </form>
+                  <% } %>
+                </div>
+                <dialog id="roles-dialog-<%= a.id %>" class="member-picker-dialog">
+                  <form method="POST" action="/main-admin/users/<%= a.id %>/roles">
+                    <h3>Roles &mdash; <%= a.memberName %></h3>
+                    <div class="stack-form">
+                      <% allRoles.forEach(function(role) { %>
+                        <label class="checkbox-option">
+                          <input type="checkbox" name="roleIds" value="<%= role.id %>" <%= a.roleIds.indexOf(role.id) !== -1 ? 'checked' : '' %> />
+                          <%= role.label %>
+                        </label>
+                      <% }); %>
+                    </div>
+                    <div class="notes-dialog-actions">
+                      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                      <button type="submit" class="primary-btn">Save Roles</button>
+                    </div>
+                  </form>
+                </dialog>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

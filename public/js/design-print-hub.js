@@ -48,6 +48,7 @@
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
     classCheckinQr: document.getElementById('print-classCheckinQr-section'),
+    playgroundQr: document.getElementById('print-playgroundQr-section'),
     libraryBarcodes: document.getElementById('print-libraryBarcodes-section'),
     logs: document.getElementById('print-logs-section'),
   };
@@ -282,6 +283,34 @@
     return out;
   }
 
+  // Mirrors utils/members.js's lastNameOf exactly (final whitespace-
+  // separated token) - every print route sorts its own request's members
+  // by last name server-side (byLastName), but that sort only ever sees
+  // ONE batch's worth of ids at a time here. A real bug report: "select
+  // all" on Barcodes Only "still separates the names into different
+  // groups when printing" - the checkbox rows themselves are in the
+  // Design/Print picker's own family-grouped order (utils/members.js's
+  // sortMembersByFamily, via membersWithDetails), not alphabetical, so
+  // chunking split that family-grouped order into batches and each
+  // batch's own from-scratch alphabetical sort read as several separate
+  // A-Z runs back to back instead of one continuous list. Sorting the
+  // full selection by last name BEFORE chunking means every batch is
+  // already a correctly-ordered slice of one single alphabetical run -
+  // each batch's own server-side sort then has nothing left to do.
+  function lastNameOf(fullName) {
+    const parts = (fullName || '').trim().split(/\s+/);
+    return parts.length > 0 ? parts[parts.length - 1] : '';
+  }
+
+  function sortCheckboxesByLastName(checkboxes) {
+    return checkboxes.slice().sort((a, b) => {
+      const nameA = (a.closest('tr') && a.closest('tr').dataset.name) || '';
+      const nameB = (b.closest('tr') && b.closest('tr').dataset.name) || '';
+      return lastNameOf(nameA).localeCompare(lastNameOf(nameB), undefined, { sensitivity: 'base' }) ||
+        nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+  }
+
   async function fetchChunkDocument(action, memberIds) {
     const body = new URLSearchParams();
     memberIds.forEach((id) => body.append('memberIds', id));
@@ -306,7 +335,8 @@
   // template ends up with more than one of that same container back to
   // back, which prints identically to one continuous one.
   async function printInChunks(form) {
-    const checkedIds = Array.from(form.querySelectorAll('input[name="memberIds"]:checked')).map((cb) => cb.value);
+    const checkedBoxes = sortCheckboxesByLastName(Array.from(form.querySelectorAll('input[name="memberIds"]:checked')));
+    const checkedIds = checkedBoxes.map((cb) => cb.value);
     const win = window.open('', '_blank');
     if (!win) return; // Popup blocked - nothing more to do client-side; reducing the selection below MAX_PRINT_CHUNK still works the normal way.
     win.document.write('<!doctype html><title>Preparing print job&hellip;</title><body style="font: 16px sans-serif; padding: 2rem;">Preparing your print job&hellip; this tab will fill in automatically once ready.</body>');
@@ -337,23 +367,62 @@
       try {
         const sourceMain = doc.getElementById('main-content');
         if (!sourceMain || !targetMain) continue;
+        // A real bug report: printing several hundred name tags "timed out,
+        // wouldn't load all the pages" - re-running the shared renderers
+        // over win.document (every batch reprocessing every earlier
+        // batch's already-finished content too, not just what's new) was
+        // never actually the "idempotent, just as safe" no-op the old
+        // comment here claimed. renderNameTagBarcodes redoes real SVG
+        // generation for every barcode again; worse, badge-autofit.js's
+        // shrink search always resets each field back to its own recorded
+        // full-size data-base-font-size before re-measuring - re-running it
+        // means redoing the ENTIRE shrink-to-fit search, forced-reflow
+        // measurements and all, for every already-fitted card on every
+        // later batch. That's O(total batches²) work, not O(n) - batch 5
+        // of a many-hundred-member print job was redoing 4 batches' worth
+        // of already-finished shrink searches on top of its own, and it
+        // only gets worse the bigger the co-op. Scoping both calls to just
+        // the newly-imported nodes fixes that: each batch now does exactly
+        // its own share of the work, regardless of how many batches came
+        // before it.
+        const imported = [];
         Array.from(sourceMain.children).forEach((child) => {
           if (child.classList.contains('no-print')) return; // the header/Print button - only the first batch's copy is kept.
-          targetMain.appendChild(win.document.importNode(child, true));
+          imported.push(targetMain.appendChild(win.document.importNode(child, true)));
         });
-        // Re-render whatever the newly-appended content needs (barcodes,
-        // shrink-to-fit label names) - both are idempotent on content
-        // that's already rendered, so re-running them over the whole tab
-        // on every batch is simpler, and just as safe, as tracking exactly
-        // what's new each time.
-        if (typeof win.renderNameTagBarcodes === 'function') win.renderNameTagBarcodes(win.document);
-        win.dispatchEvent(new win.Event('beforeprint'));
+        let handledDirectly = false;
+        if (typeof win.renderNameTagBarcodes === 'function') {
+          imported.forEach((node) => win.renderNameTagBarcodes(node));
+          handledDirectly = true;
+        }
+        if (typeof win.runBadgeAutoFit === 'function') {
+          imported.forEach((node) => win.runBadgeAutoFit(node));
+          handledDirectly = true;
+        }
+        // Barcode Only / Barcode Mailing Labels sheets (public/js/barcode-
+        // print-shrink-name.js) expose neither function above - a
+        // synthetic beforeprint is the only hook they listen for, and that
+        // script's own work (re-running JsBarcode + a plain scrollWidth
+        // shrink loop, no forced-reflow search) is cheap enough per badge
+        // that re-running it over the whole tab hasn't shown the same
+        // blowup, so it's left as-is rather than adding scoped support
+        // for a page type that isn't the one actually timing out.
+        if (!handledDirectly) win.dispatchEvent(new win.Event('beforeprint'));
       } catch (err) {
         // One bad batch shouldn't take down the rest of an otherwise-fine
         // print job - the remaining batches still get appended.
         console.error('Bulk print: failed to merge one batch into the print tab', err);
       }
     }
+
+    // A real request: "after any bulk printing the page should refresh on
+    // its own." This path bypasses the form's own native submission
+    // entirely (preventDefault above), so bulk-print-refresh.js's generic
+    // submit listener never sees a chance to fire for it - reload here
+    // instead, once every batch has actually finished landing in the
+    // print tab, rather than on that script's fixed short delay (which
+    // could easily fire before a many-hundred-member job is done).
+    window.location.reload();
   }
 
   function wireChunkedSubmit(formId) {

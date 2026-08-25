@@ -639,7 +639,11 @@ async function removeFromFloaterForOverlappingHours(classId, memberId) {
 // time case but far too expensive to run after every single row of a bulk
 // import - skipSync lets a bulk caller (Class Schedule Import) insert the
 // class_staff rows directly and run just one sync at the end instead of
-// one per staff member added.
+// one per staff member added. syncClassRosterMembers (this one class, so
+// cheap either way) always runs regardless of skipSync, same as
+// setEnrollment's own pattern - a bulk import still needs this class's
+// own roster to pick up its new teacher/assistant immediately, only the
+// day-wide rebuild is worth batching.
 async function addStaff(classId, memberId, role, { skipSync } = {}) {
   await db
     .prepare(
@@ -648,6 +652,7 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
     )
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
   await removeFromFloaterForOverlappingHours(classId, memberId);
+  await syncClassRosterMembers(classId);
   if (skipSync) return;
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
@@ -655,6 +660,7 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
 
 async function removeStaff(classId, memberId) {
   await db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, memberId);
+  await syncClassRosterMembers(classId);
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
 }
@@ -969,15 +975,24 @@ async function backfillClassRosterDates() {
   }
 }
 
-// Rebuilds a class's roster membership from its current enrollment
-// (students only - a class roster never includes its teachers/assistants).
+// Rebuilds a class's roster membership from its current enrollment AND
+// staffing. A real request: "teachers and assistants should be able to
+// be checked in on the class roster" - a class's own teacher(s)/
+// assistant(s) (class_staff) used to never be part of its roster at all,
+// only its enrolled students (class_enrollments), so they had no way to
+// be checked in/out for that specific class (only the day-level Parent
+// roster, via syncDayMemberRosters) - both feed the same roster_members
+// table now, so resolveScan's own roster_members membership check (kiosk
+// Class Check-In) and the admin class-tab roster both pick up staff for
+// free with no changes of their own needed.
 async function syncClassRosterMembers(classId) {
   const rosterId = await ensureClassRoster(classId);
   if (!rosterId) return;
-  const studentIds = new Set(
+  const memberIds = new Set(
     (await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId)).map((r) => r.student_id)
   );
-  await setRosterMembership(rosterId, studentIds);
+  (await db.prepare('SELECT member_id FROM class_staff WHERE class_id = ?').all(classId)).forEach((r) => memberIds.add(r.member_id));
+  await setRosterMembership(rosterId, memberIds);
 }
 
 const DAY_ROSTER_LABEL = { monday: 'Monday', wednesday: 'Wednesday' };
@@ -1729,6 +1744,7 @@ module.exports = {
   isValidDay,
   defaultDay,
   HOUR_POSITIONS,
+  UNASSIGNED_ROOM,
   COLOR_PALETTE,
   GRADE_LEVELS,
   ageGroupList,

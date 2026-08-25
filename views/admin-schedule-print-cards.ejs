@@ -25,7 +25,7 @@
     <% pages.forEach(function(pageCards) { %>
       <div class="badge-sheet-page badge-sheet">
         <% pageCards.forEach(function(c) { %>
-          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight, safeInset: SCHEDULE_CARD_SAFE_INSET }) %>
         <% }); %>
       </div>
     <% }); %>

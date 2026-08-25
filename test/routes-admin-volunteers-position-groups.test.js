@@ -112,3 +112,56 @@ test('saving the dialog can edit an existing position\'s title/room, add a brand
   const floaters = await db.prepare('SELECT member_id FROM permanent_job_floaters WHERE job_id = ?').all(frontDesk1);
   assert.deepEqual(floaters.map((f) => f.member_id), [member.lastInsertRowid], 'renaming a still-checked hour must not wipe its floater list');
 });
+
+// A real request: "next to each position in that pop up there should be
+// a trashcan symbol to remove that position. once you click the trash
+// can the position is deleted but the add/edit window remains open for
+// editing."
+test('each existing position in the dialog has its own trash-icon delete button', async () => {
+  const { cookie } = await loginAsAdmin();
+  const jobId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Copy Room', '2')").run()).lastInsertRowid;
+
+  const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
+  const dialogHtml = /<dialog id="add-job-dialog"[\s\S]*?<\/dialog>/.exec(res.text)[0];
+  assert.match(
+    dialogHtml,
+    new RegExp(`formaction="/admin/volunteers/monday/substitutes/permanent-jobs/group/${jobId}/delete\\?dialog=job"`),
+    'the Copy Room group should have its own delete button targeting its keyId'
+  );
+  // The blank "Add New Position" row at the bottom has nothing to delete.
+  assert.doesNotMatch(dialogHtml.slice(dialogHtml.indexOf('Add New Position')), /icon-btn-danger/);
+});
+
+test('clicking a position\'s trash icon deletes every hour row for that position, keeps the dialog open, and leaves other positions alone', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const goneHour1 = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Kitchen Duty', '')").run()).lastInsertRowid;
+  await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 2, 'Kitchen Duty', '')").run();
+  const staysId = (await db.prepare("INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES ('monday', 1, 'Front Desk', '')").run()).lastInsertRowid;
+  const floater = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Kitchen Floater', 'kitchen-floater-1', 'parent')").run();
+  await db
+    .prepare(`INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status) VALUES ('2026-09-14', 'job', ?, ?, 0, 'approved')`)
+    .run(goneHour1, floater.lastInsertRowid);
+
+  const res = await request(app)
+    .post(`/admin/volunteers/monday/substitutes/permanent-jobs/group/${goneHour1}/delete`)
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ _csrf: csrfToken, date: '2026-09-14' });
+
+  assert.equal(res.status, 302);
+  assert.match(res.headers.location, /dialog=job/, 'the redirect should keep the dialog open, not drop back to the closed manage page');
+
+  const remainingKitchen = await db.prepare("SELECT * FROM permanent_jobs WHERE day = 'monday' AND title = 'Kitchen Duty'").all();
+  assert.equal(remainingKitchen.length, 0, 'both of Kitchen Duty\'s hour rows should be gone, not just the one keyId pointed at');
+  const remainingAssignments = await db.prepare("SELECT * FROM substitute_assignments WHERE slot_type = 'job' AND slot_id = ?").all(goneHour1);
+  assert.equal(remainingAssignments.length, 0, 'the deleted position\'s own substitute assignment should be cleaned up too');
+
+  const stillThere = await db.prepare('SELECT * FROM permanent_jobs WHERE id = ?').get(staysId);
+  assert.ok(stillThere, 'Front Desk, a completely different position, must be untouched');
+
+  // The manage page's own reopen script should target the real dialog id
+  // (add-job-dialog), not a guessed edit-job-dialog that doesn't exist -
+  // a real bug this session found while wiring this same redirect.
+  const afterRedirect = await request(app).get(res.headers.location).set('Cookie', cookie);
+  assert.match(afterRedirect.text, /document\.getElementById\('add-job-dialog'\)\.showModal\(\)/);
+});

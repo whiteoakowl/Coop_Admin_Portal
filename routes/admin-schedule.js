@@ -35,6 +35,7 @@ const {
   listClassArchives,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
+const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { scheduleCardDataForMembers, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
@@ -484,6 +485,7 @@ router.post('/schedule/print-cards', requireFullAdmin, async (req, res) => {
     cards,
     cardWidth: CARD_WIDTH,
     cardHeight: CARD_HEIGHT,
+    SCHEDULE_CARD_SAFE_INSET,
   });
 });
 

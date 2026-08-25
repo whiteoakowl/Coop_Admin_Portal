@@ -74,6 +74,40 @@ async function seedIfMissing(db) {
       .run(JSON.stringify(SCHEDULE_CARD_DEFAULT_LAYOUT));
   }
 
+  // A real request: "make an admin setup/cleanup card with a barcode. if
+  // someone doesn't have a setup cleanup card to scan the admin setup/
+  // cleanup card can be scanned to bypass the checkout demand for a
+  // setup/cleanup card... this card isn't linked to any specific member.
+  // its just a general bypass card." A real 'setupCleanup' misc_badges
+  // row (see routes/checkout.js's findSetupCleanupBypassBadge use of it)
+  // but with task_item_id left NULL - every other row of that badge_type
+  // is auto-created 1:1 from a real task_list_items row (utils/
+  // taskList.js's upsertTaskBadge), so a NULL task_item_id row is never
+  // produced any other way and safely doubles as this row's own marker.
+  // Seeded once, like the default admin account/PIN above - not part of
+  // the admin-imported/task-derived deck lifecycle (replaceMiscBadges is
+  // blocked for 'setupCleanup' server-side - see routes/admin-misc-
+  // badges.js), so nothing else ever recreates or touches it once it
+  // exists. Shows up in Design > Print > Setup/Cleanup Badges for free,
+  // right alongside every real task's own badge.
+  const bypassBadgeExists = await db.prepare("SELECT 1 FROM misc_badges WHERE badge_type = 'setupCleanup' AND task_item_id IS NULL").get();
+  if (!bypassBadgeExists) {
+    const existsCode = db.prepare('SELECT 1 FROM task_list_items WHERE barcode = ?');
+    let code;
+    do {
+      code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    } while (await existsCode.get(code));
+    await db
+      .prepare('INSERT INTO misc_badges (badge_type, title, description, barcode) VALUES (?, ?, ?, ?)')
+      .run(
+        'setupCleanup',
+        'Setup/Cleanup Bypass Card',
+        "Scan this instead of a member's own Setup/Cleanup badge at checkout when they don't have theirs to scan. Not tied to any specific member or task.",
+        code
+      );
+    console.log('Seeded a general Setup/Cleanup bypass badge for checkout (Design > Print > Setup/Cleanup Badges).');
+  }
+
   const leadershipCount = (await db.prepare('SELECT COUNT(*) AS c FROM leadership_contacts').get()).c;
   if (Number(leadershipCount) === 0) {
     const roles = ['Director', 'Assistant Director', 'Co-op Classes', 'Finance Team', 'Events Coordinator', 'Yearbook Team'];
@@ -81,6 +115,107 @@ async function seedIfMissing(db) {
       await db.prepare('INSERT INTO leadership_contacts (role, position) VALUES (?, ?)').run(roles[i], i);
     }
   }
+
+  await seedPortalPlatform(db);
+}
+
+// The five starter portal roles, the permission catalog Main Admin can
+// grant to any role, and one bootstrapped Main Admin account - without
+// this, nobody could ever reach the Main Admin Portal to grant that role
+// to anyone else in the first place. Same "seed once on a fresh database"
+// pattern as the rest of seedIfMissing above, not a repeatable backfill.
+const PORTAL_ROLES = [
+  { key: 'parent', label: 'Parent', description: 'Manages their family, registers students for classes, and tracks accounting/training.', isSystem: true },
+  { key: 'student', label: 'Student', description: "Views their own classes, assignments, grades, and training.", isSystem: true },
+  { key: 'teacher', label: 'Teacher', description: 'Manages their own classes: rosters, attendance, lessons, and grading.', isSystem: true },
+  { key: 'coop_admin', label: 'Co-op Admin', description: 'Operational co-op admin: check-in/out, scheduling, floaters, setup/cleanup.', isSystem: true },
+  { key: 'main_admin', label: 'Main Admin', description: 'Platform control center: users, roles, website content, and every other portal.', isSystem: true },
+];
+
+const PORTAL_PERMISSIONS = [
+  { key: 'manage_users', label: 'Manage Users', description: 'Approve accounts, assign roles and portal access.' },
+  { key: 'manage_roles', label: 'Manage Roles & Permissions', description: 'Create/edit roles and control which permissions they grant.' },
+  { key: 'manage_website', label: 'Manage Website', description: 'Edit the public homepage, announcements, and FAQs.' },
+  { key: 'manage_classes', label: 'Manage Classes', description: 'Create/edit classes, capacity, and registration windows.' },
+  { key: 'manage_registrations', label: 'Manage Registrations', description: "Review and adjust members' class registrations." },
+  { key: 'manage_events', label: 'Manage Events', description: 'Create/edit events, volunteer signups, and donation requests.' },
+  { key: 'manage_volunteers', label: 'Manage Volunteers', description: 'Manage floater/setup-cleanup assignments and event volunteer signups.' },
+  { key: 'manage_finances', label: 'Manage Finances', description: 'View and record accounting charges, payments, and refunds.' },
+  { key: 'manage_store', label: 'Manage Store', description: 'Manage products, inventory, and orders.' },
+  { key: 'manage_forum', label: 'Manage Forum', description: 'Moderate forum categories, threads, and posts.' },
+  { key: 'manage_forms', label: 'Manage Forms', description: 'Build and publish custom forms, and view submissions.' },
+  { key: 'manage_training', label: 'Manage Training', description: 'Create courses/lessons and assign training.' },
+  { key: 'manage_documents', label: 'Manage Documents', description: 'Upload and organize shared documents.' },
+  { key: 'manage_publications', label: 'Manage Publications', description: 'Write and publish articles, publications, and photo albums.' },
+  { key: 'manage_directory', label: 'Manage Directory', description: 'Manage the member and business directories.' },
+];
+
+async function seedPortalPlatform(db) {
+  const roleIdByKey = {};
+  for (const role of PORTAL_ROLES) {
+    const existing = await db.prepare('SELECT id FROM roles WHERE key = ?').get(role.key);
+    if (existing) {
+      roleIdByKey[role.key] = existing.id;
+      continue;
+    }
+    const info = await db
+      .prepare('INSERT INTO roles (key, label, description, is_system) VALUES (?, ?, ?, ?)')
+      .run(role.key, role.label, role.description, role.isSystem ? 1 : 0);
+    roleIdByKey[role.key] = info.lastInsertRowid;
+  }
+
+  const permissionIdByKey = {};
+  for (const perm of PORTAL_PERMISSIONS) {
+    const existing = await db.prepare('SELECT id FROM permissions WHERE key = ?').get(perm.key);
+    if (existing) {
+      permissionIdByKey[perm.key] = existing.id;
+      continue;
+    }
+    const info = await db.prepare('INSERT INTO permissions (key, label, description) VALUES (?, ?, ?)').run(perm.key, perm.label, perm.description);
+    permissionIdByKey[perm.key] = info.lastInsertRowid;
+  }
+
+  // Main Admin gets every permission by default - every other role starts
+  // with none, left for a Main Admin to grant deliberately from the Roles
+  // & Permissions screen.
+  const mainAdminRoleId = roleIdByKey.main_admin;
+  for (const key of Object.keys(permissionIdByKey)) {
+    await db
+      .prepare('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?) ON CONFLICT (role_id, permission_id) DO NOTHING')
+      .run(mainAdminRoleId, permissionIdByKey[key]);
+  }
+
+  const anyMainAdmin = await db
+    .prepare('SELECT 1 FROM member_account_roles WHERE role_id = ? LIMIT 1')
+    .get(mainAdminRoleId);
+  if (anyMainAdmin) return;
+
+  const email = process.env.MAIN_ADMIN_EMAIL || 'mainadmin@coop.local';
+  const password = process.env.MAIN_ADMIN_PASSWORD || 'changeme123';
+
+  const existsCode = db.prepare('SELECT 1 FROM members WHERE member_code = ?');
+  let code;
+  do {
+    code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  } while (await existsCode.get(code));
+
+  // active = 0 - this isn't a real co-op attendee, just the platform's
+  // own bootstrap login, so it must stay out of the existing Co-op Admin
+  // Portal's own member-facing lists/counts/exports (Members page,
+  // rosters, print sheets) by default, the same way every other
+  // already-archived member already does.
+  const memberInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, active) VALUES ('Main Admin', ?, ?, 'admin', 0)")
+    .run(code, code);
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const accountInfo = await db
+    .prepare(
+      "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())"
+    )
+    .run(memberInfo.lastInsertRowid, email, passwordHash);
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, mainAdminRoleId);
+
+  console.log(`Seeded a Main Admin portal account "${email}" / "${password}". Log in at /login and change the password after first login.`);
 }
 
 // Genuine one-time backfill for an ALREADY-DEPLOYED Postgres database -

@@ -9,7 +9,7 @@
   <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
     <div class="print-preview-header no-print">
       <h1>Print Name Tags + Schedule Cards (Front &amp; Back)</h1>
-      <p class="hint">Print double-sided, flipping on the long edge. Cut along the grid lines - each card's name tag side will match its schedule card on the back.</p>
+      <p class="hint">Print double-sided, flipping on the long edge. Cut along the grid lines - each card's name tag side will match its schedule card on the back. The schedule card side prints with a small extra blank margin, so a little real-world printer registration drift between the front and back passes doesn't cut off any information.</p>
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
@@ -26,7 +26,7 @@
       <div class="badge-sheet-page badge-sheet">
         <% backPages[i].forEach(function(c) { %>
           <% if (c) { %>
-            <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+            <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight, safeInset: SCHEDULE_CARD_SAFE_INSET }) %>
           <% } else { %>
             <div class="badge-canvas badge-canvas-blank" style="width: <%= cardWidth %>px; height: <%= cardHeight %>px;"></div>
           <% } %>

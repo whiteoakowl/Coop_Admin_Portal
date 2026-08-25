@@ -64,7 +64,7 @@ test('Floater Teams: 4 hour cards, rank/remove start locked, hour title is edita
 
   await t.test('the rank select and the remove-member trash icon both start locked', () => {
     assert.match(res.text, /<select name="rank" class="team-member-rank-select" onchange="this\.form\.requestSubmit\(\)" disabled>/);
-    assert.match(res.text, /members\/\d+\/remove[^]*?data-edit-toggle-reveal hidden/);
+    assert.match(res.text, /data-edit-toggle-reveal hidden data-member-remove-btn/);
   });
 });
 

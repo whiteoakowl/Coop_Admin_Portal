@@ -112,3 +112,30 @@ test('POST /name-tag/submit', async (t) => {
     assert.match(submit.text, /Request submitted for Alex Admin/);
   });
 });
+
+test('GET /name-tag lists every active member type in the picker, correctly labeled', async (t) => {
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Admin', 'Label Admin', 'admin')").run();
+  await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Parent', 'Label Parent', 'parent')").run();
+  const { lastInsertRowid: studentId2 } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Label Student', 'Label Student', 'student')")
+    .run();
+
+  await t.test('admins, parents, and students all appear in the dropdown with their real type', async () => {
+    const res = await request(app).get('/name-tag');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /Label Admin \(Admin\)/);
+    assert.match(res.text, /Label Parent \(Parent\)/);
+    assert.match(res.text, /Label Student \(Student\)/);
+  });
+
+  await t.test('a student picked as the submitter shows their own checkbox group with their real type', async () => {
+    const res = await request(app).get('/name-tag');
+    // Every member's own self-checkbox is rendered (all groups render,
+    // only the matching one is unhidden client-side) - the student's own
+    // group should show their real type, not a hardcoded "(Parent)".
+    const groupStart = res.text.indexOf(`data-member-id="${studentId2}"`);
+    assert.ok(groupStart !== -1, 'expected a member group for the student');
+    const groupHtml = res.text.slice(groupStart, groupStart + 500);
+    assert.match(groupHtml, /Label Student \(Student\)/);
+  });
+});

@@ -1,14 +1,17 @@
 /* global keepInputFocused, initIdKeypad, initKioskMethodChooser, createKioskCameraScanner */
 // Mirrors public/js/kiosk-checkin.js's fetch-and-show pattern, posting to
-// this class's own scoped, mode-specific scan endpoint (routes/kiosk-
-// class-checkin.js) - see that route's own comment on why the two are
-// kept independent. The class id and mode come from the page body's data
-// attributes rather than being hardcoded into a shared script, so this
-// one file works for both Check In and Check Out on every class.
+// this scan's own scoped, mode-specific endpoint (routes/kiosk-class-
+// checkin.js) - see that route's own comment on why it's kept independent
+// from the main portal's own kiosk. The scan target and mode come from the
+// page body's data attributes rather than being hardcoded into a shared
+// script, so this one file works for both Check In and Check Out on every
+// class AND on every Playground hour (routes/kiosk-class-checkin.js's
+// class and playground routes both render this same view/script, just
+// with different scanBaseUrl/completeUrl values).
 // Continuous: never leaves whichever entry method is active after a
 // scan, so the very next scan (Mobile Barcode Scan, a hardware Barcode
 // Scan, or typing another ID/name) just works - Complete is what exits
-// back to the class's attendance page. #barcode-input stays the shared,
+// back to the attendance/log page. #barcode-input stays the shared,
 // permanently-hidden target every method funnels a value through except
 // typing a name, which has its own separate, genuinely visible input
 // (#name-input) since a hardware scanner's hidden target can't also be a
@@ -17,7 +20,8 @@
   const form = document.getElementById('scan-form');
   if (!form) return;
 
-  const classId = document.body.dataset.classId;
+  const scanBaseUrl = document.body.dataset.scanBaseUrl;
+  const completeUrl = document.body.dataset.completeUrl;
   const mode = document.body.dataset.mode === 'checkout' ? 'checkout' : 'checkin';
   const input = document.getElementById('barcode-input');
   const result = document.getElementById('kiosk-result');
@@ -48,7 +52,7 @@
 
   document.querySelectorAll('[data-complete]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      window.location.href = `/kiosk/class-checkin/classes/${classId}/attendance`;
+      window.location.href = completeUrl;
     });
   });
 
@@ -82,7 +86,7 @@
     setState('loading', 'Checking…', 'loader');
 
     try {
-      const res = await fetch(`/kiosk/class-checkin/classes/${classId}/scan/${mode}`, {
+      const res = await fetch(`${scanBaseUrl}/scan/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'barcode=' + encodeURIComponent(value),

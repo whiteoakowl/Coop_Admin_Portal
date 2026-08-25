@@ -21,6 +21,19 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { todayISO, addDays, weekdayOf } = require('../utils/dates');
+
+// A real bug: this test used to hardcode a specific far-future date
+// string as its session date - safely in the future when written, but a
+// literal calendar date eventually stops being "future" as real time
+// passes (exactly what happened here). Computed fresh relative to the
+// real clock every run instead - always a real Monday, always at least
+// 3 weeks out, so it stays valid indefinitely.
+function futureMonday() {
+  let d = addDays(todayISO(), 21);
+  while (weekdayOf(d) !== 1) d = addDays(d, 1);
+  return d;
+}
 
 test.before(() => app.ready);
 test.after(() => {
@@ -64,7 +77,7 @@ test('Task 1 dropdowns each suggest a distinct task before Task 2 dropdowns get 
   }
 
   // Mark Cara absent on the session date.
-  const date = '2026-08-24'; // a Monday
+  const date = futureMonday();
   await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('monday', ?)").run(date);
   const roster = await db.prepare("INSERT INTO rosters (schedule_day, name, active) VALUES ('monday', 'Suggestion Test Roster', 1)").run();
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(roster.lastInsertRowid, date);

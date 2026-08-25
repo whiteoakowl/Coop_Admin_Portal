@@ -73,7 +73,7 @@ test('Setup/Cleanup team card: inline edit-in-place markup, no popup dialog', as
 
   await t.test('the delete-team trash icon and the member remove trash icon both start hidden', () => {
     assert.match(res.text, /teams\/\d+\/delete[^]*?data-edit-toggle-reveal hidden/);
-    assert.match(res.text, /remove-member\/\d+[^]*?data-edit-toggle-reveal hidden/);
+    assert.match(res.text, /data-edit-toggle-reveal hidden data-member-remove-btn/);
   });
 
   await t.test('the Save button is wired to the team-edit-form via the form= attribute, not physically nested inside it', () => {

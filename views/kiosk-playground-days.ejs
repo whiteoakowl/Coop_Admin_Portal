@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap">
+    <div class="kiosk-inline-header">
+      <a href="/kiosk/class-checkin/classes" class="kiosk-home kiosk-home-inline">&larr; Class Check-In</a>
+      <form method="POST" action="/kiosk/class-checkin/lock">
+        <button type="submit" class="btn-secondary">Done</button>
+      </form>
+    </div>
+    <h1>Playground Check-In</h1>
+    <p class="subtitle">Choose a day to see its playground hours.</p>
+
+    <div class="landing-grid landing-grid-two">
+      <a class="landing-card landing-card-purple" href="/kiosk/class-checkin/playground/monday">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+        <span class="landing-label">Monday</span>
+      </a>
+      <a class="landing-card landing-card-purple" href="/kiosk/class-checkin/playground/wednesday">
+        <span class="landing-icon"><svg class="icon"><use href="#icon-clipboard-list"/></svg></span>
+        <span class="landing-label">Wednesday</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

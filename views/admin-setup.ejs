@@ -72,8 +72,14 @@
               own copy of this same comment for the full "blank-looking
               leading page" bug report and why 8.2in, not 9.2in, is team
               1's own real budget once the header's ~0.79in is accounted
-              for. %>
-          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="<%= i === 0 ? '8.2in' : '9.2in' %>">
+              for. Each team still runs fitOne() against its own budget
+              first; data-shrink-to-fit-group="teams" then levels every
+              team's resulting page down to whichever one needed the most
+              shrinking, so a print job's pages all read the same font
+              size - a real, twice-repeated request, most recently with
+              two screenshots showing genuinely different sizes across
+              pages. %>
+          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="<%= i === 0 ? '8.2in' : '9.2in' %>" data-shrink-to-fit-group="teams">
           <%# The whole card (info + members) is one edit-toggle .edit-
               section (public/js/edit-toggle.js) - clicking Edit unfreezes
               the title/description/leader fields in place and reveals the
@@ -148,6 +154,23 @@
                     <svg class="icon"><use href="#icon-map-pin"/></svg>
                     <input type="text" name="meetingLocation" class="team-info-meeting-input" value="<%= t.meeting_location || '' %>" placeholder="Meeting location" disabled />
                   </div>
+                  <%# A real request: "add a dropdown menu to each setup/
+                      cleanup team list that asks, log on check in or log
+                      on check out. choosing one or the other will
+                      determine when a member is asked to scan their
+                      setup/cleanup card." Same freeze/unfreeze-in-place
+                      editing as the rest of this row - saves together
+                      with everything else on this form. Still only ever
+                      asked of parents/admins either way - students never
+                      scan a Setup/Cleanup badge (routes/checkout.js,
+                      routes/kiosk.js). %>
+                  <div class="team-info-leader">
+                    <svg class="icon"><use href="#icon-barcode"/></svg>
+                    <select name="taskScanTiming" class="team-info-leader-select" disabled>
+                      <option value="checkout" <%= t.task_scan_timing !== 'checkin' ? 'selected' : '' %>>Log on check out</option>
+                      <option value="checkin" <%= t.task_scan_timing === 'checkin' ? 'selected' : '' %>>Log on check in</option>
+                    </select>
+                  </div>
                 </div>
               </form>
               <%# A real request: "header for each card in print should be
@@ -168,12 +191,21 @@
                   <p class="team-card-empty">No members yet.</p>
                 <% } %>
                 <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
+                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                     <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
-                    <form method="POST" action="/admin/setup/<%= day %>/teams/<%= t.id %>/remove-member/<%= m.id %>" class="inline-block-form" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from this team?">
-                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
+                    <%# A real request: "when deleting ... cleanup/signup
+                        members from lists it should allow for multiple
+                        deletes and then click save before refreshing."
+                        This trash icon no longer submits its own form
+                        immediately - it flips a same-named hidden
+                        checkbox tied (via form="...") to the card's own
+                        team-edit-form, so any number of pending removals
+                        ride along with that form's single Save submission
+                        instead of each causing its own round trip/page
+                        reload (public/js/team-member-remove-toggle.js). %>
+                    <input type="checkbox" name="removeMemberIds" value="<%= m.id %>" form="team-edit-form-<%= t.id %>" hidden data-member-remove-checkbox />
+                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-remove-btn aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </div>
                 <% }); %>
               </div>
@@ -207,6 +239,12 @@
             <% availableLeaders.forEach(function(p) { %>
               <option value="<%= p.id %>"><%= p.name %></option>
             <% }); %>
+          </select>
+        </label>
+        <label>Setup/Cleanup badge scan
+          <select name="taskScanTiming">
+            <option value="checkout" selected>Log on check out</option>
+            <option value="checkin">Log on check in</option>
           </select>
         </label>
         <div class="notes-dialog-actions">
@@ -249,6 +287,7 @@
     </dialog>
   </main>
   <script src="/js/edit-toggle.js"></script>
+  <script src="/js/team-member-remove-toggle.js"></script>
   <script src="/js/print-shrink-to-fit.js"></script>
 </body>
 </html>

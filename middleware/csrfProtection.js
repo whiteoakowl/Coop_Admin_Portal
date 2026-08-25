@@ -24,19 +24,25 @@
 // regardless. public/js/csrf.js appends the token to a multipart form's
 // action URL for exactly this reason - see its own comment.
 //
-// Deliberately scoped to admin sessions only: the kiosk and every other
-// public-facing POST (check-in, find-a-parent, absence/name-tag forms)
-// has no authenticated session for a forged cross-site request to ride
-// along on in the first place - the CSRF threat model doesn't apply to
-// a route anyone can already call directly by design (see
-// routes/kiosk.js's own comments on why that's intentional), and no
+// Deliberately scoped to authenticated sessions only (the single shared
+// Admin login, req.session.adminId, OR a member portal login,
+// req.session.portalAccountId - see middleware/portalAuth.js): the kiosk
+// and every other public-facing POST (check-in, find-a-parent, absence/
+// name-tag forms) has no authenticated session for a forged cross-site
+// request to ride along on in the first place - the CSRF threat model
+// doesn't apply to a route anyone can already call directly by design
+// (see routes/kiosk.js's own comments on why that's intentional), and no
 // session exists there to store a token to check them against without
-// creating one for every anonymous visitor for zero real benefit.
+// creating one for every anonymous visitor for zero real benefit. Both
+// session kinds share the same req.session.csrfToken field - a browser
+// only ever authenticates as one or the other in practice, and even
+// holding both at once is harmless here since the token just needs to
+// match whatever the page it came from was actually rendered with.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 module.exports = function csrfProtection(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
-  if (!req.session || !req.session.adminId) return next(); // no admin session yet - requireAdmin will handle it
+  if (!req.session || !(req.session.adminId || req.session.portalAccountId)) return next(); // no authenticated session yet
 
   const submitted = (req.body && req.body._csrf) || req.query._csrf || req.get('X-CSRF-Token');
   if (submitted && submitted === req.session.csrfToken) return next();

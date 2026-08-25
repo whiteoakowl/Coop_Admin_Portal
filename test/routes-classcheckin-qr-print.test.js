@@ -2,11 +2,14 @@
 // to scan for quick links to class check in/out kiosk for teachers.
 // should be able to select how many classes are added. portrait view,
 // name of each class. evenly spaced and displayed up to 4 class on a
-// page." Covers the new Design/Print "Class Check-In QR Codes" panel
-// (routes/admin-design.js) end to end: the picker lists every class, and
-// the print route paginates selected classes 4-per-page, each with a QR
-// code encoding an ABSOLUTE URL to that class's own Class Check-In quick
-// link (/kiosk/class-checkin/classes/:id/attendance - the same one every
+// page" - later refined to "each page should be all of the class qr
+// codes for that classroom, that day." Covers the Design/Print "Class
+// Check-In QR Codes" panel (routes/admin-design.js) end to end: the
+// picker lists every class, and the print route groups selected classes
+// into one page per (day, room) - a room can never have more than 4
+// classes in a day (one per hour_position) - each with a QR code
+// encoding an ABSOLUTE URL to that class's own Class Check-In quick link
+// (/kiosk/class-checkin/classes/:id/attendance - the same one every
 // class card's own quick link opens).
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -79,13 +82,25 @@ test('printing with no classes selected redirects with an error', async () => {
   assert.match(decodeURIComponent(res.headers.location), /Select at least one class/);
 });
 
-test('the print sheet paginates 4 classes per page, each with an absolute QR link and class name', async (t) => {
+// A real follow-up request: "Each page should be all of the class qr
+// codes for that classroom, that day." Pages now group by (day, room)
+// rather than just chunking the selection 4-at-a-time - covered directly
+// below rather than by the old flat "5 classes -> 2 pages" chunking test,
+// which no longer describes how pages are built at all.
+test('the print sheet groups classes into one page per (day, room), sorted by hour position', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const classIds = [];
-  for (let i = 0; i < 5; i++) {
-    classIds.push(await createClass({ day: 'monday', hourPosition: (i % 4) + 1, className: `Sheet Class ${i}`, room: `Room ${i}` }));
-  }
+  // Room A/monday: 4 classes filling every hour slot, seeded out of
+  // hour_position order - the page should still read 1, 2, 3, 4.
+  const roomAIds = [];
+  roomAIds.push(await createClass({ day: 'monday', hourPosition: 3, className: 'Room A Hour 3', room: 'Room A' }));
+  roomAIds.push(await createClass({ day: 'monday', hourPosition: 1, className: 'Room A Hour 1', room: 'Room A' }));
+  roomAIds.push(await createClass({ day: 'monday', hourPosition: 4, className: 'Room A Hour 4', room: 'Room A' }));
+  roomAIds.push(await createClass({ day: 'monday', hourPosition: 2, className: 'Room A Hour 2', room: 'Room A' }));
+  // Room B/wednesday: only 1 class - a different day AND a different room
+  // than Room A, so it must land on its own separate page.
+  const roomBId = await createClass({ day: 'wednesday', hourPosition: 1, className: 'Room B Solo Class', room: 'Room B' });
 
+  const classIds = [...roomAIds, roomBId];
   const res = await request(app)
     .post('/admin/design/print-classcheckin-qr')
     .set('Cookie', cookie)
@@ -93,19 +108,30 @@ test('the print sheet paginates 4 classes per page, each with an absolute QR lin
     .send({ classIds: classIds.map(String), _csrf: csrfToken });
   assert.equal(res.status, 200);
 
-  await t.test('5 selected classes land on 2 pages (4 + 1), not one long page', async () => {
+  await t.test('5 classes across 2 (day, room) groups land on exactly 2 pages', async () => {
     const pageCount = (res.text.match(/class="qr-sheet-page"/g) || []).length;
-    assert.equal(pageCount, 2, '5 classes at 4-per-page should produce 2 pages');
+    assert.equal(pageCount, 2, 'one page for Room A/monday, one page for Room B/wednesday');
     const cellCount = (res.text.match(/class="qr-sheet-cell"/g) || []).length;
     assert.equal(cellCount, 5, 'every selected class should get its own cell across both pages');
+  });
+
+  await t.test('each page header names its own room and day', async () => {
+    assert.match(res.text, /Room A[\s\S]{0,30}Monday/);
+    assert.match(res.text, /Room B[\s\S]{0,30}Wednesday/);
+  });
+
+  await t.test('Room A\'s page reads Hour 1 through Hour 4 in order, not seed order', async () => {
+    const order = ['Room A Hour 1', 'Room A Hour 2', 'Room A Hour 3', 'Room A Hour 4'].map((name) => res.text.indexOf(name));
+    assert.ok(order.every((i) => i !== -1), 'all four class names should be present');
+    assert.deepEqual(order, [...order].sort((a, b) => a - b), 'hour 1-4 should appear in that order on the page');
   });
 
   await t.test('each cell carries the class name and an absolute Class Check-In URL', async () => {
     for (const classId of classIds) {
       assert.match(res.text, new RegExp(`data-qr-value="http://[^"]*/kiosk/class-checkin/classes/${classId}/attendance"`));
     }
-    assert.match(res.text, /Sheet Class 0/);
-    assert.match(res.text, /Sheet Class 4/);
+    assert.match(res.text, /Room A Hour 1/);
+    assert.match(res.text, /Room B Solo Class/);
   });
 
   await t.test('the QR rendering script and vendored library are both loaded', async () => {

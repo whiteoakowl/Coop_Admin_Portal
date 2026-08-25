@@ -10,6 +10,7 @@ const {
   updatePermanentJob,
   deletePermanentJob,
   savePositionGroup,
+  deletePositionGroup,
   setJobFloaters,
   setAssignment,
   approveAssignment,
@@ -75,6 +76,23 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/save-groups', requireAd
   res.redirect(subUrl(day, { date: req.body.date, notice: 'Positions saved.' }));
 });
 
+// A real bug report: "next to each position in that pop up there should
+// be a trashcan symbol to remove that position. once you click the trash
+// can the position is deleted but the add/edit window remains open for
+// editing." keyId (a group's own anchor job id - see
+// groupedPermanentJobsForDay) may stand for several permanent_jobs rows,
+// one per hour the position runs - deletePositionGroup removes all of
+// them. Echoes dialog=job back through the redirect (same reopen
+// mechanism the Save button's own save-groups route above already uses)
+// so the dialog pops right back open with the position gone instead of
+// leaving the admin back at the closed manage page.
+router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const keyId = parseInt(req.params.keyId, 10);
+  const title = await deletePositionGroup(day, keyId);
+  res.redirect(subUrl(day, { date: req.body.date, dialog: 'job', notice: title ? `Deleted "${title}".` : 'Position not found.' }));
+});
+
 router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const id = parseInt(req.params.id, 10);
@@ -111,7 +129,11 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, asy
   const memberId = parseInt(req.body.memberId, 10);
   const isOverride = req.body.isOverride === '1';
   if (isValidISODate(date) && slotId && memberId) {
-    await setAssignment(date, slotType, slotId, memberId, isOverride);
+    try {
+      await setAssignment(date, slotType, slotId, memberId, isOverride);
+    } catch (e) {
+      return res.redirect(subUrl(day, { date, error: e.message }));
+    }
   }
   res.redirect(subUrl(day, { date }));
 });

@@ -137,7 +137,7 @@ test('Setup/Cleanup: admin + kiosk views highlight an absent member\'s whole row
       const res = await request(app).get(`/admin/setup/${day}/manage`).set('Cookie', cookie);
       assert.equal(res.status, 200);
       if (isToday) {
-        assert.match(res.text, /team-member-row team-member-row-absent">\s*<span class="team-member-avatar">A<\/span>/, 'the absent member should be highlighted');
+        assert.match(res.text, /team-member-row team-member-row-absent"[^>]*>\s*<span class="team-member-avatar">A<\/span>/, 'the absent member should be highlighted');
       } else {
         assert.doesNotMatch(res.text, /team-member-row-absent/, "today doesn't fall on this day, so nothing should be highlighted");
       }

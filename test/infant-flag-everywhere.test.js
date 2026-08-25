@@ -28,6 +28,19 @@ const app = require('../server');
 const db = require('../db');
 const { getListByDay, sectionsForList, addMemberToSection } = require('../utils/volunteers');
 const { createPermanentJob } = require('../utils/substitutes');
+const { todayISO, addDays, weekdayOf } = require('../utils/dates');
+
+// A real bug: this test used to hardcode a specific far-future date
+// string as its session date - safely in the future when written, but a
+// literal calendar date eventually stops being "future" as real time
+// passes (exactly what happened here). Computed fresh relative to the
+// real clock every run instead - always a real Monday, always at least
+// 3 weeks out, so it stays valid indefinitely.
+function futureMonday() {
+  let d = addDays(todayISO(), 21);
+  while (weekdayOf(d) !== 1) d = addDays(d, 1);
+  return d;
+}
 
 test.before(() => app.ready);
 test.after(() => {
@@ -78,8 +91,9 @@ test('the "(infant)" flag appears next to a parent\'s name in all four places', 
   // permanent job in hour 1 AND an upcoming session date on the list, or
   // hourSections comes back empty and there's no dropdown to check at all.
   await createPermanentJob({ day, hourPosition: 1, title: 'Infant Flag Test Job', room: 'Room 1' });
-  await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, '2026-08-24');
-  const manageRes = await request(app).get(`/admin/volunteers/${day}/manage?date=2026-08-24`).set('Cookie', cookie);
+  const date = futureMonday();
+  await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, date);
+  const manageRes = await request(app).get(`/admin/volunteers/${day}/manage?date=${date}`).set('Cookie', cookie);
   assert.equal(manageRes.status, 200);
   assert.match(manageRes.text, /Ivy Infant-Parent \([^)]*, infant\)/, 'Floater assignment dropdown should append ", infant" to the option text');
 
@@ -96,8 +110,8 @@ test('the "(infant)" flag appears next to a parent\'s name in all four places', 
   );
 
   // 4) Setup/Cleanup assignment cards.
-  await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('monday', '2026-08-24')").run();
-  const assignmentsRes = await request(app).get('/admin/setup/monday/assignments?date=2026-08-24').set('Cookie', cookie);
+  await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('monday', ?)").run(date);
+  const assignmentsRes = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
   assert.equal(assignmentsRes.status, 200);
   assert.match(
     assignmentsRes.text,

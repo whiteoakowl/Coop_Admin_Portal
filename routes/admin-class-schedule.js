@@ -298,13 +298,27 @@ router.post('/class-schedule/archive/delete-all', requireFullAdmin, async (req, 
   res.redirect('/admin/schedule?tab=archive&notice=' + encodeURIComponent(`Deleted all ${count} archived class(es).`));
 });
 
+// A real bug report: "when adding or deleting new members on edit class
+// popup it goes to an error page." Every one of these 4 routes called
+// straight into setEnrollment/addStaff/removeStaff with no try/catch, so
+// any failure there (a genuinely bad row, a transient DB error, anything)
+// fell through to server.js's generic catch-all and rendered the same
+// blank "Something went wrong" page every other unguarded upload/mutation
+// route used to (see routes/admin-documents.js's own identical fix) -
+// no way for the admin to tell what happened or for it to get reported
+// back accurately. Wrapping each in try/catch surfaces the real
+// underlying message via the existing error-banner redirect instead.
 router.post('/class-schedule/classes/:id/enrollment/add', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
   const addIds = [].concat(req.body.studentIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   const existingIds = cls.students.map((s) => s.id);
-  await setEnrollment(id, [...new Set([...existingIds, ...addIds])]);
+  try {
+    await setEnrollment(id, [...new Set([...existingIds, ...addIds])]);
+  } catch (err) {
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 
@@ -313,7 +327,11 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
   const studentId = parseInt(req.params.studentId, 10);
-  await setEnrollment(id, cls.students.map((s) => s.id).filter((sid) => sid !== studentId));
+  try {
+    await setEnrollment(id, cls.students.map((s) => s.id).filter((sid) => sid !== studentId));
+  } catch (err) {
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 
@@ -323,7 +341,11 @@ router.post('/class-schedule/classes/:id/staff/add', requireFullAdmin, async (re
   if (!cls) return res.status(404).send('Not found');
   const memberId = parseInt(req.body.memberId, 10);
   const role = req.body.role === 'assistant' ? 'assistant' : 'teacher';
-  if (memberId) await addStaff(id, memberId, role);
+  try {
+    if (memberId) await addStaff(id, memberId, role);
+  } catch (err) {
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 
@@ -331,7 +353,11 @@ router.post('/class-schedule/classes/:id/staff/:memberId/remove', requireFullAdm
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
-  await removeStaff(id, parseInt(req.params.memberId, 10));
+  try {
+    await removeStaff(id, parseInt(req.params.memberId, 10));
+  } catch (err) {
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
+  }
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });
 
@@ -349,19 +375,35 @@ router.post('/class-schedule/classes/:id/roster/add', requireFullAdmin, async (r
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
-
-  const role = req.body.role;
-  if (role === 'student') {
-    const studentId = parseInt(req.body.studentId, 10);
-    if (studentId) {
-      const existingIds = cls.students.map((s) => s.id);
-      if (!existingIds.includes(studentId)) await setEnrollment(id, [...existingIds, studentId]);
-    }
-  } else if (role === 'teacher' || role === 'assistant') {
-    const staffId = parseInt(req.body.staffId, 10);
-    if (staffId) await addStaff(id, staffId, role);
-  }
   const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
+
+  try {
+    const role = req.body.role;
+    if (role === 'student') {
+      const studentId = parseInt(req.body.studentId, 10);
+      if (studentId) {
+        const existingIds = cls.students.map((s) => s.id);
+        if (!existingIds.includes(studentId)) await setEnrollment(id, [...existingIds, studentId]);
+      }
+    } else if (role === 'teacher' || role === 'assistant') {
+      const staffId = parseInt(req.body.staffId, 10);
+      if (staffId) await addStaff(id, staffId, role);
+    }
+  } catch (err) {
+    // A real bug report: "when adding or deleting new members on edit
+    // class popup it goes to an error page." public/js/class-schedule-
+    // view.js's fetch()-based Add Member handler falls back to a real
+    // form.submit() on ANY non-ok response - before this, that resubmit
+    // hit this exact same unguarded code a second time and crashed into
+    // server.js's generic catch-all either way, so the fallback never
+    // actually helped. Returning a real error here for both paths (JSON
+    // for the fetch case, a redirect with the existing error banner for
+    // the plain-form fallback) means a genuine failure now surfaces the
+    // real reason instead of a blank "Something went wrong" no matter
+    // which path handles it.
+    if (wantsJson) return res.status(500).json({ ok: false, error: err.message });
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not add member: ${err.message}`));
+  }
   if (wantsJson) return res.json({ ok: true });
   res.redirect(`/admin/class-schedule/${cls.day}`);
 });

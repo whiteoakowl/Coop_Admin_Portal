@@ -82,7 +82,7 @@
                   <p class="team-card-empty">No floaters assigned to this hour yet.</p>
                 <% } %>
                 <% team.members.forEach(function(m) { %>
-                  <div class="team-member-row">
+                  <div class="team-member-row" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                     <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
                     <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
@@ -92,9 +92,18 @@
                         <% }); %>
                       </select>
                     </form>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/remove" class="inline-block-form no-print" data-edit-toggle-reveal hidden data-confirm="Remove <%= m.name %> from <%= team.hourLabel %>?">
-                      <button type="submit" class="icon-btn" aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
+                    <%# A real request: "when deleting floaters ... it
+                        should allow for multiple deletes and then click
+                        save before refreshing." This trash icon no longer
+                        submits its own form immediately - it flips a
+                        same-named hidden checkbox tied (via form="...") to
+                        the card's own hour-edit-form, so any number of
+                        pending removals ride along with that form's
+                        single Save submission instead of each causing its
+                        own round trip/page reload (public/js/team-member-
+                        remove-toggle.js). %>
+                    <input type="checkbox" name="removeMemberIds" value="<%= m.id %>" form="hour-edit-form-<%= team.section.id %>" hidden data-member-remove-checkbox />
+                    <button type="button" class="icon-btn" data-edit-toggle-reveal hidden data-member-remove-btn aria-label="Remove <%= m.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
                   </div>
                 <% }); %>
               </div>
@@ -142,5 +151,6 @@
     </dialog>
   </main>
   <script src="/js/edit-toggle.js"></script>
+  <script src="/js/team-member-remove-toggle.js"></script>
 </body>
 </html>

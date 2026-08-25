@@ -12,14 +12,6 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Teams</p>
-      </div>
-    </div>
-
     <% if (teams.length === 0) { %>
       <p class="roster-empty">No teams yet.</p>
     <% } %>
@@ -32,60 +24,79 @@
             form controls here at all (no <input>, no <select>, no edit/
             delete/remove buttons) - this page is read-only by design, so
             there's nothing for @media print to have to hide.
-
-            Team 1 only (i === 0) shares its physical page with
-            .print-header above (see styles.css's .team-print-page-fit
-            comment on why every OTHER team still gets a page fully to
-            itself via page-break-before) - a real bug report: "the first
-            page blank... team 1 and 2 fit to one page each" turned out to
-            mean the header, alone on its own page ahead of every team,
-            just LOOKED blank/wasted (a small logo + two lines of text on
-            an otherwise empty 8.5x11 sheet). Giving team 1's own budget
-            the same 9.2in as every other team once it's no longer alone
-            on its page is wrong, though - confirmed live: a busy team 1
-            (many members) genuinely spilled onto a second page, since the
-            header (measured ~0.79in tall, logo + two lines + margin) was
-            never subtracted from what team 1 actually has left to shrink
-            into. 8.2in leaves real margin below the measured ~8.4in that
-            would just barely fit, same "don't ride right up against the
-            threshold" cushion .team-print-page-fit's own 9.2in already
-            uses. %>
-        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="<%= i === 0 ? '8.2in' : '9.2in' %>">
-          <div class="team-col">
-            <div class="team-info-card team-accent-<%= i % 5 %>">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
-              <h3 class="team-info-title"><%= t.title %></h3>
-              <% if (t.description) { %><p class="team-info-desc-print"><%= t.description %></p><% } %>
-              <div class="team-print-meta">
-                <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
-                <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>
-                <% if (t.meeting_location) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= t.meeting_location %></span><% } %>
+            print-header is repeated inside every card's own wrapper
+            (a real request: "the logo header should be on every page")
+            rather than once at the top of the document - one team per
+            physical page means a single top-level header would only
+            ever land on whichever page happens to hold it, not every
+            page. Wrapped together with .team-col in one inner div (not
+            as separate siblings of .team-print-page-fit) because
+            print-shrink-to-fit.js's fitOne() shrinks exactly ONE element
+            - wrap.firstElementChild - so header and card have to be that
+            same single child to shrink as one unit together.
+            data-shrink-to-fit-group="teams" levels every team's page on
+            this day down to whichever ONE team needed the most shrinking
+            - a real request, twice over: first "all pages should have
+            the same font size" (which is why this existed originally),
+            then removed after a follow-up report that a light team's
+            page was left "mostly blank" once leveled down to match one
+            genuinely oversized team, then a further follow-up report -
+            with two screenshots, one clearly larger font than the other
+            - that independent per-team sizing looked WORSE: "printing
+            setup cleanup team pages are still two different font sizes
+            ... they should all be the same font size and fit on one
+            page." Consistency across every page in the same print job
+            wins over a given page using its own full available room -
+            back to group leveling. Every card's own font size is still
+            fixed at 12pt/18pt as a starting point (styles.css's
+            .setup-team-card-grid rules below) - fitGroup (public/js/
+            print-shrink-to-fit.js) only ever shrinks BELOW that shared
+            starting point, per the day's busiest team, never per-page. %>
+        <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in" data-shrink-to-fit-group="teams">
+          <div class="team-print-page-inner">
+            <div class="print-header">
+              <img src="/img/logo.png" alt="" />
+              <div>
+                <p class="print-header-title">Sanford Homeschoolers</p>
+                <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Teams</p>
               </div>
             </div>
-            <div class="team-members-card">
-              <h4>Members</h4>
-              <div class="team-card-members">
-                <% if (t.members.length === 0) { %>
-                  <p class="team-card-empty">No members yet.</p>
-                <% } %>
-                <% t.members.forEach(function(m) { %>
-                  <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
-                    <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
-                  </div>
-                <% }); %>
+            <div class="team-col">
+              <div class="team-info-card team-accent-<%= i % 5 %>">
+                <span class="team-info-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
+                <h3 class="team-info-title"><%= t.title %></h3>
+                <% if (t.description) { %><p class="team-info-desc-print"><%= t.description %></p><% } %>
+                <div class="team-print-meta">
+                  <% if (t.leaderName) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-user"/></svg> <%= t.leaderName %></span><% } %>
+                  <% if (t.meeting_time) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-clock"/></svg> <%= t.meeting_time %></span><% } %>
+                  <% if (t.meeting_location) { %><span class="team-print-meta-item"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= t.meeting_location %></span><% } %>
+                </div>
               </div>
-            </div>
-            <% if (t.taskSection && t.taskSection.items.length > 0) { %>
-              <div class="team-tasks-card">
-                <h4>Tasks</h4>
-                <ol class="team-tasks-list">
-                  <% t.taskSection.items.forEach(function(item) { %>
-                    <li><%= item.description %></li>
+              <div class="team-members-card">
+                <h4>Members</h4>
+                <div class="team-card-members">
+                  <% if (t.members.length === 0) { %>
+                    <p class="team-card-empty">No members yet.</p>
+                  <% } %>
+                  <% t.members.forEach(function(m) { %>
+                    <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>">
+                      <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
+                      <span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
+                    </div>
                   <% }); %>
-                </ol>
+                </div>
               </div>
-            <% } %>
+              <% if (t.taskSection && t.taskSection.items.length > 0) { %>
+                <div class="team-tasks-card">
+                  <h4>Tasks</h4>
+                  <ol class="team-tasks-list">
+                    <% t.taskSection.items.forEach(function(item) { %>
+                      <li><%= item.description %></li>
+                    <% }); %>
+                  </ol>
+                </div>
+              <% } %>
+            </div>
           </div>
         </div>
       <% }); %>

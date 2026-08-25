@@ -109,6 +109,24 @@ test('todayISO', async (t) => {
     assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
     assert.equal(isValidISODate(today), true);
   });
+
+  // A real bug: this used to derive "today" from new Date()'s
+  // server-local Y/M/D - fine on a machine already running Eastern time,
+  // but Netlify Functions run in UTC, so from ~8pm-midnight Eastern the
+  // UTC clock has already rolled to the next calendar day, and every
+  // "today" comparison across the app (dashboard stats, alerts,
+  // attendance session_date) silently pointed at tomorrow. This instant
+  // is 2:00 AM UTC on June 16 - 10:00 PM Eastern (EDT, UTC-4) on June 15
+  // - so todayISO() must return the 15th, not the 16th, regardless of
+  // what timezone the server process itself is running in.
+  await t.test('uses the Eastern calendar day, not the server process timezone, even when they disagree', () => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-06-16T02:00:00Z').getTime() });
+    try {
+      assert.equal(todayISO(), '2024-06-15');
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
 });
 
 test('formatDateLabel / formatDateLong', async (t) => {
@@ -138,9 +156,23 @@ test('formatTime', async (t) => {
     assert.equal(formatTime(undefined), null);
   });
 
-  await t.test('formats a real epoch timestamp as h:mm AM/PM', () => {
+  // A real bug report: "check in and out times should read Eastern Time
+  // (ET)." formatTime always renders in America/New_York regardless of
+  // the server's own OS timezone (Netlify Functions run in UTC) - this
+  // epoch is 14:30 UTC in June (EDT, UTC-4), so it should read 10:30 AM,
+  // not the server-local "2:30 PM" a bare toLocaleTimeString would give
+  // on a UTC host.
+  await t.test('formats a real epoch timestamp as h:mm AM/PM, in Eastern Time regardless of server timezone', () => {
     const epoch = new Date('2024-06-15T14:30:00Z').getTime();
-    assert.equal(formatTime(epoch), '2:30 PM');
+    assert.equal(formatTime(epoch), '10:30 AM');
+  });
+
+  // Same conversion, but in January (EST, UTC-5, no daylight saving) -
+  // proves this uses the real America/New_York IANA zone (which already
+  // knows the EST/EDT boundary) rather than a fixed UTC-4/-5 offset.
+  await t.test('accounts for standard time (EST, UTC-5) in winter, not just daylight time', () => {
+    const epoch = new Date('2024-01-15T14:30:00Z').getTime();
+    assert.equal(formatTime(epoch), '9:30 AM');
   });
 
   // Coverage for a live bug report: attendance.check_in_time/checkouts.
@@ -156,7 +188,7 @@ test('formatTime', async (t) => {
   // Logs > Check In/Out tab, member profile history, CSV exports).
   await t.test('formats correctly even when epochMs arrives as a numeric STRING (Postgres bigint-as-string)', () => {
     const epoch = new Date('2024-06-15T14:30:00Z').getTime();
-    assert.equal(formatTime(String(epoch)), '2:30 PM');
+    assert.equal(formatTime(String(epoch)), '10:30 AM');
   });
 
   await t.test('returns null (not "Invalid Date") for a falsy/zero value that arrives as a string too', () => {
@@ -189,13 +221,19 @@ test('formatTimestamp / formatFriendlyTimestamp', async (t) => {
     assert.equal(formatFriendlyTimestamp(null), null);
   });
 
-  await t.test('convert a SQLite UTC datetime string to a local label', () => {
-    assert.equal(formatTimestamp('2024-06-15 16:30:00'), '6/15/2024, 4:30 PM');
-    assert.equal(formatFriendlyTimestamp('2024-06-15 16:30:00'), 'June 15, 2024 4:30pm');
+  // A real bug: this used to render in whatever OS timezone the server
+  // process itself runs in (UTC on Netlify Functions), the same class of
+  // bug formatTime above was already fixed for - now pinned to
+  // 'America/New_York' regardless of server timezone. 16:30 UTC in June
+  // (EDT, UTC-4) is 12:30 PM Eastern, not the server-local "4:30 PM" a
+  // bare toLocaleString would give on a UTC host.
+  await t.test('convert a UTC datetime string to an Eastern-time label, regardless of server timezone', () => {
+    assert.equal(formatTimestamp('2024-06-15 16:30:00'), '6/15/2024, 12:30 PM');
+    assert.equal(formatFriendlyTimestamp('2024-06-15 16:30:00'), 'June 15, 2024 12:30pm');
   });
 
   await t.test('formatFriendlyTimestamp pads single-digit minutes', () => {
-    assert.equal(formatFriendlyTimestamp('2024-06-15 09:05:00'), 'June 15, 2024 9:05am');
+    assert.equal(formatFriendlyTimestamp('2024-06-15 09:05:00'), 'June 15, 2024 5:05am');
   });
 });
 

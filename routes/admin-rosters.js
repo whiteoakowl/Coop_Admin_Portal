@@ -15,9 +15,10 @@ const {
   classRosterIdsForDay,
   HOUR_POSITIONS,
 } = require('../utils/classSchedule');
-const { defaultDay, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
+const { defaultDay, DAYS, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
 const { REASON_LABELS } = require('../utils/rosters');
 const { rosterDates, buildRosterGridData } = require('../utils/rosterGrid');
+const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
 
 // The alert log below the grid only makes sense for today, and only when
 // today is actually a session day for this roster's day-of-week (mirrors
@@ -151,6 +152,7 @@ function archiveRow(row) {
       checkOutTime: c.checkOutTime,
       number: c.number,
       cleanupTaskNumber: c.cleanupTaskNumber,
+      cleanupTeamName: c.cleanupTeamName,
     })),
   };
 }
@@ -296,6 +298,65 @@ router.get('/rosters', requireAdmin, async (req, res) => {
       dayFilter,
       hourFilter,
       hourPositions: HOUR_POSITIONS,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  // Playground: an open drop-in log with no fixed roster - "anybody can
+  // check in and out of the playground" - so unlike Classes (a list of
+  // real `classes` rows), there's nothing to list except the 8 fixed
+  // (day, hour) slots themselves. Each links to its own tab key
+  // ("playground-monday-1", mirroring "class-<id>" above), which the
+  // regex just below matches against.
+  if (requestedTab === 'playground') {
+    const entries = [];
+    for (const day of DAYS) {
+      for (const hour of HOUR_POSITIONS) {
+        entries.push({ day, hour, dayLabel: DAY_LABELS[day], hourLabel: await playgroundHourLabel(day, hour) });
+      }
+    }
+    return res.render('admin-rosters', {
+      title: 'Attendance',
+      tab: 'playground',
+      topTab: 'playground',
+      view: 'playgroundList',
+      playgroundEntries: entries,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  const playgroundMatch = /^playground-(monday|wednesday)-([1-4])$/.exec(requestedTab);
+  if (playgroundMatch) {
+    const pgDay = playgroundMatch[1];
+    const pgHour = parseInt(playgroundMatch[2], 10);
+    const rosterId = await ensurePlaygroundRoster(pgDay, pgHour);
+    // A playground slot borrows its session dates from the day's Student
+    // roster, same reasoning as a class roster (utils/classSchedule.js's
+    // ensureClassRoster) - playground runs during the same sessions
+    // classes do, so there's no such thing as a session date the day's
+    // students have that playground doesn't, or vice versa. Read live
+    // rather than stored, so there's no separate Edit Dates step to keep
+    // in sync (unlike a class roster's own roster_dates rows).
+    const studentRosterId = await ensureDayRoster(pgDay, 'student');
+    const pgDates = await rosterDates(studentRosterId);
+    const today = todayISO();
+    const requestedDate = isValidISODate(req.query.date) && pgDates.includes(req.query.date) ? req.query.date : null;
+    const selectedDate = requestedDate || [...pgDates].reverse().find((d) => d <= today) || pgDates[pgDates.length - 1] || null;
+    return res.render('admin-rosters', {
+      title: 'Attendance',
+      tab: requestedTab,
+      topTab: 'playground',
+      view: 'playgroundLog',
+      pgDay,
+      pgHour,
+      pgDayLabel: DAY_LABELS[pgDay],
+      pgHourLabel: await playgroundHourLabel(pgDay, pgHour),
+      pgDates: pgDates.map((d) => ({ date: d, label: formatDateLabel(d) })),
+      selectedDate,
+      selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+      log: selectedDate ? await playgroundLogForDate(rosterId, selectedDate) : [],
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
