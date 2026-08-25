@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Events</h1>
+    <p class="hint">Create and manage co-op events - registration, volunteer roles, and donation requests.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+      </div>
+    </div>
+
+    <% if (events.length === 0) { %>
+      <p class="roster-empty">No events yet &mdash; create one above.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% events.forEach(function(e) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+            <h3 class="team-info-title"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></h3>
+            <span class="badge-pill badge-pill-<%= e.status === 'published' ? 'green' : e.status === 'cancelled' ? 'gray' : 'orange' %>"><%= e.status.charAt(0).toUpperCase() + e.status.slice(1) %></span>
+            <p class="hint"><%= e.visibility === 'public' ? 'Public' : 'Members only' %></p>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/builder">Edit</a>
+              <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Registrations</a>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <dialog id="new-event-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events">
+        <h3>New Event</h3>
+        <label>Title
+          <input type="text" name="title" placeholder="e.g. Fall Family Picnic" required />
+        </label>
+        <label>Starts
+          <input type="datetime-local" name="startsAt" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

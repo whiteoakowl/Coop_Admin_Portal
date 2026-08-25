@@ -6006,6 +6006,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .site-benefit-card h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--ink); }
 .site-benefit-card p { font-size: 0.95rem; margin: 0; }
 
+/* Events (Community & Commerce track) - public/member event browsing
+   cards. No existing shape covers "card with an image on top, a date
+   line, and a title" so this is new, but reuses the same tokens/border/
+   radius/shadow every other card family here already uses. */
+.event-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+.event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform 0.15s ease; }
+.event-card:hover { transform: translateY(-2px); }
+.event-card-image { aspect-ratio: 16 / 9; overflow: hidden; }
+.event-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.event-card-body { padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.event-card-body h3 { margin: 0; font-size: 1.05rem; color: var(--ink); }
+.event-card-date { font-size: 0.82rem; color: var(--brand-dark, var(--brand)); font-weight: 700; display: flex; align-items: center; gap: 0.35rem; }
+.event-card-location { margin: 0; font-size: 0.88rem; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; }
+
 .site-announcement-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
 .site-announcement-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; text-align: left; }
 .site-announcement-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--ink); }

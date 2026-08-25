@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Registrations &mdash; <%= event.title %></h1>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">&larr; Back to Event</a>
+      </div>
+    </div>
+
+    <% if (registrations.length === 0) { %>
+      <p class="roster-empty">No one has registered yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Registered</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% registrations.forEach(function(r) { %>
+              <tr>
+                <td class="roster-name-col"><%= r.memberName %></td>
+                <td>
+                  <% if (r.status === 'confirmed') { %>
+                    <span class="badge-pill badge-pill-green">Confirmed</span>
+                  <% } else if (r.status === 'waitlisted') { %>
+                    <span class="badge-pill badge-pill-orange">Waitlisted</span>
+                  <% } else { %>
+                    <span class="badge-pill badge-pill-gray">Cancelled</span>
+                  <% } %>
+                </td>
+                <td><%= r.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/events">&larr; All Events</a></p>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <% if (event.imageUrl) { %>
+          <img src="<%= event.imageUrl %>" alt="" style="width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); margin-bottom: 1.25rem;" />
+        <% } %>
+
+        <h1><%= event.title %></h1>
+        <p class="site-hero-meta"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= startsLabel %><% if (endsLabel) { %> &ndash; <%= endsLabel %><% } %></p>
+        <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
+        <% if (event.description) { %><p><%= event.description %></p><% } %>
+
+        <% if (!portalAccount) { %>
+          <p class="hint"><a href="/login?next=<%= encodeURIComponent('/events/' + event.id) %>">Log in</a> to register, volunteer, or claim a donation item.</p>
+        <% } else { %>
+
+          <div class="manage-section">
+            <div class="grid-box-header"><h2>Register</h2></div>
+            <% if (event.capacity != null) { %><p class="hint"><%= event.registrationCount %>/<%= event.capacity %> registered<% if (event.waitlistCount) { %> &middot; <%= event.waitlistCount %> waitlisted<% } %></p><% } %>
+            <div class="roster-btn-row">
+              <% family.forEach(function(m) { %>
+                <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
+                  <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form">
+                    <input type="hidden" name="memberId" value="<%= m.id %>" />
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                  </form>
+                <% } else { %>
+                  <form method="POST" action="/events/<%= event.id %>/register" class="inline-block-form">
+                    <input type="hidden" name="memberId" value="<%= m.id %>" />
+                    <button type="submit" class="roster-action-btn"><%= m.name %>: Register</button>
+                  </form>
+                <% } %>
+              <% }); %>
+            </div>
+          </div>
+
+          <% if (event.volunteerRoles.length) { %>
+            <div class="manage-section">
+              <div class="grid-box-header"><h2>Volunteer</h2></div>
+              <div class="training-lesson-list">
+                <% event.volunteerRoles.forEach(function(role) { %>
+                  <div class="training-lesson-row">
+                    <div class="training-lesson-row-main">
+                      <svg class="icon"><use href="#icon-users"/></svg>
+                      <div class="training-lesson-info">
+                        <strong><%= role.role_name %></strong>
+                        <span class="hint">
+                          <%= role.remaining %> spot<%= role.remaining == 1 ? '' : 's' %> left
+                          <% if (role.time_label) { %> &middot; <%= role.time_label %><% } %>
+                          <% if (role.location) { %> &middot; <%= role.location %><% } %>
+                        </span>
+                        <% if (role.description) { %><span class="hint"><%= role.description %></span><% } %>
+                      </div>
+                      <div class="training-lesson-actions roster-btn-row">
+                        <% family.forEach(function(m) { %>
+                          <% var key = role.id + ':' + m.id; %>
+                          <% if (volunteeredKey.indexOf(key) !== -1) { %>
+                            <form method="POST" action="/events/<%= event.id %>/volunteer-roles/<%= role.id %>/cancel" class="inline-block-form">
+                              <input type="hidden" name="memberId" value="<%= m.id %>" />
+                              <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                            </form>
+                          <% } else if (role.remaining > 0) { %>
+                            <form method="POST" action="/events/<%= event.id %>/volunteer-roles/<%= role.id %>/signup" class="inline-block-form">
+                              <input type="hidden" name="memberId" value="<%= m.id %>" />
+                              <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
+                            </form>
+                          <% } %>
+                        <% }); %>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (event.donationItems.length) { %>
+            <div class="manage-section">
+              <div class="grid-box-header"><h2>Donations Needed</h2></div>
+              <div class="training-lesson-list">
+                <% event.donationItems.forEach(function(item) { %>
+                  <div class="training-lesson-row">
+                    <div class="training-lesson-row-main">
+                      <svg class="icon"><use href="#icon-badge"/></svg>
+                      <div class="training-lesson-info">
+                        <strong><%= item.item_name %></strong>
+                        <span class="hint">
+                          <%= item.remaining %> still needed
+                          <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
+                        </span>
+                        <% if (item.notes) { %><span class="hint"><%= item.notes %></span><% } %>
+                      </div>
+                      <% if (item.remaining > 0) { %>
+                        <form method="POST" action="/events/<%= event.id %>/donation-items/<%= item.id %>/claim" class="training-lesson-actions">
+                          <select name="memberId">
+                            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+                          </select>
+                          <input type="number" name="quantity" min="1" value="1" max="<%= item.remaining %>" style="width: 4rem;" />
+                          <button type="submit" class="roster-action-btn">I'll Bring It</button>
+                        </form>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

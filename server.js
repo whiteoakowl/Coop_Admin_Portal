@@ -110,6 +110,13 @@ const publicSiteRouter = require('./routes/public-site');
 const portalAuthRouter = require('./routes/portal-auth');
 const parentPortalRouter = require('./routes/parent-portal');
 const mainAdminRouter = require('./routes/main-admin');
+// Community & Commerce track (Track B, TEAM_B_HANDOFF.md) - member/
+// public-facing Events at /events, admin Events management folded into
+// the Main Admin Portal's own URL namespace at /main-admin/events (a
+// sibling router, not an edit to routes/main-admin.js itself, which is
+// on Track A's hard-boundary list).
+const eventsRouter = require('./routes/events');
+const adminEventsRouter = require('./routes/admin-events');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -287,6 +294,8 @@ app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
 app.use('/main-admin', mainAdminRouter);
+app.use('/events', eventsRouter);
+app.use('/main-admin/events', adminEventsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

@@ -129,18 +129,54 @@ extend it.
   and `faqs` — the actual "admins don't need to touch code" requirement,
   scoped to the copy that matters rather than a full arbitrary page builder.
 
+## Community & Commerce track — Events, Volunteer signups, Donation
+   signups (done — Track B, branch `platform-community-commerce`)
+
+- `supabase/migrations/20260825030000_events_module.sql`: `events`,
+  `event_registrations`, `event_volunteer_roles`, `event_volunteer_signups`,
+  `event_donation_items`, `event_donation_claims`. `manage_events`/
+  `manage_volunteers` permissions were already pre-seeded in
+  `db/bootstrapPg.js` for this track to use.
+- `utils/events.js`: all business logic — capacity/waitlist registration
+  (same shape Parent Portal's own class registration already established),
+  volunteer-role slot-filling and donation-item quantity-claimed always
+  re-derived live from real rows server-side, never a cached counter.
+- `routes/admin-events.js` (mounted `/main-admin/events`, gated
+  `requirePortalAuth, requirePortal('main_admin'), requirePortalPermission
+  ('manage_events')`): create/edit/publish/cancel/delete an event, upload an
+  event image (public bucket, same `utils/storage.js` pattern as
+  admin-name-tag.js/admin-schedule.js), manage its volunteer roles and
+  donation items, and a read-only registrations report. A sibling router,
+  not an edit to the off-limits `routes/main-admin.js` — existing Main
+  Admin pages don't gain a reciprocal nav link back to Events because of
+  that same boundary (an accepted, documented tradeoff).
+- `routes/events.js` (mounted `/events`): public/member browsing —
+  `visibility: 'public'` events are visible signed out, every published
+  event is visible to any signed-in portal account (not scoped to one
+  portal, unlike class registration). Registering, volunteering, and
+  claiming a donation item all require sign-in and let an account act for
+  itself or any member of its own family (`familyForAccount`, generalized
+  from Parent Portal's own student-only `childrenForAccount`) — every
+  mutating route re-verifies the target member is really part of the
+  acting account's family before writing anything.
+- Real route-level tests: `test/routes-events.test.js` (admin create/
+  publish, public-vs-members visibility, family registration + capacity/
+  waitlist, cross-family access denial, volunteer slot-filling, donation
+  claim clamping).
+
 ## Explicitly NOT built yet
 
-Everything else in the original request: Student Portal, Teacher Portal,
-lessons/assignments/grading beyond the existing Training module, staged/
-group registration windows (today it's a simple per-class open/closed
-toggle), Events + volunteer/donation signups, weekly newsletter, SMS
-notifications, accounting/payments, Store, Forums, Library parent-facing
-integration, Diplomas, Transcripts, Classifieds, Business/Member Directory,
-custom Form builder, Photos/Albums, Publications/Articles, full website
-appearance control (colors/logo/nav), audit log, notification center, global
-search, and generalized documents. See `TEAM_B_HANDOFF.md` for how this is
-being split into two parallel tracks.
+Student Portal, Teacher Portal, lessons/assignments/grading beyond the
+existing Training module, staged/group registration windows (today it's a
+simple per-class open/closed toggle) — all Track A scope. Business
+Directory + Classifieds, Member Directory, Forums, Custom Forms, Store,
+Accounting/Payments, weekly newsletter, SMS/notification framework,
+Photos/Albums + Publications/Articles, audit log, and global search —
+Track B scope, next up after Events/Volunteer/Donation signups above. Also
+still missing: Diplomas, Transcripts, Library parent-facing integration,
+full website appearance control (colors/logo/nav), and generalized
+documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
+parallel tracks.
 
 ## Verification so far
 
