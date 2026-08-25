@@ -110,6 +110,54 @@ extend it.
 - Every route re-derives "this parent's own children" itself rather than
   trusting a student id from the request — a parent can only ever register/
   cancel their own family's students.
+- **Staged/group registration windows** (the piece the portal foundation
+  migration's own comment called out as "intentionally not built here"):
+  `supabase/migrations/20260825030000_registration_windows.sql`'s
+  `registration_windows` table (label, target role or "everyone",
+  opens/closes) plus `utils/registrationWindows.js`
+  (`isRegistrationOpenForAccount`, `nextWindowForAccount`). A class only
+  accepts a new registration once its own `registration_open` flag is set
+  *and*, if any windows exist at all, the parent qualifies for one that's
+  currently open — with no windows defined, behavior is identical to
+  before this existed (every open class, open to everyone). Managed at
+  `/main-admin/registration-windows` (gated by the pre-existing
+  `manage_classes` permission). Cancelling an existing registration is
+  never gated by windows — only *new* registrations are.
+- **Admin UI gap closed**: the Co-op Admin Portal's own Add/Edit Class
+  dialog (`views/partials/class-schedule-grid.ejs`,
+  `views/admin-class-schedule-manage.ejs`,
+  `views/class-schedule-view-fragment.ejs`) had no way to actually set
+  `capacity`/`registration_open`/`description` — Parent Portal's
+  registration feature depended on fields nothing in the UI could edit.
+  Added a "Parent Portal Registration" section to all three forms
+  (`utils/classSchedule.js`'s `createClass`/`updateClass` now accept and
+  persist them).
+- **`utils/dates.js` gained `easternInputToUtcText`**: converts an admin's
+  `<input type="datetime-local">` value (interpreted as the co-op's own
+  Eastern time, same convention as this file's existing `todayISO`/
+  `formatTime`) into the UTC text `now_text()` itself produces, so window
+  times can be compared with plain string operators. No timezone library
+  existed in this app for the "local wall time → UTC" direction (unlike
+  the reverse, which `Intl` handles directly) — implemented via the
+  standard render-and-diff trick, documented inline.
+- **Real gap found and fixed while building this**: `data-confirm` forms
+  (the sitewide delete-confirmation attribute) were silently inert on
+  every portal page — `views/partials/portal-nav.ejs` never loaded
+  `confirm-dialog.js` or the dialog markup the way `admin-nav.ejs` does.
+  Fixed once in the shared partial, so it now works for every portal
+  (Main Admin's Website/Registration deletes, Parent Portal's own forms),
+  not just the new Registration Windows page that surfaced it.
+- **Library** (`GET /parent/library`): read-only view of this family's own
+  library activity (currently checked-out items with due dates, overdue
+  flagged, plus a short recent-returns history) — the "Library parent-
+  facing integration" scope item. Reuses the *existing*
+  `library_items`/`library_checkouts` tables and the Co-op Admin Portal's
+  own scan-based checkout/check-in tools (`routes/admin-library.js`)
+  unchanged; this is purely a filtered view (`utils/library.js`'s new
+  `libraryActivityForMemberIds`), not a second checkout system. Scoped to
+  every member of the parent's own family (`utils/members.js`'s existing
+  `familyOf`), not just their children — a parent can check items out on
+  their own barcode too.
 
 ## Main Admin Portal (done — enough to actually run the system)
 
@@ -129,23 +177,115 @@ extend it.
   and `faqs` — the actual "admins don't need to touch code" requirement,
   scoped to the copy that matters rather than a full arbitrary page builder.
 
+## Teacher Portal (done — view-only rosters)
+
+- `routes/teacher-portal.js`, gated `requirePortalAuth, requirePortal('teacher')`.
+- **Home** (`GET /teacher`): every class the signed-in teacher is staffed on
+  (read from the *existing* `class_staff` table — the same teacher/assistant
+  model `routes/admin-schedule.js` already uses, not a parallel list), with
+  a student count and co-teacher names, reusing `allClassesList`'s computed
+  fields (`timeLabel`/`gradeLabel`/`teacherNames`) rather than re-deriving
+  day/time formatting a second time.
+- **Roster** (`GET /teacher/classes/:id`): the enrolled students for one of
+  the teacher's own classes (name, grade, medical/allergy notes — the same
+  fields the existing class-roster print view already shows a teacher on
+  paper). Re-derives "does this teacher actually teach this class" from
+  `class_staff` on every request rather than trusting the id in the URL —
+  a teacher can't view another class's roster by guessing its id.
+- **Assignments/Grading** (`utils/academics.js`): a teacher creates
+  assignments for their own class (`GET`/`POST /teacher/classes/:id/
+  assignments`) and grades them (`GET /teacher/assignments/:id`, `POST
+  /teacher/assignments/:id/grades` — one bulk save across the whole
+  roster). `class_assignments.class_name` is a **snapshot taken at
+  creation**, not a live join, and `class_id` is `ON DELETE SET NULL` —
+  the same "flatten to plain text, drop the FK-linked detail" pattern
+  `class_schedule_archives` already uses, needed for the same reason: a
+  class being archived must not destroy the grades a student already
+  earned in it. Confirmed live (see Verification below) — a grade
+  recorded before archiving is still visible after.
+
+## Student Portal (done — view-only schedule + academic record)
+
+- `routes/student-portal.js`, gated `requirePortalAuth, requirePortal('student')`.
+- **Home** (`GET /student`) and **My Classes** (`GET /student/classes`): the
+  student's own enrolled classes, read from the *existing*
+  `class_enrollments` table. Registration itself stays a Parent Portal
+  action (a parent registers their children) — this portal only ever
+  displays what's already there, never a second enrollment path a parent's
+  view and a student's view could drift out of sync on.
+- **Assignments** (`GET /student/assignments`): ungraded work for
+  currently-enrolled classes, plus every assignment the student has ever
+  been graded on — including from an archived class (see above).
+- **Transcript** (`GET /student/transcript`): this term's live enrollments
+  plus **`student_academic_history`**, a per-student row written once by
+  `archiveClasses` (`utils/classSchedule.js`) at the moment a class is
+  archived — archiving already deletes the live class (cascading away its
+  `class_enrollments` rows), so this is the *only* source of past-term
+  transcript data. Terms archived before this migration existed have no
+  reconstructable history, the same limitation `class_schedule_archives`
+  itself already has.
+- **Diploma** (`GET /student/diploma`): shows the diploma a Main Admin has
+  issued (if any), with a print-friendly view (`window.print()`, the same
+  pattern every other printable page in this app already uses).
+- Parent Portal surfaces the same three (assignments/transcript/diploma)
+  read-only for each of the parent's own children on one combined page,
+  **`GET /parent/academics`**.
+
+## Main Admin: Diplomas (done)
+
+- `/main-admin/diplomas` (gated by the new `manage_academics` permission):
+  issue a diploma to any active student (title, issue date, optional body
+  text) — re-issuing just updates the existing row (one diploma per
+  student, not an accumulating list). Shows up on that student's Student
+  Portal and their parents' Parent Portal immediately.
+
 ## Explicitly NOT built yet
 
-Everything else in the original request: Student Portal, Teacher Portal,
-lessons/assignments/grading beyond the existing Training module, staged/
-group registration windows (today it's a simple per-class open/closed
-toggle), Events + volunteer/donation signups, weekly newsletter, SMS
-notifications, accounting/payments, Store, Forums, Library parent-facing
-integration, Diplomas, Transcripts, Classifieds, Business/Member Directory,
-custom Form builder, Photos/Albums, Publications/Articles, full website
-appearance control (colors/logo/nav), audit log, notification center, global
-search, and generalized documents. See `TEAM_B_HANDOFF.md` for how this is
-being split into two parallel tracks.
+Events + volunteer/donation signups, weekly newsletter, SMS notifications,
+accounting/payments, Store, Forums, Classifieds, Business/Member
+Directory, custom Form builder, Photos/Albums, Publications/Articles, full
+website appearance control (colors/logo/nav), audit log, notification
+center, global search, and generalized documents — this is now Team B's
+full remaining scope; see `TEAM_B_HANDOFF.md`. Track A's own originally-
+scoped list (Foundation through Diplomas/Transcripts, above) is complete.
 
 ## Verification so far
 
-- Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`).
+- Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`) —
+  re-confirmed after Teacher/Student Portal, registration windows, the
+  Library integration, and Assignments/Grading/Diplomas/Transcripts.
 - Lint clean repo-wide (`npx eslint .`).
+- Assignments/Grading/Diplomas/Transcripts live-verified end-to-end
+  (Playwright), including the archive-survival fix: a teacher creates an
+  assignment and grades a student; the grade shows correctly on both
+  Student Portal and Parent Portal; a Co-op Admin then **archives the
+  class** through the real Class Schedule "Archive" flow; the student's
+  Transcript correctly moves the class from "Current Term" to "Past
+  Terms" with the right teacher/date; and — the point of the exercise —
+  the earlier assignment and its grade are **still visible** on both
+  Student and Parent Portal after archiving, not silently deleted. (A
+  first pass of this got it wrong: `class_assignments.class_id` originally
+  cascade-deleted with the class, taking the assignment and its grade
+  with it — caught by this same live-verification pass, not a unit test,
+  and fixed by denormalizing `class_name` onto the assignment row and
+  changing the FK to `ON DELETE SET NULL` before commit.) Main Admin then
+  issues a diploma, which immediately appears on both Student and Parent
+  Portal with a working print view.
+- Parent Portal Library live-verified end-to-end (Playwright): a seeded
+  family with one active in-window checkout, one active overdue checkout
+  (on the parent's own barcode, not just a child's), and one already-
+  returned item all show correctly on `/parent/library` — overdue flagged,
+  due dates and return timestamps formatted, scoped to the whole family.
+- Registration windows live-verified end-to-end (Playwright): admin sets
+  a class's capacity/Open/description via the Class Schedule dialog and
+  it persists on save+reopen; Main Admin creates a Teacher-only window and
+  a parent account (holding only the `parent` role) correctly sees
+  registration gated with a "not open yet" message; adding a second,
+  everyone-targeted window immediately un-gates it; the parent completes
+  a real registration and the seat count decrements. Teacher/Student
+  Portal live-verified the same way (seeded teacher sees only their own
+  class + roster with medical notes; seeded student sees only their own
+  enrolled class).
 - Screenshot-verified live (Playwright) for: public homepage, registration
   page, portal login, Main Admin home/Users/Website. Two real CSS bugs were
   found and fixed this way (not by lint/tests): the hero "Learn More" button

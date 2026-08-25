@@ -11,7 +11,11 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
-const { formatFriendlyTimestamp } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
+const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
+const { familyOf } = require('../utils/members');
+const { libraryActivityForMemberIds } = require('../utils/library');
+const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -70,11 +74,16 @@ router.get('/classes', async (req, res) => {
     isFull: c.capacity != null && Number(c.studentCount) >= c.capacity,
   }));
 
+  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
+  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
+
   res.render('parent-classes', {
     title: 'Classes',
     classes,
     children,
     enrolledKey: [...enrolledKey],
+    windowOpen,
+    nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -92,6 +101,9 @@ router.post('/classes/:id/register', async (req, res) => {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) {
     return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for that class.'));
+  }
+  if (!(await isRegistrationOpenForAccount(req.portalRoles))) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
   }
   const alreadyEnrolled = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(classId, studentId);
   if (alreadyEnrolled) {
@@ -134,6 +146,36 @@ router.post('/classes/:id/unregister', async (req, res) => {
   });
 
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+});
+
+// Library - read-only. Reuses the EXISTING library_items/library_checkouts
+// tables the Co-op Admin Portal's own scan-based Library tools already
+// write to; a parent just gets a filtered view of their own family's
+// activity, not a second checkout system.
+router.get('/library', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const family = member ? [member, ...(await familyOf(member.id))] : [];
+  const memberIds = family.map((m) => m.id);
+  const { active, recentReturns } = await libraryActivityForMemberIds(memberIds);
+  res.render('parent-library', { title: 'Library', active, recentReturns });
+});
+
+// Academics - assignments/grades, transcript, and diploma status for each
+// of the parent's own children in one place (utils/academics.js). Purely
+// read-only, same as everywhere else a parent views (rather than acts on)
+// their children's records.
+router.get('/academics', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const academics = [];
+  for (const child of children) {
+    const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(child.id);
+    const classIds = enrolledRows.map((r) => r.class_id);
+    const assignments = await assignmentsForStudent(child.id, classIds);
+    const { current, history } = await transcriptForStudent(child.id);
+    const diploma = await diplomaForStudent(child.id);
+    academics.push({ child, assignments, current, history, diploma });
+  }
+  res.render('parent-academics', { title: 'Academics', academics });
 });
 
 module.exports = router;

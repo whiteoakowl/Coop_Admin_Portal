@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
+      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Assignments</h1>
+
+    <% if (assignments.length === 0) { %>
+      <p class="roster-empty">No assignments yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Assignment</th>
+              <th>Class</th>
+              <th>Due</th>
+              <th>Grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% assignments.forEach(function(a) { %>
+              <tr>
+                <td class="roster-name-col">
+                  <strong><%= a.title %></strong>
+                  <% if (a.description) { %><div class="hint"><%= a.description %></div><% } %>
+                </td>
+                <td><%= a.class_name %></td>
+                <td><%= a.dueDateLabel || '—' %></td>
+                <td>
+                  <% if (!a.graded) { %>
+                    <span class="hint">Not graded yet</span>
+                  <% } else { %>
+                    <strong><%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %></strong>
+                    <% if (a.feedback) { %><div class="hint"><%= a.feedback %></div><% } %>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

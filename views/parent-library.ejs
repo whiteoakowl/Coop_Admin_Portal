@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Library</h1>
+    <p class="hint">What your family currently has checked out, and what's come back recently.</p>
+
+    <section class="portal-dashboard-section">
+      <h2>Currently Checked Out</h2>
+      <% if (active.length === 0) { %>
+        <p class="roster-empty">Nothing checked out right now.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Checked Out To</th>
+                <th>Checked Out</th>
+                <th>Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% active.forEach(function(c) { %>
+                <tr>
+                  <td class="roster-name-col"><%= c.title %></td>
+                  <td><%= c.memberName %></td>
+                  <td><%= c.checkedOutAt %></td>
+                  <td>
+                    <% if (!c.dueDateLabel) { %>
+                      &mdash;
+                    <% } else if (c.overdue) { %>
+                      <span class="badge-pill badge-pill-absent">Overdue &middot; <%= c.dueDateLabel %></span>
+                    <% } else { %>
+                      <%= c.dueDateLabel %>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="portal-dashboard-section">
+      <h2>Recently Returned</h2>
+      <% if (recentReturns.length === 0) { %>
+        <p class="roster-empty">No return history yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Checked Out To</th>
+                <th>Returned</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% recentReturns.forEach(function(r) { %>
+                <tr>
+                  <td class="roster-name-col"><%= r.title %></td>
+                  <td><%= r.memberName %></td>
+                  <td><%= r.checkedInAt %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

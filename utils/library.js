@@ -112,6 +112,55 @@ async function membersWithActiveCheckouts() {
   );
 }
 
+// Parent Portal's Library tab: this family's own active checkouts (across
+// every member of the family, not just students - a parent can check
+// items out on their own barcode too) plus a short recent-returns history,
+// so a parent can see what's out and what's due without needing the
+// Co-op Admin Portal's own scan-based Library tools at all.
+async function libraryActivityForMemberIds(memberIds) {
+  if (memberIds.length === 0) return { active: [], recentReturns: [] };
+  const placeholders = memberIds.map(() => '?').join(',');
+  const today = todayISO();
+
+  const activeRows = await db
+    .prepare(
+      `SELECT lc.id AS checkout_id, lc.checked_out_at, lc.due_date, m.name AS member_name, li.title AS item_title
+       FROM library_checkouts lc
+       JOIN members m ON m.id = lc.member_id
+       JOIN library_items li ON li.id = lc.item_id
+       WHERE lc.checked_in_at IS NULL AND lc.member_id IN (${placeholders})
+       ORDER BY lc.due_date IS NULL, lc.due_date, lc.checked_out_at`
+    )
+    .all(...memberIds);
+  const active = activeRows.map((row) => ({
+    checkoutId: row.checkout_id,
+    memberName: row.member_name,
+    title: row.item_title,
+    checkedOutAt: formatFriendlyTimestamp(row.checked_out_at),
+    dueDateLabel: row.due_date ? formatDateLabel(row.due_date) : null,
+    overdue: !!row.due_date && row.due_date < today,
+  }));
+
+  const returnRows = await db
+    .prepare(
+      `SELECT m.name AS member_name, li.title AS item_title, lc.checked_in_at
+       FROM library_checkouts lc
+       JOIN members m ON m.id = lc.member_id
+       JOIN library_items li ON li.id = lc.item_id
+       WHERE lc.checked_in_at IS NOT NULL AND lc.member_id IN (${placeholders})
+       ORDER BY lc.checked_in_at DESC
+       LIMIT 10`
+    )
+    .all(...memberIds);
+  const recentReturns = returnRows.map((row) => ({
+    memberName: row.member_name,
+    title: row.item_title,
+    checkedInAt: formatFriendlyTimestamp(row.checked_in_at),
+  }));
+
+  return { active, recentReturns };
+}
+
 module.exports = {
   findMemberByBarcode,
   findItemByBarcode,
@@ -126,4 +175,5 @@ module.exports = {
   checkoutItems,
   returnCheckout,
   membersWithActiveCheckouts,
+  libraryActivityForMemberIds,
 };

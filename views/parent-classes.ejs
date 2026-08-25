@@ -9,6 +9,8 @@
     navLinks: [
       { href: '/parent', icon: 'home', label: 'Home' },
       { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
     ],
   }) %>
 
@@ -18,6 +20,12 @@
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (!windowOpen) { %>
+      <div class="alert alert-info">
+        Registration isn't open for your account yet<% if (nextWindowLabel) { %> - it opens <%= nextWindowLabel %><% } %>.
+        You can still manage registrations you already have below.
+      </div>
+    <% } %>
 
     <% if (children.length === 0) { %>
       <p class="roster-empty">No students are linked to your family yet, so there's no one to register. Contact an admin if this looks wrong.</p>
@@ -68,11 +76,13 @@
                           <input type="hidden" name="studentId" value="<%= child.id %>" />
                           <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= child.name %>: Cancel</button>
                         </form>
-                      <% } else { %>
+                      <% } else if (windowOpen) { %>
                         <form method="POST" action="/parent/classes/<%= c.id %>/register" class="inline-block-form">
                           <input type="hidden" name="studentId" value="<%= child.id %>" />
                           <button type="submit" class="roster-action-btn"><%= child.name %>: Register</button>
                         </form>
+                      <% } else { %>
+                        <span class="hint"><%= child.name %>: not open yet</span>
                       <% } %>
                     <% }); %>
                   <% } %>

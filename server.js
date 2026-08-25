@@ -110,6 +110,8 @@ const publicSiteRouter = require('./routes/public-site');
 const portalAuthRouter = require('./routes/portal-auth');
 const parentPortalRouter = require('./routes/parent-portal');
 const mainAdminRouter = require('./routes/main-admin');
+const teacherPortalRouter = require('./routes/teacher-portal');
+const studentPortalRouter = require('./routes/student-portal');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -287,6 +289,8 @@ app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
 app.use('/main-admin', mainAdminRouter);
+app.use('/teacher', teacherPortalRouter);
+app.use('/student', studentPortalRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not
