@@ -452,8 +452,8 @@ async function renameRoom(day, oldName, newName) {
 async function createClass(fields) {
   const info = await db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time, capacity, registration_open, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -464,7 +464,10 @@ async function createClass(fields) {
       fields.color || (await nextPaletteColor()),
       fields.notes || null,
       fields.startTime || null,
-      fields.endTime || null
+      fields.endTime || null,
+      fields.capacity || null,
+      fields.registrationOpen ? 1 : 0,
+      fields.description || null
     );
   const id = info.lastInsertRowid;
   await ensureClassRoster(id);
@@ -474,7 +477,7 @@ async function createClass(fields) {
 async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ? WHERE id = ?`
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ? WHERE id = ?`
   ).run(
     fields.day,
     fields.hourPosition,
@@ -485,6 +488,9 @@ async function updateClass(id, fields) {
     fields.notes || null,
     fields.startTime || null,
     fields.endTime || null,
+    fields.capacity || null,
+    fields.registrationOpen ? 1 : 0,
+    fields.description || null,
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.

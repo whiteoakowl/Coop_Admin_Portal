@@ -11,7 +11,8 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
-const { formatFriendlyTimestamp } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
+const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -70,11 +71,16 @@ router.get('/classes', async (req, res) => {
     isFull: c.capacity != null && Number(c.studentCount) >= c.capacity,
   }));
 
+  const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
+  const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
+
   res.render('parent-classes', {
     title: 'Classes',
     classes,
     children,
     enrolledKey: [...enrolledKey],
+    windowOpen,
+    nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -92,6 +98,9 @@ router.post('/classes/:id/register', async (req, res) => {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) {
     return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for that class.'));
+  }
+  if (!(await isRegistrationOpenForAccount(req.portalRoles))) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
   }
   const alreadyEnrolled = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(classId, studentId);
   if (alreadyEnrolled) {

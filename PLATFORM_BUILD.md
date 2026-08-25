@@ -110,6 +110,43 @@ extend it.
 - Every route re-derives "this parent's own children" itself rather than
   trusting a student id from the request — a parent can only ever register/
   cancel their own family's students.
+- **Staged/group registration windows** (the piece the portal foundation
+  migration's own comment called out as "intentionally not built here"):
+  `supabase/migrations/20260825030000_registration_windows.sql`'s
+  `registration_windows` table (label, target role or "everyone",
+  opens/closes) plus `utils/registrationWindows.js`
+  (`isRegistrationOpenForAccount`, `nextWindowForAccount`). A class only
+  accepts a new registration once its own `registration_open` flag is set
+  *and*, if any windows exist at all, the parent qualifies for one that's
+  currently open — with no windows defined, behavior is identical to
+  before this existed (every open class, open to everyone). Managed at
+  `/main-admin/registration-windows` (gated by the pre-existing
+  `manage_classes` permission). Cancelling an existing registration is
+  never gated by windows — only *new* registrations are.
+- **Admin UI gap closed**: the Co-op Admin Portal's own Add/Edit Class
+  dialog (`views/partials/class-schedule-grid.ejs`,
+  `views/admin-class-schedule-manage.ejs`,
+  `views/class-schedule-view-fragment.ejs`) had no way to actually set
+  `capacity`/`registration_open`/`description` — Parent Portal's
+  registration feature depended on fields nothing in the UI could edit.
+  Added a "Parent Portal Registration" section to all three forms
+  (`utils/classSchedule.js`'s `createClass`/`updateClass` now accept and
+  persist them).
+- **`utils/dates.js` gained `easternInputToUtcText`**: converts an admin's
+  `<input type="datetime-local">` value (interpreted as the co-op's own
+  Eastern time, same convention as this file's existing `todayISO`/
+  `formatTime`) into the UTC text `now_text()` itself produces, so window
+  times can be compared with plain string operators. No timezone library
+  existed in this app for the "local wall time → UTC" direction (unlike
+  the reverse, which `Intl` handles directly) — implemented via the
+  standard render-and-diff trick, documented inline.
+- **Real gap found and fixed while building this**: `data-confirm` forms
+  (the sitewide delete-confirmation attribute) were silently inert on
+  every portal page — `views/partials/portal-nav.ejs` never loaded
+  `confirm-dialog.js` or the dialog markup the way `admin-nav.ejs` does.
+  Fixed once in the shared partial, so it now works for every portal
+  (Main Admin's Website/Registration deletes, Parent Portal's own forms),
+  not just the new Registration Windows page that surfaced it.
 
 ## Main Admin Portal (done — enough to actually run the system)
 
@@ -160,20 +197,30 @@ extend it.
 
 ## Explicitly NOT built yet
 
-Lessons/assignments/grading beyond the existing Training module, staged/
-group registration windows (today it's a simple per-class open/closed
-toggle), Events + volunteer/donation signups, weekly newsletter, SMS
-notifications, accounting/payments, Store, Forums, Library parent-facing
-integration, Diplomas, Transcripts, Classifieds, Business/Member Directory,
-custom Form builder, Photos/Albums, Publications/Articles, full website
-appearance control (colors/logo/nav), audit log, notification center, global
-search, and generalized documents. See `TEAM_B_HANDOFF.md` for how this is
-being split into two parallel tracks.
+Lessons/assignments/grading beyond the existing Training module, Events +
+volunteer/donation signups, weekly newsletter, SMS notifications,
+accounting/payments, Store, Forums, Library parent-facing integration,
+Diplomas, Transcripts, Classifieds, Business/Member Directory, custom Form
+builder, Photos/Albums, Publications/Articles, full website appearance
+control (colors/logo/nav), audit log, notification center, global search,
+and generalized documents. See `TEAM_B_HANDOFF.md` for how this is being
+split into two parallel tracks.
 
 ## Verification so far
 
-- Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`).
+- Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`) —
+  re-confirmed after Teacher/Student Portal and registration windows.
 - Lint clean repo-wide (`npx eslint .`).
+- Registration windows live-verified end-to-end (Playwright): admin sets
+  a class's capacity/Open/description via the Class Schedule dialog and
+  it persists on save+reopen; Main Admin creates a Teacher-only window and
+  a parent account (holding only the `parent` role) correctly sees
+  registration gated with a "not open yet" message; adding a second,
+  everyone-targeted window immediately un-gates it; the parent completes
+  a real registration and the seat count decrements. Teacher/Student
+  Portal live-verified the same way (seeded teacher sees only their own
+  class + roster with medical notes; seeded student sees only their own
+  enrolled class).
 - Screenshot-verified live (Playwright) for: public homepage, registration
   page, portal login, Main Admin home/Users/Website. Two real CSS bugs were
   found and fixed this way (not by lint/tests): the hero "Learn More" button

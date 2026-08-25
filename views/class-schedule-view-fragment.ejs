@@ -79,8 +79,19 @@
           </div>
         </div>
 
-        <label class="member-form-full">Class Description
+        <label class="member-form-full">Class Description <span class="hint">(internal notes)</span>
           <textarea name="notes" rows="4" disabled><%= cls.notes || '' %></textarea>
+        </label>
+
+        <label>Capacity <span class="hint">(blank = unlimited)</span>
+          <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" disabled />
+        </label>
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Parent Portal Registration</label>
+          <label class="grade-pill"><input type="checkbox" name="registrationOpen" value="1" <%= cls.registration_open ? 'checked' : '' %> disabled /> Open for parent registration</label>
+        </div>
+        <label class="member-form-full">Public Description <span class="hint">(shown to parents browsing classes)</span>
+          <textarea name="description" rows="3" disabled><%= cls.description || '' %></textarea>
         </label>
       </form>
     </div>
