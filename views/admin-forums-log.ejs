@@ -20,21 +20,37 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Member Directory</h1>
-    <p class="hint"><%= memberCount %> active member<%= memberCount == 1 ? '' : 's' %> currently visible (fewer if any have opted themselves out). Choose which fields show for everyone - never turn on more than families should reasonably see.</p>
+    <h1>Forum Moderation Log</h1>
+    <p><a href="/main-admin/forums">&larr; Forums</a></p>
 
-    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
-
-    <div class="manage-section">
-      <form method="POST" action="/main-admin/member-directory/fields">
-        <% fieldSettings.forEach(function(f) { %>
-          <label class="grade-pill"><input type="checkbox" name="fields" value="<%= f.key %>" <%= f.visible ? 'checked' : '' %> /> <%= f.label %></label>
-        <% }); %>
-        <div class="member-form-full" style="margin-top: 1rem;">
-          <button type="submit" class="primary-btn">Save</button>
-        </div>
-      </form>
-    </div>
+    <% if (entries.length === 0) { %>
+      <p class="roster-empty">No moderation actions yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Moderator</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% entries.forEach(function(e) { %>
+              <tr>
+                <td><%= e.created_at %></td>
+                <td><%= e.memberName || 'Unknown' %></td>
+                <td><%= e.action %></td>
+                <td><%= e.target_type %> #<%= e.target_id %></td>
+                <td><%= e.detail || '' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
   </main>
 </body>
 </html>

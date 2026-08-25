@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Forums',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/forums', icon: 'users', label: 'Forums' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>New Thread &mdash; <%= category.name %></h1>
+    <p><a href="/forums/<%= category.id %>">&larr; Back</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/forums/<%= category.id %>/threads" class="member-form-grid">
+      <label class="member-form-full">Title
+        <input type="text" name="title" required />
+      </label>
+      <div class="member-form-full" data-forum-editor>
+        <label>Message</label>
+        <%- include('partials/forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="body" data-forum-body-input />
+      </div>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Post Thread</button>
+      </div>
+    </form>
+  </main>
+  <script src="/js/forum-editor.js"></script>
+</body>
+</html>

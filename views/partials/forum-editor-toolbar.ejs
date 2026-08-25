@@ -1,0 +1,16 @@
+<%
+// Toolbar for the forum rich-text editor (public/js/forum-editor.js).
+// Every button here maps 1:1 to a tag utils/sanitizeHtml.js actually
+// allows to survive - no button offers formatting the server would just
+// strip back out.
+%>
+<div class="forum-editor-toolbar">
+  <button type="button" data-forum-cmd="formatBlock" data-forum-value="h2" title="Heading">H2</button>
+  <button type="button" data-forum-cmd="formatBlock" data-forum-value="h3" title="Subheading">H3</button>
+  <button type="button" data-forum-cmd="bold" title="Bold"><strong>B</strong></button>
+  <button type="button" data-forum-cmd="italic" title="Italic"><em>I</em></button>
+  <button type="button" data-forum-cmd="insertUnorderedList" title="Bullet List">&bull; List</button>
+  <button type="button" data-forum-cmd="insertOrderedList" title="Numbered List">1. List</button>
+  <button type="button" data-forum-cmd="formatBlock" data-forum-value="blockquote" title="Quote">&ldquo;Quote&rdquo;</button>
+  <button type="button" data-forum-cmd="createLink" title="Link">Link</button>
+</div>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Forums',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/forums', icon: 'users', label: 'Forums' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Forums</h1>
+
+    <% if (categories.length === 0) { %>
+      <p class="roster-empty">No forums yet.</p>
+    <% } else { %>
+      <div class="team-card-grid">
+        <% categories.forEach(function(c) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
+              <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } %>
+              <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
+              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

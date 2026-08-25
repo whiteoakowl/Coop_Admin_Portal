@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Forums</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-forum-dialog').showModal()">+ New Forum</button>
+    </div>
+    <p><a href="/main-admin/forums/moderation-log">View Moderation Log</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (categories.length === 0) { %>
+      <p class="roster-empty">No forums yet &mdash; create one above.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% categories.forEach(function(c) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+            <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
+            <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
+            <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
+            <div class="roster-btn-row">
+              <% if (c.is_locked) { %>
+                <form method="POST" action="/main-admin/forums/<%= c.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
+              <% } else { %>
+                <form method="POST" action="/main-admin/forums/<%= c.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
+              <% } %>
+              <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <dialog id="new-forum-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/forums">
+        <h3>New Forum</h3>
+        <label>Name
+          <input type="text" name="name" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="2"></textarea>
+        </label>
+        <label>Type
+          <select name="scope" onchange="document.getElementById('forum-class-field').style.display = this.value === 'class' ? '' : 'none';">
+            <option value="general">General (any signed-in member)</option>
+            <option value="class">Private Class Forum</option>
+          </select>
+        </label>
+        <label id="forum-class-field" style="display: none;">Class
+          <select name="classId">
+            <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

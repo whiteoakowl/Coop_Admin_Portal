@@ -128,6 +128,11 @@ const adminClassifiedsRouter = require('./routes/admin-classifieds');
 // /main-admin/member-directory.
 const memberDirectoryRouter = require('./routes/member-directory');
 const adminMemberDirectoryRouter = require('./routes/admin-member-directory');
+// Item 6: Forums at /forums (members-only; category access additionally
+// restricted for private class forums), category management admin at
+// /main-admin/forums.
+const forumsRouter = require('./routes/forums');
+const adminForumsRouter = require('./routes/admin-forums');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -313,6 +318,8 @@ app.use('/classifieds', classifiedsRouter);
 app.use('/main-admin/classifieds', adminClassifiedsRouter);
 app.use('/member-directory', memberDirectoryRouter);
 app.use('/main-admin/member-directory', adminMemberDirectoryRouter);
+app.use('/forums', forumsRouter);
+app.use('/main-admin/forums', adminForumsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

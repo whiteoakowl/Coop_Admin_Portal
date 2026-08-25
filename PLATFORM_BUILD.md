@@ -228,17 +228,59 @@ extend it.
   a field on shows it everywhere, sign-in required, self opt-out takes
   effect immediately, cross-family opt-out denial).
 
+## Community & Commerce track — Forums (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825060000_forums.sql`: `forum_categories`
+  (general or `scope='class'`, `class_id` referencing Track A's own
+  `classes` table read-only), `forum_threads`, `forum_posts`, and
+  `forum_moderation_actions` — the audit trail the handoff's own spec for
+  this item explicitly calls for.
+- `utils/sanitizeHtml.js` (new `sanitize-html` dependency): every post
+  body is sanitized server-side against a small allowlist (headings/
+  bold/italic/lists/links/quotes) before it's ever stored — the client-
+  side rich-text toolbar (`public/js/forum-editor.js`, a `contenteditable`
+  div + `execCommand`, "keep it simple, don't overbuild") only offers
+  those same options, but the sanitizer is what actually enforces it, not
+  client trust. A real XSS attempt (`<script>`/`onerror=`) is covered in
+  `test/routes-forums.test.js`.
+- `utils/forums.js`: category access (`canAccessCategory` — a `general`
+  category is open to any signed-in account; a `class` category checks
+  the acting account's whole family against `class_staff`/
+  `class_enrollments`, so a student's own parent is covered without a
+  special case, since `familyForAccount` already returns the whole
+  family), thread/post CRUD, and every moderation action logging to
+  `forum_moderation_actions`.
+- `routes/forums.js` (`/forums`, members-only, no public option):
+  browsing/posting, plus in-context moderation (edit-any/remove/restore/
+  pin/lock/archive/move) gated per-action by
+  `req.portalPermissions.has('manage_forum')` rather than a separate
+  admin-only router — `manage_forum` can be granted to any role (e.g. a
+  teacher moderating their own class forum), matching how Main Admin's
+  own Roles & Permissions screen already treats permissions as
+  independent of portal.
+- `routes/admin-forums.js` (`/main-admin/forums`, `manage_forum`):
+  category structural setup (create general or private class forums,
+  lock/delete) and the moderation log viewer — day-to-day thread/post
+  moderation deliberately lives in `routes/forums.js` instead, not here.
+- 8 new views + `public/js/forum-editor.js` +
+  `views/partials/forum-editor-toolbar.ejs`, and
+  `test/routes-forums.test.js` (6 tests: sign-in required, thread
+  creation + reply, server-side sanitization, private class forum access
+  control, non-main_admin moderation + audit log entry, locked-thread
+  reply denial).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Forums, Custom
-Forms, Store, Accounting/Payments, weekly newsletter, SMS/notification
+simple per-class open/closed toggle) — all Track A scope. Custom Forms,
+Store, Accounting/Payments, weekly newsletter, SMS/notification
 framework, Photos/Albums + Publications/Articles, audit log, and global
 search — Track B scope, next up after Events/Volunteer/Donation signups,
-Business Directory/Classifieds, and Member Directory above. Also still
-missing: Diplomas, Transcripts, Library parent-facing integration, full
-website appearance control (colors/logo/nav), and generalized
+Business Directory/Classifieds, Member Directory, and Forums above. Also
+still missing: Diplomas, Transcripts, Library parent-facing integration,
+full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.
 
