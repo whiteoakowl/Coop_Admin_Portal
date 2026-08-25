@@ -647,7 +647,8 @@ async function getPlayerState(assignmentId) {
   const assignment = await db
     .prepare(
       `SELECT ta.*, t.title, t.description, t.estimated_minutes AS "estimatedMinutes", t.sequential_lessons AS "sequentialLessons",
-        t.allow_skipping_lessons AS "allowSkippingLessons", t.passing_score AS "passingScore"
+        t.allow_skipping_lessons AS "allowSkippingLessons", t.passing_score AS "passingScore",
+        t.require_video_completion AS "requireVideoCompletion"
        FROM training_assignments ta JOIN trainings t ON t.id = ta.training_id WHERE ta.id = ?`
     )
     .get(assignmentId);
@@ -660,11 +661,31 @@ async function getPlayerState(assignmentId) {
   const lessons = await db
     .prepare('SELECT * FROM training_lesson_progress WHERE attempt_id = ? ORDER BY lesson_position_snapshot, id')
     .all(attempt.id);
-  const required = lessons.filter((l) => l.lesson_required_snapshot === 1);
-  const completedRequired = required.filter((l) => l.status === 'completed');
-  const percentComplete = required.length ? Math.round((completedRequired.length / required.length) * 100) : 100;
+  // completionGatingLessons's own comment explains why a training with
+  // zero required lessons falls back to counting every lesson instead of
+  // reading as instantly 100% complete.
+  const gating = completionGatingLessons(lessons);
+  const completedGating = gating.filter((l) => l.status === 'completed');
+  const percentComplete = gating.length ? Math.round((completedGating.length / gating.length) * 100) : 100;
 
   return { assignment, attempt, lessons, percentComplete };
+}
+
+// The lessons that must be 'completed' before an attempt can finalize -
+// every required lesson, normally. A real bug: `.every()` on an EMPTY
+// array is vacuously true, so a training built entirely out of optional
+// lessons (every lesson's own "Required to complete this training"
+// checkbox left unchecked) had its very first lesson completion
+// immediately finalize the whole attempt as passed/failed, with every
+// other lesson still sitting untouched - both here (maybeFinalizeAttempt)
+// and in getPlayerState's percentComplete, which showed a fresh attempt
+// as already 100% before the member had done anything. Falling back to
+// every lesson in the attempt when none are marked required keeps
+// "finished" meaning what a member/admin would actually expect: every
+// lesson in the outline, not an empty required subset.
+function completionGatingLessons(lessons) {
+  const required = lessons.filter((l) => l.lesson_required_snapshot === 1);
+  return required.length ? required : lessons;
 }
 
 // Marks one lesson "in progress" (first time it's opened) - refuses a
@@ -872,7 +893,7 @@ async function submitQuiz(assignmentId, lessonId, answers) {
 // finishing it means.
 async function maybeFinalizeAttempt(attemptId) {
   const lessons = await db.prepare('SELECT * FROM training_lesson_progress WHERE attempt_id = ?').all(attemptId);
-  const requiredDone = lessons.filter((l) => l.lesson_required_snapshot === 1).every((l) => l.status === 'completed');
+  const requiredDone = completionGatingLessons(lessons).every((l) => l.status === 'completed');
   if (!requiredDone) return { finalized: false };
 
   const attempt = await db.prepare('SELECT * FROM training_attempts WHERE id = ?').get(attemptId);

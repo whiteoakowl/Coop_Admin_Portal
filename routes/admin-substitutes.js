@@ -129,7 +129,11 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, asy
   const memberId = parseInt(req.body.memberId, 10);
   const isOverride = req.body.isOverride === '1';
   if (isValidISODate(date) && slotId && memberId) {
-    await setAssignment(date, slotType, slotId, memberId, isOverride);
+    try {
+      await setAssignment(date, slotType, slotId, memberId, isOverride);
+    } catch (e) {
+      return res.redirect(subUrl(day, { date, error: e.message }));
+    }
   }
   res.redirect(subUrl(day, { date }));
 });

@@ -81,6 +81,26 @@ router.post('/checkin/scan', async (req, res) => {
   }
 
   if (alreadyPresent) {
+    // A real bug: a "log on check-in" member who scanned their name tag
+    // (step 1, above) but never completed step 2 (their Setup/Cleanup
+    // task scan) - closed the browser, walked away, connection dropped -
+    // used to hit this flat "already checked in" reply on their next
+    // scan and never get re-offered step 2, silently pushing them into
+    // checkout's own task-scan fallback instead of the check-in-time
+    // flow their team is configured for. Re-checks the same
+    // memberScansTaskAtCheckin gate step 1 uses below before accepting
+    // "already checked in" as the final word.
+    if (member.member_type !== 'student') {
+      const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+      if (day && (await memberScansTaskAtCheckin(member.id, day))) {
+        const alreadyTaskScanned = await db
+          .prepare('SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
+          .get(member.id, today);
+        if (!alreadyTaskScanned) {
+          return res.json({ ok: true, memberType: 'parent-taskscan', memberId: member.id, name: member.name });
+        }
+      }
+    }
     return res.json({
       ok: true,
       alreadyChecked: true,

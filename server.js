@@ -260,6 +260,18 @@ app.get('/', (req, res) => {
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
+// contact-admins.js and membership.js (both mounted below) gate every one
+// of their own routes behind requireAdmin/requireFullAdmin despite living
+// outside the '/admin' path prefix (their URLs read as top-level, not
+// admin-namespaced) - a real gap this used to miss: middleware/
+// csrfProtection.js was only ever mounted ahead of the '/admin' routers
+// further down, so these two authenticated, state-changing routers had no
+// CSRF check at all. csrfProtection itself is a no-op for any request
+// without an admin session, so mounting it here ahead of this whole
+// router group is safe for its public/kiosk routers too (absence,
+// name-tag, volunteers, setup, training all have no admin session to
+// forge a request against in the first place).
+app.use('/', require('./middleware/csrfProtection'));
 app.use('/', absenceRouter);
 app.use('/', nameTagRouter);
 app.use('/', volunteersRouter);

@@ -271,8 +271,15 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
   const date = req.body.date;
   const slot = req.body.slot === '2' ? 2 : 1;
   const taskItemId = parseInt(req.body.taskItemId, 10) || null;
-  if (date && isValidISODate(date)) await setTaskAssignment(day, memberId, date, slot, taskItemId);
-  res.redirect(`/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : ''));
+  const back = `/admin/setup/${day}/assignments` + (date ? `?date=${encodeURIComponent(date)}` : '');
+  if (date && isValidISODate(date)) {
+    try {
+      await setTaskAssignment(day, memberId, date, slot, taskItemId);
+    } catch (e) {
+      return res.redirect(back + (date ? '&' : '?') + 'error=' + encodeURIComponent(e.message));
+    }
+  }
+  res.redirect(back);
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {

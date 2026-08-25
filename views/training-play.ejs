@@ -137,7 +137,18 @@
           <% if (selected.lesson_type_snapshot !== 'quiz' && selected.status !== 'completed') { %>
             <form method="POST" action="/training/<%= state.assignment.id %>/lessons/<%= selected.lesson_id %>/complete" id="training-complete-form">
               <%
-                const videoBlocked = selected.lesson_type_snapshot === 'video' && selected.video_completed !== 1;
+                // Must mirror utils/training.js's completeLesson server-side
+                // gate exactly - a real bug had this disable the button for
+                // ANY unwatched video, even an optional lesson or a training
+                // with "Watch all required videos" turned off, both cases
+                // the server would actually accept the completion for,
+                // leaving a normal member stuck on a dead-end disabled
+                // button for no real reason.
+                const videoBlocked =
+                  selected.lesson_type_snapshot === 'video' &&
+                  state.assignment.requireVideoCompletion === 1 &&
+                  selected.lesson_required_snapshot === 1 &&
+                  selected.video_completed !== 1;
               %>
               <button type="submit" class="primary-btn" id="training-complete-btn" <%= videoBlocked ? 'disabled' : '' %>><%= videoBlocked ? 'Watch the video to continue' : 'Mark Complete & Continue' %></button>
             </form>

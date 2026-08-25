@@ -54,11 +54,32 @@ const storageClient = createStorageClient();
 // Storage is actually configured.
 if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const uploadPhoto = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_PHOTO_BYTES },
   fileFilter: imageFileFilter,
 });
+
+// A photo over the limit above makes multer.single() itself throw a
+// MulterError (LIMIT_FILE_SIZE), which - unlike imageFileFilter rejecting
+// a wrong file TYPE (that just leaves req.file undefined) - was never
+// caught anywhere, so it fell through to server.js's generic catch-all
+// error handler: a bare 500 page that threw away every other field the
+// admin had just typed (name, address, medical notes, family). Same fix
+// as routes/admin-documents.js's own uploadDocument wrapper, parametrized
+// by redirect target since /members/new and /members/:id/edit each redirect
+// back to their own page on error.
+function uploadMemberPhoto(redirectTo) {
+  return function (req, res, next) {
+    uploadPhoto.single('photo')(req, res, (err) => {
+      if (err && err.code === 'LIMIT_FILE_SIZE') {
+        return res.redirect(`${redirectTo(req)}?error=` + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_PHOTO_BYTES / (1024 * 1024)}MB.`));
+      }
+      next(err);
+    });
+  };
+}
 
 // Saves an uploaded photo (Storage or local disk, see above) and returns
 // the key to store in photo_path.
@@ -394,7 +415,7 @@ router.get('/members/new', async (req, res) => {
   });
 });
 
-router.post('/members/new', uploadPhoto.single('photo'), async (req, res) => {
+router.post('/members/new', uploadMemberPhoto(() => '/admin/members/new'), async (req, res) => {
   const f = memberFormFields(req);
 
   if (!f.name) {
@@ -568,7 +589,7 @@ router.get('/members/:id/edit', async (req, res) => {
   });
 });
 
-router.post('/members/:id/edit', uploadPhoto.single('photo'), async (req, res) => {
+router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${req.params.id}/edit`), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const f = memberFormFields(req);
 

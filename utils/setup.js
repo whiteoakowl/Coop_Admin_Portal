@@ -150,6 +150,24 @@ async function setTaskAssignment(day, memberId, date, slot, taskItemId) {
     }
     return;
   }
+  // Reject a task already held by a DIFFERENT member for this day/date -
+  // taskOptionsExcludingAssignedElsewhere below already filters these out
+  // of the suggestion dropdown, but that's a render-time filter only; a
+  // second admin tab, a stale page, or two admins acting at once could
+  // otherwise still write the same task to two members with nothing here
+  // to stop it, defeating the whole reason this filtering exists (two
+  // people showing up expecting to do the identical job).
+  const conflict = await db
+    .prepare(
+      `SELECT member_id FROM setup_task_assignments
+       WHERE day = ? AND session_date = ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
+       LIMIT 1`
+    )
+    .get(day, date, memberId, taskItemId, taskItemId);
+  if (conflict) {
+    throw new Error('That task has already been assigned to someone else for this date.');
+  }
+
   await db
     .prepare(
       `INSERT INTO setup_task_assignments (day, member_id, session_date, ${column}) VALUES (?, ?, ?, ?)

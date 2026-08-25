@@ -57,9 +57,35 @@ router.post('/checkout/scan', async (req, res) => {
     return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
   }
 
-  const rosters = await getMemberRostersForDate(member.id, today);
+  // Excludes class rosters (rosters.category === 'Class Roster') - same
+  // reasoning as routes/kiosk.js's own /checkin/scan: the front-door
+  // portal only ever checks someone out of the day's own Parent/Student
+  // roster, never a specific class's own roster (that's
+  // routes/kiosk-class-checkin.js's job, with its own independent
+  // check-out screen), so the two presence signals stay independent.
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  // Same "already done today" guard routes/kiosk.js's own /checkin/scan
+  // has (alreadyPresent) and routes/kiosk-class-checkin.js's scan/checkout
+  // has (its own `existing` check) - without this, a duplicate scan (a
+  // scanner double-fire, or a sibling re-scanning the same badge) just
+  // silently overwrote check_out_time with a later, spurious time.
+  let alreadyCheckedOut = true;
+  for (const r of rosters) {
+    const existing = await db.prepare('SELECT 1 FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today);
+    if (!existing) alreadyCheckedOut = false;
+  }
+  if (alreadyCheckedOut) {
+    return res.json({
+      ok: true,
+      alreadyChecked: true,
+      memberType: member.member_type === 'student' ? 'student' : 'parent-already-logged',
+      name: member.name,
+      message: `${member.name}, you're already checked out today.`,
+    });
   }
 
   if (member.member_type === 'student') {
@@ -134,7 +160,7 @@ router.post('/checkout/task-scan', async (req, res) => {
     return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
   }
 
-  const rosters = await getMemberRostersForDate(member.id, today);
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }

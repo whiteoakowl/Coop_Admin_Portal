@@ -36,11 +36,28 @@ const storageClient = createStorageClient();
 // Storage is actually configured.
 if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
 
+const MAX_CHILD_PHOTO_BYTES = 5 * 1024 * 1024;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_CHILD_PHOTO_BYTES },
   fileFilter: imageFileFilter,
 });
+
+// A child photo over the limit above makes multer.any() itself throw a
+// MulterError (LIMIT_FILE_SIZE) - unlike imageFileFilter rejecting a
+// wrong file TYPE (which just leaves that file out of req.files), this
+// error was never caught anywhere, so it fell through to server.js's
+// generic catch-all error handler and threw away everything the admin
+// had typed for every child on the form, not just the one photo. Same
+// fix as routes/admin-documents.js's own uploadDocument wrapper.
+function uploadChildPhotos(req, res, next) {
+  upload.any()(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect('/membership?error=' + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_CHILD_PHOTO_BYTES / (1024 * 1024)}MB.`));
+    }
+    next(err);
+  });
+}
 
 router.get('/membership', requireFullAdmin, (req, res) => {
   res.render('membership', {
@@ -64,7 +81,7 @@ function parseChildren(body) {
   return [];
 }
 
-router.post('/membership', requireFullAdmin, upload.any(), async (req, res) => {
+router.post('/membership', requireFullAdmin, uploadChildPhotos, async (req, res) => {
   const body = req.body;
   const parent1FirstName = (body.parent1FirstName || '').trim();
   const parent1LastName = (body.parent1LastName || '').trim();

@@ -173,7 +173,7 @@ async function assignmentFor(date, slotType, slotId) {
 }
 
 async function memberName(memberId) {
-  const row = await db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
+  const row = await db.prepare('SELECT name FROM members WHERE id = ? AND active = 1').get(memberId);
   return row ? row.name : null;
 }
 
@@ -181,7 +181,51 @@ async function memberName(memberId) {
 // or overriding with someone else entirely) is always the final word -
 // always lands as 'approved', whether or not a pending row already
 // existed for this slot.
+// A slot's own hour position, regardless of which kind it is - a
+// permanent job's own hour_position column, or (for a class-coverage
+// slot) the hour_position of the class classStaffSlotId encoded it from.
+async function hourPositionForSlot(slotType, slotId) {
+  if (slotType === 'job') {
+    const row = await db.prepare('SELECT hour_position AS "hourPosition" FROM permanent_jobs WHERE id = ?').get(slotId);
+    return row ? row.hourPosition : null;
+  }
+  const classId = Math.floor(slotId / 1000000);
+  const row = await db.prepare('SELECT hour_position AS "hourPosition" FROM classes WHERE id = ?').get(classId);
+  return row ? row.hourPosition : null;
+}
+
+// A real bug: nothing here ever stopped the SAME member being written
+// into two conflicting slots in the same hour - the board's own
+// usedThisHour/suggestedFloaters tracking (substituteBoard, above) only
+// ever guards a single render, not the write itself, so a second admin
+// tab, a stale page, or two admins acting concurrently could double-book
+// one floater into two positions at once with no warning either at
+// submit time or afterward. Skips the check entirely if either slot's
+// hour can't be resolved (a slot that's since been deleted) rather than
+// blocking on stale data.
 async function setAssignment(date, slotType, slotId, memberId, isOverride) {
+  const targetHour = await hourPositionForSlot(slotType, slotId);
+  if (targetHour != null) {
+    // Only an already-APPROVED assignment elsewhere counts as a real
+    // conflict - a merely 'pending' row is just the auto-suggest
+    // system's own non-committal guess (resolveSlot's own comment: "a
+    // still-'pending' pick... is just that - a suggestion"), freely
+    // overwritten/cleared elsewhere the moment it stops being eligible,
+    // so it must never block a genuinely different approved assignment
+    // for the same member.
+    const others = await db
+      .prepare(
+        `SELECT slot_type AS "slotType", slot_id AS "slotId" FROM substitute_assignments
+         WHERE session_date = ? AND member_id = ? AND status = 'approved' AND NOT (slot_type = ? AND slot_id = ?)`
+      )
+      .all(date, memberId, slotType, slotId);
+    for (const o of others) {
+      if ((await hourPositionForSlot(o.slotType, o.slotId)) === targetHour) {
+        throw new Error('This member is already covering a different position during this same hour.');
+      }
+    }
+  }
+
   await db.prepare(
     `INSERT INTO substitute_assignments (session_date, slot_type, slot_id, member_id, is_override, status)
      VALUES (?, ?, ?, ?, ?, 'approved')
@@ -222,11 +266,22 @@ async function clearAssignment(date, slotType, slotId) {
 // showed a generic "(Available)" instead of their real rank, most visibly
 // for a backup-only floater (the only tier this can ever silently misdi
 // as anything looking like a "better" rank).
+// A real bug: an admin approves someone for a future date, then that
+// member gets archived (routes/admin-members.js's bulk-archive just sets
+// active = 0, with no cleanup of substitute_assignments) - the board,
+// planning grid, and public kiosk all kept showing them as covering it
+// indefinitely, with nothing ever re-flagging the slot as unassigned. An
+// inactive member's own name is null now, so treating that the same as
+// "no assignment exists" (returning null, same as the !existing case
+// above it) puts the slot back into the normal "Needs Substitute" state
+// instead of silently pointing at someone who no longer exists here.
 async function assignedInfo(existing, floaterPool) {
   if (!existing) return null;
+  const name = await memberName(existing.member_id);
+  if (!name) return null;
   return {
     id: existing.member_id,
-    name: await memberName(existing.member_id),
+    name,
     isOverride: !!existing.is_override,
     status: existing.status,
     infant: await hasInfantChild(existing.member_id),
@@ -432,16 +487,53 @@ async function jobAssignmentGrid(day, dates) {
   return hours.filter((h) => h.jobs.length > 0);
 }
 
-// Single-date "Floater Assignment Dashboard" cards (the Chart tab's view,
-// and the Archive tab's popup/print record for a date that's passed) -
-// same permanent-job/substitute_assignments data as jobAssignmentGrid,
-// just reshaped for one date's cards instead of a multi-date table (each
-// job gets one `assigned` directly, not a one-element `cells` array).
+// Single-date "Floater Assignment Dashboard" cards (the Archive tab's own
+// popup/print/CSV record for a date that's passed) - same permanent-job
+// data as jobAssignmentGrid, reshaped for one date's cards instead of a
+// multi-date table (each job gets one `assigned` directly, not a
+// one-element `cells` array), PLUS each hour's own approved class-
+// coverage slots. A real bug: this used to only ever read permanent_jobs
+// - the same gap publicFloaterCardsForDate (the public kiosk's own view)
+// was already fixed for - so an approved substitute covering a class's
+// own missing teacher/assistant slot was invisible in the Archive tab's
+// view, print, and CSV export, even though the live Substitutes Needed
+// board (substituteBoard) is exactly where an admin approves those
+// slots. Mirrors publicFloaterCardsForDate's own class loop: only ever
+// READS existing substitute_assignments rows (never auto-picks/writes,
+// unlike substituteBoard), and only surfaces a slot once it's 'approved'
+// - a still-pending suggestion has no place in a historical record of
+// what actually happened.
 async function dailyAssignmentCards(day, date) {
-  return (await jobAssignmentGrid(day, [date])).map((hour) => ({
-    position: hour.position,
-    jobs: hour.jobs.map((job) => ({ id: job.id, title: job.title, room: job.room, assigned: job.cells[0].assigned })),
-  }));
+  const jobHours = await jobAssignmentGrid(day, [date]);
+  const jobsByHour = {};
+  jobHours.forEach((h) => {
+    jobsByHour[h.position] = h.jobs.map((job) => ({ id: job.id, title: job.title, room: job.room, assigned: job.cells[0].assigned }));
+  });
+
+  const missingById = await missingMemberIdsForDate(date);
+  const grid = await gridForDay(day);
+  const classesByHour = {};
+  for (const hourGroup of grid) {
+    const rows = [];
+    for (const cls of hourGroup.classes) {
+      for (const person of cls.staff) {
+        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+        if (!missingById.has(person.id)) continue;
+        const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+        rows.push({
+          title: cls.class_name,
+          room: cls.room || '',
+          assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+        });
+      }
+    }
+    if (rows.length) classesByHour[hourGroup.position] = rows;
+  }
+
+  return HOUR_POSITIONS.map((position) => ({
+    position,
+    jobs: [...(jobsByHour[position] || []), ...(classesByHour[position] || [])],
+  })).filter((h) => h.jobs.length > 0);
 }
 
 // dailyAssignmentCards with each hour's real label merged in - shared by
@@ -522,16 +614,37 @@ async function publicFloaterCardsForDate(day, date) {
 // that day's permanent-job positions ended up with an approved floater -
 // same underlying data as dailyAssignmentCards, just counted instead of
 // rendered, for the log list before an admin opens one date's full record.
+// A real bug, the same gap dailyAssignmentCards above was just fixed for:
+// this only ever counted permanent_jobs, so a date fully covered by
+// approved class-coverage substitutes (with zero permanent-job slots
+// needing anyone) showed as "0 of 0" instead of reflecting the real
+// class-coverage positions that date actually had.
 async function archivedDateSummaries(day, dates) {
   const jobs = await permanentJobsForDay(day);
+  const grid = await gridForDay(day);
   const result = [];
   for (const date of dates) {
+    let totalPositions = jobs.length;
     let assignedCount = 0;
     for (const j of jobs) {
       const a = await assignmentFor(date, 'job', j.id);
       if (a && a.status === 'approved') assignedCount++;
     }
-    result.push({ date, totalPositions: jobs.length, assignedCount });
+
+    const missingById = await missingMemberIdsForDate(date);
+    for (const hourGroup of grid) {
+      for (const cls of hourGroup.classes) {
+        for (const person of cls.staff) {
+          if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+          if (!missingById.has(person.id)) continue;
+          totalPositions++;
+          const a = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+          if (a && a.status === 'approved') assignedCount++;
+        }
+      }
+    }
+
+    result.push({ date, totalPositions, assignedCount });
   }
   return result;
 }
