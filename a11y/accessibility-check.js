@@ -143,6 +143,18 @@ async function axeCheck(urlPath, { cookies } = {}) {
   try {
     if (cookies && cookies.length) await context.addCookies(cookies);
     const page = await context.newPage();
+    // Every page's own <head> (views/partials/head.ejs) pulls the
+    // Google Fonts webfont over the real network - fine for real users,
+    // but here it means 'load' below can't resolve until that third-
+    // party request finishes, and a slow/proxied/offline network turns
+    // each of this file's 14 page checks into a ~20s wait apiece (this
+    // block is what actually made the run fast again after that was
+    // diagnosed). Aborting it is safe for axe-core's own purposes -
+    // color-contrast reads computed CSS color values, not glyph
+    // rendering, and the fallback stack in styles.css's own font-family
+    // rules still applies - so this doesn't change what's being checked,
+    // only how long checking it takes to start.
+    await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
     await page.goto(base + urlPath, { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
     const results = await new AxeBuilder({ page }).analyze();
     return results.violations.map((v) => ({

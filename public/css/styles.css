@@ -45,6 +45,10 @@
   --surface: #ffffff;
   --ink: #1c2530;
   --muted: #64748b;
+  --muted-dark: #576277;  /* accessible variant of --muted - for text sitting on a
+                              tinted (non-white) background, where --muted itself
+                              falls just short of WCAG AA 4.5:1 (caught by the
+                              a11y/accessibility-check.js CI check) */
   --brand: #79baec;       /* logo blue - fills, borders, badges (pair with --ink or white) */
   --brand-dark: #2e6da4;  /* accessible mid blue - links, text (not button fills) */
   --brand-darker: #1f4e7a; /* hover state for brand-dark */
@@ -2014,7 +2018,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-cell-select-present { background: var(--green-bg); color: var(--green); }
 .roster-cell-select-late { background: var(--yellow-bg); color: var(--yellow); }
 .roster-cell-select-absent { background: var(--red-bg); color: var(--red); }
-.roster-cell-select-blank { background: #e7edf5; color: var(--muted); }
+/* color: var(--muted-dark), not var(--muted) - --muted itself only hits a
+   4.04:1 contrast ratio on this tinted background, short of WCAG AA's
+   4.5:1 (caught by the a11y check below). */
+.roster-cell-select-blank { background: #e7edf5; color: var(--muted-dark); }
 .print-only-tag { display: none; }
 
 .roster-table-detailed { width: auto; font-size: 0.8rem; }
@@ -6019,7 +6026,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .site-hero h1 { font-size: clamp(2rem, 4vw, 2.75rem); margin: 0 0 0.9rem; line-height: 1.15; }
 .site-hero p { font-size: 1.15rem; opacity: 0.92; margin: 0 0 1.75rem; }
 .site-hero-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-.site-hero .primary-btn { background: #fff; color: var(--bg); font-size: 1.05rem; padding: 0.85rem 1.6rem; }
+/* color: var(--brand-dark), not var(--bg) - white background needs the
+   accessible-on-white blue (--bg itself only hits a 4.1:1 contrast ratio
+   on white, short of WCAG AA's 4.5:1 - caught by the a11y check below). */
+.site-hero .primary-btn { background: #fff; color: var(--brand-dark); font-size: 1.05rem; padding: 0.85rem 1.6rem; }
 .site-hero .primary-btn:hover { background: #f0f6fc; }
 .site-hero .btn-secondary { background: transparent; border-color: rgba(255, 255, 255, 0.6); color: #fff; font-size: 1.05rem; padding: 0.85rem 1.6rem; }
 .site-hero .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; color: #fff; }
@@ -6035,6 +6045,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .site-section-alt { background: #f4f8fc; }
 .site-section h2 { font-size: 1.75rem; margin: 0 0 1rem; color: var(--ink); }
 .site-section p { color: var(--muted); line-height: 1.6; font-size: 1.05rem; }
+/* --muted on -alt's own #f4f8fc tint (rather than -surface's white) falls
+   just short of WCAG AA's 4.5:1 - --muted-dark instead, same reasoning as
+   --brand-dark existing above for text on a non-white background. */
+.site-section-alt .site-section-inner p { color: var(--muted-dark); }
 
 .site-benefits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
 .site-benefit-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
@@ -6085,9 +6099,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .site-faq-item summary::-webkit-details-marker { display: none; }
 .site-faq-item p { padding-bottom: 1rem; margin: 0; }
 
-.site-cta { text-align: center; padding: 4rem 1.5rem; background: var(--brand); color: #fff; }
+/* background: var(--brand-dark), not var(--brand) - white text on
+   --brand's own lighter #79baec only hits a 2.09:1 contrast ratio, well
+   short of WCAG AA's 4.5:1 (caught by the a11y check below); --brand-dark
+   is the token that already exists for exactly this "text needs to sit
+   on a blue background/or be blue text" case. */
+.site-cta { text-align: center; padding: 4rem 1.5rem; background: var(--brand-dark); color: #fff; }
 .site-cta h2 { color: #fff; }
-.site-cta .primary-btn { background: #fff; color: var(--bg); }
+.site-cta .primary-btn { background: #fff; color: var(--brand-dark); }
 
 .site-footer { padding: 2.5rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; background: var(--surface); border-top: 1px solid var(--border); }
 .site-footer a { color: var(--muted); }
