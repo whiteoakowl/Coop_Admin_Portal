@@ -575,25 +575,54 @@ real dependency runs the opposite direction from the numbering.
 - Reciprocal "Audit Log" nav link added across every other Track B admin
   view.
 
+## Community & Commerce track — Global Search (done — Track B, branch
+   `platform-community-commerce`) — the last item on Team B's own
+   priority list
+
+- `utils/globalSearch.js`: simple substring matching over
+  events/directory/classifieds/forum threads/custom forms/store
+  products/publications/photo albums/sent newsletter issues - not a real
+  search index, this app's scale (a single co-op) doesn't call for one.
+  Permission-aware by construction, not by re-deriving access rules
+  here: every source is fetched through the SAME already-access-checked
+  listing function its own member-facing router already calls
+  (`forums.accessibleCategories`, `customForms.formsVisibleTo`, etc.) -
+  search never bypasses a visibility check a browsing page would have
+  enforced. Member Directory is deliberately NOT included - its own
+  per-field, admin-configured visibility (item 5) is too easy to get
+  subtly wrong by re-deriving a text index over it here.
+- `routes/search.js` (`/search`, members-only - simplest to reason about
+  permission-wise, and most of what it searches is members-only anyway).
+  Not to be confused with the pre-existing Track A `/admin/search`
+  (`routes/admin-search.js`, its own untouched
+  `test/routes-search.test.js`) - an unrelated member-lookup tool.
+- 1 new view and `test/routes-global-search.test.js` (6 tests: sign-in
+  required, an empty query and a no-match query both return a clean
+  200, a published event and an active store product are each found by
+  title, and — the clearest proof of permission-awareness — a private
+  class forum thread is found in search by that class's own enrolled
+  family but never by an outsider account).
+
+This completes every item on `TEAM_B_HANDOFF.md`'s own numbered
+priority list (1 through 14).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Global search —
-Track B scope, genuinely last (per the handoff's own framing — "there's
-nothing to search until the rest exists"), next up after Events/Volunteer/
-Donation signups, Business Directory/Classifieds, Member Directory,
-Forums, Custom Forms, Accounting/Payments, Store, Weekly Newsletter, the
-SMS/notification framework, Photos/Albums + Publications/Articles, and the
-Audit Log above.
-Also still missing: Diplomas, Transcripts, Library parent-facing integration,
-full website appearance control (colors/logo/nav), and generalized
-documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
-parallel tracks.
+simple per-class open/closed toggle) — all Track A scope, not this
+track's to build.
+Also still missing (all pre-existing Track A/foundation gaps, not
+Track B's numbered list): Diplomas, Transcripts, Library parent-facing
+integration, full website appearance control (colors/logo/nav), and
+generalized documents. See `TEAM_B_HANDOFF.md` for how this was split
+into two parallel tracks.
 
 ## Verification so far
 
-- Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`).
+- Full test suite passing: 978 pass, 0 fail, 1 skipped (`npm test`), as of
+  the last Track B feature (Global Search, item 14 — the final item on
+  Team B's own priority list).
 - Lint clean repo-wide (`npx eslint .`).
 - Screenshot-verified live (Playwright) for: public homepage, registration
   page, portal login, Main Admin home/Users/Website. Two real CSS bugs were

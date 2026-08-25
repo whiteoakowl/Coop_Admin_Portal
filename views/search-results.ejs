@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Search',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/search', icon: 'search', label: 'Search' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Search</h1>
+    <form method="GET" action="/search" class="member-form-grid">
+      <label class="member-form-full">
+        <input type="search" name="q" value="<%= q %>" placeholder="Search events, forums, directory, store, and more..." autofocus />
+      </label>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Search</button>
+      </div>
+    </form>
+
+    <% if (q && results.length === 0) { %>
+      <p class="roster-empty">No results for "<%= q %>".</p>
+    <% } else if (results.length > 0) { %>
+      <p class="hint"><%= results.length %> result<%= results.length === 1 ? '' : 's' %></p>
+      <div class="manage-section">
+        <% results.forEach(function(r) { %>
+          <div class="team-info-card" style="margin-bottom: 0.75rem;">
+            <span class="badge-pill"><%= r.type %></span>
+            <h3 class="team-info-title"><a href="<%= r.url %>"><%= r.title %></a></h3>
+            <% if (r.snippet) { %><p class="hint"><%= r.snippet %></p><% } %>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

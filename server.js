@@ -177,6 +177,11 @@ const adminPublicationsRouter = require('./routes/admin-publications');
 // dedicated permission, separate from every action it records). No
 // member-facing router - this is Main Admin-only.
 const adminAuditLogRouter = require('./routes/admin-audit-log');
+// Item 14: Global Search at /search - genuinely last, permission-aware
+// by reusing each feature's own already-access-checked listing function
+// rather than re-deriving access rules - see utils/globalSearch.js's
+// own header comment.
+const searchRouter = require('./routes/search');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -379,6 +384,7 @@ app.use('/main-admin/photos', adminPhotosRouter);
 app.use('/publications', publicationsRouter);
 app.use('/main-admin/publications', adminPublicationsRouter);
 app.use('/main-admin/audit-log', adminAuditLogRouter);
+app.use('/search', searchRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not
