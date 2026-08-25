@@ -737,9 +737,8 @@ split.
   and Assignments/Grading/Diplomas/Transcripts): 898 pass, 0 fail, 1
   skipped.
 - Both branches were then merged together onto `main` in this repo (see
-  "Git / branching" below) - re-verified with a fresh full-suite run and
-  `npx eslint .` after the merge; see that section for the combined
-  result.
+  "Git / branching" below) - re-verified with a fresh full-suite run
+  after the merge: 980 pass, 0 fail, 1 skipped (`npm test`).
 - Lint clean repo-wide (`npx eslint .`).
 - Assignments/Grading/Diplomas/Transcripts live-verified end-to-end
   (Playwright), including the archive-survival fix: a teacher creates an
