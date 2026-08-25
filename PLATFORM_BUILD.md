@@ -147,6 +147,17 @@ extend it.
   Fixed once in the shared partial, so it now works for every portal
   (Main Admin's Website/Registration deletes, Parent Portal's own forms),
   not just the new Registration Windows page that surfaced it.
+- **Library** (`GET /parent/library`): read-only view of this family's own
+  library activity (currently checked-out items with due dates, overdue
+  flagged, plus a short recent-returns history) — the "Library parent-
+  facing integration" scope item. Reuses the *existing*
+  `library_items`/`library_checkouts` tables and the Co-op Admin Portal's
+  own scan-based checkout/check-in tools (`routes/admin-library.js`)
+  unchanged; this is purely a filtered view (`utils/library.js`'s new
+  `libraryActivityForMemberIds`), not a second checkout system. Scoped to
+  every member of the parent's own family (`utils/members.js`'s existing
+  `familyOf`), not just their children — a parent can check items out on
+  their own barcode too.
 
 ## Main Admin Portal (done — enough to actually run the system)
 
@@ -199,18 +210,24 @@ extend it.
 
 Lessons/assignments/grading beyond the existing Training module, Events +
 volunteer/donation signups, weekly newsletter, SMS notifications,
-accounting/payments, Store, Forums, Library parent-facing integration,
-Diplomas, Transcripts, Classifieds, Business/Member Directory, custom Form
-builder, Photos/Albums, Publications/Articles, full website appearance
-control (colors/logo/nav), audit log, notification center, global search,
-and generalized documents. See `TEAM_B_HANDOFF.md` for how this is being
-split into two parallel tracks.
+accounting/payments, Store, Forums, Diplomas, Transcripts, Classifieds,
+Business/Member Directory, custom Form builder, Photos/Albums,
+Publications/Articles, full website appearance control (colors/logo/nav),
+audit log, notification center, global search, and generalized documents.
+See `TEAM_B_HANDOFF.md` for how this is being split into two parallel
+tracks.
 
 ## Verification so far
 
 - Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`) —
-  re-confirmed after Teacher/Student Portal and registration windows.
+  re-confirmed after Teacher/Student Portal, registration windows, and the
+  Library integration.
 - Lint clean repo-wide (`npx eslint .`).
+- Parent Portal Library live-verified end-to-end (Playwright): a seeded
+  family with one active in-window checkout, one active overdue checkout
+  (on the parent's own barcode, not just a child's), and one already-
+  returned item all show correctly on `/parent/library` — overdue flagged,
+  due dates and return timestamps formatted, scoped to the whole family.
 - Registration windows live-verified end-to-end (Playwright): admin sets
   a class's capacity/Open/description via the Class Schedule dialog and
   it persists on save+reopen; Main Admin creates a Teacher-only window and

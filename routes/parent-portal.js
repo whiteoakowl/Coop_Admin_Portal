@@ -13,6 +13,8 @@ const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
 const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
+const { familyOf } = require('../utils/members');
+const { libraryActivityForMemberIds } = require('../utils/library');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -143,6 +145,18 @@ router.post('/classes/:id/unregister', async (req, res) => {
   });
 
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+});
+
+// Library - read-only. Reuses the EXISTING library_items/library_checkouts
+// tables the Co-op Admin Portal's own scan-based Library tools already
+// write to; a parent just gets a filtered view of their own family's
+// activity, not a second checkout system.
+router.get('/library', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const family = member ? [member, ...(await familyOf(member.id))] : [];
+  const memberIds = family.map((m) => m.id);
+  const { active, recentReturns } = await libraryActivityForMemberIds(memberIds);
+  res.render('parent-library', { title: 'Library', active, recentReturns });
 });
 
 module.exports = router;
