@@ -196,17 +196,49 @@ extend it.
   members visibility, cross-family submission denial, member withdrawal,
   classifieds sold-hides-from-active-browsing).
 
+## Community & Commerce track — Member Directory (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825050000_member_directory.sql`: no copy of
+  member data — two small settings tables instead:
+  `member_directory_field_settings` (which fields a Main Admin has opted
+  INTO the directory — a fixed allowlist, `phone`/`email`/`address`/
+  `grade_level`/`family`/`photo`, nothing on by default, never an
+  arbitrary `members` column) and `member_directory_opt_outs` (which
+  individual members have removed themselves entirely).
+- `utils/memberDirectory.js`: reads live from `members`/`families`
+  (Track A's own tables, read-only). `getFieldSettings()`/
+  `setFieldVisibility()` for the admin allowlist,
+  `isOptedOut()`/`setOptedOut()` for the per-member opt-out,
+  `listDirectoryMembers()`/`getDirectoryMember()` for browsing (already
+  excludes opted-out members).
+- `routes/admin-member-directory.js` (`/main-admin/member-directory`,
+  `manage_directory` — the same permission that already covers the
+  business directory, per its own catalog description): one settings
+  form, since there's no listing CRUD here — just which fields to expose.
+- `routes/member-directory.js` (`/member-directory`): members-only for
+  every route, no public option (unlike Events/Directory/Classifieds'
+  own public toggle) — this is real personal contact information.
+  Browsing/detail pages render only the fields the field settings turned
+  on (`visibleFields()` trims a full member row down before it ever
+  reaches a template), plus a `/mine` self-service page for a signed-in
+  account to opt itself or any of its own family in or out.
+- Real route-level tests: `test/routes-member-directory.test.js` (a field
+  never leaks before it's turned on even though the data exists, turning
+  a field on shows it everywhere, sign-in required, self opt-out takes
+  effect immediately, cross-family opt-out denial).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Member
-Directory, Forums, Custom Forms, Store, Accounting/Payments, weekly
-newsletter, SMS/notification framework, Photos/Albums + Publications/
-Articles, audit log, and global search — Track B scope, next up after
-Events/Volunteer/Donation signups and Business Directory/Classifieds
-above. Also still missing: Diplomas, Transcripts, Library parent-facing
-integration, full website appearance control (colors/logo/nav), and generalized
+simple per-class open/closed toggle) — all Track A scope. Forums, Custom
+Forms, Store, Accounting/Payments, weekly newsletter, SMS/notification
+framework, Photos/Albums + Publications/Articles, audit log, and global
+search — Track B scope, next up after Events/Volunteer/Donation signups,
+Business Directory/Classifieds, and Member Directory above. Also still
+missing: Diplomas, Transcripts, Library parent-facing integration, full
+website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.
 

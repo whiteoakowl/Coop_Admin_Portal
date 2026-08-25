@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Member Directory',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/member-directory', icon: 'users', label: 'Directory' },
+      { href: '/member-directory/mine', icon: 'lock', label: 'My Privacy' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Directory Privacy</h1>
+    <p class="hint">Choose whether you or any of your family appear in the Member Directory. This is separate from what fields are shown - a Main Admin controls that.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="training-lesson-list">
+      <% family.forEach(function(m) { %>
+        <div class="training-lesson-row">
+          <div class="training-lesson-row-main">
+            <svg class="icon"><use href="#icon-user"/></svg>
+            <div class="training-lesson-info">
+              <strong><%= m.name %></strong>
+              <span class="hint"><%= m.optedOut ? 'Not shown in the directory' : 'Shown in the directory' %></span>
+            </div>
+            <div class="training-lesson-actions">
+              <% if (m.optedOut) { %>
+                <form method="POST" action="/member-directory/<%= m.id %>/opt-in" class="inline-block-form">
+                  <button type="submit" class="roster-action-btn">Show Me</button>
+                </form>
+              <% } else { %>
+                <form method="POST" action="/member-directory/<%= m.id %>/opt-out" class="inline-block-form">
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove Me</button>
+                </form>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

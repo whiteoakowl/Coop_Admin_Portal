@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Member Directory',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/member-directory', icon: 'users', label: 'Directory' },
+      { href: '/member-directory/mine', icon: 'lock', label: 'My Privacy' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Member Directory</h1>
+    <p class="hint">Fields shown here are chosen by a Main Admin - a member can also remove themselves entirely under My Privacy.</p>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members to show yet.</p>
+    <% } else { %>
+      <div class="team-card-grid">
+        <% members.forEach(function(m) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <% if (m.photoUrl) { %>
+                <img src="<%= m.photoUrl %>" alt="" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 0.4rem;" />
+              <% } else { %>
+                <span class="team-info-icon"><svg class="icon"><use href="#icon-user"/></svg></span>
+              <% } %>
+              <h3 class="team-info-title"><a href="/member-directory/<%= m.id %>"><%= m.name %></a></h3>
+              <% if (m.familyName) { %><p class="hint"><%= m.familyName %></p><% } %>
+              <% if (m.gradeLevel) { %><p class="hint">Grade <%= m.gradeLevel %></p><% } %>
+              <% if (m.phone) { %><p class="hint"><%= m.phone %></p><% } %>
+              <% if (m.email) { %><p class="hint"><%= m.email %></p><% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>
