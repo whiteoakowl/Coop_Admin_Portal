@@ -137,6 +137,12 @@ const adminForumsRouter = require('./routes/admin-forums');
 // specific people/roles), builder admin at /main-admin/forms.
 const customFormsRouter = require('./routes/custom-forms');
 const adminCustomFormsRouter = require('./routes/admin-custom-forms');
+// Item 9 (built ahead of item 8 - Store depends on it): Accounting at
+// /accounting (would live in the Parent Portal's own tab, but that
+// router/views are off-limits - a sibling top-level page instead),
+// admin at /main-admin/accounting.
+const accountingRouter = require('./routes/accounting');
+const adminAccountingRouter = require('./routes/admin-accounting');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -326,6 +332,8 @@ app.use('/forums', forumsRouter);
 app.use('/main-admin/forums', adminForumsRouter);
 app.use('/forms', customFormsRouter);
 app.use('/main-admin/forms', adminCustomFormsRouter);
+app.use('/accounting', accountingRouter);
+app.use('/main-admin/accounting', adminAccountingRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

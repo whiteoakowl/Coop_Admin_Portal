@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Accounting',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/accounting', icon: 'file-text', label: 'Accounting' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Accounting</h1>
+    <p class="hint">Charges and payment history for you and your family. Payments are recorded by a Main Admin after money is received - there's no online payment here.</p>
+
+    <% members.forEach(function(row) { %>
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2><%= row.member.name %></h2>
+          <span class="badge-pill badge-pill-<%= row.balanceCents > 0 ? 'orange' : 'green' %>"><%= row.balanceCents > 0 ? formatCents(row.balanceCents) + ' due' : 'Paid in full' %></span>
+        </div>
+
+        <% if (row.charges.length === 0) { %>
+          <p class="roster-empty">No charges on record.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Paid</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% row.charges.forEach(function(c) { %>
+                  <tr>
+                    <td><%= c.description %></td>
+                    <td><%= formatCents(c.amount_cents) %></td>
+                    <td><%= formatCents(c.amountPaid) %></td>
+                    <td><span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span></td>
+                    <td><%= c.created_at %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (row.receipts.length > 0) { %>
+          <h3 class="hint" style="margin-top: 1rem;">Receipt History</h3>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr>
+                  <th>For</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% row.receipts.forEach(function(r) { %>
+                  <tr>
+                    <td><%= r.chargeDescription %></td>
+                    <td><%= formatCents(r.amount_cents) %></td>
+                    <td><%= r.created_at %></td>
+                    <td><%= r.note || '' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    <% }); %>
+  </main>
+</body>
+</html>

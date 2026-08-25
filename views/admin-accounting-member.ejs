@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1><%= member.name %></h1>
+      <span class="badge-pill badge-pill-<%= balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(balanceCents) %> due</span>
+    </div>
+    <p><a href="/main-admin/accounting">&larr; All Accounting</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Charges</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-charge-dialog').showModal()">+ Add Charge</button>
+      </div>
+
+      <% if (charges.length === 0) { %>
+        <p class="roster-empty">No charges yet.</p>
+      <% } %>
+
+      <div class="training-lesson-list">
+        <% charges.forEach(function(c) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <svg class="icon"><use href="#icon-file-text"/></svg>
+              <div class="training-lesson-info">
+                <strong><%= c.description %></strong>
+                <span class="badge-pill badge-pill-<%= c.status === 'paid' ? 'green' : c.status === 'cancelled' || c.status === 'refunded' ? 'gray' : 'orange' %>"><%= c.status.replace('_', ' ') %></span>
+                <span class="hint"><%= formatCents(c.amountPaid) %> of <%= formatCents(c.amount_cents) %> paid &middot; <%= c.created_at %></span>
+              </div>
+              <div class="training-lesson-actions roster-btn-row">
+                <% if (c.status !== 'cancelled') { %>
+                  <button type="button" class="roster-action-btn" onclick="document.getElementById('payment-dialog-<%= c.id %>').showModal()">Record Payment</button>
+                  <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/cancel" class="inline-block-form" data-confirm="Cancel this charge?">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                  </form>
+                <% } %>
+              </div>
+            </div>
+          </div>
+
+          <dialog id="payment-dialog-<%= c.id %>" class="member-picker-dialog">
+            <form method="POST" action="/main-admin/accounting/charges/<%= c.id %>/payments">
+              <h3>Record Payment &mdash; <%= c.description %></h3>
+              <label>Direction
+                <select name="direction">
+                  <option value="payment">Payment received</option>
+                  <option value="refund">Refund issued</option>
+                </select>
+              </label>
+              <label>Amount ($)
+                <input type="number" name="amount" min="0.01" step="0.01" required />
+              </label>
+              <label>Note
+                <input type="text" name="note" placeholder="e.g. Cash, Check #123, Venmo" />
+              </label>
+              <div class="notes-dialog-actions">
+                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                <button type="submit" class="primary-btn">Record</button>
+              </div>
+            </form>
+          </dialog>
+        <% }); %>
+      </div>
+    </div>
+
+    <dialog id="add-charge-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/accounting/members/<%= member.id %>/charges">
+        <h3>Add Charge</h3>
+        <label>Description
+          <input type="text" name="description" placeholder="e.g. Registration Fee" required />
+        </label>
+        <label>Amount ($)
+          <input type="number" name="amount" min="0.01" step="0.01" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

@@ -22,31 +22,37 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Forum Moderation Log</h1>
-    <p><a href="/main-admin/forums">&larr; Forums</a></p>
+    <h1>Accounting</h1>
+    <p class="hint">Members with any charge history below. To add a first charge for someone new, find them here.</p>
 
-    <% if (entries.length === 0) { %>
-      <p class="roster-empty">No moderation actions yet.</p>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="GET" onsubmit="event.preventDefault(); var id = this.memberId.value; if (id) window.location = '/main-admin/accounting/members/' + id;" class="roster-btn-row" style="margin-bottom: 1rem;">
+      <select name="memberId">
+        <option value="">Find a member&hellip;</option>
+        <% allMembers.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+      </select>
+      <button type="submit" class="roster-action-btn">Go</button>
+    </form>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No charges recorded yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Moderator</th>
-              <th>Action</th>
-              <th>Target</th>
-              <th>Detail</th>
+              <th>Member</th>
+              <th>Balance</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <% entries.forEach(function(e) { %>
+            <% members.forEach(function(m) { %>
               <tr>
-                <td><%= e.created_at %></td>
-                <td><%= e.memberName || 'Unknown' %></td>
-                <td><%= e.action %></td>
-                <td><%= e.target_type %> #<%= e.target_id %></td>
-                <td><%= e.detail || '' %></td>
+                <td class="roster-name-col"><%= m.name %></td>
+                <td><span class="badge-pill badge-pill-<%= m.balanceCents > 0 ? 'orange' : 'green' %>"><%= formatCents(m.balanceCents) %></span></td>
+                <td><a href="/main-admin/accounting/members/<%= m.id %>">View</a></td>
               </tr>
             <% }); %>
           </tbody>

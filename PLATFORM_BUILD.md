@@ -313,16 +313,58 @@ extend it.
   it to every holder, resubmission redirects instead of duplicating, and
   cross-family submission denial).
 
+## Community & Commerce track — Accounting/Payments foundation (done —
+   Track B, branch `platform-community-commerce`)
+
+Built ahead of Store (handoff item 8) even though the handoff lists Store
+first — item 9's own text requires Store's checkout to be wired through
+this same abstraction rather than a separate "did they pay" flag, so the
+real dependency runs the opposite direction from the numbering.
+
+- `supabase/migrations/20260825080000_payments_foundation.sql`:
+  `payment_charges` (money owed — a store order, an event registration
+  fee, or a manual charge; `status` is never set directly by a route,
+  only ever recomputed from real payment rows), `payment_payments` (one
+  row per real payment or refund — positive/negative `amount_cents` —
+  against a charge). A payment **abstraction** only: no real processor is
+  integrated, no raw card data is ever stored: `method` is `'manual'`
+  today (an admin recording something that already happened outside the
+  app — cash, check, Venmo) with a `'stripe_placeholder'` value reserved
+  for later.
+- `utils/payments.js`: `recalculateStatus()` is the one place a charge's
+  status changes, always derived from its own `payment_payments` rows.
+  A full refund closes a charge out (`'refunded'`) rather than re-billing
+  the member for the same amount — caught and fixed via a failing test
+  before it shipped, so `balanceForMember()` only ever sums `'pending'`
+  charges, not refunded/partially-refunded ones. `formatCents()` is the
+  one place this app formats a dollar amount, reused by every view here.
+- `routes/admin-accounting.js` (`/main-admin/accounting`,
+  `manage_finances` — already pre-seeded): per-member charge/payment/
+  refund recording, a member picker to reach anyone with no charge
+  history yet.
+- `routes/accounting.js` (`/accounting`): would naturally live as a tab
+  inside the Parent Portal, but `routes/parent-portal.js`/
+  `views/parent-*.ejs` are off-limits — a sibling top-level page instead
+  (same reasoning as Member Directory/Forums/Custom Forms), open to any
+  signed-in account's own family, any role, showing balance/charges/
+  receipt history.
+- 3 new views and `test/routes-accounting.test.js` (5 tests: sign-in
+  required, a charge goes pending → paid and the member sees it in their
+  own Accounting page, a full refund closes the charge without re-billing
+  the balance, a cancelled charge stays cancelled even if a stray payment
+  is recorded against it, cross-family charge visibility denial).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Store,
-Accounting/Payments, weekly newsletter, SMS/notification framework,
-Photos/Albums + Publications/Articles, audit log, and global search —
-Track B scope, next up after Events/Volunteer/Donation signups, Business
-Directory/Classifieds, Member Directory, Forums, and Custom Forms above.
-Also still missing: Diplomas, Transcripts, Library parent-facing integration,
+simple per-class open/closed toggle) — all Track A scope. Store, weekly
+newsletter, SMS/notification framework, Photos/Albums + Publications/
+Articles, audit log, and global search — Track B scope, next up after
+Events/Volunteer/Donation signups, Business Directory/Classifieds, Member
+Directory, Forums, Custom Forms, and Accounting/Payments above (Store is
+next, now that it has the payment abstraction to wire its checkout
+through). Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.
