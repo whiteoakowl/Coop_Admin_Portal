@@ -8,24 +8,24 @@
     }, 2000);
   }
 
-  const parentSelect = document.getElementById('parentId');
+  const memberSelect = document.getElementById('memberId');
   const groups = document.querySelectorAll('#name-tag-member-groups .absence-children-group');
   const requiredMsg = document.getElementById('member-required-msg');
   const selectAllBtn = document.getElementById('select-all-btn');
 
-  function showGroupForParent() {
+  function showGroupForMember() {
     groups.forEach((g) => {
-      g.hidden = g.dataset.parentId !== parentSelect.value;
+      g.hidden = g.dataset.memberId !== memberSelect.value;
     });
     if (requiredMsg) requiredMsg.hidden = true;
     if (selectAllBtn) {
-      selectAllBtn.hidden = !parentSelect.value;
+      selectAllBtn.hidden = !memberSelect.value;
       selectAllBtn.textContent = 'Select All';
     }
   }
 
-  if (parentSelect) {
-    parentSelect.addEventListener('change', showGroupForParent);
+  if (memberSelect) {
+    memberSelect.addEventListener('change', showGroupForMember);
   }
 
   if (selectAllBtn) {

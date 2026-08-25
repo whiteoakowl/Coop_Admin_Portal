@@ -18,30 +18,31 @@
 
     <form method="POST" action="/name-tag/submit" id="name-tag-form" class="form-outer-panel" data-redirect-home="<%= result && result.redirectHome ? '1' : '' %>">
       <div class="form-section">
-        <h2>Parent Name</h2>
+        <h2>Your Name</h2>
         <div class="stack-form">
-          <select id="parentId" name="parentId" required>
+          <select id="memberId" name="memberId" required>
             <option value="">Select your name&hellip;</option>
-            <% parents.forEach(function(p) { %>
-              <option value="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option>
+            <% members.forEach(function(m) { %>
+              <option value="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %></option>
             <% }); %>
           </select>
         </div>
 
         <button type="button" id="select-all-btn" class="btn-secondary select-all-btn" hidden>Select All</button>
         <div id="name-tag-member-groups">
-          <% parents.forEach(function(p) { %>
-            <% var kids = childrenByParent[p.id] || []; %>
-            <div class="absence-children-group" data-parent-id="<%= p.id %>" <%= String(formValues.parentId) === String(p.id) ? '' : 'hidden' %>>
+          <% members.forEach(function(m) { %>
+            <% var family = familyByMember[m.id] || []; %>
+            <% var typeLabel = m.member_type === 'admin' ? 'Admin' : m.member_type === 'student' ? 'Student' : 'Parent'; %>
+            <div class="absence-children-group" data-member-id="<%= m.id %>" <%= String(formValues.memberId) === String(m.id) ? '' : 'hidden' %>>
               <div class="checkbox-group">
                 <label class="checkbox-option">
-                  <input type="checkbox" name="memberIds" value="<%= p.id %>" <%= formValues.memberIds.map(String).includes(String(p.id)) ? 'checked' : '' %> />
-                  <%= p.name %> (Parent)
+                  <input type="checkbox" name="memberIds" value="<%= m.id %>" <%= formValues.memberIds.map(String).includes(String(m.id)) ? 'checked' : '' %> />
+                  <%= m.name %> (<%= typeLabel %>)
                 </label>
-                <% kids.forEach(function(k) { %>
+                <% family.forEach(function(f) { %>
                   <label class="checkbox-option">
-                    <input type="checkbox" name="memberIds" value="<%= k.id %>" <%= formValues.memberIds.map(String).includes(String(k.id)) ? 'checked' : '' %> />
-                    <%= k.name %>
+                    <input type="checkbox" name="memberIds" value="<%= f.id %>" <%= formValues.memberIds.map(String).includes(String(f.id)) ? 'checked' : '' %> />
+                    <%= f.name %>
                   </label>
                 <% }); %>
               </div>

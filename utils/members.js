@@ -88,6 +88,19 @@ async function activeParentAndAdminOptions() {
   return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()).sort(byLastName);
 }
 
+// Every active member, any type - a real request: "the drop down menu of
+// names should include all members admin, primary parent, parent and
+// student" for the Name Tag Request form specifically, since a student
+// old enough to notice a lost tag or a schedule change shouldn't need a
+// parent to submit the request for them. Deliberately its own function
+// rather than widening activeParentAndAdminOptions itself, for the exact
+// same reason that one exists separately from activeParentOptions -
+// Absence/Late (routes/absence.js) shares activeParentAndAdminOptions and
+// stays parent+admin-only; only Name Tag moves to every member type.
+async function activeMemberOptions() {
+  return (await db.prepare('SELECT id, name, member_type FROM members WHERE active = 1').all()).sort(byLastName);
+}
+
 // Every other active member sharing memberId's family_id (any type -
 // family is symmetric and not restricted to parent/student). Empty if the
 // member isn't connected to anyone.
@@ -124,6 +137,19 @@ async function familyGroupsByParent() {
   return byParent;
 }
 
+// Same shape/purpose as familyGroupsByParent above, but for the Name Tag
+// Request form's own wider activeMemberOptions() picker (any member type,
+// not just parent/admin) - takes the already-fetched member list instead
+// of re-querying its own, since the caller needs that same list for the
+// picker dropdown anyway.
+async function familyGroupsByMember(members) {
+  const byMember = {};
+  for (const m of members) {
+    byMember[m.id] = (await familyOf(m.id)).map((x) => ({ id: x.id, name: x.name }));
+  }
+  return byMember;
+}
+
 // Confirms memberId is really part of parentId's family (themselves, or
 // anyone sharing their family_id) before letting a form submission touch
 // that record. parentId is whatever was picked from a parents-picker
@@ -136,6 +162,24 @@ async function loadFamilyMember(memberId, parentId) {
   const parent = await db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(parentId);
   if (!parent || parent.family_id == null) return null;
   return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, parent.family_id);
+}
+
+// Same as loadFamilyMember above, except the self-selection branch allows
+// ANY active member type, not just parent/admin - Name Tag Request's own
+// activeMemberOptions() picker lets a student pick themselves too, and
+// this is what actually validates that pick server-side once the form is
+// submitted. Kept separate from loadFamilyMember itself (rather than
+// widening it in place) so Absence/Late, which still shares that
+// function, is provably unaffected - its own picker never offers a
+// student's id as requesterId to begin with, but this way there's no
+// ambiguity about it either.
+async function loadFamilyMemberAnyType(memberId, requesterId) {
+  if (memberId === requesterId) {
+    return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(requesterId);
+  }
+  const requester = await db.prepare('SELECT family_id FROM members WHERE id = ? AND active = 1').get(requesterId);
+  if (!requester || requester.family_id == null) return null;
+  return db.prepare('SELECT * FROM members WHERE id = ? AND active = 1 AND family_id = ?').get(memberId, requester.family_id);
 }
 
 // Every family an admin has created ("+ Add Family" on the Members page) -
@@ -321,8 +365,11 @@ module.exports = {
   findMemberByName,
   activeParentOptions,
   activeParentAndAdminOptions,
+  activeMemberOptions,
   familyGroupsByParent,
+  familyGroupsByMember,
   loadFamilyMember,
+  loadFamilyMemberAnyType,
   familyOf,
   hasInfantChild,
   allFamilies,
