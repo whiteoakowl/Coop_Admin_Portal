@@ -12,6 +12,7 @@ const { requirePortalAuth } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const events = require('../utils/events');
+const notifications = require('../utils/notifications');
 
 function withImageUrl(event) {
   return { ...event, imageUrl: event.image_key ? `/uploads/events/${event.image_key}` : null };
@@ -82,6 +83,8 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
 
   const member = family.find((m) => m.id === memberId);
   const notice = status === 'confirmed' ? `${member.name} is registered.` : `That event is full - ${member.name} has been added to the waitlist.`;
+  const event = await events.getEvent(eventId);
+  await notifications.notify(req.portalAccount.id, 'event_registration', { title: `Registered: ${event.title}`, body: notice, linkUrl: back });
   res.redirect(back + '?notice=' + encodeURIComponent(notice));
 });
 

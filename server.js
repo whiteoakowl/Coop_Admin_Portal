@@ -154,6 +154,14 @@ const adminStoreRouter = require('./routes/admin-store');
 // /main-admin/newsletter (manage_communications).
 const newsletterRouter = require('./routes/newsletter');
 const adminNewsletterRouter = require('./routes/admin-newsletter');
+// Item 11: SMS/notification framework at /notifications (Notification
+// Center + a member's own email/sms opt-out preferences), admin control
+// over which types auto-send at /main-admin/notifications
+// (manage_communications). Shares one "notification" concept across
+// in-app/email/sms rather than being built as separate systems - see
+// utils/notifications.js's own header comment.
+const notificationsRouter = require('./routes/notifications');
+const adminNotificationsRouter = require('./routes/admin-notifications');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -349,6 +357,8 @@ app.use('/store', storeRouter);
 app.use('/main-admin/store', adminStoreRouter);
 app.use('/newsletter', newsletterRouter);
 app.use('/main-admin/newsletter', adminNewsletterRouter);
+app.use('/notifications', notificationsRouter);
+app.use('/main-admin/notifications', adminNotificationsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

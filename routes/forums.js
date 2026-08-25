@@ -19,6 +19,7 @@ const router = express.Router();
 const { requirePortalAuth } = require('../middleware/portalAuth');
 const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const forums = require('../utils/forums');
+const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth);
 
@@ -112,6 +113,11 @@ router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
   if (!body) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('A message is required.'));
   const self = await memberForAccount(req.portalAccount.id);
   await forums.addPost(req.thread.id, body, self.id, req.portalAccount.id);
+  // Notify the thread's own starter, not the replier - and never notify
+  // someone replying to their own thread.
+  if (req.thread.account_id && req.thread.account_id !== req.portalAccount.id) {
+    await notifications.notify(req.thread.account_id, 'forum_reply', { title: `New reply: ${req.thread.title}`, body: 'Someone replied to your thread.', linkUrl: `/forums/threads/${req.thread.id}` });
+  }
   res.redirect(`/forums/threads/${req.thread.id}`);
 });
 

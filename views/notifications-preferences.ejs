@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Notifications',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/notifications', icon: 'bell', label: 'Notifications' },
+      { href: '/notifications/preferences', icon: 'sliders', label: 'Preferences' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Notification Preferences</h1>
+    <p class="hint">In-app notifications (the Notification Center) always happen. Choose which types also reach you by email or text.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="/notifications/preferences">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Type</th><th>Email</th><th>SMS</th></tr>
+        </thead>
+        <tbody>
+          <% preferences.forEach(function(p) { %>
+            <tr>
+              <td><%= p.type.label %><br /><span class="hint"><%= p.type.description %></span></td>
+              <td><input type="checkbox" name="email_<%= p.type.key %>" value="1" <%= p.email ? 'checked' : '' %> /></td>
+              <td><input type="checkbox" name="sms_<%= p.type.key %>" value="1" <%= p.sms ? 'checked' : '' %> /></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <button type="submit" class="primary-btn">Save</button>
+    </form>
+  </main>
+</body>
+</html>

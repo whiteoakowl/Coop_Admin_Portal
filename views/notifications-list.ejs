@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Notifications',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/notifications', icon: 'bell', label: 'Notifications' },
+      { href: '/notifications/preferences', icon: 'sliders', label: 'Preferences' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Notifications</h1>
+      <% if (items.some(function(i) { return !i.read_at; })) { %>
+        <form method="POST" action="/notifications/read-all">
+          <button type="submit" class="roster-action-btn">Mark All Read</button>
+        </form>
+      <% } %>
+    </div>
+
+    <% if (items.length === 0) { %>
+      <p class="roster-empty">No notifications yet.</p>
+    <% } else { %>
+      <div class="manage-section">
+        <% items.forEach(function(i) { %>
+          <div class="team-info-card" style="<%= i.read_at ? '' : 'border-left: 3px solid var(--brand);' %> margin-bottom: 0.75rem;">
+            <h3 class="team-info-title"><%= i.title %></h3>
+            <p><%= i.body %></p>
+            <p class="hint"><%= i.created_at %></p>
+            <div class="roster-btn-row">
+              <% if (i.link_url) { %><a class="roster-action-btn" href="<%= i.link_url %>">View</a><% } %>
+              <% if (!i.read_at) { %>
+                <form method="POST" action="/notifications/<%= i.id %>/read" class="inline-block-form">
+                  <button type="submit" class="roster-action-btn">Mark Read</button>
+                </form>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

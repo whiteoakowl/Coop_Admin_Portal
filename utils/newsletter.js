@@ -8,6 +8,7 @@
 // stopping short of a real payment processor.
 const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
+const notifications = require('./notifications');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -99,10 +100,17 @@ async function unschedule(id) {
 }
 
 // "Sent" is a status change recording who it would have reached, not a
-// real email dispatch - see this file's own header comment.
+// real email dispatch - see this file's own header comment. Each active
+// account also gets a real notification through utils/notifications.js
+// (item 11) - the Notification Center entry IS the "you have mail" a
+// real send would have produced.
 async function markSent(id) {
-  const recipientCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'active'").get()).c);
-  await db.prepare("UPDATE newsletter_issues SET status = 'sent', sent_at = now_text(), recipient_count = ?, updated_at = now_text() WHERE id = ?").run(recipientCount, id);
+  const issue = await getIssue(id);
+  const recipients = await db.prepare("SELECT id FROM member_accounts WHERE status = 'active'").all();
+  await db.prepare("UPDATE newsletter_issues SET status = 'sent', sent_at = now_text(), recipient_count = ?, updated_at = now_text() WHERE id = ?").run(recipients.length, id);
+  for (const recipient of recipients) {
+    await notifications.notify(recipient.id, 'newsletter_sent', { title: issue.subject, body: 'A new newsletter issue is available.', linkUrl: `/newsletter/${id}` });
+  }
 }
 
 async function deleteIssue(id) {

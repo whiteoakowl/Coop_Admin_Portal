@@ -434,15 +434,66 @@ real dependency runs the opposite direction from the numbering.
   `admin-accounting-member.ejs` (missing a "Store" link from the previous
   feature) got both added.
 
+## Community & Commerce track — SMS/text notification framework (done —
+   Track B, branch `platform-community-commerce`)
+
+- `supabase/migrations/20260825110000_notifications.sql`: `notification_types`
+  (an admin-controlled catalog, seeded from real callers only — every key
+  has an actual feature generating it, never a placeholder type),
+  `notification_preferences` (a member's own per-type, per-channel
+  email/sms opt-out; only override rows are stored — an account with no
+  row is enabled by default), `notifications` (one row per notification
+  actually generated — the Notification Center's own data, `read_at` is
+  what "unread" means there), `notification_deliveries` (one row per
+  channel actually attempted, always including `in_app`).
+- `utils/notifications.js`: `notify()` is the single entry point every
+  other feature calls — it shares one "notification" concept across
+  in-app/email/sms rather than being two unrelated systems, per the
+  handoff's own suggestion. It always creates the in-app notification,
+  then — only if the type's `auto_send_enabled` is on — attempts email
+  and sms, each recorded as `'skipped'` with why (opted out, or no
+  provider configured) rather than silently doing nothing.
+  `utils/emailProvider.js`/`utils/smsProvider.js` are provider
+  ABSTRACTIONS, same reasoning `utils/payments.js` already established
+  for not integrating a real payment processor — no email or SMS vendor
+  is configured anywhere in this app, so `send()` never makes a real
+  network call. A real provider would plug in behind that same
+  `send()` signature without any caller above it changing.
+- Three real callers, not placeholders: `routes/events.js`'s
+  registration handler (`event_registration`), `routes/forums.js`'s
+  reply handler (`forum_reply` — notifies the thread's own starter, never
+  a self-reply), and `utils/newsletter.js`'s `markSent()`
+  (`newsletter_sent` — every active member account).
+- `routes/admin-notifications.js` (`/main-admin/notifications`,
+  `manage_communications`): the one thing an admin controls is
+  `auto_send_enabled` per type — "admin control over which message types
+  actually send automatically," per the handoff — not a freeform type
+  editor.
+- `routes/notifications.js` (`/notifications`, members-only): the
+  Notification Center (list, mark read/mark all read) plus
+  `/notifications/preferences`, a member's own per-type email/sms
+  opt-out (in-app can't be turned off).
+- 4 new views and `test/routes-notifications.test.js` (8 tests: sign-in
+  required for admin and member routes, event registration notifies the
+  registrant with in-app always sent and email skipped for no provider,
+  a forum reply notifies the thread starter but never a self-reply, mark
+  read/mark-all-read, opting out of email for one type is recorded as
+  skipped while other types stay unaffected, turning a type's auto-send
+  off stops email/sms but keeps the in-app notification, sending a
+  newsletter issue notifies every active member account).
+- Reciprocal "Notifications" nav link added across every other Track B
+  admin view; also caught and fixed `admin-store-list.ejs` missing its
+  own "Newsletter" link from the previous feature.
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. SMS/notification
-framework, Photos/Albums + Publications/Articles, audit log, and global
-search — Track B scope, next up after Events/Volunteer/Donation signups,
-Business Directory/Classifieds, Member Directory, Forums, Custom Forms,
-Accounting/Payments, Store, and Weekly Newsletter above.
+simple per-class open/closed toggle) — all Track A scope. Photos/Albums +
+Publications/Articles, audit log, and global search — Track B scope, next
+up after Events/Volunteer/Donation signups, Business Directory/
+Classifieds, Member Directory, Forums, Custom Forms, Accounting/Payments,
+Store, Weekly Newsletter, and the SMS/notification framework above.
 Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
