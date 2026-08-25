@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Sanford Homeschoolers Check-In/Out",
-  "short_name": "SH Check-In",
+  "name": "Co-op Admin Portal",
+  "short_name": "Co-op Admin Portal",
   "description": "Check-in/out, attendance, floater assignments, class schedules, and member management for Sanford Homeschoolers co-op.",
   "start_url": "/",
   "scope": "/",

@@ -17,6 +17,14 @@
      actually does - static-asset caching only, nothing session-gated). -->
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#4682B4" />
+<%# A real bug report: "When downloading the app its labeled SH Check
+    In. It should be labeled Co-op Admin Portal." manifest.json's own
+    name/short_name already carry that label (used for Android/Chrome's
+    install), but iOS Safari's "Add to Home Screen" often ignores the
+    web manifest entirely and falls back to this specific meta tag - set
+    explicitly so both platforms actually agree, instead of iOS silently
+    reading whatever this page's own <title> happened to be. %>
+<meta name="apple-mobile-web-app-title" content="Co-op Admin Portal" />
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
 <script src="/js/pwa.js" defer></script>
 <script src="/js/csrf.js" defer></script>
