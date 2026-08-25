@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Classifieds</h1>
+    <p class="hint">Members post their own listings for review here.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (listings.length === 0) { %>
+      <p class="roster-empty">No listings yet.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% listings.forEach(function(l) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <span class="team-info-icon"><svg class="icon"><use href="#icon-tag"/></svg></span>
+            <h3 class="team-info-title"><a href="/main-admin/classifieds/<%= l.id %>/edit"><%= l.title %></a></h3>
+            <span class="badge-pill badge-pill-<%= l.status === 'active' ? 'green' : l.status === 'sold' ? 'gray' : l.status === 'archived' ? 'gray' : 'orange' %>"><%= l.status.charAt(0).toUpperCase() + l.status.slice(1) %></span>
+            <p class="hint"><%= l.price || 'No price listed' %> &bull; <%= l.visibility === 'public' ? 'Public' : 'Members only' %></p>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/main-admin/classifieds/<%= l.id %>/edit">Edit</a>
+              <% if (l.status !== 'active') { %>
+                <form method="POST" action="/main-admin/classifieds/<%= l.id %>/status" class="inline-block-form">
+                  <input type="hidden" name="status" value="active" />
+                  <button type="submit" class="roster-action-btn">Approve</button>
+                </form>
+              <% } %>
+              <% if (l.status !== 'archived') { %>
+                <form method="POST" action="/main-admin/classifieds/<%= l.id %>/status" class="inline-block-form">
+                  <input type="hidden" name="status" value="archived" />
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Archive</button>
+                </form>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/directory">&larr; All Listings</a></p>
+
+        <% if (listing.imageUrl) { %>
+          <img src="<%= listing.imageUrl %>" alt="" style="width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); margin-bottom: 1.25rem;" />
+        <% } %>
+
+        <h1><%= listing.business_name %></h1>
+        <% if (listing.category) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= listing.category %></p><% } %>
+        <% if (listing.address) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= listing.address %></p><% } %>
+        <% if (listing.phone) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-phone"/></svg> <%= listing.phone %></p><% } %>
+        <% if (listing.email) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-mail"/></svg> <%= listing.email %></p><% } %>
+        <% if (listing.website) { %><p class="site-hero-meta"><a href="<%= listing.website %>" target="_blank" rel="noopener"><%= listing.website %></a></p><% } %>
+        <% if (listing.description) { %><p><%= listing.description %></p><% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

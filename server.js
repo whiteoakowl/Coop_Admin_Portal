@@ -117,6 +117,12 @@ const mainAdminRouter = require('./routes/main-admin');
 // on Track A's hard-boundary list).
 const eventsRouter = require('./routes/events');
 const adminEventsRouter = require('./routes/admin-events');
+// Item 4: Business Directory at /directory, Classifieds at /classifieds,
+// same sibling-router shape as Events above.
+const directoryRouter = require('./routes/directory');
+const adminDirectoryRouter = require('./routes/admin-directory');
+const classifiedsRouter = require('./routes/classifieds');
+const adminClassifiedsRouter = require('./routes/admin-classifieds');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -296,6 +302,10 @@ app.use('/parent', parentPortalRouter);
 app.use('/main-admin', mainAdminRouter);
 app.use('/events', eventsRouter);
 app.use('/main-admin/events', adminEventsRouter);
+app.use('/directory', directoryRouter);
+app.use('/main-admin/directory', adminDirectoryRouter);
+app.use('/classifieds', classifiedsRouter);
+app.use('/main-admin/classifieds', adminClassifiedsRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

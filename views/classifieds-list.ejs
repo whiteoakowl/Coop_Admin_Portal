@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="btn-secondary" href="/classifieds/mine">My Listings</a>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <h1>Classifieds</h1>
+        <p>Buy, sell, and give away with other co-op families.</p>
+
+        <% if (listings.length === 0) { %>
+          <p class="roster-empty">No listings yet.</p>
+        <% } else { %>
+          <div class="event-card-grid">
+            <% listings.forEach(function(l) { %>
+              <a class="event-card" href="/classifieds/<%= l.id %>">
+                <% if (l.imageUrl) { %>
+                  <div class="event-card-image"><img src="<%= l.imageUrl %>" alt="" /></div>
+                <% } %>
+                <div class="event-card-body">
+                  <% if (l.price) { %><span class="event-card-date"><svg class="icon"><use href="#icon-tag"/></svg> <%= l.price %></span><% } %>
+                  <h3><%= l.title %></h3>
+                  <% if (l.category) { %><p class="event-card-location"><%= l.category %></p><% } %>
+                </div>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

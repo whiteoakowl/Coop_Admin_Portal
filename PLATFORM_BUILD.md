@@ -155,26 +155,58 @@ extend it.
   event is visible to any signed-in portal account (not scoped to one
   portal, unlike class registration). Registering, volunteering, and
   claiming a donation item all require sign-in and let an account act for
-  itself or any member of its own family (`familyForAccount`, generalized
-  from Parent Portal's own student-only `childrenForAccount`) — every
-  mutating route re-verifies the target member is really part of the
-  acting account's family before writing anything.
+  itself or any member of its own family (`utils/portalAuth.js`'s
+  `familyForAccount`, generalized from Parent Portal's own student-only
+  `childrenForAccount`) — every mutating route re-verifies the target
+  member is really part of the acting account's family before writing
+  anything.
 - Real route-level tests: `test/routes-events.test.js` (admin create/
   publish, public-vs-members visibility, family registration + capacity/
   waitlist, cross-family access denial, volunteer slot-filling, donation
   claim clamping).
 
+## Community & Commerce track — Business Directory, Classifieds (done —
+   Track B, branch `platform-community-commerce`)
+
+- `supabase/migrations/20260825040000_directory_classifieds.sql`:
+  `business_directory_listings`, `classified_listings`. Both share the
+  same submit → `pending` → admin-approved `active` → `archived` shape
+  (classifieds adds a `sold` status the submitting member can set
+  themselves); a new `manage_classifieds` permission was added to
+  `db/bootstrapPg.js`'s `PORTAL_PERMISSIONS` catalog (`manage_directory`
+  was already pre-seeded and covers the business directory).
+- `utils/directory.js` / `utils/classifieds.js`: near-identical business
+  logic, kept as two separate feature-scoped files (this codebase's own
+  convention — one utils file per feature, not a generic "listings"
+  engine) rather than one shared abstraction.
+- `routes/admin-directory.js` (`/main-admin/directory`, `manage_directory`)
+  / `routes/admin-classifieds.js` (`/main-admin/classifieds`,
+  `manage_classifieds`): review queue, approve/archive/delete, edit any
+  listing, image upload (same public-bucket pattern as Events' own image
+  upload). Sibling routers, same reasoning as `routes/admin-events.js`.
+- `routes/directory.js` (`/directory`) / `routes/classifieds.js`
+  (`/classifieds`): public/member browsing (only `active` + visibility-
+  appropriate listings show), a signed-in account's own `/mine` page to
+  submit/edit/withdraw (or mark sold, classifieds) a listing for itself or
+  any member of its own family — same `familyForAccount` scoping Events
+  uses, now shared from `utils/portalAuth.js` rather than redefined per
+  route file once a second feature needed the identical scope.
+- Real route-level tests: `test/routes-directory-classifieds.test.js`
+  (pending-hides-from-public → admin-approves → visible, public-vs-
+  members visibility, cross-family submission denial, member withdrawal,
+  classifieds sold-hides-from-active-browsing).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Business
-Directory + Classifieds, Member Directory, Forums, Custom Forms, Store,
-Accounting/Payments, weekly newsletter, SMS/notification framework,
-Photos/Albums + Publications/Articles, audit log, and global search —
-Track B scope, next up after Events/Volunteer/Donation signups above. Also
-still missing: Diplomas, Transcripts, Library parent-facing integration,
-full website appearance control (colors/logo/nav), and generalized
+simple per-class open/closed toggle) — all Track A scope. Member
+Directory, Forums, Custom Forms, Store, Accounting/Payments, weekly
+newsletter, SMS/notification framework, Photos/Albums + Publications/
+Articles, audit log, and global search — Track B scope, next up after
+Events/Volunteer/Donation signups and Business Directory/Classifieds
+above. Also still missing: Diplomas, Transcripts, Library parent-facing
+integration, full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.
 

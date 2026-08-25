@@ -63,6 +63,22 @@ async function memberForAccount(accountId) {
   return db.prepare('SELECT m.* FROM members m JOIN member_accounts ma ON ma.member_id = m.id WHERE ma.id = ?').get(accountId);
 }
 
+// Self + every other active member sharing the account's own family_id -
+// the full set of people this account can act on behalf of (register for
+// an event, submit a directory/classifieds listing, etc.). Broader than
+// routes/parent-portal.js's own student-only childrenForAccount: any
+// portal account, not just a parent, should be able to act for its whole
+// family, not only its kids. Shared here (rather than redefined per
+// route file) once more than one Community & Commerce feature needed
+// the exact same "who can this account act for" scope.
+async function familyForAccount(accountId) {
+  const self = await memberForAccount(accountId);
+  if (!self) return [];
+  if (!self.family_id) return [self];
+  const rest = await db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY LOWER(name)').all(self.family_id, self.id);
+  return [self, ...rest];
+}
+
 module.exports = {
   findAccountByEmail,
   findAccountById,
@@ -71,4 +87,5 @@ module.exports = {
   rolesForAccount,
   permissionsForAccount,
   memberForAccount,
+  familyForAccount,
 };

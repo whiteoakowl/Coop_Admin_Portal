@@ -9,24 +9,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth } = require('../middleware/portalAuth');
-const { memberForAccount } = require('../utils/portalAuth');
+const { familyForAccount } = require('../utils/portalAuth');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const events = require('../utils/events');
-
-// Self + every other active member sharing the account's own family_id -
-// the full set of people this account can register/volunteer/claim a
-// donation item for, the same "any of my own family, not just myself"
-// scope parent-portal.js's own childrenForAccount established, just not
-// narrowed to students only - a teacher or co-op admin account should be
-// able to sign up their whole family for an event too, not just their
-// kids.
-async function familyForAccount(account) {
-  const self = await memberForAccount(account.id);
-  if (!self) return [];
-  if (!self.family_id) return [self];
-  const rest = await db.prepare("SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY LOWER(name)").all(self.family_id, self.id);
-  return [self, ...rest];
-}
 
 function withImageUrl(event) {
   return { ...event, imageUrl: event.image_key ? `/uploads/events/${event.image_key}` : null };
@@ -54,7 +39,7 @@ router.get('/:id', async (req, res) => {
   }
 
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  const family = req.portalAccount ? await familyForAccount(req.portalAccount) : [];
+  const family = req.portalAccount ? await familyForAccount(req.portalAccount.id) : [];
   const familyIds = family.map((m) => m.id);
   const myRegistrations = familyIds.length
     ? await db.prepare(`SELECT * FROM event_registrations WHERE event_id = ? AND status != 'cancelled' AND member_id IN (${familyIds.map(() => '?').join(',')})`).all(event.id, ...familyIds)
@@ -88,7 +73,7 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
-  const family = await familyForAccount(req.portalAccount);
+  const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only register yourself or your own family.'));
   }
@@ -105,7 +90,7 @@ router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
-  const family = await familyForAccount(req.portalAccount);
+  const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s registrations.'));
   }
@@ -118,7 +103,7 @@ router.post('/:id/volunteer-roles/:roleId/signup', requirePortalAuth, async (req
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
-  const family = await familyForAccount(req.portalAccount);
+  const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
   }
@@ -131,7 +116,7 @@ router.post('/:id/volunteer-roles/:roleId/cancel', requirePortalAuth, async (req
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
-  const family = await familyForAccount(req.portalAccount);
+  const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
   }
@@ -144,7 +129,7 @@ router.post('/:id/donation-items/:itemId/claim', requirePortalAuth, async (req, 
   const memberId = parseInt(req.body.memberId, 10);
   const back = `/events/${eventId}`;
 
-  const family = await familyForAccount(req.portalAccount);
+  const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
   }

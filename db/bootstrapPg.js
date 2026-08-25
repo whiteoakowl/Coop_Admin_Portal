@@ -140,6 +140,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_registrations', label: 'Manage Registrations', description: "Review and adjust members' class registrations." },
   { key: 'manage_events', label: 'Manage Events', description: 'Create/edit events, volunteer signups, and donation requests.' },
   { key: 'manage_volunteers', label: 'Manage Volunteers', description: 'Manage floater/setup-cleanup assignments and event volunteer signups.' },
+  { key: 'manage_classifieds', label: 'Manage Classifieds', description: 'Approve, archive, and moderate classifieds listings.' },
   { key: 'manage_finances', label: 'Manage Finances', description: 'View and record accounting charges, payments, and refunds.' },
   { key: 'manage_store', label: 'Manage Store', description: 'Manage products, inventory, and orders.' },
   { key: 'manage_forum', label: 'Manage Forum', description: 'Moderate forum categories, threads, and posts.' },

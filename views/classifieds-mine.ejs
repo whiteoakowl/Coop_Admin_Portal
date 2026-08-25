@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+    </a>
+    <div class="site-header-actions">
+      <a class="btn-secondary" href="/classifieds">All Classifieds</a>
+      <a class="primary-btn" href="/portal">My Portals</a>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <div class="grid-box-header">
+          <h1>My Classifieds</h1>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-listing-dialog').showModal()">+ Post a Listing</button>
+        </div>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <% if (listings.length === 0) { %>
+          <p class="roster-empty">You haven't posted any listings yet.</p>
+        <% } %>
+
+        <div class="training-lesson-list">
+          <% listings.forEach(function(l) { %>
+            <div class="training-lesson-row">
+              <div class="training-lesson-row-main">
+                <svg class="icon"><use href="#icon-tag"/></svg>
+                <div class="training-lesson-info">
+                  <strong><%= l.title %></strong>
+                  <span class="badge-pill badge-pill-<%= l.status === 'active' ? 'green' : l.status === 'sold' ? 'gray' : l.status === 'archived' ? 'gray' : 'orange' %>"><%= l.status.charAt(0).toUpperCase() + l.status.slice(1) %></span>
+                  <% if (l.status === 'pending') { %><span class="hint">Awaiting admin review</span><% } %>
+                </div>
+                <div class="training-lesson-actions roster-btn-row">
+                  <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-listing-dialog-<%= l.id %>').showModal()">Edit</button>
+                  <% if (l.status === 'active') { %>
+                    <form method="POST" action="/classifieds/<%= l.id %>/sold" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Mark Sold</button>
+                    </form>
+                  <% } %>
+                  <% if (l.status !== 'archived') { %>
+                    <form method="POST" action="/classifieds/<%= l.id %>/archive" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button>
+                    </form>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+
+            <dialog id="edit-listing-dialog-<%= l.id %>" class="member-picker-dialog">
+              <form method="POST" action="/classifieds/<%= l.id %>/update">
+                <h3>Edit Listing</h3>
+                <label>Title
+                  <input type="text" name="title" value="<%= l.title %>" required />
+                </label>
+                <label>Description
+                  <textarea name="description" rows="3"><%= l.description || '' %></textarea>
+                </label>
+                <label>Category
+                  <input type="text" name="category" value="<%= l.category || '' %>" />
+                </label>
+                <label>Price
+                  <input type="text" name="price" value="<%= l.price || '' %>" placeholder="e.g. $20, Free, OBO" />
+                </label>
+                <label>Visibility
+                  <select name="visibility">
+                    <option value="members" <%= l.visibility === 'members' ? 'selected' : '' %>>Members only</option>
+                    <option value="public" <%= l.visibility === 'public' ? 'selected' : '' %>>Public</option>
+                  </select>
+                </label>
+                <div class="notes-dialog-actions">
+                  <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                  <button type="submit" class="primary-btn">Save</button>
+                </div>
+              </form>
+            </dialog>
+          <% }); %>
+        </div>
+      </div>
+    </section>
+
+    <dialog id="new-listing-dialog" class="member-picker-dialog">
+      <form method="POST" action="/classifieds">
+        <h3>Post a Listing</h3>
+        <label>Who's posting this?
+          <select name="memberId" required>
+            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Title
+          <input type="text" name="title" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3"></textarea>
+        </label>
+        <label>Category
+          <input type="text" name="category" placeholder="e.g. Books, Sports Equipment" />
+        </label>
+        <label>Price
+          <input type="text" name="price" placeholder="e.g. $20, Free, OBO" />
+        </label>
+        <label>Visibility
+          <select name="visibility">
+            <option value="members">Members only</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Submit for Review</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>
