@@ -188,13 +188,24 @@ router.get('/logs', requireAdmin, async (req, res) => {
   if (tab === 'substitutes') {
     const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
     const dateFilter = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIfSessionDay(day) || '';
+    // A real request: "the substitutes needed list under logs should only
+    // show teacher and assistant positions that need a floater, not
+    // permanent positions." substituteBoard's own slots mix both
+    // slotType:'class' (a missing teacher/assistant) and slotType:'job'
+    // (a permanent job, staffed every session regardless of absences) -
+    // this list only wants the former. admin-volunteers.js's own
+    // substituteBoard call (the Floater Assignments manage page) is left
+    // untouched - it deliberately shows both (see its own comment on that
+    // history), so the filter is scoped to just this route/tab.
+    const fullBoard = await substituteBoard(day, dateFilter || null);
+    const board = fullBoard.map((hour) => ({ ...hour, slots: hour.slots.filter((s) => s.slotType === 'class') }));
     return res.render('admin-logs', {
       title: 'Substitutes Needed',
       tab,
       day,
       dayLabel: DAY_LABELS[day],
       dateFilter,
-      board: await substituteBoard(day, dateFilter || null),
+      board,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
