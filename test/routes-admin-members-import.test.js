@@ -1,11 +1,9 @@
 // Real HTTP-level coverage for the Members page's full-profile "Import"
 // feature (routes/admin-members.js's GET /members/import-template.xlsx +
-// POST /members/import) after its Name/Parent Name columns were split into
-// separate First/Last Name columns (matching Mass Import Families' own
-// split, see test/routes-admin-members-mass-import.test.js) - the columns
-// are joined back into the single "First Last" string every member is
-// stored as (utils/members.js's lastNameOf), so exact-name matching,
-// duplicate detection, and parent-linking all keep working unchanged.
+// POST /members/import) - separate First/Last Name columns are joined back
+// into the single "First Last" string every member is stored as (utils/
+// members.js's lastNameOf), so exact-name matching, duplicate detection,
+// and parent-linking all keep working unchanged.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
