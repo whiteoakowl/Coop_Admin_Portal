@@ -90,7 +90,19 @@ if (process.env.DATABASE_URL) {
   // plain `node server.js`, no Supabase involved at all, see
   // MIGRATION.md's note that this is still a real, supported deployment)
   // persists to a fixed directory so data survives a restart.
-  const pglite = process.env.DB_PATH ? new PGlite() : new PGlite(path.join(__dirname, '..', 'data', 'pglite'));
+  // PGlite's own constructor mkdir's this path without `recursive: true`,
+  // so it throws ENOENT on a fresh checkout where `data/` itself doesn't
+  // exist yet (nothing else creates it - `data/` isn't git-tracked, and
+  // a real install's first run is exactly this "clone and go" case the
+  // whole file's own header comment above describes). Creating it here
+  // first is what makes a bare `node server.js` on a fresh clone work at
+  // all, not just a repeat run where a previous boot already made it.
+  let pgliteDataDir;
+  if (!process.env.DB_PATH) {
+    pgliteDataDir = path.join(__dirname, '..', 'data', 'pglite');
+    fs.mkdirSync(pgliteDataDir, { recursive: true });
+  }
+  const pglite = process.env.DB_PATH ? new PGlite() : new PGlite(pgliteDataDir);
   schemaReady = (async () => {
     await pglite.exec(allMigrationSql());
   })();
