@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/newsletter">&larr; Back</a></p>
+    <div class="grid-box-header">
+      <h1><%= issue.subject %></h1>
+      <span class="badge-pill badge-pill-<%= issue.status === 'sent' ? 'green' : issue.status === 'scheduled' ? 'orange' : 'gray' %>"><%= issue.status.charAt(0).toUpperCase() + issue.status.slice(1) %></span>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (issue.status === 'sent') { %>
+      <p class="hint">Sent <%= issue.sent_at %> to <%= issue.recipient_count %> active member account(s). Sent issues can't be edited.</p>
+      <div class="forum-editable"><%- issue.body_html %></div>
+    <% } else { %>
+      <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid">
+        <label class="member-form-full">Subject
+          <input type="text" name="subject" value="<%= issue.subject %>" required />
+        </label>
+        <div class="member-form-full" data-forum-editor>
+          <label>Content</label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.body_html %></div>
+          <input type="hidden" name="bodyHtml" data-forum-body-input />
+        </div>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+      <script src="/js/forum-editor.js"></script>
+
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Actions</h2></div>
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/regenerate" class="inline-block-form">
+          <button type="submit" class="roster-action-btn" onclick="return confirm('Re-assemble from live data? This overwrites the current content.')">Re-assemble from Live Data</button>
+        </form>
+
+        <% if (issue.status === 'draft') { %>
+          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/schedule" class="inline-block-form">
+            <label>Schedule for
+              <input type="datetime-local" name="scheduledAt" required />
+            </label>
+            <button type="submit" class="roster-action-btn">Schedule</button>
+          </form>
+        <% } else if (issue.status === 'scheduled') { %>
+          <p class="hint">Scheduled for <%= issue.scheduled_at %>.</p>
+          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/unschedule" class="inline-block-form">
+            <button type="submit" class="roster-action-btn">Move Back to Draft</button>
+          </form>
+        <% } %>
+
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/send" class="inline-block-form">
+          <button type="submit" class="roster-action-btn" onclick="return confirm('Mark this issue sent? This records who it reached and can\'t be undone.')">Mark Sent</button>
+        </form>
+
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/delete" class="inline-block-form">
+          <button type="submit" class="roster-action-btn roster-action-btn-danger" onclick="return confirm('Delete this draft?')">Delete</button>
+        </form>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

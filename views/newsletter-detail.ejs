@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Newsletter',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/newsletter', icon: 'mail', label: 'Newsletter' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/newsletter">&larr; Back</a></p>
+    <h1><%= issue.subject %></h1>
+    <p class="hint">Sent <%= issue.sent_at %></p>
+    <div class="forum-editable"><%- issue.body_html %></div>
+  </main>
+</body>
+</html>

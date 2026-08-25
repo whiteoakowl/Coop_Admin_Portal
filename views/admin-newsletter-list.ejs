@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Newsletter</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-issue-dialog').showModal()">+ New Issue</button>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (issues.length === 0) { %>
+      <p class="roster-empty">No issues yet &mdash; create one above.</p>
+    <% } %>
+
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr><th>Subject</th><th>Status</th><th>Scheduled</th><th>Sent</th><th>Recipients</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% issues.forEach(function(i) { %>
+          <tr>
+            <td><a href="/main-admin/newsletter/<%= i.id %>/edit"><%= i.subject %></a></td>
+            <td><span class="badge-pill badge-pill-<%= i.status === 'sent' ? 'green' : i.status === 'scheduled' ? 'orange' : 'gray' %>"><%= i.status.charAt(0).toUpperCase() + i.status.slice(1) %></span></td>
+            <td><%= i.scheduled_at || '' %></td>
+            <td><%= i.sent_at || '' %></td>
+            <td><%= i.recipient_count != null ? i.recipient_count : '' %></td>
+            <td><a class="roster-action-btn" href="/main-admin/newsletter/<%= i.id %>/edit">Edit</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+
+    <dialog id="new-issue-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/newsletter">
+        <h3>New Issue</h3>
+        <p class="hint">Content is assembled automatically from upcoming events, reminders, this week's classes, announcements, and the business directory. You can edit it before sending.</p>
+        <label>Subject
+          <input type="text" name="subject" required placeholder="This Week at the Co-op" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create Draft</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

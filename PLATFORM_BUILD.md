@@ -388,15 +388,61 @@ real dependency runs the opposite direction from the numbering.
   cancelling an order restores inventory and cancels its charge instead
   of leaving it owed, cross-family purchase/order-viewing denial).
 
+## Community & Commerce track — Weekly Newsletter (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825100000_newsletter.sql`: `newsletter_issues`
+  (`status` — `'draft'`/`'scheduled'`/`'sent'` — plus `recipient_count`, a
+  snapshot taken only at send time, not a live query result — "how many
+  accounts would this have gone to" stays meaningful history even after
+  member counts change later).
+- `utils/newsletter.js`: `assembleContent()` builds the issue body from
+  real, live tables only — upcoming published events, registration/
+  volunteer-slot reminders re-derived the same way `routes/events.js`'s
+  own detail page does, this week's classes, active announcements, and
+  active business directory listings. Publications (handoff item 12,
+  not built yet) is simply omitted rather than shown as an empty
+  placeholder. `regenerate()` re-assembles from live data and overwrites
+  any hand edits, but only as an explicit admin action, never
+  automatically. There is no real email provider configured anywhere in
+  this app — same reasoning item 9 (Accounting/Payments) already
+  established for not integrating a real payment processor — so
+  `markSent()` is a status change that records a real recipient count,
+  not an actual outbound send.
+- `routes/admin-newsletter.js` (`/main-admin/newsletter`,
+  `manage_communications` — new permission, added to
+  `db/bootstrapPg.js`'s `PORTAL_PERMISSIONS`): create/edit/preview,
+  re-assemble from live data, schedule/unschedule, mark sent, delete.
+  Content is edited with the same rich-text editor Forums already built
+  (`public/js/forum-editor.js` + `partials/forum-editor-toolbar.ejs`),
+  sanitized server-side through `utils/sanitizeHtml.js`'s
+  `sanitizePostBody()` — the same allowlist Forums posts use.
+- `routes/newsletter.js` (`/newsletter`, members-only): an in-app archive
+  of `status='sent'` issues only — the actual substitute for "the
+  newsletter members received," since there's no real email. Draft and
+  scheduled issues 404 even by direct URL.
+- 4 new views and `test/routes-newsletter.test.js` (9 tests: sign-in
+  required for both admin and member routes, a draft assembles real
+  content from live announcements, editing persists sanitized HTML and
+  strips a `<script>` tag, scheduling/unscheduling toggles status without
+  losing the draft, marking sent records a real recipient snapshot
+  matching the live active-account count, only sent issues are visible
+  in the member archive while draft/scheduled ones 404, re-assembling
+  overwrites a hand edit, deleting a draft removes it).
+- Every other Track B admin view's `navLinks` got a reciprocal
+  "Newsletter" entry, and `admin-accounting-list.ejs`/
+  `admin-accounting-member.ejs` (missing a "Store" link from the previous
+  feature) got both added.
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Weekly
-newsletter, SMS/notification framework, Photos/Albums + Publications/
-Articles, audit log, and global search — Track B scope, next up after
-Events/Volunteer/Donation signups, Business Directory/Classifieds, Member
-Directory, Forums, Custom Forms, Accounting/Payments, and Store above.
+simple per-class open/closed toggle) — all Track A scope. SMS/notification
+framework, Photos/Albums + Publications/Articles, audit log, and global
+search — Track B scope, next up after Events/Volunteer/Donation signups,
+Business Directory/Classifieds, Member Directory, Forums, Custom Forms,
+Accounting/Payments, Store, and Weekly Newsletter above.
 Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two

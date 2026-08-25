@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Newsletter',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/newsletter', icon: 'mail', label: 'Newsletter' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Newsletter</h1>
+
+    <% if (issues.length === 0) { %>
+      <p class="roster-empty">No issues have gone out yet.</p>
+    <% } else { %>
+      <div class="event-card-grid">
+        <% issues.forEach(function(i) { %>
+          <a class="event-card" href="/newsletter/<%= i.id %>">
+            <div class="event-card-body">
+              <span class="event-card-date"><%= i.sent_at %></span>
+              <h3><%= i.subject %></h3>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

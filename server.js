@@ -148,6 +148,12 @@ const adminAccountingRouter = require('./routes/admin-accounting');
 // records in-person sales, recorded distinctly from an online order).
 const storeRouter = require('./routes/store');
 const adminStoreRouter = require('./routes/admin-store');
+// Item 10: Weekly Newsletter at /newsletter (members-only archive of
+// status='sent' issues - there is no real outbound email, see
+// utils/newsletter.js's own header comment), assembly/edit/send admin at
+// /main-admin/newsletter (manage_communications).
+const newsletterRouter = require('./routes/newsletter');
+const adminNewsletterRouter = require('./routes/admin-newsletter');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -341,6 +347,8 @@ app.use('/accounting', accountingRouter);
 app.use('/main-admin/accounting', adminAccountingRouter);
 app.use('/store', storeRouter);
 app.use('/main-admin/store', adminStoreRouter);
+app.use('/newsletter', newsletterRouter);
+app.use('/main-admin/newsletter', adminNewsletterRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

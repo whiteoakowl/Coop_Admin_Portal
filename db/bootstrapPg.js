@@ -149,6 +149,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_documents', label: 'Manage Documents', description: 'Upload and organize shared documents.' },
   { key: 'manage_publications', label: 'Manage Publications', description: 'Write and publish articles, publications, and photo albums.' },
   { key: 'manage_directory', label: 'Manage Directory', description: 'Manage the member and business directories.' },
+  { key: 'manage_communications', label: 'Manage Communications', description: 'Assemble/send the weekly newsletter and control SMS/notification settings.' },
 ];
 
 async function seedPortalPlatform(db) {
