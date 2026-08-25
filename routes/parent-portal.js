@@ -15,6 +15,7 @@ const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
+const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -157,6 +158,24 @@ router.get('/library', async (req, res) => {
   const memberIds = family.map((m) => m.id);
   const { active, recentReturns } = await libraryActivityForMemberIds(memberIds);
   res.render('parent-library', { title: 'Library', active, recentReturns });
+});
+
+// Academics - assignments/grades, transcript, and diploma status for each
+// of the parent's own children in one place (utils/academics.js). Purely
+// read-only, same as everywhere else a parent views (rather than acts on)
+// their children's records.
+router.get('/academics', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const academics = [];
+  for (const child of children) {
+    const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(child.id);
+    const classIds = enrolledRows.map((r) => r.class_id);
+    const assignments = await assignmentsForStudent(child.id, classIds);
+    const { current, history } = await transcriptForStudent(child.id);
+    const diploma = await diplomaForStudent(child.id);
+    academics.push({ child, assignments, current, history, diploma });
+  }
+  res.render('parent-academics', { title: 'Academics', academics });
 });
 
 module.exports = router;

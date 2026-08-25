@@ -17,6 +17,9 @@
     <p class="hint"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %> &middot; <%= cls.gradeLabel || 'All grades' %> &middot; Room <%= cls.room || 'Unassigned' %></p>
     <% if (cls.notes) { %><p class="hint"><%= cls.notes %></p><% } %>
 
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
     <section class="portal-dashboard-section">
       <h2>Roster</h2>
       <% if (students.length === 0) { %>
@@ -43,6 +46,57 @@
           </table>
         </div>
       <% } %>
+    </section>
+
+    <section class="portal-dashboard-section">
+      <h2>Assignments</h2>
+      <% if (assignments.length === 0) { %>
+        <p class="roster-empty">No assignments yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Due</th>
+                <th>Points</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% assignments.forEach(function(a) { %>
+                <tr>
+                  <td class="roster-name-col"><%= a.title %></td>
+                  <td><%= a.dueDateLabel || '—' %></td>
+                  <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
+                  <td><a class="roster-action-btn" href="/teacher/assignments/<%= a.id %>">Grade</a></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <div class="portal-dashboard-card portal-dashboard-card-wide">
+        <h3>New Assignment</h3>
+        <form method="POST" action="/teacher/classes/<%= cls.id %>/assignments" class="member-form-grid">
+          <label class="member-form-full">Title
+            <input type="text" name="title" required />
+          </label>
+          <label class="member-form-full">Description
+            <textarea name="description" rows="2"></textarea>
+          </label>
+          <label>Due Date
+            <input type="date" name="dueDate" />
+          </label>
+          <label>Points Possible
+            <input type="number" name="pointsPossible" min="0" />
+          </label>
+          <div class="member-form-full">
+            <button type="submit" class="primary-btn">Add Assignment</button>
+          </div>
+        </form>
+      </div>
     </section>
   </main>
 </body>

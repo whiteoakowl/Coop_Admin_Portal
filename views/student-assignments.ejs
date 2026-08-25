@@ -16,32 +16,38 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>My Classes</h1>
-    <p class="hint">To register for a new class or drop one, ask your parent to manage it from their Parent Portal.</p>
+    <h1>Assignments</h1>
 
-    <% if (classes.length === 0) { %>
-      <p class="roster-empty">You're not enrolled in any classes yet.</p>
+    <% if (assignments.length === 0) { %>
+      <p class="roster-empty">No assignments yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
+              <th>Assignment</th>
               <th>Class</th>
-              <th>Day / Time</th>
-              <th>Room</th>
-              <th>Teacher</th>
+              <th>Due</th>
+              <th>Grade</th>
             </tr>
           </thead>
           <tbody>
-            <% classes.forEach(function(c) { %>
+            <% assignments.forEach(function(a) { %>
               <tr>
                 <td class="roster-name-col">
-                  <strong><%= c.class_name %></strong>
-                  <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
+                  <strong><%= a.title %></strong>
+                  <% if (a.description) { %><div class="hint"><%= a.description %></div><% } %>
                 </td>
-                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
-                <td><%= c.room || '—' %></td>
-                <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
+                <td><%= a.class_name %></td>
+                <td><%= a.dueDateLabel || '—' %></td>
+                <td>
+                  <% if (!a.graded) { %>
+                    <span class="hint">Not graded yet</span>
+                  <% } else { %>
+                    <strong><%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %></strong>
+                    <% if (a.feedback) { %><div class="hint"><%= a.feedback %></div><% } %>
+                  <% } %>
+                </td>
               </tr>
             <% }); %>
           </tbody>

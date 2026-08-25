@@ -192,10 +192,19 @@ extend it.
   paper). Re-derives "does this teacher actually teach this class" from
   `class_staff` on every request rather than trusting the id in the URL —
   a teacher can't view another class's roster by guessing its id.
-- No lesson plans, assignments, or grading yet — see "Explicitly NOT built
-  yet" below.
+- **Assignments/Grading** (`utils/academics.js`): a teacher creates
+  assignments for their own class (`GET`/`POST /teacher/classes/:id/
+  assignments`) and grades them (`GET /teacher/assignments/:id`, `POST
+  /teacher/assignments/:id/grades` — one bulk save across the whole
+  roster). `class_assignments.class_name` is a **snapshot taken at
+  creation**, not a live join, and `class_id` is `ON DELETE SET NULL` —
+  the same "flatten to plain text, drop the FK-linked detail" pattern
+  `class_schedule_archives` already uses, needed for the same reason: a
+  class being archived must not destroy the grades a student already
+  earned in it. Confirmed live (see Verification below) — a grade
+  recorded before archiving is still visible after.
 
-## Student Portal (done — view-only schedule)
+## Student Portal (done — view-only schedule + academic record)
 
 - `routes/student-portal.js`, gated `requirePortalAuth, requirePortal('student')`.
 - **Home** (`GET /student`) and **My Classes** (`GET /student/classes`): the
@@ -204,25 +213,64 @@ extend it.
   action (a parent registers their children) — this portal only ever
   displays what's already there, never a second enrollment path a parent's
   view and a student's view could drift out of sync on.
-- No assignments, grades, or training progress yet — see below.
+- **Assignments** (`GET /student/assignments`): ungraded work for
+  currently-enrolled classes, plus every assignment the student has ever
+  been graded on — including from an archived class (see above).
+- **Transcript** (`GET /student/transcript`): this term's live enrollments
+  plus **`student_academic_history`**, a per-student row written once by
+  `archiveClasses` (`utils/classSchedule.js`) at the moment a class is
+  archived — archiving already deletes the live class (cascading away its
+  `class_enrollments` rows), so this is the *only* source of past-term
+  transcript data. Terms archived before this migration existed have no
+  reconstructable history, the same limitation `class_schedule_archives`
+  itself already has.
+- **Diploma** (`GET /student/diploma`): shows the diploma a Main Admin has
+  issued (if any), with a print-friendly view (`window.print()`, the same
+  pattern every other printable page in this app already uses).
+- Parent Portal surfaces the same three (assignments/transcript/diploma)
+  read-only for each of the parent's own children on one combined page,
+  **`GET /parent/academics`**.
+
+## Main Admin: Diplomas (done)
+
+- `/main-admin/diplomas` (gated by the new `manage_academics` permission):
+  issue a diploma to any active student (title, issue date, optional body
+  text) — re-issuing just updates the existing row (one diploma per
+  student, not an accumulating list). Shows up on that student's Student
+  Portal and their parents' Parent Portal immediately.
 
 ## Explicitly NOT built yet
 
-Lessons/assignments/grading beyond the existing Training module, Events +
-volunteer/donation signups, weekly newsletter, SMS notifications,
-accounting/payments, Store, Forums, Diplomas, Transcripts, Classifieds,
-Business/Member Directory, custom Form builder, Photos/Albums,
-Publications/Articles, full website appearance control (colors/logo/nav),
-audit log, notification center, global search, and generalized documents.
-See `TEAM_B_HANDOFF.md` for how this is being split into two parallel
-tracks.
+Events + volunteer/donation signups, weekly newsletter, SMS notifications,
+accounting/payments, Store, Forums, Classifieds, Business/Member
+Directory, custom Form builder, Photos/Albums, Publications/Articles, full
+website appearance control (colors/logo/nav), audit log, notification
+center, global search, and generalized documents — this is now Team B's
+full remaining scope; see `TEAM_B_HANDOFF.md`. Track A's own originally-
+scoped list (Foundation through Diplomas/Transcripts, above) is complete.
 
 ## Verification so far
 
 - Full test suite passing: 898 pass, 0 fail, 1 skipped (`npm test`) —
-  re-confirmed after Teacher/Student Portal, registration windows, and the
-  Library integration.
+  re-confirmed after Teacher/Student Portal, registration windows, the
+  Library integration, and Assignments/Grading/Diplomas/Transcripts.
 - Lint clean repo-wide (`npx eslint .`).
+- Assignments/Grading/Diplomas/Transcripts live-verified end-to-end
+  (Playwright), including the archive-survival fix: a teacher creates an
+  assignment and grades a student; the grade shows correctly on both
+  Student Portal and Parent Portal; a Co-op Admin then **archives the
+  class** through the real Class Schedule "Archive" flow; the student's
+  Transcript correctly moves the class from "Current Term" to "Past
+  Terms" with the right teacher/date; and — the point of the exercise —
+  the earlier assignment and its grade are **still visible** on both
+  Student and Parent Portal after archiving, not silently deleted. (A
+  first pass of this got it wrong: `class_assignments.class_id` originally
+  cascade-deleted with the class, taking the assignment and its grade
+  with it — caught by this same live-verification pass, not a unit test,
+  and fixed by denormalizing `class_name` onto the assignment row and
+  changing the FK to `ON DELETE SET NULL` before commit.) Main Admin then
+  issues a diploma, which immediately appears on both Student and Parent
+  Portal with a working print view.
 - Parent Portal Library live-verified end-to-end (Playwright): a seeded
   family with one active in-window checkout, one active overdue checkout
   (on the parent's own barcode, not just a child's), and one already-

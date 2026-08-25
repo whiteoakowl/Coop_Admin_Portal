@@ -10,6 +10,7 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
 const { formatFriendlyTimestamp } = require('../utils/dates');
+const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 
 router.use(requirePortalAuth, requirePortal('student'));
 
@@ -39,6 +40,25 @@ router.get('/classes', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForStudent(member);
   res.render('student-classes', { title: 'My Classes', classes });
+});
+
+router.get('/assignments', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForStudent(member);
+  const assignments = member ? await assignmentsForStudent(member.id, classes.map((c) => c.id)) : [];
+  res.render('student-assignments', { title: 'Assignments', assignments });
+});
+
+router.get('/transcript', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const { current, history } = member ? await transcriptForStudent(member.id) : { current: [], history: [] };
+  res.render('student-transcript', { title: 'Transcript', member, current, history });
+});
+
+router.get('/diploma', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const diploma = member ? await diplomaForStudent(member.id) : null;
+  res.render('student-diploma', { title: 'Diploma', member, diploma });
 });
 
 module.exports = router;

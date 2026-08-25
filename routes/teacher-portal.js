@@ -10,6 +10,8 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
+const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
+const { formatDateLabel } = require('../utils/dates');
 
 router.use(requirePortalAuth, requirePortal('teacher'));
 
@@ -42,7 +44,62 @@ router.get('/classes/:id', async (req, res) => {
   const students = await db
     .prepare(`SELECT m.* FROM class_enrollments ce JOIN members m ON m.id = ce.student_id WHERE ce.class_id = ? ORDER BY LOWER(m.name)`)
     .all(cls.id);
-  res.render('teacher-roster', { title: cls.class_name, cls, students });
+  const assignments = (await assignmentsForClass(cls.id)).map((a) => ({ ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null }));
+  res.render('teacher-roster', { title: cls.class_name, cls, students, assignments, error: req.query.error || null, notice: req.query.notice || null });
+});
+
+router.post('/classes/:id/assignments', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  const back = `/teacher/classes/${req.params.id}`;
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(back + '?error=' + encodeURIComponent('An assignment title is required.'));
+  await createAssignment({
+    classId: cls.id,
+    className: cls.class_name,
+    title,
+    description: (req.body.description || '').trim(),
+    dueDate: req.body.dueDate || null,
+    pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
+    createdByAccountId: req.portalAccount.id,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent(`"${title}" added.`));
+});
+
+router.get('/assignments/:id', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const assignment = await getAssignment(parseInt(req.params.id, 10));
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+  const { rows } = await gradebookForAssignment(assignment.id);
+  res.render('teacher-gradebook', { title: assignment.title, cls, assignment, rows, notice: req.query.notice || null });
+});
+
+router.post('/assignments/:id/grades', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+
+  const { rows } = await gradebookForAssignment(assignmentId);
+  for (const row of rows) {
+    const rawPoints = req.body[`points_${row.student_id}`];
+    const pointsEarned = rawPoints === '' || rawPoints == null ? null : Number(rawPoints);
+    const feedback = (req.body[`feedback_${row.student_id}`] || '').trim();
+    await saveGrade({ assignmentId, studentId: row.student_id, pointsEarned, feedback, gradedByAccountId: req.portalAccount.id });
+  }
+  res.redirect(`/teacher/assignments/${assignmentId}?notice=` + encodeURIComponent('Grades saved.'));
 });
 
 module.exports = router;

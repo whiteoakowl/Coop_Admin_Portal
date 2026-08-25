@@ -12,7 +12,8 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
 const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
-const { easternInputToUtcText, formatTimestamp } = require('../utils/dates');
+const { easternInputToUtcText, formatTimestamp, isValidISODate } = require('../utils/dates');
+const { allDiplomas, issueDiploma } = require('../utils/academics');
 
 router.use(requirePortalAuth, requirePortal('main_admin'));
 
@@ -245,6 +246,26 @@ router.post('/registration-windows', requirePortalPermission('manage_classes'), 
 router.post('/registration-windows/:id/delete', requirePortalPermission('manage_classes'), async (req, res) => {
   await deleteWindow(req.params.id);
   res.redirect('/main-admin/registration-windows?notice=' + encodeURIComponent('Registration window removed.'));
+});
+
+// --- Diplomas (utils/academics.js) ---
+
+router.get('/diplomas', requirePortalPermission('manage_academics'), async (req, res) => {
+  const diplomas = await allDiplomas();
+  const students = await db.prepare("SELECT id, name FROM members WHERE member_type = 'student' AND active = 1 ORDER BY LOWER(name)").all();
+  res.render('main-admin-diplomas', { title: 'Diplomas', diplomas, students, error: req.query.error || null, notice: req.query.notice || null });
+});
+
+router.post('/diplomas', requirePortalPermission('manage_academics'), async (req, res) => {
+  const studentId = parseInt(req.body.studentId, 10);
+  const title = (req.body.title || '').trim() || 'Diploma of Completion';
+  const issuedDate = req.body.issuedDate;
+  const back = '/main-admin/diplomas';
+  if (!studentId || !isValidISODate(issuedDate)) {
+    return res.redirect(back + '?error=' + encodeURIComponent('A student and a valid issue date are required.'));
+  }
+  await issueDiploma({ studentId, title, issuedDate, bodyText: (req.body.bodyText || '').trim(), issuedByAccountId: req.portalAccount.id });
+  res.redirect(back + '?notice=' + encodeURIComponent('Diploma issued.'));
 });
 
 module.exports = router;

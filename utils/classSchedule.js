@@ -536,6 +536,7 @@ async function archiveClasses(classIds) {
     if (!cls) continue;
     const staff = await staffForClass(id);
     const students = await studentsForClass(id);
+    const teacherNames = staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ') || null;
     await db
       .prepare(
         `INSERT INTO class_schedule_archives
@@ -551,10 +552,19 @@ async function archiveClasses(classIds) {
         cls.notes,
         cls.start_time,
         cls.end_time,
-        staff.filter((s) => s.role === 'teacher').map((s) => s.name).join(', ') || null,
+        teacherNames,
         staff.filter((s) => s.role === 'assistant').map((s) => s.name).join(', ') || null,
         students.length
       );
+    // One row per student who completed this class - the only source of
+    // past-term Transcript data (see student_academic_history's own
+    // migration comment), written here because this is the one place a
+    // class's enrollment is still live at the moment it's retired.
+    for (const student of students) {
+      await db
+        .prepare('INSERT INTO student_academic_history (student_id, class_name, day, age_group, teacher_names) VALUES (?, ?, ?, ?, ?)')
+        .run(student.id, cls.class_name, cls.day, cls.age_group, teacherNames);
+    }
     await deleteClass(id);
     archived++;
   }
