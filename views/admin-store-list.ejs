@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Store</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
+    </div>
+    <p><a href="/main-admin/store/orders/all">Orders &amp; In-Person Sales</a></p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (products.length === 0) { %>
+      <p class="roster-empty">No products yet &mdash; create one above.</p>
+    <% } %>
+
+    <div class="team-card-grid">
+      <% products.forEach(function(p) { %>
+        <div class="team-col">
+          <div class="team-info-card">
+            <% if (p.imageUrl) { %>
+              <img src="<%= p.imageUrl %>" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+            <% } %>
+            <h3 class="team-info-title"><a href="/main-admin/store/<%= p.id %>/edit"><%= p.name %></a></h3>
+            <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : p.status === 'archived' ? 'gray' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
+            <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></p>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/main-admin/store/<%= p.id %>/edit">Edit</a>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <dialog id="new-product-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/store">
+        <h3>New Product</h3>
+        <label>Name
+          <input type="text" name="name" required />
+        </label>
+        <label>Price ($)
+          <input type="number" name="price" min="0" step="0.01" required />
+        </label>
+        <label>Inventory (blank = unlimited)
+          <input type="number" name="inventoryCount" min="0" />
+        </label>
+        <label>Availability
+          <select name="availability">
+            <option value="both">Online + In-person</option>
+            <option value="online">Online only</option>
+            <option value="in_person">In-person only</option>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Create</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Store',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/store', icon: 'tag', label: 'Store' },
+      { href: '/store/orders', icon: 'file-text', label: 'My Orders' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/store">&larr; All Products</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (product.imageUrl) { %>
+      <img src="<%= product.imageUrl %>" alt="" style="width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius); margin-bottom: 1.25rem;" />
+    <% } %>
+
+    <h1><%= product.name %></h1>
+    <p class="site-hero-meta">$<%= (product.price_cents / 100).toFixed(2) %></p>
+    <% if (product.inventory_count != null) { %><p class="hint"><%= product.inventory_count %> left in stock</p><% } %>
+    <% if (product.description) { %><p><%= product.description %></p><% } %>
+
+    <form method="POST" action="/store/<%= product.id %>/buy" class="member-form-grid">
+      <label class="member-form-full">Buying for
+        <select name="memberId" required>
+          <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+        </select>
+      </label>
+      <label>Quantity
+        <input type="number" name="quantity" min="1" value="1" <% if (product.inventory_count != null) { %>max="<%= product.inventory_count %>"<% } %> />
+      </label>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Order</button>
+        <p class="hint">You'll owe the balance in Accounting - there's no online payment here. A Main Admin records payment once it's received.</p>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

@@ -143,6 +143,11 @@ const adminCustomFormsRouter = require('./routes/admin-custom-forms');
 // admin at /main-admin/accounting.
 const accountingRouter = require('./routes/accounting');
 const adminAccountingRouter = require('./routes/admin-accounting');
+// Item 8: Store at /store (members-only online checkout, wired through
+// the payment abstraction above), admin at /main-admin/store (also
+// records in-person sales, recorded distinctly from an online order).
+const storeRouter = require('./routes/store');
+const adminStoreRouter = require('./routes/admin-store');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -334,6 +339,8 @@ app.use('/forms', customFormsRouter);
 app.use('/main-admin/forms', adminCustomFormsRouter);
 app.use('/accounting', accountingRouter);
 app.use('/main-admin/accounting', adminAccountingRouter);
+app.use('/store', storeRouter);
+app.use('/main-admin/store', adminStoreRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

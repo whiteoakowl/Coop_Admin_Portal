@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Store',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/store', icon: 'tag', label: 'Store' },
+      { href: '/store/orders', icon: 'file-text', label: 'My Orders' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>My Orders</h1>
+
+    <% if (orders.length === 0) { %>
+      <p class="roster-empty">No orders yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Type</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% orders.forEach(function(o) { %>
+              <tr>
+                <td><a href="/store/orders/<%= o.id %>">#<%= o.id %></a></td>
+                <td><%= o.sale_type === 'online' ? 'Online' : 'In-person' %></td>
+                <td>$<%= (o.total_cents / 100).toFixed(2) %></td>
+                <td><span class="badge-pill badge-pill-<%= o.status === 'fulfilled' || o.status === 'paid' ? 'green' : o.status === 'cancelled' ? 'gray' : 'orange' %>"><%= o.status %></span></td>
+                <td><%= o.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

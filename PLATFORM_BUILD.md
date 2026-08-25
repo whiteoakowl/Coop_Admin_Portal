@@ -354,17 +354,50 @@ real dependency runs the opposite direction from the numbering.
   the balance, a cancelled charge stays cancelled even if a stray payment
   is recorded against it, cross-family charge visibility denial).
 
+## Community & Commerce track — Store (done — Track B, branch
+   `platform-community-commerce`)
+
+- `supabase/migrations/20260825090000_store.sql`: `store_products`
+  (`inventory_count` null = unlimited, decremented live on every order,
+  restored on cancellation — never trusted from a client),
+  `store_orders` (`sale_type` — `'online'` or `'in_person'` — is the
+  "must be recorded distinctly, not faked as a real online transaction"
+  requirement made structural: an in-person sale is created through its
+  own dedicated admin action and is `'paid'` immediately in that same
+  action, while an online order always starts `'pending'` until a Main
+  Admin records the payment through Accounting), `store_order_items`
+  (`unit_price_cents` is a price snapshot — a later price change never
+  retroactively changes what a past order shows as charged).
+- `utils/store.js`: `placeOnlineOrder()`/`recordInPersonSale()` share
+  `buildOrderLines()`, which re-validates every item against live
+  product rows (availability, active status, real inventory) and never
+  trusts a client-sent price or quantity. Every order's charge routes
+  through `utils/payments.js`, item 9's own abstraction — no separate
+  "did they pay" flag.
+- `routes/admin-store.js` (`/main-admin/store`, `manage_store` — already
+  pre-seeded): product CRUD + image upload (same public-bucket pattern
+  as Events), the in-person-sale form, fulfillment/cancellation.
+- `routes/store.js` (`/store`, members-only, no public storefront):
+  browsing, checkout for self or family, order history. Checkout never
+  collects payment — the confirmation page points to Accounting, where
+  the balance shows up as a real, admin-recorded charge.
+- 7 new views and `test/routes-store.test.js` (6 tests: sign-in required,
+  an online order starts pending and creates a real Accounting charge, an
+  in-person sale is paid immediately and distinct from an online order,
+  inventory is checked live and rejects an over-quantity order,
+  cancelling an order restores inventory and cancels its charge instead
+  of leaving it owed, cross-family purchase/order-viewing denial).
+
 ## Explicitly NOT built yet
 
 Student Portal, Teacher Portal, lessons/assignments/grading beyond the
 existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope. Store, weekly
+simple per-class open/closed toggle) — all Track A scope. Weekly
 newsletter, SMS/notification framework, Photos/Albums + Publications/
 Articles, audit log, and global search — Track B scope, next up after
 Events/Volunteer/Donation signups, Business Directory/Classifieds, Member
-Directory, Forums, Custom Forms, and Accounting/Payments above (Store is
-next, now that it has the payment abstraction to wire its checkout
-through). Also still missing: Diplomas, Transcripts, Library parent-facing integration,
+Directory, Forums, Custom Forms, Accounting/Payments, and Store above.
+Also still missing: Diplomas, Transcripts, Library parent-facing integration,
 full website appearance control (colors/logo/nav), and generalized
 documents. See `TEAM_B_HANDOFF.md` for how this is being split into two
 parallel tracks.

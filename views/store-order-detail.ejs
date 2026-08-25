@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Store',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+      { href: '/store', icon: 'tag', label: 'Store' },
+      { href: '/store/orders', icon: 'file-text', label: 'My Orders' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Order #<%= order.id %></h1>
+    <p><a href="/store/orders">&larr; My Orders</a></p>
+    <p class="hint">For <%= order.memberName %> &middot; <%= order.sale_type === 'online' ? 'Online' : 'In-person' %> &middot; <span class="badge-pill badge-pill-<%= order.status === 'fulfilled' || order.status === 'paid' ? 'green' : order.status === 'cancelled' ? 'gray' : 'orange' %>"><%= order.status %></span></p>
+
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Quantity</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% order.items.forEach(function(i) { %>
+            <tr>
+              <td><%= i.productName || '(removed item)' %></td>
+              <td><%= i.quantity %></td>
+              <td>$<%= (i.unit_price_cents / 100).toFixed(2) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Total: $<%= (order.total_cents / 100).toFixed(2) %></strong></p>
+    <p><a href="/accounting">View balance in Accounting</a></p>
+  </main>
+</body>
+</html>

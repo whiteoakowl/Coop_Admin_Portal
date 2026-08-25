@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Orders</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('in-person-dialog').showModal()">+ Record In-Person Sale</button>
+    </div>
+    <p><a href="/main-admin/store">&larr; All Products</a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (orders.length === 0) { %>
+      <p class="roster-empty">No orders yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Member</th>
+              <th>Type</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% orders.forEach(function(o) { %>
+              <tr>
+                <td>#<%= o.id %></td>
+                <td><%= o.memberName %></td>
+                <td><%= o.sale_type === 'online' ? 'Online' : 'In-person' %></td>
+                <td>$<%= (o.total_cents / 100).toFixed(2) %></td>
+                <td><span class="badge-pill badge-pill-<%= o.status === 'fulfilled' || o.status === 'paid' ? 'green' : o.status === 'cancelled' ? 'gray' : 'orange' %>"><%= o.status %></span></td>
+                <td><%= o.created_at %></td>
+                <td class="roster-btn-row">
+                  <% if (o.status === 'paid') { %>
+                    <form method="POST" action="/main-admin/store/orders/<%= o.id %>/fulfill" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Fulfill</button>
+                    </form>
+                  <% } %>
+                  <% if (o.status !== 'cancelled' && o.status !== 'fulfilled') { %>
+                    <form method="POST" action="/main-admin/store/orders/<%= o.id %>/cancel" class="inline-block-form" data-confirm="Cancel order #<%= o.id %>?">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <dialog id="in-person-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/store/orders/in-person">
+        <h3>Record In-Person Sale</h3>
+        <label>Member
+          <select name="memberId" required>
+            <% members.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Product
+          <select name="productId" required>
+            <% products.forEach(function(p) { %><option value="<%= p.id %>">$<%= (p.price_cents / 100).toFixed(2) %> &mdash; <%= p.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Quantity
+          <input type="number" name="quantity" min="1" value="1" required />
+        </label>
+        <p class="hint">Recorded as paid immediately - this is for a sale where money already changed hands in person.</p>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Record Sale</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>
