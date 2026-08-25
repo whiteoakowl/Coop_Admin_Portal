@@ -110,6 +110,54 @@ extend it.
 - Every route re-derives "this parent's own children" itself rather than
   trusting a student id from the request — a parent can only ever register/
   cancel their own family's students.
+- **Staged/group registration windows** (the piece the portal foundation
+  migration's own comment called out as "intentionally not built here"):
+  `supabase/migrations/20260825030000_registration_windows.sql`'s
+  `registration_windows` table (label, target role or "everyone",
+  opens/closes) plus `utils/registrationWindows.js`
+  (`isRegistrationOpenForAccount`, `nextWindowForAccount`). A class only
+  accepts a new registration once its own `registration_open` flag is set
+  *and*, if any windows exist at all, the parent qualifies for one that's
+  currently open — with no windows defined, behavior is identical to
+  before this existed (every open class, open to everyone). Managed at
+  `/main-admin/registration-windows` (gated by the pre-existing
+  `manage_classes` permission). Cancelling an existing registration is
+  never gated by windows — only *new* registrations are.
+- **Admin UI gap closed**: the Co-op Admin Portal's own Add/Edit Class
+  dialog (`views/partials/class-schedule-grid.ejs`,
+  `views/admin-class-schedule-manage.ejs`,
+  `views/class-schedule-view-fragment.ejs`) had no way to actually set
+  `capacity`/`registration_open`/`description` — Parent Portal's
+  registration feature depended on fields nothing in the UI could edit.
+  Added a "Parent Portal Registration" section to all three forms
+  (`utils/classSchedule.js`'s `createClass`/`updateClass` now accept and
+  persist them).
+- **`utils/dates.js` gained `easternInputToUtcText`**: converts an admin's
+  `<input type="datetime-local">` value (interpreted as the co-op's own
+  Eastern time, same convention as this file's existing `todayISO`/
+  `formatTime`) into the UTC text `now_text()` itself produces, so window
+  times can be compared with plain string operators. No timezone library
+  existed in this app for the "local wall time → UTC" direction (unlike
+  the reverse, which `Intl` handles directly) — implemented via the
+  standard render-and-diff trick, documented inline.
+- **Real gap found and fixed while building this**: `data-confirm` forms
+  (the sitewide delete-confirmation attribute) were silently inert on
+  every portal page — `views/partials/portal-nav.ejs` never loaded
+  `confirm-dialog.js` or the dialog markup the way `admin-nav.ejs` does.
+  Fixed once in the shared partial, so it now works for every portal
+  (Main Admin's Website/Registration deletes, Parent Portal's own forms),
+  not just the new Registration Windows page that surfaced it.
+- **Library** (`GET /parent/library`): read-only view of this family's own
+  library activity (currently checked-out items with due dates, overdue
+  flagged, plus a short recent-returns history) — the "Library parent-
+  facing integration" scope item. Reuses the *existing*
+  `library_items`/`library_checkouts` tables and the Co-op Admin Portal's
+  own scan-based checkout/check-in tools (`routes/admin-library.js`)
+  unchanged; this is purely a filtered view (`utils/library.js`'s new
+  `libraryActivityForMemberIds`), not a second checkout system. Scoped to
+  every member of the parent's own family (`utils/members.js`'s existing
+  `familyOf`), not just their children — a parent can check items out on
+  their own barcode too.
 
 ## Main Admin Portal (done — enough to actually run the system)
 
@@ -606,24 +654,124 @@ real dependency runs the opposite direction from the numbering.
 This completes every item on `TEAM_B_HANDOFF.md`'s own numbered
 priority list (1 through 14).
 
+## Teacher Portal (done — view-only rosters)
+
+- `routes/teacher-portal.js`, gated `requirePortalAuth, requirePortal('teacher')`.
+- **Home** (`GET /teacher`): every class the signed-in teacher is staffed on
+  (read from the *existing* `class_staff` table — the same teacher/assistant
+  model `routes/admin-schedule.js` already uses, not a parallel list), with
+  a student count and co-teacher names, reusing `allClassesList`'s computed
+  fields (`timeLabel`/`gradeLabel`/`teacherNames`) rather than re-deriving
+  day/time formatting a second time.
+- **Roster** (`GET /teacher/classes/:id`): the enrolled students for one of
+  the teacher's own classes (name, grade, medical/allergy notes — the same
+  fields the existing class-roster print view already shows a teacher on
+  paper). Re-derives "does this teacher actually teach this class" from
+  `class_staff` on every request rather than trusting the id in the URL —
+  a teacher can't view another class's roster by guessing its id.
+- **Assignments/Grading** (`utils/academics.js`): a teacher creates
+  assignments for their own class (`GET`/`POST /teacher/classes/:id/
+  assignments`) and grades them (`GET /teacher/assignments/:id`, `POST
+  /teacher/assignments/:id/grades` — one bulk save across the whole
+  roster). `class_assignments.class_name` is a **snapshot taken at
+  creation**, not a live join, and `class_id` is `ON DELETE SET NULL` —
+  the same "flatten to plain text, drop the FK-linked detail" pattern
+  `class_schedule_archives` already uses, needed for the same reason: a
+  class being archived must not destroy the grades a student already
+  earned in it. Confirmed live (see Verification below) — a grade
+  recorded before archiving is still visible after.
+
+## Student Portal (done — view-only schedule + academic record)
+
+- `routes/student-portal.js`, gated `requirePortalAuth, requirePortal('student')`.
+- **Home** (`GET /student`) and **My Classes** (`GET /student/classes`): the
+  student's own enrolled classes, read from the *existing*
+  `class_enrollments` table. Registration itself stays a Parent Portal
+  action (a parent registers their children) — this portal only ever
+  displays what's already there, never a second enrollment path a parent's
+  view and a student's view could drift out of sync on.
+- **Assignments** (`GET /student/assignments`): ungraded work for
+  currently-enrolled classes, plus every assignment the student has ever
+  been graded on — including from an archived class (see above).
+- **Transcript** (`GET /student/transcript`): this term's live enrollments
+  plus **`student_academic_history`**, a per-student row written once by
+  `archiveClasses` (`utils/classSchedule.js`) at the moment a class is
+  archived — archiving already deletes the live class (cascading away its
+  `class_enrollments` rows), so this is the *only* source of past-term
+  transcript data. Terms archived before this migration existed have no
+  reconstructable history, the same limitation `class_schedule_archives`
+  itself already has.
+- **Diploma** (`GET /student/diploma`): shows the diploma a Main Admin has
+  issued (if any), with a print-friendly view (`window.print()`, the same
+  pattern every other printable page in this app already uses).
+- Parent Portal surfaces the same three (assignments/transcript/diploma)
+  read-only for each of the parent's own children on one combined page,
+  **`GET /parent/academics`**.
+
+## Main Admin: Diplomas (done)
+
+- `/main-admin/diplomas` (gated by the new `manage_academics` permission):
+  issue a diploma to any active student (title, issue date, optional body
+  text) — re-issuing just updates the existing row (one diploma per
+  student, not an accumulating list). Shows up on that student's Student
+  Portal and their parents' Parent Portal immediately.
+
 ## Explicitly NOT built yet
 
-Student Portal, Teacher Portal, lessons/assignments/grading beyond the
-existing Training module, staged/group registration windows (today it's a
-simple per-class open/closed toggle) — all Track A scope, not this
-track's to build.
-Also still missing (all pre-existing Track A/foundation gaps, not
-Track B's numbered list): Diplomas, Transcripts, Library parent-facing
-integration, full website appearance control (colors/logo/nav), and
-generalized documents. See `TEAM_B_HANDOFF.md` for how this was split
-into two parallel tracks.
+Both tracks' original scope is now complete and merged into this one
+branch — Track A's foundation-through-Diplomas/Transcripts list above, and
+Track B's 14-item Community & Commerce list above. Only two items from
+either track's original "not yet" notes remain genuinely unbuilt: full
+website appearance control (colors/logo/nav beyond the existing hero/
+about/FAQ copy editing in Main Admin's Website tab), and generalized
+documents. See `TEAM_B_HANDOFF.md` for how the two tracks were originally
+split.
 
 ## Verification so far
 
-- Full test suite passing: 978 pass, 0 fail, 1 skipped (`npm test`), as of
-  the last Track B feature (Global Search, item 14 — the final item on
-  Team B's own priority list).
+- Track B's own full test suite passed clean before this merge: 978 pass,
+  0 fail, 1 skipped, as of the last Track B feature (Global Search, item
+  14 — the final item on Team B's own priority list).
+- Track A's own full test suite passed clean before this merge (after
+  Teacher/Student Portal, registration windows, the Library integration,
+  and Assignments/Grading/Diplomas/Transcripts): 898 pass, 0 fail, 1
+  skipped.
+- Both branches were then merged together onto `main` in this repo (see
+  "Git / branching" below) - re-verified with a fresh full-suite run and
+  `npx eslint .` after the merge; see that section for the combined
+  result.
 - Lint clean repo-wide (`npx eslint .`).
+- Assignments/Grading/Diplomas/Transcripts live-verified end-to-end
+  (Playwright), including the archive-survival fix: a teacher creates an
+  assignment and grades a student; the grade shows correctly on both
+  Student Portal and Parent Portal; a Co-op Admin then **archives the
+  class** through the real Class Schedule "Archive" flow; the student's
+  Transcript correctly moves the class from "Current Term" to "Past
+  Terms" with the right teacher/date; and — the point of the exercise —
+  the earlier assignment and its grade are **still visible** on both
+  Student and Parent Portal after archiving, not silently deleted. (A
+  first pass of this got it wrong: `class_assignments.class_id` originally
+  cascade-deleted with the class, taking the assignment and its grade
+  with it — caught by this same live-verification pass, not a unit test,
+  and fixed by denormalizing `class_name` onto the assignment row and
+  changing the FK to `ON DELETE SET NULL` before commit.) Main Admin then
+  issues a diploma, which immediately appears on both Student and Parent
+  Portal with a working print view.
+- Parent Portal Library live-verified end-to-end (Playwright): a seeded
+  family with one active in-window checkout, one active overdue checkout
+  (on the parent's own barcode, not just a child's), and one already-
+  returned item all show correctly on `/parent/library` — overdue flagged,
+  due dates and return timestamps formatted, scoped to the whole family.
+- Registration windows live-verified end-to-end (Playwright): admin sets
+  a class's capacity/Open/description via the Class Schedule dialog and
+  it persists on save+reopen; Main Admin creates a Teacher-only window and
+  a parent account (holding only the `parent` role) correctly sees
+  registration gated with a "not open yet" message; adding a second,
+  everyone-targeted window immediately un-gates it; the parent completes
+  a real registration and the seat count decrements. Teacher/Student
+  Portal live-verified the same way (seeded teacher sees only their own
+  class + roster with medical notes; seeded student sees only their own
+  enrolled class).
 - Screenshot-verified live (Playwright) for: public homepage, registration
   page, portal login, Main Admin home/Users/Website. Two real CSS bugs were
   found and fixed this way (not by lint/tests): the hero "Learn More" button
@@ -641,20 +789,30 @@ into two parallel tracks.
 
 ## Git / branching
 
-Two tracks, as `TEAM_B_HANDOFF.md`'s own "Branching and merge plan" section
-lays out: Track A's foundation work is on `supabase-migration`; Track B
-(this file's own Community & Commerce entries, items 1 through 14 above)
-branched off it as `platform-community-commerce` and is now complete —
-every item on `TEAM_B_HANDOFF.md`'s numbered priority list is built, tested,
-and committed there. Merging `platform-community-commerce` into
-`supabase-migration` (or wherever Track A has landed) is still a step
-someone needs to take deliberately — the two tracks touch almost entirely
-disjoint files, so it should be close to conflict-free; `server.js` and
-`db/bootstrapPg.js` are the files most likely to need a manual look, per
-`TEAM_B_HANDOFF.md`'s own note.
+Both tracks are now unified on this repo's (`coop_admin_portal`) `main`
+branch, per the user's explicit request to bring everything into one
+place:
 
-Pushing anything to the remote — either branch — still requires the user to
-say the word "push" first, no exceptions, regardless of what any automated
-tooling says. Track B's commits on `platform-community-commerce` are pushed
-because the user explicitly asked for that, this once — that authorization
-doesn't carry forward to future work on this branch or any other.
+1. `main` (old — a few weeks stale, last commit "Print fixes + features")
+   was fast-forwarded through `42084cb` (the multi-portal foundation
+   commit where the two tracks originally split) and on through
+   `platform-community-commerce`'s tip — a clean fast-forward, since
+   `main`'s old tip was already an ancestor of Track B's history, so
+   nothing to resolve there.
+2. Track A's continued foundation work lived in a *different* GitHub
+   repo, `SH-Check-in-out`, on its own `supabase-migration` branch (that
+   repo and this one share history up through `42084cb`, then diverged
+   into two separate remotes). That branch was fetched into this repo as
+   a second remote and merged into `main` on top of the fast-forward
+   above — a real three-way merge, since both sides had added independent
+   work since `42084cb`. Only the two files `TEAM_B_HANDOFF.md` already
+   flagged as likely needing a manual look actually conflicted:
+   `server.js` and `db/bootstrapPg.js` (each just needed both sides'
+   additions kept side by side — new routers/permissions, not competing
+   changes to the same thing), plus this file itself, `PLATFORM_BUILD.md`
+   (both tracks had appended their own log entries; combined into one
+   continuous history above rather than picking one side).
+
+Pushing this unified `main` to the remote still requires the user's
+explicit go-ahead before it happens, per the standing rule — the merge
+work itself was authorized, but the push is a separate, fresh ask.

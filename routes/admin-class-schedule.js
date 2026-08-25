@@ -152,6 +152,9 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     notes: (req.body.notes || '').trim(),
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
+    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+    registrationOpen: req.body.registrationOpen === '1',
+    description: (req.body.description || '').trim(),
   });
 
   const teacherId = parseInt(req.body.teacherId, 10);
@@ -238,6 +241,9 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
     notes: (req.body.notes || '').trim(),
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
+    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+    registrationOpen: req.body.registrationOpen === '1',
+    description: (req.body.description || '').trim(),
   });
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
 });

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
+      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Welcome, <%= member.name %></h1>
+
+    <div class="portal-dashboard-grid">
+      <section class="portal-dashboard-card">
+        <h2>My Classes</h2>
+        <p class="portal-dashboard-stat"><%= classes.length %></p>
+        <p class="hint">class<%= classes.length === 1 ? '' : 'es' %> this term</p>
+        <a class="roster-action-btn" href="/student/classes">View My Classes</a>
+      </section>
+    </div>
+
+    <section class="portal-dashboard-section">
+      <h2>Announcements</h2>
+      <% if (announcements.length === 0) { %>
+        <p class="roster-empty">No announcements right now.</p>
+      <% } else { %>
+        <div class="site-announcement-list">
+          <% announcements.forEach(function(a) { %>
+            <div class="site-announcement-card">
+              <span class="site-announcement-date"><%= a.publishedLabel %></span>
+              <h3><%= a.title %></h3>
+              <p><%= a.body %></p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

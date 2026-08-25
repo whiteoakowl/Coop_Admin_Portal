@@ -66,14 +66,20 @@
               team into" number as .team-print-page-fit's own max-height
               (see that rule's own comment for why it's a measurement-
               time budget rather than a permanent CSS height).
-              data-shrink-to-fit-group="teams" (see admin-setup-teams-
-              print.ejs's own comment for the full back-and-forth) levels
-              every team's page down to whichever one needed the most
+
+              Team 1 (i === 0) shares its page with .print-header above,
+              unlike every later team - see admin-setup-teams-print.ejs's
+              own copy of this same comment for the full "blank-looking
+              leading page" bug report and why 8.2in, not 9.2in, is team
+              1's own real budget once the header's ~0.79in is accounted
+              for. Each team still runs fitOne() against its own budget
+              first; data-shrink-to-fit-group="teams" then levels every
+              team's resulting page down to whichever one needed the most
               shrinking, so a print job's pages all read the same font
               size - a real, twice-repeated request, most recently with
               two screenshots showing genuinely different sizes across
               pages. %>
-          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="9.2in" data-shrink-to-fit-group="teams">
+          <div class="team-print-page-fit" data-shrink-to-fit-on-print data-shrink-to-fit-budget="<%= i === 0 ? '8.2in' : '9.2in' %>" data-shrink-to-fit-group="teams">
           <%# The whole card (info + members) is one edit-toggle .edit-
               section (public/js/edit-toggle.js) - clicking Edit unfreezes
               the title/description/leader fields in place and reveals the

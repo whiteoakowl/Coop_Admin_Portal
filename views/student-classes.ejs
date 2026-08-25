@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
+      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>My Classes</h1>
+    <p class="hint">To register for a new class or drop one, ask your parent to manage it from their Parent Portal.</p>
+
+    <% if (classes.length === 0) { %>
+      <p class="roster-empty">You're not enrolled in any classes yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Day / Time</th>
+              <th>Room</th>
+              <th>Teacher</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% classes.forEach(function(c) { %>
+              <tr>
+                <td class="roster-name-col">
+                  <strong><%= c.class_name %></strong>
+                  <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
+                </td>
+                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
+                <td><%= c.room || '—' %></td>
+                <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -151,6 +151,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_directory', label: 'Manage Directory', description: 'Manage the member and business directories.' },
   { key: 'manage_communications', label: 'Manage Communications', description: 'Assemble/send the weekly newsletter and control SMS/notification settings.' },
   { key: 'view_audit_log', label: 'View Audit Log', description: 'View the record of financial changes, moderation, and deletions across the app.' },
+  { key: 'manage_academics', label: 'Manage Academics', description: 'Issue diplomas and review student academic records.' },
 ];
 
 async function seedPortalPlatform(db) {

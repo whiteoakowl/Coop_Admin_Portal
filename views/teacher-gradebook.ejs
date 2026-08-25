@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="hint"><a href="/teacher/classes/<%= cls.id %>">&larr; Back to <%= cls.class_name %></a></p>
+    <h1><%= assignment.title %></h1>
+    <% if (assignment.description) { %><p class="hint"><%= assignment.description %></p><% } %>
+    <p class="hint">
+      <% if (assignment.points_possible != null) { %>Out of <%= assignment.points_possible %> points<% } %>
+    </p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No students enrolled in this class yet.</p>
+    <% } else { %>
+      <form method="POST" action="/teacher/assignments/<%= assignment.id %>/grades">
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Points Earned</th>
+                <th>Feedback</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(function(r) { %>
+                <tr>
+                  <td class="roster-name-col"><%= r.student_name %></td>
+                  <td>
+                    <input type="number" name="points_<%= r.student_id %>" min="0" step="0.5" value="<%= r.points_earned != null ? r.points_earned : '' %>" style="width: 6rem;" />
+                  </td>
+                  <td>
+                    <input type="text" name="feedback_<%= r.student_id %>" value="<%= r.feedback || '' %>" />
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top: 1rem;">
+          <button type="submit" class="primary-btn">Save Grades</button>
+        </div>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

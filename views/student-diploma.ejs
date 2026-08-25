@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
+      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Diploma</h1>
+
+    <% if (!diploma) { %>
+      <p class="roster-empty">No diploma has been issued yet.</p>
+    <% } else { %>
+      <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+      <section class="portal-dashboard-card portal-dashboard-card-wide">
+        <h2><%= diploma.title %></h2>
+        <p>This certifies that</p>
+        <h3><%= member.name %></h3>
+        <% if (diploma.body_text) { %><p><%= diploma.body_text %></p><% } %>
+        <p class="hint">Issued <%= diploma.issued_date %></p>
+      </section>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -44,6 +44,52 @@ function weekdayOf(iso) {
   return parseISO(iso).getDay();
 }
 
+// Converts a <input type="datetime-local"> value (e.g. "2026-09-01T09:00",
+// no timezone - the browser gives back exactly the digits the admin typed)
+// into the UTC 'YYYY-MM-DD HH:MM:SS' text now_text() itself produces, so
+// it can be compared against now_text() with plain string operators. The
+// admin is standing at the co-op's own location when they type it, so
+// (same convention as todayISO/formatTime above) it's interpreted as
+// Eastern wall-clock time, not the server's own timezone.
+//
+// There's no library on hand for "local wall time -> UTC" (unlike the
+// reverse direction Intl handles directly), so this uses the standard
+// two-pass trick: read what a UTC-literal reading of the input renders as
+// in Eastern, and use the gap between the two as that instant's UTC
+// offset - accurate for every case except the input landing inside the
+// one-hour DST-transition gap itself, which no wall-clock time can
+// unambiguously represent anyway.
+const EASTERN_OFFSET_PROBE = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour12: false,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+function easternInputToUtcText(datetimeLocalValue) {
+  if (!datetimeLocalValue) return null;
+  const [datePart, timePart] = datetimeLocalValue.split('T');
+  if (!datePart || !timePart) return null;
+  const [y, m, d] = datePart.split('-').map(Number);
+  const [hh, mm] = timePart.split(':').map(Number);
+
+  const utcGuessMs = Date.UTC(y, m - 1, d, hh, mm, 0);
+  const parts = {};
+  for (const part of EASTERN_OFFSET_PROBE.formatToParts(new Date(utcGuessMs))) {
+    if (part.type !== 'literal') parts[part.type] = Number(part.value);
+  }
+  const renderedAsUtcMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour === 24 ? 0 : parts.hour, parts.minute, parts.second);
+  const offsetMs = renderedAsUtcMs - utcGuessMs;
+  const realUtcMs = utcGuessMs - offsetMs;
+
+  const utc = new Date(realUtcMs);
+  return `${utc.getUTCFullYear()}-${pad(utc.getUTCMonth() + 1)}-${pad(utc.getUTCDate())} ${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}:${pad(utc.getUTCSeconds())}`;
+}
+
 function isValidISODate(iso) {
   if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
   const d = parseISO(iso);
@@ -183,4 +229,5 @@ module.exports = {
   formatFriendlyTimestamp,
   ageFromBirthday,
   closestUpcomingDate,
+  easternInputToUtcText,
 };

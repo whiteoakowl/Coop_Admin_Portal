@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
+      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Transcript</h1>
+    <p class="hint"><%= member.name %>'s record of classes taken.</p>
+
+    <section class="portal-dashboard-section">
+      <h2>Current Term</h2>
+      <% if (current.length === 0) { %>
+        <p class="roster-empty">Not enrolled in any classes this term.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead><tr><th>Class</th><th>Day</th><th>Teacher</th></tr></thead>
+            <tbody>
+              <% current.forEach(function(c) { %>
+                <tr>
+                  <td class="roster-name-col"><%= c.class_name %></td>
+                  <td><%= c.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= c.teacher_names || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="portal-dashboard-section">
+      <h2>Past Terms</h2>
+      <% if (history.length === 0) { %>
+        <p class="roster-empty">No completed classes on record yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead><tr><th>Class</th><th>Day</th><th>Teacher</th><th>Completed</th></tr></thead>
+            <tbody>
+              <% history.forEach(function(h) { %>
+                <tr>
+                  <td class="roster-name-col"><%= h.class_name %></td>
+                  <td><%= h.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= h.teacher_names || '—' %></td>
+                  <td><%= h.termEndedLabel %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

@@ -182,6 +182,8 @@ const adminAuditLogRouter = require('./routes/admin-audit-log');
 // rather than re-deriving access rules - see utils/globalSearch.js's
 // own header comment.
 const searchRouter = require('./routes/search');
+const teacherPortalRouter = require('./routes/teacher-portal');
+const studentPortalRouter = require('./routes/student-portal');
 const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
@@ -385,6 +387,8 @@ app.use('/publications', publicationsRouter);
 app.use('/main-admin/publications', adminPublicationsRouter);
 app.use('/main-admin/audit-log', adminAuditLogRouter);
 app.use('/search', searchRouter);
+app.use('/teacher', teacherPortalRouter);
+app.use('/student', studentPortalRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not
