@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Welcome, <%= member.name %></h1>
+    <p class="hint">Your classes and their rosters.</p>
+
+    <% if (classes.length === 0) { %>
+      <p class="roster-empty">You're not staffed on any classes yet. Contact an admin if this looks wrong.</p>
+    <% } else { %>
+      <div class="portal-dashboard-grid">
+        <% classes.forEach(function(c) { %>
+          <section class="portal-dashboard-card">
+            <h2><%= c.class_name %></h2>
+            <p class="hint"><%= c.dayLabel %> &middot; <%= c.timeLabel %> &middot; <%= c.gradeLabel || 'All grades' %></p>
+            <p class="portal-dashboard-stat"><%= c.studentCount %></p>
+            <p class="hint">student<%= Number(c.studentCount) === 1 ? '' : 's' %> enrolled</p>
+            <% if (c.assistantNames.length) { %><p class="hint">Co-taught with <%= c.assistantNames.join(', ') %></p><% } %>
+            <a class="roster-action-btn" href="/teacher/classes/<%= c.id %>">View Roster</a>
+          </section>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

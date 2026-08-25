@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="hint"><a href="/teacher">&larr; Back to Teacher Portal</a></p>
+    <h1><%= cls.class_name %></h1>
+    <p class="hint"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %> &middot; <%= cls.gradeLabel || 'All grades' %> &middot; Room <%= cls.room || 'Unassigned' %></p>
+    <% if (cls.notes) { %><p class="hint"><%= cls.notes %></p><% } %>
+
+    <section class="portal-dashboard-section">
+      <h2>Roster</h2>
+      <% if (students.length === 0) { %>
+        <p class="roster-empty">No students enrolled yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Grade</th>
+                <th>Medical/Allergy Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% students.forEach(function(s) { %>
+                <tr>
+                  <td class="roster-name-col"><%= s.name %></td>
+                  <td><%= s.grade_level || '—' %></td>
+                  <td><%= s.medical_notes || '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

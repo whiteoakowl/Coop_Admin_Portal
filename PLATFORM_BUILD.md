@@ -129,10 +129,38 @@ extend it.
   and `faqs` — the actual "admins don't need to touch code" requirement,
   scoped to the copy that matters rather than a full arbitrary page builder.
 
+## Teacher Portal (done — view-only rosters)
+
+- `routes/teacher-portal.js`, gated `requirePortalAuth, requirePortal('teacher')`.
+- **Home** (`GET /teacher`): every class the signed-in teacher is staffed on
+  (read from the *existing* `class_staff` table — the same teacher/assistant
+  model `routes/admin-schedule.js` already uses, not a parallel list), with
+  a student count and co-teacher names, reusing `allClassesList`'s computed
+  fields (`timeLabel`/`gradeLabel`/`teacherNames`) rather than re-deriving
+  day/time formatting a second time.
+- **Roster** (`GET /teacher/classes/:id`): the enrolled students for one of
+  the teacher's own classes (name, grade, medical/allergy notes — the same
+  fields the existing class-roster print view already shows a teacher on
+  paper). Re-derives "does this teacher actually teach this class" from
+  `class_staff` on every request rather than trusting the id in the URL —
+  a teacher can't view another class's roster by guessing its id.
+- No lesson plans, assignments, or grading yet — see "Explicitly NOT built
+  yet" below.
+
+## Student Portal (done — view-only schedule)
+
+- `routes/student-portal.js`, gated `requirePortalAuth, requirePortal('student')`.
+- **Home** (`GET /student`) and **My Classes** (`GET /student/classes`): the
+  student's own enrolled classes, read from the *existing*
+  `class_enrollments` table. Registration itself stays a Parent Portal
+  action (a parent registers their children) — this portal only ever
+  displays what's already there, never a second enrollment path a parent's
+  view and a student's view could drift out of sync on.
+- No assignments, grades, or training progress yet — see below.
+
 ## Explicitly NOT built yet
 
-Everything else in the original request: Student Portal, Teacher Portal,
-lessons/assignments/grading beyond the existing Training module, staged/
+Lessons/assignments/grading beyond the existing Training module, staged/
 group registration windows (today it's a simple per-class open/closed
 toggle), Events + volunteer/donation signups, weekly newsletter, SMS
 notifications, accounting/payments, Store, Forums, Library parent-facing
