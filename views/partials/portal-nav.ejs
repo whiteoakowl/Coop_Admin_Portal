@@ -1,0 +1,65 @@
+<%
+// locals: navLinks ([{href, icon, label}]), portalTitle (e.g. "Parent
+// Portal"). portalAccount/portalRoles come from res.locals
+// (middleware/portalAuth.js's loadPortalSession) automatically, no
+// explicit passing needed. Reuses the exact same .admin-sidebar/
+// .admin-mobile-topbar/.admin-mobile-tabs shell the existing Co-op Admin
+// Portal already uses (views/partials/admin-nav.ejs) - same visual
+// language across every portal, just a different link set and the
+// portal switcher below, which only ever appears when there's more than
+// one portal to switch between.
+const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 1;
+%>
+<%- include('icon-sprite') %>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<aside class="admin-sidebar">
+  <a class="brand" href="/portal">
+    <img src="/img/logo-owl.png" alt="Sanford Homeschoolers" />
+  </a>
+  <p class="portal-nav-title"><%= portalTitle %></p>
+  <nav id="admin-nav-links">
+    <% navLinks.forEach(function(link) { %>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+    <% }); %>
+  </nav>
+  <div class="admin-sidebar-bottom">
+    <% if (showSwitcher) { %>
+      <details class="portal-switcher-details">
+        <summary><svg class="icon"><use href="#icon-users"/></svg> Switch Portal</summary>
+        <div class="portal-switcher-menu">
+          <a href="/portal">All My Portals</a>
+        </div>
+      </details>
+    <% } %>
+    <form method="POST" action="/logout" class="logout-form">
+      <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
+    </form>
+  </div>
+</aside>
+
+<div class="admin-mobile-topbar">
+  <div class="admin-mobile-topbar-row">
+    <a class="brand" href="/portal">
+      <img src="/img/logo-owl.png" alt="" />
+      <%= portalTitle %>
+    </a>
+    <div class="admin-nav-right admin-nav-right-mobile">
+      <% if (showSwitcher) { %>
+        <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-users"/></svg></a>
+      <% } %>
+      <form method="POST" action="/logout" class="logout-form">
+        <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<nav class="admin-mobile-tabs" id="admin-mobile-tabs">
+  <% navLinks.forEach(function(link) { %>
+    <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+  <% }); %>
+</nav>
+
+<script src="/js/admin-nav.js"></script>
+<script src="/js/skip-link.js"></script>

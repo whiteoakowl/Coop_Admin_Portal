@@ -1,7 +1,8 @@
 // Real HTTP-level coverage for the kiosk home screen (views/kiosk-
-// home.ejs, the separate /kiosk full-screen view - see
-// test/routes-index-home.test.js for the site root, which now shares
-// this exact same shape). A desktop/tablet-only orange top menu bar
+// home.ejs, the /kiosk full-screen view - the site root now serves the
+// new public marketing homepage instead, see routes/public-site.js; a
+// physical kiosk device bookmarks this /kiosk route directly). A
+// desktop/tablet-only orange top menu bar
 // (Name Tag Form, Absence/Late Form, Find a Parent, Class Check In &
 // Out, Admin), two stacked desktop/tablet button columns (Check In/
 // Check Out - green; Floater Assignments/Setup-Cleanup Teams - purple),

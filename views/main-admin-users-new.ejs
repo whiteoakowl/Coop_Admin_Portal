@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Create Account</h1>
+    <p class="hint">Issue portal login credentials to an existing member. This account is active immediately - no approval queue.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">Every active member already has an account, or there are no members yet. Add members from the Co-op Admin Portal's Members page first.</p>
+    <% } else { %>
+      <form method="POST" action="/main-admin/users/new" class="form-outer-panel member-form-grid">
+        <label class="member-form-full">Member
+          <select name="memberId" required>
+            <option value="">Select a member&hellip;</option>
+            <% members.forEach(function(m) { %>
+              <option value="<%= m.id %>"><%= m.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Email
+          <input type="email" name="email" required />
+        </label>
+        <label class="member-form-full">Temporary Password
+          <input type="text" name="password" minlength="8" required />
+        </label>
+        <div class="member-form-full">
+          <p class="hint">Roles</p>
+          <div class="stack-form">
+            <% allRoles.forEach(function(role) { %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="roleIds" value="<%= role.id %>" />
+                <%= role.label %>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Create Account</button>
+        </div>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

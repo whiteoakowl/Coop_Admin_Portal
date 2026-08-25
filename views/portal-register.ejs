@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="public-page">
+  <%- include('partials/icon-sprite') %>
+  <main id="main-content" tabindex="-1" class="form-wrap">
+    <div class="kiosk-header">
+      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+      <h1>Member Registration</h1>
+    </div>
+    <p class="hint">Create your account to access the member portal. An administrator will review and approve your registration before you can sign in.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/register" class="form-outer-panel">
+      <div class="form-section member-form-grid">
+        <label>First Name
+          <input type="text" name="firstName" value="<%= formValues.firstName || '' %>" required autocomplete="given-name" />
+        </label>
+        <label>Last Name
+          <input type="text" name="lastName" value="<%= formValues.lastName || '' %>" required autocomplete="family-name" />
+        </label>
+        <label class="member-form-full">Email
+          <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
+        </label>
+        <label>Password
+          <input type="password" name="password" required minlength="8" autocomplete="new-password" />
+        </label>
+        <label>Confirm Password
+          <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
+        </label>
+      </div>
+      <button type="submit" class="primary-btn">Submit Registration</button>
+      <p class="hint">Already have an account? <a href="/login">Log in</a>.</p>
+    </form>
+  </main>
+</body>
+</html>

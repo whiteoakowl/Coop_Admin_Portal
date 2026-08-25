@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Welcome, <%= member.name %></h1>
+
+    <div class="portal-dashboard-grid">
+      <section class="portal-dashboard-card">
+        <h2>My Family</h2>
+        <% if (children.length === 0) { %>
+          <p class="roster-empty">No students linked to your family yet. Contact an admin if this looks wrong.</p>
+        <% } else { %>
+          <ul class="portal-dashboard-list">
+            <% children.forEach(function(c) { %>
+              <li><%= c.name %><% if (c.grade_level) { %> <span class="hint">&middot; <%= c.grade_level %></span><% } %></li>
+            <% }); %>
+          </ul>
+        <% } %>
+        <a class="roster-action-btn" href="/parent/classes">Manage Class Registration</a>
+      </section>
+
+      <section class="portal-dashboard-card">
+        <h2>Class Registrations</h2>
+        <p class="portal-dashboard-stat"><%= registrationCount %></p>
+        <p class="hint">active class registration<%= registrationCount === 1 ? '' : 's' %> across your family</p>
+        <a class="roster-action-btn" href="/parent/classes">Browse Classes</a>
+      </section>
+
+      <section class="portal-dashboard-card">
+        <h2>Quick Links</h2>
+        <ul class="portal-dashboard-list">
+          <li><a href="/name-tag">Name Tag Request Form</a></li>
+          <li><a href="/absence">Absence/Late Form</a></li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="portal-dashboard-section">
+      <h2>Announcements</h2>
+      <% if (announcements.length === 0) { %>
+        <p class="roster-empty">No announcements right now.</p>
+      <% } else { %>
+        <div class="site-announcement-list">
+          <% announcements.forEach(function(a) { %>
+            <div class="site-announcement-card">
+              <span class="site-announcement-date"><%= a.publishedLabel %></span>
+              <h3><%= a.title %></h3>
+              <p><%= a.body %></p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

@@ -106,6 +106,11 @@ const contactAdminsRouter = require('./routes/contact-admins');
 const membershipRouter = require('./routes/membership');
 const trainingRouter = require('./routes/training');
 const adminTrainingRouter = require('./routes/admin-training');
+const publicSiteRouter = require('./routes/public-site');
+const portalAuthRouter = require('./routes/portal-auth');
+const parentPortalRouter = require('./routes/parent-portal');
+const mainAdminRouter = require('./routes/main-admin');
+const { loadPortalSession } = require('./middleware/portalAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -204,6 +209,14 @@ app.use(
   })
 );
 
+// Member portal platform (Parent/Student/Teacher/Co-op Admin/Main Admin
+// logins - see middleware/portalAuth.js) - loaded globally, ahead of
+// every route, so res.locals.portalAccount/portalRoles are available to
+// any view (the public homepage's header needs to know whether to show
+// "Log In" or "My Portals") without every route computing it itself.
+// Completely independent of the single shared Admin session below.
+app.use(loadPortalSession);
+
 // Member photos may live in Supabase Storage or on local disk (see
 // utils/uploadBackend.js and MIGRATION.md) - computed once at boot, not
 // per-request, since createStorageClient() just builds a lightweight
@@ -234,10 +247,11 @@ function trainingResourceUrl(key) {
 // a public page never gets a session created just to hold this.
 app.use((req, res, next) => {
   const isAdmin = !!(req.session && req.session.adminId);
+  const isPortalSession = !!(req.session && req.session.portalAccountId);
   res.locals.isFullAdmin = isAdmin;
   res.locals.photoUrl = photoUrl;
   res.locals.trainingResourceUrl = trainingResourceUrl;
-  if (isAdmin) {
+  if (isAdmin || isPortalSession) {
     if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(24).toString('hex');
     res.locals.csrfToken = req.session.csrfToken;
     // A fixed point in time, not a sliding window - this app's session
@@ -254,12 +268,25 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => {
-  res.render('index', { title: 'SH Check-In / Check-Out', error: null });
-});
+// The site root used to BE the kiosk landing screen (views/index.ejs) -
+// now the new public marketing homepage instead (routes/public-site.js).
+// views/kiosk-home.ejs already renders that exact same kiosk screen,
+// unchanged, at /kiosk (it always has - see that route's own comment),
+// so nothing about the kiosk experience itself was touched; a physical
+// kiosk device just needs its own browser bookmark repointed from / to
+// /kiosk once.
+app.use('/', publicSiteRouter);
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
+// The new member portal platform - login/registration are public routes
+// (no session yet), Parent/Main Admin are each gated by their own role
+// (middleware/portalAuth.js's requirePortal), completely independent of
+// both the kiosk's no-login model and the single shared Admin login.
+app.use('/', require('./middleware/csrfProtection'));
+app.use('/', portalAuthRouter);
+app.use('/parent', parentPortalRouter);
+app.use('/main-admin', mainAdminRouter);
 // contact-admins.js and membership.js (both mounted below) gate every one
 // of their own routes behind requireAdmin/requireFullAdmin despite living
 // outside the '/admin' path prefix (their URLs read as top-level, not

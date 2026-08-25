@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <a class="primary-btn" href="/portal">My Portals</a>
+      <% } else { %>
+        <a class="btn-secondary" href="/login">Log In</a>
+        <a class="primary-btn" href="/register">Member Registration</a>
+      <% } %>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-hero">
+      <div class="site-hero-inner">
+        <h1><%= settings.hero_heading %></h1>
+        <p><%= settings.hero_body %></p>
+        <div class="site-hero-actions">
+          <a class="primary-btn" href="/register">Become a Member</a>
+          <a class="btn-secondary" href="#about">Learn More</a>
+        </div>
+        <p class="site-hero-meta"><svg class="icon"><use href="#icon-clock"/></svg> <%= settings.meeting_schedule_text %></p>
+      </div>
+    </section>
+
+    <section class="site-section" id="about">
+      <div class="site-section-inner">
+        <h2>About Us</h2>
+        <p><%= settings.about_body %></p>
+      </div>
+    </section>
+
+    <section class="site-section site-section-alt">
+      <div class="site-section-inner">
+        <h2>Why Families Join Us</h2>
+        <p><%= settings.benefits_body %></p>
+        <div class="site-benefits-grid">
+          <div class="site-benefit-card">
+            <h3><svg class="icon"><use href="#icon-graduation-cap"/></svg> Real Classes</h3>
+            <p>Parent- and volunteer-taught classes across a range of subjects and age groups, meeting on a reliable weekly schedule.</p>
+          </div>
+          <div class="site-benefit-card">
+            <h3><svg class="icon"><use href="#icon-users"/></svg> Community</h3>
+            <p>A supportive network of homeschooling families - friendships for your kids, encouragement for you.</p>
+          </div>
+          <div class="site-benefit-card">
+            <h3><svg class="icon"><use href="#icon-calendar-check"/></svg> Consistency</h3>
+            <p>The same two days every week, with attendance, scheduling, and communication all handled for you.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <% if (announcements.length > 0) { %>
+      <section class="site-section">
+        <div class="site-section-inner">
+          <h2>Announcements</h2>
+          <div class="site-announcement-list">
+            <% announcements.forEach(function(a) { %>
+              <div class="site-announcement-card">
+                <span class="site-announcement-date"><%= a.publishedLabel %></span>
+                <h3><%= a.title %></h3>
+                <p><%= a.body %></p>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </section>
+    <% } %>
+
+    <% if (faqs.length > 0) { %>
+      <section class="site-section site-section-alt">
+        <div class="site-section-inner">
+          <h2>Frequently Asked Questions</h2>
+          <div class="site-faq-list">
+            <% faqs.forEach(function(faq) { %>
+              <details class="site-faq-item">
+                <summary><%= faq.question %></summary>
+                <p><%= faq.answer %></p>
+              </details>
+            <% }); %>
+          </div>
+        </div>
+      </section>
+    <% } %>
+
+    <section class="site-cta">
+      <h2>Ready to join <%= settings.org_name %>?</h2>
+      <p>Create your account and we'll take it from there.</p>
+      <a class="primary-btn" href="/register">Member Registration</a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <% if (settings.contact_email) { %><a href="mailto:<%= settings.contact_email %>"><%= settings.contact_email %></a><% } %>
+      <% if (settings.contact_phone) { %> &middot; <%= settings.contact_phone %><% } %>
+    </p>
+    <p>&copy; <%= new Date().getFullYear() %> <%= settings.org_name %>. All rights reserved.</p>
+  </footer>
+</body>
+</html>

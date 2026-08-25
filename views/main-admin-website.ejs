@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Website</h1>
+    <p class="hint">Edit the public homepage's copy, announcements, and FAQs without touching code. <a href="/" target="_blank">View the live site &rarr;</a></p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2>Homepage Content</h2>
+      <form method="POST" action="/main-admin/website/settings" class="member-form-grid">
+        <label class="member-form-full">Organization Name
+          <input type="text" name="org_name" value="<%= settings.org_name %>" required />
+        </label>
+        <label class="member-form-full">Tagline
+          <input type="text" name="tagline" value="<%= settings.tagline %>" />
+        </label>
+        <label class="member-form-full">Hero Heading
+          <input type="text" name="hero_heading" value="<%= settings.hero_heading %>" required />
+        </label>
+        <label class="member-form-full">Hero Body
+          <textarea name="hero_body" rows="2"><%= settings.hero_body %></textarea>
+        </label>
+        <label class="member-form-full">Meeting Schedule
+          <input type="text" name="meeting_schedule_text" value="<%= settings.meeting_schedule_text %>" />
+        </label>
+        <label class="member-form-full">About Section
+          <textarea name="about_body" rows="3"><%= settings.about_body %></textarea>
+        </label>
+        <label class="member-form-full">Benefits Section
+          <textarea name="benefits_body" rows="3"><%= settings.benefits_body %></textarea>
+        </label>
+        <label>Contact Email
+          <input type="email" name="contact_email" value="<%= settings.contact_email || '' %>" />
+        </label>
+        <label>Contact Phone
+          <input type="text" name="contact_phone" value="<%= settings.contact_phone || '' %>" />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save Homepage Content</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2>Announcements</h2>
+      <form method="POST" action="/main-admin/website/announcements" class="member-form-grid">
+        <label class="member-form-full">Title
+          <input type="text" name="title" required />
+        </label>
+        <label class="member-form-full">Body
+          <textarea name="body" rows="2" required></textarea>
+        </label>
+        <label class="checkbox-option member-form-full">
+          <input type="checkbox" name="isPublic" value="1" />
+          Show on the public homepage (unchecked = members only)
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="roster-action-btn">Post Announcement</button>
+        </div>
+      </form>
+      <% if (announcements.length === 0) { %>
+        <p class="roster-empty">No announcements yet.</p>
+      <% } else { %>
+        <div class="site-announcement-list">
+          <% announcements.forEach(function(a) { %>
+            <div class="site-announcement-card">
+              <span class="site-announcement-date"><%= a.is_public ? 'Public' : 'Members Only' %></span>
+              <h3><%= a.title %></h3>
+              <p><%= a.body %></p>
+              <form method="POST" action="/main-admin/website/announcements/<%= a.id %>/delete" data-confirm="Delete this announcement?">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+              </form>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2>FAQs</h2>
+      <form method="POST" action="/main-admin/website/faqs" class="member-form-grid">
+        <label class="member-form-full">Question
+          <input type="text" name="question" required />
+        </label>
+        <label class="member-form-full">Answer
+          <textarea name="answer" rows="2" required></textarea>
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="roster-action-btn">Add FAQ</button>
+        </div>
+      </form>
+      <% if (faqs.length === 0) { %>
+        <p class="roster-empty">No FAQs yet.</p>
+      <% } else { %>
+        <div class="site-faq-list">
+          <% faqs.forEach(function(faq) { %>
+            <details class="site-faq-item">
+              <summary><%= faq.question %></summary>
+              <p><%= faq.answer %></p>
+              <form method="POST" action="/main-admin/website/faqs/<%= faq.id %>/delete" data-confirm="Delete this FAQ?">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+              </form>
+            </details>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>
