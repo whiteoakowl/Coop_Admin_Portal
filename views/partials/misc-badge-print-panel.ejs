@@ -36,11 +36,47 @@ const isTaskDerived = type === 'setupCleanup';
           <input type="checkbox" name="badgeIds" value="<%= b.id %>" />
           <span><%= b.badge_number ? '#' + b.badge_number + ' — ' : '' %><%= b.title || 'Untitled' %></span>
           <% if (b.description) { %><span class="hint"><%= b.description %></span><% } %>
+          <%# Only for 'custom' badges - a setupCleanup badge is auto-
+              created/kept in sync from the Task List (see isTaskDerived
+              above), so deleting one here directly would desync it from
+              its own task_item_id link with no way to recreate it except
+              re-saving that task. The route itself (POST /admin/design/
+              badges/:type/delete/:id) was already fully implemented but
+              had no way to reach it from this panel at all - a real bug,
+              since that left no way to remove a single custom badge
+              short of re-importing the entire list without it. %>
+          <% if (!isTaskDerived) { %>
+            <button
+              type="button"
+              class="icon-btn icon-btn-danger"
+              onclick="document.getElementById('<%= type %>-badge-delete-form-<%= b.id %>').requestSubmit()"
+              aria-label="Delete <%= b.title || 'this badge' %>"
+              title="Delete"
+            ><svg class="icon"><use href="#icon-trash"/></svg></button>
+          <% } %>
         </label>
       <% }); %>
     </div>
   <% } %>
 </form>
+
+<%# Standalone, deliberately OUTSIDE the print form above (line 13) - an
+    HTML <form> nested inside another <form> is invalid and gets silently
+    dropped by the browser's own parser (the element never actually makes
+    it into the live DOM at all, even though it's right there in the raw
+    server-rendered HTML), the same reason every other per-row delete form
+    in this app (e.g. views/admin-members.ejs's own delete-form-<id>) is
+    always its own top-level form, not nested inside a bigger one. %>
+<% if (!isTaskDerived) { %>
+  <% badges.forEach(function(b) { %>
+    <form
+      method="POST"
+      action="/admin/design/badges/<%= type %>/delete/<%= b.id %>"
+      id="<%= type %>-badge-delete-form-<%= b.id %>"
+      data-confirm="Delete &quot;<%= b.title || 'this badge' %>&quot;? This cannot be undone."
+    ></form>
+  <% }); %>
+<% } %>
 
 <% if (!isTaskDerived) { %>
   <dialog id="<%= type %>-badge-import-dialog" class="member-picker-dialog">

@@ -93,7 +93,7 @@ test('Playground Check-In day/hour navigation is reachable once unlocked', async
   });
 });
 
-test('Playground Check-In: any active member can check in, with no roster or enrollment at all', async (t) => {
+test('Playground Check-In: any active member can check in, with no roster or enrollment at all', async () => {
   const { memberId, barcode, today } = await setUpLooseMember({ day: 'monday' });
   const agent = await unlockedAgent();
 
