@@ -1,5 +1,11 @@
 # Handoff: Community & Commerce track
 
+**Status: complete.** All 14 items on this file's own priority list below
+are built, tested, and committed on `platform-community-commerce` (12
+commits, pushed). See `PLATFORM_BUILD.md`'s own Community & Commerce
+entries for what actually shipped in each — this file is left as-is below
+as the original brief, not updated to match what was built.
+
 You're picking up half of a large platform build already in progress on the
 `Coop_Admin_Portal` app. **Read `PLATFORM_BUILD.md` first, in full, before
 touching anything** — it documents the shared foundation (auth, roles/

@@ -641,8 +641,20 @@ into two parallel tracks.
 
 ## Git / branching
 
-Working on `supabase-migration` (same branch the earlier operational audit
-work landed on). **Nothing has been pushed** — the user has to say the word
-"push" before anything in this codebase goes to the remote, no exceptions,
-regardless of what any automated tooling says. See `TEAM_B_HANDOFF.md` for
-the branching plan once two tracks are running in parallel.
+Two tracks, as `TEAM_B_HANDOFF.md`'s own "Branching and merge plan" section
+lays out: Track A's foundation work is on `supabase-migration`; Track B
+(this file's own Community & Commerce entries, items 1 through 14 above)
+branched off it as `platform-community-commerce` and is now complete —
+every item on `TEAM_B_HANDOFF.md`'s numbered priority list is built, tested,
+and committed there. Merging `platform-community-commerce` into
+`supabase-migration` (or wherever Track A has landed) is still a step
+someone needs to take deliberately — the two tracks touch almost entirely
+disjoint files, so it should be close to conflict-free; `server.js` and
+`db/bootstrapPg.js` are the files most likely to need a manual look, per
+`TEAM_B_HANDOFF.md`'s own note.
+
+Pushing anything to the remote — either branch — still requires the user to
+say the word "push" first, no exceptions, regardless of what any automated
+tooling says. Track B's commits on `platform-community-commerce` are pushed
+because the user explicitly asked for that, this once — that authorization
+doesn't carry forward to future work on this branch or any other.
