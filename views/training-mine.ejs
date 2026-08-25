@@ -6,39 +6,41 @@
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
   <main id="main-content" tabindex="-1" class="form-wrap">
-    <div class="kiosk-header">
-      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
-      <h1>My Training</h1>
-    </div>
-    <p class="hint">Hi, <%= member.name %>. <form method="POST" action="/training/switch" class="inline-block-form"><button type="submit" class="link-btn">Not you?</button></form></p>
+    <div class="form-outer-panel">
+      <div class="kiosk-header">
+        <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+        <h1>My Training</h1>
+      </div>
+      <p class="hint">Hi, <%= member.name %>. <form method="POST" action="/training/switch" class="inline-block-form"><button type="submit" class="link-btn">Not you?</button></form></p>
 
-    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+      <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <% if (assignments.length === 0) { %>
-      <p class="roster-empty">You don't have any assigned training right now.</p>
-    <% } %>
+      <% if (assignments.length === 0) { %>
+        <p class="roster-empty">You don't have any assigned training right now.</p>
+      <% } %>
 
-    <div class="training-card-grid">
-      <% assignments.forEach(function(a) { %>
-        <div class="team-col">
-          <div class="team-info-card">
-            <span class="team-info-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-            <h3 class="team-info-title"><%= a.title %></h3>
-            <p class="hint"><%= a.lessonCount %> lesson<%= a.lessonCount == 1 ? '' : 's' %><% if (a.estimatedMinutes) { %> &bull; <%= a.estimatedMinutes %> minutes<% } %></p>
-            <%- include('partials/training-status-badge', { status: a.status }) %>
-            <% if (a.due_at) { %><p class="hint">Due <%= a.due_at %></p><% } %>
-            <% if (a.status === 'in_progress' || a.status === 'not_started') { %>
-              <a class="roster-action-btn" href="/training/<%= a.id %>/play"><%= a.status === 'not_started' ? 'Start Training' : 'Continue Training' %></a>
-            <% } else if (a.status === 'retry_required' || a.status === 'failed') { %>
-              <form method="POST" action="/training/<%= a.id %>/retake">
-                <button type="submit" class="roster-action-btn">Retake Training</button>
-              </form>
-            <% } else { %>
-              <a class="roster-action-btn" href="/training/<%= a.id %>/play">Review Training</a>
-            <% } %>
+      <div class="training-card-grid">
+        <% assignments.forEach(function(a) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+              <h3 class="team-info-title"><%= a.title %></h3>
+              <p class="hint"><%= a.lessonCount %> lesson<%= a.lessonCount == 1 ? '' : 's' %><% if (a.estimatedMinutes) { %> &bull; <%= a.estimatedMinutes %> minutes<% } %></p>
+              <%- include('partials/training-status-badge', { status: a.status }) %>
+              <% if (a.due_at) { %><p class="hint">Due <%= a.due_at %></p><% } %>
+              <% if (a.status === 'in_progress' || a.status === 'not_started') { %>
+                <a class="roster-action-btn" href="/training/<%= a.id %>/play"><%= a.status === 'not_started' ? 'Start Training' : 'Continue Training' %></a>
+              <% } else if (a.status === 'retry_required' || a.status === 'failed') { %>
+                <form method="POST" action="/training/<%= a.id %>/retake">
+                  <button type="submit" class="roster-action-btn">Retake Training</button>
+                </form>
+              <% } else { %>
+                <a class="roster-action-btn" href="/training/<%= a.id %>/play">Review Training</a>
+              <% } %>
+            </div>
           </div>
-        </div>
-      <% }); %>
+        <% }); %>
+      </div>
     </div>
   </main>
 </body>
