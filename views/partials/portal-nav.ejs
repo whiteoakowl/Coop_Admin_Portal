@@ -9,6 +9,32 @@
 // portal switcher below, which only ever appears when there's more than
 // one portal to switch between.
 const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 1;
+
+// The Community & Commerce feature set (Events, Forums, Store, Business
+// Directory, Classifieds, Member Directory, Newsletter, Photos,
+// Publications, Custom Forms, Accounting, Notifications) shipped as
+// sibling top-level pages, not tabs inside any one portal's own routes -
+// see routes/accounting.js's own header comment for why (a hard boundary
+// between this build and the pre-existing parent/teacher/student/main-
+// admin route files). Every one of them only requires SOME signed-in
+// portal account, no specific role, so they belong here - one shared
+// list every portal shows - rather than duplicated per navLinks caller.
+// A real bug this fixes: none of it was linked from anywhere at all once
+// deployed, reachable only by typing the URL directly.
+const COMMUNITY_LINKS = [
+  { href: '/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/forums', icon: 'users', label: 'Forums' },
+  { href: '/member-directory', icon: 'user', label: 'Member Directory' },
+  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/forms', icon: 'clipboard-list', label: 'Forms' },
+  { href: '/store', icon: 'grid', label: 'Store' },
+  { href: '/newsletter', icon: 'mail', label: 'Newsletter' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/publications', icon: 'file-text', label: 'Publications' },
+  { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
+  { href: '/notifications', icon: 'bell', label: 'Notifications' },
+];
 %>
 <%- include('icon-sprite') %>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -21,6 +47,12 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
   <nav id="admin-nav-links">
     <% navLinks.forEach(function(link) { %>
       <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+    <% }); %>
+  </nav>
+  <p class="portal-nav-title">Community</p>
+  <nav id="community-nav-links">
+    <% COMMUNITY_LINKS.forEach(function(link) { %>
+      <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
     <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
@@ -58,6 +90,16 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
 <nav class="admin-mobile-tabs" id="admin-mobile-tabs">
   <% navLinks.forEach(function(link) { %>
     <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+  <% }); %>
+  <%# Same COMMUNITY_LINKS as the desktop sidebar's own #community-nav-links
+      block above, appended into this one already-horizontally-scrollable
+      bar rather than a second mobile row - there's no room for a second
+      section heading at this width, and admin-nav.ejs's own mobile tabs
+      already establish "more tabs than fit -> scroll" as this app's one
+      mobile-overflow pattern, not something to invent a second version of
+      here. %>
+  <% COMMUNITY_LINKS.forEach(function(link) { %>
+    <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
   <% }); %>
 </nav>
 

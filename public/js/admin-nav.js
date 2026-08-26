@@ -36,5 +36,9 @@
   }
 
   highlightNav('#admin-nav-links');
+  // Only present on views/partials/portal-nav.ejs's pages (Parent/Teacher/
+  // Student/Main Admin) - a no-op here on admin-nav.ejs's own Co-op Admin
+  // Portal pages, which have no element with this id at all.
+  highlightNav('#community-nav-links');
   highlightNav('#admin-mobile-tabs');
 })();
