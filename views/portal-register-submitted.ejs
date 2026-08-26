@@ -14,6 +14,9 @@
       <p><svg class="icon" style="width:2.5rem;height:2.5rem;color:var(--brand);"><use href="#icon-check-circle"/></svg></p>
       <h2>Thanks for registering!</h2>
       <p class="hint">An administrator will review your registration and grant you access. You'll be able to log in once your account has been approved.</p>
+      <% if (typeof childLoginCount !== 'undefined' && childLoginCount > 0) { %>
+        <p class="hint"><%= childLoginCount %> student login<%= childLoginCount === 1 ? '' : 's' %> <%= childLoginCount === 1 ? 'was' : 'were' %> also submitted for approval.</p>
+      <% } %>
       <a class="primary-btn" href="/">Back to Home</a>
     </div>
   </main>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Announcements</h1>
+    <p class="hint">
+      Sends a notification to signed-in members - it shows up as an Announcement on their portal home page (Parent
+      Portal today). Not the same as <a href="/main-admin/website">Website</a>'s own Announcements, which post to the
+      public homepage for anyone, signed in or not.
+    </p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/announcements" class="stack-form member-form-page-panel">
+      <label class="member-form-full">Title
+        <input type="text" name="title" placeholder="e.g. Wednesday session cancelled" required />
+      </label>
+      <label class="member-form-full">Message
+        <textarea name="body" rows="4" placeholder="Enter the announcement" required></textarea>
+      </label>
+      <label class="member-form-full">Send to
+        <select name="roleKey">
+          <option value="">Everyone (all active members)</option>
+          <% roles.forEach(function(r) { %>
+            <option value="<%= r.key %>"><%= r.label %> only</option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Send Announcement</button>
+        </div>
+      </div>
+    </form>
+
+    <h2>Recently Sent</h2>
+    <% if (sent.length === 0) { %>
+      <p class="roster-empty">No announcements sent yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Title</th><th>Message</th><th>Recipients</th><th>Sent</th></tr></thead>
+          <tbody>
+            <% sent.forEach(function(s) { %>
+              <tr>
+                <td class="roster-name-col"><%= s.title %></td>
+                <td><%= s.body %></td>
+                <td><%= s.recipientCount %></td>
+                <td><%= s.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

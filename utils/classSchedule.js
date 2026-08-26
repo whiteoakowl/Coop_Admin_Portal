@@ -452,8 +452,9 @@ async function renameRoom(day, oldName, newName) {
 async function createClass(fields) {
   const info = await db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time, capacity, registration_open, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time, capacity, registration_open, description,
+         allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -467,7 +468,17 @@ async function createClass(fields) {
       fields.endTime || null,
       fields.capacity || null,
       fields.registrationOpen ? 1 : 0,
-      fields.description || null
+      fields.description || null,
+      fields.allowParentRegister === false ? 0 : 1,
+      fields.allowTeacherRegister === false ? 0 : 1,
+      fields.allowStudentRegister ? 1 : 0,
+      fields.teacherSlots || null,
+      fields.assistantSlots || null,
+      fields.minCapacity || null,
+      fields.allowCancel === false ? 0 : 1,
+      fields.autoRefundOnCancel ? 1 : 0,
+      fields.priceCents || null,
+      fields.pricePer === 'family' ? 'family' : 'person'
     );
   const id = info.lastInsertRowid;
   await ensureClassRoster(id);
@@ -477,7 +488,9 @@ async function createClass(fields) {
 async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ? WHERE id = ?`
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
+       allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?
+     WHERE id = ?`
   ).run(
     fields.day,
     fields.hourPosition,
@@ -491,6 +504,16 @@ async function updateClass(id, fields) {
     fields.capacity || null,
     fields.registrationOpen ? 1 : 0,
     fields.description || null,
+    fields.allowParentRegister === false ? 0 : 1,
+    fields.allowTeacherRegister === false ? 0 : 1,
+    fields.allowStudentRegister ? 1 : 0,
+    fields.teacherSlots || null,
+    fields.assistantSlots || null,
+    fields.minCapacity || null,
+    fields.allowCancel === false ? 0 : 1,
+    fields.autoRefundOnCancel ? 1 : 0,
+    fields.priceCents || null,
+    fields.pricePer === 'family' ? 'family' : 'person',
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.

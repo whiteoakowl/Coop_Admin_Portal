@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <%
+  const isParent = member.member_type === 'parent';
+  const isAdmin = member.member_type === 'admin';
+  const isStudent = !isParent && !isAdmin;
+  %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/main-admin/members">&larr; Members</a></p>
+    <h1><%= mode === 'create' ? 'Add Member' : 'Edit ' + member.name %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form
+      method="POST"
+      action="<%= mode === 'create' ? '/main-admin/members/new' : '/main-admin/members/' + member.id + '/edit' %>"
+      class="stack-form member-form-page-panel"
+    >
+      <div class="member-type-toggle" role="group" aria-label="Member type">
+        <label class="member-type-toggle-btn member-type-toggle-parent">
+          <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
+          <svg class="icon"><use href="#icon-user"/></svg> Parent
+        </label>
+        <label class="member-type-toggle-btn member-type-toggle-student">
+          <input type="radio" name="memberType" value="student" <%= isStudent ? 'checked' : '' %> />
+          <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
+        </label>
+        <label class="member-type-toggle-btn member-type-toggle-admin">
+          <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> />
+          <svg class="icon"><use href="#icon-badge"/></svg> Admin
+        </label>
+      </div>
+
+      <label class="checkbox-option" data-parent-only style="<%= isParent ? '' : 'display:none;' %>">
+        <input type="checkbox" name="isPrimaryParent" value="1" <%= member.is_primary_parent ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
+      </label>
+
+      <% if (member.photo_path) { %>
+        <img src="<%= photoUrl(member.photo_path) %>" alt="" style="width: 96px; height: 96px; border-radius: 50%; object-fit: cover;" />
+      <% } %>
+
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <span class="class-form-field-label required">Full Name</span>
+          <input type="text" name="name" value="<%= member.name %>" placeholder="Enter full name" required />
+        </div>
+      </div>
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <span class="class-form-field-label">Address</span>
+          <input type="text" name="address" value="<%= member.address || '' %>" placeholder="Enter street address" />
+        </div>
+      </div>
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <span class="class-form-field-label">City</span>
+          <input type="text" name="city" value="<%= member.city || '' %>" placeholder="Enter city" />
+        </div>
+        <div class="class-form-field">
+          <span class="class-form-field-label">State</span>
+          <input type="text" name="state" value="<%= member.state || '' %>" placeholder="State" maxlength="2" style="width: 5rem;" />
+        </div>
+        <div class="class-form-field">
+          <span class="class-form-field-label">Zip Code</span>
+          <input type="text" name="zip" value="<%= member.zip || '' %>" placeholder="Zip" />
+        </div>
+      </div>
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <span class="class-form-field-label">Phone</span>
+          <input type="tel" name="phone" value="<%= member.phone || '' %>" placeholder="(123) 456-7890" />
+        </div>
+        <div class="class-form-field">
+          <span class="class-form-field-label">Email</span>
+          <input type="email" name="email" value="<%= member.email || '' %>" placeholder="name@example.com" />
+        </div>
+      </div>
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <span class="class-form-field-label">Medical / Allergy Notes</span>
+          <textarea name="medicalNotes" rows="3" placeholder="Enter any medical conditions, allergies, or important notes"><%= member.medical_notes || '' %></textarea>
+        </div>
+      </div>
+      <div class="class-form-row" data-student-only style="<%= isStudent ? '' : 'display:none;' %>">
+        <div class="class-form-field">
+          <span class="class-form-field-label">Birthday</span>
+          <input type="date" name="birthday" value="<%= member.birthday || '' %>" />
+        </div>
+        <div class="class-form-field">
+          <span class="class-form-field-label">Grade Level</span>
+          <select name="gradeLevel">
+            <option value="">Select grade level</option>
+            <% gradeLevels.forEach(function(g) { %>
+              <option value="<%= g %>" <%= member.grade_level === g ? 'selected' : '' %>><%= g %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <div class="manage-section">
+        <h2><svg class="icon"><use href="#icon-users"/></svg> Family</h2>
+        <label class="member-form-full">Select an existing family
+          <select name="familyId">
+            <option value="">No family</option>
+            <% families.forEach(function(f) { %>
+              <option value="<%= f.id %>" <%= memberFamilyId === f.id ? 'selected' : '' %>>The <%= f.name %> Family</option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">&hellip;or create a new family
+          <input type="text" name="newFamilyName" placeholder="e.g. Anderson" />
+        </label>
+        <p class="hint">If you type a new family name, it wins over the dropdown above.</p>
+      </div>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <a class="btn-secondary" href="/main-admin/members">Cancel</a>
+          <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-save"/></svg> <%= mode === 'create' ? 'Add Member' : 'Save Member' %></button>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    // Same student/parent/admin field-toggling public/js/member-form.js
+    // does for the legacy Members form, kept inline here rather than
+    // sharing that file - this form has no photo upload, admin-position,
+    // or setup-team fields for that script's other listeners to safely
+    // no-op against.
+    document.querySelectorAll('input[name="memberType"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        var value = document.querySelector('input[name="memberType"]:checked').value;
+        document.querySelectorAll('[data-student-only]').forEach(function (el) { el.style.display = value === 'student' ? '' : 'none'; });
+        document.querySelectorAll('[data-parent-only]').forEach(function (el) { el.style.display = value === 'parent' ? '' : 'none'; });
+      });
+    });
+  </script>
+</body>
+</html>

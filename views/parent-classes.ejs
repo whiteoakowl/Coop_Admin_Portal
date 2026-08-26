@@ -8,14 +8,22 @@
     portalTitle: 'Parent Portal',
     navLinks: [
       { href: '/parent', icon: 'home', label: 'Home' },
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
       { href: '/parent/library', icon: 'book', label: 'Library' },
       { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Classes</h1>
+    <div class="roster-toolbar no-print">
+      <h1>Classes</h1>
+      <div class="view-toggle-buttons">
+        <button type="button" data-view-btn="list" class="icon-btn icon-btn-active" aria-pressed="true" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
+        <button type="button" data-view-btn="grid" class="icon-btn" aria-pressed="false" aria-label="Grid view" title="Grid view"><svg class="icon"><use href="#icon-grid"/></svg></button>
+      </div>
+    </div>
     <p class="hint">Browse open classes and register your children. Classes with registration closed are shown for reference only.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -34,65 +42,116 @@
     <% if (classes.length === 0) { %>
       <p class="roster-empty">No classes have been scheduled yet.</p>
     <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <thead>
-            <tr>
-              <th>Class</th>
-              <th>Day / Time</th>
-              <th>Grades</th>
-              <th>Teacher</th>
-              <th>Seats</th>
-              <th>Register</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% classes.forEach(function(c) { %>
+      <%
+      // Shared between both views below (the table's Register cell and
+      // the grid card's own Register row) so the two never drift apart -
+      // same seats/registration-window logic rendered two different ways.
+      // Builds raw HTML strings (rendered via EJS's raw-output tag, not
+      // its auto-escaping one), so every interpolated piece of
+      // member-entered text (child.name) goes through escapeHtml first -
+      // see task #45's own sitewide sweep for exactly this class of bug.
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      function registerControls(c) {
+        if (!c.registration_open) return '<span class="hint">Not open</span>';
+        if (!c.allow_parent_register) return '<span class="hint">Parent registration not open for this class</span>';
+        var eligibleIds = eligibleChildIdsByClass[c.id] || [];
+        return children
+          .map(function (child) {
+            var key = c.id + ':' + child.id;
+            var name = escapeHtml(child.name);
+            var waitlistPos = waitlistPositionByKey[key];
+            if (enrolledKey.indexOf(key) !== -1 || waitlistPos != null) {
+              var label = waitlistPos != null ? name + ': Cancel (waitlist #' + waitlistPos + ')' : name + ': Cancel';
+              return (
+                '<form method="POST" action="/parent/classes/' + c.id + '/unregister" class="inline-block-form">' +
+                '<input type="hidden" name="studentId" value="' + child.id + '" />' +
+                '<button type="submit" class="roster-action-btn roster-action-btn-danger">' + label + '</button>' +
+                '</form>'
+              );
+            }
+            if (eligibleIds.indexOf(child.id) === -1) {
+              return '<span class="hint">' + name + ': not in an eligible section</span>';
+            }
+            if (windowOpen) {
+              return (
+                '<form method="POST" action="/parent/classes/' + c.id + '/register" class="inline-block-form">' +
+                '<input type="hidden" name="studentId" value="' + child.id + '" />' +
+                '<button type="submit" class="roster-action-btn">' + name + ': Register</button>' +
+                '</form>'
+              );
+            }
+            return '<span class="hint">' + name + ': not open yet</span>';
+          })
+          .join(' ');
+      }
+      function seatsBadge(c) {
+        if (c.capacity == null) return '<span class="badge-pill">Open</span>';
+        if (c.isFull) return '<span class="badge-pill badge-pill-absent">Full</span>';
+        return '<span class="badge-pill badge-pill-present">' + c.seatsLeft + ' left</span>';
+      }
+      function priceLabel(c) {
+        if (c.price_cents == null) return '—';
+        return '$' + (c.price_cents / 100).toFixed(2) + (c.price_per === 'family' ? ' / family' : ' / student');
+      }
+      %>
+
+      <div data-view-panel="list">
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
               <tr>
-                <td class="roster-name-col">
-                  <strong><%= c.class_name %></strong>
-                  <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
-                </td>
-                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
-                <td><%= c.gradeLabel || '—' %></td>
-                <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
-                <td>
-                  <% if (c.capacity == null) { %>
-                    <span class="badge-pill">Open</span>
-                  <% } else if (c.isFull) { %>
-                    <span class="badge-pill badge-pill-absent">Full</span>
-                  <% } else { %>
-                    <span class="badge-pill badge-pill-present"><%= c.seatsLeft %> left</span>
-                  <% } %>
-                </td>
-                <td>
-                  <% if (!c.registration_open) { %>
-                    <span class="hint">Not open</span>
-                  <% } else { %>
-                    <% children.forEach(function(child) { %>
-                      <% var key = c.id + ':' + child.id; %>
-                      <% if (enrolledKey.indexOf(key) !== -1) { %>
-                        <form method="POST" action="/parent/classes/<%= c.id %>/unregister" class="inline-block-form">
-                          <input type="hidden" name="studentId" value="<%= child.id %>" />
-                          <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= child.name %>: Cancel</button>
-                        </form>
-                      <% } else if (windowOpen) { %>
-                        <form method="POST" action="/parent/classes/<%= c.id %>/register" class="inline-block-form">
-                          <input type="hidden" name="studentId" value="<%= child.id %>" />
-                          <button type="submit" class="roster-action-btn"><%= child.name %>: Register</button>
-                        </form>
-                      <% } else { %>
-                        <span class="hint"><%= child.name %>: not open yet</span>
-                      <% } %>
-                    <% }); %>
-                  <% } %>
-                </td>
+                <th>Class</th>
+                <th>Day / Time</th>
+                <th>Grades</th>
+                <th>Teacher</th>
+                <th>Seats</th>
+                <th>Price</th>
+                <th>Register</th>
               </tr>
-            <% }); %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% classes.forEach(function(c) { %>
+                <tr>
+                  <td class="roster-name-col">
+                    <strong><%= c.class_name %></strong>
+                    <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
+                  </td>
+                  <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
+                  <td><%= c.gradeLabel || '—' %></td>
+                  <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
+                  <td><%- seatsBadge(c) %></td>
+                  <td><%= priceLabel(c) %></td>
+                  <td><%- registerControls(c) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div data-view-panel="grid" hidden>
+        <div class="portal-dashboard-grid">
+          <% classes.forEach(function(c) { %>
+            <section class="portal-dashboard-card">
+              <h2><%= c.class_name %></h2>
+              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
+              <p><%= c.dayLabel %> &middot; <%= c.timeLabel %></p>
+              <p><strong>Grades:</strong> <%= c.gradeLabel || '—' %></p>
+              <p><strong>Teacher:</strong> <%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></p>
+              <p><%- seatsBadge(c) %></p>
+              <p><strong>Price:</strong> <%= priceLabel(c) %></p>
+              <div class="actions-btn-row"><%- registerControls(c) %></div>
+            </section>
+          <% }); %>
+        </div>
       </div>
     <% } %>
   </main>
+
+  <script src="/js/simple-view-toggle.js"></script>
 </body>
 </html>

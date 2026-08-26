@@ -9,13 +9,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
-const { memberForAccount } = require('../utils/portalAuth');
+const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
+const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
+const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
+const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
 const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
+const notifications = require('../utils/notifications');
+const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
+const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -33,10 +39,28 @@ async function childrenForAccount(account) {
 
 router.get('/', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
-  const announcementRows = await db
-    .prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 5")
+
+  // Two real sources merged into one feed, newest first - a real
+  // request: "notifications should be announcements and show up on the
+  // parent portal homepage, showing current announcements and past
+  // ones. main admin can send these customized notifications." Site-wide
+  // announcements (the same content Main Admin > Website manages, also
+  // shown to signed-out visitors on the public homepage) are one source;
+  // the other is Main Admin > Announcements' own per-account
+  // notifications (utils/notifications.js's notify(), type_key
+  // 'announcement') - unread ones get a "New" badge (isNew below), read
+  // ones just sink down the list, which is what "current ones and past
+  // ones" means here rather than a hard time-based cutoff.
+  const siteRows = await db
+    .prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 10")
     .all();
-  const announcements = announcementRows.map((a) => ({ ...a, publishedLabel: formatFriendlyTimestamp(a.published_at) }));
+  const personalRows = await notifications.listForAccount(req.portalAccount.id, { typeKey: 'announcement' });
+  const announcements = [
+    ...siteRows.map((a) => ({ title: a.title, body: a.body, dateLabel: formatFriendlyTimestamp(a.published_at), sortKey: a.published_at, isNew: false })),
+    ...personalRows.map((n) => ({ title: n.title, body: n.body, dateLabel: formatFriendlyTimestamp(n.created_at), sortKey: n.created_at, isNew: !n.read_at })),
+  ]
+    .sort((a, b) => (a.sortKey < b.sortKey ? 1 : -1))
+    .slice(0, 15);
 
   const childIds = children.map((c) => c.id);
   const registrationCount = childIds.length
@@ -58,6 +82,24 @@ router.get('/', async (req, res) => {
   });
 });
 
+// Every child's own section membership, and every class's own section
+// restriction, computed once for the whole list page rather than once
+// per (class, child) pair - eligibleChildIdsByClass[classId] is the set
+// of childIds from `children` who may register for that class specific
+// class, by section alone (role gating - allow_parent_register - is
+// checked separately, since it isn't per-child).
+async function eligibleChildIdsByClass(children, classes) {
+  const childSectionIds = {};
+  for (const child of children) childSectionIds[child.id] = await sectionIdsForMember(child.id);
+
+  const result = {};
+  for (const c of classes) {
+    const restriction = await classSectionIds(c.id);
+    result[c.id] = children.filter((child) => memberSatisfiesRestriction(childSectionIds[child.id], restriction)).map((child) => child.id);
+  }
+  return result;
+}
+
 router.get('/classes', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
   const childIds = children.map((c) => c.id);
@@ -67,6 +109,19 @@ router.get('/classes', async (req, res) => {
         .all(...childIds)
     : [];
   const enrolledKey = new Set(enrollmentRows.map((r) => `${r.class_id}:${r.student_id}`));
+
+  const waitlistRows = childIds.length
+    ? await db
+        .prepare(
+          `SELECT class_id, student_id, waitlist_position FROM class_registrations
+           WHERE status = 'waitlisted' AND student_id IN (${childIds.map(() => '?').join(',')})`
+        )
+        .all(...childIds)
+    : [];
+  const waitlistPositionByKey = {};
+  waitlistRows.forEach((r) => {
+    waitlistPositionByKey[`${r.class_id}:${r.student_id}`] = r.waitlist_position;
+  });
 
   const classes = (await allClassesList(null)).map((c) => ({
     ...c,
@@ -82,6 +137,8 @@ router.get('/classes', async (req, res) => {
     classes,
     children,
     enrolledKey: [...enrolledKey],
+    waitlistPositionByKey,
+    eligibleChildIdsByClass: await eligibleChildIdsByClass(children, classes),
     windowOpen,
     nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
@@ -98,34 +155,16 @@ router.post('/classes/:id/register', async (req, res) => {
   if (!children.some((c) => c.id === studentId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only register your own children.'));
   }
-  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
-  if (!cls || !cls.registration_open) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for that class.'));
-  }
-  if (!(await isRegistrationOpenForAccount(req.portalRoles))) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
-  }
-  const alreadyEnrolled = await db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(classId, studentId);
-  if (alreadyEnrolled) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Already registered for that class.'));
-  }
 
-  const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
-  const isFull = cls.capacity != null && enrolledCount >= cls.capacity;
-  const status = isFull ? 'waitlisted' : 'confirmed';
-
-  await db.withTransaction(async (tx) => {
-    await tx
-      .prepare('INSERT INTO class_registrations (class_id, student_id, registered_by_account_id, status) VALUES (?, ?, ?, ?)')
-      .run(classId, studentId, req.portalAccount.id, status);
-    if (status === 'confirmed') {
-      await tx.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(classId, studentId);
-    }
+  const result = await registerForClass({
+    classId,
+    studentId,
+    accountId: req.portalAccount.id,
+    portalRoles: req.portalRoles,
+    allowField: 'allow_parent_register',
   });
-
-  const student = children.find((c) => c.id === studentId);
-  const notice = status === 'confirmed' ? `${student.name} is registered for "${cls.class_name}".` : `${cls.class_name} is full - ${student.name} has been added to the waitlist.`;
-  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
+  res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
 });
 
 router.post('/classes/:id/unregister', async (req, res) => {
@@ -138,13 +177,8 @@ router.post('/classes/:id/unregister', async (req, res) => {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only manage registrations for your own children.'));
   }
 
-  await db.withTransaction(async (tx) => {
-    await tx.prepare('DELETE FROM class_enrollments WHERE class_id = ? AND student_id = ?').run(classId, studentId);
-    await tx
-      .prepare("UPDATE class_registrations SET status = 'cancelled', cancelled_at = now_text() WHERE class_id = ? AND student_id = ? AND status = 'confirmed'")
-      .run(classId, studentId);
-  });
-
+  const result = await unregisterFromClass({ classId, studentId, accountId: req.portalAccount.id });
+  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
@@ -176,6 +210,51 @@ router.get('/academics', async (req, res) => {
     academics.push({ child, assignments, current, history, diploma });
   }
   res.render('parent-academics', { title: 'Academics', academics });
+});
+
+// Name Tags - a real request: parents should be able to print name tags
+// for themselves/their own family, without the design or bulk-print-
+// everyone capability (those stay Main Admin/Co-op Admin only - see
+// routes/main-admin-name-tags.js's own comment on why the underlying
+// template data is shared across all three). Scoped to familyForAccount
+// (self + every other active member sharing this account's family_id),
+// enforced server-side the same way every other parent-portal route
+// re-derives its own family list rather than trusting a posted id.
+router.get('/name-tags', async (req, res) => {
+  const family = await familyForAccount(req.portalAccount.id);
+  res.render('parent-name-tags', { title: 'Name Tags', family, error: req.query.error || null });
+});
+
+router.post('/name-tags/print', async (req, res) => {
+  const family = await familyForAccount(req.portalAccount.id);
+  const familyIds = new Set(family.map((m) => m.id));
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter((id) => familyIds.has(id));
+  if (memberIds.length === 0) {
+    return res.redirect('/parent/name-tags?error=' + encodeURIComponent('Select at least one family member to print.'));
+  }
+
+  const members = family.filter((m) => memberIds.includes(m.id));
+  const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => {
+    const layout = templates[m.member_type] || templates.student;
+    return {
+      html: NameTagRenderCore.renderBadgeElements(layout.elements, dataByMember[m.id]),
+      bgCss: NameTagRenderCore.backgroundCss(layout.background, layout.backgroundOpacity),
+    };
+  });
+
+  // Reuses the exact same print template Main Admin's own bulk print
+  // renders (views/main-admin-name-tag-bulk-print.ejs) - it's already
+  // portal-agnostic (no nav, just the badge sheet + Print button), so a
+  // third near-identical copy here would only add drift risk for zero
+  // real difference.
+  res.render('main-admin-name-tag-bulk-print', {
+    title: 'Print Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+  });
 });
 
 module.exports = router;

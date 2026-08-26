@@ -9,6 +9,10 @@
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
       { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
       { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
@@ -34,6 +38,38 @@
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <details class="manage-section" style="margin-bottom: 1rem;" <%= schedule.enabled ? 'open' : '' %>>
+      <summary><svg class="icon"><use href="#icon-clock"/></svg> Weekly Send Schedule</summary>
+      <p class="hint" style="margin-top: 0.5rem;">
+        Controls when the newsletter would go out automatically once a real email provider is connected - no email
+        provider is configured yet, so nothing sends automatically regardless of this setting. Issues can still be
+        marked sent manually below.
+      </p>
+      <form method="POST" action="/main-admin/newsletter/settings" class="stack-form" style="margin-top: 0.75rem;">
+        <label class="checkbox-option">
+          <input type="checkbox" name="enabled" value="1" <%= schedule.enabled ? 'checked' : '' %> />
+          Send automatically every week
+        </label>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">Day</span>
+            <select name="day">
+              <% weekdays.forEach(function(d) { %>
+                <option value="<%= d %>" <%= schedule.day === d ? 'selected' : '' %>><%= d %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="class-form-field">
+            <span class="class-form-field-label">Time</span>
+            <input type="time" name="time" value="<%= schedule.time %>" />
+          </div>
+        </div>
+        <div>
+          <button type="submit" class="primary-btn">Save Schedule</button>
+        </div>
+      </form>
+    </details>
 
     <% if (issues.length === 0) { %>
       <p class="roster-empty">No issues yet &mdash; create one above.</p>

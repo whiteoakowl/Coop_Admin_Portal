@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="roster-toolbar">
+      <h1>Members</h1>
+      <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
+    </div>
+    <p class="hint">The full family/member roster - the same records the Co-op Admin Portal's attendance, rosters, and schedules all draw from.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="roster-toolbar no-print">
+      <form method="GET" action="/main-admin/members" class="category-filter" style="margin: 0;">
+        <label for="q-input">Search by name</label>
+        <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" />
+      </form>
+      <div class="category-filter" style="margin: 0;">
+        <label for="type-select">Filter by type or family</label>
+        <select id="type-select" onchange="window.location = this.value">
+          <option value="/main-admin/members" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
+          <option value="/main-admin/members?type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="/main-admin/members?type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="/main-admin/members?type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+          <% if (families.length > 0) { %>
+            <optgroup label="Family">
+              <% families.forEach(function(f) { %>
+                <option value="/main-admin/members?family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+              <% }); %>
+            </optgroup>
+          <% } %>
+        </select>
+      </div>
+      <a class="btn-secondary" href="<%= showArchived ? '/main-admin/members' : '/main-admin/members?archived=1' %>">
+        <%= showArchived ? 'View Active' : 'View Archived' %>
+      </a>
+    </div>
+
+    <details class="manage-section" style="margin-bottom: 1rem;">
+      <summary><svg class="icon"><use href="#icon-users"/></svg> Add a Family</summary>
+      <form method="POST" action="/main-admin/members/families/new" class="stack-form" style="margin-top: 0.75rem;">
+        <label class="member-form-full">Family Name
+          <input type="text" name="name" placeholder="e.g. Smith" required />
+        </label>
+        <button type="submit" class="primary-btn">Add Family</button>
+      </form>
+      <% if (families.length > 0) { %>
+        <table class="roster-table condensed-table" style="margin-top: 1rem;">
+          <thead><tr><th>Family</th><th>Active Members</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% families.forEach(function(f) { %>
+              <tr>
+                <td>
+                  <form method="POST" action="/main-admin/members/families/<%= f.id %>/rename" class="inline-block-form">
+                    <input type="text" name="name" value="<%= f.name %>" style="width: 12rem;" />
+                    <button type="submit" class="icon-btn" aria-label="Rename family" title="Rename"><svg class="icon"><use href="#icon-save"/></svg></button>
+                  </form>
+                </td>
+                <td><%= f.memberCount %></td>
+                <td>
+                  <form method="POST" action="/main-admin/members/families/<%= f.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= f.name %>&quot; family? Its members stay in the roster, just ungrouped.">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete family" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </details>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty"><%= showArchived ? 'No archived members.' : 'No members match this filter yet.' %></p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Family</th>
+              <th>Age/Grade</th>
+              <th>Contact</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+              <tr>
+                <td class="roster-name-col">
+                  <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
+                  <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
+                </td>
+                <td><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+                <td><%= m.familyName || '—' %></td>
+                <td>
+                  <% if (m.member_type === 'student') { %>
+                    <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
+                  <% } else { %>—<% } %>
+                </td>
+                <td><%= m.phone || m.email || '—' %></td>
+                <td class="actions-cell">
+                  <div class="actions-btn-row">
+                    <a class="icon-btn" href="/main-admin/members/<%= m.id %>/edit" aria-label="Edit <%= m.name %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
+                    <% if (showArchived) { %>
+                      <form method="POST" action="/main-admin/members/<%= m.id %>/unarchive" class="inline-block-form">
+                        <button type="submit" class="icon-btn" aria-label="Restore <%= m.name %>" title="Restore"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      </form>
+                    <% } else { %>
+                      <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
+                        <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-lock"/></svg></button>
+                      </form>
+                    <% } %>
+                    <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+    <% } %>
+  </main>
+</body>
+</html>

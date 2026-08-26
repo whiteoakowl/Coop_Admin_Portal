@@ -9,6 +9,10 @@
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
       { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
       { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
@@ -35,6 +39,12 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (event.approval_status === 'pending') { %>
+      <div class="alert alert-error">
+        This event was submitted by a member and is awaiting approval.
+        <a href="/main-admin/events/pending">Review it on the Submitted Events queue &rarr;</a>
+      </div>
+    <% } %>
 
     <div class="roster-toolbar">
       <div class="roster-btn-row">
@@ -74,8 +84,16 @@
         <label class="member-form-full">Description
           <textarea name="description" rows="3"><%= event.description || '' %></textarea>
         </label>
-        <label>Category
+        <label>Category (legacy text - prefer the dropdown below)
           <input type="text" name="category" value="<%= event.category || '' %>" placeholder="e.g. Social, Fundraiser" />
+        </label>
+        <label>Category
+          <select name="categoryId">
+            <option value="">None</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= event.category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+            <% }); %>
+          </select>
         </label>
         <label>Location
           <input type="text" name="location" value="<%= event.location || '' %>" />
@@ -92,9 +110,61 @@
             <option value="public" <%= event.visibility === 'public' ? 'selected' : '' %>>Public</option>
           </select>
         </label>
-        <label>Capacity
+        <label>Capacity (people)
           <input type="number" name="capacity" min="1" value="<%= event.capacity ?? '' %>" placeholder="No limit" />
         </label>
+        <label>Family Capacity (families)
+          <input type="number" name="familyCapacity" min="1" value="<%= event.family_capacity ?? '' %>" placeholder="No limit" />
+        </label>
+        <label>Registration Opens
+          <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+        </label>
+        <label>Registration Closes
+          <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+        </label>
+        <label>Price ($) <span class="hint">(blank = free)</span>
+          <input type="number" name="priceDollars" min="0" step="0.01" value="<%= event.price_cents != null ? (event.price_cents / 100).toFixed(2) : '' %>" />
+        </label>
+        <label>Charged per
+          <select name="pricePer">
+            <option value="person" <%= event.price_per !== 'family' ? 'selected' : '' %>>Person</option>
+            <option value="family" <%= event.price_per === 'family' ? 'selected' : '' %>>Family</option>
+          </select>
+        </label>
+
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Grades <span class="hint">(leave all unchecked to allow every grade)</span></span>
+          <div class="grade-pill-grid">
+            <% gradeOptions.forEach(function(g) { %>
+              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" <%= selectedGrades.includes(g) ? 'checked' : '' %> /> <%= g %></label>
+            <% }); %>
+          </div>
+        </div>
+
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Who Can Register</span>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <input type="hidden" name="allowAdultRegister" value="off" />
+              <label class="grade-pill"><input type="checkbox" name="allowAdultRegister" value="1" <%= event.allow_adult_register ? 'checked' : '' %> /> Parents/adults can register</label>
+            </div>
+            <div class="class-form-field">
+              <input type="hidden" name="allowChildRegister" value="off" />
+              <label class="grade-pill"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Kids can register</label>
+            </div>
+          </div>
+        </div>
+
+        <% if (sections.length) { %>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section - restricts BOTH viewing and registering)</span></span>
+            <div class="grade-pill-grid">
+              <% sections.forEach(function(s) { %>
+                <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= event.sectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
 
         <div class="member-form-full">
           <button type="submit" class="primary-btn">Save Settings</button>

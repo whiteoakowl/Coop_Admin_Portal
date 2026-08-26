@@ -4,6 +4,13 @@
 
   const Render = window.NameTagRenderCore;
   const seed = JSON.parse(dataEl.textContent);
+  // Lets this exact same editor be embedded by more than one portal (Co-op
+  // Admin's own /admin/name-tag, Main Admin's /main-admin/name-tags -
+  // "name tags can only be designed and bulk printed by main admin and
+  // co-op admin" is one shared design either portal can edit, not two
+  // separate copies of this whole editor) without duplicating this file -
+  // every fetch() below is built from this instead of a hardcoded path.
+  const BASE_PATH = seed.basePath || '/admin/name-tag';
   const BADGE_WIDTH = seed.badgeWidth;
   const BADGE_HEIGHT = seed.badgeHeight;
   const FIELDS_BY_TYPE = seed.fieldsByType;
@@ -1218,7 +1225,7 @@
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('/admin/name-tag/design-image', {
+      const res = await fetch(BASE_PATH + '/design-image', {
         method: 'POST',
         headers: { Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
         body: formData,
@@ -1409,7 +1416,7 @@
   }
 
   async function saveTemplateToServer(type, layout) {
-    const res = await fetch('/admin/name-tag/template/' + type, {
+    const res = await fetch(BASE_PATH + '/template/' + type, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
       body: JSON.stringify({ layout }),

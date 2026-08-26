@@ -9,12 +9,50 @@ const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const newsletter = require('../utils/newsletter');
 const auditLog = require('../utils/auditLog');
+const { appSetting, setAppSetting } = require('../utils/classSchedule');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_communications'));
 
+// When the weekly newsletter would go out, if automated sending is ever
+// wired up (see utils/emailProvider.js's own header comment on why no
+// real provider is configured yet - a real request: "there should be
+// setting for when the email is sent and when its turned off," built now
+// as the schedule/toggle Main Admin controls, even though nothing reads
+// it to actually trigger a send yet). Stored in app_settings (the same
+// generic key/value table utils/classSchedule.js's own appSetting/
+// setAppSetting already read/write for other single-row settings), not a
+// dedicated table - three scalar values, one row, no history needed.
+const NEWSLETTER_SEND_DAY_KEY = 'newsletter_send_day';
+const NEWSLETTER_SEND_TIME_KEY = 'newsletter_send_time';
+const NEWSLETTER_SEND_ENABLED_KEY = 'newsletter_send_enabled';
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+async function loadSendSchedule() {
+  return {
+    day: await appSetting(NEWSLETTER_SEND_DAY_KEY, 'Monday'),
+    time: await appSetting(NEWSLETTER_SEND_TIME_KEY, '08:00'),
+    enabled: (await appSetting(NEWSLETTER_SEND_ENABLED_KEY, '0')) === '1',
+  };
+}
+
 router.get('/', async (req, res) => {
   const issues = await newsletter.listIssues();
-  res.render('admin-newsletter-list', { title: 'Newsletter', issues, notice: req.query.notice || null });
+  res.render('admin-newsletter-list', {
+    title: 'Newsletter',
+    issues,
+    schedule: await loadSendSchedule(),
+    weekdays: WEEKDAYS,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/settings', async (req, res) => {
+  const day = WEEKDAYS.includes(req.body.day) ? req.body.day : 'Monday';
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.time || '') ? req.body.time : '08:00';
+  await setAppSetting(NEWSLETTER_SEND_DAY_KEY, day);
+  await setAppSetting(NEWSLETTER_SEND_TIME_KEY, time);
+  await setAppSetting(NEWSLETTER_SEND_ENABLED_KEY, req.body.enabled === '1' ? '1' : '0');
+  res.redirect('/main-admin/newsletter?notice=' + encodeURIComponent('Send schedule saved.'));
 });
 
 router.post('/', async (req, res) => {

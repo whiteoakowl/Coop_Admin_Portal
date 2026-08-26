@@ -2,8 +2,16 @@
 // signups (item 2) and Donation signups (item 3) hang directly off of,
 // via event_volunteer_roles/event_volunteer_signups and
 // event_donation_items/event_donation_claims. See supabase/migrations/
-// 20260825030000_events_module.sql for the full schema and TEAM_B_
-// HANDOFF.md for the feature list this implements.
+// 20260825030000_events_module.sql for the original schema and
+// 20260826040000_events_registration_rules.sql for the registration-rules
+// extension this file also implements: a registration open/close window,
+// a family cap alongside the existing per-person capacity, age/grade
+// restriction, per-person/per-family pricing with a waitlist (same
+// position-tracking/charge-on-promotion shape utils/classRegistration.js
+// already established for Classes), section restriction (this one also
+// hides the event entirely from members outside it, not just registration
+// - "select sections only that can view or signup"), member-submitted
+// events awaiting Main Admin approval, and lightweight guest registration.
 //
 // Registration/signup/claim all follow the same shape Track A's own
 // class_registrations already established (routes/parent-portal.js): the
@@ -11,8 +19,51 @@
 // for any of their own family, not just themselves), while the account
 // that took the action is recorded separately for accountability.
 const db = require('../db');
+const { eventSectionIds, memberSatisfiesRestriction, sectionIdsForMember } = require('./sections');
+const { createCharge, amountPaidForCharge, cancelCharge } = require('./payments');
+const { GRADE_OPTIONS } = require('./membership');
+const notifications = require('./notifications');
 
-async function listEvents({ status, visibility, upcomingOnly } = {}) {
+// Comma-joined list of GRADE_OPTIONS strings, same parse-a-multi-select-
+// TEXT-column shape as classSchedule.js's own ageGroupList (a different
+// grade vocabulary though - see the migration's own comment on why this
+// reuses GRADE_OPTIONS instead).
+function parseAgeGroupList(value) {
+  return (value || '')
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
+}
+
+function ageGroupAllowsMember(event, member) {
+  const allowed = parseAgeGroupList(event.age_group);
+  if (allowed.length === 0) return true;
+  return allowed.includes(member.grade_level);
+}
+
+// "adult" = parent/admin member_type, "child" = student - matches
+// members.member_type's own three-way vocabulary (parent/student/admin).
+function memberIsAdult(member) {
+  return member.member_type === 'parent' || member.member_type === 'admin';
+}
+
+function registrationWindowStatus(event) {
+  // now_text() lives in Postgres, not here - callers that need "is it
+  // open right now" always go through isRegistrationWindowOpen below,
+  // which asks the database for `now`, same as registrationWindows.js's
+  // own isRegistrationOpenForAccount does for classes.
+  return { opensAt: event.registration_opens_at, closesAt: event.registration_closes_at };
+}
+
+async function isRegistrationWindowOpen(event) {
+  if (!event.registration_opens_at && !event.registration_closes_at) return true;
+  const nowText = (await db.prepare('SELECT now_text() AS now').get()).now;
+  if (event.registration_opens_at && nowText < event.registration_opens_at) return false;
+  if (event.registration_closes_at && nowText >= event.registration_closes_at) return false;
+  return true;
+}
+
+async function listEvents({ status, visibility, upcomingOnly, approvalStatus, categoryId } = {}) {
   const clauses = [];
   const params = [];
   if (status) {
@@ -23,9 +74,17 @@ async function listEvents({ status, visibility, upcomingOnly } = {}) {
     clauses.push('visibility = ?');
     params.push(visibility);
   }
+  if (approvalStatus) {
+    clauses.push('approval_status = ?');
+    params.push(approvalStatus);
+  }
+  if (categoryId) {
+    clauses.push('category_id = ?');
+    params.push(categoryId);
+  }
   if (upcomingOnly) clauses.push("starts_at >= now_text()");
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  return db.prepare(`SELECT * FROM events ${where} ORDER BY starts_at`).all(...params);
+  return db.prepare(`SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor" FROM events e LEFT JOIN event_categories ec ON ec.id = e.category_id ${where} ORDER BY starts_at`).all(...params);
 }
 
 async function getEvent(id) {
@@ -33,14 +92,17 @@ async function getEvent(id) {
 }
 
 // Full detail for one event page (admin management or a member's own
-// view of it): the event row, its volunteer roles each with their own
-// signups + filled/needed counts, its donation items each with their own
-// claims + claimed/needed totals, and the event's own registration
-// count. quantity_claimed is always summed live from event_donation_
-// claims here, never a stored counter - see the migration's own comment
-// on why.
+// view of it): the event row, its category, its section restriction, its
+// volunteer roles each with their own signups + filled/needed counts, its
+// donation items each with their own claims + claimed/needed totals, its
+// guest registrations, and the event's own registration/waitlist counts
+// (families counted distinctly from people, for the family cap). quantity
+// _claimed is always summed live from event_donation_claims here, never a
+// stored counter - see the migration's own comment on why.
 async function getEventWithDetails(id) {
-  const event = await getEvent(id);
+  const event = await db
+    .prepare('SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor" FROM events e LEFT JOIN event_categories ec ON ec.id = e.category_id WHERE e.id = ?')
+    .get(id);
   if (!event) return null;
 
   const roles = await db.prepare('SELECT * FROM event_volunteer_roles WHERE event_id = ? ORDER BY position, id').all(id);
@@ -75,27 +137,89 @@ async function getEventWithDetails(id) {
   const waitlistCount = Number(
     (await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'waitlisted'").get(id)).c
   );
+  const familyCount = Number(
+    (
+      await db
+        .prepare(
+          `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
+           JOIN members m ON m.id = er.member_id
+           WHERE er.event_id = ? AND er.status = 'confirmed'`
+        )
+        .get(id)
+    ).c
+  );
+  const guestRegistrations = await db
+    .prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled' ORDER BY created_at")
+    .all(id);
 
-  return { ...event, volunteerRoles: roles, donationItems, registrationCount, waitlistCount };
+  return {
+    ...event,
+    volunteerRoles: roles,
+    donationItems,
+    registrationCount,
+    waitlistCount,
+    familyCount,
+    guestRegistrations,
+    sectionIds: await eventSectionIds(id),
+  };
 }
 
-async function createEvent(data, accountId) {
+function eventFields(data) {
+  return [
+    data.title,
+    data.description || null,
+    data.category || null,
+    data.categoryId ?? null,
+    data.location || null,
+    data.startsAt,
+    data.endsAt || null,
+    data.visibility,
+    data.capacity ?? null,
+    data.familyCapacity ?? null,
+    data.ageGroup || null,
+    data.registrationOpensAt || null,
+    data.registrationClosesAt || null,
+    data.allowAdultRegister ? 1 : 0,
+    data.allowChildRegister ? 1 : 0,
+    data.priceCents ?? null,
+    data.pricePer === 'family' ? 'family' : 'person',
+  ];
+}
+
+async function createEvent(data, accountId, { submittedByAccountId = null } = {}) {
+  const approvalStatus = submittedByAccountId ? 'pending' : 'approved';
   const info = await db
     .prepare(
-      `INSERT INTO events (title, description, category, location, starts_at, ends_at, visibility, capacity, created_by_account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO events (
+         title, description, category, category_id, location, starts_at, ends_at, visibility, capacity,
+         family_capacity, age_group, registration_opens_at, registration_closes_at,
+         allow_adult_register, allow_child_register, price_cents, price_per,
+         created_by_account_id, submitted_by_account_id, approval_status, status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(data.title, data.description || null, data.category || null, data.location || null, data.startsAt, data.endsAt || null, data.visibility, data.capacity ?? null, accountId);
+    .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, 'draft');
   return info.lastInsertRowid;
 }
 
 async function updateEvent(id, data) {
   await db
     .prepare(
-      `UPDATE events SET title = ?, description = ?, category = ?, location = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?, updated_at = now_text()
+      `UPDATE events SET
+         title = ?, description = ?, category = ?, category_id = ?, location = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?,
+         family_capacity = ?, age_group = ?, registration_opens_at = ?, registration_closes_at = ?,
+         allow_adult_register = ?, allow_child_register = ?, price_cents = ?, price_per = ?,
+         updated_at = now_text()
        WHERE id = ?`
     )
-    .run(data.title, data.description || null, data.category || null, data.location || null, data.startsAt, data.endsAt || null, data.visibility, data.capacity ?? null, id);
+    .run(...eventFields(data), id);
+}
+
+async function setEventSections(eventId, sectionIds) {
+  const ids = [].concat(sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await db.prepare('DELETE FROM event_sections WHERE event_id = ?').run(eventId);
+  for (const sectionId of ids) {
+    await db.prepare('INSERT INTO event_sections (event_id, section_id) VALUES (?, ?)').run(eventId, sectionId);
+  }
 }
 
 async function setEventStatus(id, status) {
@@ -110,49 +234,290 @@ async function deleteEvent(id) {
   await db.prepare('DELETE FROM events WHERE id = ?').run(id);
 }
 
-// Registers memberId for eventId - confirmed if there's room (or no
-// capacity set at all), waitlisted otherwise, same capacity/waitlist
-// shape as parent-portal.js's own class registration. Returns the
-// resulting status, or 'already' if memberId already has a non-cancelled
-// registration (re-registering after a cancellation is allowed - it just
-// re-runs the same capacity check fresh).
-async function registerForEvent(eventId, memberId, accountId) {
-  const existing = await db
-    .prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'")
-    .get(eventId, memberId);
-  if (existing) return existing.status;
+// --- Categories (Main-Admin managed, same shape as utils/sections.js's sections) ---
 
-  const event = await getEvent(eventId);
-  if (!event) return null;
-  const confirmedCount = Number(
-    (await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(eventId)).c
-  );
-  const isFull = event.capacity != null && confirmedCount >= event.capacity;
-  const status = isFull ? 'waitlisted' : 'confirmed';
-
-  const previouslyCancelled = await db.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(eventId, memberId);
-  if (previouslyCancelled) {
-    await db.prepare('UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL WHERE id = ?').run(status, accountId, previouslyCancelled.id);
-  } else {
-    await db.prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status) VALUES (?, ?, ?, ?)').run(eventId, memberId, accountId, status);
-  }
-  return status;
+async function listCategories() {
+  return db.prepare('SELECT * FROM event_categories ORDER BY position, name').all();
 }
 
-async function cancelRegistration(eventId, memberId) {
-  await db
-    .prepare("UPDATE event_registrations SET status = 'cancelled', cancelled_at = now_text() WHERE event_id = ? AND member_id = ? AND status != 'cancelled'")
-    .run(eventId, memberId);
+async function createCategory(name, color) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_categories').get()).p) + 1;
+  await db.prepare('INSERT INTO event_categories (name, color, position) VALUES (?, ?, ?)').run(name, color || '#EE9A4D', position);
+}
+
+async function updateCategory(id, name, color) {
+  await db.prepare('UPDATE event_categories SET name = ?, color = ? WHERE id = ?').run(name, color || '#EE9A4D', id);
+}
+
+async function deleteCategory(id) {
+  await db.prepare('DELETE FROM event_categories WHERE id = ?').run(id);
+}
+
+// --- Member-submitted events, awaiting Main Admin approval ---
+
+// A member submitting an event is really just createEvent with
+// submittedByAccountId set - approval_status starts 'pending' and the
+// event starts 'draft' either way, so a pending submission never shows
+// up anywhere but the submitter's own "my submissions" and the Main
+// Admin approval queue until it's actually decided.
+async function submitEvent(data, accountId) {
+  return createEvent(data, accountId, { submittedByAccountId: accountId });
+}
+
+async function decideSubmission(eventId, approve) {
+  const event = await getEvent(eventId);
+  if (!event || event.approval_status !== 'pending') return null;
+  await db.prepare('UPDATE events SET approval_status = ?, updated_at = now_text() WHERE id = ?').run(approve ? 'approved' : 'rejected', eventId);
+  if (event.submitted_by_account_id) {
+    await notifications.notify(event.submitted_by_account_id, 'event_submission_decided', {
+      title: approve ? `Event approved: ${event.title}` : `Event not approved: ${event.title}`,
+      body: approve
+        ? `Your submitted event "${event.title}" was approved. A Main Admin still needs to publish it before it's visible on the calendar.`
+        : `Your submitted event "${event.title}" was not approved.`,
+      linkUrl: '/events',
+    });
+  }
+  return approve ? 'approved' : 'rejected';
+}
+
+// --- Section-based "can this family even see it" visibility ---
+
+// Unions every family member's own sections into one Set, then checks the
+// event's restriction against that union - an event restricted to a
+// section any one family member holds is visible to the whole family (a
+// parent needs to see an event to register their child for it, even if
+// the parent themselves isn't personally in that section). Unrestricted
+// events (no event_sections rows) are always visible - the usual "empty
+// means unrestricted" convention.
+async function eventVisibleToFamily(eventId, family) {
+  const restriction = await eventSectionIds(eventId);
+  if (restriction.length === 0) return true;
+  const union = new Set();
+  for (const member of family) {
+    for (const id of await sectionIdsForMember(member.id)) union.add(id);
+  }
+  return memberSatisfiesRestriction(union, restriction);
 }
 
 async function registrationsForEvent(eventId) {
   return db
     .prepare(
-      `SELECT er.*, m.name AS "memberName" FROM event_registrations er
+      `SELECT er.*, m.name AS "memberName", m.member_code AS "memberCode" FROM event_registrations er
        JOIN members m ON m.id = er.member_id
        WHERE er.event_id = ? ORDER BY er.status = 'cancelled', er.created_at`
     )
     .all(eventId);
+}
+
+// --- Registration (member/public, with the full rules engine) ---
+
+// Creates (or, for 'family' pricing, reuses a sibling's already-created)
+// the payment_charges row for a member who just became 'confirmed' for a
+// priced event - same shared-between-initial-registration-and-waitlist-
+// promotion shape as classRegistration.js's own chargeForConfirmedRegistration,
+// for the same reason (a promotion owes money starting now too). Must be
+// called with the open transaction handle - see utils/payments.js's own
+// createCharge comment on why.
+async function chargeForConfirmedRegistration(tx, event, member, accountId) {
+  if (event.price_cents == null) return null;
+  let reuseCharge = null;
+  if (event.price_per === 'family' && member.family_id) {
+    reuseCharge = await tx
+      .prepare(
+        `SELECT er.charge_id FROM event_registrations er
+         JOIN members m ON m.id = er.member_id
+         WHERE er.event_id = ? AND m.family_id = ? AND er.status != 'cancelled' AND er.charge_id IS NOT NULL
+         LIMIT 1`
+      )
+      .get(event.id, member.family_id);
+  }
+  if (reuseCharge) return reuseCharge.charge_id;
+  return createCharge(member.id, accountId, 'event_registration', event.id, `${event.title} - event registration`, event.price_cents, tx);
+}
+
+// { ok: false, error } or { ok: true, notice, status, waitlistPosition }
+async function registerForEvent({ eventId, memberId, accountId, family }) {
+  const event = await getEvent(eventId);
+  if (!event) return { ok: false, error: 'That event no longer exists.' };
+  if (event.status !== 'published') return { ok: false, error: 'That event is not open for registration.' };
+  if (!(await isRegistrationWindowOpen(event))) return { ok: false, error: 'Registration is not open for that event right now.' };
+
+  const member = family.find((m) => m.id === memberId);
+  if (!member) return { ok: false, error: 'You can only register yourself or your own family.' };
+  if (memberIsAdult(member) && !event.allow_adult_register) return { ok: false, error: 'Adults cannot register for that event.' };
+  if (!memberIsAdult(member) && !event.allow_child_register) return { ok: false, error: 'Kids cannot register for that event.' };
+  if (!ageGroupAllowsMember(event, member)) return { ok: false, error: `That event is limited to specific grades - ${member.name}'s grade isn't included.` };
+
+  const restriction = await eventSectionIds(eventId);
+  if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(memberId), restriction)) {
+    return { ok: false, error: 'That event is limited to specific sections you are not part of.' };
+  }
+
+  const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(eventId, memberId);
+  if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
+
+  const confirmedCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(eventId)).c);
+  const familyCount = Number(
+    (
+      await db
+        .prepare(
+          `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
+           JOIN members m ON m.id = er.member_id
+           WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) != ?`
+        )
+        .get(eventId, member.family_id ?? -member.id)
+    ).c
+  );
+  const overCapacity = event.capacity != null && confirmedCount >= event.capacity;
+  // A family cap only blocks a *new* family from registering, once
+  // event.family_capacity families already have someone confirmed - a
+  // second (or third) member of a family that's already in doesn't count
+  // as a new family, so they're never blocked by this cap on their own.
+  const alreadyInFamily = await db
+    .prepare(
+      `SELECT 1 FROM event_registrations er JOIN members m ON m.id = er.member_id
+       WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) = ?`
+    )
+    .get(eventId, member.family_id ?? -member.id);
+  const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
+
+  const isFull = overCapacity || overFamilyCapacity;
+  const status = isFull ? 'waitlisted' : 'confirmed';
+  let waitlistPosition = null;
+  let chargeId = null;
+
+  const previouslyCancelled = await db.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(eventId, memberId);
+
+  await db.withTransaction(async (tx) => {
+    if (status === 'confirmed') {
+      chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId);
+    } else {
+      const existingWaitlisted = Number((await tx.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'waitlisted'").get(eventId)).c);
+      waitlistPosition = existingWaitlisted + 1;
+    }
+
+    if (previouslyCancelled) {
+      await tx
+        .prepare(
+          `UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL,
+             waitlist_position = ?, charge_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
+        )
+        .run(status, accountId, waitlistPosition, chargeId, previouslyCancelled.id);
+    } else {
+      await tx
+        .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(eventId, memberId, accountId, status, waitlistPosition, chargeId);
+    }
+  });
+
+  const notice =
+    status === 'confirmed'
+      ? `${member.name} is registered for "${event.title}".`
+      : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
+  return { ok: true, notice, status, waitlistPosition };
+}
+
+// Settles a cancelled registration's own charge - same policy as
+// classRegistration.js's own settleChargeOnCancel: nothing paid yet
+// clears the charge outright, something already paid only refunds if
+// there's an admin opt-in (events have no per-event auto-refund toggle
+// the way classes do, since the "bookkeeping only" pricing model this
+// whole feature set agreed to keep events simpler - an unpaid charge
+// always clears, a paid one is always left for a Main Admin to refund by
+// hand).
+async function settleChargeOnCancel(chargeId) {
+  if (!chargeId) return;
+  const paid = await amountPaidForCharge(chargeId);
+  if (paid <= 0) await cancelCharge(chargeId);
+}
+
+// Promotes the earliest-waitlisted registration (a seat just opened up)
+// and shifts every waitlisted registration behind it up by one position.
+// Returns who to notify rather than notifying directly - notify() would
+// deadlock PGlite's single test connection if called from inside this
+// open transaction (see classRegistration.js's own promoteNextWaitlisted
+// for the same reasoning), so the caller notifies once committed.
+async function promoteNextWaitlisted(tx, eventId) {
+  const next = await tx.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND status = 'waitlisted' ORDER BY waitlist_position ASC LIMIT 1").get(eventId);
+  if (!next) return null;
+
+  const event = await tx.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  const member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(next.member_id);
+  const chargeId = await chargeForConfirmedRegistration(tx, event, member, next.registered_by_account_id);
+
+  await tx.prepare("UPDATE event_registrations SET status = 'confirmed', waitlist_position = NULL, charge_id = ? WHERE id = ?").run(chargeId, next.id);
+  await tx
+    .prepare("UPDATE event_registrations SET waitlist_position = waitlist_position - 1 WHERE event_id = ? AND status = 'waitlisted' AND waitlist_position > ?")
+    .run(eventId, next.waitlist_position);
+
+  return { accountId: next.registered_by_account_id, memberName: member.name, eventTitle: event.title };
+}
+
+async function cancelRegistration(eventId, memberId) {
+  const registration = await db
+    .prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status IN ('confirmed', 'waitlisted') ORDER BY id DESC LIMIT 1")
+    .get(eventId, memberId);
+
+  let promoted = null;
+  await db.withTransaction(async (tx) => {
+    await tx.prepare("UPDATE event_registrations SET status = 'cancelled', cancelled_at = now_text() WHERE event_id = ? AND member_id = ? AND status IN ('confirmed', 'waitlisted')").run(eventId, memberId);
+
+    if (registration && registration.status === 'waitlisted' && registration.waitlist_position != null) {
+      await tx
+        .prepare("UPDATE event_registrations SET waitlist_position = waitlist_position - 1 WHERE event_id = ? AND status = 'waitlisted' AND waitlist_position > ?")
+        .run(eventId, registration.waitlist_position);
+    }
+    if (registration && registration.status === 'confirmed') {
+      promoted = await promoteNextWaitlisted(tx, eventId);
+    }
+  });
+
+  if (registration && registration.charge_id) await settleChargeOnCancel(registration.charge_id);
+
+  if (promoted) {
+    await notifications.notify(promoted.accountId, 'event_waitlist_promoted', {
+      title: `Off the waitlist: ${promoted.eventTitle}`,
+      body: `A spot opened up - ${promoted.memberName} is now confirmed for "${promoted.eventTitle}".`,
+      linkUrl: '/events/' + eventId,
+    });
+  }
+}
+
+// --- Guest registration (admin permission - no members row) ---
+
+async function addGuestRegistration(eventId, { guestName, guestEmail, guestPhone }, accountId) {
+  const info = await db
+    .prepare('INSERT INTO event_guest_registrations (event_id, guest_name, guest_email, guest_phone, registered_by_account_id) VALUES (?, ?, ?, ?, ?)')
+    .run(eventId, guestName, guestEmail || null, guestPhone || null, accountId);
+  return info.lastInsertRowid;
+}
+
+async function cancelGuestRegistration(guestRegistrationId) {
+  await db.prepare("UPDATE event_guest_registrations SET status = 'cancelled' WHERE id = ?").run(guestRegistrationId);
+}
+
+// --- Check-in / check-out (name tag barcode scan, or manual P/A) ---
+
+// Toggles the given registration/guest row directly by its own id (the
+// roster page's manual Present/Absent controls, mirroring the rest of
+// this app's own attendance-grid pattern) - `present: true` stamps
+// checked_in_at (clearing checked_out_at, same "checking in again resets
+// checkout" leniency the class scan flow has), `present: false` clears
+// both.
+async function setRegistrationCheckedIn(registrationId, present) {
+  if (present) {
+    await db.prepare("UPDATE event_registrations SET checked_in_at = now_text(), checked_out_at = NULL WHERE id = ?").run(registrationId);
+  } else {
+    await db.prepare('UPDATE event_registrations SET checked_in_at = NULL, checked_out_at = NULL WHERE id = ?').run(registrationId);
+  }
+}
+
+async function setGuestCheckedIn(guestRegistrationId, present) {
+  if (present) {
+    await db.prepare("UPDATE event_guest_registrations SET checked_in_at = now_text(), checked_out_at = NULL WHERE id = ?").run(guestRegistrationId);
+  } else {
+    await db.prepare('UPDATE event_guest_registrations SET checked_in_at = NULL, checked_out_at = NULL WHERE id = ?').run(guestRegistrationId);
+  }
 }
 
 // --- Volunteer roles (handoff item 2) ---
@@ -236,17 +601,34 @@ async function cancelDonationClaim(claimId, memberId) {
 }
 
 module.exports = {
+  GRADE_OPTIONS,
+  parseAgeGroupList,
+  memberIsAdult,
+  registrationWindowStatus,
+  isRegistrationWindowOpen,
   listEvents,
   getEvent,
   getEventWithDetails,
   createEvent,
   updateEvent,
+  setEventSections,
   setEventStatus,
   setEventImage,
   deleteEvent,
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  submitEvent,
+  decideSubmission,
+  eventVisibleToFamily,
   registerForEvent,
   cancelRegistration,
   registrationsForEvent,
+  addGuestRegistration,
+  cancelGuestRegistration,
+  setRegistrationCheckedIn,
+  setGuestCheckedIn,
   addVolunteerRole,
   updateVolunteerRole,
   deleteVolunteerRole,

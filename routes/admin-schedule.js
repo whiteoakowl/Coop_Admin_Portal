@@ -86,6 +86,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       gradeLevels: GRADE_LEVELS,
       colorPalette: COLOR_PALETTE,
       availableStaff: await activeMembersForStaff(),
+      sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       selectedDate,
       absentIds: await absentMemberIdsForDate(selectedDate),
       error: req.query.error || null,

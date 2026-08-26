@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="class-schedule-print-page">
+  <main id="main-content" tabindex="-1">
+    <div class="print-preview-header no-print">
+      <h1>Events Calendar</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Events Calendar</p>
+          <p class="print-header-sub">Upcoming Events</p>
+        </div>
+      </div>
+
+      <% if (events.length === 0) { %>
+        <p>No upcoming events.</p>
+      <% } else { %>
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Location</th></tr></thead>
+          <tbody>
+            <% events.forEach(function(e) { %>
+              <tr>
+                <td><%= e.startsLabel %></td>
+                <td><%= e.title %></td>
+                <td><%= e.categoryName || '—' %></td>
+                <td><%= e.location || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

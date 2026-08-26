@@ -110,6 +110,22 @@ const publicSiteRouter = require('./routes/public-site');
 const portalAuthRouter = require('./routes/portal-auth');
 const parentPortalRouter = require('./routes/parent-portal');
 const mainAdminRouter = require('./routes/main-admin');
+// Member/family roster management, natively inside Main Admin - a sibling
+// router (not an edit to routes/main-admin.js itself) for the same reason
+// as every Community & Commerce admin panel below: reuses the existing
+// member data-layer (utils/members.js) rather than the legacy Co-op Admin
+// Portal's own /admin/members, which stays untouched on its own session.
+const mainAdminMembersRouter = require('./routes/main-admin-members');
+// Compose/send an announcement, shown on the recipient's portal home page
+// - same sibling-router shape as mainAdminMembersRouter above.
+const mainAdminAnnouncementsRouter = require('./routes/main-admin-announcements');
+// Named groups of members (independent of Family) that Events/Classes can
+// optionally restrict registration to - same sibling-router shape.
+const mainAdminSectionsRouter = require('./routes/main-admin-sections');
+// Same design canvas as Co-op Admin's own /admin/name-tag (public/js/
+// name-tag-editor.js, parameterized rather than forked - see its own
+// comment) plus bulk print, mirrored into Main Admin.
+const mainAdminNameTagsRouter = require('./routes/main-admin-name-tags');
 // Community & Commerce track (Track B, TEAM_B_HANDOFF.md) - member/
 // public-facing Events at /events, admin Events management folded into
 // the Main Admin Portal's own URL namespace at /main-admin/events (a
@@ -361,6 +377,10 @@ app.use('/', require('./middleware/csrfProtection'));
 app.use('/', portalAuthRouter);
 app.use('/parent', parentPortalRouter);
 app.use('/main-admin', mainAdminRouter);
+app.use('/main-admin/members', mainAdminMembersRouter);
+app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
+app.use('/main-admin/sections', mainAdminSectionsRouter);
+app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/events', eventsRouter);
 app.use('/main-admin/events', adminEventsRouter);
 app.use('/directory', directoryRouter);

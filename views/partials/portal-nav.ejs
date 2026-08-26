@@ -10,6 +10,16 @@
 // one portal to switch between.
 const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 1;
 
+// Optional - only views/parent-*.ejs pass this (see their own comment).
+// A real request: "parent portal should be divided between all the
+// general tabs and a co-op class section with all the tabs for
+// classes" - everywhere else's navLinks stays one flat list.
+// locals.classLinks, not `typeof classLinks !== 'undefined'` - that would
+// reference this very declaration's own not-yet-initialized `const`
+// binding (a genuine ReferenceError from `const`'s temporal dead zone,
+// unlike a bare undeclared identifier), not the value the caller passed.
+const classLinks = typeof locals.classLinks !== 'undefined' ? locals.classLinks : null;
+
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,
 // Publications, Custom Forms, Accounting, Notifications) shipped as
@@ -21,6 +31,18 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
 // list every portal shows - rather than duplicated per navLinks caller.
 // A real bug this fixes: none of it was linked from anywhere at all once
 // deployed, reachable only by typing the URL directly.
+//
+// Main Admin gets a DIFFERENT set of hrefs for the same feature names -
+// each routes/admin-*.js file (mounted at /main-admin/<feature> in
+// server.js) is that feature's own edit/moderate/create panel, not the
+// same read-only page every other portal gets. A real request: "all the
+// tabs [on Main Admin] should be ways of editing, moderating and creating
+// things for the parent, teacher and student portals" - Main Admin
+// browsing its own community exactly like a parent would defeats the
+// point of being the platform's control center. Audit Log has no
+// member-facing equivalent at all (nothing to browse, only to review), so
+// it replaces Notifications - a personal per-account inbox with nothing
+// to administer - in this list instead of just tacking on a 13th item.
 const COMMUNITY_LINKS = [
   { href: '/events', icon: 'calendar-check', label: 'Events' },
   { href: '/forums', icon: 'users', label: 'Forums' },
@@ -35,6 +57,46 @@ const COMMUNITY_LINKS = [
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
   { href: '/notifications', icon: 'bell', label: 'Notifications' },
 ];
+// Parent gets a trimmed version - a real request: "parent portal
+// dashboard should not have tabs for member directory, newsletter,
+// publication, forms or notifications. these will be managed by the
+// main admin side only." Notifications specifically becomes its own
+// Announcements section on the Parent home page (see routes/parent-
+// portal.js), not a link to the generic /notifications page; Newsletter
+// stays main-admin-authored content mailed out, not something a parent
+// browses; Member Directory/Publications/Forms stay reachable to a
+// parent only if Main Admin links to them from elsewhere (e.g. an
+// announcement or the newsletter itself), not as a standing nav tab.
+const COMMUNITY_LINKS_PARENT = [
+  { href: '/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/forums', icon: 'users', label: 'Forums' },
+  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/store', icon: 'grid', label: 'Store' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
+];
+const COMMUNITY_ADMIN_LINKS = [
+  { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+  { href: '/main-admin/member-directory', icon: 'user', label: 'Member Directory' },
+  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Forms' },
+  { href: '/main-admin/store', icon: 'grid', label: 'Store' },
+  { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+  { href: '/main-admin/photos', icon: 'camera', label: 'Photos' },
+  { href: '/main-admin/publications', icon: 'file-text', label: 'Publications' },
+  { href: '/main-admin/accounting', icon: 'check-circle', label: 'Accounting' },
+  { href: '/main-admin/audit-log', icon: 'lock', label: 'Audit Log' },
+];
+// portalTitle is a plain, caller-supplied string ('Main Admin' from every
+// views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
+// panels themselves reuse this same partial+shell, see their own
+// portalTitle) rather than a role key, so this checks the literal value
+// every one of those callers already passes - no new local needed.
+const communityLinks =
+  portalTitle === 'Main Admin' ? COMMUNITY_ADMIN_LINKS : portalTitle === 'Parent Portal' ? COMMUNITY_LINKS_PARENT : COMMUNITY_LINKS;
 %>
 <%- include('icon-sprite') %>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -49,9 +111,17 @@ const COMMUNITY_LINKS = [
       <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
     <% }); %>
   </nav>
+  <% if (classLinks) { %>
+    <p class="portal-nav-title">Co-op Classes</p>
+    <nav id="class-nav-links">
+      <% classLinks.forEach(function(link) { %>
+        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+      <% }); %>
+    </nav>
+  <% } %>
   <p class="portal-nav-title">Community</p>
   <nav id="community-nav-links">
-    <% COMMUNITY_LINKS.forEach(function(link) { %>
+    <% communityLinks.forEach(function(link) { %>
       <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
     <% }); %>
   </nav>
@@ -91,6 +161,15 @@ const COMMUNITY_LINKS = [
   <% navLinks.forEach(function(link) { %>
     <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
   <% }); %>
+  <%# Same classLinks as the desktop sidebar's own #class-nav-links block
+      above, appended into this same scrollable bar for the same reason
+      communityLinks is below - no room for a second section heading at
+      this width. %>
+  <% if (classLinks) { %>
+    <% classLinks.forEach(function(link) { %>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+    <% }); %>
+  <% } %>
   <%# Same COMMUNITY_LINKS as the desktop sidebar's own #community-nav-links
       block above, appended into this one already-horizontally-scrollable
       bar rather than a second mobile row - there's no room for a second
@@ -98,7 +177,7 @@ const COMMUNITY_LINKS = [
       already establish "more tabs than fit -> scroll" as this app's one
       mobile-overflow pattern, not something to invent a second version of
       here. %>
-  <% COMMUNITY_LINKS.forEach(function(link) { %>
+  <% communityLinks.forEach(function(link) { %>
     <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
   <% }); %>
 </nav>

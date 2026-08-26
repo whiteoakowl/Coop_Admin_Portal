@@ -8,9 +8,11 @@
     portalTitle: 'Parent Portal',
     navLinks: [
       { href: '/parent', icon: 'home', label: 'Home' },
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
       { href: '/parent/library', icon: 'book', label: 'Library' },
       { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
     ],
   }) %>
 
@@ -56,7 +58,10 @@
         <div class="site-announcement-list">
           <% announcements.forEach(function(a) { %>
             <div class="site-announcement-card">
-              <span class="site-announcement-date"><%= a.publishedLabel %></span>
+              <span class="site-announcement-date">
+                <%= a.dateLabel %>
+                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+              </span>
               <h3><%= a.title %></h3>
               <p><%= a.body %></p>
             </div>

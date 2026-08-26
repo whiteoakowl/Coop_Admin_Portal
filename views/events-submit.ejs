@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/">
+      <img src="/img/logo.png" alt="" />
+    </a>
+    <div class="site-header-actions">
+      <a class="primary-btn" href="/portal">My Portals</a>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner member-form-page-panel">
+        <h1>Submit an Event</h1>
+        <p>Propose an event for the co-op calendar. A Main Admin will review it before it's published.</p>
+        <p><a href="/events">&larr; Back to Events</a></p>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+        <form method="POST" action="/events/submit" class="stack-form">
+          <div class="member-form-grid">
+            <label class="member-form-full">Title
+              <input type="text" name="title" required />
+            </label>
+            <label class="member-form-full">Description
+              <textarea name="description" rows="3"></textarea>
+            </label>
+            <label>Location
+              <input type="text" name="location" />
+            </label>
+            <label>Starts
+              <input type="datetime-local" name="startsAt" required />
+            </label>
+            <label>Ends
+              <input type="datetime-local" name="endsAt" />
+            </label>
+          </div>
+          <div class="member-form-footer">
+            <div class="member-form-footer-edit">
+              <button type="submit" class="primary-btn">Submit for Approval</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

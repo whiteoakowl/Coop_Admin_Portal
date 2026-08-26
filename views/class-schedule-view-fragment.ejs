@@ -93,6 +93,67 @@
         <label class="member-form-full">Public Description <span class="hint">(shown to parents browsing classes)</span>
           <textarea name="description" rows="3" disabled><%= cls.description || '' %></textarea>
         </label>
+
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Who Can Register</label>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <input type="hidden" name="allowParentRegister" value="off" disabled />
+              <label class="grade-pill"><input type="checkbox" name="allowParentRegister" value="1" <%= cls.allow_parent_register ? 'checked' : '' %> disabled /> Parents can register</label>
+            </div>
+            <div class="class-form-field">
+              <input type="hidden" name="allowTeacherRegister" value="off" disabled />
+              <label class="grade-pill"><input type="checkbox" name="allowTeacherRegister" value="1" <%= cls.allow_teacher_register ? 'checked' : '' %> disabled /> Teachers/assistants can self sign-up</label>
+            </div>
+            <div class="class-form-field">
+              <label class="grade-pill"><input type="checkbox" name="allowStudentRegister" value="1" <%= cls.allow_student_register ? 'checked' : '' %> disabled /> Students can self-register</label>
+            </div>
+          </div>
+        </div>
+
+        <label>Teacher slots <span class="hint">(optional)</span>
+          <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" disabled />
+        </label>
+        <label>Assistant slots <span class="hint">(optional)</span>
+          <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" disabled />
+        </label>
+        <label>Minimum to run <span class="hint">(optional)</span>
+          <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" disabled />
+        </label>
+
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Cancellation</label>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <input type="hidden" name="allowCancel" value="off" disabled />
+              <label class="grade-pill"><input type="checkbox" name="allowCancel" value="1" <%= cls.allow_cancel ? 'checked' : '' %> disabled /> Members can cancel their registration</label>
+            </div>
+            <div class="class-form-field">
+              <label class="grade-pill"><input type="checkbox" name="autoRefundOnCancel" value="1" <%= cls.auto_refund_on_cancel ? 'checked' : '' %> disabled /> Auto-refund a paid charge on cancel</label>
+            </div>
+          </div>
+        </div>
+
+        <label>Price ($) <span class="hint">(blank = free)</span>
+          <input type="number" name="priceDollars" min="0" step="0.01" value="<%= cls.price_cents != null ? (cls.price_cents / 100).toFixed(2) : '' %>" disabled />
+        </label>
+        <label>Charged per
+          <select name="pricePer" disabled>
+            <option value="person" <%= cls.price_per !== 'family' ? 'selected' : '' %>>Person</option>
+            <option value="family" <%= cls.price_per === 'family' ? 'selected' : '' %>>Family</option>
+          </select>
+        </label>
+
+        <% if (typeof sections !== 'undefined' && sections.length) { %>
+          <div class="member-form-full">
+            <label class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></label>
+            <div class="grade-pill-grid">
+              <% sections.forEach(function(s) { %>
+                <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= (typeof selectedSectionIds !== 'undefined' && selectedSectionIds.includes(s.id)) ? 'checked' : '' %> disabled /> <%= s.name %></label>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
       </form>
     </div>
   </div>

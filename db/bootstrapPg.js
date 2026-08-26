@@ -152,6 +152,11 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_communications', label: 'Manage Communications', description: 'Assemble/send the weekly newsletter and control SMS/notification settings.' },
   { key: 'view_audit_log', label: 'View Audit Log', description: 'View the record of financial changes, moderation, and deletions across the app.' },
   { key: 'manage_academics', label: 'Manage Academics', description: 'Issue diplomas and review student academic records.' },
+  { key: 'manage_members', label: 'Manage Members', description: 'Add, edit, archive, and organize the member/family roster.' },
+  { key: 'send_announcements', label: 'Send Announcements', description: 'Compose and send announcements to members, shown on their portal home page.' },
+  { key: 'manage_sections', label: 'Manage Sections', description: 'Create sections and assign members to them, for restricting events/classes to specific groups.' },
+  { key: 'manage_name_tags', label: 'Manage Name Tags', description: 'Design name tag templates and bulk-print name tags for any member.' },
+  { key: 'register_guests', label: 'Register Guests', description: 'Register a non-member guest for an event.' },
 ];
 
 async function seedPortalPlatform(db) {

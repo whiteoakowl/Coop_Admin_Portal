@@ -9,6 +9,10 @@
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
       { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
       { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
@@ -36,6 +40,8 @@
     <div class="roster-toolbar">
       <div class="roster-btn-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+        <a class="roster-action-btn" href="/main-admin/events/categories">Categories</a>
+        <a class="roster-action-btn" href="/main-admin/events/pending">Submitted Events<% if (pendingCount) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
       </div>
     </div>
 
@@ -47,9 +53,11 @@
       <% events.forEach(function(e) { %>
         <div class="team-col">
           <div class="team-info-card">
-            <span class="team-info-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+            <span class="team-info-icon" style="<%= e.categoryColor ? `color: ${e.categoryColor};` : '' %>"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
             <h3 class="team-info-title"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></h3>
             <span class="badge-pill badge-pill-<%= e.status === 'published' ? 'green' : e.status === 'cancelled' ? 'gray' : 'orange' %>"><%= e.status.charAt(0).toUpperCase() + e.status.slice(1) %></span>
+            <% if (e.approval_status === 'pending') { %><span class="badge-pill badge-pill-orange">Pending Approval</span><% } %>
+            <% if (e.categoryName) { %><span class="badge-pill" style="background: <%= e.categoryColor %>; color: #fff;"><%= e.categoryName %></span><% } %>
             <p class="hint"><%= e.visibility === 'public' ? 'Public' : 'Members only' %></p>
             <div class="roster-btn-row">
               <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/builder">Edit</a>

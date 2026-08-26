@@ -17,7 +17,10 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>My Classes</h1>
-    <p class="hint">To register for a new class or drop one, ask your parent to manage it from their Parent Portal.</p>
+    <p class="hint">Most classes are registered for by your parent from their Parent Portal. A class listed below has been opened for you to register for yourself.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% if (classes.length === 0) { %>
       <p class="roster-empty">You're not enrolled in any classes yet.</p>
@@ -30,6 +33,7 @@
               <th>Day / Time</th>
               <th>Room</th>
               <th>Teacher</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -42,6 +46,59 @@
                 <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
                 <td><%= c.room || '—' %></td>
                 <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
+                <td>
+                  <% if (c.allow_student_register && c.allow_cancel) { %>
+                    <form method="POST" action="/student/classes/<%= c.id %>/unregister" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <% if (openClasses.length > 0) { %>
+      <h2>Register for a Class</h2>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Day / Time</th>
+              <th>Teacher</th>
+              <th>Seats</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% openClasses.forEach(function(c) { %>
+              <tr>
+                <td class="roster-name-col"><strong><%= c.class_name %></strong></td>
+                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
+                <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
+                <td>
+                  <% if (c.capacity == null) { %><span class="badge-pill">Open</span>
+                  <% } else if (c.isFull) { %><span class="badge-pill badge-pill-absent">Full</span>
+                  <% } else { %><span class="badge-pill badge-pill-present"><%= c.seatsLeft %> left</span><% } %>
+                </td>
+                <td>
+                  <% if (waitlistPositionByClassId[c.id] != null) { %>
+                    <form method="POST" action="/student/classes/<%= c.id %>/unregister" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel (waitlist #<%= waitlistPositionByClassId[c.id] %>)</button>
+                    </form>
+                  <% } else if (eligibleClassIds.indexOf(c.id) === -1) { %>
+                    <span class="hint">Not in an eligible section</span>
+                  <% } else if (windowOpen) { %>
+                    <form method="POST" action="/student/classes/<%= c.id %>/register" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Register</button>
+                    </form>
+                  <% } else { %>
+                    <span class="hint">Not open yet</span>
+                  <% } %>
+                </td>
               </tr>
             <% }); %>
           </tbody>

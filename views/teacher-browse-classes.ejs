@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/browse-classes', icon: 'graduation-cap', label: 'Sign Up to Teach' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Sign Up to Teach</h1>
+    <p class="hint">Classes below have self-signup open for teachers/assistants. Most classes are staffed by an admin instead and won't appear here.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (openClasses.length === 0) { %>
+      <p class="roster-empty">No classes currently have self-signup open.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Day / Time</th>
+              <th>Teachers</th>
+              <th>Assistants</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% openClasses.forEach(function(c) { %>
+              <% var counts = countsByClass[c.id]; %>
+              <tr>
+                <td class="roster-name-col"><strong><%= c.class_name %></strong></td>
+                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
+                <td><%= counts.teacher %><%= c.teacher_slots != null ? ' / ' + c.teacher_slots : '' %></td>
+                <td><%= counts.assistant %><%= c.assistant_slots != null ? ' / ' + c.assistant_slots : '' %></td>
+                <td>
+                  <div class="actions-btn-row">
+                    <% if (c.teacher_slots == null || counts.teacher < c.teacher_slots) { %>
+                      <form method="POST" action="/teacher/classes/<%= c.id %>/join" class="inline-block-form">
+                        <input type="hidden" name="role" value="teacher" />
+                        <button type="submit" class="roster-action-btn">Teach</button>
+                      </form>
+                    <% } %>
+                    <% if (c.assistant_slots == null || counts.assistant < c.assistant_slots) { %>
+                      <form method="POST" action="/teacher/classes/<%= c.id %>/join" class="inline-block-form">
+                        <input type="hidden" name="role" value="assistant" />
+                        <button type="submit" class="btn-secondary">Assist</button>
+                      </form>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <h2>My Classes</h2>
+    <% if (myClasses.length === 0) { %>
+      <p class="roster-empty">You're not staffed on any classes yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead><tr><th>Class</th><th>Day / Time</th><th></th></tr></thead>
+          <tbody>
+            <% myClasses.forEach(function(c) { %>
+              <tr>
+                <td class="roster-name-col"><%= c.class_name %></td>
+                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
+                <td>
+                  <% if (c.allow_teacher_register) { %>
+                    <form method="POST" action="/teacher/classes/<%= c.id %>/leave" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Leave</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

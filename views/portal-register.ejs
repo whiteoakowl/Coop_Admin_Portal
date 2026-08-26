@@ -14,27 +14,48 @@
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/register" class="form-outer-panel">
-      <div class="form-section member-form-grid">
-        <label>First Name
-          <input type="text" name="firstName" value="<%= formValues.firstName || '' %>" required autocomplete="given-name" />
-        </label>
-        <label>Last Name
-          <input type="text" name="lastName" value="<%= formValues.lastName || '' %>" required autocomplete="family-name" />
-        </label>
-        <label class="member-form-full">Email
-          <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
-        </label>
-        <label>Password
-          <input type="password" name="password" required minlength="8" autocomplete="new-password" />
-        </label>
-        <label>Confirm Password
-          <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
-        </label>
+    <form method="POST" action="/register" id="portal-register-form" class="form-outer-panel">
+      <div class="form-section">
+        <h2>Parent / Guardian</h2>
+        <div class="member-form-grid">
+          <label>First Name
+            <input type="text" name="firstName" value="<%= formValues.firstName || '' %>" required autocomplete="given-name" />
+          </label>
+          <label>Last Name
+            <input type="text" name="lastName" value="<%= formValues.lastName || '' %>" required autocomplete="family-name" />
+          </label>
+          <label class="member-form-full">Email
+            <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
+          </label>
+          <label>Password
+            <input type="password" name="password" required minlength="8" autocomplete="new-password" />
+          </label>
+          <label>Confirm Password
+            <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password" />
+          </label>
+        </div>
       </div>
+
+      <div class="form-section">
+        <h2>Children</h2>
+        <p class="hint">Add each child now so their info (and, if you'd like, their own portal login) is on file without filling out a separate form per child.</p>
+        <div id="register-children">
+          <% (children && children.length ? children : []).forEach(function(child, i) { %>
+            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child }) %>
+          <% }); %>
+        </div>
+        <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
+      </div>
+
       <button type="submit" class="primary-btn">Submit Registration</button>
       <p class="hint">Already have an account? <a href="/login">Log in</a>.</p>
     </form>
   </main>
+
+  <template id="register-child-template">
+    <%- include('partials/register-child-fields', { index: '__INDEX__', gradeOptions, values: {} }) %>
+  </template>
+
+  <script src="/js/portal-register-form.js"></script>
 </body>
 </html>

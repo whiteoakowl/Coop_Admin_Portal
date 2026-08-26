@@ -86,7 +86,16 @@ async function notify(accountId, typeKey, { title, body, linkUrl = null } = {}) 
   return notificationId;
 }
 
-async function listForAccount(accountId, { unreadOnly = false } = {}) {
+// typeKey filter added for the Parent home page's own Announcements
+// section (routes/parent-portal.js) - every other existing caller
+// (routes/notifications.js's own /notifications page) omits it and keeps
+// seeing every type mixed together, unchanged.
+async function listForAccount(accountId, { unreadOnly = false, typeKey = null } = {}) {
+  if (typeKey) {
+    return unreadOnly
+      ? db.prepare('SELECT * FROM notifications WHERE member_account_id = ? AND type_key = ? AND read_at IS NULL ORDER BY created_at DESC').all(accountId, typeKey)
+      : db.prepare('SELECT * FROM notifications WHERE member_account_id = ? AND type_key = ? ORDER BY created_at DESC').all(accountId, typeKey);
+  }
   return unreadOnly
     ? db.prepare('SELECT * FROM notifications WHERE member_account_id = ? AND read_at IS NULL ORDER BY created_at DESC').all(accountId)
     : db.prepare('SELECT * FROM notifications WHERE member_account_id = ? ORDER BY created_at DESC').all(accountId);

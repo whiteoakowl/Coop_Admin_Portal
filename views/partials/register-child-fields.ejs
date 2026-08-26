@@ -1,0 +1,65 @@
+<%
+// One repeatable "Child" block on the public self-registration form
+// (views/portal-register.ejs) - same clone-a-<template> pattern as
+// views/partials/membership-child-fields.ejs (see public/js/
+// membership-form.js), reused here via public/js/portal-register-form.js
+// so a family fills out parent AND child info once instead of the parent
+// registering, then separately re-typing each child's name/grade/etc.
+// somewhere else.
+//
+// Unlike the admin-entered Membership Form, a child block here is fully
+// optional (no `required` on name fields) - self-registration must stay
+// usable for an account that isn't tied to any currently-enrolled child
+// yet, so an empty/removed block is silently dropped server-side
+// (routes/portal-auth.js's own children filter) rather than blocking
+// submission.
+//
+// `values` carries back whatever the visitor typed if the whole form
+// re-renders after a validation error, so a mistake elsewhere on the
+// form doesn't erase children they already filled in.
+const v = (typeof values !== 'undefined' && values) || {};
+%>
+<div class="manage-section register-child-block" data-child-block>
+  <div class="membership-child-header">
+    <h3>Child</h3>
+    <button type="button" class="icon-btn register-remove-child" aria-label="Remove child" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+  </div>
+  <div class="member-form-grid">
+    <label>First Name
+      <input type="text" name="children[<%= index %>][firstName]" value="<%= v.firstName || '' %>" />
+    </label>
+    <label>Last Name
+      <input type="text" name="children[<%= index %>][lastName]" value="<%= v.lastName || '' %>" />
+    </label>
+    <label>Birthdate
+      <input type="date" name="children[<%= index %>][birthdate]" value="<%= v.birthdate || '' %>" />
+    </label>
+    <label>Grade
+      <select name="children[<%= index %>][gradeLevel]">
+        <option value="">Select Grade</option>
+        <% gradeOptions.forEach(function(g) { %>
+          <option value="<%= g %>" <%= v.gradeLevel === g ? 'selected' : '' %>><%= g %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label class="member-form-full">Medical / Allergy Notes
+      <textarea name="children[<%= index %>][medicalNotes]" rows="2"><%= v.medicalNotes || '' %></textarea>
+    </label>
+  </div>
+
+  <label class="checkbox-option">
+    <input type="checkbox" class="register-child-login-toggle" data-child-login-toggle name="children[<%= index %>][wantsLogin]" <%= v.wantsLogin ? 'checked' : '' %> />
+    Give this student their own portal login
+  </label>
+  <div class="member-form-grid register-child-login-fields" data-child-login-fields <%= v.wantsLogin ? '' : 'hidden' %>>
+    <label class="member-form-full">Student Login Email
+      <input type="email" name="children[<%= index %>][loginEmail]" value="<%= v.loginEmail || '' %>" autocomplete="off" />
+    </label>
+    <label>Password
+      <input type="password" name="children[<%= index %>][loginPassword]" minlength="8" autocomplete="new-password" />
+    </label>
+    <label>Confirm Password
+      <input type="password" name="children[<%= index %>][loginPasswordConfirm]" minlength="8" autocomplete="new-password" />
+    </label>
+  </div>
+</div>

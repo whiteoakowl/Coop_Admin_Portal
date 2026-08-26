@@ -4521,6 +4521,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .icon-btn:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); }
 .icon-btn-active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
 
+/* public/js/simple-view-toggle.js's own List/Grid button pair (views/
+   parent-classes.ejs today) - just spacing, the buttons themselves reuse
+   .icon-btn/.icon-btn-active as-is. */
+.view-toggle-buttons { display: flex; gap: 0.4rem; flex-shrink: 0; }
+
 .notes-dialog {
   width: min(420px, 90vw);
   border: none;
@@ -6139,3 +6144,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .main-admin-role-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .permission-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 1rem; }
 .portal-dashboard-card-wide { max-width: 720px; margin-bottom: 1.5rem; }
+
+/* Events List/Calendar view toggle - the month grid needs taller cells
+   than a normal .roster-table row (each day can hold several event
+   pills), so this table gets its own light modifier instead of forcing
+   every other .roster-table on the site to accommodate it. */
+.event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
+.event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; }

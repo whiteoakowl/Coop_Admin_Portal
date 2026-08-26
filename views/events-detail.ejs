@@ -34,8 +34,10 @@
         <% } %>
 
         <h1><%= event.title %></h1>
+        <% if (event.categoryName) { %><span class="badge-pill" style="background: <%= event.categoryColor %>; color: #fff;"><%= event.categoryName %></span><% } %>
         <p class="site-hero-meta"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= startsLabel %><% if (endsLabel) { %> &ndash; <%= endsLabel %><% } %></p>
         <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
+        <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
         <% if (event.description) { %><p><%= event.description %></p><% } %>
 
         <% if (!portalAccount) { %>
@@ -45,21 +47,29 @@
           <div class="manage-section">
             <div class="grid-box-header"><h2>Register</h2></div>
             <% if (event.capacity != null) { %><p class="hint"><%= event.registrationCount %>/<%= event.capacity %> registered<% if (event.waitlistCount) { %> &middot; <%= event.waitlistCount %> waitlisted<% } %></p><% } %>
-            <div class="roster-btn-row">
-              <% family.forEach(function(m) { %>
-                <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
-                  <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form">
-                    <input type="hidden" name="memberId" value="<%= m.id %>" />
-                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
-                  </form>
-                <% } else { %>
-                  <form method="POST" action="/events/<%= event.id %>/register" class="inline-block-form">
-                    <input type="hidden" name="memberId" value="<%= m.id %>" />
-                    <button type="submit" class="roster-action-btn"><%= m.name %>: Register</button>
-                  </form>
-                <% } %>
-              <% }); %>
-            </div>
+            <% if (event.family_capacity != null) { %><p class="hint"><%= event.familyCount %>/<%= event.family_capacity %> families registered</p><% } %>
+            <% if (!isRegistrationWindowOpen) { %>
+              <p class="hint">
+                <% if (event.registration_opens_at) { %>Registration opens <%= event.registration_opens_at %>.<% } %>
+                <% if (event.registration_closes_at) { %> Registration closed <%= event.registration_closes_at %>.<% } %>
+              </p>
+            <% } else { %>
+              <div class="roster-btn-row">
+                <% family.forEach(function(m) { %>
+                  <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
+                    <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form">
+                      <input type="hidden" name="memberId" value="<%= m.id %>" />
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                    </form>
+                  <% } else { %>
+                    <form method="POST" action="/events/<%= event.id %>/register" class="inline-block-form">
+                      <input type="hidden" name="memberId" value="<%= m.id %>" />
+                      <button type="submit" class="roster-action-btn"><%= m.name %>: Register</button>
+                    </form>
+                  <% } %>
+                <% }); %>
+              </div>
+            <% } %>
           </div>
 
           <% if (event.volunteerRoles.length) { %>

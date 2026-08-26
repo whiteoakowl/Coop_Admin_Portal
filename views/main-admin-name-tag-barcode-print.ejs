@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Barcodes</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <%
+      // 2 across x 6 down of fixed 3in x 1.75in cards fills a US Letter
+      // sheet (with a tighter page margin than the badge-sheet-page this
+      // reuses - see .barcode-only-sheet-page) - 12 per page.
+      var pages = [];
+      for (var i = 0; i < members.length; i += 12) pages.push(members.slice(i, i + 12));
+    %>
+    <% pages.forEach(function(pageMembers) { %>
+      <div class="badge-sheet-page barcode-only-sheet-page barcode-sheet">
+        <% pageMembers.forEach(function(m) { %>
+          <div class="barcode-cell">
+            <%# Not badge-el-barcode (public/js/name-tag-render.js's shared
+                selector) - this page renders its own barcodes, with a
+                fixed bar width instead of that renderer's stretch-to-a-
+                fixed-box sizing. See barcode-print-shrink-name.js. %>
+            <svg class="barcode-cell-svg" data-barcode-value="<%= m.barcode %>"></svg>
+            <div class="barcode-cell-name"><%= m.name %></div>
+          </div>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <%# Not public/js/name-tag-render.js (the shared badge-el-barcode
+      renderer) - this one renders its own barcodes (fixed bar width) and
+      shrinks each name to fit, once document.fonts.ready resolves. See
+      that script's own comment for why. %>
+  <script src="/js/barcode-print-shrink-name.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

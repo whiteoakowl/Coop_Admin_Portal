@@ -9,6 +9,10 @@
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
       { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
       { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
@@ -30,13 +34,33 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Registrations &mdash; <%= event.title %></h1>
 
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
     <div class="roster-toolbar">
       <div class="roster-btn-row">
         <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">&larr; Back to Event</a>
       </div>
     </div>
 
-    <% if (registrations.length === 0) { %>
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Scan to Check In / Out</h2></div>
+      <p class="hint">Scan a member's name tag barcode (or type their member ID) to toggle them Present on the roster below.</p>
+      <div class="class-form-row">
+        <div class="class-form-field">
+          <input type="text" id="event-scan-input" data-event-id="<%= event.id %>" autocomplete="off" placeholder="Scan or type barcode&hellip;" />
+        </div>
+        <div class="class-form-field">
+          <select id="event-scan-mode">
+            <option value="checkin">Check In</option>
+            <option value="checkout">Check Out</option>
+          </select>
+        </div>
+      </div>
+      <p id="event-scan-feedback" class="hint" aria-live="polite"></p>
+    </div>
+
+    <% if (registrations.length === 0 && guestRegistrations.length === 0) { %>
       <p class="roster-empty">No one has registered yet.</p>
     <% } else { %>
       <div class="roster-scroll">
@@ -46,28 +70,135 @@
               <th>Name</th>
               <th>Status</th>
               <th>Registered</th>
+              <th>Checked In</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             <% registrations.forEach(function(r) { %>
-              <tr>
+              <tr data-registration-row="<%= r.id %>">
                 <td class="roster-name-col"><%= r.memberName %></td>
                 <td>
                   <% if (r.status === 'confirmed') { %>
                     <span class="badge-pill badge-pill-green">Confirmed</span>
                   <% } else if (r.status === 'waitlisted') { %>
-                    <span class="badge-pill badge-pill-orange">Waitlisted</span>
+                    <span class="badge-pill badge-pill-orange">Waitlisted<% if (r.waitlist_position) { %> (#<%= r.waitlist_position %>)<% } %></span>
                   <% } else { %>
                     <span class="badge-pill badge-pill-gray">Cancelled</span>
                   <% } %>
                 </td>
                 <td><%= r.created_at %></td>
+                <td>
+                  <% if (r.checked_in_at && r.checked_out_at) { %>
+                    <span class="badge-pill badge-pill-gray">Checked Out</span>
+                  <% } else if (r.checked_in_at) { %>
+                    <span class="badge-pill badge-pill-green">Present</span>
+                  <% } else { %>
+                    <span class="badge-pill badge-pill-gray">Absent</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (r.status === 'confirmed') { %>
+                    <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkin" class="inline-block-form">
+                      <input type="hidden" name="present" value="<%= r.checked_in_at ? '0' : '1' %>" />
+                      <button type="submit" class="roster-action-btn"><%= r.checked_in_at ? 'Clear' : 'Present' %></button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+            <% guestRegistrations.forEach(function(g) { %>
+              <tr>
+                <td class="roster-name-col"><%= g.guest_name %> <span class="badge-pill">Guest</span></td>
+                <td><span class="badge-pill badge-pill-green">Confirmed</span></td>
+                <td><%= g.created_at %></td>
+                <td>
+                  <% if (g.checked_in_at && g.checked_out_at) { %>
+                    <span class="badge-pill badge-pill-gray">Checked Out</span>
+                  <% } else if (g.checked_in_at) { %>
+                    <span class="badge-pill badge-pill-green">Present</span>
+                  <% } else { %>
+                    <span class="badge-pill badge-pill-gray">Absent</span>
+                  <% } %>
+                </td>
+                <td>
+                  <div class="roster-btn-row">
+                    <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/checkin" class="inline-block-form">
+                      <input type="hidden" name="present" value="<%= g.checked_in_at ? '0' : '1' %>" />
+                      <button type="submit" class="roster-action-btn"><%= g.checked_in_at ? 'Clear' : 'Present' %></button>
+                    </form>
+                    <% if (canRegisterGuests) { %>
+                      <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/cancel" class="inline-block-form" data-confirm="Cancel guest &quot;<%= g.guest_name %>&quot;?">
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                      </form>
+                    <% } %>
+                  </div>
+                </td>
               </tr>
             <% }); %>
           </tbody>
         </table>
       </div>
     <% } %>
+
+    <% if (canRegisterGuests) { %>
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2>Guest Registration</h2>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-guest-dialog').showModal()">+ Register Guest</button>
+        </div>
+        <p class="hint">A guest has no member record - a lightweight walk-in registration. Check-in for guests is manual only (no name tag barcode exists to scan).</p>
+      </div>
+
+      <dialog id="add-guest-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/events/<%= event.id %>/guests">
+          <h3>Register a Guest</h3>
+          <label>Name
+            <input type="text" name="guestName" required />
+          </label>
+          <label>Email <span class="hint">(optional)</span>
+            <input type="email" name="guestEmail" />
+          </label>
+          <label>Phone <span class="hint">(optional)</span>
+            <input type="text" name="guestPhone" />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Register</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
   </main>
+  <script>
+    (function () {
+      var input = document.getElementById('event-scan-input');
+      var mode = document.getElementById('event-scan-mode');
+      var feedback = document.getElementById('event-scan-feedback');
+      var csrf = document.querySelector('meta[name="csrf-token"]');
+      if (!input) return;
+      input.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        var barcode = input.value.trim();
+        input.value = '';
+        if (!barcode) return;
+        fetch('/main-admin/events/' + input.dataset.eventId + '/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf ? csrf.content : '' },
+          body: JSON.stringify({ barcode: barcode, mode: mode.value }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            feedback.textContent = data.message || '';
+            feedback.style.color = data.ok ? '' : 'var(--red)';
+            if (data.ok) setTimeout(function () { window.location.reload(); }, 600);
+          })
+          .catch(function () {
+            feedback.textContent = 'Something went wrong - please try again.';
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

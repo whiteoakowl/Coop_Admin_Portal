@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/name-tags', icon: 'badge', label: 'Name Tags' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Name Tags</h1>
+    <p class="hint">
+      Print a name tag for yourself or anyone in your family, using the design Main Admin/Co-op Admin has set up.
+      You can't change the design here.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (family.length === 0) { %>
+      <p class="roster-empty">No family members found on your account.</p>
+    <% } else { %>
+      <form method="POST" action="/parent/name-tags/print" target="_blank">
+        <div class="member-picker-list">
+          <% family.forEach(function(m) { %>
+            <label class="member-picker-row">
+              <input type="checkbox" name="memberIds" value="<%= m.id %>" checked />
+              <span><%= m.name %></span>
+              <span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
+            </label>
+          <% }); %>
+        </div>
+        <button type="submit" class="primary-btn">Print Selected</button>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

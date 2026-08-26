@@ -38,8 +38,45 @@ const {
   activeStudents,
   activeMembersForStaff,
 } = require('../utils/classSchedule');
+const { classSectionIds } = require('../utils/sections');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// The class registration-rules fields (who can register, teacher/
+// assistant seat caps, min enrollment, cancel/refund policy, pricing) -
+// shared between the Create and Edit class forms/routes below, since
+// both post the exact same field set. A checkbox absent from req.body
+// means "unchecked", which is why allow_parent_register/allow_teacher_
+// register/allow_cancel (default-on) are read as `!== 'off'` (a hidden
+// companion input carries 'off' when the visible checkbox is unchecked -
+// see the view's own comment) while allow_student_register/auto_refund_
+// on_cancel (default-off) are read as plain presence checks.
+function registrationFieldsFromBody(body) {
+  return {
+    allowParentRegister: body.allowParentRegister !== 'off',
+    allowTeacherRegister: body.allowTeacherRegister !== 'off',
+    allowStudentRegister: body.allowStudentRegister === '1',
+    teacherSlots: body.teacherSlots ? parseInt(body.teacherSlots, 10) : null,
+    assistantSlots: body.assistantSlots ? parseInt(body.assistantSlots, 10) : null,
+    minCapacity: body.minCapacity ? parseInt(body.minCapacity, 10) : null,
+    allowCancel: body.allowCancel !== 'off',
+    autoRefundOnCancel: body.autoRefundOnCancel === '1',
+    priceCents: body.priceDollars ? Math.round(parseFloat(body.priceDollars) * 100) : null,
+    pricePer: body.pricePer === 'family' ? 'family' : 'person',
+  };
+}
+
+// Replaces a class's section restriction wholesale with whatever's
+// checked on the form - empty means unrestricted (see utils/sections.js's
+// own comment on that convention), same "delete-all-then-insert-
+// selected" shape as role_permissions elsewhere in this app.
+async function saveClassSections(classId, body) {
+  const sectionIds = [].concat(body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await db.prepare('DELETE FROM class_sections WHERE class_id = ?').run(classId);
+  for (const sectionId of sectionIds) {
+    await db.prepare('INSERT INTO class_sections (class_id, section_id) VALUES (?, ?)').run(classId, sectionId);
+  }
+}
 
 router.get('/class-schedule', requireAdmin, (req, res) => res.redirect(`/admin/class-schedule/${defaultDay()}`));
 
@@ -155,6 +192,7 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     registrationOpen: req.body.registrationOpen === '1',
     description: (req.body.description || '').trim(),
+    ...registrationFieldsFromBody(req.body),
   });
 
   const teacherId = parseInt(req.body.teacherId, 10);
@@ -163,6 +201,7 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     .map((v) => parseInt(v, 10))
     .filter(Boolean);
   for (const assistantId of assistantIds) await addStaff(id, assistantId, 'assistant');
+  await saveClassSections(id, req.body);
 
   // Land back on the day's schedule grid (where the dialog was opened
   // from) instead of jumping to the class's own Manage page - the dialog
@@ -191,6 +230,8 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
+    sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
+    selectedSectionIds: await classSectionIds(id),
   });
 });
 
@@ -215,6 +256,8 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
+    sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
+    selectedSectionIds: await classSectionIds(id),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -244,7 +287,9 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     registrationOpen: req.body.registrationOpen === '1',
     description: (req.body.description || '').trim(),
+    ...registrationFieldsFromBody(req.body),
   });
+  await saveClassSections(id, req.body);
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
 });
 

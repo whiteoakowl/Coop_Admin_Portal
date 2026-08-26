@@ -352,8 +352,15 @@ async function membersWithDetails(typeFilter, familyId) {
 // it at creation time too, so every member's printed barcode is the same
 // fixed length regardless of how long their name is (db/index.js's
 // migration backfills this same way for every member who predates it).
-async function generateMemberCode() {
-  const exists = db.prepare('SELECT 1 FROM members WHERE member_code = ?');
+// `dbHandle` defaults to the module-level connection but must be passed
+// explicitly as the transaction handle (`tx`) when called from inside
+// db.withTransaction - the test suite's embedded PGlite engine has no
+// connection pool, so a query against the outer `db` while a transaction
+// on that same single connection is still open never returns (each
+// waits on the other forever). See routes/portal-auth.js's own
+// registration transaction for the call site this was written for.
+async function generateMemberCode(dbHandle = db) {
+  const exists = dbHandle.prepare('SELECT 1 FROM members WHERE member_code = ?');
   let code;
   do {
     code = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');

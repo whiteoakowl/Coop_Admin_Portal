@@ -27,8 +27,46 @@
         <h1>Events</h1>
         <p>Upcoming co-op events, fundraisers, and get-togethers.</p>
 
+        <div class="roster-toolbar no-print">
+          <div class="roster-btn-row">
+            <div class="class-schedule-view-toggle" role="group" aria-label="List or calendar view">
+              <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/events?view=list" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
+              <a class="icon-btn<%= view === 'calendar' ? ' icon-btn-active' : '' %>" href="/events?view=calendar" aria-pressed="<%= view === 'calendar' %>" aria-label="Calendar view" title="Calendar view"><svg class="icon"><use href="#icon-calendar-check"/></svg></a>
+            </div>
+            <a class="roster-action-btn print-action-btn" href="/events/print" target="_blank">Print</a>
+            <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+              <a class="roster-action-btn" href="/events/submit">+ Submit an Event</a>
+            <% } %>
+          </div>
+        </div>
+
         <% if (events.length === 0) { %>
           <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
+        <% } else if (view === 'calendar') { %>
+          <div class="roster-toolbar no-print">
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/events?view=calendar&month=<%= calendar.prevParam %>">&larr; Prev</a>
+              <strong><%= calendar.label %></strong>
+              <a class="roster-action-btn" href="/events?view=calendar&month=<%= calendar.nextParam %>">Next &rarr;</a>
+            </div>
+          </div>
+          <table class="roster-table condensed-table event-calendar-table">
+            <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+            <tbody>
+              <% calendar.weeks.forEach(function(week) { %>
+                <tr>
+                  <% week.forEach(function(day) { %>
+                    <td class="<%= day.inMonth ? '' : 'hint' %>">
+                      <div><%= day.day %></div>
+                      <% day.events.forEach(function(e) { %>
+                        <a href="/events/<%= e.id %>" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
+                      <% }); %>
+                    </td>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         <% } else { %>
           <div class="event-card-grid">
             <% events.forEach(function(e) { %>
@@ -39,6 +77,7 @@
                 <div class="event-card-body">
                   <span class="event-card-date"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= e.startsLabel %></span>
                   <h3><%= e.title %></h3>
+                  <% if (e.categoryName) { %><span class="badge-pill" style="background: <%= e.categoryColor %>; color: #fff;"><%= e.categoryName %></span><% } %>
                   <% if (e.location) { %><p class="event-card-location"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= e.location %></p><% } %>
                 </div>
               </a>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/sections">&larr; Sections</a></p>
+    <h1><%= section.name %></h1>
+    <% if (section.description) { %><p class="hint"><%= section.description %></p><% } %>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/sections/<%= section.id %>/edit" class="stack-form member-form-page-panel">
+      <div class="member-form-grid">
+        <label>Section Name
+          <input type="text" name="name" value="<%= section.name %>" required />
+        </label>
+        <label class="member-form-full">Description
+          <input type="text" name="description" value="<%= section.description || '' %>" />
+        </label>
+      </div>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </form>
+
+    <h2>Members (<%= members.length %>)</h2>
+    <form method="POST" action="/main-admin/sections/<%= section.id %>/members/add" class="inline-block-form">
+      <select name="memberId" required>
+        <option value="">Add a member...</option>
+        <% available.forEach(function(m) { %>
+          <option value="<%= m.id %>"><%= m.name %> (<%= m.member_type %>)</option>
+        <% }); %>
+      </select>
+      <button type="submit" class="btn-secondary">+ Add</button>
+    </form>
+
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members in this section yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+              <tr>
+                <td class="roster-name-col"><%= m.name %></td>
+                <td><%= m.member_type %></td>
+                <td>
+                  <form method="POST" action="/main-admin/sections/<%= section.id %>/members/<%= m.id %>/remove" class="inline-block-form">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

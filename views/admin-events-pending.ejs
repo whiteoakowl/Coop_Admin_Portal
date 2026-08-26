@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
+      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
+      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
+      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
+      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Submitted Events</h1>
+    <p class="hint">Events members submitted for approval. Approving doesn't publish it - it just lets it into the regular Events list to edit and publish.</p>
+    <p><a href="/main-admin/events">&larr; Back to Events</a></p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (pending.length === 0) { %>
+      <p class="roster-empty">Nothing waiting on approval right now.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th></th></tr></thead>
+          <tbody>
+            <% pending.forEach(function(e) { %>
+              <tr>
+                <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
+                <td><%= e.startsLabel %></td>
+                <td><%= e.location || '—' %></td>
+                <td>
+                  <div class="roster-btn-row">
+                    <form method="POST" action="/main-admin/events/<%= e.id %>/decide" class="inline-block-form">
+                      <input type="hidden" name="decision" value="approve" />
+                      <button type="submit" class="roster-action-btn">Approve</button>
+                    </form>
+                    <form method="POST" action="/main-admin/events/<%= e.id %>/decide" class="inline-block-form">
+                      <input type="hidden" name="decision" value="reject" />
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

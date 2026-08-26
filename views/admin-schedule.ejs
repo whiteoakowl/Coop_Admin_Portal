@@ -30,7 +30,7 @@
           <a class="day-toggle-option<%= tab === 'monday' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Monday</a>
           <a class="day-toggle-option<%= tab === 'wednesday' ? ' active' : '' %>" href="/admin/schedule?tab=wednesday">Wednesday</a>
         </div>
-        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, colorPalette, availableStaff, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
+        <%- include('partials/class-schedule-grid', { day, dayLabel, error, notice, selectedDate, hours, roomGrid, rooms, gradeLevels, colorPalette, availableStaff, sections, absentIds, basePath: `/admin/schedule?tab=${tab}`, readOnly: !isFullAdmin }) %>
       <% } else if (tab === 'archive') { %>
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

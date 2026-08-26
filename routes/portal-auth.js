@@ -8,6 +8,8 @@ const db = require('../db');
 const { findAccountByEmail, verifyPassword, hashPassword } = require('../utils/portalAuth');
 const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
+const { GRADE_OPTIONS } = require('../utils/membership');
+const { isValidISODate } = require('../utils/dates');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -62,8 +64,26 @@ router.post('/logout', (req, res) => {
 
 router.get('/register', (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
-  res.render('portal-register', { title: 'Member Registration', error: null, formValues: {} });
+  res.render('portal-register', { title: 'Member Registration', error: null, formValues: {}, children: [], gradeOptions: GRADE_OPTIONS });
 });
+
+// multer isn't in play here (no file upload on this form), but the
+// "children[0][firstName]"-style bracket fields still need pulling out
+// of req.body into a real array the same way routes/membership.js's own
+// parseChildren does for the admin-entered Membership Form - same
+// bracket-naming convention, same reason (a removed block client-side
+// can leave the array sparse).
+function parseChildren(body) {
+  if (Array.isArray(body.children)) return body.children;
+  if (body.children && typeof body.children === 'object') {
+    return Object.keys(body.children).map((k) => body.children[k]);
+  }
+  return [];
+}
+
+function renderRegisterError(res, error, formValues, children) {
+  return res.render('portal-register', { title: 'Member Registration', error, formValues, children, gradeOptions: GRADE_OPTIONS });
+}
 
 // Self-registration creates a real member_accounts row with status
 // 'pending' - it grants NO portal access on its own. A Main Admin must
@@ -73,6 +93,14 @@ router.get('/register', (req, res) => {
 // someone the co-op already added by hand before self-service existed),
 // the new login links to that same profile instead of creating a
 // duplicate person.
+//
+// A real request: capture the family's children in this same submission
+// (instead of a parent registering, then somehow separately getting each
+// child added later) and, optionally per child, give that child their
+// own portal login too - a family with kids old enough to want their own
+// student-portal access shouldn't need a Main Admin to hand-create every
+// one of those accounts one at a time (though a Main Admin still can,
+// from Users > Create Account, for a member who didn't self-register).
 router.post('/register', async (req, res) => {
   const firstName = (req.body.firstName || '').trim();
   const lastName = (req.body.lastName || '').trim();
@@ -80,41 +108,129 @@ router.post('/register', async (req, res) => {
   const password = req.body.password || '';
   const formValues = { firstName, lastName, email };
 
+  const rawChildren = parseChildren(req.body).map((c, index) => ({ ...c, index }));
+  // A blank block the visitor never filled in (or removed down to zero
+  // fields client-side) is dropped rather than rejected - children are
+  // entirely optional on this form, unlike the admin Membership Form's
+  // "at least one child" requirement.
+  const children = rawChildren.filter((c) => c && ((c.firstName || '').trim() || (c.lastName || '').trim()));
+  // What re-renders the form on a validation error - every submitted
+  // block (even ones about to fail validation) so nothing the visitor
+  // already typed gets lost, but never their password.
+  const childrenForRerender = rawChildren.map((c) => ({ ...c, loginPassword: '', loginPasswordConfirm: '' }));
+
   if (!firstName || !lastName || !email || !password) {
-    return res.render('portal-register', { title: 'Member Registration', error: 'All fields are required.', formValues });
+    return renderRegisterError(res, 'All fields are required.', formValues, childrenForRerender);
   }
   if (password.length < 8) {
-    return res.render('portal-register', { title: 'Member Registration', error: 'Password must be at least 8 characters.', formValues });
+    return renderRegisterError(res, 'Password must be at least 8 characters.', formValues, childrenForRerender);
   }
   if (password !== req.body.confirmPassword) {
-    return res.render('portal-register', { title: 'Member Registration', error: 'Passwords do not match.', formValues });
+    return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender);
   }
-  if (await findAccountByEmail(email)) {
-    return res.render('portal-register', { title: 'Member Registration', error: 'An account with that email already exists. Try logging in instead.', formValues });
+
+  for (const c of children) {
+    if (!(c.firstName || '').trim() || !(c.lastName || '').trim()) {
+      return renderRegisterError(res, 'Each child needs both a first and last name.', formValues, childrenForRerender);
+    }
+    if (!c.wantsLogin) continue;
+    const childEmail = (c.loginEmail || '').trim();
+    const childPassword = c.loginPassword || '';
+    if (!childEmail || !childPassword) {
+      return renderRegisterError(res, `${c.firstName}'s portal login needs an email and password.`, formValues, childrenForRerender);
+    }
+    if (childPassword.length < 8) {
+      return renderRegisterError(res, `${c.firstName}'s password must be at least 8 characters.`, formValues, childrenForRerender);
+    }
+    if (childPassword !== c.loginPasswordConfirm) {
+      return renderRegisterError(res, `${c.firstName}'s passwords do not match.`, formValues, childrenForRerender);
+    }
+  }
+
+  // Every login email this submission is about to create, checked for
+  // collisions both against each other (two kids typing the same email)
+  // and against every existing account - a family accidentally reusing
+  // the parent's own email for a child's login is exactly the kind of
+  // mistake this needs to catch before anything is written.
+  const wantedEmails = [email, ...children.filter((c) => c.wantsLogin).map((c) => (c.loginEmail || '').trim())];
+  const seen = new Set();
+  for (const e of wantedEmails) {
+    const key = e.toLowerCase();
+    if (seen.has(key)) {
+      return renderRegisterError(res, 'Each login on this form needs its own, different email address.', formValues, childrenForRerender);
+    }
+    seen.add(key);
+  }
+  for (const e of wantedEmails) {
+    if (await findAccountByEmail(e)) {
+      return renderRegisterError(res, `${e} is already in use by another account. Try logging in instead, or use a different email.`, formValues, childrenForRerender);
+    }
   }
 
   const fullName = `${firstName} ${lastName}`;
-  let member = await db.prepare('SELECT * FROM members WHERE LOWER(email) = LOWER(?) AND email IS NOT NULL').get(email);
-  if (!member) {
-    let familyName = lastName;
-    let suffix = 2;
-    while (await db.prepare('SELECT 1 FROM families WHERE LOWER(name) = LOWER(?)').get(familyName)) {
-      familyName = `${lastName} (${suffix})`;
-      suffix += 1;
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
+
+  await db.withTransaction(async (tx) => {
+    let member = await tx.prepare('SELECT * FROM members WHERE LOWER(email) = LOWER(?) AND email IS NOT NULL').get(email);
+    let familyId = member ? member.family_id : null;
+    if (!member) {
+      let familyName = lastName;
+      let suffix = 2;
+      while (await tx.prepare('SELECT 1 FROM families WHERE LOWER(name) = LOWER(?)').get(familyName)) {
+        familyName = `${lastName} (${suffix})`;
+        suffix += 1;
+      }
+      familyId = (await tx.prepare('INSERT INTO families (name) VALUES (?)').run(familyName)).lastInsertRowid;
+      const code = await generateMemberCode(tx);
+      const info = await tx
+        .prepare("INSERT INTO members (name, barcode, member_code, member_type, email, family_id, is_primary_parent) VALUES (?, ?, ?, 'parent', ?, ?, 1)")
+        .run(fullName, code, code, email, familyId);
+      member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
     }
-    const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(familyName)).lastInsertRowid;
-    const code = await generateMemberCode();
-    const info = await db
-      .prepare("INSERT INTO members (name, barcode, member_code, member_type, email, family_id, is_primary_parent) VALUES (?, ?, ?, 'parent', ?, ?, 1)")
-      .run(fullName, code, code, email, familyId);
-    member = await db.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
-  }
 
-  await db
-    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
-    .run(member.id, email, hashPassword(password));
+    const parentAccountInfo = await tx
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
+      .run(member.id, email, hashPassword(password));
+    // The role is pre-granted now, not left for a Main Admin to remember
+    // as a second step after approving - middleware/portalAuth.js's own
+    // loadPortalSession only ever loads an 'active' account, so holding
+    // a role while still 'pending' grants nothing until a Main Admin
+    // actually approves it.
+    if (parentRole) {
+      await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(parentAccountInfo.lastInsertRowid, parentRole.id);
+    }
 
-  res.render('portal-register-submitted', { title: 'Registration Submitted' });
+    for (const c of children) {
+      const childCode = await generateMemberCode(tx);
+      const childInfo = await tx
+        .prepare(
+          `INSERT INTO members (name, barcode, member_code, member_type, family_id, birthday, grade_level, medical_notes)
+           VALUES (?, ?, ?, 'student', ?, ?, ?, ?)`
+        )
+        .run(
+          `${c.firstName.trim()} ${c.lastName.trim()}`,
+          childCode,
+          childCode,
+          familyId,
+          isValidISODate((c.birthdate || '').trim()) ? c.birthdate.trim() : null,
+          GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
+          (c.medicalNotes || '').trim() || null
+        );
+
+      if (c.wantsLogin) {
+        const childEmail = c.loginEmail.trim();
+        const childAccountInfo = await tx
+          .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
+          .run(childInfo.lastInsertRowid, childEmail, hashPassword(c.loginPassword));
+        if (studentRole) {
+          await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(childAccountInfo.lastInsertRowid, studentRole.id);
+        }
+      }
+    }
+  });
+
+  res.render('portal-register-submitted', { title: 'Registration Submitted', childLoginCount: children.filter((c) => c.wantsLogin).length });
 });
 
 // The portal switcher - shows one card per portal (role) the account

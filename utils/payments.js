@@ -6,8 +6,15 @@
 // rather than inventing their own "did they pay" flag.
 const db = require('../db');
 
-async function createCharge(memberId, accountId, sourceType, sourceId, description, amountCents) {
-  const info = await db
+// `dbHandle` defaults to the module-level connection but must be passed
+// explicitly as the transaction handle (`tx`) when called from inside
+// db.withTransaction - the test suite's embedded PGlite engine has no
+// connection pool, so a query against the outer `db` while a transaction
+// on that same single connection is still open never returns (see
+// utils/members.js's own generateMemberCode for the identical fix,
+// written for this same class of bug).
+async function createCharge(memberId, accountId, sourceType, sourceId, description, amountCents, dbHandle = db) {
+  const info = await dbHandle
     .prepare('INSERT INTO payment_charges (member_id, account_id, source_type, source_id, description, amount_cents) VALUES (?, ?, ?, ?, ?, ?)')
     .run(memberId, accountId, sourceType, sourceId, description, amountCents);
   return info.lastInsertRowid;

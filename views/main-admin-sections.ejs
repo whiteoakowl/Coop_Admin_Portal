@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Sections</h1>
+    <p class="hint">
+      A section is a named group of members (e.g. "Teen Co-op", "Homeschool Group A"), separate from Family. Events
+      and Classes can each optionally be restricted to specific sections only.
+    </p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/sections/new" class="stack-form member-form-page-panel">
+      <div class="member-form-grid">
+        <label>Section Name
+          <input type="text" name="name" placeholder="e.g. Teen Co-op" required />
+        </label>
+        <label class="member-form-full">Description
+          <input type="text" name="description" placeholder="Optional" />
+        </label>
+      </div>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">+ Add Section</button>
+        </div>
+      </div>
+    </form>
+
+    <% if (sections.length === 0) { %>
+      <p class="roster-empty">No sections yet - add one above.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Name</th><th>Description</th><th>Members</th><th></th></tr></thead>
+          <tbody>
+            <% sections.forEach(function(s) { %>
+              <tr>
+                <td class="roster-name-col"><a href="/main-admin/sections/<%= s.id %>"><%= s.name %></a></td>
+                <td><%= s.description || '—' %></td>
+                <td><%= s.memberCount %></td>
+                <td>
+                  <form method="POST" action="/main-admin/sections/<%= s.id %>/delete" class="inline-block-form" onsubmit="return confirm('Delete this section? Event/class restrictions using it will no longer apply.');">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>
