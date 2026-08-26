@@ -6114,6 +6114,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 @media (max-width: 640px) {
   .site-hero { padding: 3rem 1.25rem; }
   .site-section { padding: 2.5rem 1.25rem; }
+  /* Real bug caught by a site-wide audit crawl: .site-header never
+     wrapped, so the brand name plus both "Log In"/"Member Registration"
+     buttons together were wider than a phone screen, pushing the whole
+     page into horizontal overflow (the body's own blue background
+     showing as a sliver down the right edge of every section, not just
+     the header). Wrapping the actions onto their own line under the
+     brand is enough to fit at any width without shrinking the buttons'
+     own text/tap targets. */
+  .site-header { flex-wrap: wrap; }
+  .site-header-actions { flex-basis: 100%; justify-content: flex-end; }
 }
 
 /* Portal dashboards (Parent/Student/Teacher/Main Admin home pages) -

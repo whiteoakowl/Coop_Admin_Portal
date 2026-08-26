@@ -13,6 +13,17 @@ const { findAccountById, rolesForAccount, permissionsForAccount } = require('../
 // homepage) still show "My Portal" instead of "Log In" for a
 // signed-in visitor without every route needing its own lookup.
 async function loadPortalSession(req, res, next) {
+  // Always defined, signed in or not - a template can reference
+  // `portalAccount` directly (not every one remembers the `typeof
+  // portalAccount !== 'undefined'` guard the ones that DO expect a
+  // signed-out visitor use) without a bare reference throwing
+  // ReferenceError for a signed-out visitor, who never reaches the
+  // account lookup below. Caught by views/events-detail.ejs's own
+  // public event page crashing 500 for every signed-out visitor - the
+  // one place this had already gone unguarded.
+  res.locals.portalAccount = null;
+  res.locals.portalRoles = [];
+
   const accountId = req.session && req.session.portalAccountId;
   if (!accountId) return next();
   const account = await findAccountById(accountId);
