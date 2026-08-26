@@ -16,6 +16,7 @@ const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const store = require('../utils/store');
 const auditLog = require('../utils/auditLog');
+const { byLastName } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_store'));
 
@@ -117,7 +118,7 @@ router.post('/:id/image', upload.single('image'), async (req, res) => {
 router.get('/orders/all', async (req, res) => {
   const orders = await store.allOrders();
   const products = await store.listProducts({ availability: 'in_person' });
-  const members = await db.prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
   res.render('admin-store-orders', { title: 'Orders', orders, products, members, error: req.query.error || null, notice: req.query.notice || null });
 });
 

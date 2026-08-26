@@ -5,10 +5,10 @@
 </head>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Forums',
+    portalTitle: 'Chat',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
-      { href: '/forums', icon: 'users', label: 'Forums' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
     ],
   }) %>
 
@@ -94,7 +94,7 @@
       <div class="manage-section">
         <div class="grid-box-header"><h2>Move Thread</h2></div>
         <form method="POST" action="/forums/threads/<%= thread.id %>/move" class="inline-block-form">
-          <input type="number" name="categoryId" placeholder="Target forum ID" required />
+          <input type="number" name="categoryId" placeholder="Target chat ID" required />
           <button type="submit" class="roster-action-btn">Move</button>
         </form>
       </div>

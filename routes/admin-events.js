@@ -288,9 +288,10 @@ router.get('/:id/registrations', async (req, res) => {
   const event = await events.getEvent(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   const registrations = await events.registrationsForEvent(req.params.id);
-  const guestRegistrations = await db
-    .prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled' ORDER BY created_at")
-    .all(req.params.id);
+  const guestRegistrations = events.sortByLastNameField(
+    await db.prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled'").all(req.params.id),
+    'guest_name'
+  );
   res.render('admin-events-registrations', {
     title: `Registrations - ${event.title}`,
     event,

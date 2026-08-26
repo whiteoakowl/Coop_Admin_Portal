@@ -5,6 +5,7 @@
 // comment for why the field catalog is a fixed allowlist rather than
 // every members column.
 const db = require('../db');
+const { byLastName } = require('./members');
 
 const DIRECTORY_FIELDS = [
   { key: 'photo', label: 'Photo' },
@@ -54,15 +55,16 @@ async function setOptedOut(memberId, optedOut) {
 // row set a route then filters down to only the admin-enabled fields
 // before ever rendering it.
 async function listDirectoryMembers() {
-  return db
-    .prepare(
-      `SELECT m.*, f.name AS family_name
-       FROM members m
-       LEFT JOIN families f ON f.id = m.family_id
-       WHERE m.active = 1 AND m.id NOT IN (SELECT member_id FROM member_directory_opt_outs)
-       ORDER BY LOWER(m.name)`
-    )
-    .all();
+  return (
+    await db
+      .prepare(
+        `SELECT m.*, f.name AS family_name
+         FROM members m
+         LEFT JOIN families f ON f.id = m.family_id
+         WHERE m.active = 1 AND m.id NOT IN (SELECT member_id FROM member_directory_opt_outs)`
+      )
+      .all()
+  ).sort(byLastName);
 }
 
 async function getDirectoryMember(id) {

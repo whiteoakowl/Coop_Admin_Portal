@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Resource Links</h1>
+    <p class="hint">
+      A short, curated list of external links shown on member portals (currently Student Portal's own Resource Links
+      tab). Scope a link to one role, or leave it "Everyone" to show it on every portal.
+    </p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/admin/resource-links" class="stack-form member-form-page-panel">
+      <label class="member-form-full">Title
+        <input type="text" name="title" placeholder="e.g. Field Trip Permission Form" required />
+      </label>
+      <label class="member-form-full">URL
+        <input type="url" name="url" placeholder="https://..." required />
+      </label>
+      <label class="member-form-full">Description (optional)
+        <textarea name="description" rows="2" placeholder="A short note about this link"></textarea>
+      </label>
+      <label class="member-form-full">Show on
+        <select name="roleKey">
+          <option value="">Everyone (every portal)</option>
+          <% roles.forEach(function(r) { %>
+            <option value="<%= r.key %>"><%= r.label %> only</option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Add Link</button>
+        </div>
+      </div>
+    </form>
+
+    <h2>Current Links</h2>
+    <% if (links.length === 0) { %>
+      <p class="roster-empty">No resource links yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Title</th><th>URL</th><th>Shown On</th><th></th></tr></thead>
+          <tbody>
+            <% links.forEach(function(l) { %>
+              <tr>
+                <td class="roster-name-col"><%= l.title %></td>
+                <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
+                <td><%= l.role_key || 'Everyone' %></td>
+                <td>
+                  <form method="POST" action="/admin/resource-links/<%= l.id %>/delete" onsubmit="return confirm('Remove this link?');">
+                    <button type="submit" class="icon-btn" aria-label="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -11,7 +11,10 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
 const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
-const { formatDateLabel } = require('../utils/dates');
+const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
+const { byLastName } = require('../utils/members');
+const { buildRosterGridData } = require('../utils/rosterGrid');
+const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth, requirePortal('teacher'));
 
@@ -28,10 +31,40 @@ async function classesForTeacher(member) {
   return all.filter((c) => classIds.has(c.id));
 }
 
+// Announcements on the homepage - same site-wide + per-account
+// 'announcement' notification pattern Parent Portal's own home route
+// established (routes/parent-portal.js), reused as-is here since a
+// personal announcement is already filtered to the right audience at
+// send time (Main/Co-op Admin's own role-targeted "Send to" dropdown -
+// see routes/main-admin-announcements.js/routes/admin-announcements.js).
+async function announcementsForAccount(accountId) {
+  const siteRows = await db
+    .prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 10")
+    .all();
+  const personalRows = await notifications.listForAccount(accountId, { typeKey: 'announcement' });
+  return [
+    ...siteRows.map((a) => ({ title: a.title, body: a.body, dateLabel: formatFriendlyTimestamp(a.published_at), sortKey: a.published_at, isNew: false })),
+    ...personalRows.map((n) => ({ title: n.title, body: n.body, dateLabel: formatFriendlyTimestamp(n.created_at), sortKey: n.created_at, isNew: !n.read_at })),
+  ]
+    .sort((a, b) => (a.sortKey < b.sortKey ? 1 : -1))
+    .slice(0, 15);
+}
+
 router.get('/', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForTeacher(member);
-  res.render('teacher-home', { title: 'Teacher Portal', member, classes });
+  const announcements = await announcementsForAccount(req.portalAccount.id);
+  res.render('teacher-home', { title: 'Teacher Portal', member, classes, announcements });
+});
+
+// "Classes" tab - the same per-class cards the homepage used to show,
+// now its own page so Home can lead with Announcements instead (a real
+// request: teacher/student portal both get an explicit Classes tab,
+// separate from Home).
+router.get('/classes', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  res.render('teacher-classes', { title: 'My Classes', classes });
 });
 
 // Self-signup as a teacher or assistant on a class - a real request:
@@ -112,9 +145,9 @@ router.get('/classes/:id', async (req, res) => {
   if (!cls) {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
   }
-  const students = await db
-    .prepare(`SELECT m.* FROM class_enrollments ce JOIN members m ON m.id = ce.student_id WHERE ce.class_id = ? ORDER BY LOWER(m.name)`)
-    .all(cls.id);
+  const students = (
+    await db.prepare(`SELECT m.* FROM class_enrollments ce JOIN members m ON m.id = ce.student_id WHERE ce.class_id = ?`).all(cls.id)
+  ).sort(byLastName);
   const assignments = (await assignmentsForClass(cls.id)).map((a) => ({ ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null }));
   res.render('teacher-roster', { title: cls.class_name, cls, students, assignments, error: req.query.error || null, notice: req.query.notice || null });
 });
@@ -171,6 +204,112 @@ router.post('/assignments/:id/grades', async (req, res) => {
     await saveGrade({ assignmentId, studentId: row.student_id, pointsEarned, feedback, gradedByAccountId: req.portalAccount.id });
   }
   res.redirect(`/teacher/assignments/${assignmentId}?notice=` + encodeURIComponent('Grades saved.'));
+});
+
+// --- Attendance tab ---
+// A real request: teacher portal gets its own Attendance tab. Reuses the
+// exact same buildRosterGridData/attendance-grid.js auto-save pattern the
+// kiosk Class Check-In attendance screen already established
+// (routes/kiosk-class-checkin.js) - a teacher marking their own class's
+// attendance for today is the same trust level as a staff member running
+// that class at the kiosk, just reached through the portal instead.
+
+router.get('/attendance', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  res.render('teacher-attendance', { title: 'Attendance', classes });
+});
+
+router.get('/classes/:id/attendance', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher/attendance', backLabel: 'Back to Attendance' });
+  }
+  if (!cls.roster_id) {
+    return res.render('teacher-class-attendance', { title: `${cls.class_name} Attendance`, cls, dateLabel: formatDateLong(todayISO()), rows: [], summary: { present: 0, late: 0, absent: 0 } });
+  }
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
+  const today = todayISO();
+  const grid = await buildRosterGridData(roster, [today]);
+  res.render('teacher-class-attendance', {
+    title: `${cls.class_name} Attendance`,
+    cls,
+    dateLabel: formatDateLong(today),
+    rows: grid.rows,
+    summary: grid.summary[0] || { present: 0, late: 0, absent: 0 },
+  });
+});
+
+// Same status:<memberId>:<date> body-key convention as every other
+// attendance-grid.js consumer (admin-rosters.js, kiosk-class-checkin.js) -
+// public/js/attendance-grid.js drives this endpoint unmodified, just
+// pointed here via data-endpoint.
+router.post('/classes/:id/attendance', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const cls = classes.find((c) => c.id === parseInt(req.params.id, 10));
+  if (!cls || !cls.roster_id) return res.status(403).send('Not authorized');
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(cls.roster_id);
+  if (!roster) return res.status(404).send('Not found');
+
+  const upsert = db.prepare(
+    `INSERT INTO attendance (member_id, roster_id, session_date, status, source)
+     VALUES (?, ?, ?, ?, 'manual')
+     ON CONFLICT(member_id, roster_id, session_date) DO UPDATE SET
+       status = excluded.status,
+       source = 'manual'`
+  );
+  const clear = db.prepare('DELETE FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+
+  for (const key of Object.keys(req.body)) {
+    const match = /^status:(\d+):(\d{4}-\d{2}-\d{2})$/.exec(key);
+    if (!match) continue;
+    const [, memberId, date] = match;
+    const value = (req.body[key] || '').trim();
+    if (value === 'present' || value === 'late' || value === 'absent') {
+      await upsert.run(parseInt(memberId, 10), roster.id, date, value);
+    } else {
+      await clear.run(parseInt(memberId, 10), roster.id, date);
+    }
+  }
+
+  if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
+  res.redirect(`/teacher/classes/${cls.id}/attendance`);
+});
+
+// --- Assignments tab (across every class this teacher is staffed on) ---
+
+router.get('/assignments', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const assignmentsByClass = [];
+  for (const cls of classes) {
+    const assignments = (await assignmentsForClass(cls.id)).map((a) => ({ ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null }));
+    assignmentsByClass.push({ cls, assignments });
+  }
+  res.render('teacher-assignments', { title: 'Assignments', assignmentsByClass });
+});
+
+// --- Reports tab: a simple per-class grade summary ---
+
+router.get('/reports', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const reports = [];
+  for (const cls of classes) {
+    const assignments = await assignmentsForClass(cls.id);
+    const assignmentReports = [];
+    for (const a of assignments) {
+      const { rows } = await gradebookForAssignment(a.id);
+      const graded = rows.filter((r) => r.points_earned != null);
+      const avgPercent = graded.length && a.points_possible ? Math.round((graded.reduce((sum, r) => sum + Number(r.points_earned), 0) / graded.length / a.points_possible) * 100) : null;
+      assignmentReports.push({ assignment: a, gradedCount: graded.length, totalCount: rows.length, avgPercent });
+    }
+    reports.push({ cls, assignmentReports });
+  }
+  res.render('teacher-reports', { title: 'Reports', reports });
 });
 
 module.exports = router;

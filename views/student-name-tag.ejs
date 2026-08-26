@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
+      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
+      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Name Tag</h1>
+    <p class="hint">
+      Print your own name tag, using the design Main Admin/Co-op Admin has set up. You can't change the design here.
+    </p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (!member) { %>
+      <p class="roster-empty">No student profile found for your account.</p>
+    <% } else { %>
+      <form method="POST" action="/student/name-tag/print" target="_blank">
+        <p><strong><%= member.name %></strong></p>
+        <button type="submit" class="primary-btn">Print My Name Tag</button>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

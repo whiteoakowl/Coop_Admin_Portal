@@ -1373,12 +1373,14 @@ async function primaryParentIdsByFamily(familyIds) {
   // 'parent' record) has no representative here otherwise, so an admin's
   // enrolled kid never puts them on the day's roster despite being at
   // the co-op that day, same as any other parent would be.
-  const allParents = await db
-    .prepare(
-      `SELECT id, family_id, is_primary_parent, name FROM members
-       WHERE active = 1 AND member_type IN ('parent', 'admin') AND family_id IN (${placeholders}) ORDER BY LOWER(name)`
-    )
-    .all(...ids);
+  const allParents = (
+    await db
+      .prepare(
+        `SELECT id, family_id, is_primary_parent, name FROM members
+         WHERE active = 1 AND member_type IN ('parent', 'admin') AND family_id IN (${placeholders})`
+      )
+      .all(...ids)
+  ).sort(byLastName);
   const byFamily = {};
   allParents.forEach((p) => {
     const current = byFamily[p.family_id];

@@ -59,7 +59,7 @@
 //     scoped to the session-derived assignment id, not the client's own
 //     assertions. See each function's own comment for specifics.
 const db = require('../db');
-const { byLastName, teacherMemberIds } = require('./members');
+const { byLastName, lastNameOf, teacherMemberIds } = require('./members');
 
 const LESSON_TYPES = ['video', 'text', 'quiz'];
 const TRAINING_STATUSES = ['draft', 'published', 'archived'];
@@ -478,15 +478,16 @@ async function removeAssignment(assignmentId) {
 // The admin reporting table (module design item 14) - one row per
 // assignment for a given training.
 async function assignmentsForTraining(trainingId) {
-  return db
-    .prepare(
-      `SELECT ta.*, m.name AS "memberName", m.member_type AS "memberType"
-       FROM training_assignments ta
-       JOIN members m ON m.id = ta.member_id
-       WHERE ta.training_id = ?
-       ORDER BY LOWER(m.name)`
-    )
-    .all(trainingId);
+  return (
+    await db
+      .prepare(
+        `SELECT ta.*, m.name AS "memberName", m.member_type AS "memberType"
+         FROM training_assignments ta
+         JOIN members m ON m.id = ta.member_id
+         WHERE ta.training_id = ?`
+      )
+      .all(trainingId)
+  ).sort((a, b) => lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) || a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' }));
 }
 
 // The full drill-down behind clicking into one member/training

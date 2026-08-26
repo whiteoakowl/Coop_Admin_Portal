@@ -5,10 +5,10 @@
 </head>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Forums',
+    portalTitle: 'Chat',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
-      { href: '/forums', icon: 'users', label: 'Forums' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
     ],
   }) %>
 
@@ -19,9 +19,9 @@
         <a class="roster-action-btn" href="/forums/<%= category.id %>/new">+ New Thread</a>
       <% } %>
     </div>
-    <p><a href="/forums">&larr; All Forums</a></p>
+    <p><a href="/forums">&larr; All Chats</a></p>
     <% if (category.description) { %><p class="hint"><%= category.description %></p><% } %>
-    <% if (category.is_locked) { %><p class="hint">This forum is locked - only moderators can start new threads.</p><% } %>
+    <% if (category.is_locked) { %><p class="hint">This chat is locked - only moderators can start new threads.</p><% } %>
 
     <% if (threads.length === 0) { %>
       <p class="roster-empty">No threads yet &mdash; start one above.</p>

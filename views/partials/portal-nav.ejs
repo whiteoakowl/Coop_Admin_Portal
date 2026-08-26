@@ -45,7 +45,7 @@ const classLinks = typeof locals.classLinks !== 'undefined' ? locals.classLinks 
 // to administer - in this list instead of just tacking on a 13th item.
 const COMMUNITY_LINKS = [
   { href: '/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/forums', icon: 'users', label: 'Forums' },
+  { href: '/forums', icon: 'users', label: 'Chat' },
   { href: '/member-directory', icon: 'user', label: 'Member Directory' },
   { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -69,7 +69,7 @@ const COMMUNITY_LINKS = [
 // announcement or the newsletter itself), not as a standing nav tab.
 const COMMUNITY_LINKS_PARENT = [
   { href: '/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/forums', icon: 'users', label: 'Forums' },
+  { href: '/forums', icon: 'users', label: 'Chat' },
   { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
   { href: '/store', icon: 'grid', label: 'Store' },
@@ -78,7 +78,7 @@ const COMMUNITY_LINKS_PARENT = [
 ];
 const COMMUNITY_ADMIN_LINKS = [
   { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+  { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
   { href: '/main-admin/member-directory', icon: 'user', label: 'Member Directory' },
   { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -126,6 +126,7 @@ const communityLinks =
     <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
+    <a href="/portal/settings"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
     <% if (showSwitcher) { %>
       <details class="portal-switcher-details">
         <summary><svg class="icon"><use href="#icon-users"/></svg> Switch Portal</summary>
@@ -147,6 +148,7 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
+      <a class="admin-nav-right-link" href="/portal/settings" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>
         <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-users"/></svg></a>
       <% } %>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/teacher/reports', icon: 'file-text', label: 'Reports' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Attendance</h1>
+    <p class="hint">Pick a class to view or mark today's attendance.</p>
+
+    <% if (classes.length === 0) { %>
+      <p class="roster-empty">You're not staffed on any classes yet.</p>
+    <% } else { %>
+      <div class="training-lesson-list">
+        <% classes.forEach(function(c) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <svg class="icon"><use href="#icon-calendar-check"/></svg>
+              <div class="training-lesson-info">
+                <strong><%= c.class_name %></strong>
+                <span class="hint"><%= c.dayLabel %> &middot; <%= c.timeLabel %></span>
+              </div>
+              <a class="roster-action-btn" href="/teacher/classes/<%= c.id %>/attendance">Take Attendance</a>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

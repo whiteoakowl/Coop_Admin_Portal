@@ -7,6 +7,9 @@
 // migration).
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
@@ -16,14 +19,24 @@ const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
-const { familyOf } = require('../utils/members');
+const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
 const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
+const babysitters = require('../utils/babysitters');
+const { imageFileFilter } = require('../utils/uploads');
+const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 
 router.use(requirePortalAuth, requirePortal('parent'));
+
+const BABYSITTER_PHOTOS_BUCKET = 'private-babysitter-photos';
+const BABYSITTER_PHOTOS_DIR = path.join(__dirname, '..', 'private-uploads', 'babysitter-photos');
+const babysitterStorageClient = createStorageClient();
+if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
+const MAX_BABYSITTER_PHOTO_BYTES = 4 * 1024 * 1024;
+const uploadBabysitterPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BABYSITTER_PHOTO_BYTES }, fileFilter: imageFileFilter });
 
 // Every student in the signed-in parent's own family - the only students
 // this portal ever lets them register/view, enforced here (not just
@@ -32,9 +45,11 @@ router.use(requirePortalAuth, requirePortal('parent'));
 async function childrenForAccount(account) {
   const member = await memberForAccount(account.id);
   if (!member || !member.family_id) return [];
-  return db
-    .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'student' AND active = 1 ORDER BY LOWER(name)")
-    .all(member.family_id);
+  return (
+    await db
+      .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'student' AND active = 1")
+      .all(member.family_id)
+  ).sort(byLastName);
 }
 
 router.get('/', async (req, res) => {
@@ -255,6 +270,61 @@ router.post('/name-tags/print', async (req, res) => {
     badgeWidth: BADGE_WIDTH,
     badgeHeight: BADGE_HEIGHT,
   });
+});
+
+// Babysitter Directory - a real request: "It should appear on parent
+// portal to view directory. Parents can view or create a profile for
+// their child as well to be a babysitter." One page: the approved
+// directory, plus a create/edit form per one of the parent's own
+// children (childrenForAccount - the same "never trust a member id from
+// the request" rule this whole file already follows for class
+// registration).
+router.get('/babysitters', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const profileByChildId = {};
+  for (const child of children) profileByChildId[child.id] = await babysitters.profileForMember(child.id);
+  const directory = await babysitters.listApprovedProfiles();
+  res.render('parent-babysitters', {
+    title: 'Babysitter Directory',
+    children,
+    profileByChildId,
+    directory,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/babysitters/:memberId', uploadBabysitterPhoto.single('photo'), async (req, res) => {
+  const memberId = parseInt(req.params.memberId, 10);
+  const children = await childrenForAccount(req.portalAccount);
+  if (!children.some((c) => c.id === memberId)) {
+    return res.redirect('/parent/babysitters?error=' + encodeURIComponent('You can only manage a babysitter profile for your own children.'));
+  }
+
+  let photoKey = null;
+  if (req.file) {
+    if (babysitterStorageClient) {
+      photoKey = await uploadFile(babysitterStorageClient, BABYSITTER_PHOTOS_BUCKET, req.file.buffer, req.file.originalname, req.file.mimetype);
+    } else {
+      photoKey = generateKey(req.file.originalname);
+      fs.writeFileSync(path.join(BABYSITTER_PHOTOS_DIR, photoKey), req.file.buffer);
+    }
+  }
+
+  await babysitters.submitProfile(
+    memberId,
+    {
+      ageGrade: (req.body.ageGrade || '').trim(),
+      availability: (req.body.availability || '').trim(),
+      experience: (req.body.experience || '').trim(),
+      certifications: (req.body.certifications || '').trim(),
+      hourlyRate: (req.body.hourlyRate || '').trim(),
+      contactMethod: (req.body.contactMethod || '').trim(),
+      photoKey,
+    },
+    req.portalAccount.id
+  );
+  res.redirect('/parent/babysitters?notice=' + encodeURIComponent('Submitted for Main Admin review.'));
 });
 
 module.exports = router;

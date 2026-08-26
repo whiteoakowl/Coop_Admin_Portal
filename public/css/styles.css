@@ -1301,7 +1301,14 @@ body.public-page .roster-empty {
     z-index: 45;
     background: var(--accent);
     box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
-    padding: 0.4rem 0.6rem;
+    /* env(safe-area-inset-bottom) is 0 on most devices but real on a
+       notched/home-indicator phone (iPhone X+, with viewport-fit=cover
+       set in partials/head.ejs) - without it this bar sits flush against
+       the screen edge, right under the OS's own home-indicator gesture
+       strip, so its bottom row of tap targets is effectively unusable. A
+       real request: "on mobile view the orange menu bar at the bottom
+       should always be visible [and usable]." */
+    padding: 0.4rem 0.6rem calc(0.4rem + env(safe-area-inset-bottom));
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -1354,8 +1361,10 @@ body.public-page .roster-empty {
 
 @media (max-width: 860px) {
   /* Bottom padding clears the fixed .admin-mobile-tabs bar so page content
-     never sits underneath it. */
-  .admin-main { margin-left: 0; padding: 1.5rem 1.5rem 4.75rem; }
+     never sits underneath it - the extra env() term matches that bar's
+     own safe-area padding above, so the gap grows in step with it on a
+     notched/home-indicator phone instead of falling short. */
+  .admin-main { margin-left: 0; padding: 1.5rem 1.5rem calc(4.75rem + env(safe-area-inset-bottom)); }
 }
 
 /* A 2rem page title (see .admin-main h1's own comment) is wider than a
@@ -6151,3 +6160,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    every other .roster-table on the site to accommodate it. */
 .event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
 .event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; }
+
+/* Babysitter Directory - profile photo thumbnail, shown both on a
+   parent's own edit form (their current photo, before they replace it)
+   and on the directory's own cards. */
+.babysitter-photo-preview { width: 100%; max-width: 10rem; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); display: block; margin-bottom: 0.5rem; }

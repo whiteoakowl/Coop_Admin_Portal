@@ -8,24 +8,18 @@
     portalTitle: 'Student Portal',
     navLinks: [
       { href: '/student', icon: 'home', label: 'Home' },
-      { href: '/student/classes', icon: 'graduation-cap', label: 'My Classes' },
+      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
       { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
-      { href: '/student/transcript', icon: 'file-text', label: 'Transcript' },
-      { href: '/student/diploma', icon: 'badge', label: 'Diploma' },
+      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
+      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
+      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
-
-    <div class="portal-dashboard-grid">
-      <section class="portal-dashboard-card">
-        <h2>My Classes</h2>
-        <p class="portal-dashboard-stat"><%= classes.length %></p>
-        <p class="hint">class<%= classes.length === 1 ? '' : 'es' %> this term</p>
-        <a class="roster-action-btn" href="/student/classes">View My Classes</a>
-      </section>
-    </div>
 
     <section class="portal-dashboard-section">
       <h2>Announcements</h2>
@@ -35,7 +29,10 @@
         <div class="site-announcement-list">
           <% announcements.forEach(function(a) { %>
             <div class="site-announcement-card">
-              <span class="site-announcement-date"><%= a.publishedLabel %></span>
+              <span class="site-announcement-date">
+                <%= a.dateLabel %>
+                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+              </span>
               <h3><%= a.title %></h3>
               <p><%= a.body %></p>
             </div>
@@ -43,6 +40,15 @@
         </div>
       <% } %>
     </section>
+
+    <div class="portal-dashboard-grid">
+      <section class="portal-dashboard-card">
+        <h2>My Classes</h2>
+        <p class="portal-dashboard-stat"><%= classes.length %></p>
+        <p class="hint">class<%= classes.length === 1 ? '' : 'es' %> this term</p>
+        <a class="roster-action-btn" href="/student/classes">View My Classes</a>
+      </section>
+    </div>
   </main>
 </body>
 </html>

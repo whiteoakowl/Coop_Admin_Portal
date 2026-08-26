@@ -93,6 +93,8 @@ const adminLibraryRouter = require('./routes/admin-library');
 const adminDesignRouter = require('./routes/admin-design');
 const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
 const adminMembersRouter = require('./routes/admin-members');
+const adminAnnouncementsRouter = require('./routes/admin-announcements');
+const adminResourceLinksRouter = require('./routes/admin-resource-links');
 const adminSearchRouter = require('./routes/admin-search');
 const adminVolunteersRouter = require('./routes/admin-volunteers');
 const adminSubstitutesRouter = require('./routes/admin-substitutes');
@@ -119,6 +121,11 @@ const mainAdminMembersRouter = require('./routes/main-admin-members');
 // Compose/send an announcement, shown on the recipient's portal home page
 // - same sibling-router shape as mainAdminMembersRouter above.
 const mainAdminAnnouncementsRouter = require('./routes/main-admin-announcements');
+// Curated resource links shown on member portals (currently just Student
+// Portal) - same sibling-router shape as mainAdminAnnouncementsRouter.
+const mainAdminResourceLinksRouter = require('./routes/main-admin-resource-links');
+// Babysitter Directory approval queue - same sibling-router shape.
+const mainAdminBabysittersRouter = require('./routes/main-admin-babysitters');
 // Named groups of members (independent of Family) that Events/Classes can
 // optionally restrict registration to - same sibling-router shape.
 const mainAdminSectionsRouter = require('./routes/main-admin-sections');
@@ -186,6 +193,7 @@ const adminNotificationsRouter = require('./routes/admin-notifications');
 // /main-admin/publications (both manage_publications, already
 // pre-seeded).
 const photosRouter = require('./routes/photos');
+const babysittersRouter = require('./routes/babysitters');
 const adminPhotosRouter = require('./routes/admin-photos');
 const publicationsRouter = require('./routes/publications');
 const adminPublicationsRouter = require('./routes/admin-publications');
@@ -379,6 +387,8 @@ app.use('/parent', parentPortalRouter);
 app.use('/main-admin', mainAdminRouter);
 app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
+app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);
+app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
 app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/events', eventsRouter);
@@ -402,6 +412,7 @@ app.use('/main-admin/newsletter', adminNewsletterRouter);
 app.use('/notifications', notificationsRouter);
 app.use('/main-admin/notifications', adminNotificationsRouter);
 app.use('/photos', photosRouter);
+app.use('/babysitters', babysittersRouter);
 app.use('/main-admin/photos', adminPhotosRouter);
 app.use('/publications', publicationsRouter);
 app.use('/main-admin/publications', adminPublicationsRouter);
@@ -454,6 +465,8 @@ app.use('/admin', adminMiscBadgesRouter);
 app.use('/admin', adminMembersRouter);
 app.use('/admin', adminSearchRouter);
 app.use('/admin', adminNameTagRouter);
+app.use('/admin', adminAnnouncementsRouter);
+app.use('/admin', adminResourceLinksRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });

@@ -5,6 +5,7 @@
 // student_academic_history's "only written going forward" limitation.
 const db = require('../db');
 const { formatDateLabel, formatFriendlyTimestamp } = require('./dates');
+const { lastNameOf } = require('./members');
 
 async function assignmentsForClass(classId) {
   return db.prepare('SELECT * FROM class_assignments WHERE class_id = ? ORDER BY due_date IS NULL, due_date DESC, created_at DESC').all(classId);
@@ -27,16 +28,17 @@ async function createAssignment({ classId, className, title, description, dueDat
 async function gradebookForAssignment(assignmentId) {
   const assignment = await getAssignment(assignmentId);
   if (!assignment) return null;
-  const rows = await db
-    .prepare(
-      `SELECT m.id AS student_id, m.name AS student_name, ag.points_earned, ag.feedback
-       FROM class_enrollments ce
-       JOIN members m ON m.id = ce.student_id
-       LEFT JOIN assignment_grades ag ON ag.assignment_id = ? AND ag.student_id = m.id
-       WHERE ce.class_id = ? AND m.active = 1
-       ORDER BY LOWER(m.name)`
-    )
-    .all(assignmentId, assignment.class_id);
+  const rows = (
+    await db
+      .prepare(
+        `SELECT m.id AS student_id, m.name AS student_name, ag.points_earned, ag.feedback
+         FROM class_enrollments ce
+         JOIN members m ON m.id = ce.student_id
+         LEFT JOIN assignment_grades ag ON ag.assignment_id = ? AND ag.student_id = m.id
+         WHERE ce.class_id = ? AND m.active = 1`
+      )
+      .all(assignmentId, assignment.class_id)
+  ).sort((a, b) => lastNameOf(a.student_name).localeCompare(lastNameOf(b.student_name), undefined, { sensitivity: 'base' }) || a.student_name.localeCompare(b.student_name, undefined, { sensitivity: 'base' }));
   return { assignment, rows };
 }
 

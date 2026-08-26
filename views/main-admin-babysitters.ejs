@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Babysitter Directory</h1>
+    <p class="hint">Every submission and edit needs your review before it shows up in the directory.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (profiles.length === 0) { %>
+      <p class="roster-empty">No babysitter profiles yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Name</th><th>Age/Grade</th><th>Rate</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <% profiles.forEach(function(p) { %>
+              <tr>
+                <td class="roster-name-col"><%= p.member_name %></td>
+                <td><%= p.age_grade || '—' %></td>
+                <td><%= p.hourly_rate || '—' %></td>
+                <td>
+                  <span class="badge-pill <%= p.status === 'approved' ? 'badge-pill-present' : p.status === 'pending' ? 'badge-pill-pending' : 'badge-pill-absent' %>">
+                    <%= p.status %>
+                  </span>
+                </td>
+                <td>
+                  <% if (p.status === 'pending') { %>
+                    <form method="POST" action="/main-admin/babysitters/<%= p.id %>/approve" style="display:inline">
+                      <button type="submit" class="roster-action-btn">Approve</button>
+                    </form>
+                    <form method="POST" action="/main-admin/babysitters/<%= p.id %>/reject" style="display:inline">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

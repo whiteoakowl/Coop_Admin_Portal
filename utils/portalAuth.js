@@ -8,6 +8,7 @@
 // reach - see middleware/portalAuth.js for how routes enforce that.
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const { byLastName } = require('./members');
 
 async function findAccountByEmail(email) {
   return db.prepare('SELECT * FROM member_accounts WHERE LOWER(email) = LOWER(?)').get((email || '').trim());
@@ -75,7 +76,7 @@ async function familyForAccount(accountId) {
   const self = await memberForAccount(accountId);
   if (!self) return [];
   if (!self.family_id) return [self];
-  const rest = await db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1 ORDER BY LOWER(name)').all(self.family_id, self.id);
+  const rest = (await db.prepare('SELECT * FROM members WHERE family_id = ? AND id != ? AND active = 1').all(self.family_id, self.id)).sort(byLastName);
   return [self, ...rest];
 }
 

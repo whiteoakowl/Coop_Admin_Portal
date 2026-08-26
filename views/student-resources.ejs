@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
+      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
+      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Resource Links</h1>
+    <p class="hint">Links your teachers or the co-op have shared for you.</p>
+
+    <% if (links.length === 0) { %>
+      <p class="roster-empty">No resource links yet.</p>
+    <% } else { %>
+      <div class="training-lesson-list">
+        <% links.forEach(function(l) { %>
+          <div class="training-lesson-row">
+            <div class="training-lesson-row-main">
+              <svg class="icon"><use href="#icon-book"/></svg>
+              <div class="training-lesson-info">
+                <strong><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.title %></a></strong>
+                <% if (l.description) { %><span class="hint"><%= l.description %></span><% } %>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

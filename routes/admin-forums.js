@@ -16,36 +16,36 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 router.get('/', async (req, res) => {
   const categories = await forums.listCategories();
   const classes = await db.prepare('SELECT id, class_name FROM classes ORDER BY LOWER(class_name)').all();
-  res.render('admin-forums-list', { title: 'Forums', categories, classes, notice: req.query.notice || null, error: req.query.error || null });
+  res.render('admin-forums-list', { title: 'Chat', categories, classes, notice: req.query.notice || null, error: req.query.error || null });
 });
 
 router.post('/', async (req, res) => {
   const name = (req.body.name || '').trim();
   const scope = req.body.scope === 'class' ? 'class' : 'general';
   if (!name) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Name is required.'));
-  if (scope === 'class' && !req.body.classId) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Choose a class for a private class forum.'));
+  if (scope === 'class' && !req.body.classId) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Choose a class for a private class chat.'));
   await forums.createCategory({ name, description: (req.body.description || '').trim(), scope, classId: req.body.classId ? parseInt(req.body.classId, 10) : null });
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Forum created.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat created.'));
 });
 
 router.post('/:id/lock', async (req, res) => {
   await forums.setCategoryLocked(req.params.id, true);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Forum locked - only moderators can post new threads.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat locked - only moderators can post new threads.'));
 });
 
 router.post('/:id/unlock', async (req, res) => {
   await forums.setCategoryLocked(req.params.id, false);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Forum unlocked.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat unlocked.'));
 });
 
 router.post('/:id/delete', async (req, res) => {
   await forums.deleteCategory(req.params.id);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Forum deleted.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat deleted.'));
 });
 
 router.get('/moderation-log', async (req, res) => {
   const entries = await forums.moderationLog();
-  res.render('admin-forums-log', { title: 'Forum Moderation Log', entries });
+  res.render('admin-forums-log', { title: 'Chat Moderation Log', entries });
 });
 
 module.exports = router;

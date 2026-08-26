@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Settings',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Settings</h1>
+    <p class="hint">Account-level settings - the same no matter which portal you're signed into.</p>
+
+    <div class="training-lesson-list">
+      <div class="training-lesson-row">
+        <div class="training-lesson-row-main">
+          <svg class="icon"><use href="#icon-lock"/></svg>
+          <div class="training-lesson-info">
+            <strong>My Privacy</strong>
+            <span class="hint">Choose whether you or your family appear in the Member Directory.</span>
+          </div>
+          <div class="training-lesson-actions">
+            <a class="roster-action-btn" href="/member-directory/mine">Manage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

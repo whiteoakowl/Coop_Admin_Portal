@@ -36,7 +36,7 @@ async function loadCategory(req, res, next) {
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
   const family = await familyForAccount(req.portalAccount.id);
   if (!(await forums.canAccessCategory(category, family))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this forum.", backHref: '/forums', backLabel: 'Back to Forums' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
   }
   req.category = category;
   req.family = family;
@@ -51,7 +51,7 @@ async function loadThread(req, res, next) {
   const category = await forums.getCategory(thread.category_id);
   const family = await familyForAccount(req.portalAccount.id);
   if (!(await forums.canAccessCategory(category, family))) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this forum.", backHref: '/forums', backLabel: 'Back to Forums' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have access to this chat.", backHref: '/forums', backLabel: 'Back to Chat' });
   }
   req.thread = thread;
   req.category = category;
@@ -61,7 +61,7 @@ async function loadThread(req, res, next) {
 router.get('/', async (req, res) => {
   const family = await familyForAccount(req.portalAccount.id);
   const categories = await forums.accessibleCategories(family);
-  res.render('forums-list', { title: 'Forums', categories });
+  res.render('forums-list', { title: 'Chat', categories });
 });
 
 router.get('/:categoryId', loadCategory, async (req, res) => {
@@ -71,14 +71,14 @@ router.get('/:categoryId', loadCategory, async (req, res) => {
 
 router.get('/:categoryId/new', loadCategory, async (req, res) => {
   if (req.category.is_locked && !canModerate(req)) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: 'This forum is locked - only moderators can start new threads.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked - only moderators can start new threads.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
   res.render('forums-new-thread', { title: `New Thread - ${req.category.name}`, category: req.category, error: req.query.error || null });
 });
 
 router.post('/:categoryId/threads', loadCategory, async (req, res) => {
   if (req.category.is_locked && !canModerate(req)) {
-    return res.status(403).render('403', { title: 'Not Authorized', message: 'This forum is locked.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
+    return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
   const title = (req.body.title || '').trim();
   const body = (req.body.body || '').trim();
@@ -136,7 +136,7 @@ router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res
 });
 
 function requireModerator(req, res, next) {
-  if (!canModerate(req)) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate forums.", backHref: '/forums', backLabel: 'Back to Forums' });
+  if (!canModerate(req)) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate chats.", backHref: '/forums', backLabel: 'Back to Chat' });
   next();
 }
 
@@ -178,7 +178,7 @@ router.post('/threads/:threadId/unarchive', loadThread, requireModerator, async 
 router.post('/threads/:threadId/move', loadThread, requireModerator, async (req, res) => {
   const newCategoryId = parseInt(req.body.categoryId, 10);
   const target = await forums.getCategory(newCategoryId);
-  if (!target) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('That forum does not exist.'));
+  if (!target) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('That chat does not exist.'));
   await forums.moveThread(req.thread.id, newCategoryId, req.portalAccount.id);
   res.redirect(`/forums/threads/${req.thread.id}`);
 });

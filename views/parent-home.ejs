@@ -10,6 +10,7 @@
       { href: '/parent', icon: 'home', label: 'Home' },
       { href: '/parent/library', icon: 'book', label: 'Library' },
       { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
     ],
     classLinks: [
       { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
@@ -18,6 +19,26 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
+
+    <section class="portal-dashboard-section">
+      <h2>Announcements</h2>
+      <% if (announcements.length === 0) { %>
+        <p class="roster-empty">No announcements right now.</p>
+      <% } else { %>
+        <div class="site-announcement-list">
+          <% announcements.forEach(function(a) { %>
+            <div class="site-announcement-card">
+              <span class="site-announcement-date">
+                <%= a.dateLabel %>
+                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+              </span>
+              <h3><%= a.title %></h3>
+              <p><%= a.body %></p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
 
     <div class="portal-dashboard-grid">
       <section class="portal-dashboard-card">
@@ -49,26 +70,6 @@
         </ul>
       </section>
     </div>
-
-    <section class="portal-dashboard-section">
-      <h2>Announcements</h2>
-      <% if (announcements.length === 0) { %>
-        <p class="roster-empty">No announcements right now.</p>
-      <% } else { %>
-        <div class="site-announcement-list">
-          <% announcements.forEach(function(a) { %>
-            <div class="site-announcement-card">
-              <span class="site-announcement-date">
-                <%= a.dateLabel %>
-                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
-              </span>
-              <h3><%= a.title %></h3>
-              <p><%= a.body %></p>
-            </div>
-          <% }); %>
-        </div>
-      <% } %>
-    </section>
   </main>
 </body>
 </html>

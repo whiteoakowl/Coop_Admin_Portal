@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/teacher/reports', icon: 'file-text', label: 'Reports' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/teacher/attendance">&larr; Back to Attendance</a></p>
+    <h1><%= cls.class_name %> Attendance</h1>
+    <p class="hint"><%= dateLabel %></p>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No students are enrolled in this class.</p>
+    <% } else { %>
+      <div class="legend">
+        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+        <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+        <span id="roster-save-status" class="volunteer-save-status"></span>
+      </div>
+      <div class="roster-scroll">
+        <table class="roster-table roster-table-detailed">
+          <thead>
+            <tr>
+              <th class="roster-name-col">Name</th>
+              <th>Status</th>
+              <th>Checked In</th>
+              <th>Checked Out</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(row) { %>
+              <% var cell = row.cells[0]; %>
+              <tr>
+                <td class="roster-name-col"><%= row.member.name %></td>
+                <td>
+                  <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-endpoint="/teacher/classes/<%= cls.id %>/attendance" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %>">
+                    <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
+                    <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
+                    <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>
+                    <option value="absent" <%= cell.status === 'absent' ? 'selected' : '' %>>A</option>
+                  </select>
+                </td>
+                <td><%= cell.checkInTime || '—' %></td>
+                <td><%= cell.checkOutTime || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+          <tfoot>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Present</td>
+              <td><span class="summary-badge summary-present"><%= summary.present %></span></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Late</td>
+              <td><span class="summary-badge summary-late"><%= summary.late %></span></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr class="roster-summary-row">
+              <td class="roster-summary-label">Absent</td>
+              <td><span class="summary-badge summary-absent"><%= summary.absent %></span></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/attendance-grid.js"></script>
+</body>
+</html>

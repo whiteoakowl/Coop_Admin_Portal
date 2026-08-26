@@ -1,5 +1,12 @@
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<%# viewport-fit=cover is what makes env(safe-area-inset-*) resolve to a
+    real value instead of 0 on notched/home-indicator phones (iPhone X+) -
+    without it the fixed bottom nav bar (.admin-mobile-tabs) sits flush
+    against the very edge of the screen, under the OS's own home-indicator
+    gesture strip, so the bottom row of its tap targets is effectively
+    unusable/invisible under that overlay. See styles.css's own comment on
+    .admin-mobile-tabs' safe-area padding for the other half of this fix. %>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <%# Empty (not omitted) on every public/kiosk page - there's no admin
     session to hold a token for there, and none of those routes are
     CSRF-checked (see middleware/csrfProtection.js). public/js/csrf.js

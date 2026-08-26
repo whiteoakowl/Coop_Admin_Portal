@@ -5,18 +5,18 @@
 </head>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Forums',
+    portalTitle: 'Chat',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
-      { href: '/forums', icon: 'users', label: 'Forums' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Forums</h1>
+    <h1>Chat</h1>
 
     <% if (categories.length === 0) { %>
-      <p class="roster-empty">No forums yet.</p>
+      <p class="roster-empty">No chats yet.</p>
     <% } else { %>
       <div class="team-card-grid">
         <% categories.forEach(function(c) { %>

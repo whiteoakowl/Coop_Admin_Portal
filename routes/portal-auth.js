@@ -252,4 +252,17 @@ router.get('/portal', async (req, res) => {
   res.render('portal-switcher', { title: 'My Portals', roles, portalHomeRoutes: PORTAL_HOME_ROUTES });
 });
 
+// Account-level settings (not tied to any one portal role) - reached via
+// the gear icon every portal's own top bar now shows (partials/portal-
+// nav.ejs). A real request: "my privacy on parent portal should be
+// included in the gear settings button that should be on every portal."
+// Just a links page today (My Privacy -> /member-directory/mine); a
+// natural home for any future account-level setting (there's no self-
+// service password change yet, for instance) without needing a new gear
+// button added per portal each time.
+router.get('/portal/settings', (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fsettings');
+  res.render('portal-settings', { title: 'Settings' });
+});
+
 module.exports = router;

@@ -10,6 +10,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const customForms = require('../utils/customForms');
 const auditLog = require('../utils/auditLog');
+const { byLastName } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forms'));
 
@@ -31,7 +32,7 @@ async function loadBuilder(req, res) {
   const fields = await customForms.fieldsForForm(form.id);
   const assignments = await customForms.assignmentsForForm(form.id);
   const roles = await db.prepare('SELECT id, key, label FROM roles ORDER BY label').all();
-  const members = await db.prepare("SELECT id, name FROM members WHERE active = 1 ORDER BY LOWER(name)").all();
+  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
   res.render('admin-custom-forms-builder', {
     title: form.title,
     form,

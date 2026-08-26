@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
+      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
+      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Babysitter Profile</h1>
+    <p class="hint">
+      Every new profile, and every edit to an existing one, needs Main Admin's approval before it appears in the
+      Babysitter Directory.
+    </p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (!member) { %>
+      <p class="roster-empty">No student profile found for your account.</p>
+    <% } else { %>
+      <% if (profile) { %>
+        <p>
+          Status:
+          <span class="badge-pill <%= profile.status === 'approved' ? 'badge-pill-present' : profile.status === 'pending' ? 'badge-pill-pending' : 'badge-pill-absent' %>">
+            <%= profile.status %>
+          </span>
+        </p>
+      <% } %>
+      <form method="POST" action="/student/babysitter" enctype="multipart/form-data" class="stack-form member-form-page-panel">
+        <label class="member-form-full">Age/Grade
+          <input type="text" name="ageGrade" value="<%= profile ? profile.age_grade || '' : '' %>" placeholder="e.g. 15 / 9th grade" />
+        </label>
+        <label class="member-form-full">Availability
+          <textarea name="availability" rows="2" placeholder="e.g. Weekends, evenings after 5pm"><%= profile ? profile.availability || '' : '' %></textarea>
+        </label>
+        <label class="member-form-full">Experience
+          <textarea name="experience" rows="2" placeholder="Babysitting experience, ages watched, etc."><%= profile ? profile.experience || '' : '' %></textarea>
+        </label>
+        <label class="member-form-full">Certifications
+          <input type="text" name="certifications" value="<%= profile ? profile.certifications || '' : '' %>" placeholder="e.g. CPR certified, Red Cross Babysitting Course" />
+        </label>
+        <label class="member-form-full">Hourly Rate
+          <input type="text" name="hourlyRate" value="<%= profile ? profile.hourly_rate || '' : '' %>" placeholder="e.g. $12/hr" />
+        </label>
+        <label class="member-form-full">Contact Method
+          <input type="text" name="contactMethod" value="<%= profile ? profile.contact_method || '' : '' %>" placeholder="e.g. Text (555) 555-1234" />
+        </label>
+        <label class="member-form-full">Photo
+          <% if (profile && profile.photo_key) { %>
+            <img src="/babysitters/<%= profile.id %>/photo" alt="" class="babysitter-photo-preview" />
+          <% } %>
+          <input type="file" name="photo" accept="image/*" />
+        </label>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn"><%= profile ? 'Save Changes' : 'Submit Profile' %></button>
+          </div>
+        </div>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -11,6 +11,8 @@
       { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
       { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
@@ -19,7 +21,7 @@
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
       { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
-      { href: '/main-admin/forums', icon: 'users', label: 'Forums' },
+      { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
       { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
       { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
       { href: '/main-admin/store', icon: 'tag', label: 'Store' },
@@ -33,8 +35,8 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
-      <h1>Forums</h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-forum-dialog').showModal()">+ New Forum</button>
+      <h1>Chat</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-forum-dialog').showModal()">+ New Chat</button>
     </div>
     <p><a href="/main-admin/forums/moderation-log">View Moderation Log</a></p>
 
@@ -42,7 +44,7 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (categories.length === 0) { %>
-      <p class="roster-empty">No forums yet &mdash; create one above.</p>
+      <p class="roster-empty">No chats yet &mdash; create one above.</p>
     <% } %>
 
     <div class="team-card-grid">
@@ -70,7 +72,7 @@
 
     <dialog id="new-forum-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/forums">
-        <h3>New Forum</h3>
+        <h3>New Chat</h3>
         <label>Name
           <input type="text" name="name" required />
         </label>
@@ -80,7 +82,7 @@
         <label>Type
           <select name="scope" onchange="document.getElementById('forum-class-field').style.display = this.value === 'class' ? '' : 'none';">
             <option value="general">General (any signed-in member)</option>
-            <option value="class">Private Class Forum</option>
+            <option value="class">Private Class Chat</option>
           </select>
         </label>
         <label id="forum-class-field" style="display: none;">Class

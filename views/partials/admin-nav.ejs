@@ -23,6 +23,8 @@
       <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg> Library</a>
       <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg> Documents</a>
       <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg> Design/Print</a>
+      <a href="/admin/announcements"><svg class="icon"><use href="#icon-bell"/></svg> Announcements</a>
+      <a href="/admin/resource-links"><svg class="icon"><use href="#icon-book"/></svg> Resource Links</a>
     <% } %>
   </nav>
   <div class="admin-sidebar-bottom">
@@ -34,7 +36,7 @@
         one does. It goes to /portal, which sends a signed-out visitor
         through /login same as any other portal-to-portal jump. %>
     <a href="/portal"><svg class="icon"><use href="#icon-users"/></svg> My Portals</a>
-    <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
+    <a href="/admin/settings"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
     </form>
@@ -73,7 +75,7 @@
       <% } %>
       <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
       <a class="admin-nav-right-link" href="/portal" aria-label="My Portals"><svg class="icon"><use href="#icon-users"/></svg></a>
-      <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-sliders"/></svg></a>
+      <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <form method="POST" action="/admin/logout" class="logout-form">
         <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
       </form>
@@ -94,6 +96,8 @@
     <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg><span>Library</span></a>
     <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg><span>Documents</span></a>
     <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg><span>Design/Print</span></a>
+    <a href="/admin/announcements"><svg class="icon"><use href="#icon-bell"/></svg><span>Announcements</span></a>
+    <a href="/admin/resource-links"><svg class="icon"><use href="#icon-book"/></svg><span>Resource Links</span></a>
   <% } %>
 </nav>
 

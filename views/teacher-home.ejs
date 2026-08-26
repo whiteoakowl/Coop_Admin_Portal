@@ -8,16 +8,42 @@
     portalTitle: 'Teacher Portal',
     navLinks: [
       { href: '/teacher', icon: 'home', label: 'Home' },
-      { href: '/teacher/browse-classes', icon: 'graduation-cap', label: 'Sign Up to Teach' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/teacher/reports', icon: 'file-text', label: 'Reports' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
-    <p class="hint">Your classes and their rosters.</p>
 
+    <section class="portal-dashboard-section">
+      <h2>Announcements</h2>
+      <% if (announcements.length === 0) { %>
+        <p class="roster-empty">No announcements right now.</p>
+      <% } else { %>
+        <div class="site-announcement-list">
+          <% announcements.forEach(function(a) { %>
+            <div class="site-announcement-card">
+              <span class="site-announcement-date">
+                <%= a.dateLabel %>
+                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+              </span>
+              <h3><%= a.title %></h3>
+              <p><%= a.body %></p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+
+    <p class="hint">Your classes and their rosters.</p>
     <% if (classes.length === 0) { %>
-      <p class="roster-empty">You're not staffed on any classes yet. Contact an admin if this looks wrong.</p>
+      <p class="roster-empty">You're not staffed on any classes yet. Contact an admin if this looks wrong. <a href="/teacher/browse-classes">Sign up to teach a class &rarr;</a></p>
     <% } else { %>
       <div class="portal-dashboard-grid">
         <% classes.forEach(function(c) { %>
@@ -31,6 +57,7 @@
           </section>
         <% }); %>
       </div>
+      <p><a href="/teacher/browse-classes">+ Sign up to teach another class</a></p>
     <% } %>
   </main>
 </body>

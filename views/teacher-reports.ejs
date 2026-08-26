@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/teacher/reports', icon: 'file-text', label: 'Reports' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Reports</h1>
+    <p class="hint">A quick grading-progress summary for each of your classes.</p>
+
+    <% if (reports.length === 0) { %>
+      <p class="roster-empty">You're not staffed on any classes yet.</p>
+    <% } else { %>
+      <% reports.forEach(function(group) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2><%= group.cls.class_name %></h2></div>
+          <% if (group.assignmentReports.length === 0) { %>
+            <p class="roster-empty">No assignments yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table">
+                <thead><tr><th>Assignment</th><th>Graded</th><th>Class Average</th></tr></thead>
+                <tbody>
+                  <% group.assignmentReports.forEach(function(r) { %>
+                    <tr>
+                      <td class="roster-name-col"><%= r.assignment.title %></td>
+                      <td><%= r.gradedCount %>/<%= r.totalCount %></td>
+                      <td><%= r.avgPercent != null ? r.avgPercent + '%' : '—' %></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

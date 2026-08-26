@@ -22,7 +22,17 @@ const db = require('../db');
 const { eventSectionIds, memberSatisfiesRestriction, sectionIdsForMember } = require('./sections');
 const { createCharge, amountPaidForCharge, cancelCharge } = require('./payments');
 const { GRADE_OPTIONS } = require('./membership');
+const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
+
+// A real request: "every list should always be alphabetical according to
+// last name." Every list here carries a person's display name under a
+// different key depending on the query (memberName from a JOIN,
+// guest_name on a guest row), so this takes the field name rather than
+// assuming `.name` the way utils/members.js's own byLastName does.
+function sortByLastNameField(rows, field) {
+  return rows.sort((a, b) => lastNameOf(a[field]).localeCompare(lastNameOf(b[field]), undefined, { sensitivity: 'base' }) || a[field].localeCompare(b[field], undefined, { sensitivity: 'base' }));
+}
 
 // Comma-joined list of GRADE_OPTIONS strings, same parse-a-multi-select-
 // TEXT-column shape as classSchedule.js's own ageGroupList (a different
@@ -107,26 +117,32 @@ async function getEventWithDetails(id) {
 
   const roles = await db.prepare('SELECT * FROM event_volunteer_roles WHERE event_id = ? ORDER BY position, id').all(id);
   for (const role of roles) {
-    role.signups = await db
-      .prepare(
-        `SELECT evs.*, m.name AS "memberName" FROM event_volunteer_signups evs
-         JOIN members m ON m.id = evs.member_id
-         WHERE evs.volunteer_role_id = ? ORDER BY evs.created_at`
-      )
-      .all(role.id);
+    role.signups = sortByLastNameField(
+      await db
+        .prepare(
+          `SELECT evs.*, m.name AS "memberName" FROM event_volunteer_signups evs
+           JOIN members m ON m.id = evs.member_id
+           WHERE evs.volunteer_role_id = ?`
+        )
+        .all(role.id),
+      'memberName'
+    );
     role.filled = role.signups.length;
     role.remaining = Math.max(0, role.slots_needed - role.filled);
   }
 
   const donationItems = await db.prepare('SELECT * FROM event_donation_items WHERE event_id = ? ORDER BY position, id').all(id);
   for (const item of donationItems) {
-    item.claims = await db
-      .prepare(
-        `SELECT edc.*, m.name AS "memberName" FROM event_donation_claims edc
-         JOIN members m ON m.id = edc.member_id
-         WHERE edc.donation_item_id = ? ORDER BY edc.created_at`
-      )
-      .all(item.id);
+    item.claims = sortByLastNameField(
+      await db
+        .prepare(
+          `SELECT edc.*, m.name AS "memberName" FROM event_donation_claims edc
+           JOIN members m ON m.id = edc.member_id
+           WHERE edc.donation_item_id = ?`
+        )
+        .all(item.id),
+      'memberName'
+    );
     item.quantityClaimed = item.claims.reduce((sum, c) => sum + Number(c.quantity_claimed), 0);
     item.remaining = Math.max(0, item.quantity_needed - item.quantityClaimed);
   }
@@ -148,9 +164,10 @@ async function getEventWithDetails(id) {
         .get(id)
     ).c
   );
-  const guestRegistrations = await db
-    .prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled' ORDER BY created_at")
-    .all(id);
+  const guestRegistrations = sortByLastNameField(
+    await db.prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled'").all(id),
+    'guest_name'
+  );
 
   return {
     ...event,
@@ -300,13 +317,20 @@ async function eventVisibleToFamily(eventId, family) {
 }
 
 async function registrationsForEvent(eventId) {
-  return db
+  const rows = await db
     .prepare(
       `SELECT er.*, m.name AS "memberName", m.member_code AS "memberCode" FROM event_registrations er
        JOIN members m ON m.id = er.member_id
-       WHERE er.event_id = ? ORDER BY er.status = 'cancelled', er.created_at`
+       WHERE er.event_id = ?`
     )
     .all(eventId);
+  // Cancelled registrations sink to the bottom (real vs. historical), last
+  // name alphabetical within each group.
+  return rows.sort((a, b) => {
+    const cancelledDiff = (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0);
+    if (cancelledDiff) return cancelledDiff;
+    return lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) || a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' });
+  });
 }
 
 // --- Registration (member/public, with the full rules engine) ---
@@ -602,6 +626,7 @@ async function cancelDonationClaim(claimId, memberId) {
 
 module.exports = {
   GRADE_OPTIONS,
+  sortByLastNameField,
   parseAgeGroupList,
   memberIsAdult,
   registrationWindowStatus,

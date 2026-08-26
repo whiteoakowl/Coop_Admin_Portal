@@ -12,6 +12,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const payments = require('../utils/payments');
 const auditLog = require('../utils/auditLog');
+const { byLastName } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_finances'));
 
@@ -23,10 +24,10 @@ function toCents(dollarsString) {
 // Every active member with a nonzero balance or any charge history at
 // all - a member who's never had a charge doesn't clutter this list.
 router.get('/', async (req, res) => {
-  const members = await db.prepare("SELECT id, name FROM members WHERE active = 1 AND id IN (SELECT DISTINCT member_id FROM payment_charges) ORDER BY LOWER(name)").all();
+  const members = (await db.prepare('SELECT id, name FROM members WHERE active = 1 AND id IN (SELECT DISTINCT member_id FROM payment_charges)').all()).sort(byLastName);
   const rows = [];
   for (const m of members) rows.push({ ...m, balanceCents: await payments.balanceForMember(m.id) });
-  const allMembers = await db.prepare('SELECT id, name FROM members WHERE active = 1 ORDER BY LOWER(name)').all();
+  const allMembers = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
   res.render('admin-accounting-list', { title: 'Accounting', members: rows, allMembers, notice: req.query.notice || null, formatCents: payments.formatCents });
 });
 
