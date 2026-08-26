@@ -26,6 +26,14 @@
     <% } %>
   </nav>
   <div class="admin-sidebar-bottom">
+    <%# The Co-op Admin Portal runs on its own session (req.session.adminId,
+        middleware/requireAdmin.js) entirely separate from the member
+        portal system (req.session.portalAccountId, portal-nav.ejs's own
+        "Switch Portal" link) that parent/teacher/student/main-admin share -
+        so this link can't jump straight into another portal the way that
+        one does. It goes to /portal, which sends a signed-out visitor
+        through /login same as any other portal-to-portal jump. %>
+    <a href="/portal"><svg class="icon"><use href="#icon-users"/></svg> My Portals</a>
     <a href="/admin/settings"><svg class="icon"><use href="#icon-sliders"/></svg> Settings</a>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
@@ -64,6 +72,7 @@
         <a class="admin-nav-right-link" href="/admin/search" aria-label="Search"><svg class="icon"><use href="#icon-search"/></svg></a>
       <% } %>
       <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
+      <a class="admin-nav-right-link" href="/portal" aria-label="My Portals"><svg class="icon"><use href="#icon-users"/></svg></a>
       <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-sliders"/></svg></a>
       <form method="POST" action="/admin/logout" class="logout-form">
         <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
