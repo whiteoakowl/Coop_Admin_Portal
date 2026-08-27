@@ -107,8 +107,14 @@
      login, kiosk headers, public form headers, mobile top bar) picks one
      of these named sizes instead of a one-off pixel value, so resizing
      "the logo" in any context is a single-variable change. Always paired
-     with border-radius: 50% for the circular crop. */
-  --logo-xl: 184px;  /* admin sidebar */
+     with border-radius: 50% for the circular crop. --logo-xl no longer
+     the largest in this scale by name alone - a real request: "on
+     website view shrink text on left dashboard panel so that a scroll
+     bar isn't needed" - the old 184px logo alone (in a 220px-wide
+     sidebar) was most of what forced the sidebar to scroll on Main
+     Admin, whose left nav is the longest (its own navLinks plus the
+     12-item Community section every portal-nav.ejs caller gets). */
+  --logo-xl: 60px;  /* admin sidebar */
   --logo-lg: 140px;  /* login page */
   --logo-md: 150px;  /* kiosk/root landing header */
   --logo-sm: 100px;  /* kiosk check-in/check-out header */
@@ -1029,6 +1035,28 @@ body.public-page .roster-empty {
 
 .stack-form input[type="date"] { width: 192px; }
 
+/* A real request (Main Admin Announcements page): "balance/center the
+   text, dropdown boxes, and buttons." .member-form-grid's own input/
+   select/textarea already stretch to fill their grid cell (width: 100%,
+   below) - .stack-form, its plain vertical-stack sibling with no grid,
+   never got the same rule, so a lone text input or select inside one
+   (Announcements' own Title field and Send-to dropdown) sized to the
+   browser's tiny native default instead of the field's own label width,
+   which in turn shrank .member-form-page-panel's own width: fit-content
+   (see that rule's own comment) down to barely wider than that stray
+   control - the panel, its Title input, and its Send-to dropdown all
+   read as randomly, inconsistently sized rather than one balanced form.
+   input[type="date"] above keeps its own fixed, compact width - a full-
+   width date picker looks odd next to a calendar icon sized for a
+   narrow field. */
+.stack-form input:not([type="date"]),
+.stack-form select,
+.stack-form textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .stack-form input,
 .stack-form select,
 .stack-form textarea,
@@ -1123,8 +1151,8 @@ body.public-page .roster-empty {
   box-shadow: 2px 0 10px rgba(0,0,0,0.12);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.1rem 1rem;
+  gap: 0.3rem;
+  padding: 0.55rem 0.7rem;
   overflow-y: auto;
   z-index: 40;
 }
@@ -1133,7 +1161,7 @@ body.public-page .roster-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.15rem 0 0.4rem;
+  padding: 0.1rem 0 0.15rem;
 }
 .admin-mobile-topbar .brand {
   display: flex;
@@ -1145,15 +1173,15 @@ body.public-page .roster-empty {
 .admin-sidebar .brand img { height: var(--logo-xl); width: var(--logo-xl); border-radius: 50%; flex-shrink: 0; }
 .admin-mobile-topbar .brand img { height: var(--logo-2xs); width: var(--logo-2xs); border-radius: 50%; flex-shrink: 0; }
 
-.admin-sidebar nav { display: flex; flex-direction: column; gap: 0.15rem; }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: 0; }
 .admin-sidebar nav a {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.45rem;
   color: var(--ink);
-  font-size: 0.88rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 0.45rem 0.65rem;
+  padding: 0.18rem 0.45rem;
   border-radius: 8px;
   transition: background-color 0.15s ease;
 }
@@ -1218,26 +1246,26 @@ body.public-page .roster-empty {
    (a separate compact box) on small screens where there's no sidebar. */
 .admin-sidebar-bottom {
   margin-top: auto;
-  padding-top: 1rem;
+  padding-top: 0.4rem;
   border-top: 1px solid rgba(28, 37, 48, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.15rem;
 }
 .admin-sidebar-bottom a,
 .admin-sidebar-bottom button {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.45rem;
   width: 100%;
   color: var(--ink);
   background: rgba(28, 37, 48, 0.14);
   border: none;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.76rem;
   font-weight: 600;
   text-align: left;
-  padding: 0.65rem 0.75rem;
+  padding: 0.32rem 0.55rem;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -2631,6 +2659,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-action-btn:hover { border-color: var(--btn-bg-hover); background: var(--btn-bg-hover); }
 .roster-action-btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
 .roster-action-btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* A real request: "buttons should fit their text, match sibling button
+   sizing on the same page, and have consistent spacing between them."
+   .roster-action-btn's own flex: 1 0 auto above exists so a ROW of
+   several of them fills evenly (.roster-btn-row, matched sibling sizing
+   - see that class's own comments) - but a page header
+   (.grid-box-header, e.g. "+ Add Category"/"+ New Album"/"+ New Chat")
+   is a different kind of flex row: it pairs one action button against a
+   plain-text <h1>, so the same flex: 1 0 auto instead stretched the
+   button alone to fill the ENTIRE remaining header width - the button
+   filled the row, not its own text. Same fix as the pre-existing
+   .class-schedule-archive-controls/.qr-filter-dialog-actions overrides
+   right below, just scoped to every .grid-box-header site-wide instead
+   of listing each one by hand. A .roster-btn-row that (permanently, not
+   just in one conditional state) ever holds only one button/form has the
+   identical problem - :only-child scopes that half without touching the
+   47+ legitimate multi-button rows this same class already sizes evenly
+   on purpose. */
+.grid-box-header .roster-action-btn,
+.roster-btn-row > .roster-action-btn:only-child,
+.roster-btn-row > form:only-child .roster-action-btn {
+  flex: 0 0 auto;
+}
 
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
@@ -4387,8 +4438,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-weight: 800;
   flex-shrink: 0;
 }
-.team-member-name { flex: 1; min-width: 0; font-weight: 600; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-member-name-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.team-member-name { font-weight: 600; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-member-flag { font-size: 0.62rem; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+/* A real request: "add phone numbers for each member next to their name
+   on the setup/cleanup floater team lists." */
+.team-member-phone { font-size: 0.68rem; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Small red medical-bag flag next to a member's name wherever one shows -
    a same-glance heads-up that they have allergy/medical notes on file,
@@ -4529,6 +4584,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .icon-btn:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); }
 .icon-btn-active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+/* A plain <span> standing in for an icon-btn where there's nothing to
+   click - e.g. the mail icon on a member row with no email on file. */
+.icon-btn-disabled { opacity: 0.35; cursor: default; }
+.icon-btn-disabled:hover { border-color: var(--border); color: var(--muted); background: none; }
 
 /* public/js/simple-view-toggle.js's own List/Grid button pair (views/
    parent-classes.ejs today) - just spacing, the buttons themselves reuse
@@ -5042,6 +5101,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .roster-log-row { flex-wrap: wrap; align-items: flex-start; row-gap: 0.3rem; }
   .roster-log-name { flex-basis: 100%; }
   .roster-log-meta { flex-wrap: wrap; }
+}
+
+/* A real request: "on class rosters each student member line should
+   have registration date/time, birthday, grade, allergy symbol, mail
+   icon button to email, and phone number, parent name. make sure this
+   is all reduced in size to fit on the mobile screen as well." A rich
+   roster row (views/partials/roster-student-row.ejs) crams more meta
+   fields onto one line than a plain .roster-log-row ever needed to, so
+   its meta wraps freely instead of forcing one line, and its own action
+   icons (mail + trash) sit in their own tight flex group. */
+.roster-log-row-rich .roster-log-meta { flex-wrap: wrap; row-gap: 0.2rem; }
+.roster-log-row-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .roster-log-row-rich { padding: 0.4rem 0.6rem; gap: 0.5rem; }
+  .roster-log-row-rich .roster-log-name { font-size: 0.9rem; }
+  .roster-log-row-rich .roster-log-meta { font-size: 0.7rem; gap: 0.35rem; }
+  .roster-log-row-rich .icon-btn { width: 1.6rem; height: 1.6rem; }
 }
 .medical-flag {
   display: inline-flex;
@@ -5947,9 +6023,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    logo and the "Switch Portal" disclosure.
    --------------------------------------------------------------------- */
 .portal-nav-title {
-  margin: 0.1rem 0 0.9rem;
+  margin: 0.1rem 0 0.2rem;
   padding: 0 0.5rem;
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -5959,11 +6035,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .portal-switcher-details summary {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
   border-radius: 10px;
   cursor: pointer;
   color: #fff;
+  font-size: 0.8rem;
   font-weight: 600;
   list-style: none;
 }
@@ -6088,12 +6165,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    defined elsewhere in this file; the only genuinely new shape here is
    the rich-text editor (public/js/forum-editor.js) and a forum post
    bubble, neither of which has an existing equivalent. */
-.forum-editor-toolbar { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
-.forum-editor-toolbar button { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.85rem; cursor: pointer; }
+.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.4rem; }
+.forum-editor-toolbar-row { display: flex; gap: 0.25rem; flex-wrap: wrap; align-items: center; }
+.forum-editor-toolbar button,
+.forum-editor-toolbar select { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.85rem; cursor: pointer; line-height: 1.2; }
 .forum-editor-toolbar button:hover { background: var(--brand-soft, #eef4fb); }
+.forum-editor-toolbar button.forum-editor-toggle-on { background: var(--brand-soft, #eef4fb); border-color: var(--brand); }
+.forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.15rem; }
+.forum-editor-color { display: inline-flex; align-items: center; gap: 0.2rem; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.2rem 0.4rem; font-size: 0.85rem; cursor: pointer; }
+.forum-editor-color input[type="color"] { width: 1.4rem; height: 1.4rem; padding: 0; border: none; background: none; cursor: pointer; }
+.forum-editor-popup { position: relative; display: flex; flex-wrap: wrap; gap: 0.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.5rem; }
+.forum-editor-symbol-btn { min-width: 2rem; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 1rem; cursor: pointer; }
+.forum-editor-symbol-btn:hover { background: var(--brand-soft, #eef4fb); }
+.forum-editor-findreplace { align-items: center; }
+.forum-editor-findreplace input[type="text"] { border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.forum-editor-findreplace button { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
 .forum-editable { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 0.9rem; min-height: 6rem; background: var(--surface); }
 .forum-editable:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
 .forum-editable blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
+.forum-editable table { border-collapse: collapse; margin: 0.5rem 0; }
+.forum-editable table td, .forum-editable table th { border: 1px solid var(--border); padding: 0.35rem 0.55rem; }
+.forum-editable img { max-width: 100%; }
+.forum-editor-source-view { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.85rem; resize: vertical; }
+/* Read-only rendering of a saved rich-text body (class/event descriptions
+   on the parent/student side, announcements) - the same content rules as
+   .forum-editable above, minus the editable box's own border/padding. */
+.forum-editable-display blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
+.forum-editable-display table { border-collapse: collapse; margin: 0.5rem 0; }
+.forum-editable-display table td, .forum-editable-display table th { border: 1px solid var(--border); padding: 0.35rem 0.55rem; }
+.forum-editable-display img { max-width: 100%; }
+/* Fullscreen is a pure authoring convenience (toggled client-side only,
+   never part of the saved HTML) - covers the viewport so a long post is
+   easier to write/format without scrolling the whole page underneath. */
+[data-forum-editor].forum-editor-fullscreen { position: fixed; inset: 0; z-index: 1000; background: var(--surface); padding: 1rem; overflow-y: auto; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5); }
+[data-forum-editor].forum-editor-fullscreen .forum-editable,
+[data-forum-editor].forum-editor-fullscreen .forum-editor-source-view { min-height: calc(100vh - 12rem); }
 
 .forum-post { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.9rem; background: var(--surface); }
 .forum-post-removed { opacity: 0.6; }
@@ -6165,3 +6271,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    parent's own edit form (their current photo, before they replace it)
    and on the directory's own cards. */
 .babysitter-photo-preview { width: 100%; max-width: 10rem; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); display: block; margin-bottom: 0.5rem; }
+
+/* "Edit Permissions" bulk mode (Main Admin + Co-op Admin Members pages) -
+   the Sections/Portal Permissions column stays out of the DOM's visible
+   flow until public/js/permissions-edit-toggle.js adds .permissions-
+   mode-on to the table, same "hidden until toggled" shape as the
+   existing Archive/Delete Edit mode's own checkboxes. */
+.permissions-col { display: none; min-width: 14rem; }
+.permissions-mode-on .permissions-col { display: table-cell; }
+.permissions-cell-group { margin-bottom: 0.4rem; }
+.permissions-cell-group summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--brand-dark, var(--brand)); }
+.permissions-cell-group .checkbox-option { font-size: 0.85rem; padding: 0.15rem 0; }

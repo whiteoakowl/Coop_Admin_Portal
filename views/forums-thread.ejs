@@ -51,6 +51,7 @@
       <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>">
         <div class="forum-post-header">
           <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
+          <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
           <span class="hint"><%= p.created_at %></span>
           <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
           <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>

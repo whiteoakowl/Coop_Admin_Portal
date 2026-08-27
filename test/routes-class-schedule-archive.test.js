@@ -39,17 +39,28 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 async function createClassWithStaffAndStudent(cookie, csrfToken, overrides) {
-  const teacher = await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ name: 'Archive Test Teacher', memberType: 'parent', _csrf: csrfToken });
-  const student = await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ name: 'Archive Test Student', memberType: 'student', _csrf: csrfToken });
+  const teacher = await addSingleMember(cookie, csrfToken, 'Archive Test Teacher', 'parent');
+  const student = await addSingleMember(cookie, csrfToken, 'Archive Test Student', 'student');
   void teacher;
   void student;
 

@@ -77,9 +77,12 @@
               <label class="roster-checkbox-label">Parent Portal Registration</label>
               <label class="grade-pill"><input type="checkbox" name="registrationOpen" value="1" <%= cls.registration_open ? 'checked' : '' %> /> Open for parent registration</label>
             </div>
-            <label class="member-form-full">Public Description <span class="hint">(shown to parents browsing classes)</span>
-              <textarea name="description" rows="3"><%= cls.description || '' %></textarea>
-            </label>
+            <div class="member-form-full" data-forum-editor>
+              <label>Public Description <span class="hint">(shown to parents browsing classes)</span></label>
+              <%- include('partials/forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"><%- cls.description || '' %></div>
+              <input type="hidden" name="description" data-forum-body-input />
+            </div>
 
             <div class="member-form-full">
               <label class="roster-checkbox-label">Who Can Register</label>
@@ -181,16 +184,7 @@
               <p class="roster-log-empty">No students enrolled yet.</p>
             <% } %>
             <% enrolledStudents.forEach(function(s) { %>
-              <div class="roster-log-row">
-                <span class="roster-log-name"><%= s.name %><%- include('partials/medical-flag', { member: s }) %></span>
-                <span class="roster-log-meta">
-                  <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
-                  <% if (s.age !== null && s.age !== undefined) { %><span><%= s.age %> yrs</span><% } %>
-                </span>
-                <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/enrollment/<%= s.id %>/remove" class="inline-block-form no-print" data-confirm="Remove <%= s.name %> from this class?">
-                  <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                </form>
-              </div>
+              <%- include('partials/roster-student-row', { s: s, removeAction: '/admin/class-schedule/classes/' + cls.id + '/enrollment/' + s.id + '/remove' }) %>
             <% }); %>
           </div>
         </div>
@@ -248,5 +242,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
@@ -111,6 +107,7 @@
               Select None
             </label>
             <button type="submit" class="primary-btn name-tag-bulk-submit">Print Selected</button>
+            <button type="submit" formaction="/main-admin/name-tags/print-plain-parent" class="btn-secondary name-tag-bulk-submit" title="Selected parents only, no schedule or setup/cleanup team">Print Plain Parent Tags</button>
             <button type="submit" formaction="/main-admin/name-tags/print-barcodes" class="btn-secondary name-tag-bulk-submit">Print Barcodes Only</button>
           </div>
           <div class="member-picker-list name-tag-bulk-list" id="name-tag-bulk-list">

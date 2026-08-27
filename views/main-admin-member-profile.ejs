@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
@@ -41,6 +37,29 @@
         <p><strong>Phone:</strong> <%= member.phone || '—' %></p>
         <p><strong>Email:</strong> <%= member.email || '—' %></p>
         <% if (member.medical_notes) { %><p><strong>Medical/Allergy Notes:</strong> <%= member.medical_notes %></p><% } %>
+      </section>
+
+      <%# Admin-only category - a real request: "portal permissions should
+          be an admin only category on each member form/profile." Every
+          view on this route is already Main Admin-only, so this is
+          always shown here; editing happens from the Members list's own
+          "Edit Permissions" bulk mode (see routes/main-admin-members.js's
+          own /bulk-permissions route), not on this page. %>
+      <section class="portal-dashboard-card">
+        <h2>Portal Permissions</h2>
+        <p><strong>Sections:</strong>
+          <% if (memberSections.length === 0) { %>—<% } else { %>
+            <% memberSections.forEach(function(s) { %><span class="badge-pill"><%= s.name %></span> <% }); %>
+          <% } %>
+        </p>
+        <p><strong>Portal Roles:</strong>
+          <% if (portalRoles === null) { %>
+            No portal account
+          <% } else if (portalRoles.length === 0) { %>—<% } else { %>
+            <% portalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
+          <% } %>
+        </p>
+        <a class="roster-action-btn" href="/main-admin/members?q=<%= encodeURIComponent(member.name) %>">Edit Permissions</a>
       </section>
 
       <% if (familyMembers.length > 1) { %>

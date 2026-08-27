@@ -38,15 +38,30 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches it', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   await t.test('a fresh member gets a member_code, not a name-based barcode', async () => {
-    const res = await request(app)
-      .post('/admin/members/new')
-      .set('Cookie', cookie)
-      .type('form')
-      .send({ name: 'Priya Patel', memberType: 'student', _csrf: csrfToken });
+    const res = await addSingleMember(cookie, csrfToken, 'Priya Patel', 'student');
     assert.equal(res.status, 302);
 
     const row = await db.prepare('SELECT barcode, member_code FROM members WHERE name = ?').get('Priya Patel');
@@ -55,8 +70,8 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
   });
 
   await t.test('two members created back to back never collide on member_code', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Sam Rivera', memberType: 'student', _csrf: csrfToken });
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Jordan Kim', memberType: 'student', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Sam Rivera', 'student');
+    await addSingleMember(cookie, csrfToken, 'Jordan Kim', 'student');
     const codes = (await db.prepare("SELECT member_code FROM members WHERE name IN ('Sam Rivera', 'Jordan Kim')").all()).map((r) => r.member_code);
     assert.equal(codes.length, 2);
     assert.notEqual(codes[0], codes[1]);
@@ -65,7 +80,7 @@ test('POST /admin/members/new assigns a 6-digit member_code, and barcode matches
 
 test('editing a member never changes their member_code/barcode, even when their name changes', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Original Name', memberType: 'student', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Original Name', 'student');
   const before = await db.prepare('SELECT id, member_code, barcode FROM members WHERE name = ?').get('Original Name');
 
   await t.test('renaming the member on their edit page keeps the same member_code and barcode', async () => {
@@ -84,7 +99,7 @@ test('editing a member never changes their member_code/barcode, even when their 
 
 test('the barcode-only print sheet renders the member_code-based barcode value', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Barcode Check Kid', memberType: 'student', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Barcode Check Kid', 'student');
   const member = await db.prepare('SELECT id, member_code FROM members WHERE name = ?').get('Barcode Check Kid');
 
   await t.test('the printed barcode SVG carries the member_code as its data-barcode-value, not the name', async () => {

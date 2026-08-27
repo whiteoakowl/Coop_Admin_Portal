@@ -204,9 +204,11 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <label class="grade-pill"><input type="checkbox" name="registrationOpen" value="1" /> Open for parent registration</label>
       </div>
     </div>
-    <div class="class-form-textarea-wrap">
+    <div class="class-form-textarea-wrap member-form-full" data-forum-editor>
       <span class="class-form-field-label">Public Description <span class="optional-tag">(shown to parents browsing classes)</span></span>
-      <textarea name="description" rows="3" placeholder="What families will see on the Classes page&hellip;" maxlength="500"></textarea>
+      <%- include('forum-editor-toolbar') %>
+      <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+      <input type="hidden" name="description" data-forum-body-input />
     </div>
 
     <span class="class-form-section-label">Who Can Register</span>

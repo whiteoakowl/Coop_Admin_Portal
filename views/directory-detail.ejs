@@ -31,7 +31,7 @@
         <% } %>
 
         <h1><%= listing.business_name %></h1>
-        <% if (listing.category) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= listing.category %></p><% } %>
+        <% if (listing.categoryTitle) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= listing.categoryTitle %></p><% } %>
         <% if (listing.address) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= listing.address %></p><% } %>
         <% if (listing.phone) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-phone"/></svg> <%= listing.phone %></p><% } %>
         <% if (listing.email) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-mail"/></svg> <%= listing.email %></p><% } %>

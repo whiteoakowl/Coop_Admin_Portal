@@ -10,6 +10,14 @@
 // one portal to switch between.
 const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 1;
 
+// A real request: "under main admin portal the users tab should be
+// under the settings icon at the top" (and later, Website too) - Main
+// Admin's own gear icon now opens its own admin-configuration Settings
+// area (views/main-admin-users.ejs's own tab bar, /main-admin/settings
+// redirects there) instead of the generic per-account Settings page
+// (My Privacy, etc.) every other portal's gear still opens.
+const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/portal/settings';
+
 // Optional - only views/parent-*.ejs pass this (see their own comment).
 // A real request: "parent portal should be divided between all the
 // general tabs and a co-op class section with all the tabs for
@@ -76,6 +84,26 @@ const COMMUNITY_LINKS_PARENT = [
   { href: '/photos', icon: 'camera', label: 'Photos' },
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
 ];
+// Teacher gets a further-trimmed version - a real request: "teacher
+// portal, remove the following tabs. newsletter, forms, store,
+// publications, accounting, notifications, member directory, business
+// directory, classifieds, events and reports." ("Reports" is Teacher
+// Portal's own tab, dropped from its own navLinks array in every
+// views/teacher-*.ejs file, not from this shared list.)
+const COMMUNITY_LINKS_TEACHER = [
+  { href: '/forums', icon: 'users', label: 'Chat' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+];
+// Student gets its own trim - a real request: "remove the following
+// tabs from student portal. member directory, business directory,
+// classifieds, forms, newsletter, publications, accounting,
+// notifications." Events and Store stay (not on the removal list).
+const COMMUNITY_LINKS_STUDENT = [
+  { href: '/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/forums', icon: 'users', label: 'Chat' },
+  { href: '/store', icon: 'grid', label: 'Store' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+];
 const COMMUNITY_ADMIN_LINKS = [
   { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
   { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
@@ -96,7 +124,11 @@ const COMMUNITY_ADMIN_LINKS = [
 // portalTitle) rather than a role key, so this checks the literal value
 // every one of those callers already passes - no new local needed.
 const communityLinks =
-  portalTitle === 'Main Admin' ? COMMUNITY_ADMIN_LINKS : portalTitle === 'Parent Portal' ? COMMUNITY_LINKS_PARENT : COMMUNITY_LINKS;
+  portalTitle === 'Main Admin' ? COMMUNITY_ADMIN_LINKS
+    : portalTitle === 'Parent Portal' ? COMMUNITY_LINKS_PARENT
+    : portalTitle === 'Teacher Portal' ? COMMUNITY_LINKS_TEACHER
+    : portalTitle === 'Student Portal' ? COMMUNITY_LINKS_STUDENT
+    : COMMUNITY_LINKS;
 %>
 <%- include('icon-sprite') %>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -126,7 +158,7 @@ const communityLinks =
     <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
-    <a href="/portal/settings"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
+    <a href="<%= settingsHref %>"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
     <% if (showSwitcher) { %>
       <details class="portal-switcher-details">
         <summary><svg class="icon"><use href="#icon-users"/></svg> Switch Portal</summary>
@@ -148,7 +180,7 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
-      <a class="admin-nav-right-link" href="/portal/settings" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
+      <a class="admin-nav-right-link" href="<%= settingsHref %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>
         <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-users"/></svg></a>
       <% } %>

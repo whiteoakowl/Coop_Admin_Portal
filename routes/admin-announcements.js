@@ -15,6 +15,7 @@ const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const notifications = require('../utils/notifications');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.get('/announcements', requireAdmin, async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
@@ -38,7 +39,7 @@ router.get('/announcements', requireAdmin, async (req, res) => {
 
 router.post('/announcements', requireAdmin, async (req, res) => {
   const title = (req.body.title || '').trim();
-  const body = (req.body.body || '').trim();
+  const body = sanitizePostBody(req.body.body || '');
   const roleKey = (req.body.roleKey || '').trim();
   if (!title || !body) return res.redirect('/admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
 

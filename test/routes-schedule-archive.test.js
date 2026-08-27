@@ -41,6 +41,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 function buildImportBuffer(rows) {
   const headers = [
     'Day', 'Hour', 'Class Name', 'Room', 'Grade',
@@ -61,7 +80,7 @@ test('POST /admin/schedule/students/archive', async (t) => {
   const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Archive Schedule Class'").get();
   assert.ok(cls, 'setup: the class should exist');
 
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Archive Schedule Kid', memberType: 'student', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Archive Schedule Kid', 'student');
   const student = await db.prepare("SELECT id FROM members WHERE name = 'Archive Schedule Kid'").get();
   await request(app)
     .post(`/admin/class-schedule/classes/${cls.id}/enrollment/add`)
@@ -98,11 +117,7 @@ test('POST /admin/schedule/parents/archive unstaffs a teacher from every class',
   const { cookie, csrfToken } = await loginAsAdmin();
 
   const classBuffer = buildImportBuffer([['Monday', '2', 'Parent Archive Class', 'Room 2', '', '10:00 AM', '', '', 'Archive Parent Teacher', '', '', '', '']]);
-  await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ name: 'Archive Parent Teacher', memberType: 'parent', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Archive Parent Teacher', 'parent');
   await request(app).post('/admin/class-schedule/monday/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', classBuffer, 'classes2.xlsx');
   const cls = await db.prepare("SELECT * FROM classes WHERE class_name = 'Parent Archive Class'").get();
   const parent = await db.prepare("SELECT id FROM members WHERE name = 'Archive Parent Teacher'").get();

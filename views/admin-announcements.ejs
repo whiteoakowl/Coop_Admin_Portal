@@ -20,9 +20,12 @@
       <label class="member-form-full">Title
         <input type="text" name="title" placeholder="e.g. Wednesday session cancelled" required />
       </label>
-      <label class="member-form-full">Message
-        <textarea name="body" rows="4" placeholder="Enter the announcement" required></textarea>
-      </label>
+      <div class="member-form-full" data-forum-editor>
+        <label>Message</label>
+        <%- include('partials/forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="body" data-forum-body-input />
+      </div>
       <label class="member-form-full">Send to
         <select name="roleKey">
           <option value="">Everyone (all active members)</option>
@@ -49,7 +52,7 @@
             <% sent.forEach(function(s) { %>
               <tr>
                 <td class="roster-name-col"><%= s.title %></td>
-                <td><%= s.body %></td>
+                <td class="forum-editable-display"><%- s.body %></td>
                 <td><%= s.recipientCount %></td>
                 <td><%= s.created_at %></td>
               </tr>
@@ -59,5 +62,6 @@
       </div>
     <% } %>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

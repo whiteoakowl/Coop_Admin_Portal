@@ -1,19 +1,27 @@
+// Powers views/member-intake-form.ejs - the shared family-intake form
+// behind Add Member (Main Admin + Co-op Admin) and the Membership Form.
+// Parents are capped at 4, all pre-rendered in the page and revealed one
+// at a time (simpler than cloning since the cap is small and fixed);
+// students are unlimited, so those use the same hidden-<template>-clone
+// pattern public/js/membership-form.js already established.
 (function () {
-  const form = document.getElementById('membership-form');
-  if (!form) return;
+  const addParentBtn = document.getElementById('add-parent-btn');
+  const parentBlocks = document.querySelectorAll('[data-parent-block]');
+  let nextParentIndex = 1; // block 0 is already visible
 
-  const parent2Checkbox = document.getElementById('add-parent2-checkbox');
-  const parent2Section = document.getElementById('parent2-section');
-  if (parent2Checkbox && parent2Section) {
-    parent2Checkbox.addEventListener('change', () => {
-      parent2Section.hidden = !parent2Checkbox.checked;
+  if (addParentBtn && parentBlocks.length) {
+    addParentBtn.addEventListener('click', () => {
+      if (nextParentIndex >= parentBlocks.length) return;
+      parentBlocks[nextParentIndex].hidden = false;
+      nextParentIndex++;
+      if (nextParentIndex >= parentBlocks.length) addParentBtn.hidden = true;
     });
   }
 
-  const childrenList = document.getElementById('membership-children');
+  const childrenList = document.getElementById('children-list');
   const addChildBtn = document.getElementById('add-child-btn');
-  const template = document.getElementById('membership-child-template');
-  let childIndex = 1; // index 0 is the block already on the page
+  const template = document.getElementById('child-block-template');
+  let childIndex = 1; // block 0 is already on the page
 
   function updateRemoveButtons() {
     const blocks = childrenList.querySelectorAll('[data-child-block]');

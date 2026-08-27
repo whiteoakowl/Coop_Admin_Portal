@@ -57,6 +57,28 @@
             <% rosters.forEach(function(r) { %><span class="badge-pill"><%= r.name %></span><% }); %>
           </dd>
           <% if (member.notes) { %><dt>Notes</dt><dd><%= member.notes %></dd><% } %>
+          <%# Admin-only category - a real request: "portal permissions
+              should be an admin only category on each member form/
+              profile." Every view on this route is already Co-op
+              Admin-only, so this is always shown here; editing happens
+              from the Members list's own "Edit Permissions" bulk mode
+              (see routes/admin-members.js's own /members/bulk-
+              permissions route), not on this page. %>
+          <dt>Sections</dt>
+          <dd>
+            <% if (memberSections.length === 0) { %>—<% } else { %>
+              <% memberSections.forEach(function(s) { %><span class="badge-pill"><%= s.name %></span> <% }); %>
+            <% } %>
+          </dd>
+          <dt>Portal Permissions</dt>
+          <dd>
+            <% if (portalRoles === null) { %>
+              No portal account
+            <% } else if (portalRoles.length === 0) { %>—<% } else { %>
+              <% portalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
+            <% } %>
+            <a class="roster-action-btn" href="/admin/members">Edit Permissions</a>
+          </dd>
         </dl>
       <% } else if (tab === 'schedule') { %>
         <% if (familyRoster.length > 1) { %>

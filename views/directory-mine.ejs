@@ -61,8 +61,16 @@
                 <label>Description
                   <textarea name="description" rows="3"><%= l.description || '' %></textarea>
                 </label>
+                <%# Categories are admin-managed only (Main Admin >
+                    Business Directory > Directory tab's own +Add Category
+                    popup) - a select, not free text. %>
                 <label>Category
-                  <input type="text" name="category" value="<%= l.category || '' %>" />
+                  <select name="categoryId">
+                    <option value="">Uncategorized</option>
+                    <% categories.forEach(function(c) { %>
+                      <option value="<%= c.id %>" <%= l.category_id === c.id ? 'selected' : '' %>><%= c.title %></option>
+                    <% }); %>
+                  </select>
                 </label>
                 <label>Phone
                   <input type="text" name="phone" value="<%= l.phone || '' %>" />
@@ -108,7 +116,12 @@
           <textarea name="description" rows="3"></textarea>
         </label>
         <label>Category
-          <input type="text" name="category" placeholder="e.g. Photography, Tutoring" />
+          <select name="categoryId">
+            <option value="">Uncategorized</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>"><%= c.title %></option>
+            <% }); %>
+          </select>
         </label>
         <label>Phone
           <input type="text" name="phone" />

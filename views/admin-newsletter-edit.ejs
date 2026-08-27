@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -45,14 +41,37 @@
 
     <% if (issue.status === 'sent') { %>
       <p class="hint">Sent <%= issue.sent_at %> to <%= issue.recipient_count %> active member account(s). Sent issues can't be edited.</p>
+      <% if (issue.custom_note) { %><div class="forum-editable"><%- issue.custom_note %></div><% } %>
       <div class="forum-editable"><%- issue.body_html %></div>
     <% } else { %>
+      <%# A real request: "Add a 'Customize Newsletter' action where
+          admin writes their own note/letter that appears before the
+          automatic content." Its own form/save action and its own
+          column (custom_note) - see utils/newsletter.js's own comment
+          for why this is kept separate from the auto-assembled
+          body_html below (so "Re-assemble from Live Data" never wipes
+          it out). %>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Customize Newsletter</h2></div>
+        <p class="hint">Write a note or letter that appears before the automatically assembled content below.</p>
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/customize" class="member-form-grid" data-forum-editor>
+          <div class="member-form-full">
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.custom_note || '' %></div>
+            <input type="hidden" name="customNote" data-forum-body-input />
+          </div>
+          <div class="member-form-full">
+            <button type="submit" class="primary-btn">Save Note</button>
+          </div>
+        </form>
+      </div>
+
       <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid">
         <label class="member-form-full">Subject
           <input type="text" name="subject" value="<%= issue.subject %>" required />
         </label>
         <div class="member-form-full" data-forum-editor>
-          <label>Content</label>
+          <label>Automatic Content</label>
           <%- include('partials/forum-editor-toolbar') %>
           <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.body_html %></div>
           <input type="hidden" name="bodyHtml" data-forum-body-input />

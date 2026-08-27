@@ -8,79 +8,172 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Resource Links</h1>
+    <div class="roster-toolbar">
+      <h1>Resource Links</h1>
+      <% if (activeTab === 'resources') { %>
+        <div class="roster-btn-row">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+          <button type="button" class="primary-btn" onclick="document.getElementById('add-resource-dialog').showModal()">+ Add Resource</button>
+        </div>
+      <% } %>
+    </div>
     <p class="hint">
-      A short, curated list of external links shown on member portals (currently Student Portal's own Resource Links
-      tab). Scope a link to one role, or leave it "Everyone" to show it on every portal.
+      A curated, categorized list of external links shown on member portals (currently Student Portal's own Resource
+      Links tab). Scope a link to one role, or leave it "Everyone" to show it on every portal.
     </p>
+
+    <div class="view-tabs">
+      <a class="view-tab<%= activeTab === 'resources' ? ' active' : '' %>" href="/main-admin/resource-links?tab=resources">Resources</a>
+      <a class="view-tab<%= activeTab === 'approvals' ? ' active' : '' %>" href="/main-admin/resource-links?tab=approvals">Approvals<%= pending.length ? ' (' + pending.length + ')' : '' %></a>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/main-admin/resource-links" class="stack-form member-form-page-panel">
-      <label class="member-form-full">Title
-        <input type="text" name="title" placeholder="e.g. Field Trip Permission Form" required />
+    <% if (activeTab === 'resources') { %>
+      <%# A real request: "list shows up categorized below." %>
+      <% if (groups.length === 0) { %>
+        <p class="roster-empty">No resource links yet.</p>
+      <% } else { %>
+        <% groups.forEach(function(group) { %>
+          <div class="manage-section">
+            <h2><%= group.categoryTitle %></h2>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table">
+                <thead><tr><th>Title</th><th>Website</th><th>City/State</th><th>Shown On</th><th></th></tr></thead>
+                <tbody>
+                  <% group.links.forEach(function(l) { %>
+                    <tr>
+                      <td class="roster-name-col"><%= l.title %><% if (l.description) { %><span class="member-row-subline"><%= l.description %></span><% } %></td>
+                      <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
+                      <td><%= [l.city, l.state].filter(Boolean).join(', ') || '—' %></td>
+                      <td><%= l.role_key || 'Everyone' %></td>
+                      <td>
+                        <form method="POST" action="/main-admin/resource-links/<%= l.id %>/delete" data-confirm="Remove &quot;<%= l.title %>&quot;?">
+                          <button type="submit" class="icon-btn" aria-label="Delete <%= l.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% }); %>
+      <% } %>
+    <% } else { %>
+      <%# A real request: "members can submit resource links for
+          approval... admin side should have tab under resource links
+          for approvals." %>
+      <% if (pending.length === 0) { %>
+        <p class="roster-empty">No resource links awaiting approval.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Title</th><th>Website</th><th>City/State</th><th>Category</th><th>Submitted By</th><th></th></tr></thead>
+            <tbody>
+              <% pending.forEach(function(l) { %>
+                <tr>
+                  <td class="roster-name-col"><%= l.title %><% if (l.description) { %><span class="member-row-subline"><%= l.description %></span><% } %></td>
+                  <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
+                  <td><%= [l.city, l.state].filter(Boolean).join(', ') || '—' %></td>
+                  <td><%= l.categoryTitle || 'Uncategorized' %></td>
+                  <td><%= l.submittedByName || 'Unknown' %></td>
+                  <td class="actions-cell">
+                    <div class="actions-btn-row">
+                      <form method="POST" action="/main-admin/resource-links/<%= l.id %>/approve" class="inline-block-form">
+                        <button type="submit" class="icon-btn" aria-label="Approve <%= l.title %>" title="Approve"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      </form>
+                      <form method="POST" action="/main-admin/resource-links/<%= l.id %>/deny" class="inline-block-form" data-confirm="Deny &quot;<%= l.title %>&quot;? This removes the submission.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Deny <%= l.title %>" title="Deny"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } %>
+  </main>
+
+  <dialog id="add-category-dialog" class="member-picker-dialog">
+    <form method="POST" action="/main-admin/resource-links/categories">
+      <h3>Add Category</h3>
+      <label for="add-resource-category-title">Category Name
+        <input id="add-resource-category-title" type="text" name="title" placeholder="e.g. Local Field Trips" required />
       </label>
-      <label class="member-form-full">URL
-        <input type="url" name="url" placeholder="https://..." required />
+      <% if (categories.length > 0) { %>
+        <p class="hint">Existing categories</p>
+        <div class="grade-pill-grid">
+          <% categories.forEach(function(c) { %>
+            <form method="POST" action="/main-admin/resource-links/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= c.title %>&quot; category? Its links stay, just uncategorized.">
+              <span class="badge-pill">
+                <%= c.title %>
+                <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.title %>" title="Delete">&times;</button>
+              </span>
+            </form>
+          <% }); %>
+        </div>
+      <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="add-resource-dialog" class="member-picker-dialog">
+    <form method="POST" action="/main-admin/resource-links">
+      <h3>Add Resource</h3>
+      <label for="add-resource-title">Title
+        <input id="add-resource-title" type="text" name="title" placeholder="e.g. Field Trip Permission Form" required />
       </label>
-      <label class="member-form-full">Description (optional)
-        <textarea name="description" rows="2" placeholder="A short note about this link"></textarea>
+      <label for="add-resource-website">Website
+        <input id="add-resource-website" type="url" name="url" placeholder="https://..." required />
       </label>
-      <label class="member-form-full">Show on
-        <select name="roleKey">
+      <label for="add-resource-description">Description
+        <textarea id="add-resource-description" name="description" rows="2" placeholder="A short note about this link"></textarea>
+      </label>
+      <label for="add-resource-city">City
+        <input id="add-resource-city" type="text" name="city" placeholder="e.g. Sanford" />
+      </label>
+      <label for="add-resource-state">State
+        <input id="add-resource-state" type="text" name="state" placeholder="e.g. FL" />
+      </label>
+      <label for="add-resource-category">Category
+        <select id="add-resource-category" name="categoryId">
+          <option value="">Uncategorized</option>
+          <% categories.forEach(function(c) { %>
+            <option value="<%= c.id %>"><%= c.title %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label for="add-resource-role">Show on
+        <select id="add-resource-role" name="roleKey">
           <option value="">Everyone (every portal)</option>
           <% roles.forEach(function(r) { %>
             <option value="<%= r.key %>"><%= r.label %> only</option>
           <% }); %>
         </select>
       </label>
-      <div class="member-form-footer">
-        <div class="member-form-footer-edit">
-          <button type="submit" class="primary-btn">Add Link</button>
-        </div>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Save</button>
       </div>
     </form>
-
-    <h2>Current Links</h2>
-    <% if (links.length === 0) { %>
-      <p class="roster-empty">No resource links yet.</p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table condensed-table">
-          <thead><tr><th>Title</th><th>URL</th><th>Shown On</th><th></th></tr></thead>
-          <tbody>
-            <% links.forEach(function(l) { %>
-              <tr>
-                <td class="roster-name-col"><%= l.title %></td>
-                <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
-                <td><%= l.role_key || 'Everyone' %></td>
-                <td>
-                  <form method="POST" action="/main-admin/resource-links/<%= l.id %>/delete" onsubmit="return confirm('Remove this link?');">
-                    <button type="submit" class="icon-btn" aria-label="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
-  </main>
+  </dialog>
 </body>
 </html>

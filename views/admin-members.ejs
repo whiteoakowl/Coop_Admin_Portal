@@ -90,6 +90,8 @@
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
+        <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
+        <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
         <a
           class="roster-action-btn"
           href="/admin/members?<%= typeFilter ? 'type=' + typeFilter + '&' : '' %><%= familyFilter ? 'family=' + familyFilter + '&' : '' %><%= showArchived ? '' : 'archived=1' %>"
@@ -101,6 +103,16 @@
       id="members-bulk-form"
       method="POST"
       action="/admin/members/bulk-delete"
+    ></form>
+    <%# "Edit Permissions" bulk mode's own form - separate from members-
+        bulk-form above since it posts an entirely different shape (per-
+        member sections[]/roles[] arrays, not a flat memberIds list) to a
+        different route. See public/js/permissions-edit-toggle.js and
+        routes/admin-members.js's own bulk-permissions route. %>
+    <form
+      id="permissions-bulk-form"
+      method="POST"
+      action="/admin/members/bulk-permissions"
     ></form>
 
     <%# Combined Add/Rename/Delete Family dialog - a real request: "member
@@ -170,7 +182,7 @@
     </dialog>
 
     <div class="roster-scroll">
-      <table class="roster-table members-table members-list-table">
+      <table id="members-table" class="roster-table members-table members-list-table">
         <thead>
           <tr>
             <th class="no-print members-col-select"><span class="sr-only">Select</span></th>
@@ -179,6 +191,7 @@
             <th>Type</th>
             <th class="members-col-parent">Family</th>
             <th class="members-col-rosters">Rosters</th>
+            <th class="no-print permissions-col">Sections &amp; Portal Permissions</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -198,6 +211,9 @@
               <td class="members-col-name">
                 <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+                <%# A real request: "this will then add their admin title
+                    label next to their name on member lists." %>
+                <% if (m.adminTitle) { %><span class="badge-pill" title="Admin Position"><%= m.adminTitle %></span><% } %>
                 <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>
                   <span class="member-row-subline">
                     <%= [m.grade_level || null, m.age !== null ? (m.age + (m.age === 1 ? ' year old' : ' years old')) : null].filter(Boolean).join(' · ') %>
@@ -215,8 +231,46 @@
                   <% }); %>
                 <% } %>
               </td>
+              <td class="no-print permissions-col">
+                <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
+                <details class="permissions-cell-group">
+                  <summary>Sections</summary>
+                  <% if (sections.length === 0) { %>
+                    <p class="hint">No sections yet.</p>
+                  <% } else { %>
+                    <% sections.forEach(function(s) { %>
+                      <label class="checkbox-option">
+                        <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
+                        <%= s.name %>
+                      </label>
+                    <% }); %>
+                  <% } %>
+                </details>
+                <details class="permissions-cell-group">
+                  <summary>Portal Permissions</summary>
+                  <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
+                    <% roles.forEach(function(r) { %>
+                      <label class="checkbox-option">
+                        <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
+                        <%= r.label %>
+                      </label>
+                    <% }); %>
+                  <% } else { %>
+                    <p class="hint">No portal account (create one from Main Admin &gt; Users).</p>
+                  <% } %>
+                </details>
+              </td>
               <td class="actions-cell">
                 <div class="actions-btn-row">
+                  <%# A real request: "there should be a mail icon on each
+                      member line so that you can click and email the
+                      member." Plain mailto: link - no in-app compose
+                      feature exists to send from instead. %>
+                  <% if (m.email) { %>
+                    <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
+                  <% } else { %>
+                    <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
+                  <% } %>
                   <button
                     type="button"
                     class="icon-btn<%= m.notes ? ' icon-btn-active' : '' %>"
@@ -309,7 +363,7 @@
       <tbody>
         <% allMembersForPrint.forEach(function(m) { %>
           <tr>
-            <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %></td>
+            <td><%= m.name %><%= m.is_primary_parent ? ' (Primary)' : '' %><%= m.adminTitle ? ' (' + m.adminTitle + ')' : '' %></td>
             <td><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></td>
             <td><%= m.familyName || '—' %></td>
             <td><%= m.rosters.length ? m.rosters.map(function(r) { return r.name; }).join(', ') : '—' %></td>
@@ -327,6 +381,7 @@
   <script src="/js/members-dialogs.js"></script>
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
+  <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/edit-families.js"></script>
 </body>

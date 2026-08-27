@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -36,66 +32,148 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Chat</h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-forum-dialog').showModal()">+ New Chat</button>
+      <% if (activeTab === 'new') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+      <% } %>
     </div>
-    <p><a href="/main-admin/forums/moderation-log">View Moderation Log</a></p>
+
+    <%# A real request: "main admin portal chat should have the tabs new
+        chat, moderate, archive." See routes/admin-forums.js's own header
+        comment for what each tab covers. %>
+    <div class="view-tabs">
+      <a href="/main-admin/forums?tab=new" class="view-tab <%= activeTab === 'new' ? 'active' : '' %>">New Chat</a>
+      <a href="/main-admin/forums?tab=moderate" class="view-tab <%= activeTab === 'moderate' ? 'active' : '' %>">Moderate</a>
+      <a href="/main-admin/forums?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
+    </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <% if (categories.length === 0) { %>
-      <p class="roster-empty">No chats yet &mdash; create one above.</p>
-    <% } %>
+    <% if (activeTab === 'new') { %>
+      <% if (categories.length === 0) { %>
+        <p class="roster-empty">No chats yet &mdash; add a category above.</p>
+      <% } %>
 
-    <div class="team-card-grid">
-      <% categories.forEach(function(c) { %>
-        <div class="team-col">
-          <div class="team-info-card">
-            <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
-            <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
-            <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
-            <div class="roster-btn-row">
-              <% if (c.is_locked) { %>
-                <form method="POST" action="/main-admin/forums/<%= c.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
-              <% } else { %>
-                <form method="POST" action="/main-admin/forums/<%= c.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
-              <% } %>
-              <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
-                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-              </form>
+      <div class="team-card-grid">
+        <% categories.forEach(function(c) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
+              <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
+              <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
+              <div class="roster-btn-row">
+                <% if (c.is_locked) { %>
+                  <form method="POST" action="/main-admin/forums/<%= c.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
+                <% } else { %>
+                  <form method="POST" action="/main-admin/forums/<%= c.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
+                <% } %>
+              </div>
             </div>
           </div>
+        <% }); %>
+      </div>
+    <% } else if (activeTab === 'moderate') { %>
+      <% if (moderationEntries.length === 0) { %>
+        <p class="roster-empty">No moderation actions yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Moderator</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% moderationEntries.forEach(function(e) { %>
+                <tr>
+                  <td><%= e.created_at %></td>
+                  <td><%= e.memberName || 'Unknown' %></td>
+                  <td><%= e.action %></td>
+                  <td><%= e.target_type %> #<%= e.target_id %></td>
+                  <td><%= e.detail || '' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         </div>
-      <% }); %>
-    </div>
-
-    <dialog id="new-forum-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/forums">
-        <h3>New Chat</h3>
-        <label>Name
-          <input type="text" name="name" required />
-        </label>
-        <label>Description
-          <textarea name="description" rows="2"></textarea>
-        </label>
-        <label>Type
-          <select name="scope" onchange="document.getElementById('forum-class-field').style.display = this.value === 'class' ? '' : 'none';">
-            <option value="general">General (any signed-in member)</option>
-            <option value="class">Private Class Chat</option>
-          </select>
-        </label>
-        <label id="forum-class-field" style="display: none;">Class
-          <select name="classId">
-            <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
-          </select>
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Create</button>
+      <% } %>
+    <% } else { %>
+      <% if (archived.length === 0) { %>
+        <p class="roster-empty">No archived chats.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Thread</th>
+                <th>Chat</th>
+                <th>Started By</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% archived.forEach(function(t) { %>
+                <tr>
+                  <td><a href="/forums/<%= t.categoryId %>/threads/<%= t.id %>"><%= t.title %></a></td>
+                  <td><%= t.categoryName || 'Uncategorized' %></td>
+                  <td><%= t.authorName || 'Unknown' %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/forums/threads/<%= t.id %>/unarchive" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Unarchive</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
         </div>
-      </form>
-    </dialog>
+      <% } %>
+    <% } %>
   </main>
+
+  <dialog id="add-category-dialog" class="member-picker-dialog">
+    <form method="POST" action="/main-admin/forums">
+      <h3>Add Category</h3>
+      <label for="add-forum-category-name">Category Name
+        <input id="add-forum-category-name" type="text" name="name" placeholder="e.g. Field Trip Planning" required />
+      </label>
+      <label for="add-forum-category-description">Description
+        <textarea id="add-forum-category-description" name="description" rows="2"></textarea>
+      </label>
+      <label for="add-forum-category-scope">Type
+        <select id="add-forum-category-scope" name="scope" onchange="document.getElementById('forum-class-field').style.display = this.value === 'class' ? '' : 'none';">
+          <option value="general">General (any signed-in member)</option>
+          <option value="class">Private Class Chat</option>
+        </select>
+      </label>
+      <label id="forum-class-field" for="add-forum-category-class" style="display: none;">Class
+        <select id="add-forum-category-class" name="classId">
+          <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
+        </select>
+      </label>
+      <% if (categories.length > 0) { %>
+        <p class="hint">Existing categories</p>
+        <div class="grade-pill-grid">
+          <% categories.forEach(function(c) { %>
+            <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
+              <span class="badge-pill">
+                <%= c.name %>
+                <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.name %>" title="Delete">&times;</button>
+              </span>
+            </form>
+          <% }); %>
+        </div>
+      <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

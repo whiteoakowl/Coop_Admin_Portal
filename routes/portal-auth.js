@@ -22,13 +22,13 @@ function safeNext(value) {
 
 router.get('/login', (req, res) => {
   if (req.portalAccount) return res.redirect(safeNext(req.query.next));
-  res.render('portal-login', { title: 'Log In', error: null, notice: req.query.notice || null, next: safeNext(req.query.next) });
+  res.render('portal-login', { title: 'Member Login', error: null, notice: req.query.notice || null, next: safeNext(req.query.next) });
 });
 
 router.post('/login', async (req, res) => {
   const next = safeNext(req.body.next);
   if (portalLoginLimiter.isRateLimited(req.ip)) {
-    return res.render('portal-login', { title: 'Log In', error: 'Too many login attempts. Please wait a few minutes and try again.', notice: null, next });
+    return res.render('portal-login', { title: 'Member Login', error: 'Too many login attempts. Please wait a few minutes and try again.', notice: null, next });
   }
 
   const email = (req.body.email || '').trim();
@@ -36,20 +36,20 @@ router.post('/login', async (req, res) => {
   const passwordOk = account && (await verifyPassword(account, req.body.password));
   if (!account || !passwordOk) {
     portalLoginLimiter.recordFailure(req.ip);
-    return res.render('portal-login', { title: 'Log In', error: 'Incorrect email or password.', notice: null, next });
+    return res.render('portal-login', { title: 'Member Login', error: 'Incorrect email or password.', notice: null, next });
   }
   portalLoginLimiter.recordSuccess(req.ip);
 
   if (account.status === 'pending') {
     return res.render('portal-login', {
-      title: 'Log In',
+      title: 'Member Login',
       error: "Your registration is still awaiting admin approval. We'll email you once it's been reviewed.",
       notice: null,
       next,
     });
   }
   if (account.status === 'suspended') {
-    return res.render('portal-login', { title: 'Log In', error: 'This account has been suspended. Please contact an administrator.', notice: null, next });
+    return res.render('portal-login', { title: 'Member Login', error: 'This account has been suspended. Please contact an administrator.', notice: null, next });
   }
 
   await db.prepare('UPDATE member_accounts SET last_login_at = now_text() WHERE id = ?').run(account.id);
@@ -64,7 +64,7 @@ router.post('/logout', (req, res) => {
 
 router.get('/register', (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
-  res.render('portal-register', { title: 'Member Registration', error: null, formValues: {}, children: [], gradeOptions: GRADE_OPTIONS });
+  res.render('portal-register', { title: 'Request Membership', error: null, formValues: {}, children: [], gradeOptions: GRADE_OPTIONS });
 });
 
 // multer isn't in play here (no file upload on this form), but the
@@ -82,7 +82,7 @@ function parseChildren(body) {
 }
 
 function renderRegisterError(res, error, formValues, children) {
-  return res.render('portal-register', { title: 'Member Registration', error, formValues, children, gradeOptions: GRADE_OPTIONS });
+  return res.render('portal-register', { title: 'Request Membership', error, formValues, children, gradeOptions: GRADE_OPTIONS });
 }
 
 // Self-registration creates a real member_accounts row with status

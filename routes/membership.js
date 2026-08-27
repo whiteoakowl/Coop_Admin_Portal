@@ -1,166 +1,105 @@
+// The Membership Form - admin-only (see the header comment this used to
+// carry: an admin fills it out on a family's behalf, from a paper form
+// or a phone call), NOT one of the app's genuine public forms. A real
+// request: "Add member and membership request form should be the same
+// ... however it will still create individual profiles." Now shares
+// views/member-intake-form.ejs and utils/memberIntake.js with Main
+// Admin's and Co-op Admin's own Add Member forms (routes/main-admin-
+// members.js, routes/admin-members.js) rather than being a third,
+// separately-built form that only ever produced a PENDING
+// membership_requests/membership_request_children row for someone to
+// review later - every one of these three entry points is already
+// admin-gated, so that staging step never added real review it needed.
+//
+// Still lives outside the /admin URL prefix (unchanged, to avoid
+// disturbing anything that already links to /membership) and still
+// applies requireFullAdmin per-route rather than router-level, for the
+// same root-mounted-router reason its own original comment explained.
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { imageFileFilter } = require('../utils/uploads');
-const { GRADE_OPTIONS, VOLUNTEER_INTEREST_OPTIONS } = require('../utils/membership');
-const { createStorageClient } = require('../utils/storage');
-const { saveUpload } = require('../utils/uploadBackend');
+const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { isValidISODate } = require('../utils/dates');
+const { allFamilies } = require('../utils/members');
+const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 
-// Despite living outside the /admin URL prefix (unchanged here to avoid
-// disturbing anything that already links to /membership), this form is
-// admin-only, not public - an admin fills it out on a family's behalf
-// (from a paper form, a phone call, etc.), the same as adding a member
-// directly. It's not one of the app's genuine public forms (absence,
-// name-tag), which stay open with no login because a parent submits
-// those themselves.
-//
-// requireFullAdmin is applied per-route below, NOT as a router-level
-// `router.use(...)` here - this router is mounted at the site root ('/',
-// alongside the app's actually-public routers), not under '/admin' like
-// the other requireFullAdmin-gated routers (Documents, Library, Design,
-// Members, misc badges, Name Tag - see server.js's own mounting-order
-// comment). A path-less `router.use()` on a root-mounted router matches
-// every request the app receives, not just this router's own routes -
-// it would intercept /admin/login itself, along with everything else.
-
-const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'membership-children');
-const CHILD_PHOTOS_BUCKET = 'membership-child-photos';
-const storageClient = createStorageClient();
-// Only needed as a local-disk fallback - a serverless deployment's
-// filesystem is read-only outside /tmp, so this must not run when
-// Storage is actually configured.
-if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
-
-const MAX_CHILD_PHOTO_BYTES = 5 * 1024 * 1024;
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_CHILD_PHOTO_BYTES },
-  fileFilter: imageFileFilter,
-});
-
-// A child photo over the limit above makes multer.any() itself throw a
-// MulterError (LIMIT_FILE_SIZE) - unlike imageFileFilter rejecting a
-// wrong file TYPE (which just leaves that file out of req.files), this
-// error was never caught anywhere, so it fell through to server.js's
-// generic catch-all error handler and threw away everything the admin
-// had typed for every child on the form, not just the one photo. Same
-// fix as routes/admin-documents.js's own uploadDocument wrapper.
-function uploadChildPhotos(req, res, next) {
-  upload.any()(req, res, (err) => {
-    if (err && err.code === 'LIMIT_FILE_SIZE') {
-      return res.redirect('/membership?error=' + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_CHILD_PHOTO_BYTES / (1024 * 1024)}MB.`));
-    }
-    next(err);
-  });
+async function allSetupTeams() {
+  return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, LOWER(title)').all();
 }
 
-router.get('/membership', requireFullAdmin, (req, res) => {
-  res.render('membership', {
+router.get('/membership', requireFullAdmin, async (req, res) => {
+  res.render('member-intake-form', {
     title: 'Membership Form',
-    gradeOptions: GRADE_OPTIONS,
-    volunteerOptions: VOLUNTEER_INTEREST_OPTIONS,
+    portal: 'coop_admin',
+    formAction: '/membership',
+    backHref: '/admin/members',
+    submitLabel: 'Submit',
+    isAdmin: true,
+    families: await allFamilies(),
+    setupTeams: await allSetupTeams(),
+    gradeLevels: GRADE_LEVELS,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-// multer parses "children[0][firstName]" style multipart fields into a real
-// (possibly sparse, if a child block was removed client-side) nested array
-// on req.body.children, so the array index already lines up with the
-// original bracket index used in uploaded file fieldnames below.
-function parseChildren(body) {
-  if (Array.isArray(body.children)) return body.children;
-  if (body.children && typeof body.children === 'object') {
-    return Object.keys(body.children).map((k) => body.children[k]);
-  }
-  return [];
-}
-
-router.post('/membership', requireFullAdmin, uploadChildPhotos, async (req, res) => {
+router.post('/membership', requireFullAdmin, uploadIntakePhotos('/membership'), async (req, res) => {
   const body = req.body;
-  const parent1FirstName = (body.parent1FirstName || '').trim();
-  const parent1LastName = (body.parent1LastName || '').trim();
-  const parent1Email = (body.parent1Email || '').trim();
+  const back = '/membership';
 
-  if (!parent1FirstName || !parent1LastName || !parent1Email) {
-    return res.redirect('/membership?error=' + encodeURIComponent('Parent/Guardian #1 name and email are required.'));
+  const address = {
+    address: (body.address || '').trim() || null,
+    city: (body.city || '').trim() || null,
+    state: (body.state || '').trim() || null,
+    zip: (body.zip || '').trim() || null,
+  };
+
+  const parents = parseArrayField(body, 'parents')
+    .map((p, index) => ({ ...p, index }))
+    .filter((p) => p && (p.name || '').trim());
+  if (parents.length === 0) {
+    return res.redirect(back + '?error=' + encodeURIComponent('At least one parent/guardian name is required.'));
   }
 
-  const children = parseChildren(body)
+  const children = parseArrayField(body, 'children')
     .map((c, index) => ({ ...c, index }))
-    .filter((c) => c && (c.firstName || '').trim() && (c.lastName || '').trim());
-
+    .filter((c) => c && (c.name || '').trim());
   if (children.length === 0) {
-    return res.redirect('/membership?error=' + encodeURIComponent('Please add at least one child.'));
+    return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
   }
 
-  const volunteerInterests = [].concat(body.volunteerInterests || []).filter((v) => VOLUNTEER_INTEREST_OPTIONS.includes(v));
+  const familyId = await resolveFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
 
-  const info = await db
-    .prepare(
-      `INSERT INTO membership_requests
-        (parent1_first_name, parent1_last_name, parent1_email, parent1_phone,
-         parent2_first_name, parent2_last_name, parent2_email, parent2_phone,
-         address, city, state, zipcode, volunteer_interests)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
-      parent1FirstName,
-      parent1LastName,
-      parent1Email,
-      (body.parent1Phone || '').trim() || null,
-      (body.parent2FirstName || '').trim() || null,
-      (body.parent2LastName || '').trim() || null,
-      (body.parent2Email || '').trim() || null,
-      (body.parent2Phone || '').trim() || null,
-      (body.address || '').trim() || null,
-      (body.city || '').trim() || null,
-      (body.state || '').trim() || null,
-      (body.zipcode || '').trim() || null,
-      volunteerInterests.join(', ') || null
-    );
-
-  const requestId = info.lastInsertRowid;
-  const insertChild = db.prepare(
-    `INSERT INTO membership_request_children (request_id, first_name, last_name, birthdate, grade_level, medical_notes, photo_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  );
+  for (const p of parents) {
+    await createParentMember(familyId, address, {
+      name: p.name.trim(),
+      email: (p.email || '').trim() || null,
+      phone: (p.phone || '').trim() || null,
+      isPrimaryParent: p.isPrimaryParent === '1',
+      cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+    });
+  }
 
   for (const c of children) {
     const photoFile = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
-    const photoPath = photoFile
-      ? await saveUpload({
-          client: storageClient,
-          bucket: CHILD_PHOTOS_BUCKET,
-          localDir: PHOTO_DIR,
-          buffer: photoFile.buffer,
-          originalName: photoFile.originalname,
-          contentType: photoFile.mimetype,
-        })
-      : null;
-    await insertChild.run(
-      requestId,
-      c.firstName.trim(),
-      c.lastName.trim(),
-      // Silently dropped rather than rejecting the whole submission - a
-      // malformed birthdate here isn't fatal, it just leaves this one
-      // field blank for the admin to fill in when approving the request
-      // (see ageFromBirthday's own isValidISODate guard for why this
-      // needs to already be a real date by the time it becomes a
-      // member's birthday, not just by the time it's displayed).
-      isValidISODate((c.birthdate || '').trim()) ? c.birthdate.trim() : null,
-      GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
-      (c.medicalNotes || '').trim() || null,
-      photoPath
+    await createChildMember(
+      familyId,
+      address,
+      {
+        name: c.name.trim(),
+        // Silently dropped rather than rejecting the whole submission -
+        // a malformed birthdate here isn't fatal, it just leaves this
+        // one field blank for later editing.
+        birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
+        gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
+        medicalNotes: (c.medicalNotes || '').trim() || null,
+      },
+      photoFile
     );
   }
 
-  res.redirect('/membership?notice=' + encodeURIComponent('Thanks! Your membership request has been submitted.'));
+  res.redirect('/membership?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
 });
 
 module.exports = router;

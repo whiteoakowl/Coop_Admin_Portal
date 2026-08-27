@@ -135,4 +135,4 @@ async function getScheduleCardTemplate() {
   }
 }
 
-module.exports = { scheduleCardDataForMember, scheduleCardDataForMembers, getScheduleCardTemplate };
+module.exports = { scheduleCardDataForMember, scheduleCardDataForMembers, getScheduleCardTemplate, primaryParentFor, primaryParentsFor };

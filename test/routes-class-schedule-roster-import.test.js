@@ -40,6 +40,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 test('GET .../roster/import-template.xlsx has separate Student First/Last Name columns', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
@@ -74,11 +93,7 @@ test('GET .../roster/import-template.xlsx has separate Student First/Last Name c
 });
 
 async function t_addStudentAndImport(cookie, csrfToken, classId) {
-  await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ name: 'Roster Import Kid', memberType: 'student', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Roster Import Kid', 'student');
 
   const ws = XLSX.utils.aoa_to_sheet([['Student First Name', 'Student Last Name'], ['Roster Import', 'Kid']]);
   const wb = XLSX.utils.book_new();

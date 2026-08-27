@@ -51,6 +51,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 const IMPORT_HEADERS = [
   'Day', 'Hour', 'Class Name', 'Room', 'Grade',
   'Class Start Time', 'Class End Time', 'Class Description',
@@ -85,8 +104,8 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   // Two active parents to be matched as staff by name.
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Jane Teacher', memberType: 'parent', _csrf: csrfToken });
-  await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Alex Assistant', memberType: 'parent', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Jane Teacher', 'parent');
+  await addSingleMember(cookie, csrfToken, 'Alex Assistant', 'parent');
 
   await t.test('a row with Teacher + Assistant columns staffs the new class accordingly', async () => {
     const buffer = buildImportBuffer([['Monday', '1', 'Art Adventures', 'Room 3', '1st', '', '', '', 'Jane Teacher', '', 'Alex Assistant', '', '']]);
@@ -140,7 +159,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   });
 
   await t.test('Class Start/End Time and Description land on the class row, and a 2nd Teacher is staffed alongside the first', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Pat Second', memberType: 'parent', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Pat Second', 'parent');
     const buffer = buildImportBuffer([
       ['Monday', '3', 'Music Time', 'Room 5', '2nd', '9:00 AM', '9:45 AM', 'Singing and instruments', 'Jane Teacher', 'Pat Second', '', '', ''],
     ]);
@@ -165,8 +184,8 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
   });
 
   await t.test('all 3 assistant columns can be used at once', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Two', memberType: 'parent', _csrf: csrfToken });
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Assistant Three', memberType: 'parent', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Assistant Two', 'parent');
+    await addSingleMember(cookie, csrfToken, 'Assistant Three', 'parent');
     const buffer = buildImportBuffer([
       ['Monday', '2', 'Science Lab', 'Room 8', '', '', '', '', '', '', 'Alex Assistant', 'Assistant Two', 'Assistant Three'],
     ]);

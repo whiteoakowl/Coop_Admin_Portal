@@ -66,8 +66,17 @@
                 <label>Description
                   <textarea name="description" rows="3"><%= l.description || '' %></textarea>
                 </label>
+                <%# A real request: "Members must choose a category when
+                    creating a listing" - admin-managed only (Main Admin >
+                    Classifieds > Categories tab), so this is a required
+                    select, not free text. %>
                 <label>Category
-                  <input type="text" name="category" value="<%= l.category || '' %>" />
+                  <select name="categoryId" required>
+                    <option value="">Choose a category</option>
+                    <% categories.forEach(function(c) { %>
+                      <option value="<%= c.id %>" <%= l.category_id === c.id ? 'selected' : '' %>><%= c.title %></option>
+                    <% }); %>
+                  </select>
                 </label>
                 <label>Price
                   <input type="text" name="price" value="<%= l.price || '' %>" placeholder="e.g. $20, Free, OBO" />
@@ -104,8 +113,14 @@
           <textarea name="description" rows="3"></textarea>
         </label>
         <label>Category
-          <input type="text" name="category" placeholder="e.g. Books, Sports Equipment" />
+          <select name="categoryId" required>
+            <option value="">Choose a category</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>"><%= c.title %></option>
+            <% }); %>
+          </select>
         </label>
+        <% if (categories.length === 0) { %><p class="hint">No categories yet - check back once an admin adds some.</p><% } %>
         <label>Price
           <input type="text" name="price" placeholder="e.g. $20, Free, OBO" />
         </label>

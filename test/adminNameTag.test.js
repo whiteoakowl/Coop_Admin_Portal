@@ -112,7 +112,27 @@ test('Member form: creating an Admin member with positions, and the position pic
   const presidentId = positions.find((p) => p.title === 'President').id;
   const treasurerId = positions.find((p) => p.title === 'Treasurer').id;
 
-  const newPage = await request(app).get('/admin/members/new').set('Cookie', cookie);
+  // Admin member type (a leader who just needs a badge, no family/kids)
+  // has no place on the family-intake form at /admin/members/new -
+  // "there shouldn't be any lone admins/leaders, or single members," so
+  // that form only ever creates parent/student rows. Turning an existing
+  // member INTO an admin (with positions) is still done on their own
+  // edit page (views/admin-member-edit.ejs via views/partials/member-
+  // form-fields.ejs), which still carries the Admin/Student/Parent type
+  // toggle - so create a plain family member first, then edit them.
+  await request(app)
+    .post('/admin/members/new')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({
+      newFamilyName: 'President Family',
+      'parents[0][name]': 'Pat President',
+      'children[0][name]': 'President Filler Kid',
+      _csrf: csrfToken,
+    });
+  const created = await db.prepare("SELECT id FROM members WHERE name = 'Pat President'").get();
+
+  const newPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);
   assert.equal(newPage.status, 200);
   assert.match(newPage.text, /value="admin"/, 'expected an Admin option in the member type toggle');
   assert.match(newPage.text, /President/, 'expected the Settings-managed position in the picker');
@@ -122,7 +142,7 @@ test('Member form: creating an Admin member with positions, and the position pic
   // views/partials/member-form-fields.ejs's Admin Positions box), not the
   // old single <select name="adminPositionId">.
   const createRes = await request(app)
-    .post('/admin/members/new')
+    .post(`/admin/members/${created.id}/edit`)
     .set('Cookie', cookie)
     .type('form')
     .send({ name: 'Pat President', memberType: 'admin', adminPositionIds: [String(presidentId), String(treasurerId)], _csrf: csrfToken });

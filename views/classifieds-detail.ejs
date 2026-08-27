@@ -32,7 +32,7 @@
 
         <h1><%= listing.title %></h1>
         <% if (listing.price) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= listing.price %></p><% } %>
-        <% if (listing.category) { %><p class="site-hero-meta"><%= listing.category %></p><% } %>
+        <% if (listing.categoryTitle) { %><p class="site-hero-meta"><%= listing.categoryTitle %></p><% } %>
         <% if (listing.description) { %><p><%= listing.description %></p><% } %>
       </div>
     </section>

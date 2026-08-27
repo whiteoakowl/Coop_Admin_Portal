@@ -30,7 +30,9 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
+const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
+const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
+const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 
 router.use(requireFullAdmin);
 
@@ -140,9 +142,17 @@ router.get('/members', async (req, res) => {
   // each, whether or not their row's dialog was ever opened. Now fetched
   // on demand instead - see /members/:id/cards-fragment and
   // /members/:id/schedule-fragment below, and public/js/members-dialogs.js.
-  const withRosters = (await membersWithDetails(typeFilter, familyFilter))
-    .filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1))
-    .map((m) => ({ ...m, age: ageFromBirthday(m.birthday), birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null }));
+  const filteredMembers = (await membersWithDetails(typeFilter, familyFilter)).filter((m) => (showArchived ? Number(m.active) === 0 : Number(m.active) === 1));
+  // A real request: "this will then add their admin title label next to
+  // their name... on member lists." Batched (not per-row) for the same
+  // N+1 reason as nameTagData.js's own bulk-print title lookup.
+  const adminTitlesByMember = await adminPositionTitlesForMembers(filteredMembers.map((m) => m.id));
+  const withRosters = filteredMembers.map((m) => ({
+    ...m,
+    age: ageFromBirthday(m.birthday),
+    birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null,
+    adminTitle: (adminTitlesByMember[m.id] || []).join(', ') || null,
+  }));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -152,6 +162,18 @@ router.get('/members', async (req, res) => {
   // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
   const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
+
+  // "Edit Permissions" bulk mode only needs to know the CURRENT page's
+  // own Section/Portal Permission state - see permissions-edit-toggle.js's
+  // own comment for why this deliberately doesn't try to reach every
+  // page's rows the way the Delete/Archive bulk mode's off-page
+  // checkboxes do.
+  const pageMemberIds = pagination.items.map((m) => m.id);
+  const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const roles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
+  const sectionIdsByMember = await sectionIdsForMembers(pageMemberIds);
+  const portalStatusByMember = await portalStatusForMembers(pageMemberIds);
+
   res.render('admin-members', {
     title: 'Members',
     members: pagination.items,
@@ -167,9 +189,43 @@ router.get('/members', async (req, res) => {
     familyFilter,
     showArchived,
     families: await allFamilies(),
+    sections,
+    roles,
+    sectionIdsByMember,
+    portalStatusByMember,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// "Edit Permissions" bulk save - reconciles every member row present in
+// this submission (the current page's own memberIds[], see admin-
+// members.ejs's own hidden input) to exactly the sections/roles checked
+// for them, same "full reconcile, not incremental" shape as
+// utils/portalPermissions.js's own setMemberSections/setMemberRoles.
+// req.portalAccount doesn't exist on this session (the legacy Co-op Admin
+// login, requireFullAdmin - see this file's own header) so grantedBy
+// stays null here, unlike main-admin-members.js's own version of this
+// route.
+router.post('/members/bulk-permissions', async (req, res) => {
+  // Field names are `sections_<memberId>[]`/`roles_<memberId>[]`, NOT
+  // `sections[<memberId>][]` - qs (express's extended:true urlencoded
+  // parser) treats a bracketed segment that looks like a small integer
+  // as an ARRAY INDEX, not an object key, and silently compacts/
+  // reorders the whole thing into one array with no way to recover which
+  // member each entry belonged to (confirmed: `sections[5][]=3&
+  // sections[12][]=7` parses to `sections: ['3','7']`, losing 5 and 12
+  // entirely). A flat `sections_<memberId>` key sidesteps that qs
+  // behavior completely - see admin-members.ejs's own matching field
+  // names.
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  for (const memberId of memberIds) {
+    const sectionIds = [].concat(req.body[`sections_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
+    const roleIds = [].concat(req.body[`roles_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
+    await setMemberSections(memberId, sectionIds);
+    await setMemberRoles(memberId, roleIds, null);
+  }
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Permissions updated for ${memberIds.length} member(s).`));
 });
 
 // Powers the Members page's per-row Cards button (fetch-on-open - see
@@ -384,85 +440,88 @@ router.post('/members/families/new', async (req, res) => {
   res.redirect('/admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 
+// "Add Member" now shares the same family-intake form/logic as the
+// Membership Form (routes/membership.js) and Main Admin's own Add Member
+// (routes/main-admin-members.js) - a real request: "Add member and
+// membership request form should be the same." A further request:
+// "there shouldn't be any lone admins/leaders, or single members" -
+// every member is created through this one family-intake form now, no
+// standalone/single-member creation path at all (an earlier "or add a
+// single member" fallback at /members/new-single was removed for this
+// reason - Admin/leader member_type has no path to being newly created
+// through the UI anymore as a result). Editing an EXISTING member
+// (GET/POST /members/:id/edit below) is unaffected - it keeps its own
+// single-person admin-member-edit.ejs form, including any already-
+// existing admin-type members.
 router.get('/members/new', async (req, res) => {
-  res.render('admin-member-edit', {
+  res.render('member-intake-form', {
     title: 'Add Member',
-    mode: 'create',
-    member: {
-      member_type: 'student',
-      name: '',
-      barcode: '',
-      address: '',
-      city: '',
-      state: '',
-      zip: '',
-      phone: '',
-      email: '',
-      photo_path: null,
-      birthday: '',
-      grade_level: '',
-      medical_notes: '',
-      is_primary_parent: 0,
-    },
+    portal: 'coop_admin',
+    formAction: '/admin/members/new',
+    backHref: '/admin/members',
+    submitLabel: 'Add Member',
+    isAdmin: true,
     families: await allFamilies(),
-    memberFamilyId: null,
-    gradeLevels: GRADE_LEVELS,
     setupTeams: await allSetupTeams(),
-    memberCleanupTeamIds: [],
-    adminPositions: await listAdminPositions(),
-    memberAdminPositionIds: [],
+    gradeLevels: GRADE_LEVELS,
     error: req.query.error || null,
+    notice: null,
   });
 });
 
-router.post('/members/new', uploadMemberPhoto(() => '/admin/members/new'), async (req, res) => {
-  const f = memberFormFields(req);
+router.post('/members/new', uploadIntakePhotos('/admin/members/new'), async (req, res) => {
+  const body = req.body;
+  const back = '/admin/members/new';
 
-  if (!f.name) {
-    return res.redirect('/admin/members/new?error=' + encodeURIComponent('Name is required.'));
+  const address = {
+    address: (body.address || '').trim() || null,
+    city: (body.city || '').trim() || null,
+    state: (body.state || '').trim() || null,
+    zip: (body.zip || '').trim() || null,
+  };
+
+  const parents = parseArrayField(body, 'parents')
+    .map((p, index) => ({ ...p, index }))
+    .filter((p) => p && (p.name || '').trim());
+  if (parents.length === 0) {
+    return res.redirect(back + '?error=' + encodeURIComponent('At least one parent/guardian name is required.'));
   }
-  // Duplicate-name check used to piggyback on barcode's old UNIQUE
-  // constraint (barcode = name), which incidentally also blocked two
-  // members from ever sharing a name - now that barcode is a generated
-  // member_code instead (see utils/members.js's generateMemberCode),
-  // that's no longer automatic, so it's checked directly here to keep
-  // the same practical behavior.
-  const exists = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?)').get(f.name);
-  if (exists) {
-    return res.redirect('/admin/members/new?error=' + encodeURIComponent(`"${f.name}" is already in the member list.`));
+
+  const children = parseArrayField(body, 'children')
+    .map((c, index) => ({ ...c, index }))
+    .filter((c) => c && (c.name || '').trim());
+  if (children.length === 0) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
   }
 
-  const memberCode = await generateMemberCode();
-  const photoPath = req.file ? await savePhotoFile(req.file) : null;
+  const familyId = await resolveFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
 
-  const info = await db
-    .prepare(
-      `INSERT INTO members
-         (name, barcode, member_code, member_type, address, city, state, zip, phone, email, photo_path, birthday, grade_level, medical_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
-      f.name,
-      memberCode,
-      memberCode,
-      f.memberType,
-      f.address,
-      f.city,
-      f.state,
-      f.zip,
-      f.phone,
-      f.email,
-      photoPath,
-      f.birthday,
-      f.gradeLevel,
-      f.medicalNotes
+  for (const p of parents) {
+    await createParentMember(familyId, address, {
+      name: p.name.trim(),
+      email: (p.email || '').trim() || null,
+      phone: (p.phone || '').trim() || null,
+      isPrimaryParent: p.isPrimaryParent === '1',
+      cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+    });
+  }
+
+  for (const c of children) {
+    const photoFile = (req.files || []).find((f) => f.fieldname === `children[${c.index}][photo]`);
+    await createChildMember(
+      familyId,
+      address,
+      {
+        name: c.name.trim(),
+        birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
+        gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
+        medicalNotes: (c.medicalNotes || '').trim() || null,
+      },
+      photoFile
     );
-  await syncCleanupTeams(info.lastInsertRowid, f.cleanupTeamIds);
-  await syncMemberAdminPositions(info.lastInsertRowid, f.adminPositionIds);
-  await setMemberFamily(info.lastInsertRowid, f.familyId);
-  await setPrimaryParent(info.lastInsertRowid, f.isPrimaryParent);
+  }
 
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} added.`));
+  res.redirect('/admin/members?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
 });
 
 // Full-profile bulk import - the Members page is the only place a CSV/XLSX
@@ -540,12 +599,19 @@ router.get('/members/:id', async (req, res) => {
   // family member to show side by side.
   const scheduleFamilyAll = tab === 'schedule' && req.query.family === 'all' && familyRoster.length > 1;
 
+  const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const memberSectionIds = (await sectionIdsForMembers([id]))[id];
+  const portalStatus = (await portalStatusForMembers([id]))[id];
+  const allRoles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
+
   res.render('admin-member-profile', {
     title: member.name,
     member,
     tab,
     familyName: family ? family.familyName : null,
     familyMembers: restOfFamily.map((m) => m.name),
+    memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
+    portalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
     // Includes the member being viewed (not just the rest of the family)
     // - powers the Class Schedule/Attendance tabs' "jump to this family
     // member" dropdown, which needs the current member as one of its own

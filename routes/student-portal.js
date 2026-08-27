@@ -180,7 +180,35 @@ router.get('/diploma', async (req, res) => {
 // exactly as Main/Co-op Admin curate it, no student-side editing.
 router.get('/resources', async (req, res) => {
   const links = await resourceLinks.listResourceLinksForRole('student');
-  res.render('student-resources', { title: 'Resource Links', links });
+  res.render('student-resources', {
+    title: 'Resource Links',
+    links,
+    categories: await resourceLinks.listCategories(),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+// A real request: "members can submit resource links for approval."
+// Always lands as status 'pending' (resourceLinks.submitResourceLink) -
+// it shows up nowhere on any member's own list until a Main Admin
+// approves it from the Resource Links > Approvals tab.
+router.post('/resources/submit', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const url = (req.body.url || '').trim();
+  if (!title || !url) return res.redirect('/student/resources?error=' + encodeURIComponent('Title and website are required.'));
+
+  const member = await memberForAccount(req.portalAccount.id);
+  await resourceLinks.submitResourceLink({
+    title,
+    url,
+    description: (req.body.description || '').trim(),
+    city: (req.body.city || '').trim(),
+    state: (req.body.state || '').trim(),
+    categoryId: parseInt(req.body.categoryId, 10) || null,
+    submittedByMemberId: member ? member.id : null,
+  });
+  res.redirect('/student/resources?notice=' + encodeURIComponent('Thanks! Your resource was submitted for admin approval.'));
 });
 
 // Name Tag - a real request: Student Portal should have a "name Tag"

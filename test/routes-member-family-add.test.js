@@ -26,6 +26,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 
 const request = require('supertest');
 const app = require('../server');
+const db = require('../db');
 
 test.before(() => app.ready);
 
@@ -44,11 +45,31 @@ async function loginAsAdmin() {
   return { cookie, csrfToken: match ? match[1] : null };
 }
 
-test('the Add/Edit Member form has a single family dropdown, no duplicate checklist', async (t) => {
-  const { cookie } = await loginAsAdmin();
+test('the Edit Member form has a single family dropdown, no duplicate checklist', async (t) => {
+  const { cookie, csrfToken } = await loginAsAdmin();
 
-  await t.test('/admin/members/new renders the select and Add New Family button, not the old checklist', async () => {
-    const res = await request(app).get('/admin/members/new').set('Cookie', cookie);
+  await t.test('/admin/members/:id/edit renders the select and Add New Family button, not the old checklist', async () => {
+    // Add Member ("there shouldn't be any lone admins/leaders, or single
+    // members") now only creates members through the whole-family intake
+    // form at /admin/members/new (views/member-intake-form.ejs), which
+    // has its own plain <select>/<input> "Choose a Family" box - no
+    // dialog at all. This test's dialog-based "Choose a Family" markup
+    // (public/js/member-form.js's "+ Add New Family" popup) still lives
+    // on the EDIT form only (views/admin-member-edit.ejs via views/
+    // partials/member-form-fields.ejs), so it's covered there instead.
+    await request(app)
+      .post('/admin/members/new')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        newFamilyName: 'EditFormCheck',
+        'parents[0][name]': 'Edit Form Parent',
+        'children[0][name]': 'Edit Form Kid',
+        _csrf: csrfToken,
+      });
+    const member = await db.prepare("SELECT id FROM members WHERE name = 'Edit Form Parent'").get();
+
+    const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /data-family-select/);
     assert.match(res.text, /data-add-family-open/);

@@ -57,8 +57,16 @@
         });
       }
       function registerControls(c) {
-        if (!c.registration_open) return '<span class="hint">Not open</span>';
-        if (!c.allow_parent_register) return '<span class="hint">Parent registration not open for this class</span>';
+        // Already-enrolled/waitlisted always wins, checked per child before
+        // any of the registration-open/allow/eligibility gates below - a
+        // class's roster can be populated directly in Co-op Admin (a
+        // class_enrollments row with no class_registrations row behind
+        // it) same as through this page's own Register button, and
+        // registration_open defaults closed (see the class_registration_
+        // rules migration), so gating on it first used to hide an
+        // already-enrolled child behind "Not open" with no way to see or
+        // cancel their spot. See it enrolled/waitlisted first, THEN decide
+        // whether a NOT-yet-enrolled child can register.
         var eligibleIds = eligibleChildIdsByClass[c.id] || [];
         return children
           .map(function (child) {
@@ -74,6 +82,8 @@
                 '</form>'
               );
             }
+            if (!c.registration_open) return name + ': <span class="hint">Not open</span>';
+            if (!c.allow_parent_register) return name + ': <span class="hint">Parent registration not open for this class</span>';
             if (eligibleIds.indexOf(child.id) === -1) {
               return '<span class="hint">' + name + ': not in an eligible section</span>';
             }
@@ -119,7 +129,7 @@
                 <tr>
                   <td class="roster-name-col">
                     <strong><%= c.class_name %></strong>
-                    <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
+                    <% if (c.description) { %><div class="hint forum-editable-display"><%- c.description %></div><% } %>
                   </td>
                   <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
                   <td><%= c.gradeLabel || '—' %></td>
@@ -139,7 +149,7 @@
           <% classes.forEach(function(c) { %>
             <section class="portal-dashboard-card">
               <h2><%= c.class_name %></h2>
-              <% if (c.description) { %><p class="hint"><%= c.description %></p><% } %>
+              <% if (c.description) { %><p class="hint forum-editable-display"><%- c.description %></p><% } %>
               <p><%= c.dayLabel %> &middot; <%= c.timeLabel %></p>
               <p><strong>Grades:</strong> <%= c.gradeLabel || '—' %></p>
               <p><strong>Teacher:</strong> <%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></p>

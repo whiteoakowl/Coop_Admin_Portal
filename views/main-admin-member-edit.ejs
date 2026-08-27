@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
@@ -136,6 +132,27 @@
         </label>
         <p class="hint">If you type a new family name, it wins over the dropdown above.</p>
       </div>
+
+      <%# A real request (Approvals tab): "you can click the name and
+          view their membership form and edit, add portal settings etc.
+          save." Only rendered in edit mode for a member who already has
+          a portal account (locals.portalAccount - undefined entirely on
+          the /new "create" form, which has never had an account yet). %>
+      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+        <div class="manage-section">
+          <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
+          <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
+          <% if (allRoles.length === 0) { %>
+            <p class="hint">No roles defined yet.</p>
+          <% } else { %>
+            <div class="grade-pill-grid">
+              <% allRoles.forEach(function(r) { %>
+                <label class="grade-pill"><input type="checkbox" name="roleIds" value="<%= r.id %>" <%= portalRoleIds.has(r.id) ? 'checked' : '' %> /> <%= r.label %></label>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
 
       <div class="member-form-footer">
         <div class="member-form-footer-edit">

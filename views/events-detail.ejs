@@ -38,7 +38,7 @@
         <p class="site-hero-meta"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= startsLabel %><% if (endsLabel) { %> &ndash; <%= endsLabel %><% } %></p>
         <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
         <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
-        <% if (event.description) { %><p><%= event.description %></p><% } %>
+        <% if (event.description) { %><div class="forum-editable-display"><%- event.description %></div><% } %>
 
         <% if (!portalAccount) { %>
           <p class="hint"><a href="/login?next=<%= encodeURIComponent('/events/' + event.id) %>">Log in</a> to register, volunteer, or claim a donation item.</p>

@@ -16,6 +16,7 @@
     <p><a href="/newsletter">&larr; Back</a></p>
     <h1><%= issue.subject %></h1>
     <p class="hint">Sent <%= issue.sent_at %></p>
+    <% if (issue.custom_note) { %><div class="forum-editable"><%- issue.custom_note %></div><% } %>
     <div class="forum-editable"><%- issue.body_html %></div>
   </main>
 </body>

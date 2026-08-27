@@ -109,6 +109,45 @@ async function syncMemberAdminPositions(memberId, positionIds) {
   for (const positionId of positionIds) await link.run(memberId, positionId);
 }
 
+// A real request: "there should also be a button that says add leaders.
+// when you click the button it will show a drop down of members for you
+// to choose. click a member then choose which admin position in the
+// dropdown. save button. this adds each admin name next to their
+// position." Additive (unlike syncMemberAdminPositions' full-replace
+// shape above) - picking one member/position pair from the Add Leaders
+// dialog should never clear whatever positions that member, or anyone
+// else, already holds.
+async function addAdminPositionForMember(memberId, positionId) {
+  await db
+    .prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?) ON CONFLICT (member_id, admin_position_id) DO NOTHING')
+    .run(memberId, positionId);
+}
+
+async function removeAdminPositionForMember(memberId, positionId) {
+  await db.prepare('DELETE FROM member_admin_positions WHERE member_id = ? AND admin_position_id = ?').run(memberId, positionId);
+}
+
+// Every current member<->position assignment, grouped by position - powers
+// the Admins settings tab's "each admin name next to their position"
+// listing (and its own per-name Remove button) underneath the plain
+// title/delete rows the Add Admin Position form above it manages. Returns
+// { [positionId]: [{ id, name }, ...] }, each list ordered by member name.
+async function membersByAdminPosition() {
+  const rows = await db
+    .prepare(
+      `SELECT map.admin_position_id AS "positionId", m.id, m.name
+       FROM member_admin_positions map JOIN members m ON m.id = map.member_id
+       ORDER BY LOWER(m.name)`
+    )
+    .all();
+  const byPosition = {};
+  for (const row of rows) {
+    if (!byPosition[row.positionId]) byPosition[row.positionId] = [];
+    byPosition[row.positionId].push({ id: row.id, name: row.name });
+  }
+  return byPosition;
+}
+
 module.exports = {
   listAdminPositions,
   addAdminPosition,
@@ -117,4 +156,7 @@ module.exports = {
   adminPositionTitlesForMember,
   adminPositionTitlesForMembers,
   syncMemberAdminPositions,
+  addAdminPositionForMember,
+  removeAdminPositionForMember,
+  membersByAdminPosition,
 };

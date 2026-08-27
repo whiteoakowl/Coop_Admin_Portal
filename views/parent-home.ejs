@@ -33,7 +33,7 @@
                 <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
               </span>
               <h3><%= a.title %></h3>
-              <p><%= a.body %></p>
+              <div class="forum-editable-display"><%- a.body %></div>
             </div>
           <% }); %>
         </div>

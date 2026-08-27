@@ -45,7 +45,7 @@
                   <% if (t.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
                   <% if (t.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
                 </td>
-                <td><%= t.authorName || 'Unknown' %></td>
+                <td><%= t.authorName || 'Unknown' %><% if (t.authorAdminTitle) { %> <span class="badge-pill" title="Admin Position"><%= t.authorAdminTitle %></span><% } %></td>
                 <td><%= t.postCount - 1 %></td>
                 <td><%= t.lastActivityAt %></td>
               </tr>

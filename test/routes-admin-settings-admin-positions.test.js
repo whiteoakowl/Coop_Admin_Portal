@@ -1,9 +1,8 @@
-// Real HTTP-level coverage for Settings' new "Admin & Leaders" tab (routes/
-// admin.js's POST /settings/admin-positions and /settings/admin-positions/
-// :id/delete, backed by utils/adminPositions.js). A real user request:
-// "Under settings, add a tab for admin/leaders. Under this tab you can add
-// a list of admin positions. This list will then appear on the member form
-// as a choice in the admin position dropdown menu."
+// Real HTTP-level coverage for Settings' "Admins" tab (routes/admin.js's
+// POST /settings/admin-positions and /settings/admin-positions/:id/delete,
+// backed by utils/adminPositions.js). Originally "Admin & Leaders" - a
+// real later request renamed it: "there is a tab called admin/leaders.
+// change it to admins."
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -38,13 +37,15 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-test('Settings: Admin & Leaders tab', async (t) => {
+test('Settings: Admins tab', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   await t.test('the tab is offered and starts empty', async () => {
     const res = await request(app).get('/admin/settings?tab=leaders').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /Admin &amp; Leaders/);
+    // A real request: "there is a tab called admin/leaders. change it to
+    // admins."
+    assert.match(res.text, />Admins<\/a>/);
     assert.match(res.text, /No admin positions added yet\./);
   });
 
@@ -65,7 +66,27 @@ test('Settings: Admin & Leaders tab', async (t) => {
   });
 
   await t.test('the new position shows up in the member form dropdown', async () => {
-    const res = await request(app).get('/admin/members/new').set('Cookie', cookie);
+    // Admin Positions has no place on the family-intake form at
+    // /admin/members/new ("there shouldn't be any lone admins/leaders,
+    // or single members" - that form only ever creates parent/student
+    // rows). The checklist still lives on the EDIT form (views/admin-
+    // member-edit.ejs via views/partials/member-form-fields.ejs), always
+    // rendered there (just hidden via CSS until the Admin radio is
+    // picked) regardless of the member's current type - so any member's
+    // edit page shows it.
+    await request(app)
+      .post('/admin/members/new')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        newFamilyName: 'PositionDropdownCheck',
+        'parents[0][name]': 'Position Dropdown Parent',
+        'children[0][name]': 'Position Dropdown Kid',
+        _csrf: csrfToken,
+      });
+    const member = await db.prepare("SELECT id FROM members WHERE name = 'Position Dropdown Parent'").get();
+
+    const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /President/);
   });

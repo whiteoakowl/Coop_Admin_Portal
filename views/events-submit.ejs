@@ -29,9 +29,12 @@
             <label class="member-form-full">Title
               <input type="text" name="title" required />
             </label>
-            <label class="member-form-full">Description
-              <textarea name="description" rows="3"></textarea>
-            </label>
+            <div class="member-form-full" data-forum-editor>
+              <label>Description</label>
+              <%- include('partials/forum-editor-toolbar') %>
+              <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+              <input type="hidden" name="description" data-forum-body-input />
+            </div>
             <label>Location
               <input type="text" name="location" />
             </label>
@@ -51,5 +54,6 @@
       </div>
     </section>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

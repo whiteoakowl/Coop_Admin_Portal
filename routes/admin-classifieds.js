@@ -6,6 +6,16 @@
 // permission catalog only pre-seeded manage_directory for the member/
 // business directories, so this is a genuinely new capability, not a
 // reuse of an existing one.
+//
+// A real request: "Only admin can add classifieds categories (same Add
+// Category popup pattern to add/delete). Members must choose a category
+// when creating a listing. Admin Classifieds gets tabs: Categories,
+// Archive, Requests. Members submit listing requests that need admin
+// approval before appearing." Member submissions already landed
+// 'pending' before this (utils/classifieds.js's submitListing), so that
+// approval gate already existed - what's new here is the tabbed review
+// UI and admin-managed categories, same shape as routes/main-admin-
+// resource-links.js's own Resources/Approvals tabs.
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -31,26 +41,65 @@ function imageUrl(key) {
   return createStorageClient() ? publicUrl(CLASSIFIEDS_IMAGES_BUCKET, key) : `/uploads/classifieds/${key}`;
 }
 
+const CLASSIFIEDS_TABS = ['categories', 'archive', 'requests'];
+
 router.get('/', async (req, res) => {
-  const listings = await classifieds.listListings();
-  res.render('admin-classifieds-list', { title: 'Classifieds', listings, notice: req.query.notice || null });
+  const activeTab = CLASSIFIEDS_TABS.includes(req.query.tab) ? req.query.tab : 'categories';
+  const categories = await classifieds.listCategories();
+
+  let groups = [];
+  let archived = [];
+  let requests = [];
+  if (activeTab === 'categories') groups = await classifieds.activeListingsByCategory();
+  else if (activeTab === 'archive') archived = await classifieds.archivedListings();
+  else requests = await classifieds.listListings({ status: 'pending' });
+
+  res.render('admin-classifieds-list', {
+    title: 'Classifieds',
+    activeTab,
+    categories,
+    groups,
+    archived,
+    requests,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
 });
 
 async function loadEditor(req, res) {
   const listing = await classifieds.getListing(req.params.id);
   if (!listing) return res.status(404).render('404', { title: 'Not Found' });
-  res.render('admin-classifieds-edit', { title: listing.title, listing, imageUrl: imageUrl(listing.image_key), error: req.query.error || null, notice: req.query.notice || null });
+  const categories = await classifieds.listCategories();
+  res.render('admin-classifieds-edit', { title: listing.title, listing, categories, imageUrl: imageUrl(listing.image_key), error: req.query.error || null, notice: req.query.notice || null });
 }
 router.get('/:id/edit', loadEditor);
+
+// These two must be registered before the bare POST /:id below - '/:id'
+// matches a single path segment just like these literal paths do, and
+// Express tries routes in registration order, so '/categories' would
+// otherwise be swallowed by '/:id' with id='categories'.
+router.post('/categories', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect('/main-admin/classifieds?error=' + encodeURIComponent('Category name is required.'));
+  await classifieds.addCategory(title);
+  res.redirect('/main-admin/classifieds?notice=' + encodeURIComponent(`Added "${title}".`));
+});
+
+router.post('/categories/:id/delete', async (req, res) => {
+  await classifieds.deleteCategory(parseInt(req.params.id, 10));
+  res.redirect('/main-admin/classifieds?notice=' + encodeURIComponent('Category removed.'));
+});
 
 router.post('/:id', async (req, res) => {
   const id = req.params.id;
   const title = (req.body.title || '').trim();
+  const categoryId = parseInt(req.body.categoryId, 10) || null;
   if (!title) return res.redirect(`/main-admin/classifieds/${id}/edit?error=` + encodeURIComponent('Title is required.'));
+  if (!categoryId) return res.redirect(`/main-admin/classifieds/${id}/edit?error=` + encodeURIComponent('Category is required.'));
   await classifieds.updateListing(id, {
     title,
     description: (req.body.description || '').trim(),
-    category: (req.body.category || '').trim(),
+    categoryId,
     price: (req.body.price || '').trim(),
     visibility: req.body.visibility === 'public' ? 'public' : 'members',
   });
@@ -62,7 +111,16 @@ router.post('/:id/status', async (req, res) => {
   if (!['pending', 'active', 'sold', 'archived'].includes(status)) return res.redirect('/main-admin/classifieds');
   await classifieds.setListingStatus(req.params.id, status, req.portalAccount.id);
   await auditLog.record(req.portalAccount.id, 'listing_status_changed', 'classifieds_listing', req.params.id, status);
-  res.redirect('/main-admin/classifieds?notice=' + encodeURIComponent(status === 'active' ? 'Approved.' : `Marked ${status}.`));
+  const backTab = status === 'archived' || status === 'sold' ? 'archive' : status === 'pending' ? 'requests' : 'categories';
+  res.redirect(`/main-admin/classifieds?tab=${backTab}&notice=` + encodeURIComponent(status === 'active' ? 'Approved.' : `Marked ${status}.`));
+});
+
+// The Requests tab's own "deny" - same "nothing worth keeping once a
+// submission is rejected" reasoning as utils/resourceLinks.js's own
+// denyResourceLink, rather than adding a fourth non-live status.
+router.post('/:id/deny', async (req, res) => {
+  await classifieds.deleteListing(req.params.id);
+  res.redirect('/main-admin/classifieds?tab=requests&notice=' + encodeURIComponent('Request denied.'));
 });
 
 router.post('/:id/delete', async (req, res) => {

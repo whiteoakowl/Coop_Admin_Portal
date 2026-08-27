@@ -60,7 +60,12 @@
       // guarantee the visible, per-card ones already got above.
       document.querySelectorAll(`input[type="checkbox"].archive-offpage-checkbox[form="${formId}"]`).forEach((cb) => { cb.checked = false; });
     }
-    toggle.textContent = activating ? 'Cancel' : 'Archive';
+    // A real request (Main Admin Members' own "Edit" toggle + Actions
+    // dropdown): the off label isn't always "Archive" - data-archive-
+    // toggle-label overrides it per caller, defaulting to 'Archive' so
+    // every EXISTING caller (Class/Student/Parent Schedule grids) keeps
+    // reading exactly as before.
+    toggle.textContent = activating ? 'Cancel' : (toggle.getAttribute('data-archive-toggle-label') || 'Archive');
     toggle.setAttribute('aria-pressed', String(activating));
   });
 })();

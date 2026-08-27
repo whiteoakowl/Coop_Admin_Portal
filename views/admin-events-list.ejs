@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -34,41 +30,205 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Events</h1>
+    <div class="grid-box-header">
+      <h1>Events</h1>
+      <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+      <% } %>
+    </div>
     <p class="hint">Create and manage co-op events - registration, volunteer roles, and donation requests.</p>
 
+    <%# A real request: "Main Admin Events: Calendar/Drafts/Requests/
+        Event Attendance/Archive/Settings tabs." See routes/admin-
+        events.js's own header comment for what each tab covers. %>
+    <div class="view-tabs">
+      <a href="/main-admin/events?tab=calendar" class="view-tab <%= activeTab === 'calendar' ? 'active' : '' %>">Calendar</a>
+      <a href="/main-admin/events?tab=drafts" class="view-tab <%= activeTab === 'drafts' ? 'active' : '' %>">Drafts</a>
+      <a href="/main-admin/events?tab=requests" class="view-tab <%= activeTab === 'requests' ? 'active' : '' %>">Requests<% if (pendingCount > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
+      <a href="/main-admin/events?tab=attendance" class="view-tab <%= activeTab === 'attendance' ? 'active' : '' %>">Event Attendance</a>
+      <a href="/main-admin/events?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
+      <a href="/main-admin/events?tab=settings" class="view-tab <%= activeTab === 'settings' ? 'active' : '' %>">Settings</a>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="roster-toolbar">
-      <div class="roster-btn-row">
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
-        <a class="roster-action-btn" href="/main-admin/events/categories">Categories</a>
-        <a class="roster-action-btn" href="/main-admin/events/pending">Submitted Events<% if (pendingCount) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
+    <% if (activeTab === 'calendar') { %>
+      <% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
+        <p class="roster-empty">No published events this month.</p>
+      <% } %>
+      <div class="roster-toolbar">
+        <div class="roster-btn-row">
+          <a class="roster-action-btn" href="/main-admin/events?tab=calendar&month=<%= calendar.prevParam %>">&larr; Prev</a>
+          <strong><%= calendar.label %></strong>
+          <a class="roster-action-btn" href="/main-admin/events?tab=calendar&month=<%= calendar.nextParam %>">Next &rarr;</a>
+        </div>
       </div>
-    </div>
-
-    <% if (events.length === 0) { %>
-      <p class="roster-empty">No events yet &mdash; create one above.</p>
-    <% } %>
-
-    <div class="team-card-grid">
-      <% events.forEach(function(e) { %>
-        <div class="team-col">
-          <div class="team-info-card">
-            <span class="team-info-icon" style="<%= e.categoryColor ? `color: ${e.categoryColor};` : '' %>"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
-            <h3 class="team-info-title"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></h3>
-            <span class="badge-pill badge-pill-<%= e.status === 'published' ? 'green' : e.status === 'cancelled' ? 'gray' : 'orange' %>"><%= e.status.charAt(0).toUpperCase() + e.status.slice(1) %></span>
-            <% if (e.approval_status === 'pending') { %><span class="badge-pill badge-pill-orange">Pending Approval</span><% } %>
-            <% if (e.categoryName) { %><span class="badge-pill" style="background: <%= e.categoryColor %>; color: #fff;"><%= e.categoryName %></span><% } %>
-            <p class="hint"><%= e.visibility === 'public' ? 'Public' : 'Members only' %></p>
-            <div class="roster-btn-row">
-              <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/builder">Edit</a>
-              <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Registrations</a>
+      <table class="roster-table condensed-table event-calendar-table">
+        <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+        <tbody>
+          <% calendar.weeks.forEach(function(week) { %>
+            <tr>
+              <% week.forEach(function(day) { %>
+                <td class="<%= day.inMonth ? '' : 'hint' %>">
+                  <div><%= day.day %></div>
+                  <% day.events.forEach(function(e) { %>
+                    <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
+                  <% }); %>
+                </td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } else if (activeTab === 'drafts') { %>
+      <% if (drafts.length === 0) { %>
+        <p class="roster-empty">No drafts &mdash; create an event above.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% drafts.forEach(function(e) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <span class="team-info-icon" style="<%= e.categoryColor ? `color: ${e.categoryColor};` : '' %>"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+                <h3 class="team-info-title"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></h3>
+                <span class="badge-pill badge-pill-orange">Draft</span>
+                <% if (e.categoryName) { %><span class="badge-pill" style="background: <%= e.categoryColor %>; color: #fff;"><%= e.categoryName %></span><% } %>
+                <p class="hint"><%= e.visibility === 'public' ? 'Public' : 'Members only' %></p>
+                <div class="roster-btn-row">
+                  <a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/builder">Edit</a>
+                  <form method="POST" action="/main-admin/events/<%= e.id %>/status" class="inline-block-form">
+                    <input type="hidden" name="status" value="published" />
+                    <button type="submit" class="roster-action-btn">Publish</button>
+                  </form>
+                </div>
+              </div>
             </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'requests') { %>
+      <p class="hint">Events members submitted for approval. Approving doesn't publish it - it just lets it into Drafts to edit and publish.</p>
+      <% if (requests.length === 0) { %>
+        <p class="roster-empty">Nothing waiting on approval right now.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th></th></tr></thead>
+            <tbody>
+              <% requests.forEach(function(e) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
+                  <td><%= e.startsLabel %></td>
+                  <td><%= e.location || '—' %></td>
+                  <td>
+                    <div class="roster-btn-row">
+                      <form method="POST" action="/main-admin/events/<%= e.id %>/decide" class="inline-block-form">
+                        <input type="hidden" name="decision" value="approve" />
+                        <button type="submit" class="roster-action-btn">Approve</button>
+                      </form>
+                      <form method="POST" action="/main-admin/events/<%= e.id %>/decide" class="inline-block-form">
+                        <input type="hidden" name="decision" value="reject" />
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'attendance') { %>
+      <% if (attendance.length === 0) { %>
+        <p class="roster-empty">No published events yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Title</th><th>Starts</th><th>Registered</th><th></th></tr></thead>
+            <tbody>
+              <% attendance.forEach(function(e) { %>
+                <tr>
+                  <td class="roster-name-col"><%= e.title %></td>
+                  <td><%= e.startsLabel %></td>
+                  <td><%= e.registrationCount || 0 %></td>
+                  <td><a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Attendance</a></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'archive') { %>
+      <% if (archived.length === 0) { %>
+        <p class="roster-empty">Nothing archived.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% archived.forEach(function(e) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <span class="team-info-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+                <h3 class="team-info-title"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></h3>
+                <span class="badge-pill badge-pill-gray">Cancelled</span>
+                <div class="roster-btn-row">
+                  <form method="POST" action="/main-admin/events/<%= e.id %>/status" class="inline-block-form">
+                    <input type="hidden" name="status" value="draft" />
+                    <button type="submit" class="roster-action-btn">Restore</button>
+                  </form>
+                  <form method="POST" action="/main-admin/events/<%= e.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= e.title %>&quot;? This cannot be undone.">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } else { %>
+      <p class="hint">A fixed list an event picks one of, so the calendar can filter/color-code events consistently.</p>
+      <form method="POST" action="/main-admin/events/categories" class="stack-form member-form-page-panel">
+        <div class="member-form-grid">
+          <label>Category Name
+            <input type="text" name="name" placeholder="e.g. Field Trip" required />
+          </label>
+          <label>Color
+            <input type="color" name="color" value="#EE9A4D" />
+          </label>
+        </div>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">+ Add Category</button>
           </div>
         </div>
-      <% }); %>
-    </div>
+      </form>
+
+      <% if (categories.length === 0) { %>
+        <p class="roster-empty">No categories yet - add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Color</th><th>Name</th><th></th></tr></thead>
+            <tbody>
+              <% categories.forEach(function(c) { %>
+                <tr>
+                  <td>
+                    <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
+                      <input type="hidden" name="name" value="<%= c.name %>" />
+                      <input type="color" name="color" value="<%= c.color %>" onchange="this.form.submit()" aria-label="Color for <%= c.name %>" />
+                    </form>
+                  </td>
+                  <td><%= c.name %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this category? Events using it will just show no category.">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } %>
 
     <dialog id="new-event-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/events">

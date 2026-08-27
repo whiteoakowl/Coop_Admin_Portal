@@ -25,8 +25,36 @@
     <section class="site-section">
       <div class="site-section-inner">
         <p><a href="/photos">&larr; All Albums</a></p>
-        <h1><%= album.title %></h1>
+        <div class="roster-toolbar">
+          <div><h1><%= album.title %></h1></div>
+          <% if (photos.length > 0) { %>
+            <div class="roster-btn-row">
+              <a class="roster-action-btn" href="/photos/<%= album.id %>/download">Download Album</a>
+            </div>
+          <% } %>
+        </div>
         <% if (album.description) { %><p><%= album.description %></p><% } %>
+
+        <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (typeof notice !== 'undefined' && notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <%# A real request: "admins can create albums that members can
+            upload to. members can't upload albums." No create-album
+            form anywhere on this member-facing side - only an existing
+            album's own upload, and only once signed in. %>
+        <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+          <form method="POST" action="/photos/<%= album.id %>/upload" enctype="multipart/form-data" class="member-form-grid">
+            <label class="member-form-full">Add Photos
+              <input type="file" name="images" accept="image/*" multiple required />
+            </label>
+            <label class="member-form-full">Caption <span class="hint">(optional, applies to all photos in this upload)</span>
+              <input type="text" name="caption" placeholder="e.g. Field trip day" />
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Upload</button>
+            </div>
+          </form>
+        <% } %>
 
         <% if (photos.length === 0) { %>
           <p class="roster-empty">No photos in this album yet.</p>

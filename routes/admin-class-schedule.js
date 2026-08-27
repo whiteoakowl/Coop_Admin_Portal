@@ -5,9 +5,11 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
-const { ageFromBirthday } = require('../utils/dates');
+const { ageFromBirthday, formatFriendlyTimestamp } = require('../utils/dates');
+const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const {
   DAY_LABELS,
   HOUR_POSITIONS,
@@ -41,6 +43,29 @@ const {
 const { classSectionIds } = require('../utils/sections');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "on class rosters each student member line should have
+// registration date/time, birthday, grade, allergy symbol, mail icon
+// button to email, and phone number, parent name." Students rarely have
+// their own email/phone on file, so "parent name"/"phone"/"mail icon" all
+// mean the family's primary parent - same primaryParentsFor lookup
+// Schedule Cards already use for their own "Primary Parent Phone" line
+// (utils/scheduleCardData.js), batched once per roster rather than once
+// per student.
+async function enrichRosterStudents(students) {
+  const parentsByStudentId = await primaryParentsFor(students);
+  return students.map((s) => {
+    const parent = parentsByStudentId[s.id] || null;
+    return {
+      ...s,
+      age: ageFromBirthday(s.birthday),
+      enrolledAtLabel: s.enrolled_at ? formatFriendlyTimestamp(s.enrolled_at) : null,
+      parentName: parent ? parent.name : null,
+      parentPhone: parent ? parent.phone : null,
+      parentEmail: parent ? parent.email : null,
+    };
+  });
+}
 
 // The class registration-rules fields (who can register, teacher/
 // assistant seat caps, min enrollment, cancel/refund policy, pricing) -
@@ -191,7 +216,7 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     endTime: (req.body.endTime || '').trim(),
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     registrationOpen: req.body.registrationOpen === '1',
-    description: (req.body.description || '').trim(),
+    description: sanitizePostBody(req.body.description || ''),
     ...registrationFieldsFromBody(req.body),
   });
 
@@ -228,7 +253,7 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
     colorPalette: COLOR_PALETTE,
     selectedGrades: ageGroupList(cls.age_group),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
-    enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
+    enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
@@ -254,7 +279,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     colorPalette: COLOR_PALETTE,
     selectedGrades: ageGroupList(cls.age_group),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
-    enrolledStudents: cls.students.map((s) => ({ ...s, age: ageFromBirthday(s.birthday) })),
+    enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
@@ -286,7 +311,7 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
     endTime: (req.body.endTime || '').trim(),
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     registrationOpen: req.body.registrationOpen === '1',
-    description: (req.body.description || '').trim(),
+    description: sanitizePostBody(req.body.description || ''),
     ...registrationFieldsFromBody(req.body),
   });
   await saveClassSections(id, req.body);

@@ -10,6 +10,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
@@ -67,54 +68,86 @@ function toSqlTimestamp(datetimeLocal) {
   return datetimeLocal.replace('T', ' ') + ':00';
 }
 
-router.get('/', async (req, res) => {
-  const list = await events.listEvents();
-  const pendingCount = list.filter((e) => e.approval_status === 'pending').length;
-  res.render('admin-events-list', { title: 'Events', events: list, pendingCount, notice: req.query.notice || null });
-});
+// A real request: "Main Admin Events: Calendar/Drafts/Requests/Event
+// Attendance/Archive/Settings tabs." Calendar = published (live) events
+// on a real month grid (utils/events.js's own monthGrid, shared with the
+// member-facing /events?view=calendar); Drafts = created-but-not-yet-
+// published events (status 'draft', decided submissions included -
+// pending ones stay on Requests only); Requests = member submissions
+// awaiting a yes/no (the former standalone /pending page); Attendance =
+// a jumping-off point to each published event's own check-in/registrations
+// page (routes below, unchanged); Archive = cancelled events; Settings =
+// event categories (the former standalone /categories page).
+const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'archive', 'settings'];
 
-router.get('/categories', async (req, res) => {
-  res.render('admin-events-categories', { title: 'Event Categories', categories: await events.listCategories(), notice: req.query.notice || null, error: req.query.error || null });
+router.get('/', async (req, res) => {
+  const activeTab = EVENTS_TABS.includes(req.query.tab) ? req.query.tab : 'calendar';
+  const pending = await events.listEvents({ approvalStatus: 'pending' });
+  const pendingCount = pending.length;
+
+  let calendar = null;
+  let drafts = [];
+  let requests = [];
+  let attendance = [];
+  let archived = [];
+  let categories = [];
+  if (activeTab === 'calendar') {
+    const published = await events.listEvents({ status: 'published' });
+    calendar = events.monthGrid(req.query.month, published);
+  } else if (activeTab === 'drafts') {
+    drafts = (await events.listEvents({ status: 'draft' })).filter((e) => e.approval_status !== 'pending');
+  } else if (activeTab === 'requests') {
+    requests = pending.map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+  } else if (activeTab === 'attendance') {
+    const published = await events.listEvents({ status: 'published' });
+    attendance = await Promise.all(
+      published.map(async (e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at), registrationCount: await events.registrationCountForEvent(e.id) }))
+    );
+  } else if (activeTab === 'archive') {
+    archived = await events.listEvents({ status: 'cancelled' });
+  } else {
+    categories = await events.listCategories();
+  }
+
+  res.render('admin-events-list', {
+    title: 'Events',
+    activeTab,
+    pendingCount,
+    calendar,
+    drafts,
+    requests,
+    attendance,
+    archived,
+    categories,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
 });
 
 router.post('/categories', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/events/categories?error=' + encodeURIComponent('Category name is required.'));
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Category name is required.'));
   await events.createCategory(name, req.body.color);
-  res.redirect('/main-admin/events/categories?notice=' + encodeURIComponent('Category added.'));
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category added.'));
 });
 
 router.post('/categories/:id/update', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/events/categories?error=' + encodeURIComponent('Category name is required.'));
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Category name is required.'));
   await events.updateCategory(req.params.id, name, req.body.color);
-  res.redirect('/main-admin/events/categories?notice=' + encodeURIComponent('Category updated.'));
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category updated.'));
 });
 
 router.post('/categories/:id/delete', async (req, res) => {
   await events.deleteCategory(req.params.id);
-  res.redirect('/main-admin/events/categories?notice=' + encodeURIComponent('Category removed.'));
-});
-
-// Member-submitted events awaiting a Main Admin's yes/no ("members should
-// be able to add events for approval") - a decision doesn't publish the
-// event, it only clears approval_status so the submitter's own event now
-// shows up in the regular events list/builder like any admin-created one,
-// still starting 'draft' until a Main Admin actually chooses to publish it.
-router.get('/pending', async (req, res) => {
-  const pending = await events.listEvents({ approvalStatus: 'pending' });
-  res.render('admin-events-pending', {
-    title: 'Submitted Events',
-    pending: pending.map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) })),
-    notice: req.query.notice || null,
-  });
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category removed.'));
 });
 
 router.post('/:id/decide', async (req, res) => {
   const approve = req.body.decision === 'approve';
   const result = await events.decideSubmission(req.params.id, approve);
-  if (!result) return res.redirect('/main-admin/events/pending?notice=' + encodeURIComponent('That submission was already decided.'));
-  res.redirect('/main-admin/events/pending?notice=' + encodeURIComponent(`Submission ${result}.`));
+  if (!result) return res.redirect('/main-admin/events?tab=requests&notice=' + encodeURIComponent('That submission was already decided.'));
+  res.redirect('/main-admin/events?tab=requests&notice=' + encodeURIComponent(`Submission ${result}.`));
 });
 
 router.post('/', async (req, res) => {
@@ -126,7 +159,7 @@ router.post('/', async (req, res) => {
   const id = await events.createEvent(
     {
       title,
-      description: (req.body.description || '').trim(),
+      description: sanitizePostBody(req.body.description || ''),
       category: (req.body.category || '').trim(),
       location: (req.body.location || '').trim(),
       startsAt,
@@ -168,7 +201,7 @@ router.post('/:id', async (req, res) => {
   }
   await events.updateEvent(id, {
     title,
-    description: (req.body.description || '').trim(),
+    description: sanitizePostBody(req.body.description || ''),
     category: (req.body.category || '').trim(),
     location: (req.body.location || '').trim(),
     startsAt,

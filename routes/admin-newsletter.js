@@ -77,6 +77,14 @@ router.post('/:id', async (req, res) => {
   res.redirect(`/main-admin/newsletter/${id}/edit?notice=` + encodeURIComponent('Saved.'));
 });
 
+// A real request: "Add a 'Customize Newsletter' action where admin
+// writes their own note/letter that appears before the automatic
+// content."
+router.post('/:id/customize', async (req, res) => {
+  await newsletter.setCustomNote(req.params.id, req.body.customNote || '');
+  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Custom note saved.'));
+});
+
 router.post('/:id/regenerate', async (req, res) => {
   await newsletter.regenerate(req.params.id);
   res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Re-assembled from live data.'));

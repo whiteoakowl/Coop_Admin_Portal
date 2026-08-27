@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<%# Shared by all three admin-gated entry points that create members
+    (routes/admin-members.js's /admin/members/new, routes/main-admin-
+    members.js's /main-admin/members/new, routes/membership.js's
+    /membership) - see this file's own header comment. Co-op Admin and
+    Main Admin are two entirely separate nav shells (see routes/admin.js's
+    header comment on the two admin identity systems), so the shell
+    itself has to branch on which one rendered this page; `portal` local
+    is 'main_admin' or 'coop_admin'. %>
+<body class="<%= portal === 'main_admin' ? '' : 'admin-page' %>">
+  <% if (portal === 'main_admin') { %>
+    <%- include('partials/portal-nav', {
+      portalTitle: 'Main Admin',
+      navLinks: [
+        { href: '/main-admin', icon: 'home', label: 'Home' },
+        { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
+        { href: '/main-admin/members', icon: 'users', label: 'Members' },
+        { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+        { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+        { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+        { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+        { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
+        { href: '/main-admin/website', icon: 'palette', label: 'Website' },
+        { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+        { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+      ],
+    }) %>
+  <% } else { %>
+    <%- include('partials/admin-nav') %>
+  <% } %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="<%= backHref %>">&larr; Members</a></p>
+    <h1><%= title %></h1>
+    <%# A real request: "there shouldn't be any lone admins/leaders, or
+        single members" - every member is added here, through a family,
+        with no standalone/single-member path at all. Add to an existing
+        family's own Sections/Portal Permissions from the Members list's
+        own "Edit Permissions" button instead of a separate form. %>
+    <p class="hint">Add a whole family in one submission - each parent and child still gets their own individual profile.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="<%= formAction %>" enctype="multipart/form-data" id="member-intake-form" class="stack-form member-form-page-panel">
+      <%# "Add/choose family should be at the top of the form." %>
+      <div class="manage-section member-form-section-box member-form-section-green">
+        <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
+        <label class="member-form-full">Select an Existing Family
+          <select name="familyId">
+            <option value="">Choose from available families</option>
+            <% families.forEach(function(f) { %>
+              <option value="<%= f.id %>">The <%= f.name %> Family</option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Or Create a New Family
+          <input type="text" name="newFamilyName" placeholder="New family last name, e.g. Anderson" />
+        </label>
+      </div>
+
+      <div class="manage-section">
+        <h2>Family Address</h2>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">Address</span>
+            <input type="text" name="address" placeholder="Street address" />
+          </div>
+        </div>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">City</span>
+            <input type="text" name="city" placeholder="City" />
+          </div>
+          <div class="class-form-field">
+            <span class="class-form-field-label">State</span>
+            <input type="text" name="state" placeholder="State" />
+          </div>
+          <div class="class-form-field">
+            <span class="class-form-field-label">Zip Code</span>
+            <input type="text" name="zip" placeholder="Zip code" />
+          </div>
+        </div>
+        <%# A real request: "on the membership form, ask how long the
+            family has been homeschooling." %>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">How long has your family been homeschooling?</span>
+            <input type="text" name="homeschoolDuration" placeholder="e.g. 3 years, or this is our first year" />
+          </div>
+        </div>
+      </div>
+
+      <h2>Parents / Guardians</h2>
+      <p class="hint">At least one parent is required. Add up to 4.</p>
+      <div id="parents-list">
+        <% for (var i = 0; i < 4; i++) { %>
+          <div class="manage-section" data-parent-block <%= i > 0 ? 'hidden' : '' %>>
+            <h3>Parent/Guardian <%= i + 1 %><% if (i > 0) { %> (optional)<% } %></h3>
+            <div class="class-form-row">
+              <div class="class-form-field">
+                <span class="class-form-field-label<%= i === 0 ? ' required' : '' %>">Name</span>
+                <input type="text" name="parents[<%= i %>][name]" placeholder="Full name" <%= i === 0 ? 'required' : '' %> />
+              </div>
+              <label class="checkbox-option primary-parent-top-option">
+                <input type="checkbox" name="parents[<%= i %>][isPrimaryParent]" value="1" <%= i === 0 ? 'checked' : '' %> />
+                <svg class="icon"><use href="#icon-star"/></svg> Primary Parent
+              </label>
+            </div>
+            <div class="class-form-row">
+              <div class="class-form-field">
+                <span class="class-form-field-label">Email</span>
+                <input type="email" name="parents[<%= i %>][email]" placeholder="name@example.com" />
+              </div>
+              <div class="class-form-field">
+                <span class="class-form-field-label">Phone</span>
+                <input type="tel" name="parents[<%= i %>][phone]" placeholder="(123) 456-7890" />
+              </div>
+            </div>
+            <%# "Adding to a setup/cleanup team should only show to
+                admins and be a dropdown menu of choices next to each
+                parent name." Every route rendering this view is already
+                admin-only (see this file's own callers), so isAdmin is
+                always true today - kept as an explicit flag rather than
+                hardcoding the section in, in case a genuinely public
+                entry point to this same view is ever added later. %>
+            <% if (isAdmin) { %>
+              <div class="class-form-row">
+                <div class="class-form-field">
+                  <span class="class-form-field-label">Setup/Cleanup Team</span>
+                  <select name="parents[<%= i %>][cleanupTeamId]">
+                    <option value="">None</option>
+                    <% setupTeams.forEach(function(t) { %>
+                      <option value="<%= t.id %>"><%= t.day === 'monday' ? 'Monday' : 'Wednesday' %> &ndash; <%= t.title %></option>
+                    <% }); %>
+                  </select>
+                </div>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+      <button type="button" id="add-parent-btn" class="btn-secondary">+ Add Another Parent</button>
+
+      <h2>Students</h2>
+      <p class="hint">At least one student is required. Add as many as you need.</p>
+      <div id="children-list">
+        <div class="manage-section" data-child-block>
+          <h3>Student 1</h3>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label required">Name</span>
+              <input type="text" name="children[0][name]" placeholder="Full name" required />
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Birthday</span>
+              <input type="date" name="children[0][birthday]" />
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Grade Level</span>
+              <select name="children[0][gradeLevel]">
+                <option value="">Select grade level</option>
+                <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Medical / Allergy Notes</span>
+              <textarea name="children[0][medicalNotes]" rows="2" placeholder="Enter any medical conditions, allergies, or important notes"></textarea>
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Photo</span>
+              <input type="file" name="children[0][photo]" accept="image/*" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="add-child-btn" class="btn-secondary">+ Add Another Child</button>
+
+      <%# Cloned by public/js/member-intake-form.js - __INDEX__ gets
+          replaced with the next child's real array index on each click,
+          same "clone from a hidden <template>" pattern public/js/
+          membership-form.js already uses for this exact purpose. %>
+      <template id="child-block-template">
+        <div class="manage-section" data-child-block>
+          <div class="roster-toolbar">
+            <h3>Student</h3>
+            <button type="button" class="icon-btn icon-btn-danger membership-remove-child" aria-label="Remove this student"><svg class="icon"><use href="#icon-trash"/></svg></button>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label required">Name</span>
+              <input type="text" name="children[__INDEX__][name]" placeholder="Full name" required />
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Birthday</span>
+              <input type="date" name="children[__INDEX__][birthday]" />
+            </div>
+            <div class="class-form-field">
+              <span class="class-form-field-label">Grade Level</span>
+              <select name="children[__INDEX__][gradeLevel]">
+                <option value="">Select grade level</option>
+                <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Medical / Allergy Notes</span>
+              <textarea name="children[__INDEX__][medicalNotes]" rows="2" placeholder="Enter any medical conditions, allergies, or important notes"></textarea>
+            </div>
+          </div>
+          <div class="class-form-row">
+            <div class="class-form-field">
+              <span class="class-form-field-label">Photo</span>
+              <input type="file" name="children[__INDEX__][photo]" accept="image/*" />
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <a class="btn-secondary" href="<%= backHref %>">Cancel</a>
+          <button type="submit" class="primary-btn"><%= submitLabel %></button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script src="/js/member-intake-form.js"></script>
+</body>
+</html>

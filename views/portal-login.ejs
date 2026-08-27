@@ -5,29 +5,28 @@
 </head>
 <body class="public-page">
   <%- include('partials/icon-sprite') %>
-  <main id="main-content" tabindex="-1" class="form-wrap">
-    <div class="kiosk-header">
-      <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
-      <h1>Log In</h1>
-    </div>
-    <p class="hint">Members, teachers, and admins sign in here. Looking for the co-op kiosk? <a href="/kiosk">Go to the kiosk</a>.</p>
+  <%# A real request: "the log in page from the homepage should be
+      polished and professional, centered, well balanced, remove
+      description and kiosk link from the top. bottom should say, not a
+      member yet? request membership (link). title should say member log
+      in." Matches views/admin-login.ejs's own centered .login-wrap
+      pattern instead of the old left-aligned hint-then-panel layout. %>
+  <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow login-wrap">
+    <img class="login-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
+    <h1>Member Login</h1>
 
     <% if (notice) { %><div class="alert alert-info"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <form method="POST" action="/login" class="form-outer-panel">
+    <form method="POST" action="/login" class="stack-form">
       <input type="hidden" name="next" value="<%= next %>" />
-      <div class="form-section">
-        <label>Email
-          <input type="email" name="email" required autocomplete="email" autofocus />
-        </label>
-        <label>Password
-          <input type="password" name="password" required autocomplete="current-password" />
-        </label>
-      </div>
+      <label for="email-input">Email</label>
+      <input id="email-input" type="email" name="email" required autocomplete="email" autofocus />
+      <label for="password-input">Password</label>
+      <input id="password-input" type="password" name="password" required autocomplete="current-password" />
       <button type="submit" class="primary-btn">Log In</button>
-      <p class="hint">New to the co-op? <a href="/register">Register for an account</a>.</p>
     </form>
+    <p class="hint">Not a member yet? <a href="/register">Request Membership</a></p>
   </main>
 </body>
 </html>

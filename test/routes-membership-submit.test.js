@@ -1,12 +1,13 @@
-// Coverage for POST /membership (routes/membership.js), added while
-// converting it to async/await as part of the Supabase migration (see
-// MIGRATION.md) - it had no test coverage before this. Runs against the
-// still-live SQLite backend (await on a non-Promise value is a
-// transparent pass-through), so this suite doubles as proof the
-// conversion didn't change behavior. Specifically locks in the
-// forEach -> for-of change for inserting each child: forEach can't be
-// awaited, so a naive async conversion that kept it would silently race
-// every child insert instead of running them in order.
+// Coverage for POST /membership (routes/membership.js) - a real request:
+// "Add member and membership request form should be the same ... however
+// it will still create individual profiles." /membership now shares
+// views/member-intake-form.ejs and utils/memberIntake.js with Main
+// Admin's and Co-op Admin's own Add Member forms, and creates real
+// `members` rows directly rather than a PENDING membership_requests/
+// membership_request_children row for later review - see routes/
+// membership.js's own header comment for why that staging step never
+// added real review to begin with (every entry point here is already
+// admin-gated).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -44,56 +45,61 @@ async function loginAsAdmin() {
 test('POST /membership', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
-  await t.test('a submission with two children saves the request and both children, in order', async () => {
+  await t.test('a submission with a parent and two children creates individual member profiles for each, in order', async () => {
     const res = await request(app)
       .post('/membership')
       .set('Cookie', cookie)
       .type('form')
       .send({
-        parent1FirstName: 'Pat',
-        parent1LastName: 'Guardian',
-        parent1Email: 'pat@example.com',
-        'children[0][firstName]': 'First',
-        'children[0][lastName]': 'Kid',
-        'children[1][firstName]': 'Second',
-        'children[1][lastName]': 'Kid',
+        newFamilyName: 'Guardian',
+        'parents[0][name]': 'Pat Guardian',
+        'parents[0][email]': 'pat@example.com',
+        'children[0][name]': 'First Kid',
+        'children[1][name]': 'Second Kid',
         _csrf: csrfToken,
       });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /notice=/);
 
-    const request_ = await db.prepare('SELECT * FROM membership_requests WHERE parent1_email = ?').get('pat@example.com');
-    assert.ok(request_);
-    const children = await db
-      .prepare('SELECT first_name, last_name FROM membership_request_children WHERE request_id = ? ORDER BY id')
-      .all(request_.id);
-    assert.deepEqual(
-      children.map((c) => c.first_name),
-      ['First', 'Second']
+    const parent = await db.prepare("SELECT * FROM members WHERE email = 'pat@example.com'").get();
+    assert.ok(parent, 'expected a real member row, not just a pending request');
+    assert.equal(parent.member_type, 'parent');
+
+    const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(parent.family_id);
+    assert.equal(family.name, 'Guardian');
+
+    const children = (await db.prepare("SELECT name FROM members WHERE family_id = ? AND member_type = 'student' ORDER BY id").all(parent.family_id)).map(
+      (c) => c.name
     );
+    assert.deepEqual(children, ['First Kid', 'Second Kid']);
   });
 
   await t.test('missing parent info is rejected, nothing saved', async () => {
-    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM members').get()).c);
     const res = await request(app)
       .post('/membership')
       .set('Cookie', cookie)
       .type('form')
-      .send({ parent1FirstName: '', parent1LastName: 'Guardian', parent1Email: 'x@example.com', _csrf: csrfToken });
+      .send({ newFamilyName: 'NoParent', 'children[0][name]': 'Orphan Kid', _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM members').get()).c), before);
   });
 
-  await t.test('no children is rejected, nothing saved', async () => {
-    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
+  await t.test('no students is rejected, nothing saved', async () => {
+    const before = Number((await db.prepare('SELECT COUNT(*) AS c FROM members').get()).c);
     const res = await request(app)
       .post('/membership')
       .set('Cookie', cookie)
       .type('form')
-      .send({ parent1FirstName: 'Pat', parent1LastName: 'Guardian', parent1Email: 'nokids@example.com', _csrf: csrfToken });
+      .send({ newFamilyName: 'NoKids', 'parents[0][name]': 'Pat NoKids', _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
-    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c), before);
+    assert.equal(Number((await db.prepare('SELECT COUNT(*) AS c FROM members').get()).c), before);
+  });
+
+  await t.test('no PENDING membership_requests row is ever created - the form creates real members directly', async () => {
+    const count = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
+    assert.equal(count, 0);
   });
 });

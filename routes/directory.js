@@ -30,7 +30,8 @@ router.get('/mine', requirePortalAuth, async (req, res) => {
   for (const memberId of familyIds) {
     mine.push(...(await directory.listingsForMember(memberId)));
   }
-  res.render('directory-mine', { title: 'My Directory Listings', family, listings: mine.map(withImageUrl), notice: req.query.notice || null, error: req.query.error || null });
+  const categories = await directory.listCategories();
+  res.render('directory-mine', { title: 'My Directory Listings', family, categories, listings: mine.map(withImageUrl), notice: req.query.notice || null, error: req.query.error || null });
 });
 
 router.post('/', requirePortalAuth, async (req, res) => {
@@ -47,7 +48,7 @@ router.post('/', requirePortalAuth, async (req, res) => {
     {
       businessName,
       description: (req.body.description || '').trim(),
-      category: (req.body.category || '').trim(),
+      categoryId: parseInt(req.body.categoryId, 10) || null,
       phone: (req.body.phone || '').trim(),
       email: (req.body.email || '').trim(),
       website: (req.body.website || '').trim(),
@@ -73,7 +74,7 @@ router.post('/:id/update', requirePortalAuth, async (req, res) => {
   await directory.updateListing(listing.id, {
     businessName,
     description: (req.body.description || '').trim(),
-    category: (req.body.category || '').trim(),
+    categoryId: parseInt(req.body.categoryId, 10) || null,
     phone: (req.body.phone || '').trim(),
     email: (req.body.email || '').trim(),
     website: (req.body.website || '').trim(),

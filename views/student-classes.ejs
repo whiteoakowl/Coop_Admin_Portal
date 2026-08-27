@@ -44,7 +44,7 @@
               <tr>
                 <td class="roster-name-col">
                   <strong><%= c.class_name %></strong>
-                  <% if (c.description) { %><div class="hint"><%= c.description %></div><% } %>
+                  <% if (c.description) { %><div class="hint forum-editable-display"><%- c.description %></div><% } %>
                 </td>
                 <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
                 <td><%= c.room || '—' %></td>

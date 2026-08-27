@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -44,7 +40,7 @@
     <% if (event.approval_status === 'pending') { %>
       <div class="alert alert-error">
         This event was submitted by a member and is awaiting approval.
-        <a href="/main-admin/events/pending">Review it on the Submitted Events queue &rarr;</a>
+        <a href="/main-admin/events?tab=requests">Review it on the Requests tab &rarr;</a>
       </div>
     <% } %>
 
@@ -83,9 +79,12 @@
         <label class="member-form-full">Title
           <input type="text" name="title" value="<%= event.title %>" required />
         </label>
-        <label class="member-form-full">Description
-          <textarea name="description" rows="3"><%= event.description || '' %></textarea>
-        </label>
+        <div class="member-form-full" data-forum-editor>
+          <label>Description</label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- event.description || '' %></div>
+          <input type="hidden" name="description" data-forum-body-input />
+        </div>
         <label>Category (legacy text - prefer the dropdown below)
           <input type="text" name="category" value="<%= event.category || '' %>" placeholder="e.g. Social, Fundraiser" />
         </label>
@@ -307,5 +306,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

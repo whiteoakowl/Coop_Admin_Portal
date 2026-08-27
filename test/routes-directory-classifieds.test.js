@@ -143,11 +143,17 @@ test('a member can withdraw their own listing', async () => {
 
 test('classifieds: submit, approve, then mark sold removes it from active browsing', async () => {
   const parent = await createParentAccount();
+  // A real request: "Members must choose a category when creating a
+  // listing" - categories are admin-managed only (Main Admin > Classifieds
+  // > Categories tab's own +Add Category popup), so this test seeds one
+  // directly rather than through that admin-only route.
+  const categoryInfo = await db.prepare("INSERT INTO classified_categories (title) VALUES ('Sporting Goods')").run();
+  const categoryId = categoryInfo.lastInsertRowid;
   await request(app)
     .post('/classifieds')
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ memberId: String(parent.memberId), title: 'Used Bicycle', price: '$40', visibility: 'public', _csrf: parent.csrfToken });
+    .send({ memberId: String(parent.memberId), title: 'Used Bicycle', price: '$40', categoryId: String(categoryId), visibility: 'public', _csrf: parent.csrfToken });
   const row = await db.prepare("SELECT id FROM classified_listings WHERE title = 'Used Bicycle'").get();
 
   const admin = await loginAsMainAdmin();

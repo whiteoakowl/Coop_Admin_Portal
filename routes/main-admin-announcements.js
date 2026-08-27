@@ -16,6 +16,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const notifications = require('../utils/notifications');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('send_announcements'));
 
@@ -30,10 +31,19 @@ router.get('/', async (req, res) => {
        LIMIT 25`
     )
     .all();
+  // Public homepage posts (site_settings/announcements) - a real
+  // request: "the public home page announcements should be listed under
+  // the announcements tab" - management for these used to live only on
+  // Main Admin > Website (routes/main-admin.js's own /website/
+  // announcements POST/delete, unchanged and still what this list's own
+  // delete forms post to); this page is now the other place they show
+  // up and get created from (see the roleKey === 'public' branch below).
+  const publicAnnouncements = await db.prepare('SELECT * FROM announcements ORDER BY published_at DESC').all();
   res.render('main-admin-announcements', {
     title: 'Announcements',
     roles,
     sent,
+    publicAnnouncements,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -41,9 +51,18 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const title = (req.body.title || '').trim();
-  const body = (req.body.body || '').trim();
+  const body = sanitizePostBody(req.body.body || '');
   const roleKey = (req.body.roleKey || '').trim();
   if (!title || !body) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
+
+  // "Public" isn't a portal role - it means posting to the public
+  // homepage (site_settings/announcements) instead of sending an
+  // in-app/email notification to signed-in members, so it's handled as
+  // its own branch rather than falling into the recipients query below.
+  if (roleKey === 'public') {
+    await db.prepare('INSERT INTO announcements (title, body, is_public, created_by_account_id) VALUES (?, ?, ?, ?)').run(title, body, 1, req.portalAccount.id);
+    return res.redirect('/main-admin/announcements?notice=' + encodeURIComponent('Posted to the public homepage.'));
+  }
 
   const recipients = roleKey
     ? await db

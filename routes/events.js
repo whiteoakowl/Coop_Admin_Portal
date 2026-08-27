@@ -13,52 +13,10 @@ const { familyForAccount } = require('../utils/portalAuth');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const events = require('../utils/events');
 const notifications = require('../utils/notifications');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 function withImageUrl(event) {
   return { ...event, imageUrl: event.image_key ? `/uploads/events/${event.image_key}` : null };
-}
-
-// Builds a plain Sunday-first month grid (an array of weeks, each an
-// array of {date, inMonth, events} day cells) for the calendar view -
-// kept server-side rather than in the template, same "the view only
-// displays, the route computes" split as every other page in this app.
-function monthGrid(monthParam, eventList) {
-  const now = new Date();
-  let year = now.getUTCFullYear();
-  let month = now.getUTCMonth();
-  if (/^\d{4}-\d{2}$/.test(monthParam || '')) {
-    year = parseInt(monthParam.slice(0, 4), 10);
-    month = parseInt(monthParam.slice(5, 7), 10) - 1;
-  }
-  const firstOfMonth = new Date(Date.UTC(year, month, 1));
-  const startOffset = firstOfMonth.getUTCDay();
-  const gridStart = new Date(Date.UTC(year, month, 1 - startOffset));
-  const eventsByDate = {};
-  for (const e of eventList) {
-    const dateKey = (e.starts_at || '').slice(0, 10);
-    (eventsByDate[dateKey] = eventsByDate[dateKey] || []).push(e);
-  }
-
-  const weeks = [];
-  let cursor = new Date(gridStart);
-  for (let w = 0; w < 6; w++) {
-    const week = [];
-    for (let d = 0; d < 7; d++) {
-      const dateKey = cursor.toISOString().slice(0, 10);
-      week.push({ dateKey, day: cursor.getUTCDate(), inMonth: cursor.getUTCMonth() === month, events: eventsByDate[dateKey] || [] });
-      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
-    }
-    weeks.push(week);
-  }
-
-  const prevMonth = new Date(Date.UTC(year, month - 1, 1));
-  const nextMonth = new Date(Date.UTC(year, month + 1, 1));
-  return {
-    weeks,
-    label: firstOfMonth.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-    prevParam: `${prevMonth.getUTCFullYear()}-${String(prevMonth.getUTCMonth() + 1).padStart(2, '0')}`,
-    nextParam: `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, '0')}`,
-  };
 }
 
 // GET /events - public + member events, filtered to what THIS visitor is
@@ -86,7 +44,7 @@ router.get('/', async (req, res) => {
     settings,
     view,
     events: mapped,
-    calendar: view === 'calendar' ? monthGrid(req.query.month, mapped) : null,
+    calendar: view === 'calendar' ? events.monthGrid(req.query.month, mapped) : null,
   });
 });
 
@@ -122,7 +80,7 @@ router.post('/submit', requirePortalAuth, async (req, res) => {
   await events.submitEvent(
     {
       title,
-      description: (req.body.description || '').trim(),
+      description: sanitizePostBody(req.body.description || ''),
       location: (req.body.location || '').trim(),
       startsAt,
       endsAt: req.body.endsAt ? req.body.endsAt.replace('T', ' ') + ':00' : null,

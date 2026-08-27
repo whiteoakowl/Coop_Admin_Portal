@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
@@ -25,126 +21,321 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="roster-toolbar">
       <h1>Members</h1>
-      <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
+      <% if (activeTab === 'members') { %>
+        <div class="roster-btn-row">
+          <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
+          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
+          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
+        </div>
+      <% } %>
     </div>
-    <p class="hint">The full family/member roster - the same records the Co-op Admin Portal's attendance, rosters, and schedules all draw from.</p>
+
+    <%# A real request: "under members in main admin portal there should
+        be a tab that says approvals... there should be another tab
+        under main admin members that says settings... main admin
+        protal members should also have an archive tab." %>
+    <div class="view-tabs">
+      <a class="view-tab<%= activeTab === 'members' ? ' active' : '' %>" href="/main-admin/members?tab=members">Members</a>
+      <a class="view-tab<%= activeTab === 'approvals' ? ' active' : '' %>" href="/main-admin/members?tab=approvals">Approvals<%= (typeof pending !== 'undefined' && pending.length) ? ' (' + pending.length + ')' : '' %></a>
+      <a class="view-tab<%= activeTab === 'settings' ? ' active' : '' %>" href="/main-admin/members?tab=settings">Settings</a>
+      <a class="view-tab<%= activeTab === 'archive' ? ' active' : '' %>" href="/main-admin/members?tab=archive">Archive</a>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <div class="roster-toolbar no-print">
-      <form method="GET" action="/main-admin/members" class="category-filter" style="margin: 0;">
-        <label for="q-input">Search by name</label>
-        <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" />
-      </form>
-      <div class="category-filter" style="margin: 0;">
-        <label for="type-select">Filter by type or family</label>
-        <select id="type-select" onchange="window.location = this.value">
-          <option value="/main-admin/members" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
-          <option value="/main-admin/members?type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="/main-admin/members?type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="/main-admin/members?type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+    <% if (activeTab === 'members' || activeTab === 'archive') { %>
+      <p class="hint">The full family/member roster - the same records the Co-op Admin Portal's attendance, rosters, and schedules all draw from.</p>
+
+      <%# Same shape as routes/admin-members.js's own bulk-permissions form -
+          see that file's own comment. %>
+      <form id="permissions-bulk-form" method="POST" action="/main-admin/members/bulk-permissions"></form>
+
+      <div class="roster-toolbar no-print">
+        <form method="GET" action="/main-admin/members" class="category-filter" style="margin: 0;">
+          <input type="hidden" name="tab" value="<%= activeTab %>" />
+          <label for="q-input">Search by name</label>
+          <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" />
+        </form>
+        <div class="category-filter" style="margin: 0;">
+          <label for="type-select">Filter by type or family</label>
+          <select id="type-select" onchange="window.location = this.value">
+            <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
+            <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+            <option value="/main-admin/members?tab=<%= activeTab %>&type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+            <option value="/main-admin/members?tab=<%= activeTab %>&type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+            <% if (families.length > 0) { %>
+              <optgroup label="Family">
+                <% families.forEach(function(f) { %>
+                  <option value="/main-admin/members?tab=<%= activeTab %>&family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+                <% }); %>
+              </optgroup>
+            <% } %>
+          </select>
+        </div>
+        <%# Edit mode's Select All + Actions dropdown - hidden until the
+            "Edit" toggle button below is clicked. A real request: "there
+            should be an edit button on member page that says edit. when
+            you click it it will show check boxes next to every member.
+            you can select individusl, all or none, a dropdown also
+            appears and says actions, delete or archive are the
+            options." Members tab only - Archive already has its own
+            per-row Reactivate button below. %>
+        <% if (activeTab === 'members') { %>
+          <div class="class-schedule-archive-controls" data-archive-controls="members-select-form" hidden>
+            <label class="checkbox-option class-schedule-select-all">
+              <input type="checkbox" data-select-all-for="members-select-form" />
+              Select All
+            </label>
+            <select data-bulk-action-select form="members-select-form" aria-label="Actions">
+              <option value="">Actions</option>
+              <option
+                value="delete"
+                data-bulk-action="/main-admin/members/bulk-delete"
+                data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters and attendance history. This cannot be undone."
+                data-bulk-confirm-yes-label="Yes, Delete"
+              >Delete</option>
+              <option
+                value="archive"
+                data-bulk-action="/main-admin/members/bulk-archive"
+                data-bulk-confirm="Archive the selected member(s)? They'll move to the Archive tab, but nothing is deleted."
+                data-bulk-confirm-yes-label="Yes, Archive"
+                data-bulk-confirm-safe="1"
+              >Archive</option>
+            </select>
+          </div>
+          <form id="members-select-form" method="POST" action="/main-admin/members/bulk-delete"></form>
+          <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit" aria-pressed="false">Edit</button>
+        <% } %>
+      </div>
+
+      <% if (activeTab === 'members') { %>
+        <details class="manage-section" style="margin-bottom: 1rem;">
+          <summary><svg class="icon"><use href="#icon-users"/></svg> Add a Family</summary>
+          <form method="POST" action="/main-admin/members/families/new" class="stack-form" style="margin-top: 0.75rem;">
+            <label class="member-form-full">Family Name
+              <input type="text" name="name" placeholder="e.g. Smith" required />
+            </label>
+            <button type="submit" class="primary-btn">Add Family</button>
+          </form>
           <% if (families.length > 0) { %>
-            <optgroup label="Family">
-              <% families.forEach(function(f) { %>
-                <option value="/main-admin/members?family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-              <% }); %>
-            </optgroup>
+            <table class="roster-table condensed-table" style="margin-top: 1rem;">
+              <thead><tr><th>Family</th><th>Active Members</th><th>Actions</th></tr></thead>
+              <tbody>
+                <% families.forEach(function(f) { %>
+                  <tr>
+                    <td>
+                      <form method="POST" action="/main-admin/members/families/<%= f.id %>/rename" class="inline-block-form">
+                        <input type="text" name="name" value="<%= f.name %>" style="width: 12rem;" />
+                        <button type="submit" class="icon-btn" aria-label="Rename family" title="Rename"><svg class="icon"><use href="#icon-save"/></svg></button>
+                      </form>
+                    </td>
+                    <td><%= f.memberCount %></td>
+                    <td>
+                      <form method="POST" action="/main-admin/members/families/<%= f.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= f.name %>&quot; family? Its members stay in the roster, just ungrouped.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete family" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
           <% } %>
-        </select>
-      </div>
-      <a class="btn-secondary" href="<%= showArchived ? '/main-admin/members' : '/main-admin/members?archived=1' %>">
-        <%= showArchived ? 'View Active' : 'View Archived' %>
-      </a>
-    </div>
-
-    <details class="manage-section" style="margin-bottom: 1rem;">
-      <summary><svg class="icon"><use href="#icon-users"/></svg> Add a Family</summary>
-      <form method="POST" action="/main-admin/members/families/new" class="stack-form" style="margin-top: 0.75rem;">
-        <label class="member-form-full">Family Name
-          <input type="text" name="name" placeholder="e.g. Smith" required />
-        </label>
-        <button type="submit" class="primary-btn">Add Family</button>
-      </form>
-      <% if (families.length > 0) { %>
-        <table class="roster-table condensed-table" style="margin-top: 1rem;">
-          <thead><tr><th>Family</th><th>Active Members</th><th>Actions</th></tr></thead>
-          <tbody>
-            <% families.forEach(function(f) { %>
-              <tr>
-                <td>
-                  <form method="POST" action="/main-admin/members/families/<%= f.id %>/rename" class="inline-block-form">
-                    <input type="text" name="name" value="<%= f.name %>" style="width: 12rem;" />
-                    <button type="submit" class="icon-btn" aria-label="Rename family" title="Rename"><svg class="icon"><use href="#icon-save"/></svg></button>
-                  </form>
-                </td>
-                <td><%= f.memberCount %></td>
-                <td>
-                  <form method="POST" action="/main-admin/members/families/<%= f.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= f.name %>&quot; family? Its members stay in the roster, just ungrouped.">
-                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete family" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        </details>
       <% } %>
-    </details>
 
-    <% if (members.length === 0) { %>
-      <p class="roster-empty"><%= showArchived ? 'No archived members.' : 'No members match this filter yet.' %></p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Family</th>
-              <th>Age/Grade</th>
-              <th>Contact</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% members.forEach(function(m) { %>
+      <% if (members.length === 0) { %>
+        <p class="roster-empty"><%= showArchived ? 'No archived members.' : 'No members match this filter yet.' %></p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <%# A real request: "member list on main admin should look like
+              the member list on co-op admin" - same photo-thumb column and
+              data-family-key/members-col-name/members-list-table markup
+              public/js/members-family-collapse.js (already shared with
+              views/admin-members.ejs) needs to collapse each family down
+              to just its primary parent's row, click to expand. members
+              arrives already sorted primary-parent-first per family (see
+              utils/members.js's membersWithDetails -> sortMembersByFamily),
+              same as Co-op Admin's own list. %>
+          <table id="members-table" class="roster-table members-table members-list-table condensed-table">
+            <thead>
               <tr>
-                <td class="roster-name-col">
-                  <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
-                  <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
-                </td>
-                <td><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
-                <td><%= m.familyName || '—' %></td>
-                <td>
-                  <% if (m.member_type === 'student') { %>
-                    <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
-                  <% } else { %>—<% } %>
-                </td>
-                <td><%= m.phone || m.email || '—' %></td>
-                <td class="actions-cell">
-                  <div class="actions-btn-row">
-                    <a class="icon-btn" href="/main-admin/members/<%= m.id %>/edit" aria-label="Edit <%= m.name %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
-                    <% if (showArchived) { %>
-                      <form method="POST" action="/main-admin/members/<%= m.id %>/unarchive" class="inline-block-form">
-                        <button type="submit" class="icon-btn" aria-label="Restore <%= m.name %>" title="Restore"><svg class="icon"><use href="#icon-check"/></svg></button>
-                      </form>
-                    <% } else { %>
-                      <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
-                        <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-lock"/></svg></button>
-                      </form>
-                    <% } %>
-                    <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
-                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                    </form>
-                  </div>
-                </td>
+                <% if (activeTab === 'members') { %><th class="no-print"><span class="sr-only">Select</span></th><% } %>
+                <th class="members-col-photo"><span class="sr-only">Photo</span></th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Family</th>
+                <th>Age/Grade</th>
+                <th>Contact</th>
+                <th class="permissions-col">Sections &amp; Portal Permissions</th>
+                <th>Actions</th>
               </tr>
-            <% }); %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% members.forEach(function(m) { %>
+                <tr data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>">
+                  <% if (activeTab === 'members') { %>
+                    <td class="no-print">
+                      <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
+                    </td>
+                  <% } %>
+                  <td class="members-col-photo">
+                    <% if (m.photo_path) { %>
+                      <img class="member-thumb" src="<%= photoUrl(m.photo_path) %>" alt="" />
+                    <% } else { %>
+                      <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
+                    <% } %>
+                  </td>
+                  <td class="roster-name-col members-col-name">
+                    <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
+                    <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
+                  </td>
+                  <td><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+                  <td><%= m.familyName || '—' %></td>
+                  <td>
+                    <% if (m.member_type === 'student') { %>
+                      <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
+                    <% } else { %>—<% } %>
+                  </td>
+                  <td><%= m.phone || m.email || '—' %></td>
+                  <td class="permissions-col">
+                    <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
+                    <details class="permissions-cell-group">
+                      <summary>Sections</summary>
+                      <% if (sections.length === 0) { %>
+                        <p class="hint">No sections yet.</p>
+                      <% } else { %>
+                        <% sections.forEach(function(s) { %>
+                          <label class="checkbox-option">
+                            <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
+                            <%= s.name %>
+                          </label>
+                        <% }); %>
+                      <% } %>
+                    </details>
+                    <details class="permissions-cell-group">
+                      <summary>Portal Permissions</summary>
+                      <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
+                        <% roles.forEach(function(r) { %>
+                          <label class="checkbox-option">
+                            <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
+                            <%= r.label %>
+                          </label>
+                        <% }); %>
+                      <% } else { %>
+                        <p class="hint">No portal account &mdash; <a href="/main-admin/users/new">Create Account</a></p>
+                      <% } %>
+                    </details>
+                  </td>
+                  <td class="actions-cell">
+                    <div class="actions-btn-row">
+                      <%# A real request: "there should be a mail icon on each
+                          member line so that you can click and email the
+                          member." %>
+                      <% if (m.email) { %>
+                        <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
+                      <% } else { %>
+                        <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
+                      <% } %>
+                      <a class="icon-btn" href="/main-admin/members/<%= m.id %>/edit" aria-label="Edit <%= m.name %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
+                      <% if (showArchived) { %>
+                        <%# A real request: "next to each members name
+                            under archive there should be a button that
+                            says reactivate to make them a member again
+                            and remove them from the archive list." %>
+                        <form method="POST" action="/main-admin/members/<%= m.id %>/unarchive" class="inline-block-form">
+                          <button type="submit" class="roster-action-btn" aria-label="Reactivate <%= m.name %>" title="Reactivate">Reactivate</button>
+                        </form>
+                      <% } else { %>
+                        <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
+                          <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-lock"/></svg></button>
+                        </form>
+                      <% } %>
+                      <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+      <% } %>
+    <% } else if (activeTab === 'approvals') { %>
+      <%# A real request: "this is where new membership requests appear.
+          each line shows primary parent name. you can click the name and
+          view their membership form and edit, add portal settings etc.
+          save. each member line should have approve button, deny button
+          and trash can symbol to delete the request." %>
+      <p class="hint">Self-registered members awaiting review. Approving flips their account active and sends the Approval Letter (Settings tab); denying sends the Denial Letter without granting access.</p>
+      <% if (pending.length === 0) { %>
+        <p class="roster-empty">No membership requests awaiting approval.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Primary Parent</th><th>Email</th><th>Family</th><th>Requested</th><th></th></tr></thead>
+            <tbody>
+              <% pending.forEach(function(p) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/members/<%= p.memberId %>/edit"><%= p.primaryParentName %></a></td>
+                  <td><%= p.email %></td>
+                  <td><%= p.familyName || '—' %></td>
+                  <td><%= p.requestedAtLabel %></td>
+                  <td class="actions-cell">
+                    <div class="actions-btn-row">
+                      <form method="POST" action="/main-admin/members/approvals/<%= p.accountId %>/approve" class="inline-block-form">
+                        <button type="submit" class="icon-btn" aria-label="Approve <%= p.primaryParentName %>" title="Approve"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      </form>
+                      <form method="POST" action="/main-admin/members/approvals/<%= p.accountId %>/deny" class="inline-block-form" data-confirm="Deny <%= p.primaryParentName %>'s membership request? They'll receive the Denial Letter.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Deny <%= p.primaryParentName %>" title="Deny"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+                      </form>
+                      <form method="POST" action="/main-admin/members/approvals/<%= p.accountId %>/delete" class="inline-block-form" data-confirm="Delete <%= p.primaryParentName %>'s membership request? This cannot be undone.">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete request from <%= p.primaryParentName %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'settings') { %>
+      <%# A real request: "this will have an approval and deny letter
+          that can be edited by admin. these letters are sent
+          automatically went approve or deny buttons are clicked." %>
+      <p class="hint">Use <code>{{name}}</code> anywhere in the subject or body to insert the applicant's name.</p>
+      <div class="manage-section">
+        <h2>Approval Letter</h2>
+        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form">
+          <label class="member-form-full">Subject
+            <input type="text" name="subject" value="<%= templates.approval.subject %>" required />
+          </label>
+          <label class="member-form-full">Body
+            <textarea name="body" rows="8" required><%= templates.approval.body %></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Save Approval Letter</button>
+        </form>
       </div>
-      <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
+      <div class="manage-section">
+        <h2>Denial Letter</h2>
+        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form">
+          <label class="member-form-full">Subject
+            <input type="text" name="subject" value="<%= templates.denial.subject %>" required />
+          </label>
+          <label class="member-form-full">Body
+            <textarea name="body" rows="8" required><%= templates.denial.body %></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Save Denial Letter</button>
+        </form>
+      </div>
     <% } %>
   </main>
+  <script src="/js/permissions-edit-toggle.js"></script>
+  <script src="/js/members-family-collapse.js"></script>
+  <script src="/js/archive-select-toggle.js"></script>
+  <script src="/js/members-bulk-actions.js"></script>
 </body>
 </html>

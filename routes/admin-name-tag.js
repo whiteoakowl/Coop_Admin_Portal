@@ -228,6 +228,44 @@ router.post('/name-tag/print', async (req, res) => {
   });
 });
 
+// A real request: "add a name tag bulk printing for plain parent name
+// tag that doesn't have a schedule on the back or setup/cleanup teams
+// listed." Reuses the parent template's own saved layout (whatever the
+// admin has designed) minus any element bound to setupCleanupDays - the
+// only schedule/cleanup-related field that field ever binds to (see
+// utils/nameTagBadge.js's own PARENT_FIELDS) - rather than a second,
+// separately-maintained "plain" template that would drift from the real
+// one every time someone redesigns it. Non-parent members in the
+// selection are silently skipped, same as picking "Parents Only" in the
+// filter dropdown first.
+router.post('/name-tag/print-plain-parent', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one member to print.'));
+  }
+
+  const placeholders = memberIds.map(() => '?').join(',');
+  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders}) AND member_type = 'parent'`).all(...memberIds)).sort(byLastName);
+  if (members.length === 0) {
+    return res.redirect('/admin/name-tag?error=' + encodeURIComponent('Select at least one parent to print a plain parent tag.'));
+  }
+
+  const template = await getTemplate('parent');
+  const plainElements = template.elements.filter((el) => el.field !== 'setupCleanupDays');
+  const dataByMember = await badgeDataForMembers(members);
+  const badges = members.map((m) => ({
+    html: NameTagRenderCore.renderBadgeElements(plainElements, dataByMember[m.id]),
+    bgCss: NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity),
+  }));
+
+  res.render('admin-name-tag-bulk-print', {
+    title: 'Print Plain Parent Name Tags',
+    badges,
+    badgeWidth: BADGE_WIDTH,
+    badgeHeight: BADGE_HEIGHT,
+  });
+});
+
 // Barcode-only sheet: just the scan code and name, no name tag design -
 // for a cheap, fast-to-print stack of scan cards.
 router.post('/name-tag/print-barcodes', async (req, res) => {

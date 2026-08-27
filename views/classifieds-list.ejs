@@ -40,7 +40,7 @@
                 <div class="event-card-body">
                   <% if (l.price) { %><span class="event-card-date"><svg class="icon"><use href="#icon-tag"/></svg> <%= l.price %></span><% } %>
                   <h3><%= l.title %></h3>
-                  <% if (l.category) { %><p class="event-card-location"><%= l.category %></p><% } %>
+                  <% if (l.categoryTitle) { %><p class="event-card-location"><%= l.categoryTitle %></p><% } %>
                 </div>
               </a>
             <% }); %>

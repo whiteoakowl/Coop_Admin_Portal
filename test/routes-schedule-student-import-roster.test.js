@@ -49,6 +49,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 function buildImportBuffer(headers, rows) {
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
@@ -109,7 +128,7 @@ test('POST /admin/schedule/students/import', async (t) => {
   assert.ok(cls && cls2, 'setup: both classes should exist before importing a schedule row for them');
 
   await t.test('a row with one filled slot (Class Days "Mon") puts the student on both the class roster and the day-level Student roster', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Roster Test Kid', memberType: 'student', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Roster Test Kid', 'student');
 
     const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
       buildScheduleRow({ firstName: 'Roster Test', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Mon' }] }),
@@ -141,7 +160,7 @@ test('POST /admin/schedule/students/import', async (t) => {
   });
 
   await t.test('a row with slots on both "Mon" and "Wed" enrolls the member in both classes in one pass, regardless of slot number', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Two Day Kid', memberType: 'student', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Two Day Kid', 'student');
 
     const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
       buildScheduleRow({
@@ -171,7 +190,7 @@ test('POST /admin/schedule/students/import', async (t) => {
   });
 
   await t.test('a Class Days value this app has no day for (e.g. "Thursday") is skipped, not fatal to the row', async () => {
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Thursday Kid', memberType: 'student', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Thursday Kid', 'student');
 
     const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
       buildScheduleRow({ firstName: 'Thursday', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Thursday' }] }),
@@ -190,7 +209,7 @@ test('POST /admin/schedule/students/import', async (t) => {
 
   await t.test('the Allergy column fills in a blank medical_notes but never overwrites an existing one', async () => {
     await db.prepare("INSERT INTO members (name, barcode, member_type, medical_notes) VALUES ('Existing Allergy Kid', 'existing-allergy-kid', 'student', 'Already has peanut allergy on file')").run();
-    await request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send({ name: 'Blank Allergy Kid 2', memberType: 'student', _csrf: csrfToken });
+    await addSingleMember(cookie, csrfToken, 'Blank Allergy Kid 2', 'student');
 
     const scheduleBuffer = buildImportBuffer(SCHEDULE_HEADERS, [
       buildScheduleRow({ firstName: 'Blank Allergy Kid', lastName: '2', allergy: 'Tree nut allergy', slots: [] }),

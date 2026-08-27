@@ -1,0 +1,30 @@
+<%
+// One student's line on a class roster - a real request: "on class
+// rosters each student member line should have registration date/time,
+// birthday, grade, allergy symbol, mail icon button to email, and phone
+// number, parent name. make sure this is all reduced in size to fit on
+// the mobile screen as well." locals: s (an enriched student - see
+// routes/admin-class-schedule.js's enrichRosterStudents), classId,
+// removeAction (the form action for the trash icon).
+%>
+<div class="roster-log-row roster-log-row-rich">
+  <span class="roster-log-name"><%= s.name %><%- include('medical-flag', { member: s }) %></span>
+  <span class="roster-log-meta">
+    <% if (s.family_name) { %><span>The <%= s.family_name %> Family</span><% } %>
+    <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
+    <% if (s.birthday) { %><span><%= s.birthday %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %></span><% } %>
+    <% if (s.enrolledAtLabel) { %><span>Registered <%= s.enrolledAtLabel %></span><% } %>
+    <% if (s.parentName) { %><span><%= s.parentName %></span><% } %>
+    <% if (s.parentPhone) { %><span><%= s.parentPhone %></span><% } %>
+  </span>
+  <div class="roster-log-row-actions no-print">
+    <% if (s.parentEmail) { %>
+      <a class="icon-btn" href="mailto:<%= s.parentEmail %>" aria-label="Email <%= s.parentName || s.name %>" title="Email <%= s.parentName || s.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
+    <% } else { %>
+      <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No parent email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
+    <% } %>
+    <form method="POST" action="<%= removeAction %>" class="inline-block-form" data-confirm="Remove <%= s.name %> from this class?">
+      <button type="submit" class="icon-btn" aria-label="Remove <%= s.name %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+    </form>
+  </div>
+</div>

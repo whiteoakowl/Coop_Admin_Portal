@@ -3,9 +3,13 @@
 // public/js/archive-select-toggle.js (reused as-is - it's already generic
 // over data-archive-toggle/-controls/-select-all-for/form="<id>", not
 // actually specific to "archive"). This file only covers what that one
-// doesn't: the toolbar's three buttons (Delete/Archive/Restore Selected)
-// all submit the SAME #members-bulk-form, so one shared checkbox
-// selection can go to any of three different endpoints.
+// doesn't: routing one shared checkbox selection to whichever endpoint
+// the admin actually picked - either Co-op Admin's own toolbar buttons
+// (Delete/Archive/Restore Selected, all submitting the SAME
+// #members-bulk-form) or Main Admin's own single "Actions" dropdown
+// (views/main-admin-members.ejs's <select data-bulk-action-select> -
+// "a dropdown also appears and says actions, delete or archive are the
+// options", a real request).
 //
 // Each button carries its target in data-bulk-action rather than the
 // native HTML `formaction` attribute a plain <button type="submit"
@@ -37,5 +41,32 @@
     form.dataset.confirmYesLabel = btn.dataset.bulkConfirmYesLabel || 'Yes, Delete';
     if (btn.dataset.bulkConfirmSafe) form.dataset.confirmSafe = '1';
     else delete form.dataset.confirmSafe;
+  });
+
+  // A real request (Main Admin Members' Edit mode): "a dropdown also
+  // appears and says actions, delete or archive are the options" - the
+  // same data-bulk-action/-confirm/-confirm-yes-label/-confirm-safe
+  // wiring above, just read off the SELECTED <option> of a
+  // <select data-bulk-action-select form="..."> instead of a clicked
+  // button, since there's no single element to read data- attributes
+  // from otherwise. Submits immediately on change (there's no separate
+  // "go" button - picking an action from a placeholder-first dropdown IS
+  // the action), then resets back to the placeholder so the dropdown
+  // never keeps showing whichever action was last picked.
+  document.addEventListener('change', (e) => {
+    const select = e.target.closest('[data-bulk-action-select]');
+    if (!select) return;
+    const option = select.selectedOptions[0];
+    if (!option || !option.dataset.bulkAction) return;
+    const formId = select.getAttribute('form');
+    const form = formId && document.getElementById(formId);
+    if (!form) return;
+    form.action = option.dataset.bulkAction;
+    form.dataset.confirm = option.dataset.bulkConfirm;
+    form.dataset.confirmYesLabel = option.dataset.bulkConfirmYesLabel || 'Yes';
+    if (option.dataset.bulkConfirmSafe) form.dataset.confirmSafe = '1';
+    else delete form.dataset.confirmSafe;
+    form.requestSubmit();
+    select.value = '';
   });
 })();

@@ -101,6 +101,14 @@ async function getEvent(id) {
   return db.prepare('SELECT * FROM events WHERE id = ?').get(id);
 }
 
+// A lighter-weight version of getEventWithDetails's own registrationCount
+// - just the one count, for the Events > Event Attendance tab's own
+// per-event list (routes/admin-events.js), which doesn't need the rest of
+// that function's volunteer-role/donation-item detail.
+async function registrationCountForEvent(id) {
+  return Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(id)).c);
+}
+
 // Full detail for one event page (admin management or a member's own
 // view of it): the event row, its category, its section restriction, its
 // volunteer roles each with their own signups + filled/needed counts, its
@@ -624,8 +632,56 @@ async function cancelDonationClaim(claimId, memberId) {
   await db.prepare('DELETE FROM event_donation_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
 }
 
+// Builds a plain Sunday-first month grid (an array of weeks, each an
+// array of {date, inMonth, events} day cells) for a calendar view -
+// shared by the member-facing /events?view=calendar (routes/events.js)
+// and Main Admin's own Events > Calendar tab (routes/admin-events.js;
+// "Main Admin Events: Calendar/Drafts/Requests/Attendance/Archive/
+// Settings tabs" - a real request), kept here rather than duplicated in
+// either route file - same "the view only displays, the route computes"
+// split as every other page in this app.
+function monthGrid(monthParam, eventList) {
+  const now = new Date();
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth();
+  if (/^\d{4}-\d{2}$/.test(monthParam || '')) {
+    year = parseInt(monthParam.slice(0, 4), 10);
+    month = parseInt(monthParam.slice(5, 7), 10) - 1;
+  }
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const startOffset = firstOfMonth.getUTCDay();
+  const gridStart = new Date(Date.UTC(year, month, 1 - startOffset));
+  const eventsByDate = {};
+  for (const e of eventList) {
+    const dateKey = (e.starts_at || '').slice(0, 10);
+    (eventsByDate[dateKey] = eventsByDate[dateKey] || []).push(e);
+  }
+
+  const weeks = [];
+  let cursor = new Date(gridStart);
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      const dateKey = cursor.toISOString().slice(0, 10);
+      week.push({ dateKey, day: cursor.getUTCDate(), inMonth: cursor.getUTCMonth() === month, events: eventsByDate[dateKey] || [] });
+      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+    }
+    weeks.push(week);
+  }
+
+  const prevMonth = new Date(Date.UTC(year, month - 1, 1));
+  const nextMonth = new Date(Date.UTC(year, month + 1, 1));
+  return {
+    weeks,
+    label: firstOfMonth.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+    prevParam: `${prevMonth.getUTCFullYear()}-${String(prevMonth.getUTCMonth() + 1).padStart(2, '0')}`,
+    nextParam: `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, '0')}`,
+  };
+}
+
 module.exports = {
   GRADE_OPTIONS,
+  monthGrid,
   sortByLastNameField,
   parseAgeGroupList,
   memberIsAdult,
@@ -633,6 +689,7 @@ module.exports = {
   isRegistrationWindowOpen,
   listEvents,
   getEvent,
+  registrationCountForEvent,
   getEventWithDetails,
   createEvent,
   updateEvent,

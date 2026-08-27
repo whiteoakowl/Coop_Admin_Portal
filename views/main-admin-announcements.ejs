@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
@@ -26,8 +22,7 @@
     <h1>Announcements</h1>
     <p class="hint">
       Sends a notification to signed-in members - it shows up as an Announcement on their portal home page (Parent
-      Portal today). Not the same as <a href="/main-admin/website">Website</a>'s own Announcements, which post to the
-      public homepage for anyone, signed in or not.
+      Portal today). Choose "Public" below to post to the public homepage instead, for anyone, signed in or not.
     </p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -37,15 +32,19 @@
       <label class="member-form-full">Title
         <input type="text" name="title" placeholder="e.g. Wednesday session cancelled" required />
       </label>
-      <label class="member-form-full">Message
-        <textarea name="body" rows="4" placeholder="Enter the announcement" required></textarea>
-      </label>
+      <div class="member-form-full" data-forum-editor>
+        <label>Message</label>
+        <%- include('partials/forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="body" data-forum-body-input />
+      </div>
       <label class="member-form-full">Send to
         <select name="roleKey">
           <option value="">Everyone (all active members)</option>
           <% roles.forEach(function(r) { %>
             <option value="<%= r.key %>"><%= r.label %> only</option>
           <% }); %>
+          <option value="public">Public (posts to the homepage)</option>
         </select>
       </label>
       <div class="member-form-footer">
@@ -66,7 +65,7 @@
             <% sent.forEach(function(s) { %>
               <tr>
                 <td class="roster-name-col"><%= s.title %></td>
-                <td><%= s.body %></td>
+                <td class="forum-editable-display"><%- s.body %></td>
                 <td><%= s.recipientCount %></td>
                 <td><%= s.created_at %></td>
               </tr>
@@ -75,6 +74,27 @@
         </table>
       </div>
     <% } %>
+
+    <%# Relocated from Main Admin > Website - see this page's own hint
+        text above. %>
+    <h2>Public Homepage Announcements</h2>
+    <% if (publicAnnouncements.length === 0) { %>
+      <p class="roster-empty">No public announcements yet.</p>
+    <% } else { %>
+      <div class="site-announcement-list">
+        <% publicAnnouncements.forEach(function(a) { %>
+          <div class="site-announcement-card">
+            <span class="site-announcement-date"><%= a.is_public ? 'Public' : 'Members Only' %></span>
+            <h3><%= a.title %></h3>
+            <div class="forum-editable-display"><%- a.body %></div>
+            <form method="POST" action="/main-admin/website/announcements/<%= a.id %>/delete" data-confirm="Delete this announcement?">
+              <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
   </main>
+  <script src="/js/forum-editor.js"></script>
 </body>
 </html>

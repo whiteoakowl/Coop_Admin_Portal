@@ -10,7 +10,15 @@ const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin } = require('../utils/classCheckinPin');
 const { computeTrend } = require('../utils/dashboardTrends');
-const { listAdminPositions, addAdminPosition, deleteAdminPosition } = require('../utils/adminPositions');
+const {
+  listAdminPositions,
+  addAdminPosition,
+  deleteAdminPosition,
+  addAdminPositionForMember,
+  removeAdminPositionForMember,
+  membersByAdminPosition,
+} = require('../utils/adminPositions');
+const { activeMemberOptions } = require('../utils/members');
 
 // --- Auth ---
 
@@ -255,6 +263,8 @@ async function renderSettings(req, res, error, success, activeTab) {
     activeTab: tab,
     documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
     adminPositions: await listAdminPositions(),
+    leadersByPosition: await membersByAdminPosition(),
+    memberOptions: await activeMemberOptions(),
     error,
     success,
   });
@@ -324,11 +334,12 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
   await renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
 });
 
-// Admin & Leaders: a plain list of position titles ("President",
-// "Treasurer", ...) an admin member can optionally be assigned on the
-// member form (views/partials/member-form-fields.ejs's Admin Position
-// dropdown) and that then prints on their Admin name tag (utils/
-// nameTagData.js's adminPositionLabel).
+// Admins: a plain list of position titles ("President", "Treasurer",
+// ...) - the list itself is unchanged from when this tab was still
+// called "Admin & Leaders" (before the member-type admin/lone-member
+// removal below), just relabeled. Prints on a leader's Admin name tag
+// (utils/nameTagData.js's adminPositionLabel) once assigned via Add
+// Leaders below.
 router.post('/settings/admin-positions', requireAdmin, requireFullAdmin, async (req, res) => {
   const title = (req.body.title || '').trim();
   if (!title) return renderSettings(req, res, 'Position title is required.', null, 'leaders');
@@ -339,6 +350,32 @@ router.post('/settings/admin-positions', requireAdmin, requireFullAdmin, async (
 router.post('/settings/admin-positions/:id/delete', requireAdmin, requireFullAdmin, async (req, res) => {
   await deleteAdminPosition(parseInt(req.params.id, 10));
   await renderSettings(req, res, null, 'Position removed.', 'leaders');
+});
+
+// A real request: "there should also be a button that says add leaders.
+// when you click the button it will show a drop down of members for you
+// to choose. click a member then choose which admin position in the
+// dropdown. save button. this adds each admin name next to their
+// position." Choosing "admin" is no longer an option on the member
+// form itself (see #235's own removal of lone-admin/single-member
+// creation) - this Add Leaders picker is the real replacement: any
+// existing member can be assigned an admin position without changing
+// their member_type at all, which is also why member_admin_positions
+// (not members.member_type) has been the source of truth for "who's a
+// leader" all along.
+router.post('/settings/admin-positions/assign', requireAdmin, requireFullAdmin, async (req, res) => {
+  const memberId = parseInt(req.body.memberId, 10);
+  const positionId = parseInt(req.body.positionId, 10);
+  if (!memberId || !positionId) {
+    return renderSettings(req, res, 'Choose both a member and a position.', null, 'leaders');
+  }
+  await addAdminPositionForMember(memberId, positionId);
+  await renderSettings(req, res, null, 'Leader added.', 'leaders');
+});
+
+router.post('/settings/admin-positions/:positionId/members/:memberId/remove', requireAdmin, requireFullAdmin, async (req, res) => {
+  await removeAdminPositionForMember(parseInt(req.params.memberId, 10), parseInt(req.params.positionId, 10));
+  await renderSettings(req, res, null, 'Leader removed.', 'leaders');
 });
 
 module.exports = router;

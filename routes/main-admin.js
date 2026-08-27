@@ -34,6 +34,26 @@ router.get('/', async (req, res) => {
   });
 });
 
+// A real request: "under main admin portal the users tab should be
+// under the settings icon at the top as a file tab" - Users and Website
+// (see /website below) both dropped out of the top-level nav (every
+// views/main-admin-*.ejs's own navLinks array) and now live only under
+// the gear icon (views/partials/portal-nav.ejs's settingsHref). This
+// bare redirect gives that gear icon one stable URL to open - Users
+// happens to be first since Users existed here before Website did.
+router.get('/settings', requirePortalPermission('manage_users'), (req, res) => {
+  res.redirect('/main-admin/users');
+});
+
+// A real request: "the co-op admin portal settings quicklinks tab
+// should also appear under the settings gear on main admin as a tab."
+// Open to any Main Admin account (no narrower requirePortalPermission
+// gate) - same as Co-op Admin's own Quick Links tab, which every admin
+// sees regardless of full-admin status (routes/admin.js's renderSettings).
+router.get('/quick-links', (req, res) => {
+  res.render('main-admin-quick-links', { title: 'Quick Links' });
+});
+
 // --- Users ---
 
 router.get('/users', requirePortalPermission('manage_users'), async (req, res) => {
@@ -176,9 +196,8 @@ router.post('/roles/:id/permissions', requirePortalPermission('manage_roles'), a
 
 router.get('/website', requirePortalPermission('manage_website'), async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  const announcements = await db.prepare('SELECT * FROM announcements ORDER BY published_at DESC').all();
   const faqs = await db.prepare('SELECT * FROM faqs ORDER BY position, id').all();
-  res.render('main-admin-website', { title: 'Website', settings, announcements, faqs, notice: req.query.notice || null });
+  res.render('main-admin-website', { title: 'Website', settings, faqs, notice: req.query.notice || null });
 });
 
 router.post('/website/settings', requirePortalPermission('manage_website'), async (req, res) => {
@@ -192,19 +211,15 @@ router.post('/website/settings', requirePortalPermission('manage_website'), asyn
   res.redirect('/main-admin/website?notice=' + encodeURIComponent('Website settings saved.'));
 });
 
-router.post('/website/announcements', requirePortalPermission('manage_website'), async (req, res) => {
-  const title = (req.body.title || '').trim();
-  const body = (req.body.body || '').trim();
-  if (!title || !body) return res.redirect('/main-admin/website?notice=' + encodeURIComponent('Title and body are required.'));
-  await db
-    .prepare('INSERT INTO announcements (title, body, is_public, created_by_account_id) VALUES (?, ?, ?, ?)')
-    .run(title, body, req.body.isPublic === '1' ? 1 : 0, req.portalAccount.id);
-  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Announcement posted.'));
-});
-
+// Public homepage announcements are now created from the Announcements
+// tab itself (routes/main-admin-announcements.js's roleKey === 'public'
+// branch) - a real request: "the public home page announcements should
+// be listed under the announcements tab." The delete route stays here
+// (unchanged URL) since that's what the relocated list's own delete
+// forms on that page still post to - only the CREATE form/route moved.
 router.post('/website/announcements/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
   await db.prepare('DELETE FROM announcements WHERE id = ?').run(req.params.id);
-  res.redirect('/main-admin/website?notice=' + encodeURIComponent('Announcement removed.'));
+  res.redirect('/main-admin/announcements?notice=' + encodeURIComponent('Announcement removed.'));
 });
 
 router.post('/website/faqs', requirePortalPermission('manage_website'), async (req, res) => {

@@ -41,6 +41,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
+// /admin/members/new-single (a flat {name, memberType} fixture route) was
+// removed - "there shouldn't be any lone admins/leaders, or single
+// members" - so this fixture now goes through the real family-intake
+// form (/admin/members/new) instead, with a throwaway filler entry on
+// the side it doesn't care about (createParentMember/createChildMember
+// never enforce name uniqueness, so a constant filler name is safe to
+// reuse across calls).
+async function addSingleMember(cookie, csrfToken, name, memberType) {
+  const body = { newFamilyName: `${name} Family`, _csrf: csrfToken };
+  if (memberType === 'parent') {
+    body['parents[0][name]'] = name;
+    body['children[0][name]'] = 'Filler Child';
+  } else {
+    body['parents[0][name]'] = 'Filler Parent';
+    body['children[0][name]'] = name;
+  }
+  return request(app).post('/admin/members/new').set('Cookie', cookie).type('form').send(body);
+}
+
 test('GET /admin/import-template/names.xlsx has separate First/Last Name columns', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app)
@@ -60,11 +79,7 @@ test('GET /admin/import-template/names.xlsx has separate First/Last Name columns
 
 test('POST /admin/volunteers/monday/import matches an active parent by joining First/Last Name columns', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  await request(app)
-    .post('/admin/members/new')
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ name: 'Robin Floater', memberType: 'parent', _csrf: csrfToken });
+  await addSingleMember(cookie, csrfToken, 'Robin Floater', 'parent');
 
   await t.test('an .xlsx file with First/Last Name columns', async () => {
     const ws = XLSX.utils.aoa_to_sheet([['First Name', 'Last Name'], ['Robin', 'Floater']]);

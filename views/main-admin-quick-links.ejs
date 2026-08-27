@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <%# A real request: "the co-op admin portal settings quicklinks tab
+      should also appear under the settings gear on main admin as a
+      tab." Same link set as views/admin-settings.ejs's own Quick Links
+      panel (routes/admin.js) - Main Admin oversees the whole platform
+      too and reaches for the same kiosk/public-form/admin shortcuts. %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'quicklinks' }) %>
+    <h1>Quick Links</h1>
+    <p class="subtitle">Kiosk screens, public forms, and admin pages, opened in a new tab.</p>
+    <div class="admin-card-grid">
+      <a class="admin-card" href="/kiosk" target="_blank">Full Kiosk Screen</a>
+      <a class="admin-card" href="/kiosk/checkin" target="_blank">Check-In Kiosk</a>
+      <a class="admin-card" href="/kiosk/checkout" target="_blank">Check-Out Kiosk</a>
+      <a class="admin-card" href="/kiosk/class-checkin" target="_blank">Class Check-In Kiosk</a>
+      <a class="admin-card" href="/absence" target="_blank">Absence/Late Form (public link)</a>
+      <a class="admin-card" href="/name-tag" target="_blank">Name Tag Form (public link)</a>
+      <a class="admin-card" href="/membership" target="_blank">Membership Form (public link)</a>
+      <a class="admin-card" href="/training" target="_blank">Training (public link)</a>
+      <a class="admin-card" href="/setup" target="_blank">Setup/Cleanup Assignments</a>
+      <a class="admin-card" href="/volunteers" target="_blank">Floater Assignments</a>
+      <a class="admin-card" href="/" target="_blank">Public Homepage</a>
+      <a class="admin-card" href="/register" target="_blank">Request Membership (public link)</a>
+    </div>
+  </main>
+</body>
+</html>

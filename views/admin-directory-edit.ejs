@@ -8,15 +8,11 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
       { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
       { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -51,6 +47,11 @@
             <button type="submit" class="roster-action-btn">Approve</button>
           </form>
         <% } %>
+        <% if (listing.status === 'pending') { %>
+          <form method="POST" action="/main-admin/directory/<%= listing.id %>/deny" class="inline-block-form" data-confirm="Deny this listing request? It will be removed.">
+            <button type="submit" class="roster-action-btn roster-action-btn-danger">Deny</button>
+          </form>
+        <% } %>
         <% if (listing.status !== 'archived') { %>
           <form method="POST" action="/main-admin/directory/<%= listing.id %>/status" class="inline-block-form">
             <input type="hidden" name="status" value="archived" />
@@ -73,7 +74,12 @@
           <textarea name="description" rows="3"><%= listing.description || '' %></textarea>
         </label>
         <label>Category
-          <input type="text" name="category" value="<%= listing.category || '' %>" />
+          <select name="categoryId">
+            <option value="">Uncategorized</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= listing.category_id === c.id ? 'selected' : '' %>><%= c.title %></option>
+            <% }); %>
+          </select>
         </label>
         <label>Phone
           <input type="text" name="phone" value="<%= listing.phone || '' %>" />

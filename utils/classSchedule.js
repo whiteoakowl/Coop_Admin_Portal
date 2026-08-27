@@ -151,7 +151,7 @@ async function studentsForClass(classId) {
   return (
     await db
       .prepare(
-        `SELECT m.*, f.name AS family_name FROM class_enrollments ce
+        `SELECT m.*, f.name AS family_name, ce.created_at AS enrolled_at FROM class_enrollments ce
          JOIN members m ON m.id = ce.student_id
          LEFT JOIN families f ON f.id = m.family_id
          WHERE ce.class_id = ? AND m.active = 1`

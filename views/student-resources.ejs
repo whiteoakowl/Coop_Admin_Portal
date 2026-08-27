@@ -19,8 +19,14 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Resource Links</h1>
+    <div class="roster-toolbar">
+      <h1>Resource Links</h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('submit-resource-dialog').showModal()">+ Submit a Resource</button>
+    </div>
     <p class="hint">Links your teachers or the co-op have shared for you.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% if (links.length === 0) { %>
       <p class="roster-empty">No resource links yet.</p>
@@ -40,5 +46,39 @@
       </div>
     <% } %>
   </main>
+
+  <dialog id="submit-resource-dialog" class="member-picker-dialog">
+    <form method="POST" action="/student/resources/submit">
+      <h3>Submit a Resource</h3>
+      <p class="hint">Shared a great link with your co-op? Submit it here - a Main Admin will review it before it appears on this list.</p>
+      <label for="submit-resource-title">Title
+        <input id="submit-resource-title" type="text" name="title" required />
+      </label>
+      <label for="submit-resource-website">Website
+        <input id="submit-resource-website" type="url" name="url" placeholder="https://..." required />
+      </label>
+      <label for="submit-resource-description">Description
+        <textarea id="submit-resource-description" name="description" rows="2"></textarea>
+      </label>
+      <label for="submit-resource-city">City
+        <input id="submit-resource-city" type="text" name="city" />
+      </label>
+      <label for="submit-resource-state">State
+        <input id="submit-resource-state" type="text" name="state" />
+      </label>
+      <label for="submit-resource-category">Category
+        <select id="submit-resource-category" name="categoryId">
+          <option value="">Uncategorized</option>
+          <% categories.forEach(function(c) { %>
+            <option value="<%= c.id %>"><%= c.title %></option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Submit</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

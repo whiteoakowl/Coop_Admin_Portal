@@ -84,7 +84,7 @@
                 <% team.members.forEach(function(m) { %>
                   <div class="team-member-row" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span>
+                    <span class="team-member-name-col"><span class="team-member-name" title="<%= m.name %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
                     <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
                       <select name="rank" class="team-member-rank-select" onchange="this.form.requestSubmit()" disabled>
                         <% ranks.forEach(function(r) { %>

@@ -59,10 +59,21 @@ async function accessibleCategories(family) {
 // or the thread's own creation if it somehow has none) - computed live
 // from real post rows rather than a denormalized/cached "last activity"
 // column that could drift.
+// A real request: "this will then add their admin title label next to
+// their name... when they post or comment in the chats." One admin can
+// hold several positions (member_admin_positions, see utils/
+// adminPositions.js) - string_agg'd into a single "President, Treasurer"
+// label per author, same pattern as academics.js's own teacher_names.
+// Null for a member who holds no admin position, same as authorName
+// itself for a deleted member.
+const ADMIN_TITLE_SUBQUERY = `(SELECT string_agg(ap.title, ', ' ORDER BY ap.position, LOWER(ap.title))
+   FROM member_admin_positions map JOIN admin_positions ap ON ap.id = map.admin_position_id
+   WHERE map.member_id = m.id) AS "authorAdminTitle"`;
+
 async function listThreads(categoryId) {
   return db
     .prepare(
-      `SELECT t.*, m.name AS "authorName",
+      `SELECT t.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY},
               COALESCE((SELECT MAX(p.created_at) FROM forum_posts p WHERE p.thread_id = t.id AND p.status = 'active'), t.created_at) AS "lastActivityAt",
               (SELECT COUNT(*) FROM forum_posts p WHERE p.thread_id = t.id AND p.status = 'active') AS "postCount"
        FROM forum_threads t
@@ -74,7 +85,9 @@ async function listThreads(categoryId) {
 }
 
 async function getThread(id) {
-  return db.prepare('SELECT t.*, m.name AS "authorName" FROM forum_threads t LEFT JOIN members m ON m.id = t.member_id WHERE t.id = ?').get(id);
+  return db
+    .prepare(`SELECT t.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY} FROM forum_threads t LEFT JOIN members m ON m.id = t.member_id WHERE t.id = ?`)
+    .get(id);
 }
 
 async function createThread(categoryId, title, bodyHtml, memberId, accountId) {
@@ -87,7 +100,7 @@ async function createThread(categoryId, title, bodyHtml, memberId, accountId) {
 async function listPosts(threadId) {
   return db
     .prepare(
-      `SELECT p.*, m.name AS "authorName" FROM forum_posts p
+      `SELECT p.*, m.name AS "authorName", ${ADMIN_TITLE_SUBQUERY} FROM forum_posts p
        LEFT JOIN members m ON m.id = p.member_id
        WHERE p.thread_id = ? ORDER BY p.created_at`
     )
@@ -150,6 +163,27 @@ async function logEdit(actorAccountId, postId) {
   await logModeration(actorAccountId, 'edit', 'post', postId, null);
 }
 
+// A real request (Main Admin Chat's own Archive tab): "main admin portal
+// chat should have the tabs new chat, moderate, archive." Categories
+// themselves have no archive concept - only a hard delete ("this removes
+// every thread and post in it") - but individual THREADS already do
+// (forum_threads.status, set by routes/forums.js's own member-facing
+// archive/unarchive buttons via setThreadArchived above), so the Archive
+// tab surfaces exactly that: every thread any member or moderator has
+// archived, across every category, with a way to restore it.
+async function archivedThreads() {
+  return db
+    .prepare(
+      `SELECT t.*, m.name AS "authorName", c.name AS "categoryName", c.id AS "categoryId"
+       FROM forum_threads t
+       LEFT JOIN members m ON m.id = t.member_id
+       LEFT JOIN forum_categories c ON c.id = t.category_id
+       WHERE t.status = 'archived'
+       ORDER BY t.updated_at DESC`
+    )
+    .all();
+}
+
 async function moderationLog(limit = 100) {
   return db
     .prepare(
@@ -183,5 +217,6 @@ module.exports = {
   setThreadArchived,
   moveThread,
   logEdit,
+  archivedThreads,
   moderationLog,
 };

@@ -27,9 +27,13 @@ router.get('/mine', requirePortalAuth, async (req, res) => {
   for (const memberId of familyIds) {
     mine.push(...(await classifieds.listingsForMember(memberId)));
   }
-  res.render('classifieds-mine', { title: 'My Classifieds', family, listings: mine.map(withImageUrl), notice: req.query.notice || null, error: req.query.error || null });
+  const categories = await classifieds.listCategories();
+  res.render('classifieds-mine', { title: 'My Classifieds', family, categories, listings: mine.map(withImageUrl), notice: req.query.notice || null, error: req.query.error || null });
 });
 
+// A real request: "Members must choose a category when creating a
+// listing" - categoryId is required on both create and update below,
+// same as title.
 router.post('/', requirePortalAuth, async (req, res) => {
   const family = await familyForAccount(req.portalAccount.id);
   const memberId = parseInt(req.body.memberId, 10);
@@ -40,11 +44,15 @@ router.post('/', requirePortalAuth, async (req, res) => {
   if (!title) {
     return res.redirect('/classifieds/mine?error=' + encodeURIComponent('Title is required.'));
   }
+  const categoryId = parseInt(req.body.categoryId, 10) || null;
+  if (!categoryId) {
+    return res.redirect('/classifieds/mine?error=' + encodeURIComponent('Please choose a category.'));
+  }
   await classifieds.submitListing(
     {
       title,
       description: (req.body.description || '').trim(),
-      category: (req.body.category || '').trim(),
+      categoryId,
       price: (req.body.price || '').trim(),
       visibility: req.body.visibility === 'public' ? 'public' : 'members',
     },
@@ -64,10 +72,14 @@ router.post('/:id/update', requirePortalAuth, async (req, res) => {
   if (!title) {
     return res.redirect('/classifieds/mine?error=' + encodeURIComponent('Title is required.'));
   }
+  const categoryId = parseInt(req.body.categoryId, 10) || null;
+  if (!categoryId) {
+    return res.redirect('/classifieds/mine?error=' + encodeURIComponent('Please choose a category.'));
+  }
   await classifieds.updateListing(listing.id, {
     title,
     description: (req.body.description || '').trim(),
-    category: (req.body.category || '').trim(),
+    categoryId,
     price: (req.body.price || '').trim(),
     visibility: req.body.visibility === 'public' ? 'public' : 'members',
   });

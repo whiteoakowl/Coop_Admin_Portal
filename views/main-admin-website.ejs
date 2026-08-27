@@ -8,21 +8,18 @@
     portalTitle: 'Main Admin',
     navLinks: [
       { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/users', icon: 'user-check', label: 'Users' },
       { href: '/main-admin/members', icon: 'users', label: 'Members' },
       { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
       { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
       { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/sections', icon: 'grid', label: 'Sections' },
       { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/roles', icon: 'sliders', label: 'Roles & Permissions' },
-      { href: '/main-admin/website', icon: 'palette', label: 'Website' },
       { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
       { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
+    <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'website' }) %>
     <h1>Website</h1>
     <p class="hint">Edit the public homepage's copy, announcements, and FAQs without touching code. <a href="/" target="_blank">View the live site &rarr;</a></p>
 
@@ -64,40 +61,11 @@
       </form>
     </section>
 
-    <section class="portal-dashboard-card portal-dashboard-card-wide">
-      <h2>Announcements</h2>
-      <form method="POST" action="/main-admin/website/announcements" class="member-form-grid">
-        <label class="member-form-full">Title
-          <input type="text" name="title" required />
-        </label>
-        <label class="member-form-full">Body
-          <textarea name="body" rows="2" required></textarea>
-        </label>
-        <label class="checkbox-option member-form-full">
-          <input type="checkbox" name="isPublic" value="1" />
-          Show on the public homepage (unchecked = members only)
-        </label>
-        <div class="member-form-full">
-          <button type="submit" class="roster-action-btn">Post Announcement</button>
-        </div>
-      </form>
-      <% if (announcements.length === 0) { %>
-        <p class="roster-empty">No announcements yet.</p>
-      <% } else { %>
-        <div class="site-announcement-list">
-          <% announcements.forEach(function(a) { %>
-            <div class="site-announcement-card">
-              <span class="site-announcement-date"><%= a.is_public ? 'Public' : 'Members Only' %></span>
-              <h3><%= a.title %></h3>
-              <p><%= a.body %></p>
-              <form method="POST" action="/main-admin/website/announcements/<%= a.id %>/delete" data-confirm="Delete this announcement?">
-                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-              </form>
-            </div>
-          <% }); %>
-        </div>
-      <% } %>
-    </section>
+    <%# A real request: "the public home page announcements should be
+        listed under the announcements tab" - posting/managing them
+        moved to /main-admin/announcements (its "Public" Send To
+        option). %>
+    <p class="hint">Public homepage announcements are now posted and managed from <a href="/main-admin/announcements">Announcements</a>.</p>
 
     <section class="portal-dashboard-card portal-dashboard-card-wide">
       <h2>FAQs</h2>

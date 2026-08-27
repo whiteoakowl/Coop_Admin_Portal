@@ -14,16 +14,23 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
-// Every section pulls straight from its own table's live rows - Events
-// and Directory read from Track A/Track B's own utils rather than
-// re-querying here, so this stays a single source of truth for "what
-// counts as upcoming/active" as those modules evolve. Any section with
-// nothing to show is simply omitted rather than rendered as an empty
-// placeholder.
+// The 30-day lookback shared by the Business Directory and Classifieds
+// sections below - "additions from the last 30 days," a real request -
+// computed in SQL (not a JS Date passed in as a param) so it stays
+// correct against the DB's own clock rather than the app server's.
+const LAST_30_DAYS_SQL = "to_char(now() at time zone 'utc' - interval '30 days', 'YYYY-MM-DD HH24:MI:SS')";
+
+// Every section pulls straight from its own table's live rows - Events,
+// Directory, and Classifieds read from Track A/Track B's own utils
+// rather than re-querying here, so this stays a single source of truth
+// for "what counts as upcoming/active" as those modules evolve. Any
+// section with nothing to show is simply omitted rather than rendered as
+// an empty placeholder.
 async function assembleContent() {
   const parts = [];
 
-  const events = await db.prepare("SELECT * FROM events WHERE status = 'published' AND starts_at >= now_text() ORDER BY starts_at LIMIT 5").all();
+  // A real request: "auto-includes next 10 events."
+  const events = await db.prepare("SELECT * FROM events WHERE status = 'published' AND starts_at >= now_text() ORDER BY starts_at LIMIT 10").all();
   if (events.length) {
     parts.push('<h2>Upcoming Events</h2><ul>' + events.map((e) => `<li><strong>${escapeHtml(e.title)}</strong> - ${escapeHtml(e.starts_at)}${e.location ? ' at ' + escapeHtml(e.location) : ''}</li>`).join('') + '</ul>');
   }
@@ -56,9 +63,23 @@ async function assembleContent() {
     parts.push('<h2>Announcements</h2><ul>' + announcements.map((a) => `<li><strong>${escapeHtml(a.title)}</strong> - ${escapeHtml(a.body)}</li>`).join('') + '</ul>');
   }
 
-  const listings = await db.prepare("SELECT * FROM business_directory_listings WHERE status = 'active' ORDER BY created_at DESC LIMIT 5").all();
+  // A real request: "business directory additions from the last 30
+  // days" - every new listing in that window, not a fixed top-N, so a
+  // slow week shows nothing and a busy one shows everything.
+  const listings = await db
+    .prepare(`SELECT l.*, c.title AS "categoryTitle" FROM business_directory_listings l LEFT JOIN business_directory_categories c ON c.id = l.category_id WHERE l.status = 'active' AND l.created_at >= ${LAST_30_DAYS_SQL} ORDER BY l.created_at DESC`)
+    .all();
   if (listings.length) {
-    parts.push('<h2>Business Directory</h2><ul>' + listings.map((l) => `<li><strong>${escapeHtml(l.business_name)}</strong>${l.category ? ' - ' + escapeHtml(l.category) : ''}</li>`).join('') + '</ul>');
+    parts.push('<h2>New in the Business Directory</h2><ul>' + listings.map((l) => `<li><strong>${escapeHtml(l.business_name)}</strong>${l.categoryTitle ? ' - ' + escapeHtml(l.categoryTitle) : ''}</li>`).join('') + '</ul>');
+  }
+
+  // A real request: "classifieds from the last 30 days" - same window
+  // and reasoning as the Business Directory section above.
+  const classifieds = await db
+    .prepare(`SELECT l.*, c.title AS "categoryTitle" FROM classified_listings l LEFT JOIN classified_categories c ON c.id = l.category_id WHERE l.status = 'active' AND l.created_at >= ${LAST_30_DAYS_SQL} ORDER BY l.created_at DESC`)
+    .all();
+  if (classifieds.length) {
+    parts.push('<h2>New Classifieds</h2><ul>' + classifieds.map((l) => `<li><strong>${escapeHtml(l.title)}</strong>${l.price ? ' - ' + escapeHtml(l.price) : ''}${l.categoryTitle ? ' (' + escapeHtml(l.categoryTitle) + ')' : ''}</li>`).join('') + '</ul>');
   }
 
   // Only public publications - a members-only article summarized in an
@@ -88,6 +109,15 @@ async function createDraft(subject, accountId) {
 
 async function updateIssue(id, data) {
   await db.prepare('UPDATE newsletter_issues SET subject = ?, body_html = ?, updated_at = now_text() WHERE id = ?').run(data.subject, sanitizePostBody(data.bodyHtml), id);
+}
+
+// A real request: "Add a 'Customize Newsletter' action where admin
+// writes their own note/letter that appears before the automatic
+// content." Its own column and its own save action, deliberately
+// separate from updateIssue's body_html - see the migration's own
+// comment on why (regenerate() below never touches this).
+async function setCustomNote(id, note) {
+  await db.prepare('UPDATE newsletter_issues SET custom_note = ?, updated_at = now_text() WHERE id = ?').run(sanitizePostBody(note || ''), id);
 }
 
 // Regenerates body_html from live data, overwriting any hand edits - an
@@ -130,6 +160,7 @@ module.exports = {
   getIssue,
   createDraft,
   updateIssue,
+  setCustomNote,
   regenerate,
   scheduleIssue,
   unschedule,

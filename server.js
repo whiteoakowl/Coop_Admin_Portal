@@ -94,7 +94,6 @@ const adminDesignRouter = require('./routes/admin-design');
 const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
 const adminMembersRouter = require('./routes/admin-members');
 const adminAnnouncementsRouter = require('./routes/admin-announcements');
-const adminResourceLinksRouter = require('./routes/admin-resource-links');
 const adminSearchRouter = require('./routes/admin-search');
 const adminVolunteersRouter = require('./routes/admin-volunteers');
 const adminSubstitutesRouter = require('./routes/admin-substitutes');
@@ -466,7 +465,6 @@ app.use('/admin', adminMembersRouter);
 app.use('/admin', adminSearchRouter);
 app.use('/admin', adminNameTagRouter);
 app.use('/admin', adminAnnouncementsRouter);
-app.use('/admin', adminResourceLinksRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Not Found' });
