@@ -6444,6 +6444,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
 .event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; }
 
+/* A real request: "prev/next buttons should be side by side with the
+   month name stacked above them" - previously Prev/<month name>/Next sat
+   as three items crammed into one .roster-btn-row, which not only read
+   oddly (a plain text label sandwiched between two buttons) but broke
+   that row's own mobile button-grid math (roster-btn-row-grid.js only
+   counts .roster-action-btn children, so the month name <strong> silently
+   rode along as an extra, unaccounted-for grid cell). The month label now
+   sits in its own line above a Prev/Next .roster-btn-row containing only
+   the two buttons; the Calendar/List view toggle gets its own second
+   .roster-btn-row alongside it. */
+.event-calendar-month-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+.event-calendar-month-label { margin: 0; font-size: 1.1rem; }
+.event-calendar-toolbar { align-items: flex-start; }
+/* Calendar/List view toggle reuses .archived-toggle-btn's own "pressed"
+   look (see that class's own comment above) rather than inventing a
+   second active-state treatment for the same idea. */
+
 /* Babysitter Directory - profile photo thumbnail, shown both on a
    parent's own edit form (their current photo, before they replace it)
    and on the directory's own cards. */
