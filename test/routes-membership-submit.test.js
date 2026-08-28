@@ -102,4 +102,61 @@ test('POST /membership', async (t) => {
     const count = Number((await db.prepare('SELECT COUNT(*) AS c FROM membership_requests').get()).c);
     assert.equal(count, 0);
   });
+
+  // A real request: "you can only have one primary parent per family."
+  await t.test('checking Primary Parent on more than one parent block in the same submission leaves only the last one primary', async () => {
+    const res = await request(app)
+      .post('/membership')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        newFamilyName: 'TwoPrimaries',
+        'parents[0][name]': 'First Parent',
+        'parents[0][isPrimaryParent]': '1',
+        'parents[1][name]': 'Second Parent',
+        'parents[1][isPrimaryParent]': '1',
+        'children[0][name]': 'Kid',
+        _csrf: csrfToken,
+      });
+    assert.equal(res.status, 302);
+
+    const first = await db.prepare("SELECT is_primary_parent FROM members WHERE name = 'First Parent'").get();
+    const second = await db.prepare("SELECT is_primary_parent FROM members WHERE name = 'Second Parent'").get();
+    assert.equal(Number(first.is_primary_parent), 0, 'the earlier-inserted parent must be cleared once a later one is also marked primary');
+    assert.equal(Number(second.is_primary_parent), 1);
+  });
+
+  await t.test('a new primary parent added to a family that already has one clears the old one', async () => {
+    const before = await request(app)
+      .post('/membership')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        newFamilyName: 'ExistingPrimary',
+        'parents[0][name]': 'Original Primary',
+        'parents[0][isPrimaryParent]': '1',
+        'children[0][name]': 'Kid',
+        _csrf: csrfToken,
+      });
+    assert.equal(before.status, 302);
+    const family = await db.prepare("SELECT family_id FROM members WHERE name = 'Original Primary'").get();
+
+    const after = await request(app)
+      .post('/membership')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({
+        familyId: String(family.family_id),
+        'parents[0][name]': 'New Primary',
+        'parents[0][isPrimaryParent]': '1',
+        'children[0][name]': 'Second Kid',
+        _csrf: csrfToken,
+      });
+    assert.equal(after.status, 302);
+
+    const original = await db.prepare("SELECT is_primary_parent FROM members WHERE name = 'Original Primary'").get();
+    const newPrimary = await db.prepare("SELECT is_primary_parent FROM members WHERE name = 'New Primary'").get();
+    assert.equal(Number(original.is_primary_parent), 0);
+    assert.equal(Number(newPrimary.is_primary_parent), 1);
+  });
 });

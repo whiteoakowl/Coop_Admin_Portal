@@ -121,8 +121,19 @@ async function syncCleanupTeam(memberId, teamId) {
 // module's own header comment - every caller of this function is
 // already admin-gated, but the field itself is only ever rendered to an
 // admin in the shared view, per "should only show to admins").
+//
+// A real request: "you can only have one primary parent per family."
+// The single-member edit path already enforces this (see utils/
+// members.js's setPrimaryParent, which clears the flag off anyone else
+// in the family first) - this form skipped that until now, so checking
+// Primary Parent on more than one parent block in the same submission,
+// or on a new parent joining a family that already has one, could leave
+// two members both marked primary. Same family-wide clear-first here.
 async function createParentMember(familyId, address, parent) {
   const memberCode = await generateMemberCode();
+  if (parent.isPrimaryParent && familyId != null) {
+    await db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(familyId);
+  }
   const info = await db
     .prepare(
       `INSERT INTO members (name, barcode, member_code, member_type, family_id, address, city, state, zip, phone, email, is_primary_parent)

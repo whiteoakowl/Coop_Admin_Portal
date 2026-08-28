@@ -331,11 +331,50 @@
           <button type="submit" class="primary-btn">Save Denial Letter</button>
         </form>
       </div>
+
+      <%# A real request: "there should be a place at the bottom of the
+          membership application to check a box after reading the policy
+          handbook. can't check the box until you have scrolled through
+          the entire handbook." What's written here is what a family
+          reads and must scroll through on the public application
+          (views/portal-register.ejs) before they can submit. %>
+      <div class="manage-section">
+        <h2>Policy Handbook</h2>
+        <p class="hint">Shown on the public membership application - an applicant must scroll through this before they can check the "I have read the Policy Handbook" box and submit.</p>
+        <form method="POST" action="/main-admin/members/settings/handbook" class="stack-form" data-forum-editor>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
+          <input type="hidden" name="handbookHtml" data-forum-body-input />
+          <button type="submit" class="primary-btn">Save Policy Handbook</button>
+        </form>
+      </div>
+
+      <%# A real request: "place at the bottom of the application for
+          payment." This app has no online "pay now" flow anywhere (see
+          utils/membershipHandbook.js's own comment) - what's saved here
+          is the fee amount and how a family actually pays, shown as
+          information on the application, not a checkout. %>
+      <div class="manage-section">
+        <h2>Membership Fee &amp; Payment</h2>
+        <p class="hint">Shown on the public membership application. Leave the fee at $0 to hide the fee amount and just show the instructions.</p>
+        <form method="POST" action="/main-admin/members/settings/payment" class="stack-form">
+          <label>Membership Fee (USD)
+            <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
+          </label>
+          <label class="member-form-full">Payment Instructions
+            <textarea name="instructions" rows="4" placeholder="e.g. Pay by cash, check, or Venmo once your registration is approved."><%= paymentInfo.instructions %></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Save Payment Info</button>
+        </form>
+      </div>
     <% } %>
   </main>
   <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
+  <% if (activeTab === 'settings') { %>
+    <script src="/js/forum-editor.js"></script>
+  <% } %>
 </body>
 </html>

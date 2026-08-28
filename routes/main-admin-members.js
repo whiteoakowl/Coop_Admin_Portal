@@ -44,6 +44,8 @@ const {
   parseArrayField,
 } = require('../utils/memberIntake');
 const membershipApprovals = require('../utils/membershipApprovals');
+const membershipHandbook = require('../utils/membershipHandbook');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
 
@@ -102,6 +104,8 @@ router.get('/', async (req, res) => {
       title: 'Members',
       activeTab,
       templates: await membershipApprovals.getLetterTemplates(),
+      handbookHtml: await membershipHandbook.getHandbookHtml(),
+      paymentInfo: await membershipHandbook.getPaymentInfo(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -202,6 +206,26 @@ router.post('/settings/letters/:kind', async (req, res) => {
   }
   await membershipApprovals.updateLetterTemplate(kind, subject, body);
   res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent(`${kind === 'approval' ? 'Approval' : 'Denial'} letter saved.`));
+});
+
+// A real request: "there should be a place at the bottom of the
+// membership application to check a box after reading the policy
+// handbook." What a family sees on the public form (views/portal-
+// register.ejs) is admin-edited here.
+router.post('/settings/handbook', async (req, res) => {
+  await membershipHandbook.setHandbookHtml(sanitizePostBody(req.body.handbookHtml || ''));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Policy Handbook saved.'));
+});
+
+// A real request: "place at the bottom of the application for payment."
+// Informational only, matching this app's existing payment convention
+// (see utils/membershipHandbook.js's own comment) - no online charge is
+// created from this form.
+router.post('/settings/payment', async (req, res) => {
+  const dollars = parseFloat(req.body.feeDollars || '0');
+  const feeCents = Number.isFinite(dollars) ? Math.round(dollars * 100) : 0;
+  await membershipHandbook.setPaymentInfo(feeCents, (req.body.instructions || '').trim());
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Payment info saved.'));
 });
 
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the

@@ -10,7 +10,6 @@
       <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
       <h1>Request Membership</h1>
     </div>
-    <p class="hint">Create your account to access the member portal. An administrator will review and approve your membership request before you can sign in.</p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
@@ -27,6 +26,22 @@
           <label class="member-form-full">Email
             <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
           </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2>Children</h2>
+        <div id="register-children">
+          <% (children && children.length ? children : []).forEach(function(child, i) { %>
+            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child }) %>
+          <% }); %>
+        </div>
+        <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
+      </div>
+
+      <div class="form-section">
+        <h2>Account Login</h2>
+        <div class="member-form-grid">
           <label>Password
             <input type="password" name="password" required minlength="8" autocomplete="new-password" />
           </label>
@@ -36,16 +51,46 @@
         </div>
       </div>
 
+      <%# A real request: "there should be a place at the bottom of the
+          membership application to check a box after reading the policy
+          handbook. can't check the box until you have scrolled through
+          the entire handbook. can't submit application without checking
+          the box." public/js/portal-register-form.js disables the
+          checkbox until #handbook-scroll-box is scrolled to its bottom;
+          routes/portal-auth.js's POST /register checks handbookRead
+          again server-side since a disabled attribute is only ever a
+          client-side nicety. %>
       <div class="form-section">
-        <h2>Children</h2>
-        <p class="hint">Add each child now so their info (and, if you'd like, their own portal login) is on file without filling out a separate form per child.</p>
-        <div id="register-children">
-          <% (children && children.length ? children : []).forEach(function(child, i) { %>
-            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child }) %>
-          <% }); %>
+        <h2>Policy Handbook</h2>
+        <div id="handbook-scroll-box" class="handbook-scroll-box">
+          <% if (handbookHtml && handbookHtml.trim()) { %>
+            <%- handbookHtml %>
+          <% } else { %>
+            <p class="hint">No Policy Handbook has been posted yet.</p>
+          <% } %>
         </div>
-        <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
+        <label class="checkbox-option">
+          <input type="checkbox" name="handbookRead" id="handbook-read-checkbox" value="1" required disabled />
+          I have read the Policy Handbook
+        </label>
+        <p class="hint" id="handbook-scroll-hint">Scroll through the handbook above to enable this checkbox.</p>
       </div>
+
+      <%# A real request: "place at the bottom of the application for
+          payment." Informational only - this app has no online "pay
+          now" flow anywhere (see utils/membershipHandbook.js's own
+          comment). %>
+      <% if (paymentInfo.feeCents > 0 || paymentInfo.instructions) { %>
+        <div class="form-section">
+          <h2>Payment</h2>
+          <% if (paymentInfo.feeCents > 0) { %>
+            <p>Membership Fee: <strong>$<%= (paymentInfo.feeCents / 100).toFixed(2) %></strong></p>
+          <% } %>
+          <% if (paymentInfo.instructions) { %>
+            <p class="hint"><%= paymentInfo.instructions %></p>
+          <% } %>
+        </div>
+      <% } %>
 
       <button type="submit" class="primary-btn">Submit Registration</button>
       <p class="hint">Already have an account? <a href="/login">Log in</a>.</p>

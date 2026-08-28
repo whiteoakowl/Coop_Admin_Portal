@@ -10,6 +10,7 @@ const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { isValidISODate } = require('../utils/dates');
+const membershipHandbook = require('../utils/membershipHandbook');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -62,9 +63,17 @@ router.post('/logout', (req, res) => {
   res.redirect('/');
 });
 
-router.get('/register', (req, res) => {
+router.get('/register', async (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
-  res.render('portal-register', { title: 'Request Membership', error: null, formValues: {}, children: [], gradeOptions: GRADE_OPTIONS });
+  res.render('portal-register', {
+    title: 'Request Membership',
+    error: null,
+    formValues: {},
+    children: [],
+    gradeOptions: GRADE_OPTIONS,
+    handbookHtml: await membershipHandbook.getHandbookHtml(),
+    paymentInfo: await membershipHandbook.getPaymentInfo(),
+  });
 });
 
 // multer isn't in play here (no file upload on this form), but the
@@ -81,8 +90,16 @@ function parseChildren(body) {
   return [];
 }
 
-function renderRegisterError(res, error, formValues, children) {
-  return res.render('portal-register', { title: 'Request Membership', error, formValues, children, gradeOptions: GRADE_OPTIONS });
+async function renderRegisterError(res, error, formValues, children) {
+  return res.render('portal-register', {
+    title: 'Request Membership',
+    error,
+    formValues,
+    children,
+    gradeOptions: GRADE_OPTIONS,
+    handbookHtml: await membershipHandbook.getHandbookHtml(),
+    paymentInfo: await membershipHandbook.getPaymentInfo(),
+  });
 }
 
 // Self-registration creates a real member_accounts row with status
@@ -127,6 +144,14 @@ router.post('/register', async (req, res) => {
   }
   if (password !== req.body.confirmPassword) {
     return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender);
+  }
+  // A real request: "can't submit application without checking the
+  // box" (having read the Policy Handbook). The checkbox itself is
+  // disabled client-side until the visitor scrolls through the whole
+  // handbook (public/js/portal-register-form.js) - checked again here
+  // since a disabled attribute is only ever a client-side nicety.
+  if (req.body.handbookRead !== '1') {
+    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender);
   }
 
   for (const c of children) {
