@@ -22,6 +22,23 @@
     <h1>Main Admin</h1>
     <p class="hint">The control center for the whole platform - users, roles/permissions, and public website content.</p>
 
+    <%# A real request: "should show a counter of how many families,
+        how many parents and how many students." %>
+    <div class="totals-card">
+      <div class="totals-item">
+        <span class="stat-value"><%= familyCount %></span>
+        <span class="stat-label">Families</span>
+      </div>
+      <div class="totals-item">
+        <span class="stat-value"><%= parentCount %></span>
+        <span class="stat-label">Parents</span>
+      </div>
+      <div class="totals-item">
+        <span class="stat-value"><%= studentCount %></span>
+        <span class="stat-label">Students</span>
+      </div>
+    </div>
+
     <div class="totals-card">
       <div class="totals-item">
         <span class="stat-value"><%= pendingCount %></span>
@@ -56,26 +73,18 @@
       <% } %>
     </section>
 
+    <%# A real request: "roles and permissions, website settings, and
+        co-op admin portal links should all be under the main admin
+        settings gear icon" - moved to the gear icon's own dropdown
+        (views/partials/portal-nav.ejs), alongside Users which already
+        lived there. Users also keeps this one homepage card since
+        approving pending registrations is common enough day-to-day work
+        to still surface here directly. %>
     <div class="portal-dashboard-grid">
       <section class="portal-dashboard-card">
         <h2>Users</h2>
         <p class="hint">Approve pending registrations, create accounts directly, and assign portal roles.</p>
         <a class="roster-action-btn" href="/main-admin/users">Manage Users</a>
-      </section>
-      <section class="portal-dashboard-card">
-        <h2>Roles &amp; Permissions</h2>
-        <p class="hint">Control which capabilities each role grants.</p>
-        <a class="roster-action-btn" href="/main-admin/roles">Manage Roles</a>
-      </section>
-      <section class="portal-dashboard-card">
-        <h2>Website</h2>
-        <p class="hint">Edit the public homepage copy, announcements, and FAQs.</p>
-        <a class="roster-action-btn" href="/main-admin/website">Manage Website</a>
-      </section>
-      <section class="portal-dashboard-card">
-        <h2>Co-op Admin Portal</h2>
-        <p class="hint">Operational co-op tools: check-in/out, scheduling, floaters, setup/cleanup.</p>
-        <a class="roster-action-btn" href="/admin">Open Co-op Admin</a>
       </section>
     </div>
   </main>

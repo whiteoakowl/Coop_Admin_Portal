@@ -158,7 +158,26 @@ const communityLinks =
     <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
-    <a href="<%= settingsHref %>"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
+    <%# A real request: "roles and permissions, website settings, and
+        co-op admin portal links should all be under the main admin
+        settings gear icon" - Main Admin's gear opens a dropdown of its
+        own admin-configuration destinations (same expand/collapse
+        pattern as Switch Portal below) instead of linking straight to
+        Users the way it used to. Every other portal's gear stays a
+        plain link to the generic per-account Settings page. %>
+    <% if (portalTitle === 'Main Admin') { %>
+      <details class="portal-switcher-details">
+        <summary><svg class="icon"><use href="#icon-gear"/></svg> Settings</summary>
+        <div class="portal-switcher-menu">
+          <a href="/main-admin/users">Users</a>
+          <a href="/main-admin/roles">Roles &amp; Permissions</a>
+          <a href="/main-admin/website">Website</a>
+          <a href="/admin">Co-op Admin Portal</a>
+        </div>
+      </details>
+    <% } else { %>
+      <a href="<%= settingsHref %>"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
+    <% } %>
     <% if (showSwitcher) { %>
       <details class="portal-switcher-details">
         <summary><svg class="icon"><use href="#icon-users"/></svg> Switch Portal</summary>
