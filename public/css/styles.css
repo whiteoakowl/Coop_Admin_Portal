@@ -6461,6 +6461,42 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    look (see that class's own comment above) rather than inventing a
    second active-state treatment for the same idea. */
 
+/* A real request: "on mobile, replace the [Events] tabs with stacked
+   expandable bars - click the title to expand it." Below 640px the
+   usual .view-tabs pill strip (.event-tabs-desktop here) hides in favor
+   of .event-mobile-accordion's own full-width bars - see
+   views/admin-events-list.ejs's own comment on why there are two of
+   these blocks (one for the bars before the active tab, one for the
+   bars after) instead of one. */
+.event-mobile-accordion { display: none; }
+@media (max-width: 640px) {
+  .event-tabs-desktop { display: none; }
+  .event-mobile-accordion {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+  }
+  .event-accordion-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    color: var(--ink);
+    font-weight: 600;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .event-mobile-accordion .event-accordion-bar:last-child { border-bottom: none; }
+  .event-accordion-bar-active { background: var(--brand-soft); color: var(--brand-dark); }
+  .event-accordion-chevron { flex-shrink: 0; width: 1.1rem; height: 1.1rem; transition: transform 0.15s ease; }
+  .event-accordion-chevron-closed { transform: rotate(-90deg); }
+}
+
 /* Babysitter Directory - profile photo thumbnail, shown both on a
    parent's own edit form (their current photo, before they replace it)
    and on the directory's own cards. */
