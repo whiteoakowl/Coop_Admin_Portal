@@ -23,14 +23,15 @@
       <h1>Resource Links</h1>
       <% if (activeTab === 'resources') { %>
         <div class="roster-btn-row">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
-          <button type="button" class="primary-btn" onclick="document.getElementById('add-resource-dialog').showModal()">+ Add Resource</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add/Edit Category</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-resource-dialog').showModal()">+ Add Resource</button>
         </div>
       <% } %>
     </div>
     <p class="hint">
       A curated, categorized list of external links shown on member portals (currently Student Portal's own Resource
-      Links tab). Scope a link to one role, or leave it "Everyone" to show it on every portal.
+      Links tab). Scope a link to one role, or leave it "Everyone" to show it on every portal. Click a resource's
+      name below to edit it.
     </p>
 
     <div class="view-tabs">
@@ -55,7 +56,22 @@
                 <tbody>
                   <% group.links.forEach(function(l) { %>
                     <tr>
-                      <td class="roster-name-col"><%= l.title %><% if (l.description) { %><span class="member-row-subline"><%= l.description %></span><% } %></td>
+                      <td class="roster-name-col">
+                        <button
+                          type="button"
+                          class="link-btn"
+                          data-edit-resource
+                          data-id="<%= l.id %>"
+                          data-title="<%= l.title %>"
+                          data-url="<%= l.url %>"
+                          data-description="<%= l.description || '' %>"
+                          data-city="<%= l.city || '' %>"
+                          data-state="<%= l.state || '' %>"
+                          data-category-id="<%= l.category_id || '' %>"
+                          data-role-key="<%= l.role_key || '' %>"
+                        ><%= l.title %></button>
+                        <% if (l.description) { %><span class="member-row-subline"><%= l.description %></span><% } %>
+                      </td>
                       <td><a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.url %></a></td>
                       <td><%= [l.city, l.state].filter(Boolean).join(', ') || '—' %></td>
                       <td><%= l.role_key || 'Everyone' %></td>
@@ -110,29 +126,34 @@
   </main>
 
   <dialog id="add-category-dialog" class="member-picker-dialog">
+    <h3>Add/Edit Category</h3>
     <form method="POST" action="/main-admin/resource-links/categories">
-      <h3>Add Category</h3>
-      <label for="add-resource-category-title">Category Name
+      <label for="add-resource-category-title">New Category Name
         <input id="add-resource-category-title" type="text" name="title" placeholder="e.g. Local Field Trips" required />
       </label>
-      <% if (categories.length > 0) { %>
-        <p class="hint">Existing categories</p>
-        <div class="grade-pill-grid">
-          <% categories.forEach(function(c) { %>
-            <form method="POST" action="/main-admin/resource-links/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= c.title %>&quot; category? Its links stay, just uncategorized.">
-              <span class="badge-pill">
-                <%= c.title %>
-                <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.title %>" title="Delete">&times;</button>
-              </span>
-            </form>
-          <% }); %>
-        </div>
-      <% } %>
       <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-        <button type="submit" class="primary-btn">Save</button>
+        <button type="submit" class="primary-btn">Add</button>
       </div>
     </form>
+    <% if (categories.length > 0) { %>
+      <p class="hint">Existing categories</p>
+      <div class="stack-form">
+        <% categories.forEach(function(c) { %>
+          <div class="roster-btn-row">
+            <form method="POST" action="/main-admin/resource-links/categories/<%= c.id %>" class="roster-btn-form">
+              <input type="text" name="title" value="<%= c.title %>" aria-label="Rename <%= c.title %>" required />
+              <button type="submit" class="roster-action-btn" aria-label="Save <%= c.title %>" title="Save">Save</button>
+            </form>
+            <form method="POST" action="/main-admin/resource-links/categories/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.title %>&quot; category? Its links stay, just uncategorized.">
+              <button type="submit" class="icon-btn" aria-label="Delete <%= c.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+    </div>
   </dialog>
 
   <dialog id="add-resource-dialog" class="member-picker-dialog">
@@ -175,5 +196,65 @@
       </div>
     </form>
   </dialog>
+
+  <%# A real request: "click on the resource, a window should pop up
+      where you can edit the category and info and save." One shared
+      dialog, filled in from the clicked row's own data-* attributes
+      (see the script below) rather than one dialog per row. %>
+  <dialog id="edit-resource-dialog" class="member-picker-dialog">
+    <form method="POST" id="edit-resource-form">
+      <h3>Edit Resource</h3>
+      <label for="edit-resource-title">Title
+        <input id="edit-resource-title" type="text" name="title" required />
+      </label>
+      <label for="edit-resource-website">Website
+        <input id="edit-resource-website" type="url" name="url" required />
+      </label>
+      <label for="edit-resource-description">Description
+        <textarea id="edit-resource-description" name="description" rows="2"></textarea>
+      </label>
+      <label for="edit-resource-city">City
+        <input id="edit-resource-city" type="text" name="city" />
+      </label>
+      <label for="edit-resource-state">State
+        <input id="edit-resource-state" type="text" name="state" />
+      </label>
+      <label for="edit-resource-category">Category
+        <select id="edit-resource-category" name="categoryId">
+          <option value="">Uncategorized</option>
+          <% categories.forEach(function(c) { %>
+            <option value="<%= c.id %>"><%= c.title %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label for="edit-resource-role">Show on
+        <select id="edit-resource-role" name="roleKey">
+          <option value="">Everyone (every portal)</option>
+          <% roles.forEach(function(r) { %>
+            <option value="<%= r.key %>"><%= r.label %> only</option>
+          <% }); %>
+        </select>
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+    document.querySelectorAll('[data-edit-resource]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        document.getElementById('edit-resource-form').action = '/main-admin/resource-links/' + button.dataset.id;
+        document.getElementById('edit-resource-title').value = button.dataset.title || '';
+        document.getElementById('edit-resource-website').value = button.dataset.url || '';
+        document.getElementById('edit-resource-description').value = button.dataset.description || '';
+        document.getElementById('edit-resource-city').value = button.dataset.city || '';
+        document.getElementById('edit-resource-state').value = button.dataset.state || '';
+        document.getElementById('edit-resource-category').value = button.dataset.categoryId || '';
+        document.getElementById('edit-resource-role').value = button.dataset.roleKey || '';
+        document.getElementById('edit-resource-dialog').showModal();
+      });
+    });
+  </script>
 </body>
 </html>

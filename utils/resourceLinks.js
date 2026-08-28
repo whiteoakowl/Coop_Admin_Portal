@@ -85,6 +85,15 @@ async function deleteCategory(id) {
   await db.prepare('DELETE FROM resource_link_categories WHERE id = ?').run(id);
 }
 
+// A real request: "'Add Category' button should say 'add/edit category'"
+// - each existing category gets its own rename field in that same popup,
+// not just delete.
+async function renameCategory(id, title) {
+  const trimmed = (title || '').trim();
+  if (!trimmed) return;
+  await db.prepare('UPDATE resource_link_categories SET title = ? WHERE id = ?').run(trimmed, id);
+}
+
 async function createResourceLink({ title, url, description, roleKey, city, state, categoryId, createdByAccountId }) {
   const info = await db
     .prepare(
@@ -125,6 +134,17 @@ async function deleteResourceLink(id) {
   await db.prepare('DELETE FROM resource_links WHERE id = ?').run(id);
 }
 
+// A real request: "click on the resource, a window should pop up where
+// you can edit the category and info and save."
+async function updateResourceLink(id, { title, url, description, roleKey, city, state, categoryId }) {
+  await db
+    .prepare(
+      `UPDATE resource_links SET title = ?, url = ?, description = ?, role_key = ?, city = ?, state = ?, category_id = ?
+       WHERE id = ?`
+    )
+    .run(title, url, description || null, roleKey || null, city || null, state || null, categoryId || null, id);
+}
+
 module.exports = {
   listResourceLinksForRole,
   listApprovedResourceLinksByCategory,
@@ -132,9 +152,11 @@ module.exports = {
   listCategories,
   addCategory,
   deleteCategory,
+  renameCategory,
   createResourceLink,
   submitResourceLink,
   approveResourceLink,
   denyResourceLink,
   deleteResourceLink,
+  updateResourceLink,
 };

@@ -54,6 +54,20 @@ router.post('/', async (req, res) => {
   res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource added.'));
 });
 
+router.post('/:id', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const url = (req.body.url || '').trim();
+  const description = (req.body.description || '').trim();
+  const city = (req.body.city || '').trim();
+  const state = (req.body.state || '').trim();
+  const roleKey = (req.body.roleKey || '').trim();
+  const categoryId = parseInt(req.body.categoryId, 10) || null;
+  if (!title || !url) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Title and website are required.'));
+
+  await resourceLinks.updateResourceLink(parseInt(req.params.id, 10), { title, url, description, roleKey, city, state, categoryId });
+  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource updated.'));
+});
+
 router.post('/:id/delete', async (req, res) => {
   await resourceLinks.deleteResourceLink(parseInt(req.params.id, 10));
   res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Resource removed.'));
@@ -64,6 +78,13 @@ router.post('/categories', async (req, res) => {
   if (!title) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Category name is required.'));
   await resourceLinks.addCategory(title);
   res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent(`Added "${title}".`));
+});
+
+router.post('/categories/:id', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect('/main-admin/resource-links?error=' + encodeURIComponent('Category name is required.'));
+  await resourceLinks.renameCategory(parseInt(req.params.id, 10), title);
+  res.redirect('/main-admin/resource-links?notice=' + encodeURIComponent('Category renamed.'));
 });
 
 router.post('/categories/:id/delete', async (req, res) => {
