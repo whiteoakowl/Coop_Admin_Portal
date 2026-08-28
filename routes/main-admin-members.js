@@ -203,7 +203,7 @@ router.post('/approvals/:accountId/delete', async (req, res) => {
 router.post('/settings/letters/:kind', async (req, res) => {
   const kind = req.params.kind;
   const subject = (req.body.subject || '').trim();
-  const body = (req.body.body || '').trim();
+  const body = sanitizePostBody(req.body.body || '');
   if (kind !== 'approval' && kind !== 'denial') return res.redirect('/main-admin/members?tab=settings');
   if (!subject || !body) {
     return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('Subject and body are both required.'));

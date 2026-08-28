@@ -66,6 +66,22 @@ function renderTemplate(text, name) {
   return (text || '').replace(/\{\{\s*name\s*\}\}/g, name);
 }
 
+// A real request: "approval and denial messages should have the same
+// text editing icons we added to other chat boxes" - views/main-admin-
+// members.ejs's Settings tab now edits body as rich HTML instead of
+// plain text. A letter saved before that change (or never re-saved
+// since) is still plain text with real newlines - dropped straight into
+// the Notification Center's HTML rendering, a run of newlines collapses
+// to a single space, losing the paragraph breaks. Same "no HTML tags
+// yet" detection views/main-admin-members.ejs's own toEditableHtml uses
+// for the editor's own initial fill, applied here too so the applicant
+// actually sees it formatted, not just the admin previewing it.
+function toDisplayHtml(text) {
+  if (/<[a-z][\s\S]*>/i.test(text || '')) return text;
+  const esc = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+}
+
 // Sends the given letter (approval/denial) to the account, through the
 // same notify() every other feature already uses - see that function's
 // own header comment for why this never makes a real network call (no
@@ -78,7 +94,7 @@ async function sendLetter(accountId, kind, recipientName) {
   const typeKey = kind === 'approval' ? 'membership_approved' : 'membership_denied';
   await notify(accountId, typeKey, {
     title: renderTemplate(template.subject, recipientName),
-    body: renderTemplate(template.body, recipientName),
+    body: renderTemplate(toDisplayHtml(template.body), recipientName),
   });
 }
 

@@ -305,29 +305,48 @@
     <% } else if (activeTab === 'settings') { %>
       <%# A real request: "this will have an approval and deny letter
           that can be edited by admin. these letters are sent
-          automatically went approve or deny buttons are clicked." %>
+          automatically went approve or deny buttons are clicked." A
+          second real request: "approval and denial messages should have
+          the same text editing icons we added to other chat boxes" -
+          same forum-editor-toolbar/forum-editor.js rich-text component
+          the Policy Handbook editor below already uses. %>
       <p class="hint">Use <code>{{name}}</code> anywhere in the subject or body to insert the applicant's name.</p>
+      <%
+        // The two letters were plain text (newline-separated paragraphs)
+        // before this editor existed - dropped straight into a
+        // contenteditable div, a run of newlines collapses to a single
+        // space in HTML, losing the paragraph breaks on first load even
+        // though the underlying saved text is untouched. Detecting "no
+        // HTML tags yet" and turning newlines into real breaks only for
+        // that initial fill (not the stored value) keeps a legacy letter
+        // readable until the next time an admin saves it as real HTML.
+        function toEditableHtml(text) {
+          if (/<[a-z][\s\S]*>/i.test(text || '')) return text;
+          const esc = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return esc.split(/\n{2,}/).map((p) => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+        }
+      %>
       <div class="manage-section">
         <h2>Approval Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form">
+        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form" data-forum-editor>
           <label class="member-form-full">Subject
             <input type="text" name="subject" value="<%= templates.approval.subject %>" required />
           </label>
-          <label class="member-form-full">Body
-            <textarea name="body" rows="8" required><%= templates.approval.body %></textarea>
-          </label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.approval.body) %></div>
+          <input type="hidden" name="body" data-forum-body-input />
           <button type="submit" class="primary-btn">Save Approval Letter</button>
         </form>
       </div>
       <div class="manage-section">
         <h2>Denial Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form">
+        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form" data-forum-editor>
           <label class="member-form-full">Subject
             <input type="text" name="subject" value="<%= templates.denial.subject %>" required />
           </label>
-          <label class="member-form-full">Body
-            <textarea name="body" rows="8" required><%= templates.denial.body %></textarea>
-          </label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.denial.body) %></div>
+          <input type="hidden" name="body" data-forum-body-input />
           <button type="submit" class="primary-btn">Save Denial Letter</button>
         </form>
       </div>

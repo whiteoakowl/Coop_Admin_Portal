@@ -30,7 +30,19 @@
         <% items.forEach(function(i) { %>
           <div class="team-info-card" style="<%= i.read_at ? '' : 'border-left: 3px solid var(--brand);' %> margin-bottom: 0.75rem;">
             <h3 class="team-info-title"><%= i.title %></h3>
-            <p><%= i.body %></p>
+            <%# Membership approval/denial letters (utils/membershipApprovals.js)
+                are the one notification body type that's rich HTML, admin-
+                authored and sanitized on save (see routes/main-admin-
+                members.js's POST /settings/letters/:kind) - rendered
+                unescaped only for those two type keys so the formatting
+                actually shows, while every other notification type's body
+                (often built from user-submitted text, e.g. a forum reply
+                preview) stays plain-text-escaped as before. %>
+            <% if (i.type_key === 'membership_approved' || i.type_key === 'membership_denied') { %>
+              <div><%- i.body %></div>
+            <% } else { %>
+              <p><%= i.body %></p>
+            <% } %>
             <p class="hint"><%= i.created_at %></p>
             <div class="roster-btn-row">
               <% if (i.link_url) { %><a class="roster-action-btn" href="<%= i.link_url %>">View</a><% } %>
