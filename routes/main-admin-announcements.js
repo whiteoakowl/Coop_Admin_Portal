@@ -15,6 +15,7 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const announcements = require('../utils/announcements');
+const emailComposer = require('../utils/emailComposer');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('send_announcements'));
 
@@ -50,12 +51,86 @@ router.post('/', async (req, res) => {
   res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
 });
 
-// Email/Text composer tabs (items 12/13) aren't built yet - these keep
-// the 4-tab Communication bar fully clickable in the meantime rather than
-// linking to a 404.
-router.get('/email', (req, res) => {
-  res.render('main-admin-communication-coming-soon', { title: 'Communication', activeTab: 'email' });
+// Communication > Email tab (item 12): filter popup + checkbox member
+// list, "Create Email" -> compose screen, send now or schedule for
+// later. See utils/emailComposer.js's own header comment for why
+// filtering happens in JS against the candidates list rather than in SQL.
+router.get('/email', async (req, res) => {
+  const [roles, sections, gradeLevels, candidates, campaigns] = await Promise.all([
+    emailComposer.listRoles(),
+    emailComposer.listSections(),
+    emailComposer.listGradeLevels(),
+    emailComposer.listRecipientCandidates(),
+    emailComposer.listCampaigns(),
+  ]);
+  res.render('main-admin-email', {
+    title: 'Communication',
+    roles,
+    sections,
+    gradeLevels,
+    ageGroups: emailComposer.AGE_GROUPS,
+    candidates,
+    campaigns,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 });
+
+router.post('/email/compose', async (req, res) => {
+  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (recipientIds.length === 0) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('Select at least one recipient.'));
+
+  const candidates = await emailComposer.listRecipientCandidates();
+  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  res.render('main-admin-email-compose', {
+    title: 'Compose Email',
+    recipients,
+    error: null,
+  });
+});
+
+router.post('/email/send', async (req, res) => {
+  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const subject = (req.body.subject || '').trim();
+  const body = sanitizePostBody(req.body.body || '');
+  const replyTo = (req.body.replyTo || '').trim();
+  const sendOption = req.body.sendOption === 'schedule' ? 'schedule' : 'now';
+  const scheduledAt = (req.body.scheduledAt || '').trim();
+
+  if (recipientIds.length === 0 || !subject || !body) {
+    return res.render('main-admin-email-compose', {
+      title: 'Compose Email',
+      recipients: [],
+      error: 'Recipients, a subject, and a message are all required. Go back and try again.',
+    });
+  }
+  if (sendOption === 'schedule' && !scheduledAt) {
+    const candidates = await emailComposer.listRecipientCandidates();
+    return res.render('main-admin-email-compose', {
+      title: 'Compose Email',
+      recipients: candidates.filter((c) => recipientIds.includes(c.accountId)),
+      error: 'Choose a date/time to schedule this email for.',
+    });
+  }
+
+  if (sendOption === 'schedule') {
+    await emailComposer.createScheduled({ subject, bodyHtml: body, replyTo, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+    return res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  }
+
+  const { recipientCount } = await emailComposer.createAndSend({ subject, bodyHtml: body, replyTo, recipientAccountIds: recipientIds, sentByAccountId: req.portalAccount.id, sentByPortal: 'main_admin' });
+  res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+});
+
+router.post('/email/:id/send', async (req, res) => {
+  const campaign = await emailComposer.sendScheduled(req.params.id);
+  if (!campaign) return res.redirect('/main-admin/announcements/email?error=' + encodeURIComponent('That email was already sent or does not exist.'));
+  res.redirect('/main-admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
+});
+
+// Text composer tab (item 13) isn't built yet - keeps the 4-tab
+// Communication bar fully clickable in the meantime rather than linking
+// to a 404.
 router.get('/text', (req, res) => {
   res.render('main-admin-communication-coming-soon', { title: 'Communication', activeTab: 'text' });
 });
