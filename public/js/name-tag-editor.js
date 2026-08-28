@@ -276,17 +276,24 @@
   // phone, say) doesn't fight whatever zoom the person has since chosen,
   // the same "don't re-fight a manual choice" restraint print-shrink-to-
   // fit.js's own -on-print variant documents for the same reason.
+  //
+  // A follow-up real bug report: the previous version computed the
+  // "best fit" from the column's own clientWidth vs. BADGE_WIDTH, but
+  // right at the boundary (BADGE_WIDTH exactly at or barely under the
+  // measured column width) the canvas's own 1px border still bled a few
+  // pixels past the edge even though that width check said it fit -
+  // clientWidth vs. a fixed pixel width is too fragile a comparison to
+  // get right for every phone. Fixed 75% below any of this app's usual
+  // mobile breakpoints (matching the shared @media (max-width: 640px)
+  // every other mobile-only rule in styles.css already uses) instead -
+  // 336px * 0.75 = 252px comfortably clears any phone-width layout this
+  // app supports, so there's no boundary left to get wrong.
   function autoFitZoomToViewport() {
-    if (!zoomSelect || !zoomWrap.parentElement) return;
-    const available = zoomWrap.parentElement.clientWidth;
-    if (!available || available >= BADGE_WIDTH) return;
-    const options = Array.from(zoomSelect.options).map((o) => parseFloat(o.value)).filter((v) => !Number.isNaN(v));
-    if (!options.length) return;
-    const fits = options.filter((v) => BADGE_WIDTH * v <= available);
-    const best = fits.length ? Math.max(...fits) : Math.min(...options);
-    if (best === zoom) return;
-    zoomSelect.value = String(best);
-    zoom = best;
+    if (!zoomSelect || !window.matchMedia('(max-width: 640px)').matches) return;
+    const target = 0.75;
+    if (zoom === target) return;
+    zoomSelect.value = String(target);
+    zoom = target;
     applyZoom();
   }
 
