@@ -31,7 +31,7 @@ const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
-const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
+const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 
 router.use(requireFullAdmin);
@@ -127,6 +127,7 @@ async function attendanceHistoryForMember(memberId) {
 router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
+  const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
   // "Archive" (see /members/bulk-archive below) sets active = 0 on a
   // member rather than deleting them - a soft, undoable removal from the
   // active list, unlike the "Delete Selected" button which is permanent.
@@ -147,12 +148,19 @@ router.get('/members', async (req, res) => {
   // their name... on member lists." Batched (not per-row) for the same
   // N+1 reason as nameTagData.js's own bulk-print title lookup.
   const adminTitlesByMember = await adminPositionTitlesForMembers(filteredMembers.map((m) => m.id));
-  const withRosters = filteredMembers.map((m) => ({
+  // Mobile shows which day(s) a member is actually on instead of the
+  // Type column (a real request: "on mobile the column type shouldn't
+  // be there. It should read whether they are on Wednesday or Monday
+  // rosters") - derived from each roster's own schedule_day, not a
+  // second lookup, and also doubles as the new day filter option below.
+  let withRosters = filteredMembers.map((m) => ({
     ...m,
     age: ageFromBirthday(m.birthday),
     birthdayLabel: m.birthday ? formatDateNumeric(m.birthday) : null,
     adminTitle: (adminTitlesByMember[m.id] || []).join(', ') || null,
+    rosterDays: [...new Set(m.rosters.map((r) => r.schedule_day).filter(Boolean))],
   }));
+  if (dayFilter) withRosters = withRosters.filter((m) => m.rosterDays.includes(dayFilter));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -162,17 +170,6 @@ router.get('/members', async (req, res) => {
   // see admin-members.ejs's own comment, mirroring admin-schedule.ejs's.
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
   const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
-
-  // "Edit Permissions" bulk mode only needs to know the CURRENT page's
-  // own Section/Portal Permission state - see permissions-edit-toggle.js's
-  // own comment for why this deliberately doesn't try to reach every
-  // page's rows the way the Delete/Archive bulk mode's off-page
-  // checkboxes do.
-  const pageMemberIds = pagination.items.map((m) => m.id);
-  const sections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
-  const roles = await db.prepare('SELECT * FROM roles ORDER BY label').all();
-  const sectionIdsByMember = await sectionIdsForMembers(pageMemberIds);
-  const portalStatusByMember = await portalStatusForMembers(pageMemberIds);
 
   res.render('admin-members', {
     title: 'Members',
@@ -184,48 +181,16 @@ router.get('/members', async (req, res) => {
       '/admin/members?' +
       (typeFilter ? `type=${typeFilter}&` : '') +
       (familyFilter ? `family=${familyFilter}&` : '') +
+      (dayFilter ? `day=${dayFilter}&` : '') +
       (showArchived ? `archived=1&` : ''),
     typeFilter,
     familyFilter,
+    dayFilter,
     showArchived,
     families: await allFamilies(),
-    sections,
-    roles,
-    sectionIdsByMember,
-    portalStatusByMember,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
-});
-
-// "Edit Permissions" bulk save - reconciles every member row present in
-// this submission (the current page's own memberIds[], see admin-
-// members.ejs's own hidden input) to exactly the sections/roles checked
-// for them, same "full reconcile, not incremental" shape as
-// utils/portalPermissions.js's own setMemberSections/setMemberRoles.
-// req.portalAccount doesn't exist on this session (the legacy Co-op Admin
-// login, requireFullAdmin - see this file's own header) so grantedBy
-// stays null here, unlike main-admin-members.js's own version of this
-// route.
-router.post('/members/bulk-permissions', async (req, res) => {
-  // Field names are `sections_<memberId>[]`/`roles_<memberId>[]`, NOT
-  // `sections[<memberId>][]` - qs (express's extended:true urlencoded
-  // parser) treats a bracketed segment that looks like a small integer
-  // as an ARRAY INDEX, not an object key, and silently compacts/
-  // reorders the whole thing into one array with no way to recover which
-  // member each entry belonged to (confirmed: `sections[5][]=3&
-  // sections[12][]=7` parses to `sections: ['3','7']`, losing 5 and 12
-  // entirely). A flat `sections_<memberId>` key sidesteps that qs
-  // behavior completely - see admin-members.ejs's own matching field
-  // names.
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  for (const memberId of memberIds) {
-    const sectionIds = [].concat(req.body[`sections_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
-    const roleIds = [].concat(req.body[`roles_${memberId}`] || []).map((id) => parseInt(id, 10)).filter(Boolean);
-    await setMemberSections(memberId, sectionIds);
-    await setMemberRoles(memberId, roleIds, null);
-  }
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Permissions updated for ${memberIds.length} member(s).`));
 });
 
 // Powers the Members page's per-row Cards button (fetch-on-open - see

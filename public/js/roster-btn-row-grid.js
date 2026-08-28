@@ -32,6 +32,17 @@
     // so this counts the button, not the (layout-invisible) form itself.
     const items = row.querySelectorAll(':scope > .roster-action-btn, :scope > form > .roster-action-btn');
     if (items.length === 0) return;
+    // A toolbar can opt into a fixed column count (e.g. the Members page
+    // wanting its 3 buttons to always read as 2 neat rows, not 1 wide
+    // row) via data-fixed-columns="2" instead of the adaptive layout
+    // below - same inline grid-template-columns mechanism, just skipping
+    // the "fewest rows at ≤4 columns" calculation for a toolbar that
+    // wants a specific shape regardless of button count.
+    const fixedColumns = parseInt(row.dataset.fixedColumns, 10);
+    if (fixedColumns > 0) {
+      row.style.gridTemplateColumns = `repeat(${fixedColumns}, 1fr)`;
+      return;
+    }
     // As few rows as it takes to keep every row at 4 columns or fewer,
     // then columns balanced evenly across exactly that many rows (rather
     // than cramming 4-per-row into every row but the last, which would

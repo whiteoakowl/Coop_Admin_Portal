@@ -51,7 +51,7 @@ test('GET /admin/members only shows active members by default, and only archived
   const archivedRes = await request(app).get('/admin/members?archived=1').set('Cookie', cookie);
   assert.doesNotMatch(archivedRes.text, /Active Member/);
   assert.match(archivedRes.text, /Archived Member/);
-  assert.match(archivedRes.text, /View Active/);
+  assert.match(archivedRes.text, /class="view-tab active"[^>]*>Archived</);
 
   await db.prepare('DELETE FROM members WHERE id IN (?, ?)').run(activeId, archivedId);
 });

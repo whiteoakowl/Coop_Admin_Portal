@@ -15,6 +15,18 @@
     </div>
     <h1>Members</h1>
 
+    <%
+      // Builds an /admin/members URL preserving every filter dimension
+      // except whatever's passed in overrides - one helper instead of
+      // hand-concatenating type/family/day/archived query strings at
+      // every link on this page (tabs, filter dropdown, Export).
+      function memberHref(overrides) {
+        var params = Object.assign({ type: typeFilter, family: familyFilter, day: dayFilter, archived: showArchived ? '1' : '' }, overrides);
+        var qs = Object.keys(params).filter(function (k) { return params[k]; }).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+        return '/admin/members' + (qs ? '?' + qs : '');
+      }
+    %>
+
     <% if (error) { %>
       <div class="alert alert-error no-print"><%= error %></div>
     <% } %>
@@ -22,25 +34,26 @@
       <div class="alert alert-success no-print"><%= notice %></div>
     <% } %>
 
-    <div class="roster-toolbar no-print">
-      <div class="category-filter" style="margin: 0;">
-        <label for="type-select">Filter by type or family</label>
-        <select id="type-select" onchange="window.location = this.value">
-          <option value="/admin/members" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
-          <option value="/admin/members?type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="/admin/members?type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="/admin/members?type=admin" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
-          <% if (families.length > 0) { %>
-            <optgroup label="Family">
-              <% families.forEach(function(f) { %>
-                <option value="/admin/members?family=<%= f.id %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-              <% }); %>
-            </optgroup>
-          <% } %>
-        </select>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= !showArchived ? ' active' : '' %>" href="<%= memberHref({ archived: '' }) %>">Members</a>
+      <a class="view-tab<%= showArchived ? ' active' : '' %>" href="<%= memberHref({ archived: '1' }) %>">Archived</a>
+    </div>
+
+    <div class="roster-toolbar no-print" id="members-toolbar">
+      <%# Role permissions, Import, and Add/Edit Member all live only on
+          the Main Admin Portal's own Members page now - a real request:
+          "the buttons on the members page will read Export, Print,
+          Edit." data-fixed-columns keeps these 3 reading as two neat
+          rows on mobile instead of one wide row (see roster-btn-row-
+          grid.js's own comment on the attribute). %>
+      <div class="roster-btn-row" data-fixed-columns="2">
+        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
+        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
       </div>
+
       <%# Edit mode's Select All + Delete/Archive/Restore Selected controls
-          - hidden until the "Edit" toggle button below is clicked (see
+          - hidden until the "Edit" toggle button above is clicked (see
           public/js/archive-select-toggle.js, reused as-is from the Class/
           Student/Parent Schedule archive grids). %>
       <div class="class-schedule-archive-controls" data-archive-controls="members-bulk-form" hidden>
@@ -78,24 +91,30 @@
           >Archive Selected</button>
         <% } %>
       </div>
-      <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/admin/members/new">+ Add Member</a>
-        <%# A real request: "add/edit families should be one button.
-            combine the feature." Used to be two separate buttons/dialogs
-            (+ Add Family, Edit Families) - one combined "Families" button
-            now opens one dialog with an "add new" row on top of the same
-            rename/delete list, see manage-families-dialog below. %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-families-dialog').showModal()">Families</button>
-        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-dialog').showModal()">Import</button>
-        <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
-        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
-        <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
-        <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
-        <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
-        <a
-          class="roster-action-btn"
-          href="/admin/members?<%= typeFilter ? 'type=' + typeFilter + '&' : '' %><%= familyFilter ? 'family=' + familyFilter + '&' : '' %><%= showArchived ? '' : 'archived=1' %>"
-        ><%= showArchived ? 'View Active' : 'View Archived' %></a>
+
+      <%# A real request: "filter by family should be under the buttons.
+          it should just say filter." Single dropdown, same "one filter
+          dimension at a time" model the type/family split already used -
+          now with a Roster Day group alongside Type/Family. %>
+      <div class="category-filter" style="margin: 0;">
+        <label for="type-select">Filter</label>
+        <select id="type-select" onchange="window.location = this.value">
+          <option value="<%= memberHref({ type: '', family: '', day: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter) ? 'selected' : '' %>>All</option>
+          <option value="<%= memberHref({ type: 'parent', family: '', day: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="<%= memberHref({ type: 'student', family: '', day: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="<%= memberHref({ type: 'admin', family: '', day: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+          <optgroup label="Roster Day">
+            <option value="<%= memberHref({ type: '', family: '', day: 'monday' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </optgroup>
+          <% if (families.length > 0) { %>
+            <optgroup label="Family">
+              <% families.forEach(function(f) { %>
+                <option value="<%= memberHref({ type: '', family: f.id, day: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+              <% }); %>
+            </optgroup>
+          <% } %>
+        </select>
       </div>
     </div>
 
@@ -104,82 +123,6 @@
       method="POST"
       action="/admin/members/bulk-delete"
     ></form>
-    <%# "Edit Permissions" bulk mode's own form - separate from members-
-        bulk-form above since it posts an entirely different shape (per-
-        member sections[]/roles[] arrays, not a flat memberIds list) to a
-        different route. See public/js/permissions-edit-toggle.js and
-        routes/admin-members.js's own bulk-permissions route. %>
-    <form
-      id="permissions-bulk-form"
-      method="POST"
-      action="/admin/members/bulk-permissions"
-    ></form>
-
-    <%# Combined Add/Rename/Delete Family dialog - a real request: "member
-        page. add/edit families should be one button. combine the
-        feature." Used to be two separate buttons/dialogs (+ Add Family,
-        Edit Families); the "add new" mini-form on top is unchanged
-        otherwise (still a real page navigation back to /admin/members on
-        submit, same as before). Rename or delete a family "name" itself
-        is distinct from the per-member "Choose a Family" dropdown on the
-        Add/Edit Member form, which only assigns/clears one member's own
-        family_id - deleting a family here only ungroups its members
-        (families.id has ON DELETE SET NULL on members.family_id), it
-        never deletes a member. %>
-    <dialog id="manage-families-dialog" class="member-picker-dialog">
-      <h3>Families</h3>
-      <form method="POST" action="/admin/members/families/new" class="manage-families-add-form">
-        <label>Add a New Family
-          <input type="text" name="name" placeholder="Family last name, e.g. Anderson" required />
-        </label>
-        <button type="submit" class="btn-secondary">+ Add</button>
-      </form>
-      <% if (families.length === 0) { %>
-        <p class="hint">No families added yet.</p>
-      <% } else { %>
-        <ul class="edit-families-list" id="edit-families-list">
-          <% families.forEach(function(f) { %>
-            <li class="edit-families-row" data-family-id="<%= f.id %>">
-              <form method="POST" action="/admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
-                <input type="text" name="name" value="<%= f.name %>" required aria-label="Rename &quot;<%= f.name %>&quot; family" />
-                <button type="submit" class="btn-secondary">Save</button>
-              </form>
-              <span class="hint"><%= f.memberCount %> member<%= f.memberCount == 1 ? '' : 's' %></span>
-              <%# Deliberately a plain button, not a submitting form - see
-                  public/js/edit-families.js. A real page navigation here
-                  would close this whole dialog on every single delete,
-                  which is exactly the friction an admin clearing out
-                  several old families at once doesn't want. %>
-              <button
-                type="button"
-                class="icon-btn"
-                data-delete-family="<%= f.id %>"
-                data-family-name="<%= f.name %>"
-                data-member-count="<%= f.memberCount %>"
-                aria-label="Delete &quot;<%= f.name %>&quot; family"
-                title="Delete Family"
-              ><svg class="icon"><use href="#icon-trash"/></svg></button>
-            </li>
-          <% }); %>
-        </ul>
-        <p class="hint" id="edit-families-empty" hidden>No families added yet.</p>
-      <% } %>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-      </div>
-    </dialog>
-
-    <dialog id="import-dialog" class="member-picker-dialog">
-      <form method="POST" action="/admin/members/import" enctype="multipart/form-data">
-        <h3>Import</h3>
-        <a class="btn-secondary import-sample-link" href="/admin/members/import-template.xlsx">Download Sample File</a>
-        <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Import</button>
-        </div>
-      </form>
-    </dialog>
 
     <div class="roster-scroll">
       <table id="members-table" class="roster-table members-table members-list-table">
@@ -188,10 +131,10 @@
             <th class="no-print members-col-select"><span class="sr-only">Select</span></th>
             <th class="members-col-photo"><span class="sr-only">Photo</span></th>
             <th>Name</th>
-            <th>Type</th>
+            <th class="members-col-type">Type</th>
             <th class="members-col-parent">Family</th>
             <th class="members-col-rosters">Rosters</th>
-            <th class="no-print permissions-col">Sections &amp; Portal Permissions</th>
+            <th class="members-col-days">Roster Day</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -220,7 +163,7 @@
                   </span>
                 <% } %>
               </td>
-              <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+              <td class="members-col-type"><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
               <td class="members-col-parent"><%= m.familyName || '—' %></td>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
@@ -231,34 +174,19 @@
                   <% }); %>
                 <% } %>
               </td>
-              <td class="no-print permissions-col">
-                <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
-                <details class="permissions-cell-group">
-                  <summary>Sections</summary>
-                  <% if (sections.length === 0) { %>
-                    <p class="hint">No sections yet.</p>
-                  <% } else { %>
-                    <% sections.forEach(function(s) { %>
-                      <label class="checkbox-option">
-                        <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
-                        <%= s.name %>
-                      </label>
-                    <% }); %>
-                  <% } %>
-                </details>
-                <details class="permissions-cell-group">
-                  <summary>Portal Permissions</summary>
-                  <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
-                    <% roles.forEach(function(r) { %>
-                      <label class="checkbox-option">
-                        <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
-                        <%= r.label %>
-                      </label>
-                    <% }); %>
-                  <% } else { %>
-                    <p class="hint">No portal account (create one from Main Admin &gt; Users).</p>
-                  <% } %>
-                </details>
+              <%# Mobile-only replacement for the Type column - a real
+                  request: "on mobile the column type shouldn't be there.
+                  it should read whether they are on Wednesday or Monday
+                  rosters." Desktop hides this and keeps Type instead
+                  (see the matching @media rule in styles.css). %>
+              <td class="members-col-days">
+                <% if (m.rosterDays.length === 0) { %>
+                  <span class="hint">none</span>
+                <% } else { %>
+                  <% m.rosterDays.forEach(function(d) { %>
+                    <span class="badge-pill"><%= d === 'monday' ? 'Mon' : 'Wed' %></span>
+                  <% }); %>
+                <% } %>
               </td>
               <td class="actions-cell">
                 <div class="actions-btn-row">
@@ -381,8 +309,6 @@
   <script src="/js/members-dialogs.js"></script>
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
-  <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
-  <script src="/js/edit-families.js"></script>
 </body>
 </html>

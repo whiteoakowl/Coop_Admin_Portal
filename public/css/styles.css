@@ -2155,15 +2155,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    at once (admin-logs.ejs is tab-conditional). */
 .logs-print-table { display: none; }
 
-/* Mobile member list: keep it to Name, Type, and the action icons - Photo,
-   Parent, and Rosters are useful on a wide screen but just add scroll on
-   a phone. Name itself switches from the table's usual nowrap to
-   wrapping, so a long name grows the row instead of getting clipped
+/* .members-col-days (the mobile-only Mon/Wed roster indicator - see
+   admin-members.ejs's own comment) only ever shows inside the
+   @media (max-width: 640px) block below; hidden here so a wide screen
+   never renders both it and Type at once. */
+.members-col-days { display: none; }
+
+/* Mobile member list: keep it to Name, Roster Day, and the action icons -
+   Photo, Family, and Rosters are useful on a wide screen but just add
+   scroll on a phone. A real request: "on mobile the column type
+   shouldn't be there. It should read whether they are on Wednesday or
+   Monday rosters" - Type is swapped out for .members-col-days instead of
+   just being dropped. Name itself switches from the table's usual nowrap
+   to wrapping, so a long name grows the row instead of getting clipped
    past the screen edge with no ellipsis/affordance that it continues -
    the row-scroll pattern that works fine for secondary columns doesn't
    work for the one column mobile is actually built to show. */
 @media (max-width: 640px) {
-  .members-col-photo, .members-col-parent, .members-col-rosters { display: none; }
+  .members-col-photo, .members-col-parent, .members-col-rosters, .members-col-type { display: none; }
+  .members-col-days { display: table-cell; }
   /* Beats the base .roster-table td nowrap rule on specificity (two
      classes vs. one) - see that rule's own comment for why nowrap is the
      right default everywhere else. */
@@ -2790,6 +2800,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     font-size: 0.72rem;
     white-space: normal;
     line-height: 1.2;
+  }
+
+  /* A toolbar opted into a fixed 2-column shape (data-fixed-columns="2",
+     see roster-btn-row-grid.js) with an odd button count leaves its last
+     button alone on the final row - :last-child:nth-child(odd) is only
+     true when that lone trailing button is odd-positioned, i.e. actually
+     alone (an even count already fills its last row in pairs and should
+     stay untouched). Spans it full width instead of leaving it stranded
+     in the first column with an empty gap beside it. */
+  .roster-btn-row[data-fixed-columns] > .roster-action-btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* A real request: "filter by family should be under the buttons."
+     .roster-toolbar's flex-wrap only drops .category-filter to its own
+     line once the row actually runs out of width - on a phone the 2-row
+     button grid above is narrow enough that the filter still fits beside
+     it instead of below. flex-basis: 100% forces it onto its own line
+     every time, scoped to just this page's toolbar (#members-toolbar) so
+     other .roster-toolbar + .category-filter pages keep their existing
+     side-by-side layout. */
+  #members-toolbar .category-filter {
+    flex-basis: 100%;
   }
 }
 
