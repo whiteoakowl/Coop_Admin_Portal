@@ -113,8 +113,16 @@
      bar isn't needed" - the old 184px logo alone (in a 220px-wide
      sidebar) was most of what forced the sidebar to scroll on Main
      Admin, whose left nav is the longest (its own navLinks plus the
-     12-item Community section every portal-nav.ejs caller gets). */
-  --logo-xl: 60px;  /* admin sidebar */
+     12-item Community section every portal-nav.ejs caller gets).
+     Raised again since (a later, real request: "dashboard side panels
+     tabs on web view should be bigger. logo should be much bigger.") -
+     not all the way back to 184px, which is what caused the scrolling
+     problem the shrink above fixed; the sidebar's own overflow-y: auto
+     (.admin-sidebar) already handles Main Admin's longer nav gracefully
+     if it does end up needing to scroll at this size on a shorter
+     screen, so a modest scroll is an acceptable tradeoff here, not a
+     regression of that original bug. */
+  --logo-xl: 92px;  /* admin sidebar */
   --logo-lg: 140px;  /* login page */
   --logo-md: 150px;  /* kiosk/root landing header */
   --logo-sm: 100px;  /* kiosk check-in/check-out header */
@@ -1156,13 +1164,18 @@ body.public-page .roster-empty {
 .skip-link:focus { top: 0.5rem; }
 
 /* Left-hand dashboard panel (desktop) - fixed for the full viewport height,
-   holds the brand + the primary section links. */
+   holds the brand + the primary section links. Width raised alongside
+   the bigger logo/nav text below it (a real request: "dashboard side
+   panels tabs on web view should be bigger") - .admin-page-corner-actions
+   and .admin-main's own margin-left must stay in lockstep with this
+   value, they're the two other places layout reserves space for this
+   fixed sidebar. */
 .admin-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  width: 220px;
+  width: 260px;
   background: var(--accent);
   box-shadow: 2px 0 10px rgba(0,0,0,0.12);
   display: flex;
@@ -1193,11 +1206,11 @@ body.public-page .roster-empty {
 .admin-sidebar nav a {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   color: var(--ink);
-  font-size: 0.74rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  padding: 0.18rem 0.45rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 8px;
   transition: background-color 0.15s ease;
 }
@@ -1239,7 +1252,7 @@ body.public-page .roster-empty {
   align-items: center;
   justify-content: flex-end;
   gap: 0.6rem;
-  margin-left: 220px;
+  margin-left: 260px;
   padding: 0.65rem 1.25rem;
   background: var(--accent);
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
@@ -1272,16 +1285,16 @@ body.public-page .roster-empty {
 .admin-sidebar-bottom button {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   width: 100%;
   color: var(--ink);
   background: rgba(28, 37, 48, 0.14);
   border: none;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-align: left;
-  padding: 0.32rem 0.55rem;
+  padding: 0.45rem 0.6rem;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -1392,7 +1405,7 @@ body.public-page .roster-empty {
    "No active alerts today." message, a filter label) renders directly on
    --bg and fails color-contrast (axe-core caught this: --ink and --muted
    text both fall well under the 4.5:1 minimum against --bg). */
-.admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; min-height: 100vh; background: var(--surface); }
+.admin-main { max-width: 1200px; margin-left: 260px; padding: 1.75rem 2rem 2rem; min-height: 100vh; background: var(--surface); }
 
 /* Every admin page's h1 is its page title - give it clean, consistent air
    below it (a rule line) so it always stands apart from the h2 section
@@ -6156,9 +6169,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    logo and the "Switch Portal" disclosure.
    --------------------------------------------------------------------- */
 .portal-nav-title {
-  margin: 0.1rem 0 0.2rem;
-  padding: 0 0.5rem;
-  font-size: 0.68rem;
+  margin: 0.3rem 0 0.2rem;
+  padding: 0 0.55rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
