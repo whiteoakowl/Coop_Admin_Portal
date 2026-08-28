@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Communication</h1>
+    <div class="view-tabs">
+      <a class="view-tab" href="/admin/announcements">Announcements</a>
+      <a class="view-tab<%= activeTab === 'email' ? ' active' : '' %>" href="/admin/announcements/email">Email</a>
+      <a class="view-tab<%= activeTab === 'text' ? ' active' : '' %>" href="/admin/announcements/text">Text</a>
+    </div>
+    <p class="hint"><%= activeTab === 'email' ? 'Email' : 'Text' %> is coming soon.</p>
+  </main>
+</body>
+</html>

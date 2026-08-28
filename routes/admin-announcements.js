@@ -1,37 +1,32 @@
-// Co-op Admin's own Announcements (mounted at /admin/announcements,
-// server.js) - a real request: "be able to create separate announcements
-// for parent, student and teacher portal. Can do this from the main
-// admin and co-op admin portals." Functionally identical to Main Admin's
-// own Announcements (routes/main-admin-announcements.js) - same
-// notifications.notify() 'announcement' type, same role-targeted "Send
-// to" dropdown (any role, including parent/student/teacher separately) -
-// just gated behind the Co-op Admin session (requireAdmin) instead of a
-// Main Admin portal account, since this app's Co-op Admin Portal is the
-// original single shared admin login, a completely separate identity
-// system from the newer member_accounts-based portals (see routes/admin.js's
-// own header comment).
+// Co-op Admin's Communication hub (mounted at /admin/announcements,
+// server.js) - a real request: "main admin and co-op admin announcements
+// should be communication, and it should have 4 tabs: announcements,
+// email, text, and newsletter." Functionally identical to Main Admin's
+// own Communication > Announcements tab (routes/main-admin-
+// announcements.js) - both share utils/announcements.js's send logic and
+// unified announcement_log - just gated behind the Co-op Admin session
+// (requireAdmin) instead of a Main Admin portal account, since this app's
+// Co-op Admin Portal is the original single shared admin login, a
+// completely separate identity system from the newer member_accounts-based
+// portals (see routes/admin.js's own header comment). That's also why
+// sentByAccountId is always null here - the shared admin login has no
+// member_accounts row to attribute the send to.
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
+const announcements = require('../utils/announcements');
 
 router.get('/announcements', requireAdmin, async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
-  const sent = await db
-    .prepare(
-      `SELECT n.title, n.body, n.created_at, COUNT(*) AS "recipientCount"
-       FROM notifications n WHERE n.type_key = 'announcement'
-       GROUP BY n.title, n.body, n.created_at
-       ORDER BY n.created_at DESC
-       LIMIT 25`
-    )
-    .all();
+  const roleLabelByKey = Object.fromEntries(roles.map((r) => [r.key, r.label]));
+  const log = await announcements.listAnnouncementLog();
   res.render('admin-announcements', {
-    title: 'Announcements',
+    title: 'Communication',
     roles,
-    sent,
+    log,
+    targetLabels: (targets) => announcements.targetLabels(targets, roleLabelByKey),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -40,25 +35,29 @@ router.get('/announcements', requireAdmin, async (req, res) => {
 router.post('/announcements', requireAdmin, async (req, res) => {
   const title = (req.body.title || '').trim();
   const body = sanitizePostBody(req.body.body || '');
-  const roleKey = (req.body.roleKey || '').trim();
+  const targets = announcements.normalizeTargets(req.body.targets);
   if (!title || !body) return res.redirect('/admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
+  if (targets.length === 0) return res.redirect('/admin/announcements?error=' + encodeURIComponent('Choose at least one recipient.'));
 
-  const recipients = roleKey
-    ? await db
-        .prepare(
-          `SELECT DISTINCT ma.id FROM member_accounts ma
-           JOIN member_account_roles mar ON mar.member_account_id = ma.id
-           JOIN roles r ON r.id = mar.role_id
-           WHERE ma.status = 'active' AND r.key = ?`
-        )
-        .all(roleKey)
-    : await db.prepare("SELECT id FROM member_accounts WHERE status = 'active'").all();
+  const { recipientCount } = await announcements.sendAnnouncement({
+    title,
+    body,
+    targets,
+    sentByAccountId: null,
+    sentByPortal: 'coop_admin',
+  });
 
-  for (const recipient of recipients) {
-    await notifications.notify(recipient.id, 'announcement', { title, body });
-  }
+  res.redirect('/admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+});
 
-  res.redirect('/admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipients.length} member(s).`));
+// Email/Text composer tabs (items 12/13) aren't built yet - these keep
+// the 4-tab Communication bar fully clickable in the meantime rather than
+// linking to a 404.
+router.get('/announcements/email', requireAdmin, (req, res) => {
+  res.render('admin-communication-coming-soon', { title: 'Communication', activeTab: 'email' });
+});
+router.get('/announcements/text', requireAdmin, (req, res) => {
+  res.render('admin-communication-coming-soon', { title: 'Communication', activeTab: 'text' });
 });
 
 module.exports = router;

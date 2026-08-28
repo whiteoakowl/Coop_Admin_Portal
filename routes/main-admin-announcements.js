@@ -1,49 +1,32 @@
-// Main Admin composes and sends an announcement to some or all members -
-// a real request: notifications should show up as current + past
-// announcements on the Parent Portal home page, sent by Main Admin.
-// Reuses utils/notifications.js's existing notify() (the same entry
-// point event registration/forum-reply/newsletter-sent confirmations
-// already go through) with a new 'announcement' type key
-// (supabase/migrations/20260826000000_announcement_notification_type.sql)
-// rather than a parallel send mechanism - the Notification Center, the
-// in-app delivery guarantee, and the email/sms provider abstraction all
-// come for free this way. Distinct from Main Admin > Website's own
-// "Announcements" (site_settings/announcements, shown on the PUBLIC
-// homepage to anyone, signed in or not) - this is a per-account
-// notification sent only to signed-in portal accounts.
+// Main Admin's Communication hub - a real request: "main admin and co-op
+// admin announcements should be communication, and it should have 4 tabs:
+// announcements, email, text, and newsletter." This file still only owns
+// the Announcements tab (Email/Text are their own not-yet-built routes,
+// Newsletter reuses the existing routes/admin-newsletter.js unchanged -
+// see views/main-admin-communication-announcements.ejs's tab bar). Sending
+// itself is shared with Co-op Admin's identical tab via
+// utils/announcements.js, which also owns the unified "Past Announcements"
+// log (announcement_log) - the old per-portal "Recently Sent" table
+// (grouped notifications rows) and the separate "Public Homepage
+// Announcements" section are both gone in favor of that one log.
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
+const announcements = require('../utils/announcements');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('send_announcements'));
 
 router.get('/', async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
-  const sent = await db
-    .prepare(
-      `SELECT n.title, n.body, n.created_at, COUNT(*) AS "recipientCount"
-       FROM notifications n WHERE n.type_key = 'announcement'
-       GROUP BY n.title, n.body, n.created_at
-       ORDER BY n.created_at DESC
-       LIMIT 25`
-    )
-    .all();
-  // Public homepage posts (site_settings/announcements) - a real
-  // request: "the public home page announcements should be listed under
-  // the announcements tab" - management for these used to live only on
-  // Main Admin > Website (routes/main-admin.js's own /website/
-  // announcements POST/delete, unchanged and still what this list's own
-  // delete forms post to); this page is now the other place they show
-  // up and get created from (see the roleKey === 'public' branch below).
-  const publicAnnouncements = await db.prepare('SELECT * FROM announcements ORDER BY published_at DESC').all();
+  const roleLabelByKey = Object.fromEntries(roles.map((r) => [r.key, r.label]));
+  const log = await announcements.listAnnouncementLog();
   res.render('main-admin-announcements', {
-    title: 'Announcements',
+    title: 'Communication',
     roles,
-    sent,
-    publicAnnouncements,
+    log,
+    targetLabels: (targets) => announcements.targetLabels(targets, roleLabelByKey),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -52,34 +35,29 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const title = (req.body.title || '').trim();
   const body = sanitizePostBody(req.body.body || '');
-  const roleKey = (req.body.roleKey || '').trim();
+  const targets = announcements.normalizeTargets(req.body.targets);
   if (!title || !body) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('Title and body are required.'));
+  if (targets.length === 0) return res.redirect('/main-admin/announcements?error=' + encodeURIComponent('Choose at least one recipient.'));
 
-  // "Public" isn't a portal role - it means posting to the public
-  // homepage (site_settings/announcements) instead of sending an
-  // in-app/email notification to signed-in members, so it's handled as
-  // its own branch rather than falling into the recipients query below.
-  if (roleKey === 'public') {
-    await db.prepare('INSERT INTO announcements (title, body, is_public, created_by_account_id) VALUES (?, ?, ?, ?)').run(title, body, 1, req.portalAccount.id);
-    return res.redirect('/main-admin/announcements?notice=' + encodeURIComponent('Posted to the public homepage.'));
-  }
+  const { recipientCount } = await announcements.sendAnnouncement({
+    title,
+    body,
+    targets,
+    sentByAccountId: req.portalAccount.id,
+    sentByPortal: 'main_admin',
+  });
 
-  const recipients = roleKey
-    ? await db
-        .prepare(
-          `SELECT DISTINCT ma.id FROM member_accounts ma
-           JOIN member_account_roles mar ON mar.member_account_id = ma.id
-           JOIN roles r ON r.id = mar.role_id
-           WHERE ma.status = 'active' AND r.key = ?`
-        )
-        .all(roleKey)
-    : await db.prepare("SELECT id FROM member_accounts WHERE status = 'active'").all();
+  res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+});
 
-  for (const recipient of recipients) {
-    await notifications.notify(recipient.id, 'announcement', { title, body });
-  }
-
-  res.redirect('/main-admin/announcements?notice=' + encodeURIComponent(`Sent to ${recipients.length} member(s).`));
+// Email/Text composer tabs (items 12/13) aren't built yet - these keep
+// the 4-tab Communication bar fully clickable in the meantime rather than
+// linking to a 404.
+router.get('/email', (req, res) => {
+  res.render('main-admin-communication-coming-soon', { title: 'Communication', activeTab: 'email' });
+});
+router.get('/text', (req, res) => {
+  res.render('main-admin-communication-coming-soon', { title: 'Communication', activeTab: 'text' });
 });
 
 module.exports = router;
