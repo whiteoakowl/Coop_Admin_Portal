@@ -3689,6 +3689,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .name-tag-bulk-filter .name-tag-bulk-submit { margin-left: auto; }
 .name-tag-bulk-filter .name-tag-bulk-submit + .name-tag-bulk-submit { margin-left: 0; }
 
+/* Item 16 - a real request: "buttons/filters for print/design should
+   exactly match co-op admin's name tag page, same button stacking" - the
+   Print tab's filter dropdown/checkboxes/submit buttons are already the
+   same shared markup on both portals (this file is included from both
+   views/main-admin-name-tags.ejs and views/admin-name-tag.ejs), but once
+   this row's own flex-wrap kicked in on a narrow screen, the auto-margin
+   trick above (meant for one wide row) instead stranded "Select None"
+   alone on a line with "Print Selected" floated far off to its right.
+   Below the same breakpoint .name-tag-editor-actions already uses for
+   its own Reset/Save buttons, drop straight to one full-width control per
+   row in visual order instead - the same clean stacking every other
+   toolbar in the app already gets. */
+@media (max-width: 640px) {
+  .name-tag-bulk-filter { flex-direction: column; align-items: stretch; }
+  .name-tag-bulk-filter .name-tag-bulk-filter-select { width: 100%; }
+  .name-tag-bulk-filter .name-tag-bulk-submit,
+  .name-tag-bulk-filter .name-tag-bulk-submit + .name-tag-bulk-submit {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
 @media (max-width: 720px) {
   .name-tag-editor-body { grid-template-columns: 1fr; }
 }
