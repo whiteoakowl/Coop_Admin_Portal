@@ -45,6 +45,7 @@ const {
 } = require('../utils/memberIntake');
 const membershipApprovals = require('../utils/membershipApprovals');
 const membershipHandbook = require('../utils/membershipHandbook');
+const membershipFormFields = require('../utils/membershipFormFields');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
@@ -106,6 +107,9 @@ router.get('/', async (req, res) => {
       templates: await membershipApprovals.getLetterTemplates(),
       handbookHtml: await membershipHandbook.getHandbookHtml(),
       paymentInfo: await membershipHandbook.getPaymentInfo(),
+      parentFormFields: await membershipFormFields.listFields('parent'),
+      childFormFields: await membershipFormFields.listFields('child'),
+      fieldTypes: membershipFormFields.FIELD_TYPES,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -228,6 +232,29 @@ router.post('/settings/payment', async (req, res) => {
   res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Payment info saved.'));
 });
 
+// A real request: "under members in main admin portal there should be a
+// settings tab for editing and adding parts of the membership form."
+// target is 'parent' or 'child' - which repeatable block (Parent/
+// Guardian vs Student) the new question shows up under on both the
+// admin-entered Membership Form/Add Member forms and the public self-
+// registration application.
+router.post('/settings/membership-fields', async (req, res) => {
+  const target = req.body.target === 'child' ? 'child' : 'parent';
+  const id = await membershipFormFields.createField(target, req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
+  if (!id) return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('A field label is required.'));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field added.'));
+});
+
+router.post('/settings/membership-fields/:id/update', async (req, res) => {
+  await membershipFormFields.updateField(parseInt(req.params.id, 10), req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field saved.'));
+});
+
+router.post('/settings/membership-fields/:id/delete', async (req, res) => {
+  await membershipFormFields.deleteField(parseInt(req.params.id, 10));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field deleted.'));
+});
+
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the
 // Members tab) - a real request: "there should be an edit button on
 // member page that says edit. when you click it it will show check
@@ -343,6 +370,8 @@ router.get('/new', async (req, res) => {
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
     gradeLevels: GRADE_LEVELS,
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
     error: req.query.error || null,
     notice: null,
   });
@@ -382,6 +411,7 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+      customFieldValues: p.customFields,
     });
   }
 
@@ -395,6 +425,7 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        customFieldValues: c.customFields,
       },
       photoFile
     );

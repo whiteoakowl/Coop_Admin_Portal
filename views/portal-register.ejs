@@ -27,13 +27,16 @@
             <input type="email" name="email" value="<%= formValues.email || '' %>" required autocomplete="email" />
           </label>
         </div>
+        <% parentFields.forEach(function(f) { %>
+          <%- include('partials/membership-form-field', { field: f, namePrefix: 'customFields', values: formValues.customFields }) %>
+        <% }); %>
       </div>
 
       <div class="form-section">
         <h2>Children</h2>
         <div id="register-children">
           <% (children && children.length ? children : []).forEach(function(child, i) { %>
-            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child }) %>
+            <%- include('partials/register-child-fields', { index: i, gradeOptions, values: child, childFields }) %>
           <% }); %>
         </div>
         <button type="button" class="btn-secondary" id="add-child-btn">+ Add Child</button>
@@ -98,7 +101,7 @@
   </main>
 
   <template id="register-child-template">
-    <%- include('partials/register-child-fields', { index: '__INDEX__', gradeOptions, values: {} }) %>
+    <%- include('partials/register-child-fields', { index: '__INDEX__', gradeOptions, values: {}, childFields }) %>
   </template>
 
   <script src="/js/portal-register-form.js"></script>

@@ -1,0 +1,79 @@
+<%
+// One target's ('parent' or 'child') list of admin-defined extra
+// membership-form questions (utils/membershipFormFields.js), plus the
+// form to add a new one - included twice from views/main-admin-members.ejs's
+// Settings tab, once per target, since the two lists are otherwise
+// identical markup.
+%>
+<h3><%= label %> Fields</h3>
+<% if (fields.length === 0) { %>
+  <p class="hint">No extra <%= label.toLowerCase() %> fields yet.</p>
+<% } else { %>
+  <table class="roster-table condensed-table" style="margin-bottom: 1rem;">
+    <thead><tr><th>Label</th><th>Type</th><th>Required</th><th>Actions</th></tr></thead>
+    <tbody>
+      <% fields.forEach(function(f) { %>
+        <tr>
+          <td>
+            <details>
+              <summary><%= f.label %></summary>
+              <form method="POST" action="/main-admin/members/settings/membership-fields/<%= f.id %>/update" class="stack-form" style="margin-top: 0.5rem;">
+                <label>Label
+                  <input type="text" name="label" value="<%= f.label %>" required />
+                </label>
+                <label>Type
+                  <select name="fieldType" class="membership-field-type-select">
+                    <% fieldTypes.forEach(function(t) { %>
+                      <option value="<%= t.key %>" <%= f.field_type === t.key ? 'selected' : '' %>><%= t.label %></option>
+                    <% }); %>
+                  </select>
+                </label>
+                <label class="member-form-full membership-field-options-row" <%= f.field_type === 'dropdown' ? '' : 'hidden' %>>
+                  Dropdown Choices (one per line)
+                  <textarea name="options" rows="3"><%= f.options.join('\n') %></textarea>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="isRequired" value="1" <%= f.is_required ? 'checked' : '' %> />
+                  Required
+                </label>
+                <button type="submit" class="primary-btn">Save</button>
+              </form>
+            </details>
+          </td>
+          <td><%= (fieldTypes.find(function(t) { return t.key === f.field_type; }) || {}).label || f.field_type %></td>
+          <td><%= f.is_required ? 'Yes' : 'No' %></td>
+          <td>
+            <form method="POST" action="/main-admin/members/settings/membership-fields/<%= f.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= f.label %>&quot; field? Answers already collected for it are removed too.">
+              <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete field" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+<details class="manage-section">
+  <summary>+ Add <%= label %> Field</summary>
+  <form method="POST" action="/main-admin/members/settings/membership-fields" class="stack-form" style="margin-top: 0.75rem;">
+    <input type="hidden" name="target" value="<%= target %>" />
+    <label>Label
+      <input type="text" name="label" placeholder="e.g. T-Shirt Size" required />
+    </label>
+    <label>Type
+      <select name="fieldType" class="membership-field-type-select">
+        <% fieldTypes.forEach(function(t) { %>
+          <option value="<%= t.key %>"><%= t.label %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label class="member-form-full membership-field-options-row" hidden>
+      Dropdown Choices (one per line)
+      <textarea name="options" rows="3" placeholder="Small&#10;Medium&#10;Large"></textarea>
+    </label>
+    <label class="checkbox-option">
+      <input type="checkbox" name="isRequired" value="1" />
+      Required
+    </label>
+    <button type="submit" class="primary-btn">Add Field</button>
+  </form>
+</details>

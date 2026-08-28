@@ -33,6 +33,7 @@ const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../ut
 const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions, adminPositionTitlesForMembers } = require('../utils/adminPositions');
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
+const membershipFormFields = require('../utils/membershipFormFields');
 
 router.use(requireFullAdmin);
 
@@ -429,6 +430,8 @@ router.get('/members/new', async (req, res) => {
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
     gradeLevels: GRADE_LEVELS,
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
     error: req.query.error || null,
     notice: null,
   });
@@ -468,6 +471,7 @@ router.post('/members/new', uploadIntakePhotos('/admin/members/new'), async (req
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+      customFieldValues: p.customFields,
     });
   }
 
@@ -481,6 +485,7 @@ router.post('/members/new', uploadIntakePhotos('/admin/members/new'), async (req
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        customFieldValues: c.customFields,
       },
       photoFile
     );

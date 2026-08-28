@@ -367,6 +367,18 @@
           <button type="submit" class="primary-btn">Save Payment Info</button>
         </form>
       </div>
+
+      <%# A real request: "under members in main admin portal there
+          should be a settings tab for editing and adding parts of the
+          membership form." Admin-defined extra questions, shown on both
+          the admin-entered Membership Form/Add Member forms and the
+          public self-registration application. %>
+      <div class="manage-section">
+        <h2>Membership Form Fields</h2>
+        <p class="hint">Extra questions shown on the Parent/Guardian and Student sections of every form that adds a new family member.</p>
+        <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
+        <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
+      </div>
     <% } %>
   </main>
   <script src="/js/permissions-edit-toggle.js"></script>
@@ -375,6 +387,7 @@
   <script src="/js/members-bulk-actions.js"></script>
   <% if (activeTab === 'settings') { %>
     <script src="/js/forum-editor.js"></script>
+    <script src="/js/membership-field-type-toggle.js"></script>
   <% } %>
 </body>
 </html>

@@ -11,6 +11,7 @@ const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { isValidISODate } = require('../utils/dates');
 const membershipHandbook = require('../utils/membershipHandbook');
+const membershipFormFields = require('../utils/membershipFormFields');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -73,6 +74,8 @@ router.get('/register', async (req, res) => {
     gradeOptions: GRADE_OPTIONS,
     handbookHtml: await membershipHandbook.getHandbookHtml(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
   });
 });
 
@@ -99,6 +102,8 @@ async function renderRegisterError(res, error, formValues, children) {
     gradeOptions: GRADE_OPTIONS,
     handbookHtml: await membershipHandbook.getHandbookHtml(),
     paymentInfo: await membershipHandbook.getPaymentInfo(),
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
   });
 }
 
@@ -123,7 +128,7 @@ router.post('/register', async (req, res) => {
   const lastName = (req.body.lastName || '').trim();
   const email = (req.body.email || '').trim();
   const password = req.body.password || '';
-  const formValues = { firstName, lastName, email };
+  const formValues = { firstName, lastName, email, customFields: req.body.customFields };
 
   const rawChildren = parseChildren(req.body).map((c, index) => ({ ...c, index }));
   // A blank block the visitor never filled in (or removed down to zero
@@ -196,6 +201,15 @@ router.post('/register', async (req, res) => {
   const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
   const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
 
+  // Custom field answers (utils/membershipFormFields.js) are saved
+  // AFTER the transaction below, via the module-level `db` connection -
+  // not from inside it via `tx`, since PGlite's single-connection test
+  // engine hangs on an outer-`db` query while a `tx` transaction on that
+  // same connection is still open (see utils/members.js's own
+  // generateMemberCode comment on this exact class of bug).
+  let newParentMemberId = null;
+  const newChildMemberIds = [];
+
   await db.withTransaction(async (tx) => {
     let member = await tx.prepare('SELECT * FROM members WHERE LOWER(email) = LOWER(?) AND email IS NOT NULL').get(email);
     let familyId = member ? member.family_id : null;
@@ -213,6 +227,7 @@ router.post('/register', async (req, res) => {
         .run(fullName, code, code, email, familyId);
       member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
     }
+    newParentMemberId = member.id;
 
     const parentAccountInfo = await tx
       .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
@@ -242,6 +257,7 @@ router.post('/register', async (req, res) => {
           GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
           (c.medicalNotes || '').trim() || null
         );
+      newChildMemberIds.push({ memberId: childInfo.lastInsertRowid, customFields: c.customFields });
 
       if (c.wantsLogin) {
         const childEmail = c.loginEmail.trim();
@@ -254,6 +270,13 @@ router.post('/register', async (req, res) => {
       }
     }
   });
+
+  if (newParentMemberId != null) {
+    await membershipFormFields.saveFieldValues(newParentMemberId, 'parent', req.body.customFields);
+  }
+  for (const child of newChildMemberIds) {
+    await membershipFormFields.saveFieldValues(child.memberId, 'child', child.customFields);
+  }
 
   res.render('portal-register-submitted', { title: 'Registration Submitted', childLoginCount: children.filter((c) => c.wantsLogin).length });
 });

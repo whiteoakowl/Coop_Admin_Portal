@@ -23,6 +23,7 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { isValidISODate } = require('../utils/dates');
 const { allFamilies } = require('../utils/members');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
+const membershipFormFields = require('../utils/membershipFormFields');
 
 async function allSetupTeams() {
   return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, LOWER(title)').all();
@@ -39,6 +40,8 @@ router.get('/membership', requireFullAdmin, async (req, res) => {
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
     gradeLevels: GRADE_LEVELS,
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -78,6 +81,7 @@ router.post('/membership', requireFullAdmin, uploadIntakePhotos('/membership'), 
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+      customFieldValues: p.customFields,
     });
   }
 
@@ -94,6 +98,7 @@ router.post('/membership', requireFullAdmin, uploadIntakePhotos('/membership'), 
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        customFieldValues: c.customFields,
       },
       photoFile
     );
