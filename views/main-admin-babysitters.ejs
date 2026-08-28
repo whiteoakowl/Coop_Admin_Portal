@@ -19,44 +19,152 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Babysitter Directory</h1>
-    <p class="hint">Every submission and edit needs your review before it shows up in the directory.</p>
+    <div class="roster-toolbar">
+      <h1>Babysitter Directory</h1>
+      <% if (activeTab === 'directory') { %>
+        <div class="roster-btn-row">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-babysitter-dialog').showModal()">+ Add Babysitter Profile</button>
+        </div>
+      <% } %>
+    </div>
+    <p class="hint">Every member submission and edit needs your review before it shows up in the directory (unless you turn that off in Settings).</p>
+
+    <div class="view-tabs">
+      <a class="view-tab<%= activeTab === 'directory' ? ' active' : '' %>" href="/main-admin/babysitters?tab=directory">Babysitter</a>
+      <a class="view-tab<%= activeTab === 'approvals' ? ' active' : '' %>" href="/main-admin/babysitters?tab=approvals">Approvals<%= pending.length ? ' (' + pending.length + ')' : '' %></a>
+      <a class="view-tab<%= activeTab === 'settings' ? ' active' : '' %>" href="/main-admin/babysitters?tab=settings">Settings</a>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <% if (profiles.length === 0) { %>
-      <p class="roster-empty">No babysitter profiles yet.</p>
+    <% if (activeTab === 'directory') { %>
+      <%# A real request: "directory should be cards, alphabetical by
+          last name, with photo, name, grade and phone number" -
+          listApprovedProfiles() already sorts by last name. %>
+      <% if (directory.length === 0) { %>
+        <p class="roster-empty">No approved babysitter profiles yet.</p>
+      <% } else { %>
+        <div class="portal-dashboard-grid">
+          <% directory.forEach(function(p) { %>
+            <section class="portal-dashboard-card">
+              <% if (p.photo_key) { %><img src="/babysitters/<%= p.id %>/photo" alt="" class="babysitter-photo-preview" /><% } %>
+              <h2><%= p.member_name %></h2>
+              <p class="hint"><%= p.age_grade || '' %></p>
+              <% if (p.member_phone) { %><p><strong>Phone:</strong> <%= p.member_phone %></p><% } %>
+              <% if (p.contact_preference) { %><p><strong>Prefers:</strong> <%= p.contact_preference.charAt(0).toUpperCase() + p.contact_preference.slice(1) %></p><% } %>
+              <% if (p.availability) { %><p><strong>Availability:</strong> <%= p.availability %></p><% } %>
+              <% if (p.experience) { %><p><strong>Experience:</strong> <%= p.experience %></p><% } %>
+              <% if (p.certifications) { %><p><strong>Certifications:</strong> <%= p.certifications %></p><% } %>
+              <% if (p.hourly_rate) { %><p><strong>Rate:</strong> <%= p.hourly_rate %></p><% } %>
+              <% if (p.contact_method) { %><p><strong>Contact:</strong> <%= p.contact_method %></p><% } %>
+            </section>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } else if (activeTab === 'approvals') { %>
+      <% if (pending.length === 0) { %>
+        <p class="roster-empty">Nothing awaiting approval.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Name</th><th>Age/Grade</th><th>Rate</th><th></th></tr></thead>
+            <tbody>
+              <% pending.forEach(function(p) { %>
+                <tr>
+                  <td class="roster-name-col"><%= p.member_name %></td>
+                  <td><%= p.age_grade || '—' %></td>
+                  <td><%= p.hourly_rate || '—' %></td>
+                  <td class="actions-cell">
+                    <div class="actions-btn-row">
+                      <form method="POST" action="/main-admin/babysitters/<%= p.id %>/approve" class="inline-block-form">
+                        <button type="submit" class="icon-btn" aria-label="Approve <%= p.member_name %>" title="Approve"><svg class="icon"><use href="#icon-check"/></svg></button>
+                      </form>
+                      <form method="POST" action="/main-admin/babysitters/<%= p.id %>/reject" class="inline-block-form" data-confirm="Reject this submission?">
+                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Reject <%= p.member_name %>" title="Reject"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
     <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table condensed-table">
-          <thead><tr><th>Name</th><th>Age/Grade</th><th>Rate</th><th>Status</th><th></th></tr></thead>
-          <tbody>
-            <% profiles.forEach(function(p) { %>
-              <tr>
-                <td class="roster-name-col"><%= p.member_name %></td>
-                <td><%= p.age_grade || '—' %></td>
-                <td><%= p.hourly_rate || '—' %></td>
-                <td>
-                  <span class="badge-pill <%= p.status === 'approved' ? 'badge-pill-present' : p.status === 'pending' ? 'badge-pill-pending' : 'badge-pill-absent' %>">
-                    <%= p.status %>
-                  </span>
-                </td>
-                <td>
-                  <% if (p.status === 'pending') { %>
-                    <form method="POST" action="/main-admin/babysitters/<%= p.id %>/approve" style="display:inline">
-                      <button type="submit" class="roster-action-btn">Approve</button>
-                    </form>
-                    <form method="POST" action="/main-admin/babysitters/<%= p.id %>/reject" style="display:inline">
-                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
-                    </form>
-                  <% } %>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
+      <form method="POST" action="/main-admin/babysitters/settings" class="stack-form member-form-page-panel">
+        <label class="checkbox-option">
+          <input type="checkbox" name="requireApproval" value="1" <%= requireApproval ? 'checked' : '' %> />
+          Require Main Admin approval for every member submission and edit
+        </label>
+        <p class="hint">When off, a member's submission or edit goes straight into the directory instead of waiting in Approvals. Profiles you add yourself from the Babysitter tab are always approved right away either way.</p>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </div>
+      </form>
     <% } %>
   </main>
+
+  <dialog id="add-babysitter-dialog" class="member-picker-dialog">
+    <form method="POST" action="/main-admin/babysitters" enctype="multipart/form-data" class="stack-form">
+      <h3>Add Babysitter Profile</h3>
+      <label for="add-babysitter-member">Member
+        <select id="add-babysitter-member" name="memberId" required>
+          <option value="">Choose a member…</option>
+          <% members.forEach(function(m) { %>
+            <option value="<%= m.id %>" data-grade="<%= m.grade_level || '' %>" data-phone="<%= m.phone || '' %>"><%= m.name %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label for="add-babysitter-age-grade">Age/Grade
+        <input id="add-babysitter-age-grade" type="text" name="ageGrade" placeholder="e.g. 15 / 9th grade" />
+      </label>
+      <label for="add-babysitter-availability">Availability
+        <textarea id="add-babysitter-availability" name="availability" rows="2" placeholder="e.g. Weekends, evenings after 5pm"></textarea>
+      </label>
+      <label for="add-babysitter-experience">Experience
+        <textarea id="add-babysitter-experience" name="experience" rows="2" placeholder="Babysitting experience, ages watched, etc."></textarea>
+      </label>
+      <label for="add-babysitter-certifications">Certifications
+        <input id="add-babysitter-certifications" type="text" name="certifications" placeholder="e.g. CPR certified, Red Cross Babysitting Course" />
+      </label>
+      <label for="add-babysitter-rate">Hourly Rate
+        <input id="add-babysitter-rate" type="text" name="hourlyRate" placeholder="e.g. $12/hr" />
+      </label>
+      <label for="add-babysitter-contact-method">Contact Method
+        <input id="add-babysitter-contact-method" type="text" name="contactMethod" placeholder="e.g. Text (555) 555-1234" />
+      </label>
+      <label for="add-babysitter-contact-preference">Prefers
+        <select id="add-babysitter-contact-preference" name="contactPreference">
+          <option value="">No preference set</option>
+          <option value="call">Call</option>
+          <option value="text">Text</option>
+          <option value="either">Either</option>
+        </select>
+      </label>
+      <label for="add-babysitter-photo">Photo
+        <input id="add-babysitter-photo" type="file" name="photo" accept="image/*" />
+      </label>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+    (function () {
+      var select = document.getElementById('add-babysitter-member');
+      var ageGrade = document.getElementById('add-babysitter-age-grade');
+      if (!select) return;
+      select.addEventListener('change', function () {
+        var option = select.options[select.selectedIndex];
+        if (!ageGrade.value) ageGrade.value = option.dataset.grade || '';
+        var contactMethod = document.getElementById('add-babysitter-contact-method');
+        if (!contactMethod.value && option.dataset.phone) contactMethod.value = option.dataset.phone;
+      });
+    })();
+  </script>
 </body>
 </html>
