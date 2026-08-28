@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { buildTemplateWorkbook, readRowsFromFile, toCsvRow, sendCsv } = require('../utils/spreadsheet');
+const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { createStorageClient } = require('../utils/storage');
@@ -23,7 +23,6 @@ const {
   setPrimaryParent,
   rostersForMember,
   membersWithDetails,
-  generateMemberCode,
   byLastName,
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
@@ -34,6 +33,7 @@ const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions,
 const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/portalPermissions');
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 const membershipFormFields = require('../utils/membershipFormFields');
+const memberImport = require('../utils/memberImport');
 
 router.use(requireFullAdmin);
 
@@ -235,51 +235,7 @@ router.get('/members/export.csv', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const members = await membersWithDetails(typeFilter, familyFilter);
-
-  const typeLabel = (t) => (t === 'parent' ? 'Parent' : 'Student');
-  const lines = [
-    toCsvRow([
-      'Name',
-      'Member ID',
-      'Type',
-      'Active',
-      'Address',
-      'City',
-      'State',
-      'Zip',
-      'Phone',
-      'Email',
-      'Birthday',
-      'Grade Level',
-      'Medical Notes',
-      'Family',
-      'Primary Parent',
-      'Rosters',
-      'Notes',
-    ]),
-    ...members.map((m) =>
-      toCsvRow([
-        m.name,
-        m.member_code || '',
-        typeLabel(m.member_type),
-        m.active ? 'Yes' : 'No',
-        m.address || '',
-        m.city || '',
-        m.state || '',
-        m.zip || '',
-        m.phone || '',
-        m.email || '',
-        m.birthday || '',
-        m.grade_level || '',
-        m.medical_notes || '',
-        m.familyName || '',
-        m.is_primary_parent ? 'Yes' : '',
-        m.rosters.map((r) => r.name).join('; '),
-        m.notes || '',
-      ])
-    ),
-  ];
-
+  const lines = memberImport.buildMembersExportCsvLines(members);
   sendCsv(res, `members${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
 });
 
@@ -340,27 +296,6 @@ async function syncCleanupTeams(memberId, teamIds) {
 async function clearVolunteerMembershipIfNotParent(memberId, memberType) {
   if (memberType === 'parent') return;
   await db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
-}
-
-// Full-profile import (below) links an imported student to its "Parent
-// Name" column by family, same as before - but a family has to actually
-// exist now, so if the matched parent doesn't have one yet, one is
-// invented from their surname (mirrors the migration in db/index.js) so
-// the import's existing "link student to parent" behavior keeps working.
-async function ensureFamilyForParent(parentId) {
-  const parent = await db.prepare('SELECT id, name, family_id FROM members WHERE id = ?').get(parentId);
-  if (!parent) return null;
-  if (parent.family_id != null) return parent.family_id;
-  const lastName = parent.name.trim().split(/\s+/).pop() || parent.name;
-  let name = lastName;
-  let suffix = 1;
-  while (await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?)').get(name)) {
-    suffix++;
-    name = `${lastName} ${suffix}`;
-  }
-  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(name)).lastInsertRowid;
-  await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, parentId);
-  return familyId;
 }
 
 // memberCount included for the form's "Setup Team - 2 members" checklist
@@ -521,30 +456,6 @@ router.get('/members/import-template.xlsx', (req, res) => {
 // U.S.-style M/D/Y (the overwhelming common case for a Date cell)
 // normalized into ISO.
 //
-// A real bug report - "importing birthdays comes in as NaN/NaN/NaN, only
-// 1 row imported out of many" - traced to the year group here requiring
-// exactly 4 digits (\d{4}). Confirmed live: a genuine Excel Date cell,
-// typed and left at Excel's own default short-date format rather than
-// explicitly reformatted to a 4-digit year, reads back through
-// SheetJS's raw:false as "4/12/15" - a 2-digit year - not "4/12/2015".
-// Every row shaped like that silently failed this regex and got counted
-// as an unreadable date instead of imported, which is exactly a "only
-// the one row I happened to type the full year out for by hand made it
-// through" result. \d{2,4} now accepts either; a 2-digit year picks
-// 2000s vs 1900s the same way spreadsheet apps themselves do (Excel's
-// own cutoff is 30, not tied to the current year, so this stays stable
-// as time passes rather than drifting) - correct either way for this
-// column's whole realistic range (a co-op member's child's birth year).
-function normalizeBirthdayToISO(value) {
-  if (isValidISODate(value)) return value;
-  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(String(value).trim());
-  if (!match) return null;
-  const [, m, d, yRaw] = match;
-  const y = yRaw.length === 2 ? (Number(yRaw) < 30 ? `20${yRaw}` : `19${yRaw}`) : yRaw;
-  const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  return isValidISODate(iso) ? iso : null;
-}
-
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
 
 // Clicking a member's name anywhere lands here - a read-only profile with
@@ -678,99 +589,6 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   res.redirect('/admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });
 
-const MEMBER_IMPORT_HEADER_ALIASES = {
-  firstName: ['first name', 'first'],
-  lastName: ['last name', 'last'],
-  type: ['type', 'member type'],
-  address: ['address'],
-  city: ['city'],
-  state: ['state'],
-  zip: ['zip', 'zip code', 'zipcode'],
-  phone: ['phone', 'phone number'],
-  email: ['email', 'email address'],
-  birthday: ['birthday', 'birth date', 'dob'],
-  gradeLevel: ['grade level', 'grade'],
-  medicalNotes: ['medical/allergy notes', 'medical notes', 'allergy notes', 'medical'],
-  parentFirstName: ['parent first name'],
-  parentLastName: ['parent last name'],
-};
-
-// First/Last are separate columns in the spreadsheet, but every member is
-// still stored as a single "First Last" string - see utils/members.js's
-// lastNameOf - the same convention the membership form's one-box Name
-// field already uses. Joined back together here at read time so nothing
-// downstream (duplicate-name matching, family-name derivation, display)
-// needs to know the template ever had separate columns.
-function normalizeImportRow(row) {
-  const lowerMap = {};
-  for (const key of Object.keys(row)) lowerMap[key.trim().toLowerCase()] = row[key];
-  const out = {};
-  for (const [field, aliases] of Object.entries(MEMBER_IMPORT_HEADER_ALIASES)) {
-    for (const alias of aliases) {
-      if (lowerMap[alias] !== undefined && String(lowerMap[alias]).trim() !== '') {
-        out[field] = String(lowerMap[alias]).trim();
-        break;
-      }
-    }
-  }
-  out.name = [out.firstName, out.lastName].filter(Boolean).join(' ');
-  out.parentName = [out.parentFirstName, out.parentLastName].filter(Boolean).join(' ');
-  return out;
-}
-
-// Fields a matched-by-name import row can contribute to an existing
-// member's profile - never overwrites a value the member already has,
-// only fills in what's currently blank (see mergeableFieldsFor below).
-const IMPORT_MERGE_FIELDS = [
-  ['address', 'Address'],
-  ['city', 'City'],
-  ['state', 'State'],
-  ['zip', 'Zip'],
-  ['phone', 'Phone'],
-  ['email', 'Email'],
-  ['birthday', 'Birthday'],
-  ['gradeLevel', 'Grade Level'],
-  ['medicalNotes', 'Medical/Allergy Notes'],
-];
-
-// The DB column for each importable field differs from its JS name in a
-// couple of cases (gradeLevel -> grade_level, medicalNotes -> medical_notes).
-const IMPORT_FIELD_COLUMNS = {
-  address: 'address',
-  city: 'city',
-  state: 'state',
-  zip: 'zip',
-  phone: 'phone',
-  email: 'email',
-  birthday: 'birthday',
-  gradeLevel: 'grade_level',
-  medicalNotes: 'medical_notes',
-};
-
-function mergeableFieldsFor(existingMember, row) {
-  const updates = {};
-  for (const [field] of IMPORT_MERGE_FIELDS) {
-    const column = IMPORT_FIELD_COLUMNS[field];
-    let incoming = row[field];
-    if (!incoming) continue;
-    if (existingMember[column]) continue; // never overwrite a value that's already set
-    // Same "NaN/NaN/NaN" bug as the CREATE branch just below and Mass
-    // Import Families (see that route's own comment) - a raw spreadsheet
-    // cell's formatted text ("4/12/2015") isn't the ISO shape the
-    // birthday column is stored as, and this merge path writes whatever
-    // it's handed straight through on confirm with no read-time chance
-    // to fix it up first. An unreadable date is treated the same as one
-    // that was never provided - offering it as a mergeable field just to
-    // silently write garbage isn't better than leaving it blank.
-    if (field === 'birthday') {
-      incoming = normalizeBirthdayToISO(incoming);
-      if (!incoming) continue;
-    }
-    updates[field] = incoming;
-  }
-  return updates;
-}
-
 router.post('/members/import', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
@@ -778,80 +596,12 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
 
   let rows;
   try {
-    rows = (await readRowsFromFile(req.file.buffer)).map(normalizeImportRow).filter((r) => r.name);
+    rows = (await readRowsFromFile(req.file.buffer)).map(memberImport.normalizeImportRow).filter((r) => r.name);
   } catch (err) {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
 
-  let created = 0;
-  let skipped = 0;
-  const nameToId = {};
-  const mergeCandidates = [];
-
-  for (const r of rows) {
-    const existing = await db.prepare('SELECT * FROM members WHERE active = 1 AND LOWER(name) = LOWER(?)').get(r.name);
-    if (existing) {
-      nameToId[r.name.toLowerCase()] = existing.id;
-      skipped++;
-      const updates = mergeableFieldsFor(existing, r);
-      if (Object.keys(updates).length > 0) {
-        mergeCandidates.push({ memberId: existing.id, memberName: existing.name, updates });
-      }
-      continue;
-    }
-    const typeLower = (r.type || '').toLowerCase();
-    const memberType = MEMBER_TYPES.includes(typeLower) ? typeLower : 'student';
-    const memberCode = await generateMemberCode();
-    const info = await db
-      .prepare(
-        `INSERT INTO members (name, barcode, member_code, member_type, address, city, state, zip, phone, email, birthday, grade_level, medical_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        r.name,
-        memberCode,
-        memberCode,
-        memberType,
-        r.address || null,
-        r.city || null,
-        r.state || null,
-        r.zip || null,
-        r.phone || null,
-        r.email || null,
-        // normalizeBirthdayToISO here for the same reason mergeableFieldsFor
-        // and the Mass Import Families loop both need it (see their own
-        // comments) - a raw spreadsheet cell's formatted text isn't
-        // automatically the ISO shape this column is stored as, and
-        // writing it unconverted is what produces a literal "NaN/NaN/NaN"
-        // everywhere that birthday is later displayed.
-        memberType === 'student' && r.birthday ? normalizeBirthdayToISO(r.birthday) : null,
-        memberType === 'student' ? r.gradeLevel || null : null,
-        r.medicalNotes || null
-      );
-    nameToId[r.name.toLowerCase()] = info.lastInsertRowid;
-    created++;
-  }
-
-  let linkedParents = 0;
-  for (const r of rows) {
-    if (!r.parentName) continue;
-    const studentId = nameToId[r.name.toLowerCase()];
-    const parentRow = await db
-      .prepare("SELECT id FROM members WHERE active = 1 AND member_type IN ('parent', 'admin') AND LOWER(name) = LOWER(?)")
-      .get(r.parentName);
-    const parentId = nameToId[r.parentName.toLowerCase()] || (parentRow ? parentRow.id : null);
-    if (studentId && parentId && studentId !== parentId) {
-      const familyId = await ensureFamilyForParent(parentId);
-      if (familyId != null) {
-        await db.prepare('UPDATE members SET family_id = ? WHERE id = ?').run(familyId, studentId);
-        linkedParents++;
-      }
-    }
-  }
-
-  const summary =
-    `Imported ${rows.length} row(s): ${created} new member(s) created, ${skipped} already existed` +
-    (linkedParents ? `, ${linkedParents} linked to a parent.` : '.');
+  const { mergeCandidates, summary } = await memberImport.importMembersFromRows(rows);
 
   if (mergeCandidates.length === 0) {
     return res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
@@ -863,7 +613,7 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
     candidates: mergeCandidates.map((c) => ({
       memberId: c.memberId,
       memberName: c.memberName,
-      fields: IMPORT_MERGE_FIELDS.filter(([field]) => c.updates[field] !== undefined).map(([field, label]) => ({
+      fields: memberImport.IMPORT_MERGE_FIELDS.filter(([field]) => c.updates[field] !== undefined).map(([field, label]) => ({
         label,
         value: c.updates[field],
       })),
@@ -875,31 +625,9 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
 router.post('/members/import/confirm', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   const payloads = [].concat(req.body.payloads || []);
-  const ids = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
+  const allMemberIds = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
 
-  let merged = 0;
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i];
-    if (!memberIds.includes(id)) continue; // this row's checkbox wasn't checked
-    let updates;
-    try {
-      updates = JSON.parse(payloads[i] || '{}');
-    } catch (err) {
-      continue;
-    }
-    const setClauses = [];
-    const params = [];
-    for (const [field, value] of Object.entries(updates)) {
-      const column = IMPORT_FIELD_COLUMNS[field];
-      if (!column) continue;
-      setClauses.push(`${column} = ?`);
-      params.push(value);
-    }
-    if (setClauses.length === 0) continue;
-    params.push(id);
-    await db.prepare(`UPDATE members SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
-    merged++;
-  }
+  const merged = await memberImport.applyImportMerges(memberIds, payloads, allMemberIds);
 
   res.redirect('/admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
 });

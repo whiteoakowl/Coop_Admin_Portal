@@ -240,3 +240,13 @@ const communityLinks =
 <script src="/js/admin-nav.js"></script>
 <script src="/js/skip-link.js"></script>
 <script src="/js/confirm-dialog.js"></script>
+<%# A real request: "shrink the tabs to be seen fully on mobile view" -
+    these two already exist and are loaded for the Co-op Admin Portal's
+    own shell (views/partials/admin-nav.ejs), but were never wired in
+    here for Main Admin/every other portal that reuses this shell
+    instead - both are self-contained, CSS-class-scoped (.view-tabs,
+    .roster-btn-row) utilities with nothing Co-op-Admin-specific about
+    them, so every portal gets the same "tabs shrink to fit, buttons lay
+    out in balanced rows on a phone" behavior Co-op Admin already has. %>
+<script src="/js/fit-tabs.js"></script>
+<script src="/js/roster-btn-row-grid.js"></script>
