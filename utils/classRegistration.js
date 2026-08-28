@@ -13,6 +13,7 @@
 // class_registrations - see routes/teacher-portal.js).
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
+const { ageGroupList } = require('./classSchedule');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
@@ -61,6 +62,18 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, al
   if (alreadyWaitlisted) return { ok: false, error: 'Already on the waitlist for that class.' };
 
   const student = await db.prepare('SELECT * FROM members WHERE id = ?').get(studentId);
+  // classes.age_group was previously display-only (the "Grade Kindergarten"/
+  // "Grades 1-3" label shown everywhere a class is listed) - never actually
+  // enforced here, so nothing stopped a wrong-grade student from being
+  // registered straight through this route. A real request - "list the
+  // appropriate age/grade students... that you can sign up" - only makes
+  // sense if a mismatched one genuinely can't register, not just isn't
+  // shown by whichever UI happens to filter for it, so this closes that gap
+  // the same way section restriction just above already does.
+  const allowedGrades = ageGroupList(cls.age_group);
+  if (allowedGrades.length && !allowedGrades.includes(student.grade_level)) {
+    return { ok: false, error: `${student.name} isn't in an eligible grade level for this class.` };
+  }
   const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
   const isFull = cls.capacity != null && enrolledCount >= cls.capacity;
   const status = isFull ? 'waitlisted' : 'confirmed';

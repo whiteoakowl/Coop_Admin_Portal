@@ -1,0 +1,98 @@
+<%# Fragment (no <html>/<body>) - fetched by public/js/parent-class-view.js
+    and injected into the shared #parent-class-dialog on the Classes grid,
+    so viewing a class and registering a child never leaves the grid page.
+    Read-only class info + per-child register/cancel, unlike the Co-op
+    Admin version of this same popup (class-schedule-view-fragment.ejs) -
+    a parent never edits the class itself here. %>
+<div class="class-view-header">
+  <span class="class-view-swatch" style="background: <%= cls.color %>;"></span>
+  <h3><%= cls.class_name %></h3>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+
+<div class="parent-class-body">
+  <p class="hint">
+    <%= cls.day === 'monday' ? 'Monday' : 'Wednesday' %>
+    <% if (cls.start_time || cls.end_time) { %> &middot; <%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>
+    <% if (cls.room) { %> &middot; Room <%= cls.room %><% } %>
+  </p>
+
+  <div class="parent-class-meta">
+    <% if (gradeLabel) { %><span class="badge-pill"><%= gradeLabel %></span><% } %>
+    <span class="badge-pill">Teacher: <%= teacherNames.length ? teacherNames.join(', ') : '—' %></span>
+    <% if (assistantNames.length) { %><span class="badge-pill">Assistant: <%= assistantNames.join(', ') %></span><% } %>
+    <% if (cls.capacity == null) { %>
+      <span class="badge-pill">Open enrollment</span>
+    <% } else if (isFull) { %>
+      <span class="badge-pill badge-pill-absent">Full</span>
+    <% } else { %>
+      <span class="badge-pill badge-pill-present"><%= seatsLeft %> seat<%= seatsLeft === 1 ? '' : 's' %> left</span>
+    <% } %>
+    <% if (cls.price_cents != null) { %>
+      <span class="badge-pill">$<%= (cls.price_cents / 100).toFixed(2) %> <%= cls.price_per === 'family' ? '/ family' : '/ student' %></span>
+    <% } %>
+  </div>
+
+  <% if (cls.description) { %>
+    <div class="hint forum-editable-display parent-class-description"><%- cls.description %></div>
+  <% } %>
+
+  <hr class="parent-class-divider" />
+
+  <h4>Register your children</h4>
+  <% if (!hasChildren) { %>
+    <p class="hint">No students are linked to your family yet.</p>
+  <% } else if (children.length === 0) { %>
+    <p class="hint">None of your children are the right age/grade for this class<% if (gradeLabel) { %> (<%= gradeLabel %>)<% } %>.</p>
+  <% } else { %>
+    <%
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function childControl(child) {
+      var name = escapeHtml(child.name);
+      var waitlistPos = waitlistPositionByStudentId[child.id];
+      var isEnrolled = enrolledIds.indexOf(child.id) !== -1;
+      if (isEnrolled || waitlistPos != null) {
+        var statusLabel = waitlistPos != null ? 'Waitlisted (#' + waitlistPos + ')' : 'Registered';
+        var cancelDisabled = !cls.allow_cancel;
+        return (
+          '<div class="parent-class-child-row">' +
+          '<span class="parent-class-child-name">' + name + '</span>' +
+          '<span class="badge-pill' + (waitlistPos != null ? '' : ' badge-pill-present') + '">' + statusLabel + '</span>' +
+          (cancelDisabled
+            ? '<span class="hint">Cancellation not allowed for this class</span>'
+            : '<form method="POST" action="/parent/classes/' + cls.id + '/unregister" class="inline-block-form">' +
+              '<input type="hidden" name="studentId" value="' + child.id + '" />' +
+              '<input type="hidden" name="day" value="' + day + '" />' +
+              '<button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>' +
+              '</form>') +
+          '</div>'
+        );
+      }
+      var reg = '<div class="parent-class-child-row"><span class="parent-class-child-name">' + name + '</span>';
+      if (!cls.registration_open) {
+        reg += '<span class="hint">Not open for registration</span>';
+      } else if (!cls.allow_parent_register) {
+        reg += '<span class="hint">Parent registration not open for this class</span>';
+      } else if (!windowOpen) {
+        reg += '<span class="hint">Registration window not open yet</span>';
+      } else {
+        reg +=
+          '<form method="POST" action="/parent/classes/' + cls.id + '/register" class="inline-block-form">' +
+          '<input type="hidden" name="studentId" value="' + child.id + '" />' +
+          '<input type="hidden" name="day" value="' + day + '" />' +
+          '<button type="submit" class="roster-action-btn">Register</button>' +
+          '</form>';
+      }
+      reg += '</div>';
+      return reg;
+    }
+    %>
+    <div class="parent-class-children">
+      <% children.forEach(function(child) { %><%- childControl(child) %><% }); %>
+    </div>
+  <% } %>
+</div>

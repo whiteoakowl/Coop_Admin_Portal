@@ -13,7 +13,16 @@ const fs = require('fs');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount, familyForAccount } = require('../utils/portalAuth');
-const { allClassesList } = require('../utils/classSchedule');
+const {
+  roomGridForDay,
+  hoursForDay,
+  ageGroupList,
+  getClass,
+  formatGradeRange,
+  DAY_LABELS,
+  isValidDay,
+  defaultDay,
+} = require('../utils/classSchedule');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -97,63 +106,55 @@ router.get('/', async (req, res) => {
   });
 });
 
-// Every child's own section membership, and every class's own section
-// restriction, computed once for the whole list page rather than once
-// per (class, child) pair - eligibleChildIdsByClass[classId] is the set
-// of childIds from `children` who may register for that class specific
-// class, by section alone (role gating - allow_parent_register - is
-// checked separately, since it isn't per-child).
-async function eligibleChildIdsByClass(children, classes) {
-  const childSectionIds = {};
-  for (const child of children) childSectionIds[child.id] = await sectionIdsForMember(child.id);
-
-  const result = {};
-  for (const c of classes) {
-    const restriction = await classSectionIds(c.id);
-    result[c.id] = children.filter((child) => memberSatisfiesRestriction(childSectionIds[child.id], restriction)).map((child) => child.id);
-  }
-  return result;
+// Redirect target for the register/unregister POSTs below - always back
+// to the day grid the dialog was opened from, so cancelling/registering
+// from inside the popup lands the parent right back where they were
+// instead of resetting to Monday. Returns a URL already ending in `?` or
+// `&` so a caller can always just tack `error=`/`notice=` straight on,
+// regardless of whether a `day` param made it in.
+function classesBackUrl(day) {
+  return isValidDay(day) ? `/parent/classes?day=${day}&` : '/parent/classes?';
 }
 
+// The room x hour grid, day-tabbed exactly like Co-op Admin's own Class
+// Schedules page (utils/classSchedule.js's roomGridForDay - same data,
+// same visual grid, just read-only and with each card opening a
+// registration popup instead of an edit form). A real request: "the
+// class grid on parent portal should look like [the Co-op Admin one] -
+// when members click on the class it will show a popup with further
+// information... and list the appropriate age/grade students from your
+// family that you can sign up." Every class for the day shows here
+// regardless of registration_open - closed classes are still worth
+// seeing on the grid (and still show an already-enrolled child, added
+// straight through Co-op Admin's own roster tools) - only the fragment
+// dialog's own register controls actually gate on it.
 router.get('/classes', async (req, res) => {
+  const day = isValidDay(req.query.day) ? req.query.day : defaultDay();
   const children = await childrenForAccount(req.portalAccount);
   const childIds = children.map((c) => c.id);
-  const enrollmentRows = childIds.length
-    ? await db
-        .prepare(`SELECT class_id, student_id FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')})`)
-        .all(...childIds)
-    : [];
-  const enrolledKey = new Set(enrollmentRows.map((r) => `${r.class_id}:${r.student_id}`));
 
-  const waitlistRows = childIds.length
-    ? await db
-        .prepare(
-          `SELECT class_id, student_id, waitlist_position FROM class_registrations
-           WHERE status = 'waitlisted' AND student_id IN (${childIds.map(() => '?').join(',')})`
-        )
-        .all(...childIds)
+  // Just enough to badge a card "Registered" at a glance - the fragment
+  // dialog (fetched on click) does the real per-child eligibility and
+  // register/cancel work below.
+  const enrolledClassIds = childIds.length
+    ? (
+        await db
+          .prepare(`SELECT DISTINCT class_id FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')})`)
+          .all(...childIds)
+      ).map((r) => r.class_id)
     : [];
-  const waitlistPositionByKey = {};
-  waitlistRows.forEach((r) => {
-    waitlistPositionByKey[`${r.class_id}:${r.student_id}`] = r.waitlist_position;
-  });
-
-  const classes = (await allClassesList(null)).map((c) => ({
-    ...c,
-    seatsLeft: c.capacity == null ? null : Math.max(0, c.capacity - Number(c.studentCount)),
-    isFull: c.capacity != null && Number(c.studentCount) >= c.capacity,
-  }));
 
   const windowOpen = await isRegistrationOpenForAccount(req.portalRoles);
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
 
   res.render('parent-classes', {
     title: 'Classes',
-    classes,
-    children,
-    enrolledKey: [...enrolledKey],
-    waitlistPositionByKey,
-    eligibleChildIdsByClass: await eligibleChildIdsByClass(children, classes),
+    day,
+    dayLabel: DAY_LABELS[day],
+    hours: await hoursForDay(day),
+    roomGrid: await roomGridForDay(day),
+    hasChildren: children.length > 0,
+    enrolledClassIds,
     windowOpen,
     nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
@@ -161,14 +162,87 @@ router.get('/classes', async (req, res) => {
   });
 });
 
+// Powers the click-a-class-card popup: class info (day/time/room/
+// teacher/price/seats/public description) plus, per child in the
+// signed-in parent's own family, either their current registration
+// status (Cancel, or their waitlist position) or a Register control -
+// shown only for a child who is BOTH the right age/grade for this class
+// (classes.age_group, same GRADE_LEVELS vocabulary as the create/edit
+// class form) AND, if the class is section-restricted, in an allowed
+// section. A child already enrolled/waitlisted always shows regardless
+// of either check - added straight through Co-op Admin (or since aged
+// out of the grade range) shouldn't make their existing spot vanish from
+// view. Fetched as an HTML fragment (no <html>/<body>) into the shared
+// dialog, same pattern as the Co-op Admin grid's own View popup - see
+// public/js/fragment-dialog.js and public/js/class-schedule-view.js.
+router.get('/classes/:id/fragment', async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
+  const cls = await getClass(classId);
+  if (!cls) return res.status(404).send('Not found');
+
+  const children = await childrenForAccount(req.portalAccount);
+  const childIds = children.map((c) => c.id);
+
+  const enrolledRows = childIds.length
+    ? await db
+        .prepare(`SELECT student_id FROM class_enrollments WHERE class_id = ? AND student_id IN (${childIds.map(() => '?').join(',')})`)
+        .all(classId, ...childIds)
+    : [];
+  const enrolledIds = new Set(enrolledRows.map((r) => r.student_id));
+
+  const waitlistRows = childIds.length
+    ? await db
+        .prepare(
+          `SELECT student_id, waitlist_position FROM class_registrations
+           WHERE class_id = ? AND status = 'waitlisted' AND student_id IN (${childIds.map(() => '?').join(',')})`
+        )
+        .all(classId, ...childIds)
+    : [];
+  const waitlistPositionByStudentId = {};
+  waitlistRows.forEach((r) => {
+    waitlistPositionByStudentId[r.student_id] = r.waitlist_position;
+  });
+
+  const allowedGrades = ageGroupList(cls.age_group);
+  const restriction = await classSectionIds(classId);
+  const eligibleChildren = [];
+  for (const child of children) {
+    if (enrolledIds.has(child.id) || waitlistPositionByStudentId[child.id] != null) {
+      eligibleChildren.push(child);
+      continue;
+    }
+    if (allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
+    if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(child.id), restriction)) continue;
+    eligibleChildren.push(child);
+  }
+
+  const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
+  const staff = cls.staff || [];
+
+  res.render('parent-class-fragment', {
+    cls,
+    day: req.query.day || cls.day,
+    gradeLabel: formatGradeRange(cls.age_group),
+    teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
+    assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+    seatsLeft: cls.capacity == null ? null : Math.max(0, cls.capacity - enrolledCount),
+    isFull: cls.capacity != null && enrolledCount >= cls.capacity,
+    children: eligibleChildren,
+    hasChildren: children.length > 0,
+    enrolledIds: [...enrolledIds],
+    waitlistPositionByStudentId,
+    windowOpen: await isRegistrationOpenForAccount(req.portalRoles),
+  });
+});
+
 router.post('/classes/:id/register', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const studentId = parseInt(req.body.studentId, 10);
-  const back = '/parent/classes';
+  const back = classesBackUrl(req.body.day);
 
   const children = await childrenForAccount(req.portalAccount);
   if (!children.some((c) => c.id === studentId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only register your own children.'));
+    return res.redirect(back + 'error=' + encodeURIComponent('You can only register your own children.'));
   }
 
   const result = await registerForClass({
@@ -178,23 +252,23 @@ router.post('/classes/:id/register', async (req, res) => {
     portalRoles: req.portalRoles,
     allowField: 'allow_parent_register',
   });
-  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
-  res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
+  if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
+  res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
 });
 
 router.post('/classes/:id/unregister', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const studentId = parseInt(req.body.studentId, 10);
-  const back = '/parent/classes';
+  const back = classesBackUrl(req.body.day);
 
   const children = await childrenForAccount(req.portalAccount);
   if (!children.some((c) => c.id === studentId)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage registrations for your own children.'));
+    return res.redirect(back + 'error=' + encodeURIComponent('You can only manage registrations for your own children.'));
   }
 
   const result = await unregisterFromClass({ classId, studentId, accountId: req.portalAccount.id });
-  if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
-  res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+  if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
+  res.redirect(back + 'notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
 // Library - read-only. Reuses the EXISTING library_items/library_checkouts
