@@ -18,6 +18,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const announcements = require('../utils/announcements');
 const emailComposer = require('../utils/emailComposer');
+const textComposer = require('../utils/textComposer');
 
 router.get('/announcements', requireAdmin, async (req, res) => {
   const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
@@ -130,11 +131,80 @@ router.post('/announcements/email/:id/send', requireAdmin, async (req, res) => {
   res.redirect('/admin/announcements/email?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
 });
 
-// Text composer tab (item 13) isn't built yet - keeps the 4-tab
-// Communication bar fully clickable in the meantime rather than linking
-// to a 404.
-router.get('/announcements/text', requireAdmin, (req, res) => {
-  res.render('admin-communication-coming-soon', { title: 'Communication', activeTab: 'text' });
+// Communication > Text tab (item 13): same shared filter/candidate list
+// as Email, simpler compose screen. See routes/main-admin-
+// announcements.js's identical tab and utils/textComposer.js's own
+// header comment.
+router.get('/announcements/text', requireAdmin, async (req, res) => {
+  const [roles, sections, gradeLevels, candidates, campaigns] = await Promise.all([
+    emailComposer.listRoles(),
+    emailComposer.listSections(),
+    emailComposer.listGradeLevels(),
+    emailComposer.listRecipientCandidates(),
+    textComposer.listCampaigns(),
+  ]);
+  res.render('admin-text', {
+    title: 'Communication',
+    roles,
+    sections,
+    gradeLevels,
+    ageGroups: emailComposer.AGE_GROUPS,
+    candidates,
+    campaigns,
+    maxWords: textComposer.MAX_WORDS,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/announcements/text/compose', requireAdmin, async (req, res) => {
+  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  if (recipientIds.length === 0) return res.redirect('/admin/announcements/text?error=' + encodeURIComponent('Select at least one recipient.'));
+
+  const candidates = await emailComposer.listRecipientCandidates();
+  const recipients = candidates.filter((c) => recipientIds.includes(c.accountId));
+  res.render('admin-text-compose', {
+    title: 'Compose Text',
+    recipients,
+    maxWords: textComposer.MAX_WORDS,
+    error: null,
+  });
+});
+
+router.post('/announcements/text/send', requireAdmin, async (req, res) => {
+  const recipientIds = [].concat(req.body.recipientIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const body = (req.body.body || '').trim();
+  const sendOption = req.body.sendOption === 'schedule' ? 'schedule' : 'now';
+  const scheduledAt = (req.body.scheduledAt || '').trim();
+  const wordCount = textComposer.wordCount(body);
+
+  const renderError = async (message) => {
+    const candidates = await emailComposer.listRecipientCandidates();
+    return res.render('admin-text-compose', {
+      title: 'Compose Text',
+      recipients: candidates.filter((c) => recipientIds.includes(c.accountId)),
+      maxWords: textComposer.MAX_WORDS,
+      error: message,
+    });
+  };
+
+  if (recipientIds.length === 0 || !body) return renderError('Recipients and a message are both required. Go back and try again.');
+  if (wordCount > textComposer.MAX_WORDS) return renderError(`That message is ${wordCount} words - texts are capped at ${textComposer.MAX_WORDS} words.`);
+  if (sendOption === 'schedule' && !scheduledAt) return renderError('Choose a date/time to schedule this text for.');
+
+  if (sendOption === 'schedule') {
+    await textComposer.createScheduled({ body, recipientAccountIds: recipientIds, scheduledAt, sentByAccountId: null, sentByPortal: 'coop_admin' });
+    return res.redirect('/admin/announcements/text?notice=' + encodeURIComponent(`Scheduled for ${scheduledAt}.`));
+  }
+
+  const { recipientCount } = await textComposer.createAndSend({ body, recipientAccountIds: recipientIds, sentByAccountId: null, sentByPortal: 'coop_admin' });
+  res.redirect('/admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${recipientCount} member(s).`));
+});
+
+router.post('/announcements/text/:id/send', requireAdmin, async (req, res) => {
+  const campaign = await textComposer.sendScheduled(req.params.id);
+  if (!campaign) return res.redirect('/admin/announcements/text?error=' + encodeURIComponent('That text was already sent or does not exist.'));
+  res.redirect('/admin/announcements/text?notice=' + encodeURIComponent(`Sent to ${campaign.recipient_count} member(s).`));
 });
 
 module.exports = router;
