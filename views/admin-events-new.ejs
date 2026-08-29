@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="event-wizard-header">
+      <div>
+        <h1>Create New Event</h1>
+        <p class="hint">Fill in the details below to create your event.</p>
+      </div>
+      <div class="event-wizard-header-actions">
+        <button type="submit" form="event-wizard-form" name="status" value="draft" class="btn-secondary">Save Draft</button>
+        <button type="submit" form="event-wizard-form" name="status" value="published" class="primary-btn">Publish Event</button>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%
+    // Step definitions drive both the circle strip and the button-label
+    // logic below, so the two can never drift out of sync (a 6th step
+    // added here shows up as a 6th circle automatically).
+    var wizardSteps = [
+      { n: 1, label: 'Details' },
+      { n: 2, label: 'Date & Time' },
+      { n: 3, label: 'Location' },
+      { n: 4, label: 'Tickets' },
+      { n: 5, label: 'Additional' },
+    ];
+    %>
+    <div class="event-wizard-steps" data-wizard-steps>
+      <% wizardSteps.forEach(function(s, i) { %>
+        <button type="button" class="event-wizard-step<%= i === 0 ? ' active' : '' %>" data-step-tab="<%= s.n %>">
+          <span class="event-wizard-step-circle"><%= s.n %></span>
+          <span class="event-wizard-step-label"><%= s.label %></span>
+        </button>
+      <% }); %>
+    </div>
+
+    <form id="event-wizard-form" method="POST" action="/main-admin/events">
+      <div class="manage-section event-wizard-panel" data-step-panel="1">
+        <h2>Event Details</h2>
+        <div class="member-form-grid">
+          <label class="member-form-full">Event Title <span class="required-star">*</span>
+            <input type="text" name="title" placeholder="e.g., Annual Science Fair 2026" required data-slug-source />
+          </label>
+          <label>Event Slug
+            <input type="text" name="slug" placeholder="your-event-slug" data-slug-target />
+            <span class="hint">This will be part of your event's URL.</span>
+          </label>
+          <label>Event Category
+            <select name="categoryId">
+              <option value="">Select a category</option>
+              <% categories.forEach(function(c) { %>
+                <option value="<%= c.id %>"><%= c.name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Event Type
+            <select name="eventType">
+              <option value="">Select event type</option>
+              <% eventTypes.forEach(function(t) { %>
+                <option value="<%= t %>"><%= t %></option>
+              <% }); %>
+            </select>
+          </label>
+          <div class="member-form-full">
+            <label>Short Description <span class="required-star">*</span> <span class="hint">(50-150 characters)</span></label>
+            <div class="class-form-textarea-wrap">
+              <textarea name="shortDescription" rows="2" maxlength="150" placeholder="A short summary of your event" required oninput="this.nextElementSibling.textContent = this.value.length + '/150'"></textarea>
+              <span class="class-form-char-count">0/150</span>
+            </div>
+          </div>
+          <div class="member-form-full" data-forum-editor>
+            <label>Event Description <span class="required-star">*</span></label>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+            <input type="hidden" name="description" data-forum-body-input required />
+          </div>
+        </div>
+
+        <h3 class="event-wizard-subheading">Audience &amp; Restrictions</h3>
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
+          <div class="grade-pill-grid">
+            <% gradeOptions.forEach(function(g) { %>
+              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
+            <% }); %>
+          </div>
+        </div>
+
+        <div class="event-wizard-footer">
+          <a class="btn-secondary" href="/main-admin/events">Cancel</a>
+          <div class="event-wizard-footer-right">
+            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="manage-section event-wizard-panel" data-step-panel="2" hidden>
+        <h2>Date &amp; Time</h2>
+        <div class="member-form-grid">
+          <label>Starts <span class="required-star">*</span>
+            <input type="datetime-local" name="startsAt" required />
+          </label>
+          <label>Ends
+            <input type="datetime-local" name="endsAt" />
+          </label>
+          <label>Registration Opens
+            <input type="datetime-local" name="registrationOpensAt" />
+          </label>
+          <label>Registration Closes
+            <input type="datetime-local" name="registrationClosesAt" />
+          </label>
+        </div>
+
+        <div class="event-wizard-footer">
+          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <div class="event-wizard-footer-right">
+            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="manage-section event-wizard-panel" data-step-panel="3" hidden>
+        <h2>Location</h2>
+        <div class="member-form-grid">
+          <label class="member-form-full">Location (legacy text - prefer the dropdown below)
+            <input type="text" name="location" placeholder="e.g., Community Center, 123 Main St" />
+          </label>
+          <label class="member-form-full">Location
+            <select name="locationId">
+              <option value="">None</option>
+              <% locations.forEach(function(l) { %>
+                <option value="<%= l.id %>"><%= l.name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Visibility
+            <select name="visibility">
+              <option value="members">Members only</option>
+              <option value="public">Public</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="event-wizard-footer">
+          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <div class="event-wizard-footer-right">
+            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="manage-section event-wizard-panel" data-step-panel="4" hidden>
+        <h2>Tickets</h2>
+        <div class="member-form-grid">
+          <label>Capacity (people) <span class="hint">(blank = no limit)</span>
+            <input type="number" name="capacity" min="1" placeholder="No limit" />
+          </label>
+          <label>Family Capacity (families) <span class="hint">(blank = no limit)</span>
+            <input type="number" name="familyCapacity" min="1" placeholder="No limit" />
+          </label>
+          <label>Price ($) <span class="hint">(blank = free)</span>
+            <input type="number" name="priceDollars" min="0" step="0.01" placeholder="e.g. 10.00" />
+          </label>
+          <label>Charged per
+            <select name="pricePer">
+              <option value="person">Person</option>
+              <option value="family">Family</option>
+            </select>
+          </label>
+        </div>
+
+        <h3 class="event-wizard-subheading">Who Can Register</h3>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <input type="hidden" name="allowAdultRegister" value="off" />
+            <label class="grade-pill"><input type="checkbox" name="allowAdultRegister" value="1" checked /> Parents/adults can register</label>
+          </div>
+          <div class="class-form-field">
+            <input type="hidden" name="allowChildRegister" value="off" />
+            <label class="grade-pill"><input type="checkbox" name="allowChildRegister" value="1" checked /> Kids can register</label>
+          </div>
+        </div>
+
+        <div class="event-wizard-footer">
+          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <div class="event-wizard-footer-right">
+            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="manage-section event-wizard-panel" data-step-panel="5" hidden>
+        <h2>Additional Details</h2>
+        <div class="member-form-grid">
+          <label>Language
+            <select name="language">
+              <option value="">Select language</option>
+              <% languages.forEach(function(l) { %>
+                <option value="<%= l %>"><%= l %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Organized By
+            <input type="text" name="organizedBy" placeholder="e.g., Sanford Homeschoolers" />
+          </label>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Tags <span class="hint">(helps people find your event)</span></span>
+            <div data-tag-input="tags" class="tag-input-wrap">
+              <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
+            </div>
+          </div>
+        </div>
+
+        <% if (sections.length) { %>
+          <h3 class="event-wizard-subheading">Sections <span class="hint">(leave all unchecked to allow every section - restricts BOTH viewing and registering)</span></h3>
+          <div class="grade-pill-grid">
+            <% sections.forEach(function(s) { %>
+              <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" /> <%= s.name %></label>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <p class="hint event-wizard-media-note">
+          <svg class="icon"><use href="#icon-image"/></svg>
+          An event photo/banner can be added from the event's own page once it's created.
+        </p>
+
+        <div class="event-wizard-footer">
+          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <div class="event-wizard-footer-right">
+            <button type="submit" name="status" value="draft" class="btn-secondary">Save Draft</button>
+            <button type="submit" name="status" value="published" class="primary-btn">Publish Event</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script src="/js/forum-editor.js"></script>
+  <script src="/js/tag-input.js"></script>
+  <script src="/js/event-wizard.js"></script>
+</body>
+</html>

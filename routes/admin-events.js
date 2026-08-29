@@ -40,6 +40,25 @@ function registrationFieldsFromBody(body) {
   };
 }
 
+// The Create New Event wizard's own fields beyond what already existed -
+// slug/type/short description/language/organized-by/tags. Split out from
+// registrationFieldsFromBody above since these carry no registration
+// enforcement of their own, purely descriptive.
+function wizardFieldsFromBody(body) {
+  return {
+    slug: (body.slug || '').trim(),
+    eventType: (body.eventType || '').trim(),
+    shortDescription: (body.shortDescription || '').trim(),
+    language: (body.language || '').trim(),
+    organizedBy: (body.organizedBy || '').trim(),
+    // Comma-joined TEXT column, same multi-value convention classes.
+    // age_group/events.age_group already use - tags arrive as repeated
+    // `tags` fields from the wizard's own chip input (public/js/tag-
+    // input.js), one per chip, same shape a checkbox-grid submits.
+    tags: [].concat(body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
+  };
+}
+
 // Public bucket (event images are meant to be visible on the public
 // homepage too, unlike admin-documents.js's private `documents` bucket)
 // - same publicUrl()-or-local-disk pattern admin-name-tag.js/admin-
@@ -210,12 +229,38 @@ router.post('/:id/decide', async (req, res) => {
   res.redirect('/main-admin/events?tab=requests&notice=' + encodeURIComponent(`Submission ${result}.`));
 });
 
+// Powers the Create New Event wizard (views/admin-events-new.ejs) - a
+// real request to match a reference mockup's 5-step Details/Date & Time/
+// Location/Tickets/Additional flow. Registered before the plain POST /
+// below only for readability (a GET and a POST on the same '/' never
+// actually collide), and well before any bare GET '/:id' would (there
+// isn't one today, but this is the same "literal path before :id" rule
+// this app's route files keep re-learning - see routes/admin-classifieds.js's
+// own comment on it).
+router.get('/new', async (req, res) => {
+  res.render('admin-events-new', {
+    title: 'Create New Event',
+    categories: await events.listCategories(),
+    locations: await events.listLocations(),
+    sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
+    gradeOptions: events.GRADE_OPTIONS,
+    eventTypes: events.EVENT_TYPES,
+    languages: events.LANGUAGES,
+    error: req.query.error || null,
+  });
+});
+
 router.post('/', async (req, res) => {
   const title = (req.body.title || '').trim();
   const startsAt = toSqlTimestamp(req.body.startsAt);
   if (!title || !startsAt) {
-    return res.redirect('/main-admin/events?notice=' + encodeURIComponent('Title and start date/time are required.'));
+    return res.redirect('/main-admin/events/new?error=' + encodeURIComponent('Title and start date/time are required.'));
   }
+  // The wizard's Save Draft / Publish Event buttons are two submits of
+  // the same form, distinguished only by which button's name="status"
+  // value made it into the body (the pre-wizard "+ New Event" popup no
+  // longer exists, so status is always one of these two now).
+  const status = req.body.status === 'published' ? 'published' : 'draft';
   const id = await events.createEvent(
     {
       title,
@@ -228,11 +273,13 @@ router.post('/', async (req, res) => {
       visibility: req.body.visibility === 'public' ? 'public' : 'members',
       capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
       ...registrationFieldsFromBody(req.body),
+      ...wizardFieldsFromBody(req.body),
     },
-    req.portalAccount.id
+    req.portalAccount.id,
+    { status }
   );
   await events.setEventSections(id, req.body.sectionIds);
-  res.redirect(`/main-admin/events/${id}/builder`);
+  res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent(status === 'published' ? 'Event published.' : 'Draft saved.'));
 });
 
 // --- CSV export/import (item 5) - registered before the /:id param
@@ -278,6 +325,9 @@ async function loadBuilder(req, res) {
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     selectedGrades: events.parseAgeGroupList(event.age_group),
+    eventTypes: events.EVENT_TYPES,
+    languages: events.LANGUAGES,
+    selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -303,6 +353,7 @@ router.post('/:id', async (req, res) => {
     visibility: req.body.visibility === 'public' ? 'public' : 'members',
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
     ...registrationFieldsFromBody(req.body),
+    ...wizardFieldsFromBody(req.body),
   });
   await events.setEventSections(id, req.body.sectionIds);
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Settings saved.'));

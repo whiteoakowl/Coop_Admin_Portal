@@ -28,6 +28,44 @@ const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/p
 // unlike a bare undeclared identifier), not the value the caller passed.
 const classLinks = typeof locals.classLinks !== 'undefined' ? locals.classLinks : null;
 
+// Main Admin's own primary nav - a real request: "there are many
+// duplicate tabs, these should be the tabs and in this order." Every
+// views/main-admin-*.ejs/admin-<feature>-*.ejs file used to pass its OWN
+// copy of this same list as its own navLinks - 45 separate copies that
+// only ever drifted further apart from each other (a feature added or
+// reordered in one file with no reason it would ever get applied to the
+// other 44), which is exactly what produced the duplicate/inconsistent
+// tabs being reported. Defining it once here and using it for every
+// Main Admin page regardless of whatever navLinks that page's own call
+// site still happens to pass makes that drift structurally impossible
+// from here on - whatever's in this one array IS Main Admin's nav,
+// everywhere, unconditionally. Trimmed from 19 items down to 14 (Member
+// Directory/Newsletter/Notifications/Publications/Audit Log dropped),
+// then Publications was added back plus a new Academics tab (diploma +
+// transcript creation - see routes/main-admin.js's /academics routes),
+// for 16 total. Member Directory/Newsletter/Notifications/Audit Log
+// still reachable by their own direct URL, just no longer a standing nav
+// tab.
+const MAIN_ADMIN_NAV_LINKS = [
+  { href: '/main-admin', icon: 'home', label: 'Home' },
+  { href: '/main-admin/members', icon: 'users', label: 'Members' },
+  { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
+  { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
+  { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
+  { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+  { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+  { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/main-admin/store', icon: 'tag', label: 'Shop' },
+  { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
+  { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+  { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
+  { href: '/main-admin/academics', icon: 'graduation-cap', label: 'Academics' },
+];
+const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : navLinks;
+
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,
 // Publications, Custom Forms, Accounting, Notifications) shipped as
@@ -104,32 +142,30 @@ const COMMUNITY_LINKS_STUDENT = [
   { href: '/store', icon: 'grid', label: 'Store' },
   { href: '/photos', icon: 'camera', label: 'Photos' },
 ];
-// A real request: "audit log should be under the gear symbol for
-// settings at the top of the page" - moved out of this list into the
-// Settings gear's own dropdown below (alongside Users/Roles & Permissions/
-// Website/Co-op Admin Portal), same place items 1/6/8 of the earlier
-// session's own request moved Roles & Permissions/Website/Co-op Admin
-// Portal to.
-const COMMUNITY_ADMIN_LINKS = [
-  { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
-  { href: '/main-admin/member-directory', icon: 'user', label: 'Member Directory' },
-  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
-  { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
-  { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Forms' },
-  { href: '/main-admin/store', icon: 'grid', label: 'Store' },
-  { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
-  { href: '/main-admin/photos', icon: 'camera', label: 'Photos' },
-  { href: '/main-admin/publications', icon: 'file-text', label: 'Publications' },
-  { href: '/main-admin/accounting', icon: 'check-circle', label: 'Accounting' },
-];
 // portalTitle is a plain, caller-supplied string ('Main Admin' from every
 // views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
 // panels themselves reuse this same partial+shell, see their own
 // portalTitle) rather than a role key, so this checks the literal value
 // every one of those callers already passes - no new local needed.
+//
+// Main Admin gets no separate Community section at all (empty array, not
+// its own COMMUNITY_ADMIN_LINKS list) - a real request: "this entire 2nd
+// section of the main admin portal needs to be removed, the tabs are
+// redundant." Every one of Main Admin's own navLinks arrays (one per
+// views/main-admin-*.ejs/admin-<feature>-*.ejs file) already lists every
+// Community & Commerce feature by its own /main-admin/<feature> edit
+// route (Events, Business Directory, Classifieds, Member Directory, Chat,
+// Custom Forms, Accounting, Store, Newsletter, Photos, Publications,
+// Audit Log) - the old COMMUNITY_ADMIN_LINKS list below duplicated every
+// one of them a second time, just with slightly different labels
+// ("Forms" vs. "Custom Forms") and the read-only-portal hrefs swapped for
+// the same /main-admin/<feature> ones already one section up. Unlike
+// Parent/Teacher/Student Portal below, Main Admin's own navLinks were
+// never trimmed down to a short "core" set with Community picking up the
+// rest - they already ARE the full set, so there's nothing left for a
+// second section to add.
 const communityLinks =
-  portalTitle === 'Main Admin' ? COMMUNITY_ADMIN_LINKS
+  portalTitle === 'Main Admin' ? []
     : portalTitle === 'Parent Portal' ? COMMUNITY_LINKS_PARENT
     : portalTitle === 'Teacher Portal' ? COMMUNITY_LINKS_TEACHER
     : portalTitle === 'Student Portal' ? COMMUNITY_LINKS_STUDENT
@@ -144,7 +180,7 @@ const communityLinks =
   </a>
   <p class="portal-nav-title"><%= portalTitle %></p>
   <nav id="admin-nav-links">
-    <% navLinks.forEach(function(link) { %>
+    <% primaryNavLinks.forEach(function(link) { %>
       <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
     <% }); %>
   </nav>
@@ -156,12 +192,14 @@ const communityLinks =
       <% }); %>
     </nav>
   <% } %>
-  <p class="portal-nav-title">Community</p>
-  <nav id="community-nav-links">
-    <% communityLinks.forEach(function(link) { %>
-      <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
-    <% }); %>
-  </nav>
+  <% if (communityLinks.length) { %>
+    <p class="portal-nav-title">Community</p>
+    <nav id="community-nav-links">
+      <% communityLinks.forEach(function(link) { %>
+        <a href="<%= link.href %>"><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+      <% }); %>
+    </nav>
+  <% } %>
   <div class="admin-sidebar-bottom">
     <%# A real request: "roles and permissions, website settings, and
         co-op admin portal links should all be under the main admin
@@ -233,7 +271,7 @@ const communityLinks =
 </div>
 
 <nav class="admin-mobile-tabs" id="admin-mobile-tabs">
-  <% navLinks.forEach(function(link) { %>
+  <% primaryNavLinks.forEach(function(link) { %>
     <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
   <% }); %>
   <%# Same classLinks as the desktop sidebar's own #class-nav-links block

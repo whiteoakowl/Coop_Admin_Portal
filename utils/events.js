@@ -26,6 +26,13 @@ const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 
+// The Create New Event wizard's own Event Type / Language dropdowns - a
+// fixed, short list is plenty for a single co-op (unlike GRADE_OPTIONS/
+// sections, nothing else in the app reads these back to gate anything,
+// they're purely descriptive fields shown on the event).
+const EVENT_TYPES = ['In-Person', 'Virtual', 'Hybrid'];
+const LANGUAGES = ['English', 'Spanish', 'Other'];
+
 // A real request: "every list should always be alphabetical according to
 // last name." Every list here carries a person's display name under a
 // different key depending on the query (memberName from a JOIN,
@@ -224,10 +231,23 @@ function eventFields(data) {
     data.allowChildRegister ? 1 : 0,
     data.priceCents ?? null,
     data.pricePer === 'family' ? 'family' : 'person',
+    data.slug || null,
+    data.eventType || null,
+    data.shortDescription || null,
+    data.language || null,
+    data.organizedBy || null,
+    data.tags || null,
   ];
 }
 
-async function createEvent(data, accountId, { submittedByAccountId = null, approvalStatus: forcedApprovalStatus = null } = {}) {
+// status defaults to 'draft' (every pre-wizard caller, and a member's own
+// submitEvent below, still create a plain draft) - the Create New Event
+// wizard's own Publish Event button is the one caller that now passes
+// 'published' straight through, so publishing no longer needs a separate
+// save-then-status round trip. approvalStatus can also be forced (item
+// 9's family-submission "Automatically Approve" setting) rather than
+// derived from submittedByAccountId alone.
+async function createEvent(data, accountId, { submittedByAccountId = null, status = 'draft', approvalStatus: forcedApprovalStatus = null } = {}) {
   const approvalStatus = forcedApprovalStatus || (submittedByAccountId ? 'pending' : 'approved');
   const info = await db
     .prepare(
@@ -235,10 +255,11 @@ async function createEvent(data, accountId, { submittedByAccountId = null, appro
          title, description, category, category_id, location, location_id, starts_at, ends_at, visibility, capacity,
          family_capacity, age_group, registration_opens_at, registration_closes_at,
          allow_adult_register, allow_child_register, price_cents, price_per,
+         slug, event_type, short_description, language, organized_by, tags,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, 'draft');
+    .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
 }
 
@@ -249,6 +270,7 @@ async function updateEvent(id, data) {
          title = ?, description = ?, category = ?, category_id = ?, location = ?, location_id = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?,
          family_capacity = ?, age_group = ?, registration_opens_at = ?, registration_closes_at = ?,
          allow_adult_register = ?, allow_child_register = ?, price_cents = ?, price_per = ?,
+         slug = ?, event_type = ?, short_description = ?, language = ?, organized_by = ?, tags = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -915,6 +937,8 @@ function monthGrid(monthParam, eventList) {
 
 module.exports = {
   GRADE_OPTIONS,
+  EVENT_TYPES,
+  LANGUAGES,
   monthGrid,
   sortByLastNameField,
   parseAgeGroupList,

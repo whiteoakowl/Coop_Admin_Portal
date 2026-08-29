@@ -6,26 +6,6 @@
 <body>
   <%- include('partials/portal-nav', {
     portalTitle: 'Main Admin',
-    navLinks: [
-      { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/members', icon: 'users', label: 'Members' },
-      { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
-      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
-      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
-      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
-      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
-      { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
-      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
-      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
-      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
-      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
-      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
-      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
-      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-    ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
@@ -33,7 +13,7 @@
       <h1>Events</h1>
       <div class="roster-btn-row no-print">
         <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+          <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
         <% } %>
         <% if (activeTab === 'calendar') { %>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
@@ -501,62 +481,6 @@
         </a>
       <% }); %>
     </div>
-
-    <%# A real request: "the create event form needs a lot more detail
-        fields." The rest (volunteer roles, donation items, sections,
-        pricing/registration window) stay in the builder, reached right
-        after Create - those make more sense to add once the event
-        already exists, not crammed into this quick-create popup. %>
-    <dialog id="new-event-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/events">
-        <h3>New Event</h3>
-        <label>Title
-          <input type="text" name="title" placeholder="e.g. Fall Family Picnic" required />
-        </label>
-        <label>Description
-          <textarea name="description" rows="2" placeholder="What's happening, who it's for, what to bring"></textarea>
-        </label>
-        <label>Location
-          <select name="locationId">
-            <option value="">None</option>
-            <% locations.forEach(function(l) { %>
-              <option value="<%= l.id %>"><%= l.name %></option>
-            <% }); %>
-          </select>
-        </label>
-        <div class="class-form-row">
-          <div class="class-form-field">
-            <span class="class-form-field-label">Starts</span>
-            <input type="datetime-local" name="startsAt" required />
-          </div>
-          <div class="class-form-field">
-            <span class="class-form-field-label">Ends</span>
-            <input type="datetime-local" name="endsAt" />
-          </div>
-        </div>
-        <label>Category
-          <select name="categoryId">
-            <option value="">None</option>
-            <% categories.forEach(function(c) { %>
-              <option value="<%= c.id %>"><%= c.name %></option>
-            <% }); %>
-          </select>
-        </label>
-        <label>Visibility
-          <select name="visibility">
-            <option value="members">Members only</option>
-            <option value="public">Public</option>
-          </select>
-        </label>
-        <label>Capacity (people) <span class="hint">(blank = no limit)</span>
-          <input type="number" name="capacity" min="1" />
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Create</button>
-        </div>
-      </form>
-    </dialog>
 
     <%# Item 11 - "each event title on the attendance list should be able
         to click and pop up of event settings/creation appears." One

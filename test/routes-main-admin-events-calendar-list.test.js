@@ -87,9 +87,14 @@ test('Calendar tab: List/Calendar view toggle switches rendering and preserves t
   assert.match(listPage.text, /<th>Location<\/th>/);
 });
 
-test('New Event popup: many more detail fields beyond Title/Starts, and creating with them saves correctly', async () => {
+test('New Event wizard: many more detail fields beyond Title/Starts, and creating with them saves correctly', async () => {
+  // The quick-create popup this test originally covered was replaced by
+  // a full multi-step wizard at its own /main-admin/events/new route (a
+  // real request: "creating events should look just like this image" -
+  // see views/admin-events-new.ejs) - same fields, just on their own
+  // page instead of a dialog over the calendar tab.
   const admin = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', admin.cookie);
+  const page = await request(app).get('/main-admin/events/new').set('Cookie', admin.cookie);
   assert.match(page.text, /name="description"/);
   assert.match(page.text, /name="locationId"/);
   assert.match(page.text, /name="endsAt"/);
