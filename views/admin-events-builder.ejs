@@ -6,27 +6,6 @@
 <body>
   <%- include('partials/portal-nav', {
     portalTitle: 'Main Admin',
-    navLinks: [
-      { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/members', icon: 'users', label: 'Members' },
-      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
-      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
-      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
-      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
-      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
-      { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
-      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
-      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
-      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
-      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
-      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
-      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
-      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
-    ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
@@ -78,6 +57,20 @@
       <form method="POST" action="/main-admin/events/<%= event.id %>" class="member-form-grid">
         <label class="member-form-full">Title
           <input type="text" name="title" value="<%= event.title %>" required />
+        </label>
+        <label>Event Slug
+          <input type="text" name="slug" value="<%= event.slug || '' %>" placeholder="your-event-slug" />
+        </label>
+        <label>Event Type
+          <select name="eventType">
+            <option value="">Select event type</option>
+            <% eventTypes.forEach(function(t) { %>
+              <option value="<%= t %>" <%= event.event_type === t ? 'selected' : '' %>><%= t %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Short Description <span class="hint">(50-150 characters, shown wherever the event is listed)</span>
+          <textarea name="shortDescription" rows="2" maxlength="150"><%= event.short_description || '' %></textarea>
         </label>
         <div class="member-form-full" data-forum-editor>
           <label>Description</label>
@@ -166,6 +159,27 @@
             </div>
           </div>
         <% } %>
+
+        <label>Language
+          <select name="language">
+            <option value="">Select language</option>
+            <% languages.forEach(function(l) { %>
+              <option value="<%= l %>" <%= event.language === l ? 'selected' : '' %>><%= l %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Organized By
+          <input type="text" name="organizedBy" value="<%= event.organized_by || '' %>" placeholder="e.g., Sanford Homeschoolers" />
+        </label>
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Tags <span class="hint">(helps people find your event)</span></span>
+          <div data-tag-input="tags" class="tag-input-wrap">
+            <% selectedTags.forEach(function(t) { %>
+              <span class="tag-input-chip-initial" data-initial-tag="<%= t %>"></span>
+            <% }); %>
+            <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
+          </div>
+        </div>
 
         <div class="member-form-full">
           <button type="submit" class="primary-btn">Save Settings</button>
@@ -307,5 +321,6 @@
     </dialog>
   </main>
   <script src="/js/forum-editor.js"></script>
+  <script src="/js/tag-input.js"></script>
 </body>
 </html>

@@ -6,34 +6,13 @@
 <body>
   <%- include('partials/portal-nav', {
     portalTitle: 'Main Admin',
-    navLinks: [
-      { href: '/main-admin', icon: 'home', label: 'Home' },
-      { href: '/main-admin/members', icon: 'users', label: 'Members' },
-      { href: '/main-admin/announcements', icon: 'bell', label: 'Announcements' },
-      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
-      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
-      { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-      { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
-      { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
-      { href: '/main-admin/member-directory', icon: 'users', label: 'Member Directory' },
-      { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
-      { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
-      { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
-      { href: '/main-admin/store', icon: 'tag', label: 'Store' },
-      { href: '/main-admin/newsletter', icon: 'mail', label: 'Newsletter' },
-      { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
-      { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
-      { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
-    ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Events</h1>
       <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+        <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
       <% } %>
     </div>
     <p class="hint">Create and manage co-op events - registration, volunteer roles, and donation requests.</p>
@@ -230,21 +209,6 @@
       <% } %>
     <% } %>
 
-    <dialog id="new-event-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/events">
-        <h3>New Event</h3>
-        <label>Title
-          <input type="text" name="title" placeholder="e.g. Fall Family Picnic" required />
-        </label>
-        <label>Starts
-          <input type="datetime-local" name="startsAt" required />
-        </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Create</button>
-        </div>
-      </form>
-    </dialog>
   </main>
 </body>
 </html>

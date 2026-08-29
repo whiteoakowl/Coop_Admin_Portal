@@ -113,8 +113,22 @@
      bar isn't needed" - the old 184px logo alone (in a 220px-wide
      sidebar) was most of what forced the sidebar to scroll on Main
      Admin, whose left nav is the longest (its own navLinks plus the
-     12-item Community section every portal-nav.ejs caller gets). */
-  --logo-xl: 60px;  /* admin sidebar */
+     12-item Community section every portal-nav.ejs caller gets). Bumped
+     back up from 60 - two later "make the logo larger" requests, first
+     to 84 then to this 140 - safe now that Main Admin's own Community
+     section was removed as a redundant duplicate (see
+     MAIN_ADMIN_NAV_LINKS's own comment in portal-nav.ejs), which used to
+     be the longest sidebar case. Checked against whichever portal-nav.ejs
+     caller has the longest list now (the shared Community pages like
+     Store/Chat/Forms, which still get the full 12-item COMMUNITY_LINKS
+     plus their own 2-3 navLinks - about 15 items total): headless probes
+     of .admin-sidebar's scrollHeight vs. clientHeight on that page found
+     the sidebar first needs to scroll on browser viewports shorter than
+     ~600px tall at this size - still comfortable headroom on any real
+     laptop/desktop viewport (600px of vertical *browser content area*,
+     after all chrome, is an unusually short window). Re-run that same
+     probe against the Store page before going bigger still. */
+  --logo-xl: 140px;  /* admin sidebar */
   --logo-lg: 140px;  /* login page */
   --logo-md: 150px;  /* kiosk/root landing header */
   --logo-sm: 100px;  /* kiosk check-in/check-out header */
@@ -6366,3 +6380,109 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .permissions-cell-group { margin-bottom: 0.4rem; }
 .permissions-cell-group summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--brand-dark, var(--brand)); }
 .permissions-cell-group .checkbox-option { font-size: 0.85rem; padding: 0.15rem 0; }
+
+/* Create New Event wizard (Main Admin) - a real request to match a
+   reference mockup's 5-step Details/Date & Time/Location/Tickets/
+   Additional flow, in this site's own orange/brand palette rather than
+   the mockup's own purple. */
+.event-wizard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.event-wizard-header h1 { margin: 0 0 0.2rem; }
+.event-wizard-header-actions { display: flex; gap: 0.6rem; flex-shrink: 0; }
+
+.event-wizard-steps { display: flex; align-items: flex-start; margin-bottom: 2rem; }
+.event-wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+/* The connecting line between circles - drawn as one full-width segment
+   per step (not one shared line under everything) so each segment can
+   recolor independently as that step is completed, same "line fills in
+   as you progress" read the reference mockup has. Half-width + left/
+   right offsets keep it centered on the circle above rather than
+   spanning edge-to-edge of the flex item. */
+.event-wizard-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+.event-wizard-step.completed:not(:last-child)::after { background: var(--brand); }
+.event-wizard-step-circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--muted);
+  border: 2px solid var(--border);
+  position: relative;
+  z-index: 1;
+}
+.event-wizard-step.active .event-wizard-step-circle { background: var(--brand); color: #fff; border-color: var(--brand); }
+.event-wizard-step.completed .event-wizard-step-circle { background: var(--brand-dark, var(--brand)); color: #fff; border-color: var(--brand-dark, var(--brand)); }
+.event-wizard-step-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-align: center; }
+.event-wizard-step.active .event-wizard-step-label { color: var(--ink); }
+@media (max-width: 640px) {
+  .event-wizard-step-label { display: none; }
+}
+
+.event-wizard-panel h2 { margin-top: 0; }
+.event-wizard-subheading { margin: 1.5rem 0 0.75rem; font-size: 1rem; }
+.event-wizard-media-note { display: flex; align-items: center; gap: 0.4rem; margin-top: 1.25rem; }
+.event-wizard-media-note .icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+.event-wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.event-wizard-footer-right { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.required-star { color: var(--red); font-weight: 700; }
+
+/* Tags field (Create New Event, Additional step) - type-and-Enter chip
+   input, public/js/tag-input.js. The wrapper borrows a plain text
+   input's own look so it reads as one field even though what's inside
+   it is a row of chips plus a bare input, not a native form control. */
+.tag-input-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  background: var(--surface);
+}
+.tag-input-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--brand-soft);
+  color: var(--brand-dark, var(--brand));
+  border-radius: 999px;
+  padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.tag-input-chip button { background: none; border: none; cursor: pointer; color: inherit; font-size: 0.95rem; line-height: 1; padding: 0.1rem; }
+.tag-input-field { border: none; outline: none; flex: 1; min-width: 140px; font: inherit; background: transparent; }

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Academics</h1>
+    <p class="hint">Issue diplomas and manage student transcripts.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2>Issue a Diploma</h2>
+      <p class="hint">Shows up on the student's Student Portal (and their parents') immediately, with a print-friendly view.</p>
+      <form method="POST" action="/main-admin/academics/diploma" class="member-form-grid">
+        <label class="member-form-full">Student
+          <select name="studentId" required>
+            <option value="" disabled selected>Select a student&hellip;</option>
+            <% students.forEach(function(s) { %>
+              <option value="<%= s.id %>"><%= s.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Title
+          <input type="text" name="title" value="Diploma of Completion" />
+        </label>
+        <label>Issue Date
+          <input type="date" name="issuedDate" required />
+        </label>
+        <label class="member-form-full">Body Text <span class="hint">(optional - shown on the printed diploma)</span>
+          <textarea name="bodyText" rows="3"></textarea>
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Issue Diploma</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="portal-dashboard-section">
+      <h2>Issued Diplomas</h2>
+      <% if (diplomas.length === 0) { %>
+        <p class="roster-empty">No diplomas issued yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Title</th>
+                <th>Issued</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% diplomas.forEach(function(d) { %>
+                <tr>
+                  <td class="roster-name-col"><%= d.student_name %></td>
+                  <td><%= d.title %></td>
+                  <td><%= d.issued_date %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2>Add a Transcript Entry</h2>
+      <p class="hint">A completed class this system didn't automatically record - history from before this feature existed, or a class from a transfer student's previous co-op. Classes archived here going forward are added to a student's transcript automatically.</p>
+      <form method="POST" action="/main-admin/academics/transcript" class="member-form-grid">
+        <label class="member-form-full">Student
+          <select name="studentId" required>
+            <option value="" disabled selected>Select a student&hellip;</option>
+            <% students.forEach(function(s) { %>
+              <option value="<%= s.id %>"><%= s.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="member-form-full">Class Name
+          <input type="text" name="className" placeholder="e.g., Algebra I" required />
+        </label>
+        <label>Day
+          <select name="day">
+            <option value="">&mdash;</option>
+            <% Object.keys(dayLabels).forEach(function(d) { %>
+              <option value="<%= d %>"><%= dayLabels[d] %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Grade/Age Group
+          <select name="ageGroup">
+            <option value="">&mdash;</option>
+            <% gradeOptions.forEach(function(g) { %>
+              <option value="<%= g %>"><%= g %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Teacher(s)
+          <input type="text" name="teacherNames" placeholder="e.g., Jane Smith" />
+        </label>
+        <label>Term Ended
+          <input type="date" name="termEndedAt" required />
+        </label>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Add to Transcript</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="portal-dashboard-section">
+      <h2>Transcript Entries</h2>
+      <% if (transcriptEntries.length === 0) { %>
+        <p class="roster-empty">No transcript entries yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Class</th>
+                <th>Day</th>
+                <th>Grade</th>
+                <th>Teacher(s)</th>
+                <th>Term Ended</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% transcriptEntries.forEach(function(h) { %>
+                <tr>
+                  <td class="roster-name-col"><%= h.student_name %></td>
+                  <td><%= h.class_name %></td>
+                  <td><%= h.day ? (dayLabels[h.day] || h.day) : '—' %></td>
+                  <td><%= h.age_group || '—' %></td>
+                  <td><%= h.teacher_names || '—' %></td>
+                  <td><%= h.termEndedLabel || h.term_ended_at %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

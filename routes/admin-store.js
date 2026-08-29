@@ -34,7 +34,7 @@ function imageUrl(key) {
 
 router.get('/', async (req, res) => {
   const products = await store.listProducts();
-  res.render('admin-store-list', { title: 'Store', products: products.map((p) => ({ ...p, imageUrl: imageUrl(p.image_key) })), notice: req.query.notice || null });
+  res.render('admin-store-list', { title: 'Shop', products: products.map((p) => ({ ...p, imageUrl: imageUrl(p.image_key) })), notice: req.query.notice || null });
 });
 
 router.post('/', async (req, res) => {

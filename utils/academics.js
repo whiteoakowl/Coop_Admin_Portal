@@ -121,6 +121,29 @@ async function transcriptForStudent(studentId) {
   return { current, history };
 }
 
+// All student_academic_history rows, across every student, newest term
+// first - the Academics page's own "manually add a past term" form
+// writes here directly (see the migration's header comment: normally
+// only archiveClasses ever writes this table; this is the one other,
+// admin-driven way a row gets created, for history predating this
+// feature or transfer students).
+async function allTranscriptEntries() {
+  const rows = await db
+    .prepare(`SELECT h.*, m.name AS student_name FROM student_academic_history h JOIN members m ON m.id = h.student_id ORDER BY h.term_ended_at DESC`)
+    .all();
+  return rows.map((r) => ({ ...r, termEndedLabel: formatFriendlyTimestamp(r.term_ended_at) }));
+}
+
+async function addTranscriptEntry({ studentId, className, day, ageGroup, teacherNames, termEndedAt }) {
+  const info = await db
+    .prepare(
+      `INSERT INTO student_academic_history (student_id, class_name, day, age_group, teacher_names, term_ended_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(studentId, className, day || null, ageGroup || null, teacherNames || null, termEndedAt);
+  return info.lastInsertRowid;
+}
+
 module.exports = {
   assignmentsForClass,
   getAssignment,
@@ -132,4 +155,6 @@ module.exports = {
   allDiplomas,
   issueDiploma,
   transcriptForStudent,
+  allTranscriptEntries,
+  addTranscriptEntry,
 };
