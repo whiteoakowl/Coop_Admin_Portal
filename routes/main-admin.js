@@ -14,32 +14,79 @@ const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
 const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
 const { easternInputToUtcText, formatTimestamp, isValidISODate } = require('../utils/dates');
 const { allDiplomas, issueDiploma } = require('../utils/academics');
+const events = require('../utils/events');
+const babysitters = require('../utils/babysitters');
+const photos = require('../utils/photos');
+const directory = require('../utils/directory');
+const classifieds = require('../utils/classifieds');
 
 router.use(requirePortalAuth, requirePortal('main_admin'));
 
 // A real request: "should show a counter of how many families, how
 // many parents and how many students." Same active-only convention
 // routes/admin.js's own dashboard counters already use.
+//
+// Item 6 overhaul: "remove accounts by role counting, remove user
+// settings [already gear-icon-only per the /settings redirect above] -
+// there should be a count display for number of parents, students,
+// families, teachers and admins. Then there should be a 2nd count
+// display for pending requests such as events requests, babysitter
+// approvals, photo submissions, business directory requests, classifieds
+// request. Each name should be able to click and go straight to that
+// request page." parents/students/families stay on the members table
+// (unchanged, pre-existing counters); teachers/admins are portal ROLES
+// (member_account_roles/roles), a different concept from members.
+// member_type, since there's no 'teacher' member_type in the legacy
+// Co-op Admin member model this table also serves.
 router.get('/', async (req, res) => {
   const pendingCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'pending'").get()).c);
   const activeCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'active'").get()).c);
-  const roleCounts = await db
-    .prepare(
-      `SELECT r.label, COUNT(*) AS c FROM member_account_roles mar JOIN roles r ON r.id = mar.role_id GROUP BY r.label ORDER BY r.label`
-    )
-    .all();
   const familyCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c);
   const parentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c);
   const studentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c);
+  const teacherCount = Number(
+    (
+      await db
+        .prepare(
+          `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
+           JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
+           WHERE r.key = 'teacher' AND ma.status = 'active'`
+        )
+        .get()
+    ).c
+  );
+  const adminCount = Number(
+    (
+      await db
+        .prepare(
+          `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
+           JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
+           WHERE r.key IN ('coop_admin', 'main_admin') AND ma.status = 'active'`
+        )
+        .get()
+    ).c
+  );
+
+  const eventRequestsCount = (await events.listEvents({ approvalStatus: 'pending' })).length;
+  const babysitterApprovalsCount = (await babysitters.listPendingProfiles()).length;
+  const photoSubmissionsCount = (await photos.listPendingPhotos()).length;
+  const directoryRequestsCount = (await directory.listListings({ status: 'pending' })).length;
+  const classifiedsRequestsCount = (await classifieds.listListings({ status: 'pending' })).length;
 
   res.render('main-admin-home', {
     title: 'Main Admin',
     pendingCount,
     activeCount,
-    roleCounts,
     familyCount,
     parentCount,
     studentCount,
+    teacherCount,
+    adminCount,
+    eventRequestsCount,
+    babysitterApprovalsCount,
+    photoSubmissionsCount,
+    directoryRequestsCount,
+    classifiedsRequestsCount,
   });
 });
 

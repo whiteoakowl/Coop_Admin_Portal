@@ -24,6 +24,7 @@ const { createCharge, amountPaidForCharge, cancelCharge } = require('./payments'
 const { GRADE_OPTIONS } = require('./membership');
 const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
+const { toCsvRow } = require('./spreadsheet');
 
 // A real request: "every list should always be alphabetical according to
 // last name." Every list here carries a person's display name under a
@@ -94,7 +95,15 @@ async function listEvents({ status, visibility, upcomingOnly, approvalStatus, ca
   }
   if (upcomingOnly) clauses.push("starts_at >= now_text()");
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  return db.prepare(`SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor" FROM events e LEFT JOIN event_categories ec ON ec.id = e.category_id ${where} ORDER BY starts_at`).all(...params);
+  return db
+    .prepare(
+      `SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor", el.name AS "locationName"
+       FROM events e
+       LEFT JOIN event_categories ec ON ec.id = e.category_id
+       LEFT JOIN event_locations el ON el.id = e.location_id
+       ${where} ORDER BY starts_at`
+    )
+    .all(...params);
 }
 
 async function getEvent(id) {
@@ -119,7 +128,13 @@ async function registrationCountForEvent(id) {
 // stored counter - see the migration's own comment on why.
 async function getEventWithDetails(id) {
   const event = await db
-    .prepare('SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor" FROM events e LEFT JOIN event_categories ec ON ec.id = e.category_id WHERE e.id = ?')
+    .prepare(
+      `SELECT e.*, ec.name AS "categoryName", ec.color AS "categoryColor", el.name AS "locationName"
+       FROM events e
+       LEFT JOIN event_categories ec ON ec.id = e.category_id
+       LEFT JOIN event_locations el ON el.id = e.location_id
+       WHERE e.id = ?`
+    )
     .get(id);
   if (!event) return null;
 
@@ -196,6 +211,7 @@ function eventFields(data) {
     data.category || null,
     data.categoryId ?? null,
     data.location || null,
+    data.locationId ?? null,
     data.startsAt,
     data.endsAt || null,
     data.visibility,
@@ -211,16 +227,16 @@ function eventFields(data) {
   ];
 }
 
-async function createEvent(data, accountId, { submittedByAccountId = null } = {}) {
-  const approvalStatus = submittedByAccountId ? 'pending' : 'approved';
+async function createEvent(data, accountId, { submittedByAccountId = null, approvalStatus: forcedApprovalStatus = null } = {}) {
+  const approvalStatus = forcedApprovalStatus || (submittedByAccountId ? 'pending' : 'approved');
   const info = await db
     .prepare(
       `INSERT INTO events (
-         title, description, category, category_id, location, starts_at, ends_at, visibility, capacity,
+         title, description, category, category_id, location, location_id, starts_at, ends_at, visibility, capacity,
          family_capacity, age_group, registration_opens_at, registration_closes_at,
          allow_adult_register, allow_child_register, price_cents, price_per,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, 'draft');
   return info.lastInsertRowid;
@@ -230,13 +246,43 @@ async function updateEvent(id, data) {
   await db
     .prepare(
       `UPDATE events SET
-         title = ?, description = ?, category = ?, category_id = ?, location = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?,
+         title = ?, description = ?, category = ?, category_id = ?, location = ?, location_id = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?,
          family_capacity = ?, age_group = ?, registration_opens_at = ?, registration_closes_at = ?,
          allow_adult_register = ?, allow_child_register = ?, price_cents = ?, price_per = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
     .run(...eventFields(data), id);
+}
+
+// Item 11's title-click quick-edit popup only exposes the same fields the
+// New Event popup does (title/description/location/dates/category/
+// visibility/capacity) - a real, deliberately partial UPDATE rather than
+// reusing updateEvent()'s full column list above, because updateEvent()
+// always writes every registration-rule column (family cap, age group,
+// registration window, adult/child gating, price) and calls
+// setEventSections() right after - both would silently wipe out whatever
+// the Builder's own Registration Rules/Sections panels already set,
+// every time someone fixed a typo in the title from this quick popup.
+async function updateEventQuickFields(id, data) {
+  await db
+    .prepare(
+      `UPDATE events SET
+         title = ?, description = ?, location_id = ?, starts_at = ?, ends_at = ?, category_id = ?, visibility = ?, capacity = ?,
+         updated_at = now_text()
+       WHERE id = ?`
+    )
+    .run(
+      data.title,
+      data.description || null,
+      data.locationId ?? null,
+      data.startsAt,
+      data.endsAt || null,
+      data.categoryId ?? null,
+      data.visibility === 'public' ? 'public' : 'members',
+      data.capacity ?? null,
+      id
+    );
 }
 
 async function setEventSections(eventId, sectionIds) {
@@ -265,17 +311,73 @@ async function listCategories() {
   return db.prepare('SELECT * FROM event_categories ORDER BY position, name').all();
 }
 
-async function createCategory(name, color) {
+async function createCategory(name, color, allowSync) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_categories').get()).p) + 1;
-  await db.prepare('INSERT INTO event_categories (name, color, position) VALUES (?, ?, ?)').run(name, color || '#EE9A4D', position);
+  await db.prepare('INSERT INTO event_categories (name, color, position, allow_sync) VALUES (?, ?, ?, ?)').run(name, color || '#EE9A4D', position, allowSync ? 1 : 0);
 }
 
-async function updateCategory(id, name, color) {
-  await db.prepare('UPDATE event_categories SET name = ?, color = ? WHERE id = ?').run(name, color || '#EE9A4D', id);
+async function updateCategory(id, name, color, allowSync) {
+  await db.prepare('UPDATE event_categories SET name = ?, color = ?, allow_sync = ? WHERE id = ?').run(name, color || '#EE9A4D', allowSync ? 1 : 0, id);
 }
 
 async function deleteCategory(id) {
   await db.prepare('DELETE FROM event_categories WHERE id = ?').run(id);
+}
+
+// --- Locations (item 8) - same shape as Categories above ---
+
+async function listLocations() {
+  return db.prepare('SELECT * FROM event_locations ORDER BY position, name').all();
+}
+
+async function createLocation(name, address) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_locations').get()).p) + 1;
+  await db.prepare('INSERT INTO event_locations (name, address, position) VALUES (?, ?, ?)').run(name, address || null, position);
+}
+
+async function updateLocation(id, name, address) {
+  await db.prepare('UPDATE event_locations SET name = ?, address = ? WHERE id = ?').run(name, address || null, id);
+}
+
+async function deleteLocation(id) {
+  await db.prepare('DELETE FROM event_locations WHERE id = ?').run(id);
+}
+
+// --- Settings (item 9) - one singleton row, same shape/reasoning as
+// site_settings; see the migration header comment for which fields are
+// actually wired to live behavior vs. stored for a system that doesn't
+// exist yet in this app. ---
+
+async function getEventSettings() {
+  return db.prepare('SELECT * FROM event_settings WHERE id = 1').get();
+}
+
+async function updateEventSettings(data) {
+  await db
+    .prepare(
+      `UPDATE event_settings SET
+        default_calendar_view = ?, show_waitlist_position = ?, reminder_days_before = ?,
+        credit_on_family_cancel = ?, credit_on_admin_cancel = ?,
+        subadmin_edit_locations = ?, subadmin_edit_categories = ?,
+        family_submit_events = ?, submit_notification_email = ?,
+        family_manage_price_options = ?, family_manage_own_events = ?, family_events_public_default = ?,
+        updated_at = now_text()
+      WHERE id = 1`
+    )
+    .run(
+      data.defaultCalendarView === 'list' ? 'list' : 'calendar',
+      data.showWaitlistPosition ? 1 : 0,
+      Number(data.reminderDaysBefore) || 0,
+      data.creditOnFamilyCancel ? 1 : 0,
+      data.creditOnAdminCancel ? 1 : 0,
+      data.subadminEditLocations ? 1 : 0,
+      data.subadminEditCategories ? 1 : 0,
+      ['yes', 'auto_approve', 'no'].includes(data.familySubmitEvents) ? data.familySubmitEvents : 'yes',
+      (data.submitNotificationEmail || '').trim() || null,
+      data.familyManagePriceOptions ? 1 : 0,
+      data.familyManageOwnEvents ? 1 : 0,
+      data.familyEventsPublicDefault ? 1 : 0
+    );
 }
 
 // --- Member-submitted events, awaiting Main Admin approval ---
@@ -284,9 +386,21 @@ async function deleteCategory(id) {
 // submittedByAccountId set - approval_status starts 'pending' and the
 // event starts 'draft' either way, so a pending submission never shows
 // up anywhere but the submitter's own "my submissions" and the Main
-// Admin approval queue until it's actually decided.
+// Admin approval queue until it's actually decided. Settings-gated per
+// item 9's "Allow families to submit calendar of events items?" (Yes /
+// Automatically Approve / No) and "Make events submitted by families
+// public by default?".
 async function submitEvent(data, accountId) {
-  return createEvent(data, accountId, { submittedByAccountId: accountId });
+  const settings = await getEventSettings();
+  if (settings.family_submit_events === 'no') return null;
+  const visibility = settings.family_events_public_default ? 'public' : data.visibility;
+  return createEvent(
+    { ...data, visibility },
+    accountId,
+    settings.family_submit_events === 'auto_approve'
+      ? { submittedByAccountId: accountId, approvalStatus: 'approved' }
+      : { submittedByAccountId: accountId }
+  );
 }
 
 async function decideSubmission(eventId, approve) {
@@ -552,6 +666,26 @@ async function setGuestCheckedIn(guestRegistrationId, present) {
   }
 }
 
+// Item 11 - "a view exactly like class check in/out": distinct Check In/
+// Check Out buttons (not just the single Present/Clear toggle above) and
+// a P/A/L roster grid for manually correcting the status, same shape as
+// utils/attendance.js's own class attendance grid.
+async function setRegistrationCheckedOut(registrationId) {
+  await db.prepare("UPDATE event_registrations SET checked_out_at = now_text() WHERE id = ?").run(registrationId);
+}
+
+async function setGuestCheckedOut(guestRegistrationId) {
+  await db.prepare("UPDATE event_guest_registrations SET checked_out_at = now_text() WHERE id = ?").run(guestRegistrationId);
+}
+
+async function setRegistrationAttendanceStatus(registrationId, status) {
+  await db.prepare('UPDATE event_registrations SET attendance_status = ? WHERE id = ?').run(status || null, registrationId);
+}
+
+async function setGuestAttendanceStatus(guestRegistrationId, status) {
+  await db.prepare('UPDATE event_guest_registrations SET attendance_status = ? WHERE id = ?').run(status || null, guestRegistrationId);
+}
+
 // --- Volunteer roles (handoff item 2) ---
 
 async function addVolunteerRole(eventId, data) {
@@ -632,6 +766,104 @@ async function cancelDonationClaim(claimId, memberId) {
   await db.prepare('DELETE FROM event_donation_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
 }
 
+// --- CSV export/import (item 5) - a real request: "needs import and
+// export buttons." Datetimes round-trip as plain "YYYY-MM-DD HH:MM"
+// text (the same shape <input type="datetime-local"> already produces
+// everywhere else in this app, e.g. routes/admin-events.js's own
+// toSqlTimestamp) - deliberately not trying to guess every locale/
+// format a spreadsheet app might have serialized a date-time cell as
+// the way utils/memberImport.js's own normalizeBirthdayToISO does for a
+// date-only column; a date-time is much easier to get wrong two ways
+// (date AND time), so the export/template both model the exact format
+// the import expects instead.
+const EVENT_EXPORT_HEADER = ['Title', 'Starts At', 'Ends At', 'Location', 'Category', 'Visibility', 'Capacity', 'Description'];
+
+function buildEventsExportCsvLines(eventList) {
+  const lines = [toCsvRow(EVENT_EXPORT_HEADER)];
+  for (const e of eventList) {
+    lines.push(
+      toCsvRow([
+        e.title,
+        (e.starts_at || '').slice(0, 16),
+        (e.ends_at || '').slice(0, 16),
+        e.locationName || e.location || '',
+        e.categoryName || e.category || '',
+        e.visibility,
+        e.capacity ?? '',
+        (e.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      ])
+    );
+  }
+  return lines;
+}
+
+// "YYYY-MM-DD HH:MM" (with or without a trailing :SS, with or without a
+// T instead of a space - the exact shape <input type="datetime-local">
+// produces) straight into the "YYYY-MM-DD HH:MM:SS" text shape this
+// app's timestamp columns use - see toSqlTimestamp in routes/admin-
+// events.js, the same conversion for a real form submission.
+function normalizeEventDateTime(value) {
+  const trimmed = String(value || '').trim();
+  const match = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (!match) return null;
+  const [, date, hh, mm, ss] = match;
+  return `${date} ${hh}:${mm}:${ss || '00'}`;
+}
+
+// Imported events always land as unpublished drafts, regardless of what
+// (if anything) a Visibility column says - same "an import never skips
+// review" caution utils/resourceLinks.js's own admin-add path doesn't
+// need (that one really is meant to publish immediately) but a batch of
+// unfamiliar rows from a spreadsheet does; a Main Admin still reviews
+// and publishes each one from the Drafts tab same as always.
+async function importEventsFromRows(rows, accountId) {
+  const categories = await listCategories();
+  const categoryIdByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const locations = await listLocations();
+  const locationIdByName = new Map(locations.map((l) => [l.name.toLowerCase(), l.id]));
+
+  let imported = 0;
+  const errors = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // header is row 1
+    const title = String(row['Title'] || row['title'] || '').trim();
+    const startsRaw = row['Starts At'] || row['starts at'] || row['StartsAt'] || '';
+    const startsAt = normalizeEventDateTime(startsRaw);
+    if (!title || !startsAt) {
+      errors.push(`Row ${rowNum}: needs a Title and a valid Starts At (YYYY-MM-DD HH:MM).`);
+      continue;
+    }
+    const endsAt = normalizeEventDateTime(row['Ends At'] || row['ends at'] || '');
+    const location = String(row['Location'] || row['location'] || '').trim();
+    const categoryName = String(row['Category'] || row['category'] || '').trim();
+    const visibilityRaw = String(row['Visibility'] || row['visibility'] || '').trim().toLowerCase();
+    const capacityRaw = row['Capacity'] ?? row['capacity'];
+    const description = String(row['Description'] || row['description'] || '').trim();
+
+    await createEvent(
+      {
+        title,
+        description,
+        location,
+        locationId: locationIdByName.get(location.toLowerCase()) || null,
+        category: categoryName,
+        categoryId: categoryIdByName.get(categoryName.toLowerCase()) || null,
+        startsAt,
+        endsAt,
+        visibility: visibilityRaw === 'public' ? 'public' : 'members',
+        capacity: capacityRaw ? parseInt(capacityRaw, 10) || null : null,
+        pricePer: 'person',
+        allowAdultRegister: true,
+        allowChildRegister: true,
+      },
+      accountId
+    );
+    imported++;
+  }
+  return { imported, errors };
+}
+
 // Builds a plain Sunday-first month grid (an array of weeks, each an
 // array of {date, inMonth, events} day cells) for a calendar view -
 // shared by the member-facing /events?view=calendar (routes/events.js)
@@ -673,6 +905,8 @@ function monthGrid(monthParam, eventList) {
   const nextMonth = new Date(Date.UTC(year, month + 1, 1));
   return {
     weeks,
+    year,
+    month: month + 1,
     label: firstOfMonth.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
     prevParam: `${prevMonth.getUTCFullYear()}-${String(prevMonth.getUTCMonth() + 1).padStart(2, '0')}`,
     nextParam: `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, '0')}`,
@@ -693,6 +927,7 @@ module.exports = {
   getEventWithDetails,
   createEvent,
   updateEvent,
+  updateEventQuickFields,
   setEventSections,
   setEventStatus,
   setEventImage,
@@ -701,6 +936,16 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
+  listLocations,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  getEventSettings,
+  updateEventSettings,
+  EVENT_EXPORT_HEADER,
+  buildEventsExportCsvLines,
+  normalizeEventDateTime,
+  importEventsFromRows,
   submitEvent,
   decideSubmission,
   eventVisibleToFamily,
@@ -711,6 +956,10 @@ module.exports = {
   cancelGuestRegistration,
   setRegistrationCheckedIn,
   setGuestCheckedIn,
+  setRegistrationCheckedOut,
+  setGuestCheckedOut,
+  setRegistrationAttendanceStatus,
+  setGuestAttendanceStatus,
   addVolunteerRole,
   updateVolunteerRole,
   deleteVolunteerRole,

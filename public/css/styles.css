@@ -1471,6 +1471,12 @@ body.public-page .roster-empty {
 }
 .totals-item:nth-child(6n) { border-right: none; }
 
+/* Item 6 - Main Admin homepage "pending requests" counters double as
+   links straight to that request's own admin page, same .totals-item
+   look as the plain (non-link) counters above it. */
+a.totals-item { color: inherit; text-decoration: none; transition: background 0.1s ease; }
+a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft); }
+
 @media (max-width: 720px) {
   /* Mobile: 6 totals as a 3x2 grid instead of squeezing all 6 onto one
      unreadably-narrow line - a right border between the two items in
@@ -5382,6 +5388,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      current page; keeping it together beats letting its own member table
      split mid-card across a page boundary. */
   .floater-card { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Item 5 - "when printing the calendar view it should fit clean on one
+     page." The mobile min-width/scroll rules above exist so a phone
+     screen can pan a wide grid - meaningless on paper, and would force
+     the exact same off-page bleed print is supposed to fix. Print instead
+     forces the table back to the page's own full width (no horizontal
+     scroll container, no per-column minimum) and shrinks the type enough
+     that even a full month of events still reads as one page instead of
+     spilling into a second. */
+  .roster-scroll { overflow: visible; border: none; }
+  .event-calendar-table { table-layout: fixed; width: 100% !important; min-width: 0 !important; break-inside: avoid; page-break-inside: avoid; }
+  .event-calendar-table th, .event-calendar-table td { padding: 0.25rem; font-size: 0.65rem; }
+  .event-calendar-table td { height: auto; min-height: 3.5rem; }
+  .event-calendar-table .badge-pill { font-size: 0.55rem; padding: 0.05rem 0.25rem; }
 }
 
 .member-profile-dialog {
@@ -6440,9 +6460,48 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Events List/Calendar view toggle - the month grid needs taller cells
    than a normal .roster-table row (each day can hold several event
    pills), so this table gets its own light modifier instead of forcing
-   every other .roster-table on the site to accommodate it. */
+   every other .roster-table on the site to accommodate it. table-layout:
+   fixed (item 4 - a real bug report: "calendar bleeds off the page
+   horizontally when events are added") pins every day column to an equal
+   1/7th share of the table's own width instead of growing wider to fit a
+   long event title - combined with the .roster-scroll wrapper this table
+   now sits in (views/admin-events-list.ejs), the table itself can only
+   ever be as wide as its wrapper, same as every other roster table on
+   the site; without table-layout:fixed the browser was sizing columns to
+   fit content first and only then discovering it needed to be scrollable. */
+.event-calendar-table { table-layout: fixed; }
 .event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
-.event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; }
+.event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; overflow-wrap: break-word; }
+@media (max-width: 640px) {
+  .event-calendar-table { min-width: 30rem; }
+  .event-calendar-table th, .event-calendar-table td { padding: 0.35rem 0.3rem; font-size: 0.75rem; }
+  .event-calendar-table td { height: 4rem; }
+  .event-calendar-table .badge-pill { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
+}
+
+/* Item 2 - square icon-only Calendar View/List View toggle buttons,
+   reusing .archived-toggle-btn's own "pressed" active look (see that
+   class's comment above) instead of a second active-state treatment. */
+.icon-toggle-btn { flex: 0 0 auto; min-width: 0; width: 2.5rem; padding: 0.5rem; display: inline-flex; align-items: center; justify-content: center; }
+.icon-toggle-btn .icon { width: 1.1rem; height: 1.1rem; }
+
+/* Item 3 - desktop Events tab strip becomes a dropdown; mobile keeps its
+   own accordion (unchanged) below 640px per .event-tabs-desktop's
+   existing display:none rule. */
+.event-tabs-select { max-width: 20rem; margin-bottom: 1rem; }
+
+/* Item 10 - month/year dropdowns sit inline with Prev/Next. */
+.event-month-select { min-width: 8rem; }
+.event-year-select { min-width: 5.5rem; }
+
+/* Item 11 - "list of events on mobile should fit horizontally... reduce
+   font to help fit clean." Same .roster-scroll wrapper as every other
+   table on this page, but with its own smaller type on narrow screens
+   so a typical event title/date/count row needs less horizontal scroll
+   instead of none at all. */
+@media (max-width: 640px) {
+  .event-attendance-table th, .event-attendance-table td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
+}
 
 /* A real request: "prev/next buttons should be side by side with the
    month name stacked above them" - previously Prev/<month name>/Next sat

@@ -37,7 +37,8 @@ router.get('/', async (req, res) => {
     visible = visible.filter((e, i) => flags[i]);
   }
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  const view = req.query.view === 'calendar' ? 'calendar' : 'list';
+  const eventSettings = await events.getEventSettings();
+  const view = req.query.view ? (req.query.view === 'calendar' ? 'calendar' : 'list') : eventSettings.default_calendar_view;
   const mapped = visible.map((e) => ({ ...withImageUrl(e), startsLabel: formatFriendlyTimestamp(e.starts_at) }));
   res.render('events-list', {
     title: 'Events',
@@ -68,7 +69,8 @@ router.get('/print', async (req, res) => {
 // events.js's submitEvent) and is invisible everywhere else until
 // decided.
 router.get('/submit', requirePortalAuth, async (req, res) => {
-  res.render('events-submit', { title: 'Submit an Event', error: req.query.error || null });
+  const settings = await events.getEventSettings();
+  res.render('events-submit', { title: 'Submit an Event', error: req.query.error || null, submissionsOpen: settings.family_submit_events !== 'no' });
 });
 
 router.post('/submit', requirePortalAuth, async (req, res) => {
@@ -77,7 +79,7 @@ router.post('/submit', requirePortalAuth, async (req, res) => {
   if (!title || !startsAt) {
     return res.redirect('/events/submit?error=' + encodeURIComponent('Title and start date/time are required.'));
   }
-  await events.submitEvent(
+  const result = await events.submitEvent(
     {
       title,
       description: sanitizePostBody(req.body.description || ''),
@@ -88,6 +90,9 @@ router.post('/submit', requirePortalAuth, async (req, res) => {
     },
     req.portalAccount.id
   );
+  if (result === null) {
+    return res.redirect('/events/submit?error=' + encodeURIComponent('Event submissions are turned off right now.'));
+  }
   res.redirect('/events?notice=' + encodeURIComponent('Thanks - your event was submitted for approval.'));
 });
 

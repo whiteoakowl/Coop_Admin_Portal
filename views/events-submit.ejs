@@ -24,6 +24,9 @@
 
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
+        <% if (!submissionsOpen) { %>
+          <p class="alert alert-error">Event submissions are turned off right now.</p>
+        <% } else { %>
         <form method="POST" action="/events/submit" class="stack-form">
           <div class="member-form-grid">
             <label class="member-form-full">Title
@@ -51,6 +54,7 @@
             </div>
           </div>
         </form>
+        <% } %>
       </div>
     </section>
   </main>

@@ -19,6 +19,7 @@ const db = require('../db');
 const events = require('../utils/events');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
+const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
 
@@ -93,9 +94,11 @@ router.get('/', async (req, res) => {
   let attendance = [];
   let archived = [];
   // Always loaded (not just for the Settings tab) - the New Event
-  // dialog's own Category dropdown is reachable from the Calendar and
-  // Drafts tabs too.
+  // dialog's own Category/Location dropdowns are reachable from the
+  // Calendar and Drafts tabs too.
   const categories = await events.listCategories();
+  const locations = await events.listLocations();
+  const eventSettings = await events.getEventSettings();
   if (activeTab === 'calendar') {
     const published = await events.listEvents({ status: 'published' });
     calendar = events.monthGrid(req.query.month, published);
@@ -133,6 +136,8 @@ router.get('/', async (req, res) => {
     attendance,
     archived,
     categories,
+    locations,
+    eventSettings,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });
@@ -141,20 +146,61 @@ router.get('/', async (req, res) => {
 router.post('/categories', async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Category name is required.'));
-  await events.createCategory(name, req.body.color);
+  await events.createCategory(name, req.body.color, req.body.allowSync !== undefined);
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category added.'));
 });
 
 router.post('/categories/:id/update', async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Category name is required.'));
-  await events.updateCategory(req.params.id, name, req.body.color);
+  await events.updateCategory(req.params.id, name, req.body.color, req.body.allowSync !== undefined);
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category updated.'));
 });
 
 router.post('/categories/:id/delete', async (req, res) => {
   await events.deleteCategory(req.params.id);
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category removed.'));
+});
+
+// --- Locations (item 8) ---
+
+router.post('/locations', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Location name is required.'));
+  await events.createLocation(name, (req.body.address || '').trim());
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Location added.'));
+});
+
+router.post('/locations/:id/update', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Location name is required.'));
+  await events.updateLocation(req.params.id, name, (req.body.address || '').trim());
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Location updated.'));
+});
+
+router.post('/locations/:id/delete', async (req, res) => {
+  await events.deleteLocation(req.params.id);
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Location removed.'));
+});
+
+// --- Settings (item 9) ---
+
+router.post('/settings', async (req, res) => {
+  await events.updateEventSettings({
+    defaultCalendarView: req.body.defaultCalendarView,
+    showWaitlistPosition: req.body.showWaitlistPosition !== undefined,
+    reminderDaysBefore: req.body.reminderDaysBefore,
+    creditOnFamilyCancel: req.body.creditOnFamilyCancel === '1',
+    creditOnAdminCancel: req.body.creditOnAdminCancel === '1',
+    subadminEditLocations: req.body.subadminEditLocations === '1',
+    subadminEditCategories: req.body.subadminEditCategories === '1',
+    familySubmitEvents: req.body.familySubmitEvents,
+    submitNotificationEmail: req.body.submitNotificationEmail,
+    familyManagePriceOptions: req.body.familyManagePriceOptions === '1',
+    familyManageOwnEvents: req.body.familyManageOwnEvents === '1',
+    familyEventsPublicDefault: req.body.familyEventsPublicDefault === '1',
+  });
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Settings saved.'));
 });
 
 router.post('/:id/decide', async (req, res) => {
@@ -176,6 +222,7 @@ router.post('/', async (req, res) => {
       description: sanitizePostBody(req.body.description || ''),
       category: (req.body.category || '').trim(),
       location: (req.body.location || '').trim(),
+      locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
       startsAt,
       endsAt: toSqlTimestamp(req.body.endsAt),
       visibility: req.body.visibility === 'public' ? 'public' : 'members',
@@ -188,6 +235,37 @@ router.post('/', async (req, res) => {
   res.redirect(`/main-admin/events/${id}/builder`);
 });
 
+// --- CSV export/import (item 5) - registered before the /:id param
+// routes below so their literal paths never get shadowed by :id. ---
+
+router.get('/export.csv', async (req, res) => {
+  const all = await events.listEvents();
+  sendCsv(res, 'events.csv', events.buildEventsExportCsvLines(all));
+});
+
+router.get('/import-template.xlsx', (req, res) => {
+  const buffer = buildTemplateWorkbook(events.EVENT_EXPORT_HEADER, [
+    ['Fall Family Picnic', '2026-10-10 18:00', '2026-10-10 20:00', 'Fellowship Hall', 'Social', 'members', '50', 'Bring a dish to share.'],
+  ]);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="events-import-template.xlsx"');
+  res.send(buffer);
+});
+
+const importUpload = multer({ storage: multer.memoryStorage() });
+router.post('/import', importUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.redirect('/main-admin/events?error=' + encodeURIComponent('Please choose a file to import.'));
+  let rows;
+  try {
+    rows = await readRowsFromFile(req.file.buffer);
+  } catch (err) {
+    return res.redirect('/main-admin/events?error=' + encodeURIComponent(err.message));
+  }
+  const { imported, errors } = await events.importEventsFromRows(rows, req.portalAccount.id);
+  const notice = `Imported ${imported} event(s) as drafts.${errors.length ? ` ${errors.length} row(s) skipped.` : ''}`;
+  res.redirect('/main-admin/events?tab=drafts&notice=' + encodeURIComponent(notice));
+});
+
 async function loadBuilder(req, res) {
   const event = await events.getEventWithDetails(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
@@ -196,6 +274,7 @@ async function loadBuilder(req, res) {
     event,
     imageUrl: imageUrl(event.image_key),
     categories: await events.listCategories(),
+    locations: await events.listLocations(),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     selectedGrades: events.parseAgeGroupList(event.age_group),
@@ -218,6 +297,7 @@ router.post('/:id', async (req, res) => {
     description: sanitizePostBody(req.body.description || ''),
     category: (req.body.category || '').trim(),
     location: (req.body.location || '').trim(),
+    locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
     startsAt,
     endsAt: toSqlTimestamp(req.body.endsAt),
     visibility: req.body.visibility === 'public' ? 'public' : 'members',
@@ -226,6 +306,28 @@ router.post('/:id', async (req, res) => {
   });
   await events.setEventSections(id, req.body.sectionIds);
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Settings saved.'));
+});
+
+// Item 11 - the Attendance tab's title-click quick-edit popup. Deliberately
+// separate from POST /:id above - see updateEventQuickFields's own
+// comment for why reusing that full-update route would be a real bug.
+router.post('/:id/quick-edit', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const startsAt = toSqlTimestamp(req.body.startsAt);
+  if (!title || !startsAt) {
+    return res.redirect('/main-admin/events?tab=attendance&error=' + encodeURIComponent('Title and start date/time are required.'));
+  }
+  await events.updateEventQuickFields(req.params.id, {
+    title,
+    description: sanitizePostBody(req.body.description || ''),
+    locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
+    startsAt,
+    endsAt: toSqlTimestamp(req.body.endsAt),
+    categoryId: req.body.categoryId ? parseInt(req.body.categoryId, 10) : null,
+    visibility: req.body.visibility,
+    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+  });
+  res.redirect('/main-admin/events?tab=attendance&notice=' + encodeURIComponent('Event updated.'));
 });
 
 router.post('/:id/status', async (req, res) => {
@@ -382,6 +484,29 @@ router.post('/:id/guests/:guestId/checkin', async (req, res) => {
   await events.setGuestCheckedIn(req.params.guestId, req.body.present === '1');
   if (req.get('X-Requested-With') === 'fetch') return res.json({ ok: true });
   res.redirect(`/main-admin/events/${req.params.id}/registrations`);
+});
+
+// Item 11 - explicit Check In / Check Out buttons (distinct from the
+// Present/Clear toggle above) and a P/A/L status select, same shape as
+// class check-in/out.
+router.post('/:id/registrations/:regId/checkout', async (req, res) => {
+  await events.setRegistrationCheckedOut(req.params.regId);
+  res.redirect(`/main-admin/events/${req.params.id}/registrations`);
+});
+
+router.post('/:id/guests/:guestId/checkout', async (req, res) => {
+  await events.setGuestCheckedOut(req.params.guestId);
+  res.redirect(`/main-admin/events/${req.params.id}/registrations`);
+});
+
+router.post('/:id/registrations/:regId/status', async (req, res) => {
+  await events.setRegistrationAttendanceStatus(req.params.regId, req.body.status);
+  res.json({ ok: true });
+});
+
+router.post('/:id/guests/:guestId/status', async (req, res) => {
+  await events.setGuestAttendanceStatus(req.params.guestId, req.body.status);
+  res.json({ ok: true });
 });
 
 // Guest registration ("guest registration for events (admin permission)")

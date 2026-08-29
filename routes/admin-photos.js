@@ -32,7 +32,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 
 router.get('/', async (req, res) => {
   const albums = await photos.listAlbums();
-  res.render('admin-photos-list', { title: 'Photos', albums, notice: req.query.notice || null });
+  const pendingPhotos = await photos.listPendingPhotos();
+  res.render('admin-photos-list', { title: 'Photos', albums, pendingPhotos, notice: req.query.notice || null });
 });
 
 router.post('/', async (req, res) => {
@@ -99,6 +100,11 @@ router.post('/:id/photos/:photoId/cover', async (req, res) => {
   const photo = await photos.getPhoto(req.params.photoId);
   if (photo) await photos.setCoverImage(req.params.id, photo.image_key);
   res.redirect(`/main-admin/photos/${req.params.id}/edit?notice=` + encodeURIComponent('Cover photo set.'));
+});
+
+router.post('/:id/photos/:photoId/decide', async (req, res) => {
+  await photos.decidePhotoSubmission(req.params.photoId, req.body.decision === 'approve');
+  res.redirect(`/main-admin/photos/${req.params.id}/edit?notice=` + encodeURIComponent(req.body.decision === 'approve' ? 'Photo approved.' : 'Photo rejected.'));
 });
 
 router.post('/:id/photos/:photoId/delete', async (req, res) => {

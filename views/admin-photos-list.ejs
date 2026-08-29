@@ -25,7 +25,6 @@
       { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
       { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
       { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
     ],
   }) %>
 
@@ -36,6 +35,36 @@
     </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# Item 6 - Main Admin homepage links straight to #pending-photos so
+        approving a submission is one click from the pending-requests
+        counter, not a hunt through every album's own edit page. %>
+    <% if (pendingPhotos.length > 0) { %>
+      <section id="pending-photos" class="manage-section">
+        <div class="grid-box-header"><h2>Pending Photos</h2></div>
+        <div class="team-card-grid">
+          <% pendingPhotos.forEach(function(p) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <img src="/photos/<%= p.album_id %>/image/<%= p.id %>" alt="<%= p.caption || '' %>" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+                <p class="hint">In <a href="/main-admin/photos/<%= p.album_id %>/edit"><%= p.albumTitle %></a></p>
+                <% if (p.caption) { %><p class="hint"><%= p.caption %></p><% } %>
+                <div class="roster-btn-row">
+                  <form method="POST" action="/main-admin/photos/<%= p.album_id %>/photos/<%= p.id %>/decide" class="inline-block-form">
+                    <input type="hidden" name="decision" value="approve" />
+                    <button type="submit" class="roster-action-btn">Approve</button>
+                  </form>
+                  <form method="POST" action="/main-admin/photos/<%= p.album_id %>/photos/<%= p.id %>/decide" class="inline-block-form">
+                    <input type="hidden" name="decision" value="reject" />
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </section>
+    <% } %>
 
     <% if (albums.length === 0) { %>
       <p class="roster-empty">No albums yet &mdash; create one above.</p>

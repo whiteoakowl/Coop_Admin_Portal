@@ -25,7 +25,6 @@
       { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
       { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
       { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
     ],
   }) %>
 
@@ -93,9 +92,21 @@
               <div class="team-info-card">
                 <img src="/photos/<%= album.id %>/image/<%= p.id %>" alt="<%= p.caption || '' %>" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
                 <% if (p.caption) { %><p class="hint"><%= p.caption %></p><% } %>
+                <% if (p.status === 'pending') { %><span class="badge-pill badge-pill-orange">Pending Review</span><% } %>
+                <% if (p.status === 'rejected') { %><span class="badge-pill badge-pill-gray">Rejected</span><% } %>
                 <% if (album.cover_image_key === p.image_key) { %><span class="badge-pill badge-pill-green">Cover</span><% } %>
                 <div class="roster-btn-row">
-                  <% if (album.cover_image_key !== p.image_key) { %>
+                  <% if (p.status === 'pending') { %>
+                    <form method="POST" action="/main-admin/photos/<%= album.id %>/photos/<%= p.id %>/decide" class="inline-block-form">
+                      <input type="hidden" name="decision" value="approve" />
+                      <button type="submit" class="roster-action-btn">Approve</button>
+                    </form>
+                    <form method="POST" action="/main-admin/photos/<%= album.id %>/photos/<%= p.id %>/decide" class="inline-block-form">
+                      <input type="hidden" name="decision" value="reject" />
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                    </form>
+                  <% } %>
+                  <% if (album.cover_image_key !== p.image_key && p.status === 'approved') { %>
                     <form method="POST" action="/main-admin/photos/<%= album.id %>/photos/<%= p.id %>/cover" class="inline-block-form">
                       <button type="submit" class="roster-action-btn">Set as Cover</button>
                     </form>

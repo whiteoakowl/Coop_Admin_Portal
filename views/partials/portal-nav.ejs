@@ -104,6 +104,12 @@ const COMMUNITY_LINKS_STUDENT = [
   { href: '/store', icon: 'grid', label: 'Store' },
   { href: '/photos', icon: 'camera', label: 'Photos' },
 ];
+// A real request: "audit log should be under the gear symbol for
+// settings at the top of the page" - moved out of this list into the
+// Settings gear's own dropdown below (alongside Users/Roles & Permissions/
+// Website/Co-op Admin Portal), same place items 1/6/8 of the earlier
+// session's own request moved Roles & Permissions/Website/Co-op Admin
+// Portal to.
 const COMMUNITY_ADMIN_LINKS = [
   { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
   { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
@@ -116,7 +122,6 @@ const COMMUNITY_ADMIN_LINKS = [
   { href: '/main-admin/photos', icon: 'camera', label: 'Photos' },
   { href: '/main-admin/publications', icon: 'file-text', label: 'Publications' },
   { href: '/main-admin/accounting', icon: 'check-circle', label: 'Accounting' },
-  { href: '/main-admin/audit-log', icon: 'lock', label: 'Audit Log' },
 ];
 // portalTitle is a plain, caller-supplied string ('Main Admin' from every
 // views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
@@ -172,6 +177,7 @@ const communityLinks =
           <a href="/main-admin/users">Users</a>
           <a href="/main-admin/roles">Roles &amp; Permissions</a>
           <a href="/main-admin/website">Website</a>
+          <a href="/main-admin/audit-log">Audit Log</a>
           <a href="/admin">Co-op Admin Portal</a>
         </div>
       </details>
@@ -192,6 +198,21 @@ const communityLinks =
   </div>
 </aside>
 
+<%# A real request: "the full screen mode symbol that we used on other
+    pages should be added to every portal" - views/partials/admin-nav.ejs
+    (Co-op Admin) already has this corner button; every other portal
+    shares this partial instead, so it gets it here, once, the same
+    fullscreen-toggle.js/fullscreen-nav.js pair unchanged. No search form
+    alongside it here (unlike admin-nav.ejs's own corner) - that's a
+    Co-op-Admin-only feature (routes/admin-search.js), not something every
+    portal has. %>
+<header class="admin-page-corner-actions no-print">
+  <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn" aria-label="Full Screen View">
+    <svg class="icon"><use href="#icon-maximize"/></svg>
+    <span id="fullscreen-toggle-label">Full Screen View</span>
+  </button>
+</header>
+
 <div class="admin-mobile-topbar">
   <div class="admin-mobile-topbar-row">
     <a class="brand" href="/portal">
@@ -199,6 +220,7 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
+      <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
       <a class="admin-nav-right-link" href="<%= settingsHref %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>
         <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-users"/></svg></a>
@@ -250,3 +272,5 @@ const communityLinks =
     out in balanced rows on a phone" behavior Co-op Admin already has. %>
 <script src="/js/fit-tabs.js"></script>
 <script src="/js/roster-btn-row-grid.js"></script>
+<script src="/js/fullscreen-toggle.js"></script>
+<script src="/js/fullscreen-nav.js"></script>

@@ -51,17 +51,28 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   const res = await request(app).get('/main-admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Families<\/span>/);
   assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Parents<\/span>/);
   assert.match(res.text, /<span class="stat-value">2<\/span>\s*<span class="stat-label">Students<\/span>/);
+  assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Families<\/span>/);
+  assert.match(res.text, /<span class="stat-label">Teachers<\/span>/);
+  assert.match(res.text, /<span class="stat-label">Admins<\/span>/);
 
-  // Roles & Permissions/Website/Co-op Admin Portal cards are gone from the
-  // homepage grid - they moved to the gear dropdown below.
+  // Pending-requests counters (item 6) each link straight to their own
+  // request page.
+  assert.match(res.text, /href="\/main-admin\/events\?tab=requests"[^]*?Event Requests/);
+  assert.match(res.text, /href="\/main-admin\/babysitters\?tab=approvals"[^]*?Babysitter Approvals/);
+  assert.match(res.text, /href="\/main-admin\/photos#pending-photos"[^]*?Photo Submissions/);
+  assert.match(res.text, /href="\/main-admin\/directory\?tab=requests"[^]*?Business Directory Requests/);
+  assert.match(res.text, /href="\/main-admin\/classifieds\?tab=requests"[^]*?Classifieds Requests/);
+
+  // Roles & Permissions/Website/Co-op Admin Portal/Users cards are all
+  // gone from the homepage grid - they moved to the gear dropdown below
+  // (item 6: "remove user settings - user settings should be under the
+  // gear setting icon").
   assert.doesNotMatch(res.text, /Manage Roles/);
   assert.doesNotMatch(res.text, /Manage Website/);
   assert.doesNotMatch(res.text, /Open Co-op Admin/);
-  // Users stays as its own homepage card.
-  assert.match(res.text, /Manage Users/);
+  assert.doesNotMatch(res.text, /Manage Users/);
 
   // The gear dropdown carries all four destinations.
   assert.match(res.text, /href="\/main-admin\/users">Users</);

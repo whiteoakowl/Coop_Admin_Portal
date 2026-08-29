@@ -94,9 +94,9 @@ test('A middle tab (Requests): closed bars appear both before and after it, and 
   assert.match(draftsPage.text, /class="event-accordion-bar event-accordion-bar-active">\s*<span>Drafts/);
 });
 
-test('Desktop pill tab strip (.event-tabs-desktop) still renders unchanged, hidden on mobile by CSS only', async () => {
+test('Desktop tab dropdown (.event-tabs-desktop) still renders, hidden on mobile by CSS only', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', admin.cookie);
-  assert.match(page.text, /class="view-tabs event-tabs-desktop"/);
-  assert.match(page.text, /href="\/main-admin\/events\?tab=calendar" class="view-tab active">Calendar/);
+  assert.match(page.text, /class="event-tabs-desktop no-print"/);
+  assert.match(page.text, /<option value="\/main-admin\/events\?tab=calendar" selected>Calendar<\/option>/);
 });

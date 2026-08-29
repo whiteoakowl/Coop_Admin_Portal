@@ -25,18 +25,24 @@
       { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
       { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
       { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
     ],
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Events</h1>
-      <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
-      <% } %>
+      <div class="roster-btn-row no-print">
+        <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-event-dialog').showModal()">+ New Event</button>
+        <% } %>
+        <% if (activeTab === 'calendar') { %>
+          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <% } %>
+        <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
+        <a class="roster-action-btn file-action-btn" href="/main-admin/events/import-template.xlsx">Template</a>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
+      </div>
     </div>
-    <p class="hint">Create and manage co-op events - registration, volunteer roles, and donation requests.</p>
 
     <%
       // A real request: "Main Admin Events: Calendar/Drafts/Requests/
@@ -64,10 +70,12 @@
       ];
       const activeTabIndex = eventTabDefs.findIndex(function(t) { return t.key === activeTab; });
     %>
-    <div class="view-tabs event-tabs-desktop">
-      <% eventTabDefs.forEach(function(t) { %>
-        <a href="/main-admin/events?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %><% if (t.key === 'requests' && pendingCount > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
-      <% }); %>
+    <div class="event-tabs-desktop no-print">
+      <select class="event-tabs-select" onchange="if(this.value) window.location.href=this.value;" aria-label="Events section">
+        <% eventTabDefs.forEach(function(t) { %>
+          <option value="/main-admin/events?tab=<%= t.key %>" <%= activeTab === t.key ? 'selected' : '' %>><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> (<%= pendingCount %>)<% } %></option>
+        <% }); %>
+      </select>
     </div>
     <div class="event-mobile-accordion no-print">
       <% eventTabDefs.slice(0, activeTabIndex + 1).forEach(function(t) { %>
@@ -92,14 +100,24 @@
       <div class="roster-toolbar event-calendar-toolbar">
         <div class="event-calendar-month-nav">
           <h2 class="event-calendar-month-label"><%= calendar.label %></h2>
-          <div class="roster-btn-row">
+          <div class="roster-btn-row no-print">
             <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
+            <select id="event-month-select" class="event-month-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+document.getElementById('event-year-select').value+'-'+this.value;">
+              <% for (let m = 1; m <= 12; m++) { %>
+                <option value="<%= String(m).padStart(2, '0') %>" <%= calendar.month === m ? 'selected' : '' %>><%= new Date(Date.UTC(2000, m - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' }) %></option>
+              <% } %>
+            </select>
+            <select id="event-year-select" class="event-year-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+this.value+'-'+document.getElementById('event-month-select').value;">
+              <% for (let y = calendar.year - 3; y <= calendar.year + 3; y++) { %>
+                <option value="<%= y %>" <%= calendar.year === y ? 'selected' : '' %>><%= y %></option>
+              <% } %>
+            </select>
             <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
           </div>
         </div>
-        <div class="roster-btn-row">
-          <a class="roster-action-btn archived-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>">Calendar View</a>
-          <a class="roster-action-btn archived-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>">List View</a>
+        <div class="roster-btn-row no-print">
+          <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>" aria-label="Calendar View" title="Calendar View"><svg class="icon"><use href="#icon-grid"/></svg></a>
+          <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>" aria-label="List View" title="List View"><svg class="icon"><use href="#icon-menu"/></svg></a>
         </div>
       </div>
 
@@ -127,23 +145,25 @@
         <% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
           <p class="roster-empty">No published events this month.</p>
         <% } %>
-        <table class="roster-table condensed-table event-calendar-table">
-          <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
-          <tbody>
-            <% calendar.weeks.forEach(function(week) { %>
-              <tr>
-                <% week.forEach(function(day) { %>
-                  <td class="<%= day.inMonth ? '' : 'hint' %>">
-                    <div><%= day.day %></div>
-                    <% day.events.forEach(function(e) { %>
-                      <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
-                    <% }); %>
-                  </td>
-                <% }); %>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table event-calendar-table">
+            <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+            <tbody>
+              <% calendar.weeks.forEach(function(week) { %>
+                <tr>
+                  <% week.forEach(function(day) { %>
+                    <td class="<%= day.inMonth ? '' : 'hint' %>">
+                      <div><%= day.day %></div>
+                      <% day.events.forEach(function(e) { %>
+                        <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
+                      <% }); %>
+                    </td>
+                  <% }); %>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
     <% } else if (activeTab === 'drafts') { %>
       <% if (drafts.length === 0) { %>
@@ -207,12 +227,26 @@
         <p class="roster-empty">No published events yet.</p>
       <% } else { %>
         <div class="roster-scroll">
-          <table class="roster-table condensed-table">
+          <table class="roster-table condensed-table event-attendance-table">
             <thead><tr><th>Title</th><th>Starts</th><th>Registered</th><th></th></tr></thead>
             <tbody>
               <% attendance.forEach(function(e) { %>
                 <tr>
-                  <td class="roster-name-col"><%= e.title %></td>
+                  <td class="roster-name-col">
+                    <button
+                      type="button"
+                      class="link-btn event-quick-edit-trigger"
+                      data-id="<%= e.id %>"
+                      data-title="<%= e.title %>"
+                      data-description="<%= (e.description || '').replace(/"/g, '&quot;') %>"
+                      data-location-id="<%= e.location_id || '' %>"
+                      data-starts-at="<%= e.starts_at ? e.starts_at.replace(' ', 'T').slice(0, 16) : '' %>"
+                      data-ends-at="<%= e.ends_at ? e.ends_at.replace(' ', 'T').slice(0, 16) : '' %>"
+                      data-category-id="<%= e.category_id || '' %>"
+                      data-visibility="<%= e.visibility %>"
+                      data-capacity="<%= e.capacity ?? '' %>"
+                    ><%= e.title %></button>
+                  </td>
                   <td><%= e.startsLabel %></td>
                   <td><%= e.registrationCount || 0 %></td>
                   <td><a class="roster-action-btn" href="/main-admin/events/<%= e.id %>/registrations">Attendance</a></td>
@@ -248,8 +282,99 @@
         </div>
       <% } %>
     <% } else { %>
+      <%# Item 9 - General Settings, same fields/shape as the reference
+          screenshots. show_waitlist_position/credit_on_*/subadmin_edit_*/
+          family_manage_price_options/family_manage_own_events don't have a
+          waitlist, per-cancellation credit ledger, or sub-admin role system
+          behind them yet in this app - stored and ready for when they do,
+          same "controls X once a real feature exists" pattern the
+          newsletter's own send-schedule setting already uses. default
+          calendar view, family event submission (gate/auto-approve), the
+          notification email, and public-by-default are wired live (see
+          utils/events.js's submitEvent and routes/events.js). %>
+      <form method="POST" action="/main-admin/events/settings" class="stack-form member-form-page-panel">
+        <h2>General Settings</h2>
+        <div class="member-form-grid">
+          <div class="member-form-full">
+            <span class="class-form-field-label">Default Calendar User View</span>
+            <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="calendar" <%= eventSettings.default_calendar_view === 'calendar' ? 'checked' : '' %> /> Calendar View</label>
+            <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="list" <%= eventSettings.default_calendar_view === 'list' ? 'checked' : '' %> /> List View</label>
+          </div>
+          <label class="checkbox-option member-form-full">
+            <input type="checkbox" name="showWaitlistPosition" value="1" <%= eventSettings.show_waitlist_position ? 'checked' : '' %> />
+            Allow families to see their waiting list position.
+          </label>
+          <label>Default Days Before Event to Send Reminder Email
+            <select name="reminderDaysBefore">
+              <% [0, 1, 2, 3, 5, 7, 10, 14, 21, 30].forEach(function(d) { %>
+                <option value="<%= d %>" <%= eventSettings.reminder_days_before === d ? 'selected' : '' %>><%= d %></option>
+              <% }); %>
+            </select>
+          </label>
+          <div class="member-form-full">
+            <span class="class-form-field-label">When registrations are cancelled by a Family, allow an automated credit adjustment to the family's accounting statement?</span>
+            <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Allow</label>
+            <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="0" <%= !eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Do not allow</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">When registrations are cancelled/deleted by an Admin, or by the System for nonpayment, allow an automated credit adjustment?</span>
+            <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Allow</label>
+            <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="0" <%= !eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Do not allow</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Allow Sub-Admins the ability to edit Locations?</span>
+            <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="1" <%= eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="0" <%= !eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> No</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Allow Sub-Admins the ability to edit Categories?</span>
+            <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="1" <%= eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="0" <%= !eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> No</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Allow families to submit calendar of events items?</span>
+            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="yes" <%= eventSettings.family_submit_events === 'yes' ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="auto_approve" <%= eventSettings.family_submit_events === 'auto_approve' ? 'checked' : '' %> /> Automatically Approve</label>
+            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="no" <%= eventSettings.family_submit_events === 'no' ? 'checked' : '' %> /> No</label>
+          </div>
+          <label class="member-form-full">Email Notifications To
+            <input type="email" name="submitNotificationEmail" value="<%= eventSettings.submit_notification_email || '' %>" placeholder="admin@example.com" />
+          </label>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Allow families with full administrative rights to manage price options and payment instructions for events they submit?</span>
+            <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="1" <%= eventSettings.family_manage_price_options ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="0" <%= !eventSettings.family_manage_price_options ? 'checked' : '' %> /> No</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Allow families with full administrative rights to update and manage events they created after approval?</span>
+            <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="1" <%= eventSettings.family_manage_own_events ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="0" <%= !eventSettings.family_manage_own_events ? 'checked' : '' %> /> No</label>
+          </div>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Make events submitted by families public by default?</span>
+            <label class="checkbox-option"><input type="radio" name="familyEventsPublicDefault" value="1" <%= eventSettings.family_events_public_default ? 'checked' : '' %> /> Yes</label>
+            <label class="checkbox-option"><input type="radio" name="familyEventsPublicDefault" value="0" <%= !eventSettings.family_events_public_default ? 'checked' : '' %> /> No</label>
+          </div>
+        </div>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">Save Settings</button>
+          </div>
+        </div>
+      </form>
+
+      <%# Item 8 - "buttons for add/edit category, add/edit location; both
+          create a popup that allows you to add/edit or delete." %>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
+      </div>
+    <% } %>
+
+    <dialog id="manage-categories-dialog" class="member-picker-dialog">
+      <h3>Categories</h3>
       <p class="hint">A fixed list an event picks one of, so the calendar can filter/color-code events consistently.</p>
-      <form method="POST" action="/main-admin/events/categories" class="stack-form member-form-page-panel">
+      <form method="POST" action="/main-admin/events/categories" class="stack-form">
         <div class="member-form-grid">
           <label>Category Name
             <input type="text" name="name" placeholder="e.g. Field Trip" required />
@@ -257,6 +382,7 @@
           <label>Color
             <input type="color" name="color" value="#EE9A4D" />
           </label>
+          <label class="checkbox-option"><input type="checkbox" name="allowSync" value="1" checked /> Allow Sync</label>
         </div>
         <div class="member-form-footer">
           <div class="member-form-footer-edit">
@@ -270,17 +396,31 @@
       <% } else { %>
         <div class="roster-scroll">
           <table class="roster-table condensed-table">
-            <thead><tr><th>Color</th><th>Name</th><th></th></tr></thead>
+            <thead><tr><th>Category</th><th>Color</th><th>Allow Sync</th><th></th></tr></thead>
             <tbody>
               <% categories.forEach(function(c) { %>
                 <tr>
                   <td>
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
-                      <input type="hidden" name="name" value="<%= c.name %>" />
-                      <input type="color" name="color" value="<%= c.color %>" onchange="this.form.submit()" aria-label="Color for <%= c.name %>" />
+                      <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Name for <%= c.name %>" />
+                      <input type="hidden" name="color" value="<%= c.color %>" />
+                      <input type="hidden" name="allowSync" value="<%= c.allow_sync ? '1' : '' %>" />
                     </form>
                   </td>
-                  <td><%= c.name %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
+                      <input type="hidden" name="name" value="<%= c.name %>" />
+                      <input type="color" name="color" value="<%= c.color %>" onchange="this.form.submit()" aria-label="Color for <%= c.name %>" />
+                      <input type="hidden" name="allowSync" value="<%= c.allow_sync ? '1' : '' %>" />
+                    </form>
+                  </td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/categories/<%= c.id %>/update" class="inline-block-form">
+                      <input type="hidden" name="name" value="<%= c.name %>" />
+                      <input type="hidden" name="color" value="<%= c.color %>" />
+                      <input type="checkbox" name="allowSync" value="1" <%= c.allow_sync ? 'checked' : '' %> onchange="this.form.submit()" aria-label="Allow Sync for <%= c.name %>" />
+                    </form>
+                  </td>
                   <td>
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this category? Events using it will just show no category.">
                       <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
@@ -292,7 +432,66 @@
           </table>
         </div>
       <% } %>
-    <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="manage-locations-dialog" class="member-picker-dialog">
+      <h3>Locations</h3>
+      <p class="hint">A fixed list of locations - picked from a dropdown when creating events instead of typing an address each time.</p>
+      <form method="POST" action="/main-admin/events/locations" class="stack-form">
+        <div class="member-form-grid">
+          <label>Location Name
+            <input type="text" name="name" placeholder="e.g. Fellowship Hall" required />
+          </label>
+          <label>Address
+            <input type="text" name="address" placeholder="e.g. 123 Main St" />
+          </label>
+        </div>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">+ Add Location</button>
+          </div>
+        </div>
+      </form>
+
+      <% if (locations.length === 0) { %>
+        <p class="roster-empty">No locations yet - add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Name</th><th>Address</th><th></th></tr></thead>
+            <tbody>
+              <% locations.forEach(function(l) { %>
+                <tr>
+                  <td>
+                    <form method="POST" action="/main-admin/events/locations/<%= l.id %>/update" class="inline-block-form">
+                      <input type="text" name="name" value="<%= l.name %>" onchange="this.form.submit()" aria-label="Name for <%= l.name %>" />
+                      <input type="hidden" name="address" value="<%= l.address || '' %>" />
+                    </form>
+                  </td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/locations/<%= l.id %>/update" class="inline-block-form">
+                      <input type="hidden" name="name" value="<%= l.name %>" />
+                      <input type="text" name="address" value="<%= l.address || '' %>" onchange="this.form.submit()" aria-label="Address for <%= l.name %>" />
+                    </form>
+                  </td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/locations/<%= l.id %>/delete" class="inline-block-form" data-confirm="Delete this location? Events using it will just show no location.">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
 
     <div class="event-mobile-accordion no-print">
       <% eventTabDefs.slice(activeTabIndex + 1).forEach(function(t) { %>
@@ -318,7 +517,12 @@
           <textarea name="description" rows="2" placeholder="What's happening, who it's for, what to bring"></textarea>
         </label>
         <label>Location
-          <input type="text" name="location" placeholder="e.g. Fellowship Hall" />
+          <select name="locationId">
+            <option value="">None</option>
+            <% locations.forEach(function(l) { %>
+              <option value="<%= l.id %>"><%= l.name %></option>
+            <% }); %>
+          </select>
         </label>
         <div class="class-form-row">
           <div class="class-form-field">
@@ -353,6 +557,100 @@
         </div>
       </form>
     </dialog>
+
+    <%# Item 11 - "each event title on the attendance list should be able
+        to click and pop up of event settings/creation appears." One
+        shared dialog (not one per row - the attendance list can be
+        dozens of events long) filled in by JS from the clicked title
+        button's own data-* attributes, submitting to the same event
+        update route views/admin-events-builder.ejs's own Settings form
+        already posts to. %>
+    <dialog id="event-quick-edit-dialog" class="member-picker-dialog">
+      <form method="POST" id="event-quick-edit-form" action="">
+        <h3>Edit Event</h3>
+        <label>Title
+          <input type="text" name="title" id="event-quick-edit-title" required />
+        </label>
+        <label>Description
+          <textarea name="description" id="event-quick-edit-description" rows="2"></textarea>
+        </label>
+        <label>Location
+          <select name="locationId" id="event-quick-edit-location">
+            <option value="">None</option>
+            <% locations.forEach(function(l) { %>
+              <option value="<%= l.id %>"><%= l.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <span class="class-form-field-label">Starts</span>
+            <input type="datetime-local" name="startsAt" id="event-quick-edit-starts" required />
+          </div>
+          <div class="class-form-field">
+            <span class="class-form-field-label">Ends</span>
+            <input type="datetime-local" name="endsAt" id="event-quick-edit-ends" />
+          </div>
+        </div>
+        <label>Category
+          <select name="categoryId" id="event-quick-edit-category">
+            <option value="">None</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>"><%= c.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Visibility
+          <select name="visibility" id="event-quick-edit-visibility">
+            <option value="members">Members only</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+        <label>Capacity (people) <span class="hint">(blank = no limit)</span>
+          <input type="number" name="capacity" id="event-quick-edit-capacity" min="1" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <a class="btn-secondary" id="event-quick-edit-full-link" href="">Full Editor</a>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="import-events-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events/import" enctype="multipart/form-data">
+        <h3>Import Events</h3>
+        <p class="hint">Download the <a href="/main-admin/events/import-template.xlsx">template</a>, fill in a row per event, then upload it here. Imported events always land in Drafts for review before publishing.</p>
+        <label>File
+          <input type="file" name="file" accept=".xlsx,.xls,.csv" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
   </main>
+  <script>
+    (function () {
+      var dialog = document.getElementById('event-quick-edit-dialog');
+      if (!dialog) return;
+      document.querySelectorAll('.event-quick-edit-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.getElementById('event-quick-edit-form').action = '/main-admin/events/' + btn.dataset.id + '/quick-edit';
+          document.getElementById('event-quick-edit-title').value = btn.dataset.title || '';
+          document.getElementById('event-quick-edit-description').value = btn.dataset.description || '';
+          document.getElementById('event-quick-edit-location').value = btn.dataset.locationId || '';
+          document.getElementById('event-quick-edit-starts').value = btn.dataset.startsAt || '';
+          document.getElementById('event-quick-edit-ends').value = btn.dataset.endsAt || '';
+          document.getElementById('event-quick-edit-category').value = btn.dataset.categoryId || '';
+          document.getElementById('event-quick-edit-visibility').value = btn.dataset.visibility || 'members';
+          document.getElementById('event-quick-edit-capacity').value = btn.dataset.capacity || '';
+          document.getElementById('event-quick-edit-full-link').href = '/main-admin/events/' + btn.dataset.id + '/builder';
+          dialog.showModal();
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -22,33 +22,39 @@
     <h1>Main Admin</h1>
     <p class="hint">The control center for the whole platform - users, roles/permissions, and public website content.</p>
 
-    <%# A real request: "should show a counter of how many families,
-        how many parents and how many students." %>
-    <div class="totals-card">
-      <div class="totals-item">
-        <span class="stat-value"><%= familyCount %></span>
-        <span class="stat-label">Families</span>
+    <%# Item 6: "remove accounts by role counting, remove user settings -
+        user settings should be under the gear setting icon at the top of
+        the page [already true - see routes/main-admin.js's own /settings
+        redirect and the gear dropdown in partials/portal-nav.ejs]. There
+        should be a count display for number of parents, students,
+        families, teachers and admins. Then there should be a 2nd count
+        display for pending requests... each name should be able to click
+        and go straight to that request page." %>
+    <section class="portal-dashboard-section">
+      <h2>People</h2>
+      <div class="totals-card">
+        <div class="totals-item">
+          <span class="stat-value"><%= parentCount %></span>
+          <span class="stat-label">Parents</span>
+        </div>
+        <div class="totals-item">
+          <span class="stat-value"><%= studentCount %></span>
+          <span class="stat-label">Students</span>
+        </div>
+        <div class="totals-item">
+          <span class="stat-value"><%= familyCount %></span>
+          <span class="stat-label">Families</span>
+        </div>
+        <div class="totals-item">
+          <span class="stat-value"><%= teacherCount %></span>
+          <span class="stat-label">Teachers</span>
+        </div>
+        <div class="totals-item">
+          <span class="stat-value"><%= adminCount %></span>
+          <span class="stat-label">Admins</span>
+        </div>
       </div>
-      <div class="totals-item">
-        <span class="stat-value"><%= parentCount %></span>
-        <span class="stat-label">Parents</span>
-      </div>
-      <div class="totals-item">
-        <span class="stat-value"><%= studentCount %></span>
-        <span class="stat-label">Students</span>
-      </div>
-    </div>
-
-    <div class="totals-card">
-      <div class="totals-item">
-        <span class="stat-value"><%= pendingCount %></span>
-        <span class="stat-label">Pending Accounts</span>
-      </div>
-      <div class="totals-item">
-        <span class="stat-value"><%= activeCount %></span>
-        <span class="stat-label">Active Accounts</span>
-      </div>
-    </div>
+    </section>
 
     <% if (pendingCount > 0) { %>
       <div class="alert alert-info">
@@ -58,35 +64,30 @@
     <% } %>
 
     <section class="portal-dashboard-section">
-      <h2>Accounts by Role</h2>
-      <% if (roleCounts.length === 0) { %>
-        <p class="roster-empty">No roles have been granted yet.</p>
-      <% } else { %>
-        <div class="totals-card">
-          <% roleCounts.forEach(function(r) { %>
-            <div class="totals-item">
-              <span class="stat-value"><%= r.c %></span>
-              <span class="stat-label"><%= r.label %></span>
-            </div>
-          <% }); %>
-        </div>
-      <% } %>
+      <h2>Pending Requests</h2>
+      <div class="totals-card totals-card-links">
+        <a class="totals-item" href="/main-admin/events?tab=requests">
+          <span class="stat-value"><%= eventRequestsCount %></span>
+          <span class="stat-label">Event Requests</span>
+        </a>
+        <a class="totals-item" href="/main-admin/babysitters?tab=approvals">
+          <span class="stat-value"><%= babysitterApprovalsCount %></span>
+          <span class="stat-label">Babysitter Approvals</span>
+        </a>
+        <a class="totals-item" href="/main-admin/photos#pending-photos">
+          <span class="stat-value"><%= photoSubmissionsCount %></span>
+          <span class="stat-label">Photo Submissions</span>
+        </a>
+        <a class="totals-item" href="/main-admin/directory?tab=requests">
+          <span class="stat-value"><%= directoryRequestsCount %></span>
+          <span class="stat-label">Business Directory Requests</span>
+        </a>
+        <a class="totals-item" href="/main-admin/classifieds?tab=requests">
+          <span class="stat-value"><%= classifiedsRequestsCount %></span>
+          <span class="stat-label">Classifieds Requests</span>
+        </a>
+      </div>
     </section>
-
-    <%# A real request: "roles and permissions, website settings, and
-        co-op admin portal links should all be under the main admin
-        settings gear icon" - moved to the gear icon's own dropdown
-        (views/partials/portal-nav.ejs), alongside Users which already
-        lived there. Users also keeps this one homepage card since
-        approving pending registrations is common enough day-to-day work
-        to still surface here directly. %>
-    <div class="portal-dashboard-grid">
-      <section class="portal-dashboard-card">
-        <h2>Users</h2>
-        <p class="hint">Approve pending registrations, create accounts directly, and assign portal roles.</p>
-        <a class="roster-action-btn" href="/main-admin/users">Manage Users</a>
-      </section>
-    </div>
   </main>
 </body>
 </html>

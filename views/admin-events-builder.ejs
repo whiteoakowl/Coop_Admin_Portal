@@ -25,7 +25,6 @@
       { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
       { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
       { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
     ],
   }) %>
 
@@ -96,8 +95,16 @@
             <% }); %>
           </select>
         </label>
-        <label>Location
+        <label>Location (legacy text - prefer the dropdown below)
           <input type="text" name="location" value="<%= event.location || '' %>" />
+        </label>
+        <label>Location
+          <select name="locationId">
+            <option value="">None</option>
+            <% locations.forEach(function(l) { %>
+              <option value="<%= l.id %>" <%= event.location_id === l.id ? 'selected' : '' %>><%= l.name %></option>
+            <% }); %>
+          </select>
         </label>
         <label>Starts
           <input type="datetime-local" name="startsAt" value="<%= event.starts_at ? event.starts_at.replace(' ', 'T').slice(0, 16) : '' %>" required />

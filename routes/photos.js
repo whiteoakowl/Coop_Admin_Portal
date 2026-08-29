@@ -61,7 +61,7 @@ router.get('/:id', async (req, res) => {
     if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
     return res.status(404).render('404', { title: 'Not Found' });
   }
-  const albumPhotos = await photos.listPhotos(album.id);
+  const albumPhotos = await photos.listPhotos(album.id, { status: 'approved' });
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
   res.render('photos-detail', { title: album.title, settings, album, photos: albumPhotos, error: req.query.error || null, notice: req.query.notice || null });
 });
@@ -105,11 +105,14 @@ router.post('/:id/upload', requirePortalAuth, upload.array('images', 20), async 
       key = generateKey(file.originalname);
       fs.writeFileSync(path.join(PHOTOS_DIR, key), file.buffer);
     }
-    await photos.addPhoto(album.id, key, (req.body.caption || '').trim(), req.portalAccount.id);
+    await photos.addPhoto(album.id, key, (req.body.caption || '').trim(), req.portalAccount.id, 'pending');
     if (!firstKey) firstKey = key;
   }
-  if (!album.cover_image_key && firstKey) await photos.setCoverImage(album.id, firstKey);
-  res.redirect(`/photos/${album.id}?notice=` + encodeURIComponent('Photo(s) added.'));
+  // Deliberately not set as cover here (unlike admin-photos.js's own
+  // upload route) - a pending, not-yet-reviewed submission shouldn't
+  // become the album's public-facing cover photo before a Main Admin
+  // has approved it.
+  res.redirect(`/photos/${album.id}?notice=` + encodeURIComponent('Thanks - your photo(s) were submitted for approval.'));
 });
 
 // A real request: "there should be a download button for each album so
@@ -123,7 +126,7 @@ router.get('/:id/download', async (req, res) => {
     if (!req.portalAccount) return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
     return res.status(404).render('404', { title: 'Not Found' });
   }
-  const albumPhotos = await photos.listPhotos(album.id);
+  const albumPhotos = await photos.listPhotos(album.id, { status: 'approved' });
   if (albumPhotos.length === 0) return res.status(404).render('404', { title: 'Not Found' });
 
   const safeTitle = (album.title || 'album').replace(/[^a-z0-9]+/gi, '-').toLowerCase();

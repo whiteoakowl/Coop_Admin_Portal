@@ -75,13 +75,13 @@ test('Calendar tab: List/Calendar view toggle switches rendering and preserves t
   await publishEvent(admin, eventId);
 
   const calendarPage = await request(app).get('/main-admin/events?tab=calendar&month=2027-09').set('Cookie', admin.cookie);
-  assert.match(calendarPage.text, /class="roster-action-btn archived-toggle-btn active" href="\/main-admin\/events\?tab=calendar&view=calendar&month=2027-09">Calendar View/);
+  assert.match(calendarPage.text, /class="roster-action-btn archived-toggle-btn icon-toggle-btn active" href="\/main-admin\/events\?tab=calendar&view=calendar&month=2027-09" aria-label="Calendar View"/);
   assert.match(calendarPage.text, /event-calendar-table/);
   assert.doesNotMatch(calendarPage.text, /<th>Location<\/th>/);
 
   const listPage = await request(app).get('/main-admin/events?tab=calendar&view=list&month=2027-09').set('Cookie', admin.cookie);
   assert.equal(listPage.status, 200);
-  assert.match(listPage.text, /class="roster-action-btn archived-toggle-btn active" href="\/main-admin\/events\?tab=calendar&view=list&month=2027-09">List View/);
+  assert.match(listPage.text, /class="roster-action-btn archived-toggle-btn icon-toggle-btn active" href="\/main-admin\/events\?tab=calendar&view=list&month=2027-09" aria-label="List View"/);
   assert.match(listPage.text, /Fall Picnic/);
   assert.match(listPage.text, /Fellowship Hall/);
   assert.match(listPage.text, /<th>Location<\/th>/);
@@ -91,7 +91,7 @@ test('New Event popup: many more detail fields beyond Title/Starts, and creating
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', admin.cookie);
   assert.match(page.text, /name="description"/);
-  assert.match(page.text, /name="location"/);
+  assert.match(page.text, /name="locationId"/);
   assert.match(page.text, /name="endsAt"/);
   assert.match(page.text, /name="categoryId"/);
   assert.match(page.text, /name="visibility"/);

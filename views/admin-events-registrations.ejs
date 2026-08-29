@@ -25,7 +25,6 @@
       { href: '/main-admin/notifications', icon: 'bell', label: 'Notifications' },
       { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
       { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
-      { href: '/main-admin/audit-log', icon: 'file-text', label: 'Audit Log' },
     ],
   }) %>
 
@@ -69,6 +68,7 @@
               <th>Status</th>
               <th>Registered</th>
               <th>Checked In</th>
+              <th>P/A/L</th>
               <th></th>
             </tr>
           </thead>
@@ -96,11 +96,24 @@
                   <% } %>
                 </td>
                 <td>
+                  <select class="roster-cell-select roster-cell-select-<%= r.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/status" aria-label="P/A/L for <%= r.memberName %>">
+                    <option value="" <%= !r.attendance_status ? 'selected' : '' %>>—</option>
+                    <option value="present" <%= r.attendance_status === 'present' ? 'selected' : '' %>>P</option>
+                    <option value="late" <%= r.attendance_status === 'late' ? 'selected' : '' %>>L</option>
+                    <option value="absent" <%= r.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
+                  </select>
+                </td>
+                <td>
                   <% if (r.status === 'confirmed') { %>
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkin" class="inline-block-form">
-                      <input type="hidden" name="present" value="<%= r.checked_in_at ? '0' : '1' %>" />
-                      <button type="submit" class="roster-action-btn"><%= r.checked_in_at ? 'Clear' : 'Present' %></button>
-                    </form>
+                    <div class="roster-btn-row">
+                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkin" class="inline-block-form">
+                        <input type="hidden" name="present" value="1" />
+                        <button type="submit" class="roster-action-btn">Check In</button>
+                      </form>
+                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkout" class="inline-block-form">
+                        <button type="submit" class="roster-action-btn">Check Out</button>
+                      </form>
+                    </div>
                   <% } %>
                 </td>
               </tr>
@@ -120,10 +133,21 @@
                   <% } %>
                 </td>
                 <td>
+                  <select class="roster-cell-select roster-cell-select-<%= g.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/status" aria-label="P/A/L for <%= g.guest_name %>">
+                    <option value="" <%= !g.attendance_status ? 'selected' : '' %>>—</option>
+                    <option value="present" <%= g.attendance_status === 'present' ? 'selected' : '' %>>P</option>
+                    <option value="late" <%= g.attendance_status === 'late' ? 'selected' : '' %>>L</option>
+                    <option value="absent" <%= g.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
+                  </select>
+                </td>
+                <td>
                   <div class="roster-btn-row">
                     <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/checkin" class="inline-block-form">
-                      <input type="hidden" name="present" value="<%= g.checked_in_at ? '0' : '1' %>" />
-                      <button type="submit" class="roster-action-btn"><%= g.checked_in_at ? 'Clear' : 'Present' %></button>
+                      <input type="hidden" name="present" value="1" />
+                      <button type="submit" class="roster-action-btn">Check In</button>
+                    </form>
+                    <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/checkout" class="inline-block-form">
+                      <button type="submit" class="roster-action-btn">Check Out</button>
                     </form>
                     <% if (canRegisterGuests) { %>
                       <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/cancel" class="inline-block-form" data-confirm="Cancel guest &quot;<%= g.guest_name %>&quot;?">
@@ -195,6 +219,25 @@
           .catch(function () {
             feedback.textContent = 'Something went wrong - please try again.';
           });
+      });
+    })();
+
+    // P/A/L roster grid (item 11) - each select auto-saves on change, same
+    // "no separate Edit/Save step" pattern public/js/attendance-grid.js
+    // uses for class attendance, but posting a plain `status` field to
+    // this page's own per-row endpoint instead of that script's class-
+    // attendance-specific `status:<memberId>:<date>` body key.
+    (function () {
+      var csrf = document.querySelector('meta[name="csrf-token"]');
+      document.querySelectorAll('.roster-cell-select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+          sel.className = 'roster-cell-select roster-cell-select-' + (sel.value || 'blank');
+          fetch(sel.dataset.statusEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf ? csrf.content : '' },
+            body: 'status=' + encodeURIComponent(sel.value) + '&_csrf=' + encodeURIComponent(csrf ? csrf.content : ''),
+          });
+        });
       });
     })();
   </script>
