@@ -18,6 +18,22 @@
     });
   }
 
+  // A real request: "you can only have one primary parent per family."
+  // The server (utils/memberIntake.js's createParentMember) enforces this
+  // no matter what gets submitted, but leaving every block's checkbox
+  // independently checkable here would let someone check two, submit, and
+  // be surprised which one "won." Radio-button behavior instead - marking
+  // one Primary Parent unchecks it everywhere else on the form.
+  const primaryParentBoxes = document.querySelectorAll('[data-parent-block] input[name$="[isPrimaryParent]"]');
+  primaryParentBoxes.forEach((box) => {
+    box.addEventListener('change', () => {
+      if (!box.checked) return;
+      primaryParentBoxes.forEach((other) => {
+        if (other !== box) other.checked = false;
+      });
+    });
+  });
+
   const childrenList = document.getElementById('children-list');
   const addChildBtn = document.getElementById('add-child-btn');
   const template = document.getElementById('child-block-template');

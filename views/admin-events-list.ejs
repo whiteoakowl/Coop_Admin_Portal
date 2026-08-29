@@ -17,49 +17,113 @@
     </div>
     <p class="hint">Create and manage co-op events - registration, volunteer roles, and donation requests.</p>
 
-    <%# A real request: "Main Admin Events: Calendar/Drafts/Requests/
-        Event Attendance/Archive/Settings tabs." See routes/admin-
-        events.js's own header comment for what each tab covers. %>
-    <div class="view-tabs">
-      <a href="/main-admin/events?tab=calendar" class="view-tab <%= activeTab === 'calendar' ? 'active' : '' %>">Calendar</a>
-      <a href="/main-admin/events?tab=drafts" class="view-tab <%= activeTab === 'drafts' ? 'active' : '' %>">Drafts</a>
-      <a href="/main-admin/events?tab=requests" class="view-tab <%= activeTab === 'requests' ? 'active' : '' %>">Requests<% if (pendingCount > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
-      <a href="/main-admin/events?tab=attendance" class="view-tab <%= activeTab === 'attendance' ? 'active' : '' %>">Event Attendance</a>
-      <a href="/main-admin/events?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
-      <a href="/main-admin/events?tab=settings" class="view-tab <%= activeTab === 'settings' ? 'active' : '' %>">Settings</a>
+    <%
+      // A real request: "Main Admin Events: Calendar/Drafts/Requests/
+      // Event Attendance/Archive/Settings tabs" (see routes/admin-
+      // events.js's own header comment for what each tab covers), and a
+      // follow-up: "on mobile, replace the tabs with stacked expandable
+      // bars - click the title to expand it." Desktop keeps the usual
+      // .view-tabs pill strip; on mobile it's replaced with this same
+      // list of tabs rendered as full-width bars stacked top to bottom,
+      // with the current tab's bar shown "expanded" (open, its content
+      // directly beneath it) and every other tab shown as a closed bar
+      // you tap to navigate to and expand - see the two
+      // .event-mobile-accordion blocks below (one for the bars before
+      // the active tab, one for the bars after) sandwiching the exact
+      // same content this page already rendered for the desktop tab
+      // panel, so there's no second copy of any tab's markup to keep in
+      // sync.
+      const eventTabDefs = [
+        { key: 'calendar', label: 'Calendar' },
+        { key: 'drafts', label: 'Drafts' },
+        { key: 'requests', label: 'Requests' },
+        { key: 'attendance', label: 'Event Attendance' },
+        { key: 'archive', label: 'Archive' },
+        { key: 'settings', label: 'Settings' },
+      ];
+      const activeTabIndex = eventTabDefs.findIndex(function(t) { return t.key === activeTab; });
+    %>
+    <div class="view-tabs event-tabs-desktop">
+      <% eventTabDefs.forEach(function(t) { %>
+        <a href="/main-admin/events?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %><% if (t.key === 'requests' && pendingCount > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
+      <% }); %>
+    </div>
+    <div class="event-mobile-accordion no-print">
+      <% eventTabDefs.slice(0, activeTabIndex + 1).forEach(function(t) { %>
+        <% if (t.key === activeTab) { %>
+          <div class="event-accordion-bar event-accordion-bar-active">
+            <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
+            <svg class="icon event-accordion-chevron"><use href="#icon-chevron-down"/></svg>
+          </div>
+        <% } else { %>
+          <a class="event-accordion-bar" href="/main-admin/events?tab=<%= t.key %>">
+            <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
+            <svg class="icon event-accordion-chevron event-accordion-chevron-closed"><use href="#icon-chevron-down"/></svg>
+          </a>
+        <% } %>
+      <% }); %>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (activeTab === 'calendar') { %>
-      <% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
-        <p class="roster-empty">No published events this month.</p>
-      <% } %>
-      <div class="roster-toolbar">
+      <div class="roster-toolbar event-calendar-toolbar">
+        <div class="event-calendar-month-nav">
+          <h2 class="event-calendar-month-label"><%= calendar.label %></h2>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
+            <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
+          </div>
+        </div>
         <div class="roster-btn-row">
-          <a class="roster-action-btn" href="/main-admin/events?tab=calendar&month=<%= calendar.prevParam %>">&larr; Prev</a>
-          <strong><%= calendar.label %></strong>
-          <a class="roster-action-btn" href="/main-admin/events?tab=calendar&month=<%= calendar.nextParam %>">Next &rarr;</a>
+          <a class="roster-action-btn archived-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>">Calendar View</a>
+          <a class="roster-action-btn archived-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>">List View</a>
         </div>
       </div>
-      <table class="roster-table condensed-table event-calendar-table">
-        <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
-        <tbody>
-          <% calendar.weeks.forEach(function(week) { %>
-            <tr>
-              <% week.forEach(function(day) { %>
-                <td class="<%= day.inMonth ? '' : 'hint' %>">
-                  <div><%= day.day %></div>
-                  <% day.events.forEach(function(e) { %>
-                    <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
-                  <% }); %>
-                </td>
-              <% }); %>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
+
+      <% if (calendarView === 'list') { %>
+        <% if (calendarList.length === 0) { %>
+          <p class="roster-empty">No published events this month.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table condensed-table">
+              <thead><tr><th>Title</th><th>Starts</th><th>Location</th><th>Category</th></tr></thead>
+              <tbody>
+                <% calendarList.forEach(function(e) { %>
+                  <tr>
+                    <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
+                    <td><%= e.startsLabel %></td>
+                    <td><%= e.location || '—' %></td>
+                    <td><% if (e.categoryColor) { %><span class="badge-pill" style="background:<%= e.categoryColor %>;color:#fff;"><%= e.categoryName || '' %></span><% } else { %>—<% } %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      <% } else { %>
+        <% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
+          <p class="roster-empty">No published events this month.</p>
+        <% } %>
+        <table class="roster-table condensed-table event-calendar-table">
+          <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+          <tbody>
+            <% calendar.weeks.forEach(function(week) { %>
+              <tr>
+                <% week.forEach(function(day) { %>
+                  <td class="<%= day.inMonth ? '' : 'hint' %>">
+                    <div><%= day.day %></div>
+                    <% day.events.forEach(function(e) { %>
+                      <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
+                    <% }); %>
+                  </td>
+                <% }); %>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
     <% } else if (activeTab === 'drafts') { %>
       <% if (drafts.length === 0) { %>
         <p class="roster-empty">No drafts &mdash; create an event above.</p>
@@ -209,6 +273,14 @@
       <% } %>
     <% } %>
 
+    <div class="event-mobile-accordion no-print">
+      <% eventTabDefs.slice(activeTabIndex + 1).forEach(function(t) { %>
+        <a class="event-accordion-bar" href="/main-admin/events?tab=<%= t.key %>">
+          <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
+          <svg class="icon event-accordion-chevron event-accordion-chevron-closed"><use href="#icon-chevron-down"/></svg>
+        </a>
+      <% }); %>
+    </div>
   </main>
 </body>
 </html>

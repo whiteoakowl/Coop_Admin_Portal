@@ -113,21 +113,21 @@
      bar isn't needed" - the old 184px logo alone (in a 220px-wide
      sidebar) was most of what forced the sidebar to scroll on Main
      Admin, whose left nav is the longest (its own navLinks plus the
-     12-item Community section every portal-nav.ejs caller gets). Bumped
-     back up from 60 - two later "make the logo larger" requests, first
-     to 84 then to this 140 - safe now that Main Admin's own Community
-     section was removed as a redundant duplicate (see
-     MAIN_ADMIN_NAV_LINKS's own comment in portal-nav.ejs), which used to
-     be the longest sidebar case. Checked against whichever portal-nav.ejs
-     caller has the longest list now (the shared Community pages like
-     Store/Chat/Forms, which still get the full 12-item COMMUNITY_LINKS
-     plus their own 2-3 navLinks - about 15 items total): headless probes
-     of .admin-sidebar's scrollHeight vs. clientHeight on that page found
-     the sidebar first needs to scroll on browser viewports shorter than
-     ~600px tall at this size - still comfortable headroom on any real
-     laptop/desktop viewport (600px of vertical *browser content area*,
-     after all chrome, is an unusually short window). Re-run that same
-     probe against the Store page before going bigger still. */
+     12-item Community section every portal-nav.ejs caller gets). Raised
+     again since, twice over (two sessions, working the same "make the
+     logo bigger" request in parallel - see the .admin-sidebar width
+     bump alongside this one, from the same later session): first to 84,
+     then to this 140, safe now that Main Admin's own Community section
+     was removed as a redundant duplicate (see MAIN_ADMIN_NAV_LINKS's own
+     comment in portal-nav.ejs), which used to be the longest sidebar
+     case. Checked against whichever portal-nav.ejs caller has the
+     longest list now (the shared Community pages like Store/Chat/Forms,
+     which still get the full 12-item COMMUNITY_LINKS plus their own 2-3
+     navLinks - about 15 items total) - re-run that probe (headless
+     .admin-sidebar scrollHeight vs. clientHeight on the Store page)
+     after any further change to this value, the sidebar width, or the
+     nav's own font/padding, since all three trade off against the same
+     fixed-height sidebar. */
   --logo-xl: 140px;  /* admin sidebar */
   --logo-lg: 140px;  /* login page */
   --logo-md: 150px;  /* kiosk/root landing header */
@@ -1025,6 +1025,22 @@ body.public-page .roster-empty {
 }
 .form-section h2 { margin: 0 0 0.85rem; }
 
+/* A real request: "can't check the box until you have scrolled through
+   the entire handbook" (views/portal-register.ejs, public/js/portal-
+   register-form.js). A fixed height + overflow-y: auto is what makes
+   the box actually scrollable instead of growing to fit whatever the
+   admin wrote - a short handbook just leaves empty space at the bottom,
+   which is fine, the JS enables the checkbox immediately in that case. */
+.handbook-scroll-box {
+  height: 16rem;
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: #f8fafc;
+  margin-bottom: 0.75rem;
+}
+
 /* ---------- Membership Form ---------- */
 
 .membership-add-parent2 { margin-top: 1rem; }
@@ -1154,13 +1170,18 @@ body.public-page .roster-empty {
 .skip-link:focus { top: 0.5rem; }
 
 /* Left-hand dashboard panel (desktop) - fixed for the full viewport height,
-   holds the brand + the primary section links. */
+   holds the brand + the primary section links. Width raised alongside
+   the bigger logo/nav text below it (a real request: "dashboard side
+   panels tabs on web view should be bigger") - .admin-page-corner-actions
+   and .admin-main's own margin-left must stay in lockstep with this
+   value, they're the two other places layout reserves space for this
+   fixed sidebar. */
 .admin-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  width: 220px;
+  width: 260px;
   background: var(--accent);
   box-shadow: 2px 0 10px rgba(0,0,0,0.12);
   display: flex;
@@ -1191,11 +1212,11 @@ body.public-page .roster-empty {
 .admin-sidebar nav a {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   color: var(--ink);
-  font-size: 0.74rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  padding: 0.18rem 0.45rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 8px;
   transition: background-color 0.15s ease;
 }
@@ -1237,7 +1258,7 @@ body.public-page .roster-empty {
   align-items: center;
   justify-content: flex-end;
   gap: 0.6rem;
-  margin-left: 220px;
+  margin-left: 260px;
   padding: 0.65rem 1.25rem;
   background: var(--accent);
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
@@ -1270,16 +1291,16 @@ body.public-page .roster-empty {
 .admin-sidebar-bottom button {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   width: 100%;
   color: var(--ink);
   background: rgba(28, 37, 48, 0.14);
   border: none;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-align: left;
-  padding: 0.32rem 0.55rem;
+  padding: 0.45rem 0.6rem;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -1390,7 +1411,7 @@ body.public-page .roster-empty {
    "No active alerts today." message, a filter label) renders directly on
    --bg and fails color-contrast (axe-core caught this: --ink and --muted
    text both fall well under the 4.5:1 minimum against --bg). */
-.admin-main { max-width: 1200px; margin-left: 220px; padding: 1.75rem 2rem 2rem; min-height: 100vh; background: var(--surface); }
+.admin-main { max-width: 1200px; margin-left: 260px; padding: 1.75rem 2rem 2rem; min-height: 100vh; background: var(--surface); }
 
 /* Every admin page's h1 is its page title - give it clean, consistent air
    below it (a rule line) so it always stands apart from the h2 section
@@ -2169,19 +2190,38 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    at once (admin-logs.ejs is tab-conditional). */
 .logs-print-table { display: none; }
 
-/* Mobile member list: keep it to Name, Type, and the action icons - Photo,
-   Parent, and Rosters are useful on a wide screen but just add scroll on
-   a phone. Name itself switches from the table's usual nowrap to
-   wrapping, so a long name grows the row instead of getting clipped
+/* .members-col-days (the mobile-only Mon/Wed roster indicator - see
+   admin-members.ejs's own comment) and .members-col-sections (Main
+   Admin's own equivalent - see main-admin-members.ejs's own comment,
+   "instead of showing type on the member row mobile view show the
+   sections a family is listed in") only ever show inside the
+   @media (max-width: 640px) block below; hidden here so a wide screen
+   never renders either of them alongside Type at once. */
+.members-col-days, .members-col-sections { display: none; }
+
+/* Mobile member list: keep it to Name, Roster Day, and the action icons -
+   Photo, Family, and Rosters are useful on a wide screen but just add
+   scroll on a phone. A real request: "on mobile the column type
+   shouldn't be there. It should read whether they are on Wednesday or
+   Monday rosters" - Type is swapped out for .members-col-days instead of
+   just being dropped. Name itself switches from the table's usual nowrap
+   to wrapping, so a long name grows the row instead of getting clipped
    past the screen edge with no ellipsis/affordance that it continues -
    the row-scroll pattern that works fine for secondary columns doesn't
    work for the one column mobile is actually built to show. */
 @media (max-width: 640px) {
-  .members-col-photo, .members-col-parent, .members-col-rosters { display: none; }
+  .members-col-photo, .members-col-parent, .members-col-rosters, .members-col-type,
+  .members-col-agegrade, .members-col-contact { display: none; }
+  .members-col-days, .members-col-sections { display: table-cell; }
   /* Beats the base .roster-table td nowrap rule on specificity (two
      classes vs. one) - see that rule's own comment for why nowrap is the
      right default everywhere else. */
   .members-table td.members-col-name { white-space: normal; }
+
+  /* A real request: "shrink font on member rows so that first and last
+     name is on the same row and you can see all of the icons in the
+     mobile view without sliding side to side." */
+  .members-table th, .members-table td { font-size: 0.8rem; }
 
   /* A real bug report: even with Photo/Family/Rosters already hidden
      above, the 4 action icons (Notes/View Cards/View Schedule/Delete)
@@ -2804,6 +2844,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     font-size: 0.72rem;
     white-space: normal;
     line-height: 1.2;
+  }
+
+  /* A toolbar opted into a fixed 2-column shape (data-fixed-columns="2",
+     see roster-btn-row-grid.js) with an odd button count leaves its last
+     button alone on the final row - :last-child:nth-child(odd) is only
+     true when that lone trailing button is odd-positioned, i.e. actually
+     alone (an even count already fills its last row in pairs and should
+     stay untouched). Spans it full width instead of leaving it stranded
+     in the first column with an empty gap beside it. */
+  .roster-btn-row[data-fixed-columns] > .roster-action-btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* A real request: "filter by family should be under the buttons."
+     .roster-toolbar's flex-wrap only drops .category-filter to its own
+     line once the row actually runs out of width - on a phone the 2-row
+     button grid above is narrow enough that the filter still fits beside
+     it instead of below. flex-basis: 100% forces it onto its own line
+     every time, scoped to just this page's toolbar (#members-toolbar) so
+     other .roster-toolbar + .category-filter pages keep their existing
+     side-by-side layout. */
+  #members-toolbar .category-filter {
+    flex-basis: 100%;
   }
 }
 
@@ -3631,6 +3694,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    toolbar's own action row already uses (.roster-btn-row). */
 .name-tag-bulk-filter .name-tag-bulk-submit { margin-left: auto; }
 .name-tag-bulk-filter .name-tag-bulk-submit + .name-tag-bulk-submit { margin-left: 0; }
+
+/* Item 16 - a real request: "buttons/filters for print/design should
+   exactly match co-op admin's name tag page, same button stacking" - the
+   Print tab's filter dropdown/checkboxes/submit buttons are already the
+   same shared markup on both portals (this file is included from both
+   views/main-admin-name-tags.ejs and views/admin-name-tag.ejs), but once
+   this row's own flex-wrap kicked in on a narrow screen, the auto-margin
+   trick above (meant for one wide row) instead stranded "Select None"
+   alone on a line with "Print Selected" floated far off to its right.
+   Below the same breakpoint .name-tag-editor-actions already uses for
+   its own Reset/Save buttons, drop straight to one full-width control per
+   row in visual order instead - the same clean stacking every other
+   toolbar in the app already gets. */
+@media (max-width: 640px) {
+  .name-tag-bulk-filter { flex-direction: column; align-items: stretch; }
+  .name-tag-bulk-filter .name-tag-bulk-filter-select { width: 100%; }
+  .name-tag-bulk-filter .name-tag-bulk-submit,
+  .name-tag-bulk-filter .name-tag-bulk-submit + .name-tag-bulk-submit {
+    margin-left: 0;
+    width: 100%;
+  }
+}
 
 @media (max-width: 720px) {
   .name-tag-editor-body { grid-template-columns: 1fr; }
@@ -6121,9 +6206,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    logo and the "Switch Portal" disclosure.
    --------------------------------------------------------------------- */
 .portal-nav-title {
-  margin: 0.1rem 0 0.2rem;
-  padding: 0 0.5rem;
-  font-size: 0.68rem;
+  margin: 0.3rem 0 0.2rem;
+  padding: 0 0.55rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -6364,6 +6449,59 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    every other .roster-table on the site to accommodate it. */
 .event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
 .event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; }
+
+/* A real request: "prev/next buttons should be side by side with the
+   month name stacked above them" - previously Prev/<month name>/Next sat
+   as three items crammed into one .roster-btn-row, which not only read
+   oddly (a plain text label sandwiched between two buttons) but broke
+   that row's own mobile button-grid math (roster-btn-row-grid.js only
+   counts .roster-action-btn children, so the month name <strong> silently
+   rode along as an extra, unaccounted-for grid cell). The month label now
+   sits in its own line above a Prev/Next .roster-btn-row containing only
+   the two buttons; the Calendar/List view toggle gets its own second
+   .roster-btn-row alongside it. */
+.event-calendar-month-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+.event-calendar-month-label { margin: 0; font-size: 1.1rem; }
+.event-calendar-toolbar { align-items: flex-start; }
+/* Calendar/List view toggle reuses .archived-toggle-btn's own "pressed"
+   look (see that class's own comment above) rather than inventing a
+   second active-state treatment for the same idea. */
+
+/* A real request: "on mobile, replace the [Events] tabs with stacked
+   expandable bars - click the title to expand it." Below 640px the
+   usual .view-tabs pill strip (.event-tabs-desktop here) hides in favor
+   of .event-mobile-accordion's own full-width bars - see
+   views/admin-events-list.ejs's own comment on why there are two of
+   these blocks (one for the bars before the active tab, one for the
+   bars after) instead of one. */
+.event-mobile-accordion { display: none; }
+@media (max-width: 640px) {
+  .event-tabs-desktop { display: none; }
+  .event-mobile-accordion {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+  }
+  .event-accordion-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    color: var(--ink);
+    font-weight: 600;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .event-mobile-accordion .event-accordion-bar:last-child { border-bottom: none; }
+  .event-accordion-bar-active { background: var(--brand-soft); color: var(--brand-dark); }
+  .event-accordion-chevron { flex-shrink: 0; width: 1.1rem; height: 1.1rem; transition: transform 0.15s ease; }
+  .event-accordion-chevron-closed { transform: rotate(-90deg); }
+}
 
 /* Babysitter Directory - profile photo thumbnail, shown both on a
    parent's own edit form (their current photo, before they replace it)

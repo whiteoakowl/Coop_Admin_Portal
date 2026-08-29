@@ -9,14 +9,17 @@
 // generation, active/archived filtering) can't drift between the two -
 // only the route wiring, auth gate, and view are new.
 //
-// Scoped down from /admin/members's full feature set on purpose: no photo
-// upload, CSV export, Excel bulk import, bulk-select actions, or
-// printable name-tag/schedule-card generation here - those stay print/
-// file-heavy legacy-portal-only features. This still covers every core
-// "manage the roster" action: add, edit every profile field, family
-// grouping (including creating a family inline), archive, and delete.
+// Scoped down from /admin/members's full feature set on purpose: no
+// photo upload or printable name-tag/schedule-card generation here -
+// those stay print/file-heavy legacy-portal-only features. CSV export
+// and Excel bulk import DO live here too now - a real request: "add
+// member button, edit permissions button, edit, import, export buttons
+// should be under the member tab" - sharing utils/memberImport.js's
+// logic with routes/admin-members.js's own identical feature rather
+// than a second, drifting copy.
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const { formatDateLabel, formatDateNumeric, ageFromBirthday, isValidISODate } = require('../utils/dates');
@@ -24,6 +27,9 @@ const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { createStorageClient } = require('../utils/storage');
 const { removeUpload } = require('../utils/uploadBackend');
+const { spreadsheetFileFilter } = require('../utils/uploads');
+const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
+const memberImport = require('../utils/memberImport');
 const path = require('path');
 const {
   familyOf,
@@ -44,12 +50,16 @@ const {
   parseArrayField,
 } = require('../utils/memberIntake');
 const membershipApprovals = require('../utils/membershipApprovals');
+const membershipHandbook = require('../utils/membershipHandbook');
+const membershipFormFields = require('../utils/membershipFormFields');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
 
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
 const MEMBER_PHOTOS_BUCKET = 'member-photos';
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
 const storageClient = createStorageClient();
 
 // Only used here to clean up an existing photo on delete (see
@@ -102,6 +112,11 @@ router.get('/', async (req, res) => {
       title: 'Members',
       activeTab,
       templates: await membershipApprovals.getLetterTemplates(),
+      handbookHtml: await membershipHandbook.getHandbookHtml(),
+      paymentInfo: await membershipHandbook.getPaymentInfo(),
+      parentFormFields: await membershipFormFields.listFields('parent'),
+      childFormFields: await membershipFormFields.listFields('child'),
+      fieldTypes: membershipFormFields.FIELD_TYPES,
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -153,6 +168,74 @@ router.get('/', async (req, res) => {
   });
 });
 
+// A real request: "add member button, edit permissions button, edit,
+// import, export buttons should be under the member tab above filter."
+// Same export shape as routes/admin-members.js's own /members/export.csv,
+// via the shared utils/memberImport.js.
+router.get('/export.csv', async (req, res) => {
+  const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
+  const familyFilter = parseInt(req.query.family, 10) || null;
+  const members = await membersWithDetails(typeFilter, familyFilter);
+  const lines = memberImport.buildMembersExportCsvLines(members);
+  sendCsv(res, `members${typeFilter ? '-' + typeFilter : ''}.csv`, lines);
+});
+
+router.get('/import-template.xlsx', (req, res) => {
+  const buffer = buildTemplateWorkbook(
+    ['First Name', 'Last Name', 'Type', 'Address', 'City', 'State', 'Zip', 'Phone', 'Email', 'Birthday', 'Grade Level', 'Medical/Allergy Notes', 'Parent First Name', 'Parent Last Name'],
+    [
+      ['Jane', 'Smith', 'Parent', '123 Main St', 'Anytown', 'NC', '27330', '555-987-6543', 'jane@example.com', '', '', '', '', ''],
+      ['Alice', 'Smith', 'Student', '123 Main St', 'Anytown', 'NC', '27330', '555-123-4567', '', '2015-04-12', '5th Grade', 'Peanut allergy', 'Jane', 'Smith'],
+    ]
+  );
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="members-import-template.xlsx"');
+  res.send(buffer);
+});
+
+router.post('/import', importUpload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.redirect('/main-admin/members?error=' + encodeURIComponent('Please choose a file to import.'));
+  }
+
+  let rows;
+  try {
+    rows = (await readRowsFromFile(req.file.buffer)).map(memberImport.normalizeImportRow).filter((r) => r.name);
+  } catch (err) {
+    return res.redirect('/main-admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
+  }
+
+  const { mergeCandidates, summary } = await memberImport.importMembersFromRows(rows);
+
+  if (mergeCandidates.length === 0) {
+    return res.redirect('/main-admin/members?notice=' + encodeURIComponent(summary));
+  }
+
+  res.render('main-admin-members-import-confirm', {
+    title: 'Confirm Import Merge',
+    summary,
+    candidates: mergeCandidates.map((c) => ({
+      memberId: c.memberId,
+      memberName: c.memberName,
+      fields: memberImport.IMPORT_MERGE_FIELDS.filter(([field]) => c.updates[field] !== undefined).map(([field, label]) => ({
+        label,
+        value: c.updates[field],
+      })),
+      payload: JSON.stringify(c.updates),
+    })),
+  });
+});
+
+router.post('/import/confirm', async (req, res) => {
+  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  const payloads = [].concat(req.body.payloads || []);
+  const allMemberIds = [].concat(req.body.allMemberIds || []).map((id) => parseInt(id, 10));
+
+  const merged = await memberImport.applyImportMerges(memberIds, payloads, allMemberIds);
+
+  res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Merged new profile details into ${merged} existing member(s).`));
+});
+
 // "Edit Permissions" bulk save - see routes/admin-members.js's own
 // identical route for the full comment on what this reconciles.
 // req.portalAccount DOES exist on this session (a real member_accounts-
@@ -195,13 +278,56 @@ router.post('/approvals/:accountId/delete', async (req, res) => {
 router.post('/settings/letters/:kind', async (req, res) => {
   const kind = req.params.kind;
   const subject = (req.body.subject || '').trim();
-  const body = (req.body.body || '').trim();
+  const body = sanitizePostBody(req.body.body || '');
   if (kind !== 'approval' && kind !== 'denial') return res.redirect('/main-admin/members?tab=settings');
   if (!subject || !body) {
     return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('Subject and body are both required.'));
   }
   await membershipApprovals.updateLetterTemplate(kind, subject, body);
   res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent(`${kind === 'approval' ? 'Approval' : 'Denial'} letter saved.`));
+});
+
+// A real request: "there should be a place at the bottom of the
+// membership application to check a box after reading the policy
+// handbook." What a family sees on the public form (views/portal-
+// register.ejs) is admin-edited here.
+router.post('/settings/handbook', async (req, res) => {
+  await membershipHandbook.setHandbookHtml(sanitizePostBody(req.body.handbookHtml || ''));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Policy Handbook saved.'));
+});
+
+// A real request: "place at the bottom of the application for payment."
+// Informational only, matching this app's existing payment convention
+// (see utils/membershipHandbook.js's own comment) - no online charge is
+// created from this form.
+router.post('/settings/payment', async (req, res) => {
+  const dollars = parseFloat(req.body.feeDollars || '0');
+  const feeCents = Number.isFinite(dollars) ? Math.round(dollars * 100) : 0;
+  await membershipHandbook.setPaymentInfo(feeCents, (req.body.instructions || '').trim());
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Payment info saved.'));
+});
+
+// A real request: "under members in main admin portal there should be a
+// settings tab for editing and adding parts of the membership form."
+// target is 'parent' or 'child' - which repeatable block (Parent/
+// Guardian vs Student) the new question shows up under on both the
+// admin-entered Membership Form/Add Member forms and the public self-
+// registration application.
+router.post('/settings/membership-fields', async (req, res) => {
+  const target = req.body.target === 'child' ? 'child' : 'parent';
+  const id = await membershipFormFields.createField(target, req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
+  if (!id) return res.redirect('/main-admin/members?tab=settings&error=' + encodeURIComponent('A field label is required.'));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field added.'));
+});
+
+router.post('/settings/membership-fields/:id/update', async (req, res) => {
+  await membershipFormFields.updateField(parseInt(req.params.id, 10), req.body.label, req.body.fieldType, req.body.options, req.body.isRequired === '1');
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field saved.'));
+});
+
+router.post('/settings/membership-fields/:id/delete', async (req, res) => {
+  await membershipFormFields.deleteField(parseInt(req.params.id, 10));
+  res.redirect('/main-admin/members?tab=settings&notice=' + encodeURIComponent('Field deleted.'));
 });
 
 // --- Edit mode bulk actions (checkboxes + Actions dropdown on the
@@ -319,6 +445,8 @@ router.get('/new', async (req, res) => {
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
     gradeLevels: GRADE_LEVELS,
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
     error: req.query.error || null,
     notice: null,
   });
@@ -358,6 +486,7 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
       phone: (p.phone || '').trim() || null,
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
+      customFieldValues: p.customFields,
     });
   }
 
@@ -371,6 +500,7 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
         birthday: isValidISODate((c.birthday || '').trim()) ? c.birthday.trim() : null,
         gradeLevel: GRADE_LEVELS.includes(c.gradeLevel) ? c.gradeLevel : null,
         medicalNotes: (c.medicalNotes || '').trim() || null,
+        customFieldValues: c.customFields,
       },
       photoFile
     );

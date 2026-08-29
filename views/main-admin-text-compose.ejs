@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/announcements/text">&larr; Back</a></p>
+    <h1>Compose Text</h1>
+    <p class="hint"><%= recipients.length %> recipient<%= recipients.length === 1 ? '' : 's' %>: <%= recipients.map(function(r) { return r.name; }).join(', ') %></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/announcements/text/send" class="stack-form member-form-page-panel">
+      <% recipients.forEach(function(r) { %>
+        <input type="hidden" name="recipientIds" value="<%= r.accountId %>" />
+      <% }); %>
+
+      <label class="member-form-full">Message (<%= maxWords %> words max)
+        <textarea name="body" id="text-body" rows="4" required data-max-words="<%= maxWords %>" placeholder="e.g. Wednesday session is cancelled today."></textarea>
+      </label>
+      <p class="hint" id="text-word-count">0 / <%= maxWords %> words</p>
+
+      <div class="member-form-full">
+        <span class="checkbox-group-label">Send</span>
+        <label class="checkbox-option">
+          <input type="radio" name="sendOption" value="now" checked data-send-option />
+          Send right away
+        </label>
+        <label class="checkbox-option">
+          <input type="radio" name="sendOption" value="schedule" data-send-option />
+          Schedule for later
+        </label>
+        <input type="datetime-local" name="scheduledAt" id="text-scheduled-at" disabled />
+      </div>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Send Text</button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script>
+    document.querySelectorAll('[data-send-option]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        document.getElementById('text-scheduled-at').disabled = document.querySelector('[data-send-option]:checked').value !== 'schedule';
+      });
+    });
+    const textBody = document.getElementById('text-body');
+    const wordCountLabel = document.getElementById('text-word-count');
+    const maxWords = Number(textBody.dataset.maxWords);
+    textBody.addEventListener('input', function () {
+      const words = textBody.value.trim().split(/\s+/).filter(Boolean);
+      wordCountLabel.textContent = words.length + ' / ' + maxWords + ' words';
+      wordCountLabel.classList.toggle('alert-error', words.length > maxWords);
+    });
+  </script>
+</body>
+</html>

@@ -105,14 +105,27 @@ router.get('/', async (req, res) => {
   const pendingCount = pending.length;
 
   let calendar = null;
+  let calendarView = 'calendar';
+  let calendarList = [];
   let drafts = [];
   let requests = [];
   let attendance = [];
   let archived = [];
-  let categories = [];
+  // Always loaded (not just for the Settings tab) - the New Event
+  // dialog's own Category dropdown is reachable from the Calendar and
+  // Drafts tabs too.
+  const categories = await events.listCategories();
   if (activeTab === 'calendar') {
     const published = await events.listEvents({ status: 'published' });
     calendar = events.monthGrid(req.query.month, published);
+    calendarView = req.query.view === 'list' ? 'list' : 'calendar';
+    if (calendarView === 'list') {
+      calendarList = calendar.weeks
+        .flat()
+        .filter((day) => day.inMonth)
+        .flatMap((day) => day.events)
+        .map((e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+    }
   } else if (activeTab === 'drafts') {
     drafts = (await events.listEvents({ status: 'draft' })).filter((e) => e.approval_status !== 'pending');
   } else if (activeTab === 'requests') {
@@ -124,8 +137,6 @@ router.get('/', async (req, res) => {
     );
   } else if (activeTab === 'archive') {
     archived = await events.listEvents({ status: 'cancelled' });
-  } else {
-    categories = await events.listCategories();
   }
 
   res.render('admin-events-list', {
@@ -133,6 +144,9 @@ router.get('/', async (req, res) => {
     activeTab,
     pendingCount,
     calendar,
+    calendarView,
+    calendarList,
+    monthParam: req.query.month || '',
     drafts,
     requests,
     attendance,

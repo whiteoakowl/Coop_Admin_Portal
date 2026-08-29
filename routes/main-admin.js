@@ -19,6 +19,9 @@ const { GRADE_OPTIONS } = require('../utils/membership');
 
 router.use(requirePortalAuth, requirePortal('main_admin'));
 
+// A real request: "should show a counter of how many families, how
+// many parents and how many students." Same active-only convention
+// routes/admin.js's own dashboard counters already use.
 router.get('/', async (req, res) => {
   const pendingCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'pending'").get()).c);
   const activeCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'active'").get()).c);
@@ -27,12 +30,18 @@ router.get('/', async (req, res) => {
       `SELECT r.label, COUNT(*) AS c FROM member_account_roles mar JOIN roles r ON r.id = mar.role_id GROUP BY r.label ORDER BY r.label`
     )
     .all();
+  const familyCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c);
+  const parentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c);
+  const studentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c);
 
   res.render('main-admin-home', {
     title: 'Main Admin',
     pendingCount,
     activeCount,
     roleCounts,
+    familyCount,
+    parentCount,
+    studentCount,
   });
 });
 

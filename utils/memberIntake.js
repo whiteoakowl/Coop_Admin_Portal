@@ -21,6 +21,7 @@ const { generateMemberCode } = require('./members');
 const { createStorageClient } = require('./storage');
 const { saveUpload } = require('./uploadBackend');
 const { imageFileFilter } = require('./uploads');
+const membershipFormFields = require('./membershipFormFields');
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
 const MEMBER_PHOTOS_BUCKET = 'member-photos';
@@ -116,13 +117,28 @@ async function syncCleanupTeam(memberId, teamId) {
   await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING').run(teamId, memberId);
 }
 
-// parent: { name, email, phone, isPrimaryParent, cleanupTeamId } -
-// cleanupTeamId only ever set from an admin-filled form (see this
-// module's own header comment - every caller of this function is
-// already admin-gated, but the field itself is only ever rendered to an
-// admin in the shared view, per "should only show to admins").
+// parent: { name, email, phone, isPrimaryParent, cleanupTeamId,
+// customFieldValues } - cleanupTeamId only ever set from an admin-filled
+// form (see this module's own header comment - every caller of this
+// function is already admin-gated, but the field itself is only ever
+// rendered to an admin in the shared view, per "should only show to
+// admins"). customFieldValues is { [fieldId]: rawValue } for whatever
+// admin-defined extra questions (utils/membershipFormFields.js) were
+// answered - a real request: "settings tab for editing and adding
+// parts of the membership form."
+//
+// A real request: "you can only have one primary parent per family."
+// The single-member edit path already enforces this (see utils/
+// members.js's setPrimaryParent, which clears the flag off anyone else
+// in the family first) - this form skipped that until now, so checking
+// Primary Parent on more than one parent block in the same submission,
+// or on a new parent joining a family that already has one, could leave
+// two members both marked primary. Same family-wide clear-first here.
 async function createParentMember(familyId, address, parent) {
   const memberCode = await generateMemberCode();
+  if (parent.isPrimaryParent && familyId != null) {
+    await db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(familyId);
+  }
   const info = await db
     .prepare(
       `INSERT INTO members (name, barcode, member_code, member_type, family_id, address, city, state, zip, phone, email, is_primary_parent)
@@ -130,11 +146,12 @@ async function createParentMember(familyId, address, parent) {
     )
     .run(parent.name, memberCode, memberCode, familyId, address.address, address.city, address.state, address.zip, parent.phone || null, parent.email || null, parent.isPrimaryParent ? 1 : 0);
   await syncCleanupTeam(info.lastInsertRowid, parent.cleanupTeamId || null);
+  await membershipFormFields.saveFieldValues(info.lastInsertRowid, 'parent', parent.customFieldValues);
   return info.lastInsertRowid;
 }
 
-// child: { name, birthday, gradeLevel, medicalNotes }, photoFile: a
-// multer file object or null/undefined.
+// child: { name, birthday, gradeLevel, medicalNotes, customFieldValues },
+// photoFile: a multer file object or null/undefined.
 async function createChildMember(familyId, address, child, photoFile) {
   const memberCode = await generateMemberCode();
   const photoPath = photoFile ? await savePhotoFile(photoFile) : null;
@@ -144,6 +161,7 @@ async function createChildMember(familyId, address, child, photoFile) {
        VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(child.name, memberCode, memberCode, familyId, address.address, address.city, address.state, address.zip, child.birthday || null, child.gradeLevel || null, child.medicalNotes || null, photoPath);
+  await membershipFormFields.saveFieldValues(info.lastInsertRowid, 'child', child.customFieldValues);
   return info.lastInsertRowid;
 }
 

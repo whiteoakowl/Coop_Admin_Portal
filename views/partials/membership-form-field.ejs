@@ -1,0 +1,45 @@
+<%
+// One admin-defined extra question (utils/membershipFormFields.js),
+// rendered inside a Parent or Student block on both the admin-entered
+// Membership Form/Add Member forms (views/member-intake-form.ejs) and
+// the public self-registration application (views/portal-register.ejs).
+// `field` is a row from membershipFormFields.listFields() (options
+// already parsed from JSON); `namePrefix` is the enclosing block's own
+// bracket path, e.g. "parents[0][customFields]" or
+// "children[__INDEX__][customFields]" - this field's own id is appended
+// as the final bracket segment so submitted values arrive keyed by
+// field id (see utils/memberIntake.js's customFieldValues) - prefixed
+// with a non-numeric "f" (qs, express's urlencoded body parser, treats
+// a purely-numeric bracket key as an array INDEX and silently compacts
+// sparse ones together instead of keeping it as an object key keyed by
+// that literal number - see utils/membershipFormFields.js's own comment
+// on the matching "f"-prefix read-back). `values` (optional, keyed the
+// same "f"+id way) re-fills whatever was already typed if the public
+// application re-renders after a validation error - same "don't lose
+// what the visitor already typed" convention every other field on that
+// form already follows.
+const inputName = namePrefix + '[f' + field.id + ']';
+const existing = (typeof values !== 'undefined' && values) ? values['f' + field.id] : null;
+%>
+<div class="class-form-row">
+  <div class="class-form-field">
+    <span class="class-form-field-label<%= field.is_required ? ' required' : '' %>"><%= field.label %></span>
+    <% if (field.field_type === 'long_text') { %>
+      <textarea name="<%= inputName %>" rows="2" <%= field.is_required ? 'required' : '' %>><%= existing || '' %></textarea>
+    <% } else if (field.field_type === 'dropdown') { %>
+      <select name="<%= inputName %>" <%= field.is_required ? 'required' : '' %>>
+        <option value="">Select&hellip;</option>
+        <% field.options.forEach(function(opt) { %>
+          <option value="<%= opt %>" <%= existing === opt ? 'selected' : '' %>><%= opt %></option>
+        <% }); %>
+      </select>
+    <% } else if (field.field_type === 'checkbox') { %>
+      <label class="checkbox-option">
+        <input type="checkbox" name="<%= inputName %>" value="1" <%= existing === '1' ? 'checked' : '' %> />
+        Yes
+      </label>
+    <% } else { %>
+      <input type="text" name="<%= inputName %>" value="<%= existing || '' %>" <%= field.is_required ? 'required' : '' %> />
+    <% } %>
+  </div>
+</div>

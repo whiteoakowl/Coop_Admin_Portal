@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/admin/announcements/email">&larr; Back</a></p>
+    <h1>Compose Email</h1>
+    <p class="hint"><%= recipients.length %> recipient<%= recipients.length === 1 ? '' : 's' %>: <%= recipients.map(function(r) { return r.name; }).join(', ') %></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/admin/announcements/email/send" class="stack-form member-form-page-panel">
+      <% recipients.forEach(function(r) { %>
+        <input type="hidden" name="recipientIds" value="<%= r.accountId %>" />
+      <% }); %>
+
+      <label class="member-form-full">Subject
+        <input type="text" name="subject" placeholder="e.g. Wednesday session cancelled" required />
+      </label>
+      <div class="member-form-full" data-forum-editor>
+        <label>Message</label>
+        <%- include('partials/forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable contenteditable="true"></div>
+        <input type="hidden" name="body" data-forum-body-input />
+      </div>
+      <label class="member-form-full">Reply-To (optional)
+        <input type="email" name="replyTo" placeholder="e.g. board@ourcoop.org" />
+      </label>
+
+      <div class="member-form-full">
+        <span class="checkbox-group-label">Send</span>
+        <label class="checkbox-option">
+          <input type="radio" name="sendOption" value="now" checked data-send-option />
+          Send right away
+        </label>
+        <label class="checkbox-option">
+          <input type="radio" name="sendOption" value="schedule" data-send-option />
+          Schedule for later
+        </label>
+        <input type="datetime-local" name="scheduledAt" id="email-scheduled-at" disabled />
+      </div>
+
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Send Email</button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script src="/js/forum-editor.js"></script>
+  <script>
+    document.querySelectorAll('[data-send-option]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        document.getElementById('email-scheduled-at').disabled = document.querySelector('[data-send-option]:checked').value !== 'schedule';
+      });
+    });
+  </script>
+</body>
+</html>

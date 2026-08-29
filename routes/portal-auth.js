@@ -10,6 +10,8 @@ const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
 const { isValidISODate } = require('../utils/dates');
+const membershipHandbook = require('../utils/membershipHandbook');
+const membershipFormFields = require('../utils/membershipFormFields');
 
 const portalLoginLimiter = createFailureRateLimiter({ windowMs: 15 * 60 * 1000, maxAttempts: 8 });
 
@@ -62,9 +64,19 @@ router.post('/logout', (req, res) => {
   res.redirect('/');
 });
 
-router.get('/register', (req, res) => {
+router.get('/register', async (req, res) => {
   if (req.portalAccount) return res.redirect('/portal');
-  res.render('portal-register', { title: 'Request Membership', error: null, formValues: {}, children: [], gradeOptions: GRADE_OPTIONS });
+  res.render('portal-register', {
+    title: 'Request Membership',
+    error: null,
+    formValues: {},
+    children: [],
+    gradeOptions: GRADE_OPTIONS,
+    handbookHtml: await membershipHandbook.getHandbookHtml(),
+    paymentInfo: await membershipHandbook.getPaymentInfo(),
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
+  });
 });
 
 // multer isn't in play here (no file upload on this form), but the
@@ -81,8 +93,18 @@ function parseChildren(body) {
   return [];
 }
 
-function renderRegisterError(res, error, formValues, children) {
-  return res.render('portal-register', { title: 'Request Membership', error, formValues, children, gradeOptions: GRADE_OPTIONS });
+async function renderRegisterError(res, error, formValues, children) {
+  return res.render('portal-register', {
+    title: 'Request Membership',
+    error,
+    formValues,
+    children,
+    gradeOptions: GRADE_OPTIONS,
+    handbookHtml: await membershipHandbook.getHandbookHtml(),
+    paymentInfo: await membershipHandbook.getPaymentInfo(),
+    parentFields: await membershipFormFields.listFields('parent'),
+    childFields: await membershipFormFields.listFields('child'),
+  });
 }
 
 // Self-registration creates a real member_accounts row with status
@@ -106,7 +128,7 @@ router.post('/register', async (req, res) => {
   const lastName = (req.body.lastName || '').trim();
   const email = (req.body.email || '').trim();
   const password = req.body.password || '';
-  const formValues = { firstName, lastName, email };
+  const formValues = { firstName, lastName, email, customFields: req.body.customFields };
 
   const rawChildren = parseChildren(req.body).map((c, index) => ({ ...c, index }));
   // A blank block the visitor never filled in (or removed down to zero
@@ -127,6 +149,14 @@ router.post('/register', async (req, res) => {
   }
   if (password !== req.body.confirmPassword) {
     return renderRegisterError(res, 'Passwords do not match.', formValues, childrenForRerender);
+  }
+  // A real request: "can't submit application without checking the
+  // box" (having read the Policy Handbook). The checkbox itself is
+  // disabled client-side until the visitor scrolls through the whole
+  // handbook (public/js/portal-register-form.js) - checked again here
+  // since a disabled attribute is only ever a client-side nicety.
+  if (req.body.handbookRead !== '1') {
+    return renderRegisterError(res, 'Please scroll through and confirm you have read the Policy Handbook before submitting.', formValues, childrenForRerender);
   }
 
   for (const c of children) {
@@ -171,6 +201,15 @@ router.post('/register', async (req, res) => {
   const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
   const studentRole = await db.prepare("SELECT id FROM roles WHERE key = 'student'").get();
 
+  // Custom field answers (utils/membershipFormFields.js) are saved
+  // AFTER the transaction below, via the module-level `db` connection -
+  // not from inside it via `tx`, since PGlite's single-connection test
+  // engine hangs on an outer-`db` query while a `tx` transaction on that
+  // same connection is still open (see utils/members.js's own
+  // generateMemberCode comment on this exact class of bug).
+  let newParentMemberId = null;
+  const newChildMemberIds = [];
+
   await db.withTransaction(async (tx) => {
     let member = await tx.prepare('SELECT * FROM members WHERE LOWER(email) = LOWER(?) AND email IS NOT NULL').get(email);
     let familyId = member ? member.family_id : null;
@@ -188,6 +227,7 @@ router.post('/register', async (req, res) => {
         .run(fullName, code, code, email, familyId);
       member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
     }
+    newParentMemberId = member.id;
 
     const parentAccountInfo = await tx
       .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status) VALUES (?, ?, ?, 'pending')")
@@ -217,6 +257,7 @@ router.post('/register', async (req, res) => {
           GRADE_OPTIONS.includes(c.gradeLevel) ? c.gradeLevel : null,
           (c.medicalNotes || '').trim() || null
         );
+      newChildMemberIds.push({ memberId: childInfo.lastInsertRowid, customFields: c.customFields });
 
       if (c.wantsLogin) {
         const childEmail = c.loginEmail.trim();
@@ -229,6 +270,13 @@ router.post('/register', async (req, res) => {
       }
     }
   });
+
+  if (newParentMemberId != null) {
+    await membershipFormFields.saveFieldValues(newParentMemberId, 'parent', req.body.customFields);
+  }
+  for (const child of newChildMemberIds) {
+    await membershipFormFields.saveFieldValues(child.memberId, 'child', child.customFields);
+  }
 
   res.render('portal-register-submitted', { title: 'Registration Submitted', childLoginCount: children.filter((c) => c.wantsLogin).length });
 });

@@ -9,21 +9,15 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <div class="roster-toolbar">
-      <h1>Members</h1>
-      <% if (activeTab === 'members') { %>
-        <div class="roster-btn-row">
-          <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
-          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
-          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
-        </div>
-      <% } %>
-    </div>
+    <h1>Members</h1>
 
     <%# A real request: "under members in main admin portal there should
         be a tab that says approvals... there should be another tab
         under main admin members that says settings... main admin
-        protal members should also have an archive tab." %>
+        protal members should also have an archive tab." A second real
+        request: "shrink the tabs to be seen fully on mobile view" -
+        public/js/fit-tabs.js (now loaded globally, see views/partials/
+        portal-nav.ejs) shrinks this row's font/padding to fit. %>
     <div class="view-tabs">
       <a class="view-tab<%= activeTab === 'members' ? ' active' : '' %>" href="/main-admin/members?tab=members">Members</a>
       <a class="view-tab<%= activeTab === 'approvals' ? ' active' : '' %>" href="/main-admin/members?tab=approvals">Approvals<%= (typeof pending !== 'undefined' && pending.length) ? ' (' + pending.length + ')' : '' %></a>
@@ -40,6 +34,34 @@
       <%# Same shape as routes/admin-members.js's own bulk-permissions form -
           see that file's own comment. %>
       <form id="permissions-bulk-form" method="POST" action="/main-admin/members/bulk-permissions"></form>
+      <form id="members-select-form" method="POST" action="/main-admin/members/bulk-delete"></form>
+
+      <%# A real request: "add member button, edit permissions button,
+          edit, import, export buttons should be under the member tab
+          above filter." Members tab only - Archive doesn't add/import
+          members. %>
+      <% if (activeTab === 'members') { %>
+        <div class="roster-btn-row no-print">
+          <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
+          <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
+          <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
+          <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit" aria-pressed="false">Edit</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()">Import</button>
+          <a class="roster-action-btn file-action-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
+        </div>
+
+        <dialog id="main-admin-import-dialog" class="member-picker-dialog">
+          <form method="POST" action="/main-admin/members/import" enctype="multipart/form-data">
+            <h3>Import</h3>
+            <a class="btn-secondary import-sample-link" href="/main-admin/members/import-template.xlsx">Download Sample File</a>
+            <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Import</button>
+            </div>
+          </form>
+        </dialog>
+      <% } %>
 
       <div class="roster-toolbar no-print">
         <form method="GET" action="/main-admin/members" class="category-filter" style="margin: 0;">
@@ -48,7 +70,7 @@
           <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" />
         </form>
         <div class="category-filter" style="margin: 0;">
-          <label for="type-select">Filter by type or family</label>
+          <label for="type-select">Filter</label>
           <select id="type-select" onchange="window.location = this.value">
             <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
             <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
@@ -64,7 +86,7 @@
           </select>
         </div>
         <%# Edit mode's Select All + Actions dropdown - hidden until the
-            "Edit" toggle button below is clicked. A real request: "there
+            "Edit" toggle button above is clicked. A real request: "there
             should be an edit button on member page that says edit. when
             you click it it will show check boxes next to every member.
             you can select individusl, all or none, a dropdown also
@@ -94,8 +116,6 @@
               >Archive</option>
             </select>
           </div>
-          <form id="members-select-form" method="POST" action="/main-admin/members/bulk-delete"></form>
-          <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit" aria-pressed="false">Edit</button>
         <% } %>
       </div>
 
@@ -153,10 +173,18 @@
                 <% if (activeTab === 'members') { %><th class="no-print"><span class="sr-only">Select</span></th><% } %>
                 <th class="members-col-photo"><span class="sr-only">Photo</span></th>
                 <th>Name</th>
-                <th>Type</th>
-                <th>Family</th>
-                <th>Age/Grade</th>
-                <th>Contact</th>
+                <%# A real request: "instead of showing type on the member
+                    row mobile view show the sections a family is listed
+                    in." Type stays the desktop column; .members-col-
+                    sections (hidden on desktop, shown only on mobile -
+                    see public/css/styles.css's own comment) takes its
+                    place there, same swap admin-members.ejs's own
+                    Type -> Roster Day already does. %>
+                <th class="members-col-type">Type</th>
+                <th class="members-col-sections">Sections</th>
+                <th class="members-col-parent">Family</th>
+                <th class="members-col-agegrade">Age/Grade</th>
+                <th class="members-col-contact">Contact</th>
                 <th class="permissions-col">Sections &amp; Portal Permissions</th>
                 <th>Actions</th>
               </tr>
@@ -180,14 +208,25 @@
                     <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
                     <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
                   </td>
-                  <td><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
-                  <td><%= m.familyName || '—' %></td>
-                  <td>
+                  <td class="members-col-type"><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+                  <td class="members-col-sections">
+                    <% var memberSectionIds = sectionIdsByMember[m.id]; %>
+                    <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
+                    <% if (memberSections.length === 0) { %>
+                      <span class="hint">none</span>
+                    <% } else { %>
+                      <% memberSections.forEach(function(s) { %>
+                        <span class="badge-pill"><%= s.name %></span>
+                      <% }); %>
+                    <% } %>
+                  </td>
+                  <td class="members-col-parent"><%= m.familyName || '—' %></td>
+                  <td class="members-col-agegrade">
                     <% if (m.member_type === 'student') { %>
                       <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
                     <% } else { %>—<% } %>
                   </td>
-                  <td><%= m.phone || m.email || '—' %></td>
+                  <td class="members-col-contact"><%= m.phone || m.email || '—' %></td>
                   <td class="permissions-col">
                     <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
                     <details class="permissions-cell-group">
@@ -295,31 +334,98 @@
     <% } else if (activeTab === 'settings') { %>
       <%# A real request: "this will have an approval and deny letter
           that can be edited by admin. these letters are sent
-          automatically went approve or deny buttons are clicked." %>
+          automatically went approve or deny buttons are clicked." A
+          second real request: "approval and denial messages should have
+          the same text editing icons we added to other chat boxes" -
+          same forum-editor-toolbar/forum-editor.js rich-text component
+          the Policy Handbook editor below already uses. %>
       <p class="hint">Use <code>{{name}}</code> anywhere in the subject or body to insert the applicant's name.</p>
+      <%
+        // The two letters were plain text (newline-separated paragraphs)
+        // before this editor existed - dropped straight into a
+        // contenteditable div, a run of newlines collapses to a single
+        // space in HTML, losing the paragraph breaks on first load even
+        // though the underlying saved text is untouched. Detecting "no
+        // HTML tags yet" and turning newlines into real breaks only for
+        // that initial fill (not the stored value) keeps a legacy letter
+        // readable until the next time an admin saves it as real HTML.
+        function toEditableHtml(text) {
+          if (/<[a-z][\s\S]*>/i.test(text || '')) return text;
+          const esc = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return esc.split(/\n{2,}/).map((p) => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+        }
+      %>
       <div class="manage-section">
         <h2>Approval Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form">
+        <form method="POST" action="/main-admin/members/settings/letters/approval" class="stack-form" data-forum-editor>
           <label class="member-form-full">Subject
             <input type="text" name="subject" value="<%= templates.approval.subject %>" required />
           </label>
-          <label class="member-form-full">Body
-            <textarea name="body" rows="8" required><%= templates.approval.body %></textarea>
-          </label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.approval.body) %></div>
+          <input type="hidden" name="body" data-forum-body-input />
           <button type="submit" class="primary-btn">Save Approval Letter</button>
         </form>
       </div>
       <div class="manage-section">
         <h2>Denial Letter</h2>
-        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form">
+        <form method="POST" action="/main-admin/members/settings/letters/denial" class="stack-form" data-forum-editor>
           <label class="member-form-full">Subject
             <input type="text" name="subject" value="<%= templates.denial.subject %>" required />
           </label>
-          <label class="member-form-full">Body
-            <textarea name="body" rows="8" required><%= templates.denial.body %></textarea>
-          </label>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- toEditableHtml(templates.denial.body) %></div>
+          <input type="hidden" name="body" data-forum-body-input />
           <button type="submit" class="primary-btn">Save Denial Letter</button>
         </form>
+      </div>
+
+      <%# A real request: "there should be a place at the bottom of the
+          membership application to check a box after reading the policy
+          handbook. can't check the box until you have scrolled through
+          the entire handbook." What's written here is what a family
+          reads and must scroll through on the public application
+          (views/portal-register.ejs) before they can submit. %>
+      <div class="manage-section">
+        <h2>Policy Handbook</h2>
+        <p class="hint">Shown on the public membership application - an applicant must scroll through this before they can check the "I have read the Policy Handbook" box and submit.</p>
+        <form method="POST" action="/main-admin/members/settings/handbook" class="stack-form" data-forum-editor>
+          <%- include('partials/forum-editor-toolbar') %>
+          <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
+          <input type="hidden" name="handbookHtml" data-forum-body-input />
+          <button type="submit" class="primary-btn">Save Policy Handbook</button>
+        </form>
+      </div>
+
+      <%# A real request: "place at the bottom of the application for
+          payment." This app has no online "pay now" flow anywhere (see
+          utils/membershipHandbook.js's own comment) - what's saved here
+          is the fee amount and how a family actually pays, shown as
+          information on the application, not a checkout. %>
+      <div class="manage-section">
+        <h2>Membership Fee &amp; Payment</h2>
+        <p class="hint">Shown on the public membership application. Leave the fee at $0 to hide the fee amount and just show the instructions.</p>
+        <form method="POST" action="/main-admin/members/settings/payment" class="stack-form">
+          <label>Membership Fee (USD)
+            <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
+          </label>
+          <label class="member-form-full">Payment Instructions
+            <textarea name="instructions" rows="4" placeholder="e.g. Pay by cash, check, or Venmo once your registration is approved."><%= paymentInfo.instructions %></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Save Payment Info</button>
+        </form>
+      </div>
+
+      <%# A real request: "under members in main admin portal there
+          should be a settings tab for editing and adding parts of the
+          membership form." Admin-defined extra questions, shown on both
+          the admin-entered Membership Form/Add Member forms and the
+          public self-registration application. %>
+      <div class="manage-section">
+        <h2>Membership Form Fields</h2>
+        <p class="hint">Extra questions shown on the Parent/Guardian and Student sections of every form that adds a new family member.</p>
+        <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
+        <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
       </div>
     <% } %>
   </main>
@@ -327,5 +433,9 @@
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
+  <% if (activeTab === 'settings') { %>
+    <script src="/js/forum-editor.js"></script>
+    <script src="/js/membership-field-type-toggle.js"></script>
+  <% } %>
 </body>
 </html>

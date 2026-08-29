@@ -1,0 +1,12 @@
+-- Main Admin > Babysitters polish (item 15) - a real request: "babysitter
+-- tab should have babysitter, approvals and settings tab. add a babysitter
+-- profile button that pops up and picks a member (auto fills the rest of
+-- the form)... directory should be cards, alphabetical by last name,
+-- with photo, name, grade and phone number... add a call or text
+-- preference field."
+--
+-- contact_method (existing) is a free-text "how to reach me" field
+-- ("Text (555) 555-1234") - contact_preference is the new, separate
+-- structured Call/Text/Either choice the request asks for, so a directory
+-- view could one day filter/sort by it without parsing free text.
+alter table babysitter_profiles add column if not exists contact_preference text check (contact_preference in ('call', 'text', 'either'));

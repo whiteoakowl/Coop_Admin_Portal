@@ -9,10 +9,18 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Announcements</h1>
+    <h1>Communication</h1>
+    <div class="view-tabs">
+      <a class="view-tab active" href="/main-admin/announcements">Announcements</a>
+      <a class="view-tab" href="/main-admin/announcements/email">Email</a>
+      <a class="view-tab" href="/main-admin/announcements/text">Text</a>
+      <a class="view-tab" href="/main-admin/newsletter">Newsletter</a>
+    </div>
+
     <p class="hint">
-      Sends a notification to signed-in members - it shows up as an Announcement on their portal home page (Parent
-      Portal today). Choose "Public" below to post to the public homepage instead, for anyone, signed in or not.
+      Sends a notification to signed-in members - it shows up as an Announcement on their portal home page. Check
+      "Public Homepage" to also post to the public homepage, for anyone, signed in or not. Choose as many recipients
+      as you like.
     </p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -28,15 +36,16 @@
         <div class="forum-editable" data-forum-editable contenteditable="true"></div>
         <input type="hidden" name="body" data-forum-body-input />
       </div>
-      <label class="member-form-full">Send to
-        <select name="roleKey">
-          <option value="">Everyone (all active members)</option>
+      <div class="member-form-full">
+        <span class="checkbox-group-label">Send to</span>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="targets" value="everyone" /> Everyone (all active members)</label>
           <% roles.forEach(function(r) { %>
-            <option value="<%= r.key %>"><%= r.label %> only</option>
+            <label><input type="checkbox" name="targets" value="<%= r.key %>" /> <%= r.label %></label>
           <% }); %>
-          <option value="public">Public (posts to the homepage)</option>
-        </select>
-      </label>
+          <label><input type="checkbox" name="targets" value="public" /> Public Homepage</label>
+        </div>
+      </div>
       <div class="member-form-footer">
         <div class="member-form-footer-edit">
           <button type="submit" class="primary-btn">Send Announcement</button>
@@ -44,44 +53,25 @@
       </div>
     </form>
 
-    <h2>Recently Sent</h2>
-    <% if (sent.length === 0) { %>
+    <h2>Past Announcements</h2>
+    <% if (log.length === 0) { %>
       <p class="roster-empty">No announcements sent yet.</p>
     <% } else { %>
       <div class="roster-scroll">
         <table class="roster-table condensed-table">
-          <thead><tr><th>Title</th><th>Message</th><th>Recipients</th><th>Sent</th></tr></thead>
+          <thead><tr><th>Title</th><th>Message</th><th>Portals</th><th>Recipients</th><th>Sent</th></tr></thead>
           <tbody>
-            <% sent.forEach(function(s) { %>
+            <% log.forEach(function(s) { %>
               <tr>
                 <td class="roster-name-col"><%= s.title %></td>
                 <td class="forum-editable-display"><%- s.body %></td>
-                <td><%= s.recipientCount %></td>
+                <td><%= targetLabels(s.targets).join(', ') %></td>
+                <td><%= s.recipient_count %></td>
                 <td><%= s.created_at %></td>
               </tr>
             <% }); %>
           </tbody>
         </table>
-      </div>
-    <% } %>
-
-    <%# Relocated from Main Admin > Website - see this page's own hint
-        text above. %>
-    <h2>Public Homepage Announcements</h2>
-    <% if (publicAnnouncements.length === 0) { %>
-      <p class="roster-empty">No public announcements yet.</p>
-    <% } else { %>
-      <div class="site-announcement-list">
-        <% publicAnnouncements.forEach(function(a) { %>
-          <div class="site-announcement-card">
-            <span class="site-announcement-date"><%= a.is_public ? 'Public' : 'Members Only' %></span>
-            <h3><%= a.title %></h3>
-            <div class="forum-editable-display"><%- a.body %></div>
-            <form method="POST" action="/main-admin/website/announcements/<%= a.id %>/delete" data-confirm="Delete this announcement?">
-              <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-            </form>
-          </div>
-        <% }); %>
       </div>
     <% } %>
   </main>

@@ -62,4 +62,7 @@ const v = (typeof values !== 'undefined' && values) || {};
       <input type="password" name="children[<%= index %>][loginPasswordConfirm]" minlength="8" autocomplete="new-password" />
     </label>
   </div>
+  <% (childFields || []).forEach(function(f) { %>
+    <%- include('membership-form-field', { field: f, namePrefix: 'children[' + index + '][customFields]', values: v.customFields }) %>
+  <% }); %>
 </div>

@@ -49,4 +49,28 @@
       bindRemove(block);
     });
   }
+
+  // A real request: "can't check the box until you have scrolled
+  // through the entire handbook." The checkbox starts `disabled` (see
+  // views/portal-register.ejs) so it can't be checked at all until this
+  // fires - scrollHeight - clientHeight - scrollTop hitting ~0 is the
+  // standard "scrolled to the bottom" check; the 4px slack absorbs sub-
+  // pixel rounding some browsers introduce on fractional zoom levels. A
+  // handbook short enough to never need scrolling (scrollHeight <=
+  // clientHeight) enables the checkbox immediately instead of trapping
+  // the visitor behind a scrollbar that isn't there.
+  const scrollBox = document.getElementById('handbook-scroll-box');
+  const handbookCheckbox = document.getElementById('handbook-read-checkbox');
+  const scrollHint = document.getElementById('handbook-scroll-hint');
+  if (scrollBox && handbookCheckbox) {
+    function checkScrolled() {
+      const atBottom = scrollBox.scrollHeight - scrollBox.clientHeight <= scrollBox.scrollTop + 4;
+      if (atBottom) {
+        handbookCheckbox.disabled = false;
+        if (scrollHint) scrollHint.hidden = true;
+      }
+    }
+    scrollBox.addEventListener('scroll', checkScrolled);
+    checkScrolled();
+  }
 })();

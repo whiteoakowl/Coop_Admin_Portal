@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Communication</h1>
+    <div class="view-tabs">
+      <a class="view-tab" href="/main-admin/announcements">Announcements</a>
+      <a class="view-tab" href="/main-admin/announcements/email">Email</a>
+      <a class="view-tab active" href="/main-admin/announcements/text">Text</a>
+      <a class="view-tab" href="/main-admin/newsletter">Newsletter</a>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/main-admin/announcements/text/compose" id="email-select-form">
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
+        <button type="button" class="roster-action-btn" data-email-select="all">Select All</button>
+        <button type="button" class="roster-action-btn" data-email-select="none">Select None</button>
+        <button type="submit" class="primary-btn">Create Text</button>
+      </div>
+      <p class="hint" id="email-select-count"></p>
+
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table" id="email-candidate-table">
+          <thead>
+            <tr><th></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+          </thead>
+          <tbody>
+            <% candidates.forEach(function(c) { %>
+              <tr
+                data-email-row
+                data-role="<%= c.roles.join(',') %>"
+                data-section="<%= c.sections.join('|') %>"
+                data-grade="<%= c.gradeLevel || '' %>"
+                data-age-group="<%= c.ageGroup || '' %>"
+                data-registered="<%= c.registeredForClasses ? 'yes' : 'no' %>"
+              >
+                <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
+                <td><%= c.name %></td>
+                <td><%= c.email || '' %></td>
+                <td><%= c.gradeLevel || '' %></td>
+                <td><%= c.sections.join(', ') %></td>
+                <td><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <% if (candidates.length === 0) { %><p class="roster-empty">No active members yet.</p><% } %>
+      </div>
+    </form>
+
+    <dialog id="email-filter-dialog" class="member-picker-dialog">
+      <h3>Filter</h3>
+      <div class="stack-form">
+        <label>Role
+          <select id="email-filter-role">
+            <option value="">Any</option>
+            <% roles.forEach(function(r) { %><option value="<%= r.key %>"><%= r.label %></option><% }); %>
+          </select>
+        </label>
+        <label>Section
+          <select id="email-filter-section">
+            <option value="">Any</option>
+            <% sections.forEach(function(s) { %><option value="<%= s.name %>"><%= s.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Grade Level
+          <select id="email-filter-grade">
+            <option value="">Any</option>
+            <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+          </select>
+        </label>
+        <label>Age Group
+          <select id="email-filter-age">
+            <option value="">Any</option>
+            <% ageGroups.forEach(function(g) { %><option value="<%= g.key %>"><%= g.label %></option><% }); %>
+          </select>
+        </label>
+        <label>Registered for Classes
+          <select id="email-filter-registered">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+      </div>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" data-email-filter-clear>Clear Filters</button>
+        <button type="button" class="primary-btn" onclick="document.getElementById('email-filter-dialog').close()">Done</button>
+      </div>
+    </dialog>
+
+    <h2>Past &amp; Scheduled Texts</h2>
+    <% if (campaigns.length === 0) { %>
+      <p class="roster-empty">No texts sent yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Message</th><th>Status</th><th>Recipients</th><th>Scheduled</th><th>Sent</th><th></th></tr></thead>
+          <tbody>
+            <% campaigns.forEach(function(c) { %>
+              <tr>
+                <td class="roster-name-col"><%= c.body %></td>
+                <td><span class="badge-pill badge-pill-<%= c.status === 'sent' ? 'green' : 'orange' %>"><%= c.status.charAt(0).toUpperCase() + c.status.slice(1) %></span></td>
+                <td><%= c.recipient_count %></td>
+                <td><%= c.scheduled_at || '' %></td>
+                <td><%= c.sent_at || '' %></td>
+                <td>
+                  <% if (c.status === 'scheduled') { %>
+                    <form method="POST" action="/main-admin/announcements/text/<%= c.id %>/send" data-confirm="Send this text now?">
+                      <button type="submit" class="roster-action-btn">Send Now</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/email-composer-filters.js"></script>
+</body>
+</html>

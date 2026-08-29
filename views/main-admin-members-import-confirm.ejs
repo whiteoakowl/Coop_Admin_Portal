@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+    navLinks: [
+      { href: '/main-admin', icon: 'home', label: 'Home' },
+      { href: '/main-admin/members', icon: 'users', label: 'Members' },
+      { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
+      { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
+      { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+      { href: '/main-admin/registration-windows', icon: 'clock', label: 'Registration' },
+      { href: '/main-admin/diplomas', icon: 'badge', label: 'Diplomas' },
+    ],
+  }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Confirm Import Merge</h1>
+    <p class="hint"><%= summary %></p>
+    <p class="hint">These names matched existing members in Members. Choose which ones should have the blank fields below filled in from the imported file - nothing that's already set on a profile will be overwritten.</p>
+
+    <form method="POST" action="/main-admin/members/import/confirm">
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr><th></th><th>Name</th><th>New Information</th></tr>
+          </thead>
+          <tbody>
+            <% candidates.forEach(function(c) { %>
+              <tr>
+                <td>
+                  <input type="checkbox" name="memberIds" value="<%= c.memberId %>" checked />
+                  <input type="hidden" name="allMemberIds" value="<%= c.memberId %>" />
+                  <input type="hidden" name="payloads" value="<%= c.payload %>" />
+                </td>
+                <td><%= c.memberName %></td>
+                <td>
+                  <% c.fields.forEach(function(f) { %>
+                    <span class="badge-pill"><%= f.label %>: <%= f.value %></span>
+                  <% }); %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <div class="notes-dialog-actions">
+        <a class="btn-secondary" href="/main-admin/members">Skip All</a>
+        <button type="submit" class="primary-btn">Merge Selected</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
