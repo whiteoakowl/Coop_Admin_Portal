@@ -117,6 +117,89 @@
       sync();
     }
 
+    function insertChecklist() {
+      editable.focus();
+      restoreSelection();
+      document.execCommand('insertHTML', false, '<ul class="task-list"><li><input type="checkbox"> </li></ul><p><br></p>');
+      sync();
+    }
+
+    // YouTube/Vimeo only, matching the server's own allowedIframeHostnames
+    // (utils/sanitizeHtml.js) - anything else would just get its src
+    // stripped and the whole iframe dropped on save, so there's no point
+    // accepting a URL here the server would only reject there. Recognizes
+    // the handful of real URL shapes people actually paste (a full
+    // watch/vimeo.com link, a youtu.be short link, or an existing embed
+    // URL) and normalizes all of them to the plain .../embed/ID form.
+    function parseVideoEmbedUrl(raw) {
+      var youtube = raw.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{6,})/);
+      if (youtube) return 'https://www.youtube-nocookie.com/embed/' + youtube[1];
+      var vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+      if (vimeo) return 'https://player.vimeo.com/video/' + vimeo[1];
+      return null;
+    }
+
+    function insertVideo() {
+      var raw = window.prompt('YouTube or Vimeo video URL:');
+      if (!raw) return;
+      var embedUrl = parseVideoEmbedUrl(raw);
+      if (!embedUrl) {
+        window.alert("That doesn't look like a YouTube or Vimeo link. Paste the video's normal page URL (e.g. https://www.youtube.com/watch?v=... or https://vimeo.com/...).");
+        return;
+      }
+      editable.focus();
+      restoreSelection();
+      document.execCommand(
+        'insertHTML',
+        false,
+        '<iframe src="' + embedUrl + '" width="560" height="315" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><p><br></p>'
+      );
+      sync();
+    }
+
+    // Duplicate - clones the block the caret/selection is in and inserts
+    // the copy directly after it. Falls back to duplicating the whole
+    // editable content when there's no real selection to anchor to
+    // (matches every other command here restoring the saved selection
+    // first; this is just the one that needs a whole element to clone
+    // rather than a plain execCommand).
+    function duplicateBlock() {
+      editable.focus();
+      restoreSelection();
+      var sel = window.getSelection();
+      var block = sel.rangeCount ? closestBlock(sel.getRangeAt(0).startContainer) : null;
+      if (!block) return;
+      var copy = block.cloneNode(true);
+      block.insertAdjacentElement('afterend', copy);
+      sync();
+    }
+
+    // Paste - the async Clipboard API (navigator.clipboard.readText) is
+    // used instead of document.execCommand('paste'), which modern Chrome
+    // blocks outright for scripted callers regardless of a real user
+    // click triggering it. Plain text only (not the clipboard's original
+    // HTML/formatting) - reading rich HTML off the clipboard needs the
+    // broader, less consistently supported navigator.clipboard.read(),
+    // and a plain-text paste a person can then re-format with the rest of
+    // this toolbar is a reasonable, reliable floor. Native Ctrl+V already
+    // pastes full rich content directly into the contenteditable div
+    // without going through this button at all.
+    function pasteFromClipboard() {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        window.alert('Use Ctrl+V (Cmd+V on Mac) to paste - this browser doesn\'t allow the Paste button to read the clipboard directly.');
+        return;
+      }
+      navigator.clipboard.readText().then(function (text) {
+        if (!text) return;
+        editable.focus();
+        restoreSelection();
+        document.execCommand('insertText', false, text);
+        sync();
+      }, function () {
+        window.alert('Use Ctrl+V (Cmd+V on Mac) to paste - the browser didn\'t allow the Paste button to read the clipboard.');
+      });
+    }
+
     function togglePopup(name) {
       wrapper.querySelectorAll('[data-forum-popup]').forEach(function (p) {
         var isTarget = p.getAttribute('data-forum-popup') === name;
@@ -168,6 +251,26 @@
           return;
         case 'insertTable':
           insertTable();
+          return;
+        case 'insertChecklist':
+          insertChecklist();
+          return;
+        case 'insertVideo':
+          insertVideo();
+          return;
+        case 'duplicate':
+          duplicateBlock();
+          return;
+        case 'pasteFromClipboard':
+          pasteFromClipboard();
+          return;
+        case 'copy':
+        case 'cut':
+        case 'delete':
+          editable.focus();
+          restoreSelection();
+          document.execCommand(cmd);
+          sync();
           return;
         case 'createLink': {
           var url = window.prompt('Link URL:');

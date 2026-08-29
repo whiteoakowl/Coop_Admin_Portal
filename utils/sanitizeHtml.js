@@ -20,7 +20,26 @@ const ALLOWED_TAGS = [
   'strong', 'em', 'u', 's', 'sub', 'sup', 'span', 'pre', 'code',
   'ul', 'ol', 'li', 'a', 'blockquote', 'img',
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  // Checklist (toolbar's Checklist button) - a <li> holding one disabled
+  // checkbox plus its label text. 'input' only ever survives in exactly
+  // that shape - see exclusiveFilter below, which drops any input that
+  // isn't type="checkbox" (there's nothing else a saved post could use
+  // 'input' for; this was never a general form-control allowance).
+  'input',
+  // Video embed (toolbar's Insert Video button). Allowing <iframe> at all
+  // is the one real exception to this file's own "no iframe" rule, so
+  // it's deliberately narrow: allowedIframeHostnames below strips the src
+  // off anything that isn't YouTube/Vimeo's own embed hosts, and the
+  // exclusiveFilter drops the iframe entirely once its src is gone -
+  // never a blank/broken iframe sitting in the saved HTML, and never an
+  // iframe pointed anywhere else on the web.
+  'iframe',
 ];
+
+// youtube-nocookie.com is YouTube's own privacy-enhanced embed host (no
+// tracking cookies until playback starts) - offered by the toolbar's
+// Insert Video prompt alongside the regular embed URL, both accepted here.
+const ALLOWED_IFRAME_HOSTNAMES = ['www.youtube.com', 'www.youtube-nocookie.com', 'player.vimeo.com'];
 
 // Only the handful of CSS properties the toolbar's Styles/Font/Size/
 // Colors/Align/Direction controls actually produce - never an open
@@ -49,6 +68,8 @@ const ALLOWED_ATTRIBUTES = {
   h4: ['style', 'dir'],
   li: ['style', 'dir'],
   blockquote: ['style', 'dir'],
+  input: ['type', 'checked', 'disabled'],
+  iframe: ['src', 'width', 'height', 'title', 'allow', 'allowfullscreen', 'frameborder', 'sandbox'],
 };
 
 const ALLOWED_STYLES = { '*': SAFE_STYLES };
@@ -64,8 +85,27 @@ function sanitizePostBody(html) {
     // upload), so an <img src> gets the same http(s)-only treatment.
     allowedSchemes: ['http', 'https', 'mailto'],
     allowedSchemesByTag: { img: ['http', 'https'] },
+    // Strips the src off any <iframe> not pointed at one of these three
+    // known embed hosts (see ALLOWED_TAGS's own comment on 'iframe') -
+    // the exclusiveFilter below then drops the whole tag once its src is
+    // gone, rather than leaving a blank iframe behind.
+    allowedIframeHostnames: ALLOWED_IFRAME_HOSTNAMES,
     transformTags: {
       a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer nofollow', target: '_blank' }),
+      // Forces the same safe sandbox/frameborder regardless of what the
+      // client-side toolbar sent - consistent output, and immune to a
+      // request built by hand rather than through the real editor.
+      iframe: sanitizeHtml.simpleTransform('iframe', { frameborder: '0', sandbox: 'allow-scripts allow-same-origin allow-presentation' }),
+      // A checklist checkbox is a read-only visual marker of the
+      // author's own checked/unchecked state, never a live control
+      // someone else's click could flip - forced disabled regardless of
+      // what was sent, same reasoning as iframe's own forced attributes.
+      input: sanitizeHtml.simpleTransform('input', { disabled: 'disabled' }),
+    },
+    exclusiveFilter: function (frame) {
+      if (frame.tag === 'iframe') return !frame.attribs.src;
+      if (frame.tag === 'input') return frame.attribs.type !== 'checkbox';
+      return false;
     },
   }).trim();
 }

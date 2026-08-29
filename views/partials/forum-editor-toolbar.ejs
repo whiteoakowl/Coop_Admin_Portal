@@ -1,25 +1,61 @@
 <%
 // Toolbar for the shared rich-text editor (public/js/forum-editor.js) -
 // used well beyond chat now (publications, newsletter, announcements/
-// notifications, class/event descriptions - "anywhere there is text," a
-// real request). Every button/dropdown here maps to something utils/
+// notifications, class/event descriptions, event/class edit forms,
+// emails - "anywhere there is text," a real request, later pinned to one
+// exact reference layout: utility row (source/search/fullscreen/undo-
+// redo/clipboard) - Paragraph/Font/Size dropdowns - inline formatting +
+// colors - alignment/lists/indent - links/media/table/symbols - Clear
+// Formatting. Every button/dropdown here maps to something utils/
 // sanitizeHtml.js actually allows to survive - no control offers
 // formatting the server would just strip back out. A few toolbar-only
 // conveniences that never touch the saved HTML at all (Find & Replace,
-// Spellcheck, Fullscreen) have no server-side counterpart to keep in
-// sync with.
+// Spellcheck, Fullscreen, Search, the clipboard row) have no server-side
+// counterpart to keep in sync with.
 %>
 <div class="forum-editor-toolbar">
   <div class="forum-editor-toolbar-row">
-    <button type="button" data-forum-cmd="toggleSource" title="Source">&lt;/&gt;</button>
+    <button type="button" class="forum-editor-btn-text" data-forum-cmd="toggleSource" title="Source">&lt;/&gt;</button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="undo" title="Undo">&#8630;</button>
-    <button type="button" data-forum-cmd="redo" title="Redo">&#8631;</button>
+    <button type="button" data-forum-cmd="findReplace" title="Find and Replace"><svg class="icon"><use href="#icon-search"/></svg></button>
+    <button type="button" data-forum-cmd="toggleFullscreen" title="Fullscreen"><svg class="icon"><use href="#icon-maximize"/></svg></button>
+    <button type="button" data-forum-cmd="undo" title="Undo"><svg class="icon"><use href="#icon-undo"/></svg></button>
+    <button type="button" data-forum-cmd="redo" title="Redo"><svg class="icon"><use href="#icon-redo"/></svg></button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="findReplace" title="Find and Replace">&#128269;</button>
-    <button type="button" data-forum-cmd="toggleSpellcheck" title="Toggle Spellcheck" data-forum-toggle>ABC&#10003;</button>
-    <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="removeFormat" title="Remove Format">T&times;</button>
+    <button type="button" data-forum-cmd="copy" title="Copy"><svg class="icon"><use href="#icon-copy"/></svg></button>
+    <button type="button" class="forum-editor-btn-text" data-forum-cmd="cut" title="Cut">&#9986;</button>
+    <button type="button" data-forum-cmd="duplicate" title="Duplicate"><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
+    <button type="button" data-forum-cmd="pasteFromClipboard" title="Paste">&#128203;</button>
+    <button type="button" data-forum-cmd="delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+  </div>
+
+  <div class="forum-editor-toolbar-row forum-editor-toolbar-row-dropdowns">
+    <select data-forum-cmd="formatBlock" title="Paragraph style">
+      <option value="">Paragraph</option>
+      <option value="p">Paragraph</option>
+      <option value="h1">Heading 1</option>
+      <option value="h2">Heading 2</option>
+      <option value="h3">Heading 3</option>
+      <option value="h4">Heading 4</option>
+      <option value="pre">Preformatted</option>
+      <option value="blockquote">Quote</option>
+    </select>
+    <select data-forum-cmd="fontName" title="Font">
+      <option value="">System Font</option>
+      <option value="Arial, sans-serif">Arial</option>
+      <option value="Georgia, serif">Georgia</option>
+      <option value="'Courier New', monospace">Courier New</option>
+      <option value="Tahoma, sans-serif">Tahoma</option>
+      <option value="'Times New Roman', serif">Times New Roman</option>
+      <option value="Verdana, sans-serif">Verdana</option>
+    </select>
+    <select data-forum-cmd="fontSize" title="Size">
+      <option value="">16px</option>
+      <option value="1">Small</option>
+      <option value="3">Normal (16px)</option>
+      <option value="5">Large</option>
+      <option value="7">Huge</option>
+    </select>
   </div>
 
   <div class="forum-editor-toolbar-row">
@@ -30,11 +66,12 @@
     <button type="button" data-forum-cmd="subscript" title="Subscript">X<sub>2</sub></button>
     <button type="button" data-forum-cmd="superscript" title="Superscript">X<sup>2</sup></button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="insertOrderedList" title="Numbered List">1. List</button>
-    <button type="button" data-forum-cmd="insertUnorderedList" title="Bullet List">&bull; List</button>
-    <button type="button" data-forum-cmd="outdent" title="Decrease Indent">&#8676;</button>
-    <button type="button" data-forum-cmd="indent" title="Increase Indent">&#8677;</button>
-    <button type="button" data-forum-cmd="formatBlock" data-forum-value="blockquote" title="Quote">&ldquo;Quote&rdquo;</button>
+    <label class="forum-editor-color" title="Text Color">A
+      <input type="color" data-forum-cmd="foreColor" value="#000000" />
+    </label>
+    <label class="forum-editor-color forum-editor-color-bg" title="Highlight Color">&#9998;
+      <input type="color" data-forum-cmd="hiliteColor" value="#ffff00" />
+    </label>
   </div>
 
   <div class="forum-editor-toolbar-row">
@@ -44,49 +81,31 @@
     <button type="button" data-forum-cmd="justifyFull" title="Justify">&#8801;&#8801;</button>
     <button type="button" data-forum-cmd="toggleDirection" title="Text Direction (Left-to-Right / Right-to-Left)">&#8596;</button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="createLink" title="Insert Link">&#128279;</button>
-    <button type="button" data-forum-cmd="unlink" title="Remove Link">&#128279;&times;</button>
-    <button type="button" data-forum-cmd="insertImage" title="Insert Image">&#128247;</button>
-    <button type="button" data-forum-cmd="insertTable" title="Insert Table">&#8862;</button>
-    <button type="button" data-forum-cmd="insertHorizontalRule" title="Horizontal Line">&mdash;</button>
-    <button type="button" data-forum-cmd="insertSymbol" title="Special Character / Emoji">&#9786;&#937;</button>
+    <button type="button" data-forum-cmd="insertUnorderedList" title="Bullet List">&bull; List</button>
+    <button type="button" data-forum-cmd="insertOrderedList" title="Numbered List">1. List</button>
+    <button type="button" data-forum-cmd="insertChecklist" title="Checklist"><svg class="icon"><use href="#icon-check"/></svg></button>
+    <span class="forum-editor-sep"></span>
+    <button type="button" data-forum-cmd="outdent" title="Decrease Indent">&#8676;</button>
+    <button type="button" data-forum-cmd="indent" title="Increase Indent">&#8677;</button>
   </div>
 
-  <div class="forum-editor-toolbar-row forum-editor-toolbar-row-dropdowns">
-    <select data-forum-cmd="formatBlock" title="Styles">
-      <option value="">Styles</option>
-      <option value="p">Paragraph</option>
-      <option value="h1">Heading 1</option>
-      <option value="h2">Heading 2</option>
-      <option value="h3">Heading 3</option>
-      <option value="h4">Heading 4</option>
-      <option value="pre">Preformatted</option>
-    </select>
-    <select data-forum-cmd="fontName" title="Font">
-      <option value="">Font</option>
-      <option value="Arial, sans-serif">Arial</option>
-      <option value="Georgia, serif">Georgia</option>
-      <option value="'Courier New', monospace">Courier New</option>
-      <option value="Tahoma, sans-serif">Tahoma</option>
-      <option value="'Times New Roman', serif">Times New Roman</option>
-      <option value="Verdana, sans-serif">Verdana</option>
-    </select>
-    <select data-forum-cmd="fontSize" title="Size">
-      <option value="">Size</option>
-      <option value="1">Small</option>
-      <option value="3">Normal</option>
-      <option value="5">Large</option>
-      <option value="7">Huge</option>
-    </select>
-    <label class="forum-editor-color" title="Text Color">A
-      <input type="color" data-forum-cmd="foreColor" value="#000000" />
-    </label>
-    <label class="forum-editor-color forum-editor-color-bg" title="Background Color">&#9635;
-      <input type="color" data-forum-cmd="hiliteColor" value="#ffff00" />
-    </label>
+  <div class="forum-editor-toolbar-row">
+    <button type="button" data-forum-cmd="createLink" title="Insert Link">&#128279;</button>
+    <button type="button" data-forum-cmd="unlink" title="Remove Link">&#128279;&times;</button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="toggleFullscreen" title="Fullscreen">&#10021;</button>
+    <button type="button" data-forum-cmd="insertImage" title="Insert Image"><svg class="icon"><use href="#icon-image"/></svg></button>
+    <button type="button" data-forum-cmd="insertVideo" title="Insert Video">&#9654;</button>
+    <button type="button" data-forum-cmd="insertTable" title="Insert Table"><svg class="icon"><use href="#icon-grid"/></svg></button>
+    <button type="button" data-forum-cmd="toggleSpellcheck" title="Toggle Spellcheck" data-forum-toggle class="forum-editor-btn-text">ABC&#10003;</button>
+    <button type="button" data-forum-cmd="insertSymbol" title="Special Character / Emoji">&#9786;&#937;</button>
+    <button type="button" data-forum-cmd="insertHorizontalRule" title="Horizontal Line">&mdash;</button>
   </div>
+
+  <div class="forum-editor-toolbar-row forum-editor-toolbar-row-bottom">
+    <button type="button" data-forum-cmd="removeFormat" title="Clear Formatting"><svg class="icon"><use href="#icon-broom"/></svg> Clear formatting</button>
+  </div>
+
+  <p class="forum-editor-hint">You can use <kbd>Shift</kbd> + <kbd>Enter</kbd> for a line break</p>
 
   <div class="forum-editor-popup" data-forum-popup="symbol" hidden>
     <%
