@@ -2807,7 +2807,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex: 1 0 auto;
   min-width: 5.5rem;
   text-align: center;
-  white-space: nowrap;
+  /* Not nowrap - a longer label (e.g. "Allergies/Medical") stayed on one
+     line and got clipped rather than growing whenever something narrower
+     than its content assigned its actual width, which happens by design
+     on mobile: roster-btn-row-grid.js locks every button in a toolbar row
+     into an equal-width CSS Grid column sized off the button COUNT, not
+     each one's own text length. Letting the label wrap to a second line
+     instead just grows that row's height a little - normal, safe button
+     behavior - instead of silently cutting text off. overflow-wrap is
+     needed alongside it since a label like "Allergies/Medical" is one
+     unbroken run with no space for the browser's normal wrap algorithm
+     to break on - this lets it break at the slash instead of overflowing
+     past the button's own edge. */
+  overflow-wrap: break-word;
   display: inline-flex;
   align-items: center;
   justify-content: center;
