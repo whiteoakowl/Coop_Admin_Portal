@@ -150,6 +150,12 @@ html, body {
   background: var(--bg);
   color: var(--ink);
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Backstop only, not the fix - every real source of page-level
+     horizontal scroll (an oversized table, a flex child that refuses to
+     shrink, etc.) should be constrained where it happens (.roster-scroll
+     and friends). This just keeps a rare miss from producing a
+     page-width scrollbar on top of that. */
+  overflow-x: hidden;
 }
 
 a { color: var(--brand-dark); text-decoration: none; }
@@ -170,6 +176,74 @@ h1, h2, h3,
 }
 
 button { font-family: inherit; cursor: pointer; }
+
+/* ---------- Form controls (global base) ----------
+   Every text-like input/select/textarea in the app used to only get the
+   modern border/radius/padding treatment if its container happened to be
+   named in one of a few dozen selector lists scattered through this file
+   (.stack-form input, .member-form-grid select, .category-filter select,
+   .manage-header-row select, ...) - the same handful of declarations
+   copy-pasted onto a new selector every time a form showed up in a new
+   context. A plain, unclassed <input>/<select>/<textarea> anywhere else
+   fell back to the browser's own default look (a different height,
+   border, and - for <select> - the native dropdown arrow), which is
+   exactly the "outdated dropdown styling"/"forms that don't line up"
+   pattern a real UI audit called out. This base rule now covers every
+   control by default; the many pre-existing selector lists above still
+   work (same properties, same values in most cases) and just layer
+   page-specific sizing (width, compact padding, margin) on top - nothing
+   needed to be removed for this to take effect everywhere at once. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+select,
+textarea {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  line-height: 1.3;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not(:disabled):hover,
+select:not(:disabled):hover,
+textarea:not(:disabled):hover {
+  border-color: var(--btn-purple);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f1f5f9;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Custom chevron replaces every browser's own native dropdown arrow (the
+   biggest single source of "this still looks like an old-fashioned
+   dropdown" - the arrow's size/position/style varies by OS and browser
+   and never matched the rest of the control) with one consistent glyph,
+   drawn the same way as .icon's own stroke-based icons so it reads as
+   part of the same visual language. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M5 7l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 0.8rem;
+}
+select:disabled { background-image: none; }
+select::-ms-expand { display: none; }
+
+textarea { resize: vertical; }
+
+::placeholder { color: var(--muted); opacity: 1; }
 
 /* ---------- Icons ---------- */
 
@@ -1101,7 +1175,17 @@ body.public-page .roster-empty {
   border-radius: var(--control-radius);
   font-size: var(--control-font-size);
   font-family: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
+}
+
+/* The shorthand above only sets background-color, on purpose - a plain
+   `background` shorthand would silently wipe the shared select chevron
+   (global base rule, further up this file) since it resets background-
+   image to none too. These two selects just need extra right padding so
+   that chevron has room next to this form scale's own wider padding. */
+.stack-form select,
+.member-form-grid select {
+  padding-right: 2.5rem;
 }
 
 .radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
@@ -1675,7 +1759,10 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 /* Floater lists: a parent with a child 2 or younger, and each name's
    auto-sub ranking (set via .volunteer-rank-select in Edit Members). */
 .infant-tag { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
-.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; }
+/* Compact numeric rank pickers - too narrow for the shared chevron
+   (global select rule above) without it overlapping the 1-2 digit value
+   they show, so both opt out of it the same way .roster-cell-select does. */
+.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; background-image: none; }
 
 .status-badge {
   display: inline-block;
@@ -1936,13 +2023,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    next over and over." */
 .pagination-page-select-label { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .pagination-page-select {
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.4rem;
   border: 1px solid var(--btn-purple);
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-weight: 600;
   color: var(--purple);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-position: right 0.45rem center;
+  background-size: 0.7rem;
 }
 .pagination-btn {
   padding: var(--control-padding-compact);
@@ -2081,6 +2170,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  /* Round color-coded status badge, not a normal dropdown - opts out of
+     the shared select chevron/padding-right (global base rule above)
+     since a visible arrow inside a 1.9rem circle would overlap the
+     Present/Late/Absent letter it displays. */
+  background-image: none;
   width: 1.9rem;
   height: 1.9rem;
   min-width: 0;
@@ -2441,7 +2535,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .member-form-city-row { display: grid; grid-template-columns: 1.3fr 1.15fr 1fr; gap: 0.75rem 1rem; }
-.member-form-city-row select { padding-right: 0.4rem; font-size: 0.88rem; }
+.member-form-city-row select { padding-right: 1.75rem; font-size: 0.88rem; background-position: right 0.55rem center; background-size: 0.7rem; }
 @media (max-width: 640px) {
   .member-form-city-row { grid-template-columns: 1fr; }
 }
@@ -3377,7 +3471,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: var(--control-font-size-compact);
   font-family: inherit;
   font-weight: 600;
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
   margin: 0.75rem 0;
 }
@@ -3388,7 +3482,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-family: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
 }
 
@@ -4061,14 +4155,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-assign-form select {
   flex: 1;
   min-width: 0;
-  padding: 0.3rem 0.4rem;
+  padding: 0.3rem 1.5rem 0.3rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.78rem;
-  background: #fff;
+  background-color: var(--surface);
+  background-position: right 0.4rem center;
+  background-size: 0.65rem;
   color: var(--ink);
 }
-.floater-assign-form select:disabled { background: #f8fafc; color: var(--muted); }
+.floater-assign-form select:disabled { background-color: #f8fafc; color: var(--muted); }
 .floater-assign-btn {
   flex-shrink: 0;
   border: none;
@@ -4332,7 +4428,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-info-leader .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 .team-info-leader-select {
   border: none;
-  background: none;
+  background-color: transparent;
+  background-position: right center;
+  background-size: 0.6rem;
+  padding: 0 0.85rem 0 0;
   font: inherit;
   font-weight: 700;
   color: var(--ink);
@@ -4563,7 +4662,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    without having to open their profile. */
 .medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
 .medical-flag .icon { width: 0.95em; height: 0.95em; }
-.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
+/* Same reasoning as .volunteer-rank-select above - too narrow for the
+   shared chevron without overlapping its own short value. */
+.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; background-image: none; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
 .grid-box {
@@ -4823,11 +4924,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.65rem 0.6rem;
   font: inherit;
   font-size: 0.92rem;
-  background: #fff;
+  background-color: var(--surface);
   width: 100%;
   min-width: 0;
   color: var(--ink);
 }
+.class-form-field select { padding-right: 2.25rem; }
 .class-form-field input[type="text"]::placeholder { color: var(--muted); }
 
 .class-form-section-label { margin: 0.2rem 0 0.9rem; font-weight: 700; font-size: 0.88rem; }
@@ -6379,7 +6481,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.4rem; }
 .forum-editor-toolbar-row { display: flex; gap: 0.25rem; flex-wrap: wrap; align-items: center; }
 .forum-editor-toolbar button,
-.forum-editor-toolbar select { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.85rem; cursor: pointer; line-height: 1.2; }
+.forum-editor-toolbar select { border: 1px solid var(--border); background-color: var(--surface); border-radius: 6px; padding: 0.3rem 1.5rem 0.3rem 0.55rem; background-position: right 0.45rem center; background-size: 0.65rem; font-size: 0.85rem; cursor: pointer; line-height: 1.2; }
 .forum-editor-toolbar button:hover { background: var(--brand-soft, #eef4fb); }
 .forum-editor-toolbar button.forum-editor-toggle-on { background: var(--brand-soft, #eef4fb); border-color: var(--brand); }
 .forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.15rem; }
@@ -6544,7 +6646,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .event-calendar-nav-row { flex-wrap: nowrap; }
 .event-calendar-nav-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
 .event-calendar-nav-row .event-month-select,
-.event-calendar-nav-row .event-year-select { padding: 0.3rem 0.4rem; font-size: 0.75rem; }
+.event-calendar-nav-row .event-year-select {
+  padding: 0.3rem 1.5rem 0.3rem 0.4rem;
+  font-size: 0.75rem;
+  background-position: right 0.5rem center;
+  background-size: 0.65rem;
+}
 @media (max-width: 480px) {
   .event-calendar-nav-row { flex-wrap: wrap; }
 }
