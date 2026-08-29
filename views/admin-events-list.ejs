@@ -19,7 +19,6 @@
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <% } %>
         <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
-        <a class="roster-action-btn file-action-btn" href="/main-admin/events/import-template.xlsx">Template</a>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
       </div>
     </div>
@@ -77,27 +76,24 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (activeTab === 'calendar') { %>
-      <div class="roster-toolbar event-calendar-toolbar">
-        <div class="event-calendar-month-nav">
-          <h2 class="event-calendar-month-label"><%= calendar.label %></h2>
-          <div class="roster-btn-row no-print">
-            <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
-            <select id="event-month-select" class="event-month-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+document.getElementById('event-year-select').value+'-'+this.value;">
-              <% for (let m = 1; m <= 12; m++) { %>
-                <option value="<%= String(m).padStart(2, '0') %>" <%= calendar.month === m ? 'selected' : '' %>><%= new Date(Date.UTC(2000, m - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' }) %></option>
-              <% } %>
-            </select>
-            <select id="event-year-select" class="event-year-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+this.value+'-'+document.getElementById('event-month-select').value;">
-              <% for (let y = calendar.year - 3; y <= calendar.year + 3; y++) { %>
-                <option value="<%= y %>" <%= calendar.year === y ? 'selected' : '' %>><%= y %></option>
-              <% } %>
-            </select>
-            <a class="roster-action-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
-          </div>
-        </div>
-        <div class="roster-btn-row no-print">
+      <div class="event-calendar-toolbar no-print">
+        <div class="roster-btn-row event-calendar-view-row">
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>" aria-label="Calendar View" title="Calendar View"><svg class="icon"><use href="#icon-grid"/></svg></a>
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>" aria-label="List View" title="List View"><svg class="icon"><use href="#icon-menu"/></svg></a>
+        </div>
+        <div class="roster-btn-row event-calendar-nav-row">
+          <a class="roster-action-btn event-calendar-nav-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
+          <select id="event-month-select" class="event-month-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+document.getElementById('event-year-select').value+'-'+this.value;">
+            <% for (let m = 1; m <= 12; m++) { %>
+              <option value="<%= String(m).padStart(2, '0') %>" <%= calendar.month === m ? 'selected' : '' %>><%= new Date(Date.UTC(2000, m - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' }) %></option>
+            <% } %>
+          </select>
+          <select id="event-year-select" class="event-year-select" onchange="window.location.href='/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+this.value+'-'+document.getElementById('event-month-select').value;">
+            <% for (let y = calendar.year - 3; y <= calendar.year + 3; y++) { %>
+              <option value="<%= y %>" <%= calendar.year === y ? 'selected' : '' %>><%= y %></option>
+            <% } %>
+          </select>
+          <a class="roster-action-btn event-calendar-nav-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
         </div>
       </div>
 

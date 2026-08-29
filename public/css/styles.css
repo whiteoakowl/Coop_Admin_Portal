@@ -2743,6 +2743,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex: 0 0 auto;
 }
 
+/* Main Admin's Email/Text composer toolbar (item 6: "select all or none
+   should be checkboxes not buttons") went from four .roster-action-btn
+   siblings down to one (Filter) sitting next to a .primary-btn submit -
+   :only-child above doesn't catch this row since Filter isn't literally
+   the only child, just the only .roster-action-btn, so it was still
+   stretching to fill the whole row on its own. */
+.email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
+
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
    switches to a filled dark state while the archived view is showing, so
@@ -6485,11 +6493,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .event-calendar-table .badge-pill { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
 }
 
-/* Item 2 - square icon-only Calendar View/List View toggle buttons,
-   reusing .archived-toggle-btn's own "pressed" active look (see that
-   class's comment above) instead of a second active-state treatment. */
+/* Item 2 - square icon-only Calendar View/List View toggle buttons. A
+   later request: "toggle for calendar or list view should be highlighted
+   white when selected, not black" - .archived-toggle-btn.active's shared
+   black "pressed" look (used by admin-design/admin-logs/admin-name-tag
+   too) stays as-is for those other pages; this toggle gets its own
+   white-when-active override scoped to .icon-toggle-btn specifically so
+   nothing else is affected. */
 .icon-toggle-btn { flex: 0 0 auto; min-width: 0; width: 2.5rem; padding: 0.5rem; display: inline-flex; align-items: center; justify-content: center; }
 .icon-toggle-btn .icon { width: 1.1rem; height: 1.1rem; }
+.icon-toggle-btn.active, .icon-toggle-btn.active:hover { background: #fff; border-color: var(--ink); color: var(--ink); }
 
 /* Item 3 - desktop Events tab strip becomes a dropdown; mobile keeps its
    own accordion (unchanged) below 640px per .event-tabs-desktop's
@@ -6509,22 +6522,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .event-attendance-table th, .event-attendance-table td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
 }
 
-/* A real request: "prev/next buttons should be side by side with the
-   month name stacked above them" - previously Prev/<month name>/Next sat
-   as three items crammed into one .roster-btn-row, which not only read
-   oddly (a plain text label sandwiched between two buttons) but broke
-   that row's own mobile button-grid math (roster-btn-row-grid.js only
-   counts .roster-action-btn children, so the month name <strong> silently
-   rode along as an extra, unaccounted-for grid cell). The month label now
-   sits in its own line above a Prev/Next .roster-btn-row containing only
-   the two buttons; the Calendar/List view toggle gets its own second
-   .roster-btn-row alongside it. */
-.event-calendar-month-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
-.event-calendar-month-label { margin: 0; font-size: 1.1rem; }
-.event-calendar-toolbar { align-items: flex-start; }
-/* Calendar/List view toggle reuses .archived-toggle-btn's own "pressed"
-   look (see that class's own comment above) rather than inventing a
-   second active-state treatment for the same idea. */
+/* A real request (superseded by the one below, kept for history): "prev/
+   next buttons should be side by side with the month name stacked above
+   them" - previously Prev/<month name>/Next sat as three items crammed
+   into one .roster-btn-row, which not only read oddly (a plain text label
+   sandwiched between two buttons) but broke that row's own mobile
+   button-grid math (roster-btn-row-grid.js only counts .roster-action-btn
+   children, so the month name <strong> silently rode along as an extra,
+   unaccounted-for grid cell).
+
+   Latest request: "row should be Prev button, month dropdown, year
+   dropdown, next button - shrink font and buttons to fit clean on one
+   row" plus "toggle should be stacked above the month and year
+   dropdowns." The standalone month-name label is dropped entirely (the
+   month/year dropdowns already show the selected month, so a third,
+   redundant label added nothing); the Calendar/List toggle now sits in
+   its own row above a single compact Prev/month-select/year-select/Next
+   row, with smaller type/padding on that row's buttons and selects so
+   all four fit cleanly without wrapping on a typical screen. */
+.event-calendar-toolbar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin: 1.25rem 0; }
+.event-calendar-nav-row { flex-wrap: nowrap; }
+.event-calendar-nav-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+.event-calendar-nav-row .event-month-select,
+.event-calendar-nav-row .event-year-select { padding: 0.3rem 0.4rem; font-size: 0.75rem; }
+@media (max-width: 480px) {
+  .event-calendar-nav-row { flex-wrap: wrap; }
+}
 
 /* A real request: "on mobile, replace the [Events] tabs with stacked
    expandable bars - click the title to expand it." Below 640px the

@@ -31,10 +31,8 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <form method="POST" action="/main-admin/announcements/text/compose" id="email-select-form">
-      <div class="roster-btn-row">
+      <div class="roster-btn-row email-toolbar-row">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
-        <button type="button" class="roster-action-btn" data-email-select="all">Select All</button>
-        <button type="button" class="roster-action-btn" data-email-select="none">Select None</button>
         <button type="submit" class="primary-btn">Create Text</button>
       </div>
       <p class="hint" id="email-select-count"></p>
@@ -42,7 +40,7 @@
       <div class="roster-scroll">
         <table class="roster-table condensed-table" id="email-candidate-table">
           <thead>
-            <tr><th></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+            <tr><th><input type="checkbox" id="email-select-all" aria-label="Select all" /></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
           </thead>
           <tbody>
             <% candidates.forEach(function(c) { %>

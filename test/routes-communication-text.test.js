@@ -76,7 +76,7 @@ test('Main Admin Text tab: same candidate list/filter/select-all wiring as Email
   assert.match(page.text, /class="view-tab active" href="\/main-admin\/announcements\/text">Text</);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, />Filter</);
-  assert.match(page.text, />Select All</);
+  assert.match(page.text, /id="email-select-all"/);
   assert.match(page.text, />Create Text</);
 });
 

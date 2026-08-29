@@ -97,8 +97,8 @@ test('Main Admin Email tab: candidate rows carry role/section/grade/age/registra
   assert.match(page.text, /data-registered="yes"/);
   assert.match(page.text, /data-section="Teen Co-op"/);
   assert.match(page.text, />Filter</);
-  assert.match(page.text, />Select All</);
-  assert.match(page.text, />Select None</);
+  assert.match(page.text, /id="email-select-all"/);
+  assert.doesNotMatch(page.text, /data-email-select="all"/, 'Select All\/Select None buttons were replaced by a single header checkbox');
 });
 
 test('Main Admin Email: Create Email renders the compose screen with hidden recipient inputs, then Send Now creates a sent campaign and notifies each recipient', async () => {
