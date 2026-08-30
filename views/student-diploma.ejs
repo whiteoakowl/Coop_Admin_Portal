@@ -4,20 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', {
-    portalTitle: 'Student Portal',
-    navLinks: [
-      { href: '/student', icon: 'home', label: 'Home' },
-      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
-      { href: '/forums', icon: 'users', label: 'Chat' },
-      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
-      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
-      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
-      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
-      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
-      { href: '/student/pets', icon: 'paw', label: 'Pets' },
-    ],
-  }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Diploma</h1>

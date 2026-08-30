@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="games-header">
+      <div>
+        <h1>Games</h1>
+        <p class="subtitle"><%= games.length %> fun games to play anytime - tap one to open it and play.</p>
+      </div>
+      <div class="games-header-stats">
+        <div class="games-header-stat">
+          <span class="games-header-stat-icon games-header-stat-icon-purple"><svg class="icon"><use href="#icon-gamepad"/></svg></span>
+          <span>
+            <span class="games-header-stat-label">Games Played</span>
+            <span class="games-header-stat-value"><%= stats.gamesPlayed %></span>
+          </span>
+        </div>
+        <div class="games-header-stat">
+          <span class="games-header-stat-icon games-header-stat-icon-gold"><svg class="icon"><use href="#icon-trophy"/></svg></span>
+          <span>
+            <span class="games-header-stat-label">High Score</span>
+            <% if (stats.highScore) { %>
+              <span class="games-header-stat-value"><%= stats.highScore.score.toLocaleString() %></span>
+              <span class="games-header-stat-sub"><%= stats.highScore.gameTitle %></span>
+            <% } else { %>
+              <span class="games-header-stat-value games-header-stat-value-muted">&mdash;</span>
+            <% } %>
+          </span>
+        </div>
+        <div class="games-header-stat">
+          <span class="games-header-stat-icon games-header-stat-icon-blue"><svg class="icon"><use href="#icon-flame"/></svg></span>
+          <span>
+            <span class="games-header-stat-label">Current Streak</span>
+            <span class="games-header-stat-value"><%= stats.streak %> <span class="games-header-stat-unit">day<%= stats.streak === 1 ? '' : 's' %></span></span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="games-toolbar" role="tablist">
+      <button type="button" class="game-filter-tab game-filter-tab-active" data-filter="all">All Games</button>
+      <button type="button" class="game-filter-tab" data-filter="puzzle">Puzzle</button>
+      <button type="button" class="game-filter-tab" data-filter="arcade">Arcade</button>
+      <button type="button" class="game-filter-tab" data-filter="word">Word</button>
+      <button type="button" class="game-filter-tab" data-filter="classic">Classic</button>
+      <button type="button" class="game-filter-tab" data-filter="trivia">Trivia</button>
+      <button type="button" class="game-filter-tab" data-filter="skill">Skill</button>
+    </div>
+
+    <div class="games-grid">
+      <% games.forEach((game, i) => { %>
+        <a class="game-tile game-tile-<%= game.accent %>" href="/student/games/play/<%= game.key %>" data-category="<%= game.category %>">
+          <span class="game-tile-badge"><%= i + 1 %></span>
+          <div class="game-tile-preview">
+            <%- game.preview %>
+          </div>
+          <div class="game-tile-footer">
+            <h3 class="game-tile-title"><%= game.title %></h3>
+            <span class="game-tile-category game-tile-category-<%= game.category %>"><%= categoryLabels[game.category] %></span>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+
+    <div class="games-banners">
+      <div class="games-banner games-banner-gold">
+        <span class="games-banner-icon"><svg class="icon"><use href="#icon-trophy"/></svg></span>
+        <div class="games-banner-text">
+          <strong>Daily Challenge</strong>
+          <span>Play <%= dailyGame.title %> today to earn extra practice!</span>
+        </div>
+        <a class="primary-btn games-banner-btn" href="/student/games/play/<%= dailyGame.key %>">Start Challenge <svg class="icon"><use href="#icon-arrow-right"/></svg></a>
+      </div>
+      <div class="games-banner games-banner-blue">
+        <span class="games-banner-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+        <div class="games-banner-text">
+          <strong>Challenge your friends!</strong>
+          <span>See who can get the highest score.</span>
+        </div>
+        <a class="btn-secondary games-banner-btn" href="/student/leaderboard">View Leaderboard <svg class="icon"><use href="#icon-arrow-right"/></svg></a>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/games/games-filter.js" defer></script>
+</body>
+</html>

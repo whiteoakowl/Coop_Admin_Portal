@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Leaderboard</h1>
+    <p class="subtitle">See how you stack up against every student portal.</p>
+
+    <div class="leaderboard-grid">
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top 5 Reading Hours</h3>
+        <% if (!readingLeaders.length) { %>
+          <p class="hint">No one has logged reading time yet - be the first!</p>
+        <% } else { %>
+          <ol class="reading-leaderboard-list">
+            <% readingLeaders.forEach((row) => { %>
+              <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+                <span class="reading-leaderboard-rank">#<%= row.rank %></span>
+                <span class="reading-leaderboard-name"><%= row.name %><%= row.memberId === memberId ? ' (You)' : '' %></span>
+                <span class="reading-leaderboard-points"><%= row.hours.toLocaleString() %> hrs</span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top 5 Reading Points</h3>
+        <% if (!readingLeaders.length) { %>
+          <p class="hint">No one has logged reading time yet - be the first!</p>
+        <% } else { %>
+          <ol class="reading-leaderboard-list">
+            <% readingLeaders.forEach((row) => { %>
+              <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+                <span class="reading-leaderboard-rank">#<%= row.rank %></span>
+                <span class="reading-leaderboard-name"><%= row.name %><%= row.memberId === memberId ? ' (You)' : '' %></span>
+                <span class="reading-leaderboard-points"><%= row.points.toLocaleString() %> pts</span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top Player - Every Game</h3>
+        <ol class="reading-leaderboard-list">
+          <% gameLeaders.forEach((row) => { %>
+            <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+              <span class="reading-leaderboard-rank"><%= row.gameTitle %></span>
+              <span class="reading-leaderboard-name"><%= row.name ? row.name + (row.memberId === memberId ? ' (You)' : '') : 'No scores yet' %></span>
+              <span class="reading-leaderboard-points"><%= row.score !== null ? row.score.toLocaleString() + ' pts' : '' %></span>
+            </li>
+          <% }) %>
+        </ol>
+      </div>
+
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top 5 Spelling Bee</h3>
+        <% if (!spellingLeaders.length) { %>
+          <p class="hint">No one has played Spelling Bee yet - be the first!</p>
+        <% } else { %>
+          <ol class="reading-leaderboard-list">
+            <% spellingLeaders.forEach((row) => { %>
+              <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+                <span class="reading-leaderboard-rank">#<%= row.rank %></span>
+                <span class="reading-leaderboard-name"><%= row.name %><%= row.memberId === memberId ? ' (You)' : '' %></span>
+                <span class="reading-leaderboard-points"><%= row.points.toLocaleString() %> pts</span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

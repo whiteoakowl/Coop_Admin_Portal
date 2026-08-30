@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Spelling Bee</h1>
+    <p class="subtitle">Level: <span class="badge-pill badge-pill-orange"><%= levelLabel %></span> - based on your grade level on file.</p>
+
+    <div class="spelling-bee-stage">
+      <div class="spelling-bee-card" id="sb-card">
+        <p class="spelling-bee-progress" id="sb-progress"></p>
+        <p class="spelling-bee-clue" id="sb-clue"></p>
+        <input type="text" id="sb-input" class="spelling-bee-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the spelling..." />
+        <p class="spelling-bee-feedback" id="sb-feedback"></p>
+        <button type="button" class="primary-btn" id="sb-submit">Submit</button>
+      </div>
+
+      <div class="spelling-bee-card" id="sb-result" hidden>
+        <h2>Round Complete!</h2>
+        <p id="sb-result-text" class="spelling-bee-result-text"></p>
+        <button type="button" class="primary-btn" id="sb-again">Play Again</button>
+      </div>
+    </div>
+
+    <h2 class="reading-achievements-heading-row">Top Spellers</h2>
+    <% if (!topPlayers.length) { %>
+      <p class="hint">No one has played yet - be the first!</p>
+    <% } else { %>
+      <ol class="reading-leaderboard-list">
+        <% topPlayers.forEach((p) => { %>
+          <li class="reading-leaderboard-row">
+            <span class="reading-leaderboard-rank">#<%= p.rank %></span>
+            <span><%= p.name %></span>
+            <span class="reading-leaderboard-points"><%= p.points %> pts</span>
+          </li>
+        <% }) %>
+      </ol>
+    <% } %>
+  </main>
+
+  <script>
+    var SPELLING_ROUND = <%- JSON.stringify(round) %>;
+  </script>
+  <script src="/js/spelling-bee.js" defer></script>
+</body>
+</html>

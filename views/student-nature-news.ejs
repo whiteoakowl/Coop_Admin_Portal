@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Nature News</h1>
+    <p class="subtitle">Share something you discovered in nature! Approved discoveries appear on everyone's homepage.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/student/nature-news" enctype="multipart/form-data" class="stack-form member-form-page-panel">
+      <label class="member-form-full">What did you discover?
+        <textarea name="description" rows="3" maxlength="1000" placeholder="Tell us about it - what, where, and why it's interesting!" required></textarea>
+      </label>
+      <label class="member-form-full">Photo
+        <input type="file" name="image" accept="image/*" required />
+      </label>
+      <div class="member-form-footer">
+        <div class="member-form-footer-edit">
+          <button type="submit" class="primary-btn">Submit for Approval</button>
+        </div>
+      </div>
+    </form>
+
+    <h2 class="reading-achievements-heading-row">Your Submissions</h2>
+    <% if (!posts.length) { %>
+      <p class="hint">You haven't submitted anything yet - share your first discovery above!</p>
+    <% } else { %>
+      <div class="nature-news-grid">
+        <% posts.forEach((post) => { %>
+          <div class="nature-news-card">
+            <img src="/nature-news/<%= post.id %>/image" alt="" class="nature-news-card-img" />
+            <div class="nature-news-card-body">
+              <span class="badge-pill <%= post.status === 'approved' ? 'badge-pill-present' : post.status === 'pending' ? 'badge-pill-pending' : 'badge-pill-absent' %>"><%= post.status %></span>
+              <p><%= post.description %></p>
+              <span class="hint"><%= post.created_at.slice(0, 10) %></span>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

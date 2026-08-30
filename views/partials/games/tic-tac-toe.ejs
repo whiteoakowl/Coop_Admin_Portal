@@ -1,0 +1,11 @@
+<div class="game-play-card" id="ttt-card">
+  <div class="game-versus-row">
+    <span class="game-versus-pill game-versus-pill-active" id="ttt-pill-x"><svg class="icon"><use href="#icon-x-circle"/></svg> You</span>
+    <span class="game-versus-vs">vs</span>
+    <span class="game-versus-pill" id="ttt-pill-o"><svg class="icon"><use href="#icon-circle"/></svg> Friend</span>
+  </div>
+  <div class="ttt-board" id="ttt-board">
+    <% for (let i = 0; i < 9; i++) { %><button type="button" class="ttt-cell" data-i="<%= i %>"></button><% } %>
+  </div>
+  <button type="button" class="primary-btn game-play-action" id="ttt-reset">New Game</button>
+</div>

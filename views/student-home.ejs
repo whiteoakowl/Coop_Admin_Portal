@@ -4,23 +4,31 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', {
-    portalTitle: 'Student Portal',
-    navLinks: [
-      { href: '/student', icon: 'home', label: 'Home' },
-      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
-      { href: '/forums', icon: 'users', label: 'Chat' },
-      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
-      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
-      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
-      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
-      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
-      { href: '/student/pets', icon: 'paw', label: 'Pets' },
-    ],
-  }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
+
+    <section class="portal-dashboard-section">
+      <h2>Word of the Week</h2>
+      <div class="word-of-week-grid">
+        <div class="word-of-week-card">
+          <span class="word-of-week-level">Elementary</span>
+          <strong class="word-of-week-word"><%= words.elementary.word %></strong>
+          <p class="hint"><%= words.elementary.definition %></p>
+        </div>
+        <div class="word-of-week-card">
+          <span class="word-of-week-level">Middle School</span>
+          <strong class="word-of-week-word"><%= words.middle.word %></strong>
+          <p class="hint"><%= words.middle.definition %></p>
+        </div>
+        <div class="word-of-week-card">
+          <span class="word-of-week-level">High School</span>
+          <strong class="word-of-week-word"><%= words.high.word %></strong>
+          <p class="hint"><%= words.high.definition %></p>
+        </div>
+      </div>
+    </section>
 
     <section class="portal-dashboard-section">
       <h2>Announcements</h2>
@@ -48,6 +56,26 @@
         <p class="portal-dashboard-stat"><%= classes.length %></p>
         <p class="hint">class<%= classes.length === 1 ? '' : 'es' %> this term</p>
         <a class="roster-action-btn" href="/student/classes">View My Classes</a>
+      </section>
+
+      <section class="portal-dashboard-card portal-dashboard-card-wide">
+        <h2>Nature News</h2>
+        <% if (!natureNewsLatest.length) { %>
+          <p class="hint">No approved discoveries yet - be the first to share one!</p>
+        <% } else { %>
+          <div class="nature-news-grid">
+            <% natureNewsLatest.forEach((post) => { %>
+              <div class="nature-news-card">
+                <img src="/nature-news/<%= post.id %>/image" alt="" class="nature-news-card-img" />
+                <div class="nature-news-card-body">
+                  <strong><%= post.member_name %></strong>
+                  <p><%= post.description %></p>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+        <a class="roster-action-btn" href="/student/nature-news">Share a Discovery</a>
       </section>
     </div>
   </main>

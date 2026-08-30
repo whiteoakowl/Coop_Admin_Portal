@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Achievements</h1>
+    <p class="subtitle">Badges you earn from your Reading Challenge progress.</p>
+
+    <% if (!dashboard) { %>
+      <p class="hint">No student profile found for your account.</p>
+    <% } else { %>
+      <div class="ach-grid">
+        <% dashboard.achievements.forEach((a) => { %>
+          <% const pct = Math.min(100, Math.round((a.progress / a.goal) * 100)); %>
+          <div class="ach-card <%= a.done ? 'ach-card-done' : '' %>">
+            <div class="ach-badge ach-badge-<%= a.color %> <%= a.done ? 'ach-badge-unlocked' : 'ach-badge-locked' %>">
+              <svg class="icon"><use href="#icon-<%= a.icon %>"/></svg>
+              <% if (a.done) { %>
+                <span class="ach-badge-flag ach-badge-check"><svg class="icon"><use href="#icon-check"/></svg></span>
+              <% } else { %>
+                <span class="ach-badge-flag ach-badge-lock"><svg class="icon"><use href="#icon-lock"/></svg></span>
+              <% } %>
+            </div>
+            <div class="ach-info">
+              <h3><%= a.label %> <span class="ach-fraction">(<%= a.progress === 0 ? 'New' : a.progress + '/' + a.goal %>)</span></h3>
+              <p class="ach-detail"><%= a.detail %></p>
+              <div class="ach-bar">
+                <% if (pct > 0) { %>
+                  <div class="ach-bar-fill ach-bar-fill-<%= a.color %>" style="width: <%= pct %>%;">
+                    <span class="ach-bar-fraction"><%= a.progress %> / <%= a.goal %> <%= a.unit %></span>
+                  </div>
+                <% } else { %>
+                  <span class="ach-bar-fraction ach-bar-fraction-empty"><%= a.progress %> / <%= a.goal %> <%= a.unit %></span>
+                <% } %>
+                <% if (a.done) { %>
+                  <span class="ach-bar-complete"><svg class="icon"><use href="#icon-check-circle"/></svg> Completed</span>
+                <% } else { %>
+                  <span class="ach-bar-percent"><%= pct %>%</span>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

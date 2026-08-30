@@ -1,55 +1,103 @@
 // Student Portal > Pets - a real request: "create a personal pet activity
 // for students. They can choose a pet, choose a few features and save.
-// Then they can name their pet, feed it, play with it, bathe it." See
-// the migration's own header comment (20260830010000_student_pets.sql)
-// for why care stats are computed here rather than stored as mutable
-// numbers, and views/partials/pet-sprites.ejs for how a species/color/
-// eyes/mouth/accessory combination actually gets drawn.
+// Then they can name their pet, feed it, play with it, bathe it."
+//
+// Originally a 5-trait mix-and-match system (Body/Ears/Eyes/Mouth/
+// Accessories, each independently cyclable) rendered as flat SVG. A
+// follow-up request ("higher level graphics and glossy like my original
+// screenshots... we need to go that route and do better") replaced that
+// with real photorealistic pet images cropped directly from the
+// reference screenshots the user provided - see public/images/pets/'s
+// own README for the crop convention. Photoreal renders can't be
+// decomposed into independently swappable parts the way flat SVG can
+// (you can't cleanly swap just the eyes on a baked photo), so
+// customization is now a single "pick one whole look" choice (PET_LOOKS
+// below) instead of five separate cyclers - this also matches what the
+// user's own reference "Choose Your Pet" mockup actually shows: complete
+// pre-rendered looks, not independently recombinable parts.
+//
+// Every PET_LOOKS entry still carries an `svg` preset (the old
+// species/ears/eyes/mouth/accessory/hex/eyeColor combination, rendered
+// via views/partials/pet-sprites.ejs) as a graceful fallback for any
+// look that doesn't have a real photo yet (`image: null` below) - so
+// adding real art later for cat_orange/turtle/chicken/lizard/panda is a
+// one-line edit (drop the file in public/images/pets/, set `image`)
+// rather than a code change. See the migration's own header comment
+// (20260830010000_student_pets.sql) for why care stats are computed
+// here rather than stored as mutable numbers.
 const db = require('../db');
 
-// Two colors each - the reference mockup's "2 cat" request generalized
-// to every species rather than special-cased just for cats.
-const SPECIES = [
-  { key: 'cat', label: 'Cat', colors: [{ key: 'black', label: 'Black', hex: '#3a3532' }, { key: 'orange', label: 'Orange', hex: '#e0813f' }] },
-  { key: 'dog', label: 'Dog', colors: [{ key: 'golden', label: 'Golden', hex: '#e3b45c' }, { key: 'brown', label: 'Brown', hex: '#8b5a2b' }] },
-  { key: 'rabbit', label: 'Rabbit', colors: [{ key: 'white', label: 'White', hex: '#f5f0e6' }, { key: 'gray', label: 'Gray', hex: '#9a9690' }] },
-  { key: 'dragon', label: 'Dragon', colors: [{ key: 'green', label: 'Green', hex: '#5fa85a' }, { key: 'purple', label: 'Purple', hex: '#8a63c9' }] },
-  { key: 'hamster', label: 'Hamster', colors: [{ key: 'brown', label: 'Brown', hex: '#c08a52' }, { key: 'white', label: 'White', hex: '#f0e9da' }] },
-  { key: 'husky', label: 'Husky', colors: [{ key: 'gray', label: 'Gray', hex: '#6b7075' }, { key: 'black', label: 'Black', hex: '#2b2b2e' }] },
-  { key: 'turtle', label: 'Turtle', colors: [{ key: 'green', label: 'Green', hex: '#5a9451' }, { key: 'blue', label: 'Blue', hex: '#4a7fa8' }] },
-  { key: 'chicken', label: 'Chicken', colors: [{ key: 'white', label: 'White', hex: '#f5f0e6' }, { key: 'red', label: 'Red', hex: '#b5502f' }] },
-  { key: 'lizard', label: 'Lizard', colors: [{ key: 'green', label: 'Green', hex: '#5a9451' }, { key: 'orange', label: 'Orange', hex: '#d9843d' }] },
-  { key: 'panda', label: 'Panda', colors: [{ key: 'black', label: 'Classic', hex: '#2d2a26' }, { key: 'red', label: 'Red Panda', hex: '#b5602f' }] },
+const PET_LOOKS = [
+  {
+    key: 'cat_black',
+    label: 'Black Cat',
+    image: '/images/pets/cat_black.webp',
+    svg: { species: 'cat_black', ears: 'pointy', eyes: 'round', mouth: 'smile', accessory: 'hat', hex: '#3a3532', eyeColor: '#7cc142', roomTheme: 'pet-room-cozy' },
+  },
+  {
+    key: 'cat_orange',
+    label: 'Orange Cat',
+    image: '/images/pets/cat_orange.webp',
+    svg: { species: 'cat_orange', ears: 'pointy', eyes: 'round', mouth: 'smile', accessory: 'collar', hex: '#e0813f', eyeColor: '#e0a83f', roomTheme: 'pet-room-cozy' },
+  },
+  {
+    key: 'dog',
+    label: 'Golden Retriever',
+    image: '/images/pets/dog.webp',
+    svg: { species: 'dog', ears: 'floppy', eyes: 'wide', mouth: 'open', accessory: 'bandana', hex: '#e3b45c', eyeColor: '#6b4423', roomTheme: 'pet-room-playroom' },
+  },
+  {
+    key: 'rabbit',
+    label: 'Rabbit',
+    image: '/images/pets/rabbit.webp',
+    svg: { species: 'rabbit', ears: 'tufted', eyes: 'round', mouth: 'smile', accessory: 'bow', hex: '#f5f0e6', eyeColor: '#4a90d9', roomTheme: 'pet-room-lavender' },
+  },
+  {
+    key: 'dragon',
+    label: 'Dragon',
+    image: '/images/pets/dragon.webp',
+    svg: { species: 'dragon', ears: 'none', eyes: 'wide', mouth: 'smile', accessory: 'none', hex: '#5fa85a', eyeColor: '#e8934a', roomTheme: 'pet-room-dungeon' },
+  },
+  {
+    key: 'hamster',
+    label: 'Hamster',
+    image: '/images/pets/hamster.webp',
+    svg: { species: 'hamster', ears: 'round', eyes: 'round', mouth: 'open', accessory: 'none', hex: '#c08a52', eyeColor: '#4a2f1f', roomTheme: 'pet-room-cage' },
+  },
+  {
+    key: 'husky',
+    label: 'Husky',
+    image: '/images/pets/husky.webp',
+    svg: { species: 'husky', ears: 'pointy', eyes: 'round', mouth: 'smile', accessory: 'collar', hex: '#6b7075', eyeColor: '#4a90d9', roomTheme: 'pet-room-snow' },
+  },
+  {
+    key: 'turtle',
+    label: 'Turtle',
+    image: '/images/pets/turtle.webp',
+    svg: { species: 'turtle', ears: 'none', eyes: 'round', mouth: 'smile', accessory: 'none', hex: '#5a9451', eyeColor: '#2d2a26', roomTheme: 'pet-room-pond' },
+  },
+  {
+    key: 'chicken',
+    label: 'Chicken',
+    image: '/images/pets/chicken.webp',
+    svg: { species: 'chicken', ears: 'none', eyes: 'round', mouth: 'smile', accessory: 'none', hex: '#f5f0e6', eyeColor: '#2d2a26', roomTheme: 'pet-room-farm' },
+  },
+  {
+    key: 'lizard',
+    label: 'Lizard',
+    image: '/images/pets/lizard.webp',
+    svg: { species: 'lizard', ears: 'none', eyes: 'round', mouth: 'smile', accessory: 'none', hex: '#5a9451', eyeColor: '#8a9a3a', roomTheme: 'pet-room-terrarium' },
+  },
+  {
+    key: 'panda',
+    label: 'Panda',
+    image: '/images/pets/panda.webp',
+    svg: { species: 'panda', ears: 'round', eyes: 'round', mouth: 'smile', accessory: 'none', hex: '#2d2a26', eyeColor: '#2d2a26', roomTheme: 'pet-room-bamboo' },
+  },
 ];
 
-const EYES = [
-  { key: 'round', label: 'Round' },
-  { key: 'sleepy', label: 'Sleepy' },
-  { key: 'wide', label: 'Wide' },
-];
-
-const MOUTHS = [
-  { key: 'smile', label: 'Smile' },
-  { key: 'open', label: 'Open' },
-  { key: 'neutral', label: 'Neutral' },
-];
-
-const ACCESSORIES = [
-  { key: 'none', label: 'None' },
-  { key: 'bow', label: 'Bow' },
-  { key: 'hat', label: 'Wizard Hat' },
-  { key: 'glasses', label: 'Glasses' },
-  { key: 'bandana', label: 'Bandana' },
-  { key: 'collar', label: 'Collar' },
-];
-
-function speciesByKey(key) {
-  return SPECIES.find((s) => s.key === key) || SPECIES[0];
-}
-
-function colorForSpecies(speciesKey, colorKey) {
-  const species = speciesByKey(speciesKey);
-  return species.colors.find((c) => c.key === colorKey) || species.colors[0];
+function lookByKey(key) {
+  return PET_LOOKS.find((l) => l.key === key) || PET_LOOKS[0];
 }
 
 async function getPetForMember(memberId) {
@@ -59,31 +107,21 @@ async function getPetForMember(memberId) {
 // Called on first visit to /student/pets/customize - not persisted until
 // the student actually hits Save, so browsing the chooser without saving
 // leaves no row behind.
-function defaultAppearance() {
-  return { species: 'dog', color: 'golden', eyes: 'round', mouth: 'smile', accessory: 'none' };
+function defaultLook() {
+  return PET_LOOKS[0].key;
 }
 
-async function savePet(memberId, { name, species, color, eyes, mouth, accessory }) {
-  const validSpecies = SPECIES.some((s) => s.key === species) ? species : 'dog';
-  const validColor = colorForSpecies(validSpecies, color).key;
-  const validEyes = EYES.some((e) => e.key === eyes) ? eyes : 'round';
-  const validMouth = MOUTHS.some((m) => m.key === mouth) ? mouth : 'smile';
-  const validAccessory = ACCESSORIES.some((a) => a.key === accessory) ? accessory : 'none';
+async function savePet(memberId, { name, look }) {
+  const validLook = PET_LOOKS.some((l) => l.key === look) ? look : defaultLook();
   const cleanName = (name || '').trim().slice(0, 40) || 'My Pet';
 
   const existing = await getPetForMember(memberId);
   if (existing) {
     await db
-      .prepare(
-        `UPDATE student_pets SET name = ?, species = ?, color = ?, eyes = ?, mouth = ?, accessory = ?, updated_at = now_text() WHERE member_id = ?`
-      )
-      .run(cleanName, validSpecies, validColor, validEyes, validMouth, validAccessory, memberId);
+      .prepare('UPDATE student_pets SET name = ?, look = ?, updated_at = now_text() WHERE member_id = ?')
+      .run(cleanName, validLook, memberId);
   } else {
-    await db
-      .prepare(
-        `INSERT INTO student_pets (member_id, name, species, color, eyes, mouth, accessory) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(memberId, cleanName, validSpecies, validColor, validEyes, validMouth, validAccessory);
+    await db.prepare('INSERT INTO student_pets (member_id, name, look) VALUES (?, ?, ?)').run(memberId, cleanName, validLook);
   }
   return getPetForMember(memberId);
 }
@@ -154,13 +192,9 @@ async function performCareAction(memberId, kind) {
 }
 
 module.exports = {
-  SPECIES,
-  EYES,
-  MOUTHS,
-  ACCESSORIES,
-  speciesByKey,
-  colorForSpecies,
-  defaultAppearance,
+  PET_LOOKS,
+  lookByKey,
+  defaultLook,
   getPetForMember,
   savePet,
   renamePet,

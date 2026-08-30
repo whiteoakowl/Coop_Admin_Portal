@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="reading-header">
+      <div>
+        <h1>Reading Challenge</h1>
+        <p class="subtitle">Track your reading. Grow your mind. Earn rewards!</p>
+      </div>
+      <% if (dashboard) { %>
+        <span class="reading-points-pill"><svg class="icon"><use href="#icon-star"/></svg> <%= dashboard.totalPoints.toLocaleString() %> Points</span>
+      <% } %>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (!dashboard) { %>
+      <p class="hint">No student profile found for your account.</p>
+    <% } else { %>
+      <div class="reading-stat-grid">
+        <div class="stat-card reading-stat-card">
+          <div class="reading-stat-top">
+            <span class="reading-stat-icon reading-stat-icon-brand"><svg class="icon"><use href="#icon-clock"/></svg></span>
+            <span class="reading-stat-title">Total Hours</span>
+          </div>
+          <div class="reading-stat-number"><span class="stat-value"><%= dashboard.totalHours.toFixed(1) %></span> <span class="reading-stat-unit">hours</span></div>
+          <span class="reading-stat-footer">All Time</span>
+        </div>
+        <div class="stat-card reading-stat-card">
+          <div class="reading-stat-top">
+            <span class="reading-stat-icon reading-stat-icon-blue"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+            <span class="reading-stat-title">This Week</span>
+          </div>
+          <div class="reading-stat-number"><span class="stat-value"><%= dashboard.weekHours.toFixed(2) %></span> <span class="reading-stat-unit">hours</span></div>
+          <span class="reading-stat-footer">Goal: <%= dashboard.weeklyGoalHours %> hours</span>
+          <div class="pet-care-bar reading-mini-bar"><div class="pet-care-bar-fill pet-care-bar-cleanliness" style="width: <%= dashboard.weeklyGoalPct %>%;"></div></div>
+        </div>
+        <div class="stat-card reading-stat-card">
+          <div class="reading-stat-top">
+            <span class="reading-stat-icon reading-stat-icon-green"><svg class="icon"><use href="#icon-trophy"/></svg></span>
+            <span class="reading-stat-title">Points Earned</span>
+          </div>
+          <div class="reading-stat-number"><span class="stat-value"><%= dashboard.totalPoints.toLocaleString() %></span> <span class="reading-stat-unit">points</span></div>
+          <span class="reading-stat-footer">All Time</span>
+        </div>
+        <div class="stat-card reading-stat-card">
+          <div class="reading-stat-top">
+            <span class="reading-stat-icon reading-stat-icon-yellow"><svg class="icon"><use href="#icon-flame"/></svg></span>
+            <span class="reading-stat-title">Current Streak</span>
+          </div>
+          <div class="reading-stat-number"><span class="stat-value"><%= dashboard.streak %></span> <span class="reading-stat-unit">days</span></div>
+          <span class="reading-stat-footer reading-stat-footer-accent"><%= dashboard.streak > 0 ? 'Keep it up!' : 'Start today!' %></span>
+        </div>
+        <div class="stat-card reading-stat-card">
+          <div class="reading-stat-top">
+            <span class="reading-stat-icon reading-stat-icon-purple"><svg class="icon"><use href="#icon-star"/></svg></span>
+            <span class="reading-stat-title">Level</span>
+          </div>
+          <div class="reading-stat-number"><span class="stat-value"><%= dashboard.levelInfo.level %></span> <span class="reading-stat-unit">Reader</span></div>
+          <span class="reading-stat-footer"><%= dashboard.levelInfo.xpIntoLevel %> / <%= dashboard.levelInfo.xpForLevel %> XP</span>
+          <div class="pet-care-bar reading-mini-bar"><div class="pet-care-bar-fill reading-bar-purple" style="width: <%= Math.round((dashboard.levelInfo.xpIntoLevel / dashboard.levelInfo.xpForLevel) * 100) %>%;"></div></div>
+        </div>
+      </div>
+
+      <div class="reading-columns">
+        <div class="reading-panel">
+          <h3><svg class="icon"><use href="#icon-book"/></svg> Log Reading Time</h3>
+          <form method="POST" action="/student/reading/log" class="stack-form">
+            <label>Date
+              <input type="date" name="log_date" value="<%= today %>" max="<%= today %>" required />
+            </label>
+            <label>Book Title
+              <input type="text" name="book_title" placeholder="What did you read?" maxlength="200" required />
+            </label>
+            <label>Time Read (hours)
+              <div class="reading-hours-stepper">
+                <button type="button" class="btn-secondary reading-stepper-btn" data-step="-0.25" aria-label="Fewer hours"><svg class="icon"><use href="#icon-minus"/></svg></button>
+                <input type="number" name="hours" id="reading-hours-input" value="1" min="0.25" max="24" step="0.25" required />
+                <button type="button" class="btn-secondary reading-stepper-btn" data-step="0.25" aria-label="More hours"><svg class="icon"><use href="#icon-plus"/></svg></button>
+              </div>
+            </label>
+            <label>Notes (optional)
+              <input type="text" name="notes" placeholder="What was your favorite part?" maxlength="500" />
+            </label>
+            <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-book"/></svg> Log Reading</button>
+          </form>
+          <div class="reading-points-preview-card">
+            <span class="reading-points-preview-icon"><svg class="icon"><use href="#icon-star"/></svg></span>
+            <div>
+              <div class="hint">Points You'll Earn</div>
+              <div class="reading-points-preview-number"><strong id="reading-points-preview"><%= dashboard.pointsPerHour %></strong> points</div>
+              <div class="hint"><%= dashboard.pointsPerHour %> points per hour</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="reading-panel">
+          <h3>Recent Reading Entries</h3>
+          <% if (!dashboard.logs.length) { %>
+            <p class="hint">No entries yet - log your first book above!</p>
+          <% } else { %>
+            <ul class="reading-entry-list">
+              <% dashboard.logs.forEach((log) => { %>
+                <li class="reading-entry">
+                  <span class="reading-entry-cover" style="background: <%= reading.coverColor(log.book_title) %>;"><%= log.book_title.charAt(0).toUpperCase() %></span>
+                  <div class="reading-entry-info">
+                    <strong><%= log.book_title %></strong>
+                    <div class="hint"><%= log.log_date %></div>
+                  </div>
+                  <div class="reading-entry-meta">
+                    <span><%= Number(log.hours).toFixed(2) %> hr</span>
+                    <span class="reading-entry-points">+<%= Math.round(Number(log.hours) * dashboard.pointsPerHour) %> pts</span>
+                  </div>
+                </li>
+              <% }) %>
+              <% dashboard.moreLogs.forEach((log) => { %>
+                <li class="reading-entry reading-entry-extra" hidden>
+                  <span class="reading-entry-cover" style="background: <%= reading.coverColor(log.book_title) %>;"><%= log.book_title.charAt(0).toUpperCase() %></span>
+                  <div class="reading-entry-info">
+                    <strong><%= log.book_title %></strong>
+                    <div class="hint"><%= log.log_date %></div>
+                  </div>
+                  <div class="reading-entry-meta">
+                    <span><%= Number(log.hours).toFixed(2) %> hr</span>
+                    <span class="reading-entry-points">+<%= Math.round(Number(log.hours) * dashboard.pointsPerHour) %> pts</span>
+                  </div>
+                </li>
+              <% }) %>
+            </ul>
+            <% if (dashboard.moreLogs.length) { %>
+              <button type="button" class="link-btn reading-view-all-btn" id="reading-view-all-btn">View All Entries</button>
+            <% } %>
+          <% } %>
+        </div>
+
+        <div class="reading-panel">
+          <div class="reading-goal-heading-row">
+            <h3><svg class="icon"><use href="#icon-calendar-check"/></svg> Reading Goal</h3>
+            <button type="button" class="link-btn" onclick="document.getElementById('edit-goal-dialog').showModal()"><svg class="icon"><use href="#icon-edit"/></svg> Edit Goal</button>
+          </div>
+          <div class="reading-goal-row">
+            <span>This Week's Goal</span>
+            <strong class="reading-goal-fraction"><%= dashboard.weekHours.toFixed(2) %> / <%= dashboard.weeklyGoalHours %> hours</strong>
+          </div>
+          <div class="pet-xp-bar"><div class="pet-xp-bar-fill" style="width: <%= dashboard.weeklyGoalPct %>%;"></div></div>
+          <% if (dashboard.weeklyGoalPct >= 100) { %>
+            <div class="reading-goal-complete-box">
+              <span class="reading-goal-complete-title">Goal completed! <svg class="icon"><use href="#icon-check-circle"/></svg></span>
+              <span class="hint">You earned <%= Math.round(dashboard.weeklyGoalHours * dashboard.pointsPerHour) %> points this week!</span>
+            </div>
+          <% } %>
+          <p class="hint reading-goal-cross-link"><a href="/student/achievements">View Achievements &rarr;</a></p>
+        </div>
+      </div>
+
+      <div class="reading-tip-grid">
+        <div class="reading-tip-card">
+          <span class="reading-tip-icon reading-tip-icon-purple"><svg class="icon"><use href="#icon-lightbulb"/></svg></span>
+          <div>
+            <strong>Did You Know?</strong>
+            <p class="hint">Students who read 20 minutes a day are exposed to 1.8 million words per year!</p>
+          </div>
+        </div>
+        <div class="reading-tip-card">
+          <span class="reading-tip-icon reading-tip-icon-green"><svg class="icon"><use href="#icon-sprout"/></svg></span>
+          <div>
+            <strong>Keep Growing!</strong>
+            <p class="hint">The more you read, the more you learn. Every page counts!</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint reading-goal-cross-link"><a href="/student/leaderboard">View Leaderboard &rarr;</a></p>
+
+      <dialog id="edit-goal-dialog" class="member-picker-dialog">
+        <form method="POST" action="/student/reading/goal">
+          <h3>Set Your Weekly Reading Goal</h3>
+          <label>Hours per week
+            <input type="number" name="weekly_goal_hours" value="<%= dashboard.weeklyGoalHours %>" min="1" max="100" step="0.5" required />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
+  </main>
+
+  <script>
+    (function () {
+      var input = document.getElementById('reading-hours-input');
+      var preview = document.getElementById('reading-points-preview');
+      var pointsPerHour = <%- JSON.stringify(dashboard ? dashboard.pointsPerHour : 10) %>;
+      if (!input) return;
+
+      function updatePreview() {
+        var hours = parseFloat(input.value) || 0;
+        if (preview) preview.textContent = Math.round(hours * pointsPerHour);
+      }
+
+      document.querySelectorAll('.reading-stepper-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var step = parseFloat(btn.dataset.step);
+          var next = Math.min(24, Math.max(0.25, (parseFloat(input.value) || 0) + step));
+          input.value = Math.round(next * 100) / 100;
+          updatePreview();
+        });
+      });
+      input.addEventListener('input', updatePreview);
+      updatePreview();
+    })();
+
+    (function () {
+      var btn = document.getElementById('reading-view-all-btn');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.reading-entry-extra').forEach(function (row) { row.hidden = false; });
+        btn.hidden = true;
+      });
+    })();
+  </script>
+</body>
+</html>

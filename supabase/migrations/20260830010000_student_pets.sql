@@ -5,11 +5,15 @@
 -- req.portalAccount.id, never trust a client-supplied id" scoping every
 -- other Student Portal route already uses.
 --
--- Appearance is a small fixed set of traits (species/color/eyes/mouth/
--- accessory), each a plain text key into utils/pets.js's own catalog -
--- no JSON blob needed since there's no free-form positioning here (all
--- traits are simple prev/next cycles through a fixed list, unlike the
--- Name Tag designer's drag-and-drop canvas).
+-- `look` is a plain text key into utils/pets.js's own PET_LOOKS catalog -
+-- a real request ("higher level graphics and glossy like my original
+-- screenshots... we need to go that route and do better") replaced the
+-- original 5-trait mix-and-match system (species/ears/eyes/mouth/
+-- accessory columns) with real photorealistic pet images (cropped
+-- directly from the reference the user provided - see
+-- public/images/pets/'s own README), so there's one "look" choice
+-- instead of five independent trait cycles - a photoreal render can't be
+-- decomposed into swappable parts the way flat SVG could.
 --
 -- Care stats (hunger/happiness/cleanliness) are intentionally NOT stored
 -- as mutable numbers - they're computed on read from how long it's been
@@ -22,11 +26,7 @@ create table if not exists student_pets (
   id integer generated always as identity primary key,
   member_id integer not null unique references members(id) on delete cascade,
   name text not null default 'My Pet',
-  species text not null default 'dog',
-  color text not null default 'default',
-  eyes text not null default 'round',
-  mouth text not null default 'smile',
-  accessory text not null default 'none',
+  look text not null default 'cat_black',
   xp integer not null default 0,
   coins integer not null default 25,
   last_fed_at text,

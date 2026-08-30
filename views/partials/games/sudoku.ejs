@@ -1,0 +1,8 @@
+<div class="game-play-card" id="sudoku-card">
+  <div class="sudoku-grid" id="sudoku-grid"></div>
+  <div class="sudoku-pad" id="sudoku-pad">
+    <% for (let n = 1; n <= 9; n++) { %><button type="button" class="sudoku-pad-btn" data-v="<%= n %>"><%= n %></button><% } %>
+    <button type="button" class="sudoku-pad-btn" data-v="0">✕</button>
+  </div>
+  <button type="button" class="primary-btn game-play-action" id="sudoku-reset">New Puzzle</button>
+</div>

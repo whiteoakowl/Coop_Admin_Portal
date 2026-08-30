@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Nature News</h1>
+    <p class="subtitle">Approve student discoveries to show them on every Student Portal homepage.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <section class="manage-section">
+      <div class="grid-box-header"><h2>Pending Review</h2></div>
+      <% if (!pending.length) { %>
+        <p class="roster-empty">Nothing waiting for review.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% pending.forEach((p) => { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <img src="/nature-news/<%= p.id %>/image" alt="" style="width: 100%; aspect-ratio: 1.3; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+                <p class="hint">By <%= p.member_name %> &middot; <%= p.created_at.slice(0, 10) %></p>
+                <p><%= p.description %></p>
+                <div class="roster-btn-row">
+                  <form method="POST" action="/main-admin/nature-news/<%= p.id %>/decide" class="inline-block-form">
+                    <input type="hidden" name="decision" value="approve" />
+                    <button type="submit" class="roster-action-btn">Approve</button>
+                  </form>
+                  <form method="POST" action="/main-admin/nature-news/<%= p.id %>/decide" class="inline-block-form">
+                    <input type="hidden" name="decision" value="reject" />
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Reject</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="manage-section">
+      <div class="grid-box-header"><h2>Recently Approved</h2></div>
+      <% if (!approved.length) { %>
+        <p class="roster-empty">No approved posts yet.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% approved.forEach((p) => { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <img src="/nature-news/<%= p.id %>/image" alt="" style="width: 100%; aspect-ratio: 1.3; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+                <p class="hint">By <%= p.member_name %> &middot; <%= p.created_at.slice(0, 10) %></p>
+                <p><%= p.description %></p>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </main>
+</body>
+</html>

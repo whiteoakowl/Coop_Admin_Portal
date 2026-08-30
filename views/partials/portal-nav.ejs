@@ -18,16 +18,6 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
 // (My Privacy, etc.) every other portal's gear still opens.
 const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/portal/settings';
 
-// Optional - only views/parent-*.ejs pass this (see their own comment).
-// A real request: "parent portal should be divided between all the
-// general tabs and a co-op class section with all the tabs for
-// classes" - everywhere else's navLinks stays one flat list.
-// locals.classLinks, not `typeof classLinks !== 'undefined'` - that would
-// reference this very declaration's own not-yet-initialized `const`
-// binding (a genuine ReferenceError from `const`'s temporal dead zone,
-// unlike a bare undeclared identifier), not the value the caller passed.
-const classLinks = typeof locals.classLinks !== 'undefined' ? locals.classLinks : null;
-
 // Main Admin's own primary nav - a real request: "there are many
 // duplicate tabs, these should be the tabs and in this order." Every
 // views/main-admin-*.ejs/admin-<feature>-*.ejs file used to pass its OWN
@@ -55,6 +45,7 @@ const MAIN_ADMIN_NAV_LINKS = [
   { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
   { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
   { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
+  { href: '/main-admin/nature-news', icon: 'sprout', label: 'Nature News' },
   { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
   { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -71,7 +62,60 @@ const MAIN_ADMIN_NAV_LINKS = [
   // under /main-admin/training/... against this link's own href.
   { href: '/main-admin/training', icon: 'graduation-cap', label: 'Training' },
 ];
-const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : navLinks;
+// Student Portal's own primary nav - a real request: "dashboard panel
+// tabs. They should be these titles and in this order," plus a labeled
+// 2nd section "Activities" (see STUDENT_ACTIVITY_LINKS/classLinksTitle
+// below). Same anti-drift reasoning as MAIN_ADMIN_NAV_LINKS above -
+// this used to be a copy-pasted navLinks array in all 12
+// views/student-*.ejs files (drifting the moment one got edited and the
+// other 11 didn't), centralized here the same way once a real
+// restructure request made that drift risk concrete. Photos moved in
+// from the old Community section (now empty for Student Portal, see
+// COMMUNITY_LINKS_STUDENT below) since it's now one of these 8 named
+// tabs rather than a Community extra; Name Tag dropped from the nav
+// entirely (still reachable at its own /student/name-tag URL, just not
+// a standing tab - not in the requested list).
+const STUDENT_NAV_LINKS = [
+  { href: '/student', icon: 'home', label: 'Home' },
+  { href: '/events?view=calendar', icon: 'calendar-check', label: 'Calendar' },
+  { href: '/forums', icon: 'users', label: 'Chat' },
+  { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
+  { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+  { href: '/student/resources', icon: 'book', label: 'Resources' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
+];
+// Section 2, labeled "Activities" (classLinksTitle below) - Achievements
+// and Leaderboard used to be sections embedded inside the Reading
+// Challenge page itself; a real request to list them as their own tabs
+// here split them into their own routes/views (routes/student-portal.js's
+// own /student/achievements, /student/leaderboard).
+const STUDENT_ACTIVITY_LINKS = [
+  { href: '/student/games', icon: 'gamepad', label: 'Games' },
+  { href: '/student/pets', icon: 'paw', label: 'Pet' },
+  { href: '/student/reading', icon: 'book', label: 'Reading Challenge' },
+  { href: '/student/achievements', icon: 'star', label: 'Achievements' },
+  { href: '/student/leaderboard', icon: 'trophy', label: 'Leaderboard' },
+  { href: '/student/nature-news', icon: 'sprout', label: 'Nature News' },
+  { href: '/student/spelling-bee', icon: 'type', label: 'Spelling Bee' },
+];
+const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : portalTitle === 'Student Portal' ? STUDENT_NAV_LINKS : navLinks;
+
+// Optional - only views/parent-*.ejs pass this (see their own comment).
+// A real request: "parent portal should be divided between all the
+// general tabs and a co-op class section with all the tabs for
+// classes" - everywhere else's navLinks stays one flat list.
+// locals.classLinks, not `typeof classLinks !== 'undefined'` - that would
+// reference this very declaration's own not-yet-initialized `const`
+// binding (a genuine ReferenceError from `const`'s temporal dead zone,
+// unlike a bare undeclared identifier), not the value the caller passed.
+// Student Portal forces its own STUDENT_ACTIVITY_LINKS above regardless
+// of whatever a page's own call site still passes (same override
+// pattern as MAIN_ADMIN_NAV_LINKS above) - its own heading text is
+// "Activities" rather than "Co-op Classes" (classLinksTitle, used by
+// the template further down), the only other caller of this section.
+const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
+const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : 'Co-op Classes';
 
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,
@@ -139,16 +183,14 @@ const COMMUNITY_LINKS_TEACHER = [
   { href: '/forums', icon: 'users', label: 'Chat' },
   { href: '/photos', icon: 'camera', label: 'Photos' },
 ];
-// Student gets its own trim - a real request: "remove the following
-// tabs from student portal. member directory, business directory,
-// classifieds, forms, newsletter, publications, accounting,
-// notifications." Events and Store stay (not on the removal list).
-const COMMUNITY_LINKS_STUDENT = [
-  { href: '/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/forums', icon: 'users', label: 'Chat' },
-  { href: '/store', icon: 'grid', label: 'Store' },
-  { href: '/photos', icon: 'camera', label: 'Photos' },
-];
+// Student Portal gets no separate Community section at all (empty
+// array, same as Main Admin above) - a real request: "dashboard panel
+// tabs. They should be these titles and in this order" gave an exact,
+// exhaustive two-section nav (STUDENT_NAV_LINKS + STUDENT_ACTIVITY_LINKS
+// above); Calendar/Chat already cover Events/Chat, Photos moved into
+// STUDENT_NAV_LINKS itself, and Store isn't in the requested list -
+// still reachable at its own /store URL, just no longer a standing tab.
+const COMMUNITY_LINKS_STUDENT = [];
 // portalTitle is a plain, caller-supplied string ('Main Admin' from every
 // views/main-admin-*.ejs and views/admin-<feature>-*.ejs file - the admin
 // panels themselves reuse this same partial+shell, see their own
@@ -192,7 +234,7 @@ const communityLinks =
     <% }); %>
   </nav>
   <% if (classLinks) { %>
-    <p class="portal-nav-title">Co-op Classes</p>
+    <p class="portal-nav-title"><%= classLinksTitle %></p>
     <nav id="class-nav-links">
       <% classLinks.forEach(function(link) { %>
         <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>

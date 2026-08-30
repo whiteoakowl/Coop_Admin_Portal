@@ -1,0 +1,20 @@
+<div class="game-play-card" id="hangman-card">
+  <svg class="hangman-gallows" viewBox="0 0 120 130" aria-hidden="true">
+    <line x1="10" y1="126" x2="70" y2="126" stroke="#3f3f46" stroke-width="4" stroke-linecap="round"/>
+    <line x1="25" y1="126" x2="25" y2="10" stroke="#3f3f46" stroke-width="4" stroke-linecap="round"/>
+    <line x1="25" y1="10" x2="80" y2="10" stroke="#3f3f46" stroke-width="4" stroke-linecap="round"/>
+    <line x1="80" y1="10" x2="80" y2="24" stroke="#3f3f46" stroke-width="4" stroke-linecap="round"/>
+    <circle id="hangman-head" cx="80" cy="34" r="10" fill="none" stroke="#3f3f46" stroke-width="4" hidden="hidden"/>
+    <line id="hangman-body" x1="80" y1="44" x2="80" y2="74" stroke="#3f3f46" stroke-width="4" stroke-linecap="round" hidden="hidden"/>
+    <line id="hangman-arm-l" x1="80" y1="52" x2="68" y2="66" stroke="#3f3f46" stroke-width="4" stroke-linecap="round" hidden="hidden"/>
+    <line id="hangman-arm-r" x1="80" y1="52" x2="92" y2="66" stroke="#3f3f46" stroke-width="4" stroke-linecap="round" hidden="hidden"/>
+    <line id="hangman-leg-l" x1="80" y1="74" x2="70" y2="92" stroke="#3f3f46" stroke-width="4" stroke-linecap="round" hidden="hidden"/>
+    <line id="hangman-leg-r" x1="80" y1="74" x2="90" y2="92" stroke="#3f3f46" stroke-width="4" stroke-linecap="round" hidden="hidden"/>
+  </svg>
+  <p class="hangman-word" id="hangman-word"></p>
+  <span class="hangman-category-pill"><svg class="icon"><use href="#icon-paw"/></svg> Category: <span id="hangman-category"></span></span>
+  <p class="hangman-guesses-label">Incorrect Guesses</p>
+  <div class="hangman-guess-dots" id="hangman-guess-dots"></div>
+  <div class="hangman-keyboard" id="hangman-keyboard"></div>
+  <button type="button" class="primary-btn game-play-action" id="hangman-reset">New Word</button>
+</div>

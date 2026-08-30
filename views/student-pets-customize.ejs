@@ -4,36 +4,30 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', {
-    portalTitle: 'Student Portal',
-    navLinks: [
-      { href: '/student', icon: 'home', label: 'Home' },
-      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
-      { href: '/forums', icon: 'users', label: 'Chat' },
-      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
-      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
-      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
-      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
-      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
-      { href: '/student/pets', icon: 'paw', label: 'Pets' },
-    ],
-  }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
   <%- include('partials/pet-sprites') %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <% if (!isNew) { %><p><a href="/student/pets">&larr; Back to My Pet</a></p><% } %>
     <h1><%= isNew ? 'Choose Your Pet' : 'Edit Your Pet' %></h1>
-    <p class="hint">Pick a body, then cycle through colors and features with the arrows. Save when you're happy with it!</p>
+    <p class="hint">Use the arrows to pick a pet, then name it and save!</p>
 
     <div class="pet-stage">
-      <div class="pet-stage-frame">
-        <svg id="pet-preview" class="pet-display" viewBox="0 0 120 120">
-          <use id="pet-preview-body" href="#pet-body-dog"/>
-          <use id="pet-preview-eyes" href="#pet-eyes-round"/>
-          <use id="pet-preview-mouth" href="#pet-mouth-smile"/>
-          <use id="pet-preview-accessory" href="#pet-accessory-none"/>
-        </svg>
+      <div class="pet-picker-row">
+        <button type="button" class="pet-trait-arrow pet-picker-arrow" id="pet-picker-prev" data-dir="-1" aria-label="Previous pet"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+        <div class="pet-stage-frame" id="pet-preview-frame">
+          <img id="pet-preview-img" class="pet-display-photo" alt="" hidden="hidden" />
+          <svg id="pet-preview" class="pet-display" viewBox="0 0 120 120" hidden="hidden">
+            <use id="pet-preview-body" href="#pet-body-dog"/>
+            <use id="pet-preview-ears" href="#pet-ears-floppy"/>
+            <use id="pet-preview-eyes" href="#pet-eyes-round"/>
+            <use id="pet-preview-mouth" href="#pet-mouth-smile"/>
+            <use id="pet-preview-accessory" href="#pet-accessory-none"/>
+          </svg>
+        </div>
+        <button type="button" class="pet-trait-arrow pet-picker-arrow" id="pet-picker-next" data-dir="1" aria-label="Next pet"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
       </div>
+      <p class="pet-picker-label" id="pet-picker-label"></p>
     </div>
 
     <form method="POST" action="/student/pets/customize" id="pet-customize-form" class="stack-form member-form-page-panel">
@@ -41,47 +35,12 @@
         <input type="text" name="name" id="pet-name-input" maxlength="40" placeholder="Name your pet" value="<%= petName %>" required />
       </label>
 
-      <div class="pet-trait-cycler">
-        <span class="pet-trait-label">Body</span>
-        <button type="button" class="pet-trait-arrow" data-trait="species" data-dir="-1" aria-label="Previous body"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-        <span class="pet-trait-value" id="pet-trait-value-species"></span>
-        <button type="button" class="pet-trait-arrow" data-trait="species" data-dir="1" aria-label="Next body"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-      </div>
-      <div class="pet-trait-cycler">
-        <span class="pet-trait-label">Color</span>
-        <button type="button" class="pet-trait-arrow" data-trait="color" data-dir="-1" aria-label="Previous color"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-        <span class="pet-trait-value" id="pet-trait-value-color"></span>
-        <button type="button" class="pet-trait-arrow" data-trait="color" data-dir="1" aria-label="Next color"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-      </div>
-      <div class="pet-trait-cycler">
-        <span class="pet-trait-label">Eyes</span>
-        <button type="button" class="pet-trait-arrow" data-trait="eyes" data-dir="-1" aria-label="Previous eyes"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-        <span class="pet-trait-value" id="pet-trait-value-eyes"></span>
-        <button type="button" class="pet-trait-arrow" data-trait="eyes" data-dir="1" aria-label="Next eyes"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-      </div>
-      <div class="pet-trait-cycler">
-        <span class="pet-trait-label">Mouth</span>
-        <button type="button" class="pet-trait-arrow" data-trait="mouth" data-dir="-1" aria-label="Previous mouth"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-        <span class="pet-trait-value" id="pet-trait-value-mouth"></span>
-        <button type="button" class="pet-trait-arrow" data-trait="mouth" data-dir="1" aria-label="Next mouth"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-      </div>
-      <div class="pet-trait-cycler">
-        <span class="pet-trait-label">Accessory</span>
-        <button type="button" class="pet-trait-arrow" data-trait="accessory" data-dir="-1" aria-label="Previous accessory"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-        <span class="pet-trait-value" id="pet-trait-value-accessory"></span>
-        <button type="button" class="pet-trait-arrow" data-trait="accessory" data-dir="1" aria-label="Next accessory"><svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-      </div>
-
-      <input type="hidden" name="species" id="pet-input-species" />
-      <input type="hidden" name="color" id="pet-input-color" />
-      <input type="hidden" name="eyes" id="pet-input-eyes" />
-      <input type="hidden" name="mouth" id="pet-input-mouth" />
-      <input type="hidden" name="accessory" id="pet-input-accessory" />
+      <input type="hidden" name="look" id="pet-input-look" />
 
       <div class="member-form-footer">
         <div class="member-form-footer-edit">
-          <button type="button" class="btn-secondary" id="pet-randomize-btn"><svg class="icon"><use href="#icon-loader"/></svg> Randomize</button>
-          <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-check"/></svg> Save Pet</button>
+          <button type="button" class="btn-secondary" id="pet-randomize-btn"><svg class="icon"><use href="#icon-shuffle"/></svg> Surprise Me</button>
+          <button type="submit" class="primary-btn"><svg class="icon"><use href="#icon-lock"/></svg> Save Pet</button>
         </div>
       </div>
     </form>
@@ -89,80 +48,62 @@
 
   <script>
     (function () {
-      // Data mirrors utils/pets.js's own SPECIES/EYES/MOUTHS/ACCESSORIES
-      // catalogs (colors are per-species there, so they're inlined here
-      // too) - this trait-cycler UI has no server precedent elsewhere in
-      // the app (see routes/student-portal.js's own header comment on
-      // pets), so it's plain vanilla JS rather than reusing any existing
-      // editor script.
-      var SPECIES = <%- JSON.stringify(speciesList) %>;
-      var EYES = <%- JSON.stringify(eyesList) %>;
-      var MOUTHS = <%- JSON.stringify(mouthsList) %>;
-      var ACCESSORIES = <%- JSON.stringify(accessoriesList) %>;
-      var appearance = <%- JSON.stringify(appearance) %>;
+      var LOOKS = <%- JSON.stringify(looks) %>;
+      var currentLook = <%- JSON.stringify(currentLook) %>;
 
-      var speciesIndex = Math.max(0, SPECIES.findIndex(function (s) { return s.key === appearance.species; }));
-      var colorIndex = Math.max(0, SPECIES[speciesIndex].colors.findIndex(function (c) { return c.key === appearance.color; }));
-      var eyesIndex = Math.max(0, EYES.findIndex(function (e) { return e.key === appearance.eyes; }));
-      var mouthIndex = Math.max(0, MOUTHS.findIndex(function (m) { return m.key === appearance.mouth; }));
-      var accessoryIndex = Math.max(0, ACCESSORIES.findIndex(function (a) { return a.key === appearance.accessory; }));
+      var index = Math.max(0, LOOKS.findIndex(function (l) { return l.key === currentLook; }));
 
-      function cycle(index, len, dir) {
-        return (index + dir + len) % len;
+      var frame = document.getElementById('pet-preview-frame');
+      var imgEl = document.getElementById('pet-preview-img');
+      var svgEl = document.getElementById('pet-preview');
+
+      function cycle(dir) {
+        index = (index + dir + LOOKS.length) % LOOKS.length;
+        render();
       }
 
       function render() {
-        var species = SPECIES[speciesIndex];
-        var color = species.colors[colorIndex];
-        var eyes = EYES[eyesIndex];
-        var mouth = MOUTHS[mouthIndex];
-        var accessory = ACCESSORIES[accessoryIndex];
+        var look = LOOKS[index];
+        document.getElementById('pet-picker-label').textContent = look.label;
+        document.getElementById('pet-input-look').value = look.key;
 
-        document.getElementById('pet-trait-value-species').textContent = species.label;
-        document.getElementById('pet-trait-value-color').textContent = color.label;
-        document.getElementById('pet-trait-value-eyes').textContent = eyes.label;
-        document.getElementById('pet-trait-value-mouth').textContent = mouth.label;
-        document.getElementById('pet-trait-value-accessory').textContent = accessory.label;
+        // SVGElement doesn't reliably reflect the `.hidden` IDL property
+        // to the actual `hidden` content attribute the way HTMLElement
+        // does (a real cross-browser gotcha, found by the black-cat
+        // body silently failing to un-hide) - setAttribute/removeAttribute
+        // work correctly on both element types, so use those instead.
+        if (look.image) {
+          imgEl.src = look.image;
+          imgEl.alt = look.label;
+          imgEl.removeAttribute('hidden');
+          svgEl.setAttribute('hidden', '');
+          frame.className = 'pet-stage-frame pet-stage-frame--photo';
+        } else {
+          var svg = look.svg;
+          document.getElementById('pet-preview-body').setAttribute('href', '#pet-body-' + svg.species);
+          document.getElementById('pet-preview-ears').setAttribute('href', '#pet-ears-' + svg.ears);
+          document.getElementById('pet-preview-eyes').setAttribute('href', '#pet-eyes-' + svg.eyes);
+          document.getElementById('pet-preview-mouth').setAttribute('href', '#pet-mouth-' + svg.mouth);
+          document.getElementById('pet-preview-accessory').setAttribute('href', '#pet-accessory-' + svg.accessory);
+          svgEl.style.color = svg.hex;
+          svgEl.style.setProperty('--eye-color', svg.eyeColor);
+          imgEl.setAttribute('hidden', '');
+          svgEl.removeAttribute('hidden');
+          frame.className = 'pet-stage-frame ' + svg.roomTheme;
+        }
 
-        document.getElementById('pet-input-species').value = species.key;
-        document.getElementById('pet-input-color').value = color.key;
-        document.getElementById('pet-input-eyes').value = eyes.key;
-        document.getElementById('pet-input-mouth').value = mouth.key;
-        document.getElementById('pet-input-accessory').value = accessory.key;
-
-        document.getElementById('pet-preview-body').setAttribute('href', '#pet-body-' + species.key);
-        document.getElementById('pet-preview-eyes').setAttribute('href', '#pet-eyes-' + eyes.key);
-        document.getElementById('pet-preview-mouth').setAttribute('href', '#pet-mouth-' + mouth.key);
-        document.getElementById('pet-preview-accessory').setAttribute('href', '#pet-accessory-' + accessory.key);
-        document.getElementById('pet-preview').style.color = color.hex;
+        // Smooth transition between choices (a real request: "smooth
+        // transitions") - a quick pop on whichever element is visible.
+        var visible = look.image ? imgEl : svgEl;
+        visible.classList.remove('pet-preview-pop');
+        void visible.offsetWidth;
+        visible.classList.add('pet-preview-pop');
       }
 
-      document.querySelectorAll('.pet-trait-arrow').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var trait = btn.dataset.trait;
-          var dir = parseInt(btn.dataset.dir, 10);
-          if (trait === 'species') {
-            speciesIndex = cycle(speciesIndex, SPECIES.length, dir);
-            colorIndex = 0;
-          } else if (trait === 'color') {
-            colorIndex = cycle(colorIndex, SPECIES[speciesIndex].colors.length, dir);
-          } else if (trait === 'eyes') {
-            eyesIndex = cycle(eyesIndex, EYES.length, dir);
-          } else if (trait === 'mouth') {
-            mouthIndex = cycle(mouthIndex, MOUTHS.length, dir);
-          } else if (trait === 'accessory') {
-            accessoryIndex = cycle(accessoryIndex, ACCESSORIES.length, dir);
-          }
-          render();
-        });
-      });
-
+      document.getElementById('pet-picker-prev').addEventListener('click', function () { cycle(-1); });
+      document.getElementById('pet-picker-next').addEventListener('click', function () { cycle(1); });
       document.getElementById('pet-randomize-btn').addEventListener('click', function () {
-        speciesIndex = Math.floor(Math.random() * SPECIES.length);
-        colorIndex = Math.floor(Math.random() * SPECIES[speciesIndex].colors.length);
-        eyesIndex = Math.floor(Math.random() * EYES.length);
-        mouthIndex = Math.floor(Math.random() * MOUTHS.length);
-        accessoryIndex = Math.floor(Math.random() * ACCESSORIES.length);
+        index = Math.floor(Math.random() * LOOKS.length);
         render();
       });
 

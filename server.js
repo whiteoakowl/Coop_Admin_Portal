@@ -203,7 +203,9 @@ const adminNotificationsRouter = require('./routes/admin-notifications');
 // pre-seeded).
 const photosRouter = require('./routes/photos');
 const babysittersRouter = require('./routes/babysitters');
+const natureNewsImageRouter = require('./routes/nature-news-image');
 const adminPhotosRouter = require('./routes/admin-photos');
+const adminNatureNewsRouter = require('./routes/admin-nature-news');
 const publicationsRouter = require('./routes/publications');
 const adminPublicationsRouter = require('./routes/admin-publications');
 // Item 13: Audit Log at /main-admin/audit-log (view_audit_log - a new,
@@ -423,7 +425,9 @@ app.use('/notifications', notificationsRouter);
 app.use('/main-admin/notifications', adminNotificationsRouter);
 app.use('/photos', photosRouter);
 app.use('/babysitters', babysittersRouter);
+app.use('/nature-news', natureNewsImageRouter);
 app.use('/main-admin/photos', adminPhotosRouter);
+app.use('/main-admin/nature-news', adminNatureNewsRouter);
 app.use('/publications', publicationsRouter);
 app.use('/main-admin/publications', adminPublicationsRouter);
 app.use('/main-admin/audit-log', adminAuditLogRouter);

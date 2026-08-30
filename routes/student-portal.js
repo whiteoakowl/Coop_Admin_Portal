@@ -26,6 +26,12 @@ const notifications = require('../utils/notifications');
 const resourceLinks = require('../utils/resourceLinks');
 const babysitters = require('../utils/babysitters');
 const pets = require('../utils/pets');
+const reading = require('../utils/reading');
+const { GAMES, CATEGORY_LABELS, gameByKey } = require('../utils/gamesCatalog');
+const gameStats = require('../utils/gameStats');
+const natureNews = require('../utils/natureNews');
+const wordOfWeek = require('../utils/wordOfWeek');
+const spellingBee = require('../utils/spellingBee');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
@@ -40,6 +46,13 @@ const babysitterStorageClient = createStorageClient();
 if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
 const MAX_BABYSITTER_PHOTO_BYTES = 4 * 1024 * 1024;
 const uploadBabysitterPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BABYSITTER_PHOTO_BYTES }, fileFilter: imageFileFilter });
+
+const NATURE_NEWS_BUCKET = 'private-nature-news';
+const NATURE_NEWS_DIR = path.join(__dirname, '..', 'private-uploads', 'nature-news');
+const natureNewsStorageClient = createStorageClient();
+if (!natureNewsStorageClient && !fs.existsSync(NATURE_NEWS_DIR)) fs.mkdirSync(NATURE_NEWS_DIR, { recursive: true });
+const MAX_NATURE_NEWS_PHOTO_BYTES = 6 * 1024 * 1024;
+const uploadNatureNewsPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_NATURE_NEWS_PHOTO_BYTES }, fileFilter: imageFileFilter });
 
 // Every class this student is enrolled in - re-derived from
 // class_enrollments on every request, the same "never trust a class id
@@ -78,7 +91,9 @@ router.get('/', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const classes = await classesForStudent(member);
   const announcements = await announcementsForAccount(req.portalAccount.id);
-  res.render('student-home', { title: 'Student Portal', member, classes, announcements });
+  const natureNewsLatest = await natureNews.listApproved(3);
+  const words = wordOfWeek.wordsOfTheWeek();
+  res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words });
 });
 
 router.get('/classes', async (req, res) => {
@@ -285,6 +300,38 @@ router.post('/babysitter', uploadBabysitterPhoto.single('photo'), async (req, re
   res.redirect('/student/babysitter?notice=' + encodeURIComponent('Submitted for Main Admin review.'));
 });
 
+// Nature News - a real request: "students can submit descriptions and
+// one image of something they discovered in nature... main admin must
+// approve. then it will appear on student portal homepage." See
+// utils/natureNews.js's own header comment for the pending/approved/
+// rejected review shape; routes/nature-news-image.js proxies the actual
+// photo file (mounted separately at /nature-news since it needs to be
+// reachable from Main Admin's own portal too, not just this
+// student-only router).
+router.get('/nature-news', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const posts = member ? await natureNews.postsForMember(member.id) : [];
+  res.render('student-nature-news', { title: 'Nature News', posts, error: req.query.error || null, notice: req.query.notice || null });
+});
+
+router.post('/nature-news', uploadNatureNewsPhoto.single('image'), async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/nature-news?error=' + encodeURIComponent('No student profile found for your account.'));
+  if (!req.file) return res.redirect('/student/nature-news?error=' + encodeURIComponent('Please attach a photo.'));
+
+  let imageKey;
+  if (natureNewsStorageClient) {
+    imageKey = await uploadFile(natureNewsStorageClient, NATURE_NEWS_BUCKET, req.file.buffer, req.file.originalname, req.file.mimetype);
+  } else {
+    imageKey = generateKey(req.file.originalname);
+    fs.writeFileSync(path.join(NATURE_NEWS_DIR, imageKey), req.file.buffer);
+  }
+
+  const result = await natureNews.submitPost(member.id, req.body.description, imageKey);
+  if (!result.ok) return res.redirect('/student/nature-news?error=' + encodeURIComponent(result.error));
+  res.redirect('/student/nature-news?notice=' + encodeURIComponent('Submitted for approval!'));
+});
+
 // Pets - a real request: "create a personal pet activity for students.
 // They can choose a pet, choose a few features and save. Then they can
 // name their pet, feed it, play with it, bathe it." Own member record
@@ -298,7 +345,7 @@ router.get('/pets', async (req, res) => {
   res.render('student-pets', {
     title: 'My Pet',
     pet,
-    color: pets.colorForSpecies(pet.species, pet.color),
+    look: pets.lookByKey(pet.look),
     stats: pets.careStats(pet),
     levelInfo: pets.levelInfo(pet.xp),
     notice: req.query.notice || null,
@@ -309,16 +356,12 @@ router.get('/pets', async (req, res) => {
 router.get('/pets/customize', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const existing = member ? await pets.getPetForMember(member.id) : null;
-  const appearance = existing || pets.defaultAppearance();
   res.render('student-pets-customize', {
     title: existing ? 'Edit Pet' : 'Choose Your Pet',
     isNew: !existing,
-    appearance,
+    currentLook: existing ? existing.look : pets.defaultLook(),
     petName: existing ? existing.name : '',
-    speciesList: pets.SPECIES,
-    eyesList: pets.EYES,
-    mouthsList: pets.MOUTHS,
-    accessoriesList: pets.ACCESSORIES,
+    looks: pets.PET_LOOKS,
   });
 });
 
@@ -327,11 +370,7 @@ router.post('/pets/customize', async (req, res) => {
   if (!member) return res.redirect('/student/pets/customize?error=' + encodeURIComponent('No student profile found for your account.'));
   await pets.savePet(member.id, {
     name: req.body.name,
-    species: req.body.species,
-    color: req.body.color,
-    eyes: req.body.eyes,
-    mouth: req.body.mouth,
-    accessory: req.body.accessory,
+    look: req.body.look,
   });
   res.redirect('/student/pets?notice=' + encodeURIComponent('Pet saved!'));
 });
@@ -354,5 +393,161 @@ async function careAction(kind, notice, req, res) {
 router.post('/pets/feed', (req, res) => careAction('feed', 'Yum! Your pet is happily fed.', req, res));
 router.post('/pets/play', (req, res) => careAction('play', 'You played with your pet!', req, res));
 router.post('/pets/bathe', (req, res) => careAction('bathe', 'Squeaky clean!', req, res));
+
+// Reading Competition - a real request: "there will be a reading log on
+// this page for students to fill out and earn points. students will be
+// compete with other students." See utils/reading.js's own header
+// comment for how points/streak/level/achievements/leaderboard are all
+// derived from the raw reading_logs rows.
+router.get('/reading', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const dashboard = member ? await reading.dashboardForMember(member.id) : null;
+  res.render('student-reading', {
+    title: 'Reading Challenge',
+    dashboard,
+    reading,
+    today: new Date().toISOString().slice(0, 10),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+// Achievements and Leaderboard used to be sections embedded inside this
+// same Reading Challenge page - a real request to list them as their
+// own tabs in the Activities nav section (views/partials/portal-nav.ejs's
+// own STUDENT_ACTIVITY_LINKS) split them into their own routes/views.
+router.get('/achievements', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const dashboard = member ? await reading.dashboardForMember(member.id) : null;
+  res.render('student-achievements', { title: 'Achievements', dashboard });
+});
+
+// A real request: "leaderboard should show top 5 ranking for reading
+// hours amongst all student portals. top 5 ranking for reading points.
+// top player for each game. top 5 highest spelling bee points winners."
+// Reading hours and points share one query (reading.js's own
+// leaderboard() already orders by hours, and points is a strict
+// multiple of hours, so the two rankings are always identical order -
+// just a different displayed unit per section).
+router.get('/leaderboard', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const readingLeaders = await reading.leaderboard(5);
+  const gameLeaders = await gameStats.topScorePerGame();
+  const spellingLeaders = await spellingBee.topPlayers(5);
+  res.render('student-leaderboard', {
+    title: 'Leaderboard',
+    readingLeaders,
+    gameLeaders,
+    spellingLeaders,
+    memberId: member ? member.id : null,
+  });
+});
+
+router.post('/reading/log', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/reading?error=' + encodeURIComponent('No student profile found for your account.'));
+  const result = await reading.addLog(member.id, {
+    bookTitle: req.body.book_title,
+    hours: req.body.hours,
+    notes: req.body.notes,
+    logDate: req.body.log_date,
+  });
+  if (!result.ok) return res.redirect('/student/reading?error=' + encodeURIComponent(result.error));
+  res.redirect('/student/reading?notice=' + encodeURIComponent(`Logged! You earned ${result.points} points.`));
+});
+
+router.post('/reading/goal', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/reading?error=' + encodeURIComponent('No student profile found for your account.'));
+  const result = await reading.setWeeklyGoal(member.id, req.body.weekly_goal_hours);
+  if (!result.ok) return res.redirect('/student/reading?error=' + encodeURIComponent(result.error));
+  res.redirect('/student/reading?notice=' + encodeURIComponent(`Weekly goal updated to ${result.hours} hours.`));
+});
+
+// Games - a real request: "create a game tab on student portal with tic
+// tac toe, hangman, checkers, chess, connect 4. games will be card
+// choices on the page when you click the games tab." Grew to 15 games
+// (a real follow-up: "let's add more games"); the grid itself only shows
+// a small preview tile per game (another real request: "game page should
+// just show a small image of the game and play button. when you click
+// play then it opens the full game to play on a new page") - the actual
+// interactive markup lives in views/partials/games/<key>.ejs and is only
+// ever rendered on the /play/:key route. All games are client-side,
+// local pass-and-play or vs-a-simple-computer-AI (no server state to
+// persist), so these routes just render the page; see
+// public/js/games/*.js for the actual game logic and utils/gamesCatalog.js
+// for the single source of truth on what games exist.
+// A single deterministic "game of the day," the same for every student
+// and stable all day (changes at UTC midnight) - what the Daily
+// Challenge banner's "Start Challenge" button links to.
+function gameOfTheDay() {
+  const dayNumber = Math.floor(Date.now() / 86400000);
+  return GAMES[dayNumber % GAMES.length];
+}
+
+router.get('/games', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const stats = member ? await gameStats.statsForMember(member.id) : { gamesPlayed: 0, streak: 0, highScore: null };
+  res.render('student-games', { title: 'Games', games: GAMES, categoryLabels: CATEGORY_LABELS, stats, dailyGame: gameOfTheDay() });
+});
+
+router.get('/games/play/:key', async (req, res) => {
+  const game = gameByKey(req.params.key);
+  if (!game) return res.redirect('/student/games');
+  const member = await memberForAccount(req.portalAccount.id);
+  if (member) await gameStats.logPlay(member.id, game.key);
+  res.render('student-game-play', { title: game.title, game, categoryLabels: CATEGORY_LABELS });
+});
+
+// Fire-and-forget call from snake.js/avoid-obstacles.js/trivia.js/
+// typing-race.js/riddle-rush.js/word-scramble.js when a round ends - only
+// the games with a genuinely comparable numeric result (see
+// utils/gameStats.js's own SCORING_GAMES comment for why the rest never
+// call this).
+router.post('/games/score', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.status(401).json({ ok: false });
+  const result = await gameStats.logScore(member.id, req.body.key, req.body.score);
+  res.json(result);
+});
+
+// Spelling Bee - a real request: "this page will have a spelling game
+// with vocabulary words for every grade level. grade level on students
+// member profile determines their vocabulary level for the spelling
+// game." See utils/spellingBee.js's own header comment for how
+// members.grade_level (two different vocabularies depending on how the
+// student was enrolled) maps to elementary/middle/high.
+function shuffle(arr) {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+router.get('/spelling-bee', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const level = spellingBee.levelForMember(member);
+  const round = shuffle(spellingBee.wordsForLevel(level)).slice(0, 8);
+  const topPlayers = await spellingBee.topPlayers(5);
+  res.render('student-spelling-bee', {
+    title: 'Spelling Bee',
+    level,
+    levelLabel: spellingBee.LEVEL_LABELS[level],
+    round,
+    topPlayers,
+  });
+});
+
+router.post('/spelling-bee/score', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.status(401).json({ ok: false });
+  const correctCount = Math.max(0, Math.min(50, parseInt(req.body.correctCount, 10) || 0));
+  const roundTotal = Math.max(1, Math.min(50, parseInt(req.body.roundTotal, 10) || 1));
+  const level = spellingBee.levelForMember(member);
+  await spellingBee.logRound(member.id, correctCount, roundTotal, level);
+  res.json({ ok: true });
+});
 
 module.exports = router;

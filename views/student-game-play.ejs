@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/student/games">&larr; Back to Games</a></p>
+    <div class="game-play-header">
+      <div>
+        <h1><%= game.title %></h1>
+        <p class="subtitle"><%= game.tagline %></p>
+      </div>
+      <span class="game-tile-category game-tile-category-<%= game.category %>"><%= categoryLabels[game.category] %></span>
+    </div>
+
+    <div class="game-play-stage">
+      <%- include('partials/games/' + game.key) %>
+    </div>
+  </main>
+
+  <script src="/js/games/game-score.js" defer></script>
+  <script src="/js/games/<%= game.script %>" defer></script>
+</body>
+</html>

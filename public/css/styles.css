@@ -6716,6 +6716,21 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .permission-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 1rem; }
 .portal-dashboard-card-wide { max-width: 720px; margin-bottom: 1.5rem; }
 
+/* Word of the Week - a real request: "show a word of the week. system
+   generates a new word every sunday. it will actually show 3 words. one
+   for elementary level, one for middle school level and one for high
+   school level, each level will be labeled." */
+.word-of-week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+.word-of-week-card {
+  padding: 1.1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface);
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.3rem;
+}
+.word-of-week-level {
+  align-self: flex-start; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px;
+  background: var(--purple-soft); color: var(--purple);
+}
+.word-of-week-word { font-size: 1.3rem; }
+
 /* Events List/Calendar view toggle - the month grid needs taller cells
    than a normal .roster-table row (each day can hold several event
    pills), so this table gets its own light modifier instead of forcing
@@ -6971,6 +6986,7 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .pet-coin-pill { background: var(--yellow-bg); color: var(--yellow); }
 .pet-coin-pill .icon { width: 1rem; height: 1rem; }
 .pet-level-pill { background: var(--brand-soft); color: var(--brand-dark); }
+.pet-level-pill .icon { width: 1rem; height: 1rem; }
 
 .pet-xp-bar { height: 0.6rem; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 0.75rem; }
 .pet-xp-bar-fill { height: 100%; background: var(--brand); border-radius: 999px; transition: width 0.2s ease; }
@@ -6978,12 +6994,115 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 
 .pet-stage { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin: 1.5rem 0; }
 .pet-stage-frame {
+  position: relative;
   width: min(280px, 80vw); aspect-ratio: 1;
   border-radius: var(--radius); border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--brand-soft), var(--surface));
-  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; justify-content: center;
+  /* Soft top-light + bottom-shade vignette (inset shadows layered onto
+     the existing drop shadow) - "should look more 2d... you are an
+     expert game image designer": a cheap stage-lighting cue so the pet
+     reads as standing in a lit room rather than pasted on a flat card. */
+  box-shadow: var(--shadow-sm), inset 0 26px 34px -18px rgba(255, 255, 255, 0.5), inset 0 -22px 30px -14px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
 }
-.pet-display { width: 78%; height: 78%; }
+.pet-display {
+  width: 78%; height: 78%; z-index: 1;
+  /* Shape-following drop shadow under the character itself (distinct
+     from the flat floor-ellipse below) - the single cheapest way to
+     make a flat SVG silhouette read as an object sitting in a scene
+     instead of a sticker on a background. */
+  filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.22));
+  animation: pet-breathe 3.6s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+.pet-display.pet-display--happy, .pet-display-photo.pet-display--happy { animation: pet-breathe 3.6s ease-in-out infinite, pet-happy-bounce 0.7s ease-in-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .pet-display, .pet-display.pet-display--happy, .pet-display-photo, .pet-display-photo.pet-display--happy { animation: none; }
+}
+
+/* Small idle "alive" motion - blink + a limb/tail wiggle - layered onto
+   the whole-body breathing loop above (a real request: "small idle
+   animations... blinking, tail movement, breathing, bouncing when
+   happy"). Both target classes baked into pet-sprites.ejs's own symbols
+   so every species picks them up automatically through <use>. */
+.pet-part-eyes { transform-box: fill-box; transform-origin: 50% 50%; animation: pet-blink 4.5s ease-in-out infinite; }
+.pet-part-wiggle { transform-box: fill-box; transform-origin: 50% 20%; animation: pet-wiggle 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pet-part-eyes, .pet-part-wiggle { animation: none; }
+}
+
+@keyframes pet-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.5%) scale(1.015); }
+}
+@keyframes pet-happy-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-10%) scale(1.05, 0.95); }
+  55% { transform: translateY(0) scale(0.97, 1.05); }
+  75% { transform: translateY(-3%) scale(1.02, 0.98); }
+}
+@keyframes pet-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.12); }
+}
+@keyframes pet-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(6deg); }
+}
+
+/* Customize screen only: a quick pop when a trait choice changes (see
+   student-pets-customize.ejs's render()) - re-added via JS on every
+   render() call so it replays on each click. */
+.pet-preview-pop { animation: pet-breathe 3.6s ease-in-out infinite, pet-trait-pop 0.22s ease-out; }
+@keyframes pet-trait-pop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-preview-pop { animation: none; }
+}
+
+/* Themed "room" backgrounds behind the pet (utils/pets.js's own
+   SPECIES.roomTheme) - a real request: "should look exactly like my
+   examples," whose reference shows a different themed scene behind each
+   pet rather than one plain frame. A soft floor-circle + a couple of
+   simple decorative shapes per theme rather than fully illustrated
+   furniture, matching this feature's flat-icon art direction. */
+.pet-stage-frame::before {
+  content: ''; position: absolute; left: 8%; right: 8%; bottom: 7%; height: 14%;
+  border-radius: 50%; background: rgba(0, 0, 0, 0.16); filter: blur(1px);
+}
+.pet-room-cozy { background: linear-gradient(180deg, #fbe8d3, #fdf6ec); }
+.pet-room-cozy::before { background: rgba(198, 138, 90, 0.18); }
+.pet-room-playroom { background: linear-gradient(180deg, #fff3c4, #eaf6ff); }
+.pet-room-playroom::before { background: rgba(120, 170, 210, 0.2); }
+.pet-room-lavender { background: linear-gradient(180deg, #ecdcf7, #fbf3fb); }
+.pet-room-lavender::before { background: rgba(163, 120, 199, 0.18); }
+.pet-room-dungeon { background: linear-gradient(180deg, #4a4a52, #6d6d78); }
+.pet-room-dungeon::before { background: rgba(0, 0, 0, 0.25); }
+.pet-room-cage { background: linear-gradient(180deg, #f6e2c2, #fdf6ec); }
+.pet-room-cage::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(90deg, rgba(120, 90, 50, 0.16) 0 3px, transparent 3px 24px);
+}
+.pet-room-snow { background: linear-gradient(180deg, #cfe6f5, #f2fafd); }
+.pet-room-snow::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.85) 2px, transparent 2.5px);
+  background-size: 26px 26px;
+}
+.pet-room-pond { background: linear-gradient(180deg, #bfe3dd, #eef8f6); }
+.pet-room-pond::before { background: rgba(70, 140, 130, 0.22); }
+.pet-room-farm { background: linear-gradient(180deg, #f6e6b0, #fdf6ec); }
+.pet-room-farm::before { background: rgba(180, 140, 60, 0.2); }
+.pet-room-terrarium { background: linear-gradient(180deg, #d3ecd0, #f1faef); border: 1px solid rgba(90, 148, 81, 0.3); }
+.pet-room-bamboo { background: linear-gradient(180deg, #e3f0da, #f6faf2); }
+.pet-room-bamboo::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(90deg, rgba(95, 168, 90, 0.18) 0 6px, transparent 6px 34px);
+}
 
 .pet-care-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 640px; margin: 0 auto 1.5rem; }
 .pet-care-stat { display: flex; flex-direction: column; gap: 0.35rem; }
@@ -7003,14 +7122,6 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    free-form drag-and-drop canvas, not a prev/next cycler), so this is a
    purpose-built pattern: a centered value between two round arrow
    buttons, one row per trait. */
-.pet-trait-cycler {
-  display: grid; grid-template-columns: 5.5rem auto 1fr auto;
-  align-items: center; gap: 0.75rem; padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
-}
-.pet-trait-cycler:last-of-type { border-bottom: none; }
-.pet-trait-label { font-weight: 600; color: var(--muted); }
-.pet-trait-value { text-align: center; font-weight: 700; color: var(--ink); }
 .pet-trait-arrow {
   width: 2.25rem; height: 2.25rem; border-radius: 999px; border: 1px solid var(--border);
   background: var(--surface); color: var(--brand-dark); display: flex; align-items: center; justify-content: center;
@@ -7021,7 +7132,673 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .pet-trait-arrow[data-dir="-1"] .icon { transform: rotate(90deg); }
 .pet-trait-arrow[data-dir="1"] .icon { transform: rotate(-90deg); }
 
+/* Whole-look picker (Choose Your Pet) - a real request: "we need to go
+   that route and do better" replaced the old 5-trait cycler UI with a
+   single big preview + prev/next arrows, matching the reference "My
+   Pet" card's own prev/next footer nav (see utils/pets.js's own header
+   comment on PET_LOOKS for why - a photoreal image can't be decomposed
+   into independently swappable parts the way flat SVG could). */
+.pet-picker-row { display: flex; align-items: center; justify-content: center; gap: 1rem; width: 100%; }
+.pet-picker-arrow { width: 3rem; height: 3rem; }
+.pet-picker-arrow .icon { width: 1.4rem; height: 1.4rem; }
+.pet-picker-label { font-weight: 700; font-size: 1.1rem; margin: 0; }
+/* Photo looks are full un-cropped scene images (see public/images/pets/README.md)
+   rather than a square sprite, so the frame switches to the image's own
+   aspect ratio and `contain` instead of `cover` - a real request: "use the
+   full exact background and image for each pet... just shrink the image
+   to fit on mobile" after an earlier pass cropped them too tightly. */
+.pet-stage-frame--photo { width: min(420px, 92vw); aspect-ratio: 2000 / 1294; }
+.pet-display-photo {
+  width: 100%; height: 100%; object-fit: contain; border-radius: calc(var(--radius) - 2px);
+  animation: pet-breathe 3.6s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-display-photo { animation: none; }
+}
+
+/* A real request: "center everything on the mobile view pet page to
+   fit clean" - the name/pencil-edit row and the coin/level pills stack
+   and center instead of splitting left/right, and the three care
+   buttons become one even 3-up row (instead of Bathe wrapping onto its
+   own lopsided line, which pushed it low enough to sit behind the
+   fixed bottom nav bar - a real, confirmed bug, not just a look). This
+   has to come after this file's own base .pet-care-actions/.pet-header
+   rules (further up) to actually win the cascade at equal specificity. */
 @media (max-width: 480px) {
   .pet-care-stats { grid-template-columns: 1fr; }
-  .pet-trait-cycler { grid-template-columns: 4.5rem auto 1fr auto; gap: 0.4rem; }
+  .pet-header { flex-direction: column; text-align: center; }
+  .pet-header h1 { justify-content: center; }
+  .pet-header-stats { justify-content: center; }
+  .pet-care-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .pet-care-btn { min-width: 0; padding-left: 0.5rem; padding-right: 0.5rem; }
 }
+
+/* ---------- Student Portal > Reading Competition ----------
+   A real request: "there will be a reading log on this page for
+   students to fill out and earn points. students will be compete with
+   other students. match the reading competition dashboard image
+   exactly. using my colors." The reference is a generic "LearnHub"
+   dashboard in an indigo/purple palette with its own left sidebar; this
+   reuses this app's own --brand/--purple/--green/--yellow tokens and
+   existing portal-nav chrome instead, but mirrors its layout: a stat-
+   card row, a log-entry form, a recent-entries list, a goal panel with
+   achievements, and (since the reference screenshot doesn't show a
+   leaderboard but the request explicitly asks for competing against
+   other students) a leaderboard panel at the bottom. */
+.reading-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.reading-points-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.85rem;
+  border-radius: 999px; background: var(--yellow-bg); color: var(--yellow); font-weight: 700; white-space: nowrap;
+}
+.reading-points-pill .icon { width: 1.1rem; height: 1.1rem; }
+
+.reading-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.reading-stat-card { align-items: stretch; gap: 0; }
+.reading-stat-top { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+.reading-stat-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.reading-stat-icon .icon { width: 1.2rem; height: 1.2rem; }
+.reading-stat-icon-brand { background: var(--purple-soft); color: var(--purple); }
+.reading-stat-icon-blue { background: var(--brand-soft); color: var(--brand-darker); }
+.reading-stat-icon-green { background: var(--green-bg); color: var(--green); }
+.reading-stat-icon-yellow { background: var(--yellow-bg); color: var(--yellow); }
+.reading-stat-icon-purple { background: var(--purple-soft); color: var(--purple); }
+.reading-stat-title { font-weight: 600; color: var(--muted-dark); font-size: 0.9rem; }
+.reading-stat-number { display: flex; align-items: baseline; gap: 0.35rem; }
+.reading-stat-number .stat-value { font-size: 1.7rem; }
+.reading-stat-unit { color: var(--muted); font-size: 0.85rem; }
+.reading-stat-footer { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.2rem; }
+.reading-stat-footer-accent { color: var(--yellow); font-weight: 600; }
+.reading-mini-bar { margin-top: 0.5rem; }
+.reading-bar-purple { background: var(--purple); }
+
+.reading-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .reading-columns { grid-template-columns: 1fr; } }
+
+.reading-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: var(--card-padding-compact); box-shadow: var(--shadow-sm);
+}
+.reading-panel h3 { display: flex; align-items: center; gap: 0.4rem; margin-top: 0; }
+.reading-panel h3 .icon { width: 1.1rem; height: 1.1rem; color: var(--brand-dark); }
+
+/* A real request: "is there a button for setting your reading goal?" -
+   the weekly goal used to be a fixed constant. */
+.reading-goal-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.reading-goal-heading-row h3 { margin: 0; }
+.reading-goal-heading-row .link-btn { display: inline-flex; align-items: center; gap: 0.3rem; }
+.reading-goal-heading-row .link-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+.reading-hours-stepper { display: flex; align-items: center; gap: 0.5rem; }
+.reading-stepper-btn { width: 2.25rem; height: 2.25rem; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.reading-stepper-btn .icon { width: 1rem; height: 1rem; }
+.reading-hours-stepper input[type="number"] { text-align: center; }
+
+.reading-points-preview-card {
+  display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; padding: 0.75rem;
+  border-radius: var(--radius); background: var(--yellow-bg); border: 1px solid rgba(161, 98, 7, 0.2);
+}
+.reading-points-preview-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: 999px; background: #fff; color: var(--yellow);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-sm);
+}
+.reading-points-preview-icon .icon { width: 1.2rem; height: 1.2rem; }
+.reading-points-preview-number { font-size: 1.15rem; font-weight: 800; }
+
+.reading-entry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.reading-entry {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+}
+.reading-entry:last-child { border-bottom: none; padding-bottom: 0; }
+.reading-entry-cover {
+  width: 2.25rem; height: 2.75rem; border-radius: 0.35rem; flex-shrink: 0; color: #fff; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm);
+}
+.reading-entry-info { flex: 1; min-width: 0; }
+.reading-entry-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; font-size: 0.85rem; color: var(--muted); flex-shrink: 0; }
+.reading-entry-points { color: var(--green); font-weight: 700; }
+.reading-view-all-btn { display: block; margin: 0.75rem auto 0; }
+
+.reading-goal-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.reading-goal-fraction { color: var(--purple); }
+.reading-goal-complete-box { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.reading-goal-complete-title { display: flex; align-items: center; gap: 0.35rem; color: var(--green); font-weight: 700; }
+.reading-goal-complete-title .icon { width: 1.1rem; height: 1.1rem; }
+
+/* Achievements page - a real request: "make the badges like the ones in
+   the screenshot. Showing locked and unlocked for what has been
+   achieved. use my color scheme of orange, blue, purple and green." One
+   color per real achievement (utils/reading.js's own `color` field on
+   each achievements() entry) instead of the reference's single reddish
+   tone for every badge. Locked vs. unlocked is genuinely binary here
+   (not three states) - even an in-progress badge still reads as
+   "locked" (grayscale + a lock icon) exactly like a badge with zero
+   progress; only `done` flips it to full color + a checkmark, matching
+   what the reference image itself actually shows (Week Warrior sits at
+   2/7 progress and is still gray-with-a-lock, same as the untouched
+   Classic Collector). */
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.ach-card {
+  display: flex; gap: 0.9rem; padding: 1.1rem; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.ach-card-done { background: var(--green-bg); border-color: transparent; }
+.ach-badge {
+  position: relative; width: 3.5rem; height: 3.5rem; border-radius: 999px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ach-badge .icon { width: 1.6rem; height: 1.6rem; }
+.ach-badge-locked { background: #e2e8f0; color: #94a3b8; }
+.ach-badge-unlocked.ach-badge-orange { background: var(--orange-bg); color: var(--orange); }
+.ach-badge-unlocked.ach-badge-blue { background: var(--brand-soft); color: var(--brand-dark); }
+.ach-badge-unlocked.ach-badge-purple { background: var(--purple-soft); color: var(--purple); }
+.ach-badge-unlocked.ach-badge-green { background: var(--green-bg); color: var(--green); }
+.ach-badge-flag {
+  position: absolute; right: -0.15rem; bottom: -0.15rem; width: 1.3rem; height: 1.3rem; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; border: 2px solid var(--surface);
+}
+.ach-badge-flag .icon { width: 0.7rem; height: 0.7rem; }
+.ach-badge-check { background: var(--green); color: #fff; }
+.ach-badge-lock { background: #64748b; color: #fff; }
+.ach-info { flex: 1; min-width: 0; }
+.ach-info h3 { margin: 0; font-size: 1rem; }
+.ach-fraction { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+.ach-detail { margin: 0.15rem 0 0.6rem; color: var(--muted); font-size: 0.85rem; }
+.ach-bar { position: relative; height: 1.6rem; border-radius: 999px; background: var(--border); overflow: hidden; }
+.ach-bar-fill {
+  height: 100%; border-radius: 999px; display: flex; align-items: center; padding: 0 0.6rem;
+  min-width: 2.2rem; white-space: nowrap; transition: width 0.2s ease;
+}
+.ach-bar-fill-orange { background: var(--orange); }
+.ach-bar-fill-blue { background: var(--brand-dark); }
+.ach-bar-fill-purple { background: var(--purple); }
+.ach-bar-fill-green { background: var(--green); }
+.ach-bar-fraction { color: #fff; font-size: 0.7rem; font-weight: 700; }
+.ach-bar-fraction-empty {
+  position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: var(--muted-dark);
+}
+.ach-bar-percent { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.ach-bar-complete {
+  position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 0.25rem;
+  font-size: 0.75rem; font-weight: 700; color: #fff;
+}
+.ach-bar-complete .icon { width: 0.85rem; height: 0.85rem; }
+
+/* Nature News - a real request: "students can submit descriptions and
+   one image of something they discovered in nature." */
+.nature-news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; margin-top: 1rem; }
+.nature-news-card { border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); overflow: hidden; }
+.nature-news-card-img { width: 100%; aspect-ratio: 1.3; object-fit: cover; display: block; }
+.nature-news-card-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.nature-news-card-body p { margin: 0; font-size: 0.9rem; }
+
+/* Spelling Bee - a real request: "vocabulary words for every grade
+   level. grade level on students member profile determines their
+   vocabulary level." */
+.spelling-bee-stage { display: flex; justify-content: center; margin-top: 1.25rem; }
+.spelling-bee-card {
+  width: 100%; max-width: 26rem; padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface); box-shadow: var(--shadow-sm); text-align: center; display: flex; flex-direction: column; gap: 0.85rem;
+}
+.spelling-bee-progress { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.spelling-bee-clue { margin: 0; font-size: 1.1rem; font-weight: 700; min-height: 3em; }
+.spelling-bee-input { width: 100%; padding: 0.6rem 0.8rem; border-radius: 0.5rem; border: 1px solid var(--border); font-size: 1.1rem; text-align: center; }
+.spelling-bee-feedback { margin: 0; min-height: 1.3em; font-weight: 700; font-size: 0.9rem; }
+.spelling-bee-feedback-correct { color: var(--green); }
+.spelling-bee-feedback-wrong { color: var(--red); }
+.spelling-bee-result-text { font-size: 1.05rem; font-weight: 600; }
+
+.reading-tip-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1.5rem; }
+@media (max-width: 700px) { .reading-tip-grid { grid-template-columns: 1fr; } }
+.reading-tip-card {
+  display: flex; align-items: flex-start; gap: 0.75rem; padding: var(--card-padding-compact);
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.reading-tip-icon { width: 2.5rem; height: 2.5rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.reading-tip-icon .icon { width: 1.2rem; height: 1.2rem; }
+.reading-tip-icon-purple { background: var(--purple-soft); color: var(--purple); }
+.reading-tip-icon-green { background: var(--green-bg); color: var(--green); }
+.reading-tip-card p { margin: 0.2rem 0 0; }
+
+/* Achievements/Leaderboard moved to their own pages under the Activities
+   nav section (a real request) - these small links replace what used to
+   be embedded sections right on this page. */
+.reading-goal-cross-link { margin-top: 1rem; text-align: right; }
+
+/* Leaderboard's 4 ranked lists - a real request: "top 5 ranking for
+   reading hours, top 5 ranking for reading points, top player for each
+   game, top 5 highest spelling bee points" - one panel per ranking. */
+.leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+.reading-leaderboard-panel { margin-top: 1rem; }
+.reading-leaderboard-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.reading-leaderboard-row {
+  display: grid; grid-template-columns: 3rem 1fr auto; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0.25rem; border-bottom: 1px solid var(--border);
+}
+.reading-leaderboard-row:last-child { border-bottom: none; }
+.reading-leaderboard-row-you { background: var(--brand-soft); border-radius: var(--radius); }
+.reading-leaderboard-rank { font-weight: 800; color: var(--muted); }
+.reading-leaderboard-points { font-weight: 700; color: var(--brand-dark); }
+
+/* ---------- Student Portal > Games ----------
+   Started as 5 pass-and-play games as plain cards, grew to 15 games in a
+   compact grid (a real follow-up: "let's add more games"), then split
+   into its current two-page shape (another real request: "game page
+   should just show a small image of the game and play button. when you
+   click play then it opens the full game to play on a new page"):
+   - /student/games (student-games.ejs) renders `.game-tile` preview
+     cards only - a numbered badge, a colored icon "preview", the title,
+     and a category pill, the whole tile a link to...
+   - /student/games/play/:key (student-game-play.ejs), which renders the
+     one selected game's actual interactive markup
+     (views/partials/games/<key>.ejs) at full size inside `.game-play-stage`.
+   Every per-game widget class below (ttt-board, hangman-*, mine-grid,
+   etc.) is now ONLY ever rendered inside `.game-play-card`, so its base
+   size IS the full-size play experience - no separate compact-grid
+   override layer to keep in sync anymore. */
+
+/* Header stats (Games Played / High Score / Current Streak) - a real
+   request: "include games played, high score, current streak bar at the
+   top right." Real numbers, not decoration: Games Played/Current Streak
+   come from every game_plays row ever logged (routes/student-portal.js's
+   GET /games/play/:key), High Score from the best game_scores row across
+   just the handful of games that report one (utils/gameStats.js's own
+   SCORING_GAMES) - see that file and its migration's header comments. */
+.games-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.games-header h1 { margin-bottom: 0; }
+.games-header-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.games-header-stat { display: flex; align-items: center; gap: 0.6rem; }
+.games-header-stat-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.games-header-stat-icon .icon { width: 1.2rem; height: 1.2rem; }
+.games-header-stat-icon-purple { background: var(--purple-soft); color: var(--purple); }
+.games-header-stat-icon-gold { background: var(--yellow-bg); color: var(--yellow-solid); }
+.games-header-stat-icon-blue { background: var(--brand-soft); color: var(--brand-dark); }
+.games-header-stat-label { display: block; font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.games-header-stat-value { display: block; font-size: 1.15rem; font-weight: 800; line-height: 1.25; }
+.games-header-stat-value-muted { color: var(--muted); font-weight: 700; }
+.games-header-stat-unit { font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+.games-header-stat-sub { display: block; font-size: 0.7rem; color: var(--muted); }
+
+/* Daily Challenge / Challenge your friends banners - a real request:
+   "include the daily challenge and challenge your friend bars at the
+   bottom." Both link somewhere real: Daily Challenge to a deterministic
+   "game of the day" (routes/student-portal.js's own gameOfTheDay(),
+   same for every student, changes at UTC midnight) and Challenge your
+   friends to the actual Leaderboard page. */
+.games-banners { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.games-banner {
+  flex: 1 1 18rem; display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.25rem;
+  border-radius: var(--radius); border: 1px solid var(--border);
+}
+.games-banner-gold { background: linear-gradient(135deg, var(--yellow-bg), #fff); }
+.games-banner-blue { background: var(--brand-soft); }
+.games-banner-icon {
+  width: 2.75rem; height: 2.75rem; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.games-banner-icon .icon { width: 1.4rem; height: 1.4rem; }
+.games-banner-gold .games-banner-icon { background: var(--yellow-solid); color: #fff; }
+.games-banner-blue .games-banner-icon { background: var(--brand); color: #fff; }
+.games-banner-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
+.games-banner-text strong { font-size: 1rem; }
+.games-banner-text span { font-size: 0.85rem; color: var(--muted); }
+.games-banner-btn { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; text-decoration: none; }
+.games-banner-btn .icon { width: 0.85rem; height: 0.85rem; }
+@media (max-width: 480px) {
+  .games-banner { flex-direction: column; align-items: flex-start; text-align: left; }
+  .games-banner-btn { width: 100%; justify-content: center; }
+}
+
+.games-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0 0.25rem; }
+.game-filter-tab {
+  padding: 0.4rem 0.95rem; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); font-weight: 700; font-size: 0.82rem; color: var(--muted); cursor: pointer;
+}
+.game-filter-tab:hover { background: var(--brand-soft); }
+.game-filter-tab-active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+@media (max-width: 640px) {
+  .games-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.65rem; }
+}
+
+/* Preview tiles (the grid) */
+.game-tile {
+  position: relative; display: flex; flex-direction: column; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden; text-decoration: none; color: inherit; transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.game-tile:hover, .game-tile:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.game-tile[hidden] { display: none; }
+.game-tile-badge {
+  position: absolute; top: 0.5rem; left: 0.5rem; width: 1.4rem; height: 1.4rem; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9); color: var(--ink); font-size: 0.72rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;
+}
+.game-tile-preview { aspect-ratio: 1.3; display: flex; align-items: center; justify-content: center; }
+.game-tile-footer { padding: 0.6rem 0.7rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.game-tile-title { margin: 0; font-size: 0.88rem; font-weight: 700; }
+.game-tile-category { align-self: flex-start; font-size: 0.66rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.game-tile-category-puzzle { background: var(--purple-soft); color: var(--purple); }
+.game-tile-category-arcade { background: var(--green-bg); color: var(--green); }
+.game-tile-category-word { background: var(--yellow-bg); color: var(--yellow); }
+.game-tile-category-classic { background: var(--brand-soft); color: var(--brand-dark); }
+.game-tile-category-trivia { background: var(--red-bg); color: var(--red); }
+.game-tile-category-skill { background: #eef2f6; color: var(--muted-dark); }
+
+/* One tinted preview background per game (loosely by category), so the
+   grid reads as colorful thumbnails the way the reference mockup's own
+   screenshots do, even without a real screenshot behind each tile. */
+.game-tile-purple .game-tile-preview { background: var(--purple-soft); }
+.game-tile-blue .game-tile-preview { background: var(--brand-soft); }
+.game-tile-yellow .game-tile-preview { background: var(--yellow-bg); }
+.game-tile-green .game-tile-preview { background: var(--green-bg); }
+.game-tile-red .game-tile-preview { background: var(--red-bg); }
+.game-tile-gray .game-tile-preview { background: #eef2f6; }
+.game-tile-brown .game-tile-preview { background: #fbedde; }
+.game-tile-forest .game-tile-preview { background: var(--green-bg); }
+.game-tile-dark .game-tile-preview { background: #1f2937; }
+.game-tile-dark .mini-label, .game-tile-dark .mini-word { color: #f1f5f9; }
+
+/* Mini gameplay mockups - small trusted HTML snippets from each catalog
+   entry's own `preview` field (utils/gamesCatalog.js), built entirely
+   from these shared helper classes so a tile reads as a little
+   in-progress screenshot of that specific game instead of one big
+   generic icon (a real request: "correct the image example on each card
+   to look like partial versions of each game"). */
+.mini-grid { display: grid; gap: 3px; width: 78%; }
+.mini-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.mini-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.mini-grid-5 { grid-template-columns: repeat(5, 1fr); }
+.mini-cell {
+  aspect-ratio: 1; border-radius: 3px; background: rgba(255, 255, 255, 0.45);
+  display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 800; color: inherit;
+}
+.mini-cell-on { background: rgba(255, 255, 255, 0.95); }
+.mini-cell-x { color: var(--purple); }
+.mini-cell-o { color: var(--red); }
+.mini-dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.45); }
+.mini-dot-y { background: #f4c542; }
+.mini-dot-r { background: var(--red); }
+.mini-row { display: flex; gap: 3px; align-items: center; justify-content: center; }
+.mini-bar { height: 6px; width: 70%; border-radius: 3px; background: rgba(255, 255, 255, 0.4); }
+.mini-bar-on { background: rgba(255, 255, 255, 0.9); }
+.mini-label { font-size: 0.6rem; font-weight: 700; text-align: center; padding: 0 0.5rem; }
+.mini-stack { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; width: 84%; }
+
+.mini-c4 { background: var(--brand-dark); padding: 6px; border-radius: 8px; }
+.mini-c4 .mini-dot { width: 0.6rem; height: 0.6rem; }
+
+.mini-word { font-family: monospace; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.15em; }
+.mini-key {
+  width: 0.85rem; height: 0.85rem; border-radius: 2px; background: rgba(255, 255, 255, 0.9);
+  font-size: 0.5rem; font-weight: 800; display: flex; align-items: center; justify-content: center; color: var(--ink);
+}
+.mini-key-off { opacity: 0.4; }
+
+.mini-snake { position: relative; width: 78%; aspect-ratio: 1.3; background: #0f172a; border-radius: 6px; }
+.mini-snake-seg { position: absolute; width: 12%; height: 16%; background: #4ade80; border-radius: 2px; }
+.mini-snake-food { position: absolute !important; }
+
+.mini-pong { position: relative; width: 78%; aspect-ratio: 1.3; background: #0f172a; border-radius: 6px; }
+.mini-pong-paddle { position: absolute; width: 6%; height: 34%; background: #fff; border-radius: 2px; top: 33%; }
+.mini-pong-paddle-l { left: 8%; }
+.mini-pong-paddle-r { right: 8%; }
+.mini-pong-ball { position: absolute !important; top: 46%; left: 48%; background: #fff !important; }
+
+.mini-drive { position: relative; width: 58%; aspect-ratio: 0.7; background: #1f2937; border-radius: 6px; overflow: hidden; }
+.mini-lane { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255, 255, 255, 0.3); }
+.mini-lane:nth-child(1) { left: 33%; }
+.mini-lane:nth-child(2) { left: 66%; }
+.mini-car { position: absolute; width: 22%; height: 16%; border-radius: 2px; background: #4ade80; }
+.mini-car-enemy { background: var(--red); }
+
+.mini-solitaire { position: relative; width: 74%; aspect-ratio: 1.1; }
+.mini-card-mini {
+  position: absolute; top: 10%; width: 34%; height: 60%; border-radius: 3px; background: #fff;
+  box-shadow: var(--shadow-sm); font-size: 0.5rem; font-weight: 800; display: flex; align-items: flex-start;
+  justify-content: flex-start; padding: 2px; color: var(--ink);
+}
+.mini-card-mini-red { color: var(--red); }
+
+.mini-checker-board { background: #a3703f; padding: 4px; border-radius: 6px; }
+.mini-checker-sq { aspect-ratio: 1; background: #e8cba3; display: flex; align-items: center; justify-content: center; }
+.mini-checker-sq-dark { background: #a3703f; }
+.mini-piece { width: 65%; height: 65%; border-radius: 999px; }
+.mini-piece-dark { background: #2d2a26; }
+.mini-piece-light { background: var(--red); }
+
+.mini-chess-board { background: #5a8a4a; }
+.mini-chess-sq { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; line-height: 1; }
+.mini-chess-light { background: #eeead6; color: #1f1f1f; }
+.mini-chess-dark { background: #5a8a4a; color: #fdfdfd; }
+
+/* Play page (one game, full size) */
+.game-play-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.game-play-stage {
+  display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  max-width: 34rem; margin: 1.5rem auto 0; padding: 1.5rem 1.25rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
+}
+.game-play-card { display: flex; flex-direction: column; align-items: center; gap: 0.85rem; width: 100%; text-align: center; }
+.game-play-action { width: 100%; max-width: 16rem; }
+.btn-active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.game-card-info { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.game-card-sub { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.game-canvas { border-radius: 0.5rem; box-shadow: var(--shadow-sm); background: #0f172a; max-width: 100%; touch-action: none; }
+
+.game-dpad { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.game-dpad-row { display: flex; gap: 0.3rem; }
+.game-dpad-btn {
+  width: 2.2rem; height: 2.2rem; border-radius: 0.4rem; border: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--brand-dark);
+}
+.game-dpad-btn:hover { background: var(--brand-soft); }
+.game-dpad-btn .icon { width: 1.1rem; height: 1.1rem; }
+.game-dpad-btn[data-dir="up"] .icon { transform: rotate(180deg); }
+.game-dpad-btn[data-dir="left"] .icon { transform: rotate(90deg); }
+.game-dpad-btn[data-dir="right"] .icon { transform: rotate(-90deg); }
+
+.game-versus-row { display: flex; align-items: center; gap: 0.6rem; }
+.game-versus-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.85rem; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 0.85rem; color: var(--muted);
+}
+.game-versus-pill .icon { width: 1rem; height: 1rem; }
+.game-versus-pill-active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.game-versus-vs { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+
+/* Tic-Tac-Toe */
+.ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; width: 100%; max-width: 16rem; }
+.ttt-cell {
+  aspect-ratio: 1; border-radius: 0.6rem; border: none; background: var(--surface); box-shadow: var(--shadow-sm);
+  font-size: 1.8rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.ttt-cell[data-mark="X"] { color: var(--purple); }
+.ttt-cell[data-mark="O"] { color: var(--red); }
+.ttt-cell:disabled { cursor: default; }
+.game-win-banner {
+  width: 100%; max-width: 16rem; text-align: center; padding: 0.6rem; border-radius: var(--radius);
+  background: var(--brand); color: #fff; font-weight: 700;
+}
+
+/* Hangman */
+.hangman-gallows { width: 100px; height: 108px; }
+.hangman-word { font-size: 1.5rem; font-weight: 800; letter-spacing: 0.3em; margin: 0; }
+.hangman-category-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border-radius: 999px;
+  background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; font-size: 0.85rem;
+}
+.hangman-category-pill .icon { width: 0.9rem; height: 0.9rem; }
+.hangman-guesses-label { margin: 0; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.hangman-guess-dots { display: flex; gap: 0.4rem; }
+.hangman-guess-dot {
+  width: 1.6rem; height: 1.6rem; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: transparent;
+}
+.hangman-guess-dot-wrong { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.hangman-keyboard { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
+.hangman-keyboard-row { display: flex; justify-content: center; gap: 0.25rem; }
+.hangman-key {
+  width: 1.9rem; height: 1.9rem; border-radius: 0.4rem; border: 1px solid var(--border); background: var(--surface);
+  font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.hangman-key:disabled { opacity: 0.4; cursor: default; }
+.hangman-key-correct { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.hangman-key-wrong { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+/* Connect Four */
+.c4-board {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; background: var(--brand-dark);
+  padding: 0.5rem; border-radius: 0.75rem; width: 100%; max-width: 20rem;
+}
+.c4-cell {
+  aspect-ratio: 1; border-radius: 50%; background: rgba(255, 255, 255, 0.35); border: none; cursor: pointer; padding: 0;
+}
+.c4-cell[data-piece="1"] { background: #f4c542; }
+.c4-cell[data-piece="2"] { background: var(--red); }
+.c4-swatch { width: 0.9rem; height: 0.9rem; border-radius: 999px; display: inline-block; }
+.c4-swatch-yellow { background: #f4c542; }
+.c4-swatch-red { background: var(--red); }
+
+/* Checkers - stacked vertically like every other game card now (a real
+   request: "all the games and game card choices are the same size" -
+   this used to sit in a wider side-by-side "half" card). */
+.game-card-info { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.checkers-score-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); width: 100%; overflow: hidden; text-align: left; }
+.checkers-score-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.85rem; }
+.checkers-score-row strong { margin-left: auto; }
+.checkers-score-vs { text-align: center; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.15rem; }
+.checkers-piece-dot { width: 1rem; height: 1rem; border-radius: 999px; display: inline-block; }
+.checkers-piece-dark { background: #3f3f46; }
+.checkers-piece-light { background: var(--red); }
+.checkers-turn-indicator { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; margin: 0; }
+.checkers-turn-dot { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--green); display: inline-block; }
+.checkers-board {
+  display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; max-width: 24rem; aspect-ratio: 1;
+  border-radius: 0.5rem; overflow: hidden; box-shadow: var(--shadow-sm);
+}
+.checkers-square { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: none; padding: 0.12rem; }
+.checkers-square-light { background: #e8cba3; }
+.checkers-square-dark { background: #a3703f; }
+.checkers-square-selectable::after { content: ''; width: 30%; height: 30%; border-radius: 999px; background: rgba(22, 163, 74, 0.55); display: block; }
+.checkers-piece {
+  width: 100%; height: 100%; border-radius: 999px; border: 3px solid rgba(0,0,0,0.25); cursor: pointer;
+}
+.checkers-piece-p1 { background: #2d2a26; }
+.checkers-piece-p2 { background: var(--red); }
+.checkers-piece-king { box-shadow: inset 0 0 0 3px #f4c542; }
+.checkers-piece-selected { outline: 3px solid var(--brand); }
+
+/* Chess */
+.chess-score-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); width: 100%; overflow: hidden; text-align: left; }
+.chess-score-row { padding: 0.6rem 0.85rem; font-weight: 600; }
+.chess-score-vs { text-align: center; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.15rem; }
+.chess-turn-indicator { font-weight: 600; margin: 0; }
+.chess-board {
+  display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; max-width: 24rem; aspect-ratio: 1;
+  border-radius: 0.5rem; overflow: hidden; box-shadow: var(--shadow-sm); border: 2px solid #3f3f46;
+}
+.chess-square { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: none; padding: 0; font-size: min(6vw, 2rem); line-height: 1; cursor: pointer; }
+.chess-square-light { background: #eeead6; }
+.chess-square-dark { background: #5a8a4a; }
+.chess-square-selectable { box-shadow: inset 0 0 0 3px rgba(22, 163, 74, 0.6); }
+.chess-square-selected { box-shadow: inset 0 0 0 3px var(--brand); }
+.chess-piece-white { color: #fdfdfd; text-shadow: 0 0 1px #3f3f46, 0 1px 1px rgba(0,0,0,0.4); }
+.chess-piece-black { color: #1f1f1f; }
+
+/* Memory Match */
+.match-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; width: 100%; max-width: 18rem; }
+.match-tile {
+  aspect-ratio: 1; border-radius: 0.5rem; border: none; background: var(--surface); box-shadow: var(--shadow-sm);
+  font-size: 1.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.match-tile-flipped { background: var(--brand-soft); }
+.match-tile-matched { background: var(--green-bg); opacity: 0.7; cursor: default; }
+
+/* Trivia Quiz */
+.trivia-level-row { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; max-width: 18rem; }
+.trivia-level-btn { width: 100%; }
+.trivia-question-box { display: flex; flex-direction: column; gap: 0.6rem; width: 100%; max-width: 20rem; }
+.trivia-score { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.trivia-question { margin: 0; font-size: 1.05rem; font-weight: 700; min-height: 2.4em; }
+.trivia-choices { display: flex; flex-direction: column; gap: 0.4rem; }
+.trivia-choice-btn {
+  padding: 0.55rem 0.7rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--surface);
+  font-size: 0.9rem; cursor: pointer; text-align: left;
+}
+.trivia-choice-btn:hover:not(:disabled) { background: var(--brand-soft); }
+.trivia-choice-btn:disabled { cursor: default; }
+.trivia-choice-correct { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.trivia-choice-wrong { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+/* Minesweeper */
+.mine-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; width: 100%; max-width: 20rem; }
+.mine-cell {
+  aspect-ratio: 1; border: 1px solid var(--border); border-radius: 0.25rem; background: #cbd5e1;
+  font-size: 0.85rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--brand-dark);
+}
+.mine-cell-revealed { background: var(--surface); cursor: default; }
+.mine-cell-flagged { background: var(--yellow-bg); }
+.mine-cell-boom { background: var(--red-bg); }
+
+/* Battleship */
+.battle-boards { display: flex; flex-direction: column; gap: 1rem; width: 100%; align-items: center; }
+.battle-board-label { margin: 0 0 0.3rem; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.battle-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; width: 100%; max-width: 16rem; }
+.battle-cell {
+  aspect-ratio: 1; border: 1px solid var(--border); border-radius: 0.25rem; background: var(--brand-soft);
+  font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.battle-cell-ship { background: #94a3b8; }
+.battle-cell-hit { background: var(--red-bg); cursor: default; }
+.battle-cell-miss { background: var(--surface); cursor: default; }
+
+/* Typing Race */
+.typing-target { margin: 0; font-size: 1.05rem; line-height: 1.6; font-family: monospace; }
+.typing-char-correct { color: var(--green); }
+.typing-char-wrong { color: var(--red); text-decoration: underline; }
+.typing-input { width: 100%; padding: 0.55rem 0.7rem; border-radius: 0.5rem; border: 1px solid var(--border); font-size: 1rem; }
+
+/* Sudoku */
+.sudoku-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 1px; width: 100%; max-width: 20rem; background: var(--ink); border: 2px solid var(--ink); }
+.sudoku-cell {
+  aspect-ratio: 1; border: none; background: var(--surface); font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--brand-dark);
+}
+.sudoku-cell-shade { background: var(--brand-soft); }
+.sudoku-cell-given { color: var(--ink); cursor: default; }
+.sudoku-cell-selected { outline: 2px solid var(--brand); outline-offset: -2px; }
+.sudoku-cell-wrong { color: var(--red); }
+.sudoku-pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; width: 100%; max-width: 20rem; }
+.sudoku-pad-btn {
+  padding: 0.5rem 0; border-radius: 0.4rem; border: 1px solid var(--border); background: var(--surface);
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+.sudoku-pad-btn:hover { background: var(--brand-soft); }
+
+/* Solitaire */
+.sol-top-row { display: flex; gap: 0.75rem; width: 100%; justify-content: space-between; }
+.sol-stock-waste { display: flex; gap: 0.4rem; }
+.sol-foundation { display: flex; gap: 0.4rem; }
+.sol-pile { position: relative; width: 3rem; height: 4.2rem; }
+.sol-tableau { display: flex; gap: 0.35rem; width: 100%; }
+.sol-col { position: relative; width: 3rem; min-height: 9rem; flex: 1; }
+.sol-card {
+  position: absolute; top: 0; left: 0; width: 3rem; height: 4.2rem; border-radius: 0.3rem;
+  border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
+  font-size: 0.9rem; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.sol-card-red { color: var(--red); }
+.sol-card-black { color: var(--ink); }
+.sol-card-back { background: var(--brand); cursor: default; }
+.sol-card-selected { outline: 3px solid var(--brand-dark); outline-offset: 1px; z-index: 5; }
+.sol-pile-empty { position: static; background: transparent; border: 1px dashed var(--border); color: var(--muted); box-shadow: none; }
+.sol-empty .sol-card { cursor: pointer; }
