@@ -10,23 +10,39 @@
 // sanitizeHtml.js actually allows to survive - no control offers
 // formatting the server would just strip back out. A few toolbar-only
 // conveniences that never touch the saved HTML at all (Find & Replace,
-// Spellcheck, Fullscreen, Search, the clipboard row) have no server-side
-// counterpart to keep in sync with.
+// Spellcheck, Fullscreen, Search, the clipboard row, text direction)
+// have no server-side counterpart to keep in sync with - Direction and
+// Spellcheck specifically aren't part of the reference image at all
+// (pre-existing features here before that image showed up), so they're
+// parked at the end of the utility row instead of sitting inside the
+// align/list row or the link/media row, which otherwise mirror the
+// reference's own button groups one-for-one.
+//
+// Icons: every icon below is a plain-stroke SVG from icon-sprite.ejs,
+// drawn to match the reference image's own icon shapes (not just a
+// generic "close enough" glyph) - see that partial's own "forum-editor-
+// toolbar icon set" comment. A handful of controls still use a plain
+// character instead of an svg (Source's "</>" ,  B/I/U/S/X2/X2, the
+// Omega special-character button, and the "--" horizontal rule) because
+// that's what the reference image itself uses at those spots too.
 %>
 <div class="forum-editor-toolbar">
   <div class="forum-editor-toolbar-row">
-    <button type="button" class="forum-editor-btn-text" data-forum-cmd="toggleSource" title="Source">&lt;/&gt;</button>
+    <button type="button" class="forum-editor-btn-text" data-forum-cmd="toggleSource" title="Source">&lt;/&gt; Source</button>
     <span class="forum-editor-sep"></span>
     <button type="button" data-forum-cmd="findReplace" title="Find and Replace"><svg class="icon"><use href="#icon-search"/></svg></button>
     <button type="button" data-forum-cmd="toggleFullscreen" title="Fullscreen"><svg class="icon"><use href="#icon-maximize"/></svg></button>
     <button type="button" data-forum-cmd="undo" title="Undo"><svg class="icon"><use href="#icon-undo"/></svg></button>
     <button type="button" data-forum-cmd="redo" title="Redo"><svg class="icon"><use href="#icon-redo"/></svg></button>
     <span class="forum-editor-sep"></span>
+    <button type="button" data-forum-cmd="duplicate" title="Duplicate"><svg class="icon"><use href="#icon-duplicate"/></svg></button>
+    <button type="button" data-forum-cmd="cut" title="Cut"><svg class="icon"><use href="#icon-scissors"/></svg></button>
     <button type="button" data-forum-cmd="copy" title="Copy"><svg class="icon"><use href="#icon-copy"/></svg></button>
-    <button type="button" class="forum-editor-btn-text" data-forum-cmd="cut" title="Cut">&#9986;</button>
-    <button type="button" data-forum-cmd="duplicate" title="Duplicate"><svg class="icon"><use href="#icon-clipboard-list"/></svg></button>
-    <button type="button" data-forum-cmd="pasteFromClipboard" title="Paste">&#128203;</button>
+    <button type="button" data-forum-cmd="pasteFromClipboard" title="Paste"><svg class="icon"><use href="#icon-clipboard-paste"/></svg></button>
     <button type="button" data-forum-cmd="delete" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+    <span class="forum-editor-sep"></span>
+    <button type="button" data-forum-cmd="toggleDirection" title="Text Direction (Left-to-Right / Right-to-Left)">&#8596;</button>
+    <button type="button" data-forum-cmd="toggleSpellcheck" title="Toggle Spellcheck" data-forum-toggle class="forum-editor-btn-text">ABC&#10003;</button>
   </div>
 
   <div class="forum-editor-toolbar-row forum-editor-toolbar-row-dropdowns">
@@ -66,43 +82,55 @@
     <button type="button" data-forum-cmd="subscript" title="Subscript">X<sub>2</sub></button>
     <button type="button" data-forum-cmd="superscript" title="Superscript">X<sup>2</sup></button>
     <span class="forum-editor-sep"></span>
-    <label class="forum-editor-color" title="Text Color">A
-      <input type="color" data-forum-cmd="foreColor" value="#000000" />
+    <%
+      // A colored underline directly under the glyph (updated live by
+      // forum-editor.js whenever the color input changes), not a boxed
+      // swatch next to it - that's what the reference image's own text-
+      // color/highlight-color buttons look like. The <input type="color">
+      // stays a real, clickable form control (visually-hidden, not
+      // display:none, so the wrapping <label> still forwards clicks to
+      // it and opens the native color picker) rather than a decorative
+      // stand-in - no fake control that looks clickable but isn't.
+    %>
+    <label class="forum-editor-color" title="Text Color">
+      <span class="forum-editor-color-glyph" data-color-glyph style="border-bottom-color:#000000">A</span>
+      <input type="color" class="forum-editor-color-input" data-forum-cmd="foreColor" value="#000000" />
     </label>
-    <label class="forum-editor-color forum-editor-color-bg" title="Highlight Color">&#9998;
-      <input type="color" data-forum-cmd="hiliteColor" value="#ffff00" />
+    <label class="forum-editor-color forum-editor-color-bg" title="Highlight Color">
+      <span class="forum-editor-color-glyph" data-color-glyph style="border-bottom-color:#ffff00"><svg class="icon"><use href="#icon-highlighter"/></svg></span>
+      <input type="color" class="forum-editor-color-input" data-forum-cmd="hiliteColor" value="#ffff00" />
     </label>
   </div>
 
   <div class="forum-editor-toolbar-row">
-    <button type="button" data-forum-cmd="justifyLeft" title="Align Left">&#8676;&#8801;</button>
-    <button type="button" data-forum-cmd="justifyCenter" title="Align Center">&#8801;</button>
-    <button type="button" data-forum-cmd="justifyRight" title="Align Right">&#8801;&#8677;</button>
-    <button type="button" data-forum-cmd="justifyFull" title="Justify">&#8801;&#8801;</button>
-    <button type="button" data-forum-cmd="toggleDirection" title="Text Direction (Left-to-Right / Right-to-Left)">&#8596;</button>
+    <button type="button" data-forum-cmd="justifyLeft" title="Align Left"><svg class="icon"><use href="#icon-align-left"/></svg></button>
+    <button type="button" data-forum-cmd="justifyCenter" title="Align Center"><svg class="icon"><use href="#icon-align-center"/></svg></button>
+    <button type="button" data-forum-cmd="justifyRight" title="Align Right"><svg class="icon"><use href="#icon-align-right"/></svg></button>
+    <button type="button" data-forum-cmd="justifyFull" title="Justify"><svg class="icon"><use href="#icon-align-justify"/></svg></button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="insertUnorderedList" title="Bullet List">&bull; List</button>
-    <button type="button" data-forum-cmd="insertOrderedList" title="Numbered List">1. List</button>
-    <button type="button" data-forum-cmd="insertChecklist" title="Checklist"><svg class="icon"><use href="#icon-check"/></svg></button>
+    <button type="button" data-forum-cmd="insertUnorderedList" title="Bullet List"><svg class="icon"><use href="#icon-list-bullet"/></svg></button>
+    <button type="button" data-forum-cmd="insertOrderedList" title="Numbered List"><svg class="icon"><use href="#icon-list-numbered"/></svg></button>
+    <button type="button" data-forum-cmd="insertChecklist" title="Checklist"><svg class="icon"><use href="#icon-list-check"/></svg></button>
     <span class="forum-editor-sep"></span>
-    <button type="button" data-forum-cmd="outdent" title="Decrease Indent">&#8676;</button>
-    <button type="button" data-forum-cmd="indent" title="Increase Indent">&#8677;</button>
+    <button type="button" data-forum-cmd="outdent" title="Decrease Indent"><svg class="icon"><use href="#icon-outdent"/></svg></button>
+    <button type="button" data-forum-cmd="indent" title="Increase Indent"><svg class="icon"><use href="#icon-indent"/></svg></button>
   </div>
 
   <div class="forum-editor-toolbar-row">
-    <button type="button" data-forum-cmd="createLink" title="Insert Link">&#128279;</button>
-    <button type="button" data-forum-cmd="unlink" title="Remove Link">&#128279;&times;</button>
+    <button type="button" data-forum-cmd="createLink" title="Insert Link"><svg class="icon"><use href="#icon-link"/></svg></button>
+    <button type="button" data-forum-cmd="unlink" title="Remove Link"><svg class="icon"><use href="#icon-unlink"/></svg></button>
     <span class="forum-editor-sep"></span>
     <button type="button" data-forum-cmd="insertImage" title="Insert Image"><svg class="icon"><use href="#icon-image"/></svg></button>
-    <button type="button" data-forum-cmd="insertVideo" title="Insert Video">&#9654;</button>
+    <button type="button" data-forum-cmd="insertVideo" title="Insert Video"><svg class="icon"><use href="#icon-video"/></svg></button>
     <button type="button" data-forum-cmd="insertTable" title="Insert Table"><svg class="icon"><use href="#icon-grid"/></svg></button>
-    <button type="button" data-forum-cmd="toggleSpellcheck" title="Toggle Spellcheck" data-forum-toggle class="forum-editor-btn-text">ABC&#10003;</button>
-    <button type="button" data-forum-cmd="insertSymbol" title="Special Character / Emoji">&#9786;&#937;</button>
-    <button type="button" data-forum-cmd="insertHorizontalRule" title="Horizontal Line">&mdash;</button>
+    <span class="forum-editor-sep"></span>
+    <button type="button" data-forum-cmd="insertSymbol" title="Emoji"><svg class="icon"><use href="#icon-smile"/></svg></button>
+    <button type="button" class="forum-editor-btn-text" data-forum-cmd="insertSymbol" title="Special Character">&#937;</button>
+    <button type="button" class="forum-editor-btn-text" data-forum-cmd="insertHorizontalRule" title="Horizontal Line">--</button>
   </div>
 
   <div class="forum-editor-toolbar-row forum-editor-toolbar-row-bottom">
-    <button type="button" data-forum-cmd="removeFormat" title="Clear Formatting"><svg class="icon"><use href="#icon-broom"/></svg> Clear formatting</button>
+    <button type="button" data-forum-cmd="removeFormat" title="Clear Formatting"><svg class="icon"><use href="#icon-eraser"/></svg> Clear formatting</button>
   </div>
 
   <p class="forum-editor-hint">You can use <kbd>Shift</kbd> + <kbd>Enter</kbd> for a line break</p>

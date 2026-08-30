@@ -307,6 +307,13 @@
       } else if (control.tagName === 'INPUT' && control.type === 'color') {
         control.addEventListener('input', function () {
           runCommand(cmd, control.value);
+          // Reflect the picked color as the underline under the "A"/
+          // highlighter glyph next to it (matching the reference
+          // toolbar's own text-color/highlight-color buttons), not just
+          // in the document - the swatch on the control itself is
+          // hidden (see .forum-editor-color-input in styles.css).
+          var glyph = control.closest('label') && control.closest('label').querySelector('[data-color-glyph]');
+          if (glyph) glyph.style.borderBottomColor = control.value;
         });
       } else if (control.tagName === 'BUTTON') {
         control.addEventListener('click', function (e) {
