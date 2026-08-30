@@ -9,8 +9,7 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Main Admin</h1>
-    <p class="hint">The control center for the whole platform - users, roles/permissions, and public website content.</p>
+    <h1>Homepage</h1>
 
     <%# Item 6: "remove accounts by role counting, remove user settings -
         user settings should be under the gear setting icon at the top of
@@ -19,9 +18,12 @@
         should be a count display for number of parents, students,
         families, teachers and admins. Then there should be a 2nd count
         display for pending requests... each name should be able to click
-        and go straight to that request page." %>
+        and go straight to that request page." A later request dropped the
+        "Main Admin" title + description ("should be called Homepage,
+        remove the description") and renamed this section "People" ->
+        "Members". %>
     <section class="portal-dashboard-section">
-      <h2>People</h2>
+      <h2>Members</h2>
       <div class="totals-card">
         <div class="totals-item">
           <span class="stat-value"><%= parentCount %></span>
@@ -56,6 +58,10 @@
     <section class="portal-dashboard-section">
       <h2>Pending Requests</h2>
       <div class="totals-card totals-card-links">
+        <a class="totals-item" href="/main-admin/users">
+          <span class="stat-value"><%= pendingCount %></span>
+          <span class="stat-label">Membership Requests</span>
+        </a>
         <a class="totals-item" href="/main-admin/events?tab=requests">
           <span class="stat-value"><%= eventRequestsCount %></span>
           <span class="stat-label">Event Requests</span>

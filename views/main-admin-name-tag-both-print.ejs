@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Name Tags + Schedule Cards</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (pairs.length === 0) { %>
+      <p class="roster-empty">No members selected.</p>
+    <% } %>
+
+    <div class="print-page member-card-pair-page">
+      <% pairs.forEach(function(p) { %>
+        <div class="member-card-pair-row">
+          <div class="member-card-pair-item">
+            <h2 class="no-print"><%= p.name %> &mdash; Name Tag</h2>
+            <%- include('partials/name-tag-badge', { html: p.nameTag.html, bgCss: p.nameTag.bgCss, badgeWidth: badgeWidth, badgeHeight: badgeHeight }) %>
+          </div>
+          <div class="member-card-pair-item">
+            <h2 class="no-print"><%= p.name %> &mdash; Schedule Card</h2>
+            <%- include('partials/name-tag-badge', { html: p.scheduleCard.html, bgCss: p.scheduleCard.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight, safeInset: SCHEDULE_CARD_SAFE_INSET }) %>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/badge-autofit.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

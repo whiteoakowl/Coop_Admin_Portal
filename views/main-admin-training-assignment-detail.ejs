@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1><%= detail.memberName %> &mdash; <%= training.title %></h1>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/main-admin/training/<%= training.id %>/report">&larr; Back to Report</a>
+      </div>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Assignment</h2></div>
+      <p><%- include('partials/training-status-badge', { status: detail.status }) %> &nbsp; Assigned <%= detail.assigned_at.slice(0, 10) %><% if (detail.due_at) { %> &middot; Due <%= detail.due_at %><% } %><% if (detail.completed_at) { %> &middot; Completed <%= detail.completed_at.slice(0, 10) %><% } %></p>
+      <p class="hint">Best score: <%= detail.best_score != null ? detail.best_score + '%' : 'n/a' %> &middot; Latest score: <%= detail.latest_score != null ? detail.latest_score + '%' : 'n/a' %> &middot; Passing score: <%= detail.trainingPassingScore %>% &middot; <%= detail.attempt_count %> attempt<%= detail.attempt_count == 1 ? '' : 's' %></p>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Attempt History</h2></div>
+      <% if (detail.attempts.length === 0) { %>
+        <p class="roster-empty">This member hasn't started the training yet.</p>
+      <% } %>
+      <% detail.attempts.forEach(function(a) { %>
+        <div class="training-lesson-row">
+          <div class="training-lesson-row-main">
+            <strong>Attempt <%= a.attempt_number %></strong>
+            <span class="hint">Started <%= a.started_at.slice(0, 16).replace('T', ' ') %><% if (a.completed_at) { %> &middot; Completed <%= a.completed_at.slice(0, 16).replace('T', ' ') %><% } %></span>
+            <% if (a.score != null) { %>
+              <span class="badge-pill badge-pill-<%= a.passed === 1 ? 'green' : 'red' %>"><%= a.score %>% &mdash; <%= a.passed === 1 ? 'Passed' : 'Not Passed' %></span>
+            <% } else { %>
+              <span class="badge-pill badge-pill-orange">In Progress</span>
+            <% } %>
+          </div>
+          <div class="training-quiz-question-list">
+            <% a.lessonProgress.forEach(function(lp) { %>
+              <div class="training-quiz-question-row">
+                <span><%= lp.lesson_title_snapshot %> (<%= lp.lesson_type_snapshot %>)</span>
+                <span class="hint">
+                  <%= lp.status %>
+                  <% if (lp.lesson_type_snapshot === 'video') { %> &middot; watched <%= lp.video_percent %>%<% } %>
+                  <% if (lp.completed_at) { %> &middot; <%= lp.completed_at.slice(0, 16).replace('T', ' ') %><% } %>
+                </span>
+              </div>
+            <% }); %>
+          </div>
+          <% if (a.quizAnswers.length > 0) { %>
+            <div class="training-quiz-question-list">
+              <% a.quizAnswers.forEach(function(qa) { %>
+                <div class="training-quiz-question-row">
+                  <span class="hint"><%= qa.is_correct === 1 ? '✓' : '✗' %></span>
+                  <span><%= qa.question_text_snapshot %> &mdash; answered "<%= qa.selected_option_text_snapshot || '(no answer)' %>"</span>
+                  <span class="hint"><%= qa.points_earned %>/<%= qa.points_possible_snapshot %> pts</span>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

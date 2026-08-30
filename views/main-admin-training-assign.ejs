@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Assign &mdash; <%= training.title %></h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (training.status !== 'published') { %>
+      <div class="alert alert-error">This training is still <strong><%= training.status %></strong> - members won't see it on their My Training page until you <a href="/main-admin/training/<%= training.id %>/builder">publish it</a>.</div>
+    <% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/main-admin/training/<%= training.id %>/builder">&larr; Back to Builder</a>
+        <a class="roster-action-btn" href="/main-admin/training/<%= training.id %>/report">View Report</a>
+      </div>
+    </div>
+
+    <form method="POST" action="/main-admin/training/<%= training.id %>/assign" class="manage-section">
+      <label class="member-form-full">Due Date <span class="hint">(optional)</span>
+        <input type="date" name="dueAt" />
+      </label>
+      <div class="member-form-full">
+        <label class="roster-checkbox-label">Members</label>
+        <div class="name-tag-bulk-filter">
+          <select class="name-tag-bulk-filter-select" id="training-assign-filter-select">
+            <option value="all">All</option>
+            <option value="student">Students Only</option>
+            <option value="primaryParent">Primary Parents Only</option>
+            <option value="parent">Parents Only</option>
+            <option value="admin">Admins Only</option>
+            <option value="teacher">Teachers Only</option>
+          </select>
+          <label class="checkbox-option name-tag-select-all">
+            <input type="checkbox" id="training-assign-select-all-checkbox" />
+            Select All
+          </label>
+          <label class="checkbox-option name-tag-select-none">
+            <input type="checkbox" id="training-assign-select-none-checkbox" />
+            Select None
+          </label>
+        </div>
+        <% if (members.length === 0) { %>
+          <p class="roster-empty">No active members yet.</p>
+        <% } else { %>
+          <div class="roster-scroll print-picker-scroll">
+            <table class="roster-table members-table condensed-table" id="training-assign-list">
+              <thead><tr><th></th><th>Name</th><th>Type</th></tr></thead>
+              <tbody>
+                <% members.forEach(function(m) { %>
+                  <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-primary="<%= m.is_primary_parent ? '1' : '0' %>">
+                    <td><input type="checkbox" name="memberIds" value="<%= m.id %>" <%= alreadyAssigned.has(m.id) ? 'checked disabled' : '' %> /></td>
+                    <td><%= m.name %><%= alreadyAssigned.has(m.id) ? ' (already assigned)' : '' %></td>
+                    <td><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+      <button type="submit" class="primary-btn">Assign Training</button>
+    </form>
+  </main>
+  <script src="/js/training-assign-picker.js"></script>
+</body>
+</html>

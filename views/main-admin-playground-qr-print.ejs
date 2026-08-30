@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <%# Same @page/.qr-sheet-page margin-stacking fix as admin-classcheckin-
+      qr-print.ejs - see that file's own comment for the full story. %>
+  <style>@page { size: letter portrait; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Playground Check-In QR Codes</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <%
+      // One page per day, one QR code per hour - the playground always has
+      // exactly 4 hours a day (utils/playground.js), which is exactly what
+      // .qr-sheet-grid's fixed 2x2 CSS grid already expects (see
+      // admin-classcheckin-qr-print.ejs's own comment on that class).
+      // Anybody scanning a code lands straight on that hour's own
+      // Playground Check-In attendance/scan screen - no roster, no
+      // enrollment, just a shared PIN-gated kiosk surface.
+    %>
+    <% pages.forEach(function(page) { %>
+      <div class="qr-sheet-page">
+        <div class="print-header">
+          <img src="/img/logo.png" alt="" />
+          <div>
+            <p class="print-header-title">Sanford Homeschoolers</p>
+            <p class="print-header-sub">Playground &middot; <%= page.dayLabel %></p>
+          </div>
+        </div>
+        <div class="qr-sheet-grid">
+          <% page.hours.forEach(function(h) { %>
+            <div class="qr-sheet-cell">
+              <div class="qr-sheet-code" data-qr-value="<%= h.checkInUrl %>"></div>
+              <p class="qr-sheet-class-name">Playground</p>
+              <p class="qr-sheet-class-meta"><%= page.dayLabel %> &middot; <%= h.hourLabel %></p>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/qrcode.min.js"></script>
+  <script src="/js/classcheckin-qr-print.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

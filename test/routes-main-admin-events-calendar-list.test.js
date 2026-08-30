@@ -56,17 +56,22 @@ async function publishEvent(admin, eventId) {
   await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
 }
 
-test('Calendar tab: month name sits on its own line above a Prev/Next row containing only those two buttons', async () => {
+test('Calendar tab: toggle row sits above a single Prev/month-select/year-select/Next row', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /<h2 class="event-calendar-month-label">/);
-  const monthNavMatch = /<div class="event-calendar-month-nav">([\s\S]*?)<\/div>\s*<\/div>/.exec(page.text);
-  assert.ok(monthNavMatch, 'expected the month-nav wrapper to be present');
-  const monthNavHtml = monthNavMatch[1];
-  assert.match(monthNavHtml, /&larr; Prev/);
-  assert.match(monthNavHtml, /Next &rarr;/);
-  assert.doesNotMatch(monthNavHtml, /<strong>/, 'the old bare <strong> month label sandwiched between the buttons should be gone');
+  assert.doesNotMatch(page.text, /event-calendar-month-label/, 'the standalone month-name label was dropped - the month/year dropdowns already show it');
+  const toolbarStart = page.text.indexOf('<div class="event-calendar-toolbar no-print">');
+  assert.ok(toolbarStart >= 0, 'expected the calendar toolbar to be present');
+  const toolbarEnd = page.text.indexOf('</table>', toolbarStart);
+  const toolbarHtml = page.text.slice(toolbarStart, toolbarEnd);
+  const toggleIndex = toolbarHtml.indexOf('event-calendar-view-row');
+  const navIndex = toolbarHtml.indexOf('event-calendar-nav-row');
+  assert.ok(toggleIndex >= 0 && navIndex >= 0 && toggleIndex < navIndex, 'the Calendar/List toggle row should render above the Prev/month/year/Next row');
+  assert.match(toolbarHtml, /&larr; Prev/);
+  assert.match(toolbarHtml, /Next &rarr;/);
+  assert.match(toolbarHtml, /id="event-month-select"/);
+  assert.match(toolbarHtml, /id="event-year-select"/);
 });
 
 test('Calendar tab: List/Calendar view toggle switches rendering and preserves the month in the URL', async () => {

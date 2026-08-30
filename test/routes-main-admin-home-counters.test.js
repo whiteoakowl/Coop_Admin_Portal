@@ -51,6 +51,13 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   const res = await request(app).get('/main-admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
+  // A later request: "should be called homepage, remove the description,
+  // people title should say members."
+  assert.match(res.text, /<h1>Homepage<\/h1>/);
+  assert.doesNotMatch(res.text, /control center for the whole platform/);
+  assert.match(res.text, /<h2>Members<\/h2>/);
+  assert.doesNotMatch(res.text, /<h2>People<\/h2>/);
+
   assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Parents<\/span>/);
   assert.match(res.text, /<span class="stat-value">2<\/span>\s*<span class="stat-label">Students<\/span>/);
   assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Families<\/span>/);
@@ -58,7 +65,10 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   assert.match(res.text, /<span class="stat-label">Admins<\/span>/);
 
   // Pending-requests counters (item 6) each link straight to their own
-  // request page.
+  // request page. A later request added Membership Requests to this same
+  // "Pending Requests" section, reusing the account-approval count/link
+  // ("pending requests should also include membership requests and link").
+  assert.match(res.text, /class="totals-item" href="\/main-admin\/users"[^]*?Membership Requests/);
   assert.match(res.text, /href="\/main-admin\/events\?tab=requests"[^]*?Event Requests/);
   assert.match(res.text, /href="\/main-admin\/babysitters\?tab=approvals"[^]*?Babysitter Approvals/);
   assert.match(res.text, /href="\/main-admin\/photos#pending-photos"[^]*?Photo Submissions/);

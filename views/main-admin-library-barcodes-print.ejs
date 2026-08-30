@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Library Barcode Labels</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (items.length === 0) { %>
+      <p class="roster-empty">No library items selected.</p>
+    <% } %>
+
+    <%
+      // Same Avery 08160-style sheet (3 across x 10 down of 2-5/8in x 1in
+      // labels = 30 per sheet) as the member barcode-labels print - a real
+      // request: "Use the same template as the barcode only badges for
+      // members." Only the second text line differs (a library item has no
+      // member-code-like ID separate from its own barcode, so its Category
+      // prints there instead).
+      var pages = [];
+      for (var i = 0; i < items.length; i += 30) pages.push(items.slice(i, i + 30));
+    %>
+    <% pages.forEach(function(pageItems) { %>
+      <div class="avery-label-sheet-page">
+        <div class="avery-label-grid">
+          <% pageItems.forEach(function(item) { %>
+            <div class="avery-label-cell">
+              <%# Same shrink-to-fit script as the member barcode sheets
+                  (barcode-cell-svg/barcode-cell-name). %>
+              <svg class="barcode-cell-svg" data-barcode-value="<%= item.barcode %>"></svg>
+              <div class="barcode-cell-name"><%= item.title %></div>
+              <div class="barcode-cell-id"><%= item.type ? item.type : 'Uncategorized' %></div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/barcode-print-shrink-name.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

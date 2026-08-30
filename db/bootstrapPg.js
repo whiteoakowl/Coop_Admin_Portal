@@ -157,7 +157,7 @@ const PORTAL_PERMISSIONS = [
   { key: 'manage_resources', label: 'Manage Resource Links', description: 'Add and remove the curated resource links shown on member portals.' },
   { key: 'manage_babysitters', label: 'Manage Babysitter Directory', description: 'Approve or reject babysitter profile submissions and edits.' },
   { key: 'manage_sections', label: 'Manage Sections', description: 'Create sections and assign members to them, for restricting events/classes to specific groups.' },
-  { key: 'manage_name_tags', label: 'Manage Name Tags', description: 'Design name tag templates and bulk-print name tags for any member.' },
+  { key: 'manage_name_tags', label: 'Manage Name Tags', description: 'Design and print name tags, schedule cards, badges, and barcode sheets for any member.' },
   { key: 'register_guests', label: 'Register Guests', description: 'Register a non-member guest for an event.' },
 ];
 

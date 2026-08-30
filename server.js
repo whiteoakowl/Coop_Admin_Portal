@@ -128,10 +128,20 @@ const mainAdminBabysittersRouter = require('./routes/main-admin-babysitters');
 // Named groups of members (independent of Family) that Events/Classes can
 // optionally restrict registration to - same sibling-router shape.
 const mainAdminSectionsRouter = require('./routes/main-admin-sections');
-// Same design canvas as Co-op Admin's own /admin/name-tag (public/js/
-// name-tag-editor.js, parameterized rather than forked - see its own
-// comment) plus bulk print, mirrored into Main Admin.
+// Same full Design/Print hub as Co-op Admin's own /admin/design (name
+// tags, schedule cards, setup/cleanup + custom badges, combined/duplex
+// printing, Avery labels, QR codes, library barcodes, the Requests
+// queue) - see routes/main-admin-name-tags.js's own comment for the one
+// deliberate scope cut (Print Schedules/Print Logs links, which point to
+// pages that don't exist under Main Admin's own namespace at all).
 const mainAdminNameTagsRouter = require('./routes/main-admin-name-tags');
+// Same Training & Learning module as Co-op Admin's own /admin/training
+// (utils/training.js, shared tables - see routes/main-admin-training.js's
+// own comment), mirrored into Main Admin. Mounted at '/main-admin' (not
+// '/main-admin/training') since its own routes are already prefixed with
+// '/training/...', the exact same shape as adminTrainingRouter's mount
+// below.
+const mainAdminTrainingRouter = require('./routes/main-admin-training');
 // Community & Commerce track (Track B, TEAM_B_HANDOFF.md) - member/
 // public-facing Events at /events, admin Events management folded into
 // the Main Admin Portal's own URL namespace at /main-admin/events (a
@@ -390,6 +400,7 @@ app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);
 app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
 app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
+app.use('/main-admin', mainAdminTrainingRouter);
 app.use('/events', eventsRouter);
 app.use('/main-admin/events', adminEventsRouter);
 app.use('/directory', directoryRouter);

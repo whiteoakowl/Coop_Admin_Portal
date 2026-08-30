@@ -1,16 +1,21 @@
 <%
 // locals: type ('setupCleanup' | 'custom'), label, badges (rows from
-// listMiscBadges). Import always replaces the whole list for this type;
-// Print with nothing checked prints every badge, checking rows prints just
-// those (see routes/admin-misc-badges.js). Setup/Cleanup badges are no
-// longer a separately admin-imported deck - each one is created/kept in
-// sync automatically from the Task List (Setup/Cleanup > Tasks tab; see
+// listMiscBadges), basePath (optional, default '/admin/design' - Main
+// Admin's own Design/Print page passes '/main-admin/name-tags' so this
+// exact partial can be reused unmodified there too, same basePath
+// parameterization pattern as name-tag-editor.js's own BASE_PATH).
+// Import always replaces the whole list for this type; Print with
+// nothing checked prints every badge, checking rows prints just those
+// (see routes/admin-misc-badges.js). Setup/Cleanup badges are no longer
+// a separately admin-imported deck - each one is created/kept in sync
+// automatically from the Task List (Setup/Cleanup > Tasks tab; see
 // utils/taskList.js's addItem/updateItem and misc_badges' own
 // task_item_id schema comment), so Import/Sample File only ever render
 // for 'custom', which is still its own independent imported list.
 const isTaskDerived = type === 'setupCleanup';
+const badgeBasePath = typeof basePath !== 'undefined' && basePath ? basePath : '/admin/design';
 %>
-<form method="POST" action="/admin/design/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form" data-bulk-print-refresh>
+<form method="POST" action="<%= badgeBasePath %>/badges/<%= type %>/print" target="_blank" id="<%= type %>-badge-print-form" data-bulk-print-refresh>
   <div class="roster-toolbar no-print">
     <div class="schedule-filters">
       <label class="checkbox-option schedule-print-select-all">
@@ -21,7 +26,7 @@ const isTaskDerived = type === 'setupCleanup';
     <div class="roster-btn-row">
       <% if (!isTaskDerived) { %>
         <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('<%= type %>-badge-import-dialog').showModal()">Import</button>
-        <a class="roster-action-btn file-action-btn" href="/admin/design/badges/<%= type %>/import-template.xlsx">Sample File</a>
+        <a class="roster-action-btn file-action-btn" href="<%= badgeBasePath %>/badges/<%= type %>/import-template.xlsx">Sample File</a>
       <% } %>
       <button type="submit" class="primary-btn">Print</button>
     </div>
@@ -71,7 +76,7 @@ const isTaskDerived = type === 'setupCleanup';
   <% badges.forEach(function(b) { %>
     <form
       method="POST"
-      action="/admin/design/badges/<%= type %>/delete/<%= b.id %>"
+      action="<%= badgeBasePath %>/badges/<%= type %>/delete/<%= b.id %>"
       id="<%= type %>-badge-delete-form-<%= b.id %>"
       data-confirm="Delete &quot;<%= b.title || 'this badge' %>&quot;? This cannot be undone."
     ></form>
@@ -80,9 +85,9 @@ const isTaskDerived = type === 'setupCleanup';
 
 <% if (!isTaskDerived) { %>
   <dialog id="<%= type %>-badge-import-dialog" class="member-picker-dialog">
-    <form method="POST" action="/admin/design/badges/<%= type %>/import" enctype="multipart/form-data">
+    <form method="POST" action="<%= badgeBasePath %>/badges/<%= type %>/import" enctype="multipart/form-data">
       <h3>Import <%= label %> Badges</h3>
-      <a class="btn-secondary import-sample-link" href="/admin/design/badges/<%= type %>/import-template.xlsx">Download Sample File</a>
+      <a class="btn-secondary import-sample-link" href="<%= badgeBasePath %>/badges/<%= type %>/import-template.xlsx">Download Sample File</a>
       <input type="file" name="file" accept=".csv,.txt,.xlsx" required />
       <div class="notes-dialog-actions">
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

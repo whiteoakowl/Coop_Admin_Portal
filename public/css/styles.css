@@ -150,6 +150,12 @@ html, body {
   background: var(--bg);
   color: var(--ink);
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Backstop only, not the fix - every real source of page-level
+     horizontal scroll (an oversized table, a flex child that refuses to
+     shrink, etc.) should be constrained where it happens (.roster-scroll
+     and friends). This just keeps a rare miss from producing a
+     page-width scrollbar on top of that. */
+  overflow-x: hidden;
 }
 
 a { color: var(--brand-dark); text-decoration: none; }
@@ -170,6 +176,74 @@ h1, h2, h3,
 }
 
 button { font-family: inherit; cursor: pointer; }
+
+/* ---------- Form controls (global base) ----------
+   Every text-like input/select/textarea in the app used to only get the
+   modern border/radius/padding treatment if its container happened to be
+   named in one of a few dozen selector lists scattered through this file
+   (.stack-form input, .member-form-grid select, .category-filter select,
+   .manage-header-row select, ...) - the same handful of declarations
+   copy-pasted onto a new selector every time a form showed up in a new
+   context. A plain, unclassed <input>/<select>/<textarea> anywhere else
+   fell back to the browser's own default look (a different height,
+   border, and - for <select> - the native dropdown arrow), which is
+   exactly the "outdated dropdown styling"/"forms that don't line up"
+   pattern a real UI audit called out. This base rule now covers every
+   control by default; the many pre-existing selector lists above still
+   work (same properties, same values in most cases) and just layer
+   page-specific sizing (width, compact padding, margin) on top - nothing
+   needed to be removed for this to take effect everywhere at once. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+select,
+textarea {
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size-compact);
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  line-height: 1.3;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not(:disabled):hover,
+select:not(:disabled):hover,
+textarea:not(:disabled):hover {
+  border-color: var(--btn-purple);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f1f5f9;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Custom chevron replaces every browser's own native dropdown arrow (the
+   biggest single source of "this still looks like an old-fashioned
+   dropdown" - the arrow's size/position/style varies by OS and browser
+   and never matched the rest of the control) with one consistent glyph,
+   drawn the same way as .icon's own stroke-based icons so it reads as
+   part of the same visual language. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M5 7l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 0.8rem;
+}
+select:disabled { background-image: none; }
+select::-ms-expand { display: none; }
+
+textarea { resize: vertical; }
+
+::placeholder { color: var(--muted); opacity: 1; }
 
 /* ---------- Icons ---------- */
 
@@ -1101,7 +1175,17 @@ body.public-page .roster-empty {
   border-radius: var(--control-radius);
   font-size: var(--control-font-size);
   font-family: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
+}
+
+/* The shorthand above only sets background-color, on purpose - a plain
+   `background` shorthand would silently wipe the shared select chevron
+   (global base rule, further up this file) since it resets background-
+   image to none too. These two selects just need extra right padding so
+   that chevron has room next to this form scale's own wider padding. */
+.stack-form select,
+.member-form-grid select {
+  padding-right: 2.5rem;
 }
 
 .radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
@@ -1675,7 +1759,10 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 /* Floater lists: a parent with a child 2 or younger, and each name's
    auto-sub ranking (set via .volunteer-rank-select in Edit Members). */
 .infant-tag { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
-.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; }
+/* Compact numeric rank pickers - too narrow for the shared chevron
+   (global select rule above) without it overlapping the 1-2 digit value
+   they show, so both opt out of it the same way .roster-cell-select does. */
+.volunteer-rank-select { font-size: 0.82rem; padding: 0.25rem 0.4rem; background-image: none; }
 
 .status-badge {
   display: inline-block;
@@ -1936,13 +2023,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    next over and over." */
 .pagination-page-select-label { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .pagination-page-select {
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 1.6rem 0.2rem 0.4rem;
   border: 1px solid var(--btn-purple);
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-weight: 600;
   color: var(--purple);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-position: right 0.45rem center;
+  background-size: 0.7rem;
 }
 .pagination-btn {
   padding: var(--control-padding-compact);
@@ -2002,9 +2091,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-family: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
   line-height: 1.3;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+/* The shorthand above only sets background-color on purpose - see the
+   .stack-form/.member-form-grid select comment further up for why a
+   plain `background` would silently wipe the shared select chevron. The
+   handful of selects in that shared rule need a bit more right padding
+   than --control-padding-compact alone leaves for the chevron to clear. */
+.category-filter select,
+.inline-form-row select,
+.manage-header-row select,
+.quick-add-row select,
+.name-tag-bulk-filter-select,
+.name-tag-add-field select {
+  padding-right: 2.25rem;
 }
 
 /* Secondary actions (dialog Cancel, small standalone buttons) get a
@@ -2081,6 +2183,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  /* Round color-coded status badge, not a normal dropdown - opts out of
+     the shared select chevron/padding-right (global base rule above)
+     since a visible arrow inside a 1.9rem circle would overlap the
+     Present/Late/Absent letter it displays. */
+  background-image: none;
   width: 1.9rem;
   height: 1.9rem;
   min-width: 0;
@@ -2441,7 +2548,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 
 .member-form-city-row { display: grid; grid-template-columns: 1.3fr 1.15fr 1fr; gap: 0.75rem 1rem; }
-.member-form-city-row select { padding-right: 0.4rem; font-size: 0.88rem; }
+.member-form-city-row select { padding-right: 1.75rem; font-size: 0.88rem; background-position: right 0.55rem center; background-size: 0.7rem; }
 @media (max-width: 640px) {
   .member-form-city-row { grid-template-columns: 1fr; }
 }
@@ -2700,7 +2807,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   flex: 1 0 auto;
   min-width: 5.5rem;
   text-align: center;
-  white-space: nowrap;
+  /* Not nowrap - a longer label (e.g. "Allergies/Medical") stayed on one
+     line and got clipped rather than growing whenever something narrower
+     than its content assigned its actual width, which happens by design
+     on mobile: roster-btn-row-grid.js locks every button in a toolbar row
+     into an equal-width CSS Grid column sized off the button COUNT, not
+     each one's own text length. Letting the label wrap to a second line
+     instead just grows that row's height a little - normal, safe button
+     behavior - instead of silently cutting text off. overflow-wrap is
+     needed alongside it since a label like "Allergies/Medical" is one
+     unbroken run with no space for the browser's normal wrap algorithm
+     to break on - this lets it break at the slash instead of overflowing
+     past the button's own edge. */
+  overflow-wrap: break-word;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2742,6 +2861,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-btn-row > form:only-child .roster-action-btn {
   flex: 0 0 auto;
 }
+
+/* Main Admin's Email/Text composer toolbar (item 6: "select all or none
+   should be checkboxes not buttons") went from four .roster-action-btn
+   siblings down to one (Filter) sitting next to a .primary-btn submit -
+   :only-child above doesn't catch this row since Filter isn't literally
+   the only child, just the only .roster-action-btn, so it was still
+   stretching to fill the whole row on its own. */
+.email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
 
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
@@ -3369,7 +3496,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   font-size: var(--control-font-size-compact);
   font-family: inherit;
   font-weight: 600;
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
   margin: 0.75rem 0;
 }
@@ -3380,7 +3507,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-family: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
 }
 
@@ -4053,14 +4180,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .floater-assign-form select {
   flex: 1;
   min-width: 0;
-  padding: 0.3rem 0.4rem;
+  padding: 0.3rem 1.5rem 0.3rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.78rem;
-  background: #fff;
+  background-color: var(--surface);
+  background-position: right 0.4rem center;
+  background-size: 0.65rem;
   color: var(--ink);
 }
-.floater-assign-form select:disabled { background: #f8fafc; color: var(--muted); }
+.floater-assign-form select:disabled { background-color: #f8fafc; color: var(--muted); }
 .floater-assign-btn {
   flex-shrink: 0;
   border: none;
@@ -4324,7 +4453,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-info-leader .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
 .team-info-leader-select {
   border: none;
-  background: none;
+  background-color: transparent;
+  background-position: right center;
+  background-size: 0.6rem;
+  padding: 0 0.85rem 0 0;
   font: inherit;
   font-weight: 700;
   color: var(--ink);
@@ -4555,7 +4687,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    without having to open their profile. */
 .medical-flag { display: inline-flex; align-items: center; justify-content: center; color: var(--red); flex-shrink: 0; margin-left: 0.3rem; vertical-align: -2px; }
 .medical-flag .icon { width: 0.95em; height: 0.95em; }
-.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; }
+/* Same reasoning as .volunteer-rank-select above - too narrow for the
+   shared chevron without overlapping its own short value. */
+.team-member-rank-select { font-size: 0.68rem; padding: 0.15rem 0.25rem; flex-shrink: 0; max-width: 6rem; background-image: none; }
 .team-card-empty { color: var(--muted); font-size: 0.78rem; padding: 0.4rem 0; }
 
 .grid-box {
@@ -4815,11 +4949,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 0.65rem 0.6rem;
   font: inherit;
   font-size: 0.92rem;
-  background: #fff;
+  background-color: var(--surface);
   width: 100%;
   min-width: 0;
   color: var(--ink);
 }
+.class-form-field select { padding-right: 2.25rem; }
 .class-form-field input[type="text"]::placeholder { color: var(--muted); }
 
 .class-form-section-label { margin: 0.2rem 0 0.9rem; font-weight: 700; font-size: 0.88rem; }
@@ -5264,6 +5399,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .grade-pill input[type="checkbox"] { accent-color: var(--btn-bg); width: 0.95rem; height: 0.95rem; }
 .grade-pill:has(input:checked) { background: var(--orange-bg); border-color: var(--btn-bg); color: var(--orange); }
+
+/* Training builder's Completion Requirements checklist reuses .grade-pill
+   for longer descriptive checkboxes, not the short flex-wrap filter tags
+   it was built for (see .grade-pill-grid above). Inside .member-form-grid,
+   that grid's own `.member-form-grid label` rule (class+element, higher
+   specificity than .grade-pill's class-only inline-flex) wins and forces
+   each pill to `display:flex; flex-direction:column`, which - because
+   flex is block-level by default - stretches every pill to the full
+   container width and stacks checkbox above centered text instead of
+   inline beside it. Scope these specific pills back to their intended
+   compact horizontal layout and stack them in a clean left-aligned column
+   (views/admin-training-builder.ejs, views/main-admin-training-builder.ejs). */
+.training-requirements { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.training-requirements .grade-pill { display: inline-flex; flex-direction: row; align-items: center; }
+
+/* Training builder's Passing Score + Video completion threshold - one
+   .member-form-grid cell (not .member-form-full) holding both fields side
+   by side, so the threshold sits on the same line as Passing Score rather
+   than as the first item in the Completion Requirements checklist above.
+   .member-form-grid label's own column-flex layout (see comment above)
+   still applies to each label inside; this just lays the two labels out
+   as a row and lets them share the cell's width evenly. */
+.training-inline-fields { display: flex; gap: 1rem; }
+.training-inline-fields label { flex: 1; min-width: 0; }
 
 /* Roster/staff "list log" - a clean, scannable row per person (name,
    grade, age, a medical/allergy flag when notes exist, remove button)
@@ -6368,27 +6527,121 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    defined elsewhere in this file; the only genuinely new shape here is
    the rich-text editor (public/js/forum-editor.js) and a forum post
    bubble, neither of which has an existing equivalent. */
-.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.4rem; }
+/* Toolbar layout matches one exact reference image, real request: "email,
+   announcements, class edit description, event calendar edit description
+   all should have these exact options" - utility row (source/search/
+   fullscreen/undo-redo/clipboard/direction/spellcheck) above Paragraph+
+   Font+Size dropdowns, inline formatting+colors, alignment+lists+indent,
+   links+media+symbols, Clear Formatting on its own row, then a Shift+
+   Enter hint. A follow-up pass ("the icons don't look exactly the same")
+   replaced the row-4/row-5 controls that had been left as text/emoji
+   glyphs with real sprite icons drawn to match the reference's own
+   shapes (icon-sprite.ejs's own "forum-editor-toolbar icon set" comment)
+   - only a handful of controls still use plain text/characters (Source,
+   B/I/U/S/X2/X2, the Omega special-character button, "--" horizontal
+   rule), because that's what the reference image itself uses there too.
+   Icon buttons are uniform squares (same sizing convention as .icon-btn
+   elsewhere) regardless of whether their icon is an <svg> or a character. */
+.forum-editor-toolbar { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt, #f7f8fa); padding: 0.5rem; }
 .forum-editor-toolbar-row { display: flex; gap: 0.25rem; flex-wrap: wrap; align-items: center; }
-.forum-editor-toolbar button,
-.forum-editor-toolbar select { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.85rem; cursor: pointer; line-height: 1.2; }
-.forum-editor-toolbar button:hover { background: var(--brand-soft, #eef4fb); }
-.forum-editor-toolbar button.forum-editor-toggle-on { background: var(--brand-soft, #eef4fb); border-color: var(--brand); }
+.forum-editor-toolbar-row + .forum-editor-toolbar-row { padding-top: 0.35rem; border-top: 1px solid var(--border); }
+.forum-editor-toolbar button {
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  line-height: 1;
+}
+.forum-editor-toolbar button .icon { width: 1.05rem; height: 1.05rem; }
+/* .forum-editor-toolbar button.forum-editor-btn-text (element+class,
+   not just the class alone) - the base button rule right above this one
+   is itself element+class (.forum-editor-toolbar button), one specificity
+   notch above a bare .forum-editor-btn-text, so a plain class selector
+   here never actually wins and its width: auto silently loses to the
+   base rule's fixed width: 1.9rem - the button stays squeezed to a 30px
+   square and multi-character text (Source's "</> Source", "ABC✓"
+   spellcheck, the Ω special-character button, "--" horizontal rule)
+   overflows both edges of that square instead of the button actually
+   growing to fit it. */
+.forum-editor-toolbar button.forum-editor-btn-text { width: auto; padding: 0 0.5rem; gap: 0.3rem; white-space: nowrap; }
+.forum-editor-toolbar-row-bottom button { width: auto; padding: 0 0.65rem; gap: 0.35rem; font-weight: 600; }
+.forum-editor-toolbar button:hover { background: var(--surface); border-color: var(--border); }
+.forum-editor-toolbar button.forum-editor-toggle-on { background: var(--brand-soft, #eef4fb); border-color: var(--brand); color: var(--brand-dark); }
+.forum-editor-toolbar-row-dropdowns { gap: 0.5rem; }
+/* width/min-width explicit (not just min-width) - several forms this
+   toolbar lives inside (.stack-form, .member-form-grid, ...) set their
+   own `select { width: 100% }` at the same specificity as this rule, and
+   without an explicit width here that survives untouched, stretching
+   every dropdown to the row's full width and forcing Paragraph/Font/Size
+   into three stacked rows instead of sitting side by side. */
+.forum-editor-toolbar select { border: 1px solid var(--border); background-color: var(--surface); border-radius: 6px; padding: 0.4rem 1.9rem 0.4rem 0.65rem; background-position: right 0.55rem center; background-size: 0.7rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); cursor: pointer; line-height: 1.2; width: auto; min-width: 8rem; }
 .forum-editor-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 0.15rem; }
-.forum-editor-color { display: inline-flex; align-items: center; gap: 0.2rem; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.2rem 0.4rem; font-size: 0.85rem; cursor: pointer; }
-.forum-editor-color input[type="color"] { width: 1.4rem; height: 1.4rem; padding: 0; border: none; background: none; cursor: pointer; }
+/* label.forum-editor-color (element+class, not just .forum-editor-color)
+   - on the event/class edit forms this toolbar lives inside a
+   .member-form-grid container, whose own `.member-form-grid label` rule
+   (element+class too, so equal specificity) sets flex-direction: column
+   for every plain field label on those forms. Equal specificity means
+   source order decides, and that stacked-label rule is defined earlier
+   in this file - without matching its specificity here, it wins and
+   stacks the "A"/highlight glyph above its color swatch instead of
+   beside it. flex-shrink: 0 additionally keeps the label from being
+   squeezed below its content width on those same narrower forms. */
+label.forum-editor-color { display: inline-flex; flex-direction: row; align-items: center; gap: 0.25rem; width: auto; height: 1.9rem; flex-shrink: 0; padding: 0 0.4rem; border: 1px solid transparent; background: none; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.forum-editor-color:hover { background: var(--surface); border-color: var(--border); }
+/* The glyph ("A" or the highlighter icon) carries a colored underline
+   that forum-editor.js keeps in sync with the color input's value - the
+   reference toolbar's own text-color/highlight-color buttons show an
+   underline under the glyph, not a separate boxed swatch. */
+.forum-editor-color-glyph { display: inline-flex; align-items: center; justify-content: center; padding-bottom: 2px; border-bottom: 3px solid; line-height: 1; }
+.forum-editor-color-glyph .icon { width: 1.05rem; height: 1.05rem; }
+/* Visually hidden, not display:none - it has to stay a real, focusable,
+   clickable form control (clicking anywhere in the wrapping <label>,
+   including the glyph and its underline, forwards the click to it and
+   opens the browser's native color picker) rather than a decorative
+   stand-in that only looks interactive. input.forum-editor-color-input
+   (element+class, not just the class) - same reason as the select and
+   label rules above: .member-form-grid input matches this too (it's
+   still a plain <input>) at equal-or-higher specificity, and would
+   otherwise blow this back up to width: 100% on the event/class edit
+   forms this toolbar also lives inside. */
+input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .forum-editor-popup { position: relative; display: flex; flex-wrap: wrap; gap: 0.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.5rem; }
-.forum-editor-symbol-btn { min-width: 2rem; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 1rem; cursor: pointer; }
+.forum-editor-symbol-btn { min-width: 2rem; width: auto; height: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 1rem; cursor: pointer; }
 .forum-editor-symbol-btn:hover { background: var(--brand-soft, #eef4fb); }
 .forum-editor-findreplace { align-items: center; }
 .forum-editor-findreplace input[type="text"] { border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.85rem; }
-.forum-editor-findreplace button { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
+.forum-editor-findreplace button { width: auto; height: auto; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
+.forum-editor-hint { margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.forum-editor-hint kbd { display: inline-block; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0.05rem 0.35rem; font-family: inherit; font-size: 0.75rem; background: var(--surface); }
 .forum-editable { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 0.9rem; min-height: 6rem; background: var(--surface); }
 .forum-editable:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
 .forum-editable blockquote { border-left: 3px solid var(--border); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 .forum-editable table { border-collapse: collapse; margin: 0.5rem 0; }
 .forum-editable table td, .forum-editable table th { border: 1px solid var(--border); padding: 0.35rem 0.55rem; }
 .forum-editable img { max-width: 100%; }
+/* Checklist item (toolbar's Checklist button) - the checkbox is always
+   saved disabled (utils/sanitizeHtml.js forces it server-side too), so
+   it reads as the author's own checked/unchecked marker, not a live
+   control. ul.task-list drops the usual bullet since the checkbox
+   already marks each line. Video embed (toolbar's Insert Video button) -
+   width:100% + aspect-ratio keeps a fixed-size YouTube/Vimeo iframe from
+   overflowing a narrower reading column instead of just clipping at its
+   own hard-coded 560x315. */
+.forum-editable ul.task-list,
+.forum-editable-display ul.task-list { list-style: none; padding-left: 0; }
+.forum-editable ul.task-list input[type="checkbox"],
+.forum-editable-display ul.task-list input[type="checkbox"] { margin-right: 0.45rem; accent-color: var(--brand); vertical-align: -0.15em; }
+.forum-editable iframe,
+.forum-editable-display iframe { display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; height: auto; border-radius: 8px; margin: 0.5rem 0; }
 .forum-editor-source-view { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.85rem; resize: vertical; }
 /* Read-only rendering of a saved rich-text body (class/event descriptions
    on the parent/student side, announcements) - the same content rules as
@@ -6485,11 +6738,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .event-calendar-table .badge-pill { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
 }
 
-/* Item 2 - square icon-only Calendar View/List View toggle buttons,
-   reusing .archived-toggle-btn's own "pressed" active look (see that
-   class's comment above) instead of a second active-state treatment. */
+/* Item 2 - square icon-only Calendar View/List View toggle buttons. A
+   later request: "toggle for calendar or list view should be highlighted
+   white when selected, not black" - .archived-toggle-btn.active's shared
+   black "pressed" look (used by admin-design/admin-logs/admin-name-tag
+   too) stays as-is for those other pages; this toggle gets its own
+   white-when-active override scoped to .icon-toggle-btn specifically so
+   nothing else is affected. */
 .icon-toggle-btn { flex: 0 0 auto; min-width: 0; width: 2.5rem; padding: 0.5rem; display: inline-flex; align-items: center; justify-content: center; }
 .icon-toggle-btn .icon { width: 1.1rem; height: 1.1rem; }
+.icon-toggle-btn.active, .icon-toggle-btn.active:hover { background: #fff; border-color: var(--ink); color: var(--ink); }
 
 /* Item 3 - desktop Events tab strip becomes a dropdown; mobile keeps its
    own accordion (unchanged) below 640px per .event-tabs-desktop's
@@ -6509,22 +6767,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .event-attendance-table th, .event-attendance-table td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
 }
 
-/* A real request: "prev/next buttons should be side by side with the
-   month name stacked above them" - previously Prev/<month name>/Next sat
-   as three items crammed into one .roster-btn-row, which not only read
-   oddly (a plain text label sandwiched between two buttons) but broke
-   that row's own mobile button-grid math (roster-btn-row-grid.js only
-   counts .roster-action-btn children, so the month name <strong> silently
-   rode along as an extra, unaccounted-for grid cell). The month label now
-   sits in its own line above a Prev/Next .roster-btn-row containing only
-   the two buttons; the Calendar/List view toggle gets its own second
-   .roster-btn-row alongside it. */
-.event-calendar-month-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
-.event-calendar-month-label { margin: 0; font-size: 1.1rem; }
-.event-calendar-toolbar { align-items: flex-start; }
-/* Calendar/List view toggle reuses .archived-toggle-btn's own "pressed"
-   look (see that class's own comment above) rather than inventing a
-   second active-state treatment for the same idea. */
+/* A real request (superseded by the one below, kept for history): "prev/
+   next buttons should be side by side with the month name stacked above
+   them" - previously Prev/<month name>/Next sat as three items crammed
+   into one .roster-btn-row, which not only read oddly (a plain text label
+   sandwiched between two buttons) but broke that row's own mobile
+   button-grid math (roster-btn-row-grid.js only counts .roster-action-btn
+   children, so the month name <strong> silently rode along as an extra,
+   unaccounted-for grid cell).
+
+   Latest request: "row should be Prev button, month dropdown, year
+   dropdown, next button - shrink font and buttons to fit clean on one
+   row" plus "toggle should be stacked above the month and year
+   dropdowns." The standalone month-name label is dropped entirely (the
+   month/year dropdowns already show the selected month, so a third,
+   redundant label added nothing); the Calendar/List toggle now sits in
+   its own row above a single compact Prev/month-select/year-select/Next
+   row, with smaller type/padding on that row's buttons and selects so
+   all four fit cleanly without wrapping on a typical screen. */
+.event-calendar-toolbar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin: 1.25rem 0; }
+.event-calendar-nav-row { flex-wrap: nowrap; }
+.event-calendar-nav-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+.event-calendar-nav-row .event-month-select,
+.event-calendar-nav-row .event-year-select {
+  padding: 0.3rem 1.5rem 0.3rem 0.4rem;
+  font-size: 0.75rem;
+  background-position: right 0.5rem center;
+  background-size: 0.65rem;
+}
+@media (max-width: 480px) {
+  .event-calendar-nav-row { flex-wrap: wrap; }
+}
 
 /* A real request: "on mobile, replace the [Events] tabs with stacked
    expandable bars - click the title to expand it." Below 640px the
