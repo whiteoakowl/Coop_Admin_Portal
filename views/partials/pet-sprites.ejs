@@ -1,0 +1,198 @@
+<%# Student Portal > Pets (routes/student-portal.js, utils/pets.js) - the
+    pet illustrations themselves, kept separate from partials/icon-sprite
+    (that one's plain line icons for chrome/nav; these are small flat-
+    color creature illustrations meant to be composited together).
+    Every body symbol shares the same 0 0 120 120 canvas with the head
+    centered around (60, 46) so the eyes/mouth/accessory overlay symbols
+    line up on top of any species without per-species positioning -
+    views/student-pets.ejs stacks body + eyes + mouth + accessory as
+    sibling <use> elements inside one <svg>. Body shapes use
+    fill="currentColor" for their main coat/shell/scale color so
+    utils/pets.js's per-species color options work by just setting the
+    wrapping element's CSS `color`; a few fixed-color accent shapes
+    (belly patches, cheeks) stay literal hex since those don't change
+    with the coat color trait. %>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+
+  <!-- ===== Bodies (species) ===== -->
+
+  <symbol id="pet-body-cat" viewBox="0 0 120 120">
+    <path d="M60 92c-20 0-34-10-34-26s12-30 34-30 34 14 34 30-14 26-34 26z" fill="currentColor"/>
+    <path d="M32 40 22 16l20 12z" fill="currentColor"/>
+    <path d="M88 40 98 16 78 28z" fill="currentColor"/>
+    <path d="M35 20 27 5l14 9z" fill="#f6b6c6"/>
+    <path d="M85 20 93 5 79 14z" fill="#f6b6c6"/>
+    <ellipse cx="60" cy="70" rx="12" ry="9" fill="#fff8ee"/>
+    <ellipse cx="42" cy="60" rx="5" ry="4" fill="#f6b6c6" opacity="0.8"/>
+    <ellipse cx="78" cy="60" rx="5" ry="4" fill="#f6b6c6" opacity="0.8"/>
+    <path d="M92 78c10 2 18 10 14 20-3 7-13 6-16-2" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="pet-body-dog" viewBox="0 0 120 120">
+    <path d="M60 94c-19 0-33-11-33-27s13-29 33-29 33 13 33 29-14 27-33 27z" fill="currentColor"/>
+    <path d="M28 30c-10-2-16 8-12 18 3 8 12 10 16 4z" fill="currentColor"/>
+    <path d="M92 30c10-2 16 8 12 18-3 8-12 10-16 4z" fill="currentColor"/>
+    <ellipse cx="60" cy="58" rx="15" ry="12" fill="#fff8ee"/>
+    <ellipse cx="60" cy="62" rx="6" ry="5" fill="#6b4423"/>
+    <ellipse cx="45" cy="52" rx="5" ry="4" fill="#f2c199" opacity="0.7"/>
+    <ellipse cx="75" cy="52" rx="5" ry="4" fill="#f2c199" opacity="0.7"/>
+  </symbol>
+
+  <symbol id="pet-body-rabbit" viewBox="0 0 120 120">
+    <path d="M60 96c-18 0-32-10-32-25s13-27 32-27 32 12 32 27-14 25-32 25z" fill="currentColor"/>
+    <path d="M40 44C30 20 34 2 42 2s10 20 6 42z" fill="currentColor"/>
+    <path d="M80 44c10-24 6-42-2-42s-10 20-6 42z" fill="currentColor"/>
+    <path d="M42 12c-3 12-2 24 1 32" fill="none" stroke="#f6b6c6" stroke-width="6" stroke-linecap="round"/>
+    <path d="M78 12c3 12 2 24-1 32" fill="none" stroke="#f6b6c6" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="60" cy="66" rx="13" ry="10" fill="#fff8ee"/>
+    <ellipse cx="45" cy="58" rx="5" ry="4" fill="#f6b6c6" opacity="0.7"/>
+    <ellipse cx="75" cy="58" rx="5" ry="4" fill="#f6b6c6" opacity="0.7"/>
+  </symbol>
+
+  <symbol id="pet-body-dragon" viewBox="0 0 120 120">
+    <path d="M60 94c-18 0-32-10-32-25s13-27 32-27 32 12 32 27-14 25-32 25z" fill="currentColor"/>
+    <path d="M30 78c-14 4-22 16-16 26 4 7 14 6 17-3z" fill="currentColor"/>
+    <path d="M90 78c14 4 22 16 16 26-4 7-14 6-17-3z" fill="currentColor"/>
+    <path d="M42 18l6 12-10-2z" fill="currentColor"/>
+    <path d="M78 18l-6 12 10-2z" fill="currentColor"/>
+    <ellipse cx="60" cy="64" rx="14" ry="11" fill="#fff8ee"/>
+    <path d="M50 84c3 4 17 4 20 0" fill="none" stroke="#e8934a" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="45" cy="56" rx="5" ry="4" fill="#e8934a" opacity="0.6"/>
+    <ellipse cx="75" cy="56" rx="5" ry="4" fill="#e8934a" opacity="0.6"/>
+  </symbol>
+
+  <symbol id="pet-body-hamster" viewBox="0 0 120 120">
+    <path d="M60 98c-22 0-38-13-38-30s16-28 38-28 38 11 38 28-16 30-38 30z" fill="currentColor"/>
+    <circle cx="26" cy="34" r="12" fill="currentColor"/>
+    <circle cx="94" cy="34" r="12" fill="currentColor"/>
+    <circle cx="26" cy="34" r="6" fill="#f6b6c6"/>
+    <circle cx="94" cy="34" r="6" fill="#f6b6c6"/>
+    <ellipse cx="60" cy="70" rx="19" ry="15" fill="#fff8ee"/>
+    <ellipse cx="44" cy="62" rx="7" ry="5" fill="#f6b6c6" opacity="0.7"/>
+    <ellipse cx="76" cy="62" rx="7" ry="5" fill="#f6b6c6" opacity="0.7"/>
+  </symbol>
+
+  <symbol id="pet-body-husky" viewBox="0 0 120 120">
+    <path d="M60 94c-19 0-33-11-33-27s13-29 33-29 33 13 33 29-14 27-33 27z" fill="currentColor"/>
+    <path d="M30 26 20 4l18 14z" fill="currentColor"/>
+    <path d="M90 26 100 4 82 18z" fill="currentColor"/>
+    <path d="M60 30c-16 0-27 13-27 28 0 9 5 16 13 20h28c8-4 13-11 13-20 0-15-11-28-27-28z" fill="#fff8ee" opacity="0.95"/>
+    <ellipse cx="60" cy="64" rx="10" ry="8" fill="#fff8ee"/>
+    <ellipse cx="60" cy="68" rx="4" ry="3" fill="#2d2a26"/>
+  </symbol>
+
+  <symbol id="pet-body-turtle" viewBox="0 0 120 120">
+    <ellipse cx="60" cy="66" rx="36" ry="28" fill="currentColor"/>
+    <path d="M60 44v44M32 66h56M40 48l40 36M80 48 40 84" stroke="#fff8ee" stroke-width="3" opacity="0.55" fill="none"/>
+    <circle cx="60" cy="30" r="16" fill="#8bbf6a"/>
+    <ellipse cx="52" cy="28" rx="3" ry="3.5" fill="#2d2a26"/>
+    <ellipse cx="68" cy="28" rx="3" ry="3.5" fill="#2d2a26"/>
+    <ellipse cx="22" cy="70" rx="9" ry="6" fill="#8bbf6a"/>
+    <ellipse cx="98" cy="70" rx="9" ry="6" fill="#8bbf6a"/>
+    <ellipse cx="60" cy="102" rx="10" ry="6" fill="#8bbf6a"/>
+  </symbol>
+
+  <symbol id="pet-body-chicken" viewBox="0 0 120 120">
+    <ellipse cx="60" cy="76" rx="28" ry="24" fill="currentColor"/>
+    <circle cx="60" cy="38" r="20" fill="currentColor"/>
+    <path d="M46 16c2-8 8-12 6-16-6 1-12 8-12 16z" fill="#e35d5d"/>
+    <path d="M74 16c-2-8-8-12-6-16 6 1 12 8 12 16z" fill="#e35d5d"/>
+    <path d="M60 40l10 5-10 4z" fill="#e8934a"/>
+    <ellipse cx="52" cy="34" rx="3.5" ry="4" fill="#2d2a26"/>
+    <path d="M58 52c4 4 8 6 14 4" fill="none" stroke="#e35d5d" stroke-width="4" stroke-linecap="round"/>
+    <path d="M84 62c10-4 20 0 18 8-2 6-12 6-16 0z" fill="currentColor"/>
+  </symbol>
+
+  <symbol id="pet-body-lizard" viewBox="0 0 120 120">
+    <path d="M28 88c-4 8-14 10-20 4 4-2 8-6 8-12z" fill="currentColor"/>
+    <ellipse cx="52" cy="76" rx="34" ry="20" fill="currentColor"/>
+    <circle cx="86" cy="52" r="20" fill="currentColor"/>
+    <path d="M40 62c3-6 9-8 12-6M64 62c3-6 9-8 12-6" stroke="#4f8a3d" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <ellipse cx="78" cy="46" rx="4" ry="4.5" fill="#2d2a26"/>
+    <ellipse cx="96" cy="46" rx="4" ry="4.5" fill="#2d2a26"/>
+    <path d="M84 60c3 3 9 3 12 0" fill="none" stroke="#4f8a3d" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="pet-body-panda" viewBox="0 0 120 120">
+    <path d="M60 96c-19 0-33-11-33-27s13-29 33-29 33 13 33 29-14 27-33 27z" fill="#fdfaf3"/>
+    <circle cx="26" cy="30" r="13" fill="currentColor"/>
+    <circle cx="94" cy="30" r="13" fill="currentColor"/>
+    <ellipse cx="42" cy="52" rx="10" ry="12" fill="currentColor"/>
+    <ellipse cx="78" cy="52" rx="10" ry="12" fill="currentColor"/>
+    <ellipse cx="60" cy="64" rx="16" ry="12" fill="#fdfaf3"/>
+    <ellipse cx="42" cy="52" rx="4.5" ry="5.5" fill="#fdfaf3"/>
+    <ellipse cx="78" cy="52" rx="4.5" ry="5.5" fill="#fdfaf3"/>
+    <ellipse cx="42" cy="53" rx="2.3" ry="3" fill="#2d2a26"/>
+    <ellipse cx="78" cy="53" rx="2.3" ry="3" fill="#2d2a26"/>
+  </symbol>
+
+  <!-- ===== Eyes ===== -->
+
+  <symbol id="pet-eyes-round" viewBox="0 0 120 120">
+    <circle cx="48" cy="58" r="5" fill="#2d2a26"/>
+    <circle cx="72" cy="58" r="5" fill="#2d2a26"/>
+    <circle cx="49.5" cy="56" r="1.6" fill="#fff"/>
+    <circle cx="73.5" cy="56" r="1.6" fill="#fff"/>
+  </symbol>
+
+  <symbol id="pet-eyes-sleepy" viewBox="0 0 120 120">
+    <path d="M42 58c4-4 10-4 14 0" stroke="#2d2a26" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M64 58c4-4 10-4 14 0" stroke="#2d2a26" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  </symbol>
+
+  <symbol id="pet-eyes-wide" viewBox="0 0 120 120">
+    <circle cx="48" cy="56" r="7" fill="#2d2a26"/>
+    <circle cx="72" cy="56" r="7" fill="#2d2a26"/>
+    <circle cx="50.5" cy="53" r="2.2" fill="#fff"/>
+    <circle cx="74.5" cy="53" r="2.2" fill="#fff"/>
+  </symbol>
+
+  <!-- ===== Mouths ===== -->
+
+  <symbol id="pet-mouth-smile" viewBox="0 0 120 120">
+    <path d="M52 72c3 4 13 4 16 0" stroke="#2d2a26" stroke-width="3" stroke-linecap="round" fill="none"/>
+  </symbol>
+
+  <symbol id="pet-mouth-open" viewBox="0 0 120 120">
+    <ellipse cx="60" cy="74" rx="7" ry="5" fill="#a85252"/>
+  </symbol>
+
+  <symbol id="pet-mouth-neutral" viewBox="0 0 120 120">
+    <line x1="53" y1="73" x2="67" y2="73" stroke="#2d2a26" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+
+  <!-- ===== Accessories ===== -->
+
+  <symbol id="pet-accessory-none" viewBox="0 0 120 120"></symbol>
+
+  <symbol id="pet-accessory-bow" viewBox="0 0 120 120">
+    <path d="M76 82c8-6 8-14 0-18-4 6-4 12 0 18z" fill="#b969c9"/>
+    <path d="M76 82c-8-6-8-14 0-18 4 6 4 12 0 18z" fill="#d089de"/>
+    <circle cx="76" cy="80" r="3" fill="#8a3f99"/>
+  </symbol>
+
+  <symbol id="pet-accessory-hat" viewBox="0 0 120 120">
+    <path d="M60 4c-3 16-3 24 0 30 8-2 14-2 22 0-8-14-14-22-22-30z" fill="#7c5ce8"/>
+    <ellipse cx="60" cy="34" rx="20" ry="5" fill="#7c5ce8"/>
+    <circle cx="60" cy="6" r="4" fill="#f4c542"/>
+  </symbol>
+
+  <symbol id="pet-accessory-glasses" viewBox="0 0 120 120">
+    <circle cx="48" cy="58" r="9" fill="none" stroke="#2d2a26" stroke-width="3"/>
+    <circle cx="72" cy="58" r="9" fill="none" stroke="#2d2a26" stroke-width="3"/>
+    <line x1="57" y1="58" x2="63" y2="58" stroke="#2d2a26" stroke-width="3"/>
+  </symbol>
+
+  <symbol id="pet-accessory-bandana" viewBox="0 0 120 120">
+    <path d="M34 82c10 6 42 6 52 0l-6 14c-14 4-26 4-40 0z" fill="#e35d5d"/>
+    <circle cx="46" cy="90" r="2" fill="#fff8ee"/>
+    <circle cx="60" cy="94" r="2" fill="#fff8ee"/>
+    <circle cx="74" cy="90" r="2" fill="#fff8ee"/>
+  </symbol>
+
+  <symbol id="pet-accessory-collar" viewBox="0 0 120 120">
+    <path d="M32 84c14 8 42 8 56 0" fill="none" stroke="#4a90d9" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="60" cy="92" r="4" fill="#f4c542"/>
+  </symbol>
+
+</svg>

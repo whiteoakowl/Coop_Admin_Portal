@@ -6683,3 +6683,72 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .tag-input-chip button { background: none; border: none; cursor: pointer; color: inherit; font-size: 0.95rem; line-height: 1; padding: 0.1rem; }
 .tag-input-field { border: none; outline: none; flex: 1; min-width: 140px; font: inherit; background: transparent; }
+
+/* ---------- Student Portal > Pets ---------- */
+
+.pet-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+.pet-header h1 { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+.pet-header h1 .link-btn { display: inline-flex; }
+.pet-header h1 .icon { width: 1.1rem; height: 1.1rem; }
+.pet-header-stats { display: flex; align-items: center; gap: 0.6rem; }
+.pet-coin-pill, .pet-level-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.75rem; border-radius: 999px; font-weight: 700; font-size: 0.9rem;
+}
+.pet-coin-pill { background: var(--yellow-bg); color: var(--yellow); }
+.pet-coin-pill .icon { width: 1rem; height: 1rem; }
+.pet-level-pill { background: var(--brand-soft); color: var(--brand-dark); }
+
+.pet-xp-bar { height: 0.6rem; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 0.75rem; }
+.pet-xp-bar-fill { height: 100%; background: var(--brand); border-radius: 999px; transition: width 0.2s ease; }
+.pet-xp-label { margin: 0.3rem 0 0; text-align: right; }
+
+.pet-stage { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin: 1.5rem 0; }
+.pet-stage-frame {
+  width: min(280px, 80vw); aspect-ratio: 1;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--brand-soft), var(--surface));
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm);
+}
+.pet-display { width: 78%; height: 78%; }
+
+.pet-care-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 640px; margin: 0 auto 1.5rem; }
+.pet-care-stat { display: flex; flex-direction: column; gap: 0.35rem; }
+.pet-care-stat-label { font-size: 0.85rem; font-weight: 600; color: var(--muted); text-align: center; }
+.pet-care-bar { height: 0.65rem; border-radius: 999px; background: var(--border); overflow: hidden; }
+.pet-care-bar-fill { height: 100%; border-radius: 999px; transition: width 0.2s ease; }
+.pet-care-bar-hunger { background: var(--yellow-solid); }
+.pet-care-bar-happiness { background: var(--green); }
+.pet-care-bar-cleanliness { background: var(--brand); }
+
+.pet-care-actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.pet-care-btn { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 7rem; justify-content: center; }
+.pet-care-btn .icon { width: 1.1rem; height: 1.1rem; }
+
+/* Trait-cycler rows (Pets > Choose/Edit Your Pet) - no precedent
+   elsewhere in the app (the Name Tag/Schedule Card designers are a
+   free-form drag-and-drop canvas, not a prev/next cycler), so this is a
+   purpose-built pattern: a centered value between two round arrow
+   buttons, one row per trait. */
+.pet-trait-cycler {
+  display: grid; grid-template-columns: 5.5rem auto 1fr auto;
+  align-items: center; gap: 0.75rem; padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.pet-trait-cycler:last-of-type { border-bottom: none; }
+.pet-trait-label { font-weight: 600; color: var(--muted); }
+.pet-trait-value { text-align: center; font-weight: 700; color: var(--ink); }
+.pet-trait-arrow {
+  width: 2.25rem; height: 2.25rem; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--brand-dark); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.pet-trait-arrow:hover { background: var(--brand-soft); }
+.pet-trait-arrow .icon { width: 1.1rem; height: 1.1rem; }
+.pet-trait-arrow[data-dir="-1"] .icon { transform: rotate(90deg); }
+.pet-trait-arrow[data-dir="1"] .icon { transform: rotate(-90deg); }
+
+@media (max-width: 480px) {
+  .pet-care-stats { grid-template-columns: 1fr; }
+  .pet-trait-cycler { grid-template-columns: 4.5rem auto 1fr auto; gap: 0.4rem; }
+}

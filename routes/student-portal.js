@@ -25,6 +25,7 @@ const { registerForClass, unregisterFromClass } = require('../utils/classRegistr
 const notifications = require('../utils/notifications');
 const resourceLinks = require('../utils/resourceLinks');
 const babysitters = require('../utils/babysitters');
+const pets = require('../utils/pets');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
@@ -283,5 +284,75 @@ router.post('/babysitter', uploadBabysitterPhoto.single('photo'), async (req, re
   );
   res.redirect('/student/babysitter?notice=' + encodeURIComponent('Submitted for Main Admin review.'));
 });
+
+// Pets - a real request: "create a personal pet activity for students.
+// They can choose a pet, choose a few features and save. Then they can
+// name their pet, feed it, play with it, bathe it." Own member record
+// only, same scoping as every other Student Portal route (never a
+// client-supplied member/pet id). No pet yet -> the chooser/customize
+// screen; a saved pet -> the dashboard.
+router.get('/pets', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const pet = member ? await pets.getPetForMember(member.id) : null;
+  if (!pet) return res.redirect('/student/pets/customize');
+  res.render('student-pets', {
+    title: 'My Pet',
+    pet,
+    color: pets.colorForSpecies(pet.species, pet.color),
+    stats: pets.careStats(pet),
+    levelInfo: pets.levelInfo(pet.xp),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.get('/pets/customize', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const existing = member ? await pets.getPetForMember(member.id) : null;
+  const appearance = existing || pets.defaultAppearance();
+  res.render('student-pets-customize', {
+    title: existing ? 'Edit Pet' : 'Choose Your Pet',
+    isNew: !existing,
+    appearance,
+    petName: existing ? existing.name : '',
+    speciesList: pets.SPECIES,
+    eyesList: pets.EYES,
+    mouthsList: pets.MOUTHS,
+    accessoriesList: pets.ACCESSORIES,
+  });
+});
+
+router.post('/pets/customize', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/pets/customize?error=' + encodeURIComponent('No student profile found for your account.'));
+  await pets.savePet(member.id, {
+    name: req.body.name,
+    species: req.body.species,
+    color: req.body.color,
+    eyes: req.body.eyes,
+    mouth: req.body.mouth,
+    accessory: req.body.accessory,
+  });
+  res.redirect('/student/pets?notice=' + encodeURIComponent('Pet saved!'));
+});
+
+router.post('/pets/name', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/pets?error=' + encodeURIComponent('No student profile found for your account.'));
+  await pets.renamePet(member.id, req.body.name);
+  res.redirect('/student/pets?notice=' + encodeURIComponent('Name updated.'));
+});
+
+async function careAction(kind, notice, req, res) {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/student/pets?error=' + encodeURIComponent('No student profile found for your account.'));
+  const result = await pets.performCareAction(member.id, kind);
+  if (!result.ok) return res.redirect('/student/pets?error=' + encodeURIComponent(result.error));
+  res.redirect('/student/pets?notice=' + encodeURIComponent(notice));
+}
+
+router.post('/pets/feed', (req, res) => careAction('feed', 'Yum! Your pet is happily fed.', req, res));
+router.post('/pets/play', (req, res) => careAction('play', 'You played with your pet!', req, res));
+router.post('/pets/bathe', (req, res) => careAction('bathe', 'Squeaky clean!', req, res));
 
 module.exports = router;

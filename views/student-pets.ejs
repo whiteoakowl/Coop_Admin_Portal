@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Student Portal',
+    navLinks: [
+      { href: '/student', icon: 'home', label: 'Home' },
+      { href: '/events?view=calendar', icon: 'calendar-check', label: 'Event Calendar' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/student/resources', icon: 'book', label: 'Resource Links' },
+      { href: '/student/name-tag', icon: 'badge', label: 'Name Tag' },
+      { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
+      { href: '/student/pets', icon: 'paw', label: 'Pets' },
+    ],
+  }) %>
+  <%- include('partials/pet-sprites') %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="pet-header">
+      <h1><%= pet.name %> <button type="button" class="link-btn" onclick="document.getElementById('rename-pet-dialog').showModal()" aria-label="Rename pet"><svg class="icon"><use href="#icon-edit"/></svg></button></h1>
+      <div class="pet-header-stats">
+        <span class="pet-coin-pill"><svg class="icon"><use href="#icon-star"/></svg> <%= pet.coins %></span>
+        <span class="pet-level-pill">Level <%= levelInfo.level %></span>
+      </div>
+    </div>
+    <div class="pet-xp-bar">
+      <div class="pet-xp-bar-fill" style="width: <%= levelInfo.xpIntoLevel %>%;"></div>
+    </div>
+    <p class="hint pet-xp-label"><%= levelInfo.xpIntoLevel %> / <%= levelInfo.xpForLevel %> XP</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="pet-stage">
+      <div class="pet-stage-frame">
+        <svg class="pet-display" viewBox="0 0 120 120" style="color: <%= color.hex %>;">
+          <use href="#pet-body-<%= pet.species %>"/>
+          <use href="#pet-eyes-<%= pet.eyes %>"/>
+          <use href="#pet-mouth-<%= pet.mouth %>"/>
+          <use href="#pet-accessory-<%= pet.accessory %>"/>
+        </svg>
+      </div>
+      <a class="roster-action-btn" href="/student/pets/customize">Edit Appearance</a>
+    </div>
+
+    <div class="pet-care-stats">
+      <div class="pet-care-stat">
+        <span class="pet-care-stat-label">Hunger</span>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-hunger" style="width: <%= stats.hunger %>%;"></div></div>
+      </div>
+      <div class="pet-care-stat">
+        <span class="pet-care-stat-label">Happiness</span>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-happiness" style="width: <%= stats.happiness %>%;"></div></div>
+      </div>
+      <div class="pet-care-stat">
+        <span class="pet-care-stat-label">Cleanliness</span>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-cleanliness" style="width: <%= stats.cleanliness %>%;"></div></div>
+      </div>
+    </div>
+
+    <div class="pet-care-actions">
+      <form method="POST" action="/student/pets/feed" class="inline-block-form">
+        <button type="submit" class="roster-action-btn pet-care-btn"><svg class="icon"><use href="#icon-bone"/></svg> Feed</button>
+      </form>
+      <form method="POST" action="/student/pets/play" class="inline-block-form">
+        <button type="submit" class="roster-action-btn pet-care-btn"><svg class="icon"><use href="#icon-ball"/></svg> Play</button>
+      </form>
+      <form method="POST" action="/student/pets/bathe" class="inline-block-form">
+        <button type="submit" class="roster-action-btn pet-care-btn"><svg class="icon"><use href="#icon-droplet"/></svg> Bathe</button>
+      </form>
+    </div>
+
+    <dialog id="rename-pet-dialog" class="member-picker-dialog">
+      <form method="POST" action="/student/pets/name">
+        <h3>Rename Your Pet</h3>
+        <label>Name
+          <input type="text" name="name" value="<%= pet.name %>" maxlength="40" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>
