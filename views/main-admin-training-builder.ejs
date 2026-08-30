@@ -58,20 +58,35 @@
         <label>Estimated Time (minutes)
           <input type="number" name="estimatedMinutes" min="1" value="<%= training.estimated_minutes || '' %>" />
         </label>
-        <label>Passing Score (%)
-          <input type="number" name="passingScore" min="0" max="100" value="<%= training.passing_score %>" required />
-        </label>
+        <%# Passing Score and Video completion threshold share one grid cell
+            (a nested flex row, see .training-inline-fields in styles.css) so
+            the threshold sits right beside Passing Score on the same line,
+            instead of buried as the first item in the Completion
+            Requirements checklist below - it's a related % setting, not a
+            checkbox toggle. %>
+        <div class="training-inline-fields">
+          <label>Passing Score (%)
+            <input type="number" name="passingScore" min="0" max="100" value="<%= training.passing_score %>" required />
+          </label>
+          <label>Video completion threshold (%)
+            <input type="number" name="videoCompletionThreshold" min="1" max="100" value="<%= training.video_completion_threshold %>" />
+          </label>
+        </div>
 
         <div class="member-form-full">
           <label class="roster-checkbox-label">Completion Requirements</label>
-          <label class="grade-pill"><input type="checkbox" name="requireVideoCompletion" data-video-completion-toggle <%= training.require_video_completion === 1 ? 'checked' : '' %> /> Watch all required videos</label>
-          <label class="grade-pill">Video completion threshold
-            <input type="number" name="videoCompletionThreshold" min="1" max="100" value="<%= training.video_completion_threshold %>" style="width: 5rem;" /> %
-          </label>
-          <label class="grade-pill"><input type="checkbox" name="requireRetakeAfterFailure" <%= training.require_retake_after_failure === 1 ? 'checked' : '' %> /> Require retake after failure</label>
-          <label class="grade-pill"><input type="checkbox" name="sequentialLessons" <%= training.sequential_lessons === 1 ? 'checked' : '' %> /> Lessons must be completed in order</label>
-          <label class="grade-pill"><input type="checkbox" name="allowSkippingLessons" <%= training.allow_skipping_lessons === 1 ? 'checked' : '' %> /> Allow skipping lessons</label>
-          <label class="grade-pill"><input type="checkbox" name="requireManagerApproval" <%= training.require_manager_approval === 1 ? 'checked' : '' %> /> Require manager approval after completion</label>
+          <%# .training-requirements scopes these .grade-pill labels back to a
+              compact left-aligned row each, stacked in a clean column - see
+              the .training-requirements rule next to .grade-pill in
+              styles.css for why the plain .grade-pill class alone renders
+              full-width/centered inside .member-form-grid. %>
+          <div class="training-requirements">
+            <label class="grade-pill"><input type="checkbox" name="requireVideoCompletion" data-video-completion-toggle <%= training.require_video_completion === 1 ? 'checked' : '' %> /> Watch all required videos</label>
+            <label class="grade-pill"><input type="checkbox" name="requireRetakeAfterFailure" <%= training.require_retake_after_failure === 1 ? 'checked' : '' %> /> Require retake after failure</label>
+            <label class="grade-pill"><input type="checkbox" name="sequentialLessons" <%= training.sequential_lessons === 1 ? 'checked' : '' %> /> Lessons must be completed in order</label>
+            <label class="grade-pill"><input type="checkbox" name="allowSkippingLessons" <%= training.allow_skipping_lessons === 1 ? 'checked' : '' %> /> Allow skipping lessons</label>
+            <label class="grade-pill"><input type="checkbox" name="requireManagerApproval" <%= training.require_manager_approval === 1 ? 'checked' : '' %> /> Require manager approval after completion</label>
+          </div>
         </div>
 
         <div class="member-form-full">

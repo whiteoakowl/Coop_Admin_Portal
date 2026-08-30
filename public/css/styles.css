@@ -5400,6 +5400,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .grade-pill input[type="checkbox"] { accent-color: var(--btn-bg); width: 0.95rem; height: 0.95rem; }
 .grade-pill:has(input:checked) { background: var(--orange-bg); border-color: var(--btn-bg); color: var(--orange); }
 
+/* Training builder's Completion Requirements checklist reuses .grade-pill
+   for longer descriptive checkboxes, not the short flex-wrap filter tags
+   it was built for (see .grade-pill-grid above). Inside .member-form-grid,
+   that grid's own `.member-form-grid label` rule (class+element, higher
+   specificity than .grade-pill's class-only inline-flex) wins and forces
+   each pill to `display:flex; flex-direction:column`, which - because
+   flex is block-level by default - stretches every pill to the full
+   container width and stacks checkbox above centered text instead of
+   inline beside it. Scope these specific pills back to their intended
+   compact horizontal layout and stack them in a clean left-aligned column
+   (views/admin-training-builder.ejs, views/main-admin-training-builder.ejs). */
+.training-requirements { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.training-requirements .grade-pill { display: inline-flex; flex-direction: row; align-items: center; }
+
+/* Training builder's Passing Score + Video completion threshold - one
+   .member-form-grid cell (not .member-form-full) holding both fields side
+   by side, so the threshold sits on the same line as Passing Score rather
+   than as the first item in the Completion Requirements checklist above.
+   .member-form-grid label's own column-flex layout (see comment above)
+   still applies to each label inside; this just lays the two labels out
+   as a row and lets them share the cell's width evenly. */
+.training-inline-fields { display: flex; gap: 1rem; }
+.training-inline-fields label { flex: 1; min-width: 0; }
+
 /* Roster/staff "list log" - a clean, scannable row per person (name,
    grade, age, a medical/allergy flag when notes exist, remove button)
    instead of the cramped inline badge-pill list used elsewhere. */
