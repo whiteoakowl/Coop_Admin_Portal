@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0; }</style>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1><%= title %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <% if (cards.length === 0) { %>
+      <p class="roster-empty">No badges selected.</p>
+    <% } %>
+
+    <%
+      // Landscape 3.5x2.25in cards fit 2 across x 4 down on a US Letter
+      // sheet with room for margins - 8 per page (same size as name tags).
+      var pages = [];
+      for (var i = 0; i < cards.length; i += 8) pages.push(cards.slice(i, i + 8));
+    %>
+    <% pages.forEach(function(pageCards) { %>
+      <div class="badge-sheet-page badge-sheet">
+        <% pageCards.forEach(function(c) { %>
+          <%- include('partials/name-tag-badge', { html: c.html, bgCss: c.bgCss, badgeWidth: cardWidth, badgeHeight: cardHeight }) %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </main>
+  <%# A real bug report: "the setup/cleanup cards when you click to print
+      them it does not show barcodes. you can see the barcode on the
+      design page, but not printing." Root cause: renderBarcodeEl (public/
+      js/name-tag-render-core.js) only ever emits an EMPTY <svg> stamped
+      with data-barcode-value - the actual bars are drawn client-side by
+      name-tag-render.js calling JsBarcode against every .badge-el-barcode
+      element, which needs the JsBarcode library itself (vendor/
+      jsbarcode.min.js) loaded first. Every other badge/name-tag print page
+      in this app already loads both (see admin-name-tag-print.ejs, admin-
+      name-tag-both-print.ejs, admin-cards-duplex-print.ejs, admin-member-
+      cards-print.ejs) - this page was the one left out, so its barcode
+      svgs sat empty while the Design tab's own preview (which does load
+      them) rendered fine. %>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/name-tag-render.js"></script>
+  <script src="/js/badge-autofit.js"></script>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

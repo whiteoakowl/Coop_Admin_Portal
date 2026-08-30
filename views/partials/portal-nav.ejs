@@ -63,6 +63,13 @@ const MAIN_ADMIN_NAV_LINKS = [
   { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
   { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
   { href: '/main-admin/academics', icon: 'graduation-cap', label: 'Academics' },
+  // Same Training & Learning module as Co-op Admin's own Training tab
+  // (routes/main-admin-training.js, shared utils/training.js data) - a
+  // real request: "the training tab should also be on main admin
+  // portal. the features should be exactly the same." No data-match
+  // needed - public/js/admin-nav.js already prefix-matches every sub-page
+  // under /main-admin/training/... against this link's own href.
+  { href: '/main-admin/training', icon: 'graduation-cap', label: 'Training' },
 ];
 const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : navLinks;
 

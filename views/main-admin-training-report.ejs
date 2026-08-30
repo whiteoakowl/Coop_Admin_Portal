@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Report &mdash; <%= training.title %></h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (training.status !== 'published') { %>
+      <div class="alert alert-error">This training is still <strong><%= training.status %></strong> - members won't see it on their My Training page until you <a href="/main-admin/training/<%= training.id %>/builder">publish it</a>.</div>
+    <% } %>
+
+    <div class="roster-toolbar">
+      <div class="roster-btn-row">
+        <a class="roster-action-btn" href="/main-admin/training/<%= training.id %>/builder">&larr; Back to Builder</a>
+        <a class="roster-action-btn" href="/main-admin/training/<%= training.id %>/assign">Assign More</a>
+      </div>
+    </div>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">Nobody has been assigned this training yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Status</th>
+              <th>Latest Score</th>
+              <th>Best Score</th>
+              <th>Attempts</th>
+              <th>Completed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+              <tr>
+                <td><a href="/main-admin/training/<%= training.id %>/assignments/<%= r.id %>"><%= r.memberName %></a></td>
+                <td><%- include('partials/training-status-badge', { status: r.status }) %></td>
+                <td><%= r.latest_score != null ? r.latest_score + '%' : '&mdash;' %></td>
+                <td><%= r.best_score != null ? r.best_score + '%' : '&mdash;' %></td>
+                <td><%= r.attempt_count %></td>
+                <td><%= r.completed_at ? r.completed_at.slice(0, 10) : '&mdash;' %></td>
+                <td>
+                  <form method="POST" action="/main-admin/training/<%= training.id %>/assignments/<%= r.id %>/remove" class="inline-block-form" data-confirm="Remove <%= r.memberName %>'s assignment? Their attempt history will be lost.">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Remove assignment for <%= r.memberName %>"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

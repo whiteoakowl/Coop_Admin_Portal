@@ -9,6 +9,12 @@
 
   const Render = window.NameTagRenderCore;
   const seed = JSON.parse(dataEl.textContent);
+  // Same basePath fallback pattern as name-tag-editor.js's own BASE_PATH -
+  // lets this exact script be reused unmodified from Main Admin's own
+  // Design/Print page (seed.basePath: '/main-admin/name-tags') instead of
+  // Co-op Admin's (default '/admin/schedule', unchanged for every
+  // existing caller that doesn't pass basePath at all).
+  const BASE_PATH = seed.basePath || '/admin/schedule';
   const CARD_WIDTH = seed.cardWidth;
   const CARD_HEIGHT = seed.cardHeight;
   const FIELDS = seed.fields || [];
@@ -1173,7 +1179,7 @@
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('/admin/schedule/design-image', { method: 'POST', headers: { 'X-CSRF-Token': window.CSRF_TOKEN || '' }, body: formData });
+      const res = await fetch(BASE_PATH + '/design-image', { method: 'POST', headers: { 'X-CSRF-Token': window.CSRF_TOKEN || '' }, body: formData });
       const data = await res.json();
       if (data.ok) {
         const el = { id: newId('image'), type: 'image', src: data.url, x: 10, y: 10, width: 100, height: 100 };
@@ -1394,7 +1400,7 @@
     document.getElementById('schedule-card-save-btn').addEventListener('click', async () => {
       saveStatus.textContent = 'Saving…';
       try {
-        const res = await fetch('/admin/schedule/design/template', {
+        const res = await fetch(BASE_PATH + '/design/template', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN || '' },
           body: JSON.stringify({ layout }),
