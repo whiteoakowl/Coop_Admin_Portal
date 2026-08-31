@@ -6183,8 +6183,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        already small at that point, the extra bit of shrink to land
        inside 9.2in instead of 9.8in isn't a meaningfully different
        reading experience, and it buys real margin against this same
-       quirk resurfacing for slightly different content/font-metrics. */
+       quirk resurfacing for slightly different content/font-metrics.
+
+       overflow: hidden - a real bug report: "printing setup cleanup team
+       pages" came out as a near-blank sheet with a thin, illegible sliver
+       of content. Root cause was public/js/print-shrink-to-fit.js letting
+       its computed zoom fall arbitrarily low (as small as ~0.12 for a
+       genuinely oversized team) with no real legibility floor - fixed
+       there by giving MIN_SCALE a real, enforced value. But this box was
+       deliberately built with NO overflow handling at all (see above) on
+       the assumption the JS would always shrink content down to fit -
+       once that assumption is no longer "shrink as far as it takes,"
+       content that still doesn't fit even at the new floor visually
+       overflows this box uncontrolled, confirmed live to bleed into and
+       garble the FOLLOWING team's page rather than cleanly staying on its
+       own (member rows visibly missing from their own team's page,
+       reappearing mid-layout on the next one) - worse than the original
+       illegible-but-complete printout. `overflow: hidden` is a no-op for
+       every normal team (content already fits comfortably inside max-
+       height, same as before) and only ever clips the rare team so large
+       it still can't fit at MIN_SCALE's floor - losing that team's
+       excess rows off the bottom of ITS OWN page is a contained, honest
+       failure mode, not smeared across someone else's. */
     max-height: 9.2in;
+    overflow: hidden;
   }
   /* :not(:first-child) - a real bug report: "the 1st page is still
      blank." Every card (first one included) forcing page-break-before

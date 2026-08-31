@@ -9,7 +9,31 @@
 // second page even though it visually looks smaller on screen.
 (function () {
   var MAX_CORRECTIONS = 40;
-  var MIN_SCALE = 0.05;
+  // A real bug report, two surfaces at once: "printing setup cleanup team
+  // pages" came out as a near-blank sheet with a thin, illegible sliver of
+  // content, and separately "class schedules are also squished for
+  // printing." Root cause traced to a genuinely oversized case (a Setup/
+  // Cleanup team with 100+ members; a Class Schedule day with dozens of
+  // rooms) computing a real first-pass scale far below anything legible
+  // (confirmed live: a 150-member team's own first estimate landed at
+  // ~0.12, and it's WORSE for Setup/Cleanup specifically - fitGroup below
+  // then levels every OTHER team's page down to that same catastrophic
+  // scale too, so one oversized team wrecked the whole print job, not
+  // just its own page). 0.05 was never actually a legibility floor
+  // despite this file's own comments claiming it was - it only ever
+  // guarded the CORRECTION LOOP's shrink step below, never the loop's own
+  // first estimate, which can (and did) land below 0.05 and then
+  // immediately `break` out of the loop on its very first fit-check
+  // before that clamp ever ran. 0.4 is a real, deliberately higher floor
+  // now enforced on that first estimate too (see fitOne below) -
+  // roughly a 4-5pt effective size off this app's own 12pt/18pt starting
+  // point, small but still readable in print, rather than a functionally
+  // blank page. Content that would have needed to shrink further than
+  // that is now left to overflow onto a following physical page instead
+  // (none of these wrappers clip with `overflow: hidden`) - a team or a
+  // day spilling onto an extra page it didn't strictly need is a far
+  // better outcome than every page on the job going illegible for it.
+  var MIN_SCALE = 0.4;
 
   function fitOne(wrap) {
     const inner = wrap.firstElementChild;
@@ -42,7 +66,14 @@
     const availH = wrap.clientHeight;
     if (budget) wrap.style.height = '';
     if (!availW || !availH) return;
-    let scale = Math.min(1, availW / inner.scrollWidth, availH / inner.scrollHeight);
+    // MIN_SCALE clamped right here too, not just inside the correction
+    // loop below - a genuinely oversized case's first estimate can land
+    // below it outright (e.g. a 150-member team estimating ~0.12), and
+    // when that estimate is already accurate enough to "fit" on its own,
+    // the loop's own `break` on its very first check fires before the
+    // loop's internal clamp ever runs - see this file's own top-of-file
+    // comment on the real bug this caused.
+    let scale = Math.max(MIN_SCALE, Math.min(1, availW / inner.scrollWidth, availH / inner.scrollHeight));
     inner.style.zoom = scale;
     // The ratio above is computed from the UNSCALED box, then applied in
     // one shot - fine for most content, but a table with many rows can
