@@ -145,6 +145,27 @@ async function swapSectionPosition(day, sectionId, direction) {
   await db.prepare('UPDATE task_list_sections SET position = ? WHERE id = ?').run(a.position, b.id);
 }
 
+// Drag-and-drop reordering (a real request: "be able to rearrange the
+// setup/cleanup task list on desktop and mobile. drag and move.") -
+// takes the WHOLE new order as one array of section ids (exactly what
+// the drag ends with, DOM order read straight off the page) and
+// rewrites every position in one pass, rather than the single-neighbor-
+// swap swapSectionPosition above does. Both stay available - dragging
+// doesn't replace the up/down buttons, just adds a faster way to do the
+// same thing. Any id not belonging to this day is ignored, so a stale/
+// tampered request can't move another day's section into this one's
+// position numbering.
+async function reorderSections(day, orderedIds) {
+  const existing = await db.prepare('SELECT id FROM task_list_sections WHERE day = ?').all(day);
+  const validIds = new Set(existing.map((s) => s.id));
+  let position = 0;
+  for (const id of orderedIds) {
+    if (!validIds.has(id)) continue;
+    await db.prepare('UPDATE task_list_sections SET position = ? WHERE id = ?').run(position, id);
+    position++;
+  }
+}
+
 async function nextItemPosition(sectionId) {
   const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM task_list_items WHERE section_id = ?').get(sectionId);
   return (row && row.maxPos != null ? row.maxPos : -1) + 1;
@@ -182,6 +203,19 @@ async function swapItemPosition(sectionId, itemId, direction) {
   const b = items[swapIdx];
   await db.prepare('UPDATE task_list_items SET position = ? WHERE id = ?').run(b.position, a.id);
   await db.prepare('UPDATE task_list_items SET position = ? WHERE id = ?').run(a.position, b.id);
+}
+
+// Same whole-order rewrite as reorderSections above, for one section's
+// own items.
+async function reorderItems(sectionId, orderedIds) {
+  const existing = await db.prepare('SELECT id FROM task_list_items WHERE section_id = ?').all(sectionId);
+  const validIds = new Set(existing.map((it) => it.id));
+  let position = 0;
+  for (const id of orderedIds) {
+    if (!validIds.has(id)) continue;
+    await db.prepare('UPDATE task_list_items SET position = ? WHERE id = ?').run(position, id);
+    position++;
+  }
 }
 
 // The one task list section (if any) linked to this team, numbered items
@@ -256,10 +290,12 @@ module.exports = {
   updateSection,
   deleteSection,
   swapSectionPosition,
+  reorderSections,
   addItem,
   updateItem,
   deleteItem,
   swapItemPosition,
+  reorderItems,
   taskSectionForTeam,
   findTaskItemByBarcode,
   findSetupCleanupBypassBadge,

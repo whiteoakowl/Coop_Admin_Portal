@@ -60,10 +60,11 @@
           (no CSRF token ever reached the real request) with no confirm
           dialog either. %>
       <form id="task-list-save-form" method="POST" action="/admin/setup/<%= day %>/tasks/save" hidden></form>
-      <div class="task-list-stack" data-task-list-form>
+      <div class="task-list-stack" data-task-list-form data-task-list-day="<%= day %>">
         <% sections.forEach(function(s, i) { %>
-          <div class="task-list-card task-list-accent-<%= i % 5 %>">
+          <div class="task-list-card task-list-accent-<%= i % 5 %>" data-task-list-section="<%= s.id %>">
             <div class="task-list-card-header">
+              <button type="button" class="task-list-drag-handle no-print" data-task-list-section-drag-handle data-task-list-edit-only hidden aria-label="Drag to reorder list &quot;<%= s.title %>&quot;" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></button>
               <input type="text" name="sectionTitle_<%= s.id %>" value="<%= s.title %>" class="task-list-title-input" data-task-list-input readonly form="task-list-save-form" />
               <div class="task-list-card-actions no-print" data-task-list-edit-only hidden>
                 <form method="POST" action="/admin/setup/<%= day %>/tasks/<%= s.id %>/move" class="inline-block-form">
@@ -94,13 +95,16 @@
 
             <div class="roster-scroll">
               <table class="roster-table members-table condensed-table task-list-table">
-                <thead><tr><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th><th class="no-print"></th></tr></thead>
-                <tbody>
+                <thead><tr><th class="no-print" data-task-list-edit-only hidden></th><th class="task-list-num-col">#</th><th>Task</th><th class="no-print" data-task-list-edit-only hidden></th><th class="no-print"></th></tr></thead>
+                <tbody data-task-list-item-tbody data-task-list-section="<%= s.id %>">
                   <% if (s.items.length === 0) { %>
-                    <tr><td colspan="4" class="roster-empty">No tasks yet.</td></tr>
+                    <tr><td colspan="5" class="roster-empty">No tasks yet.</td></tr>
                   <% } %>
                   <% s.items.forEach(function(item, j) { %>
-                    <tr>
+                    <tr data-task-list-item="<%= item.id %>">
+                      <td class="no-print" data-task-list-edit-only hidden>
+                        <button type="button" class="task-list-drag-handle" data-task-list-item-drag-handle aria-label="Drag to reorder this task" title="Drag to reorder"><svg class="icon"><use href="#icon-menu"/></svg></button>
+                      </td>
                       <td class="task-list-num-col"><%= item.number %></td>
                       <td><input type="text" name="itemDesc_<%= item.id %>" value="<%= item.description %>" class="task-list-desc-input" data-task-list-input readonly form="task-list-save-form" /></td>
                       <td class="no-print" data-task-list-edit-only hidden>
@@ -183,5 +187,6 @@
     </dialog>
   </main>
   <script src="/js/task-list-edit.js"></script>
+  <script src="/js/task-list-drag-reorder.js"></script>
 </body>
 </html>

@@ -25,10 +25,12 @@ const {
   updateSection,
   deleteSection,
   swapSectionPosition,
+  reorderSections,
   addItem,
   updateItem,
   deleteItem,
   swapItemPosition,
+  reorderItems,
 } = require('../utils/taskList');
 const { toCsvRow, sendCsv, readRowsFromFile, buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { activeParentAndAdminOptions } = require('../utils/members');
@@ -412,6 +414,18 @@ router.post('/setup/:day/tasks/:sectionId/move', requireAdmin, requireDay, async
   res.redirect(`/admin/setup/${day}/tasks`);
 });
 
+// Drag-and-drop reordering of the whole list stack - called via fetch
+// from public/js/task-list-drag-reorder.js right after a drag ends
+// (same pattern as public/js/room-row-reorder.js), not a full form
+// submit. Doesn't replace the /move buttons above, just adds a faster
+// way to do the same thing.
+router.post('/setup/:day/tasks/reorder', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const sectionIds = [].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  await reorderSections(day, sectionIds);
+  res.json({ ok: true });
+});
+
 // Single "+ Add Task" popup (toolbar, not per-card) - description +
 // which list dropdown, same pattern as Teams' "+ Add Member" popup.
 router.post('/setup/:day/tasks/add-item', requireAdmin, requireDay, async (req, res) => {
@@ -440,6 +454,13 @@ router.post('/setup/:day/tasks/:sectionId/items/:itemId/move', requireAdmin, req
   const direction = req.body.direction === 'up' ? 'up' : 'down';
   await swapItemPosition(sectionId, itemId, direction);
   res.redirect(`/admin/setup/${day}/tasks`);
+});
+
+router.post('/setup/:day/tasks/:sectionId/items/reorder', requireAdmin, requireDay, async (req, res) => {
+  const sectionId = parseInt(req.params.sectionId, 10);
+  const itemIds = [].concat(req.body.itemIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
+  await reorderItems(sectionId, itemIds);
+  res.json({ ok: true });
 });
 
 // Edit mode's one Save button - every section's title/team link and
