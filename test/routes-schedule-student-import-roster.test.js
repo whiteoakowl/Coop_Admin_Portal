@@ -1,6 +1,7 @@
-// Real HTTP-level coverage for the Student/Parent Schedule Import
-// (routes/admin-schedule.js's GET /schedule/:tab/import-template.xlsx +
-// POST /schedule/:tab/import): one row = one whole member's week, with up
+// Real HTTP-level coverage for the Member Schedules Import
+// (routes/admin-schedule.js's GET /schedule/members/import-template.xlsx +
+// POST /schedule/members/import, memberType=student|parent): one row = one
+// whole member's week, with up
 // to 8 numbered class slots (Class Start Time N / Class Title N / Class
 // Location N / Class Days N), each slot carrying its own Day value rather
 // than the day being implied by slot position - this shape mirrors a real
@@ -92,10 +93,10 @@ function buildScheduleRow({ firstName, lastName, allergy = '', slots = [] }) {
   return row;
 }
 
-test('GET /admin/schedule/students/import-template.xlsx has Member First/Last Name, Allergy, and 8 numbered Class Start Time/Title/Location/Days slots', async () => {
+test('GET /admin/schedule/members/import-template.xlsx has Member First/Last Name, Allergy, and 8 numbered Class Start Time/Title/Location/Days slots', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app)
-    .get('/admin/schedule/students/import-template.xlsx')
+    .get('/admin/schedule/members/import-template.xlsx')
     .set('Cookie', cookie)
     .buffer(true)
     .parse((response, callback) => {
@@ -109,7 +110,7 @@ test('GET /admin/schedule/students/import-template.xlsx has Member First/Last Na
   assert.deepEqual(rows[0], SCHEDULE_HEADERS);
 });
 
-test('POST /admin/schedule/students/import', async (t) => {
+test('POST /admin/schedule/members/import', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   const classBuffer = buildImportBuffer(
@@ -134,8 +135,9 @@ test('POST /admin/schedule/students/import', async (t) => {
       buildScheduleRow({ firstName: 'Roster Test', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Mon' }] }),
     ]);
     const res = await request(app)
-      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/admin/schedule/members/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
+      .field('memberType', 'student')
       .attach('file', scheduleBuffer, 'schedule.xlsx');
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('Matched 1 schedule row'));
@@ -176,8 +178,9 @@ test('POST /admin/schedule/students/import', async (t) => {
       }),
     ]);
     const res = await request(app)
-      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/admin/schedule/members/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
+      .field('memberType', 'student')
       .attach('file', scheduleBuffer, 'schedule-two-day.xlsx');
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('Matched 2 schedule row'));
@@ -196,8 +199,9 @@ test('POST /admin/schedule/students/import', async (t) => {
       buildScheduleRow({ firstName: 'Thursday', lastName: 'Kid', slots: [{ position: 1, startTime: '', className: 'Import Roster Class', room: '', days: 'Thursday' }] }),
     ]);
     const res = await request(app)
-      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/admin/schedule/members/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
+      .field('memberType', 'student')
       .attach('file', scheduleBuffer, 'schedule-thursday.xlsx');
     assert.equal(res.status, 302);
     assert.ok(decodeURIComponent(res.headers.location).includes('1 skipped'), 'a day this app has no class model for should be skipped, not throw');
@@ -216,8 +220,9 @@ test('POST /admin/schedule/students/import', async (t) => {
       buildScheduleRow({ firstName: 'Existing Allergy', lastName: 'Kid', allergy: 'Should not overwrite', slots: [] }),
     ]);
     const res = await request(app)
-      .post('/admin/schedule/students/import?_csrf=' + encodeURIComponent(csrfToken))
+      .post('/admin/schedule/members/import?_csrf=' + encodeURIComponent(csrfToken))
       .set('Cookie', cookie)
+      .field('memberType', 'student')
       .attach('file', scheduleBuffer, 'schedule-allergy.xlsx');
     assert.equal(res.status, 302);
 

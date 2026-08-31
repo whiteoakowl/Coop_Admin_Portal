@@ -1,6 +1,6 @@
-// Real HTTP-level coverage for a live bug report: on the Student/Parent
-// Schedules tab (routes/admin-schedule.js's tab='students'/'parents'
-// branch), clicking "Select All" to archive only ever selected whichever
+// Real HTTP-level coverage for a live bug report: on the Member
+// Schedules tab (routes/admin-schedule.js's tab='members' branch),
+// clicking "Select All" to archive only ever selected whichever
 // members happened to be on the CURRENT page - with 18 pages of members,
 // it silently archived none of the other 17 pages' worth. Root cause:
 // "Select All" (public/js/archive-select-toggle.js) is a purely
@@ -40,14 +40,14 @@ test.after(() => {
 async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/schedule?tab=students').set('Cookie', cookie);
+  const page = await request(app).get('/admin/schedule?tab=members&type=student').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
 
 const PAGE_SIZE = 25; // must match routes/admin-schedule.js's own constant
 
-test('Student Schedules page 1 of a multi-page list renders an off-page checkbox for every member on later pages, so Select All can reach them', async (t) => {
+test('Member Schedules (filtered to Students) page 1 of a multi-page list renders an off-page checkbox for every member on later pages, so Select All can reach them', async (t) => {
   const { cookie } = await loginAsAdmin();
 
   // 30 active students -> 2 pages (25 + 5) at PAGE_SIZE=25, alphabetized
@@ -60,12 +60,12 @@ test('Student Schedules page 1 of a multi-page list renders an off-page checkbox
     studentIds.push(id);
   }
 
-  const page1 = await request(app).get('/admin/schedule?tab=students&page=1').set('Cookie', cookie);
+  const page1 = await request(app).get('/admin/schedule?tab=members&type=student&page=1').set('Cookie', cookie);
   assert.equal(page1.status, 200);
   assert.match(page1.text, /Page 1 of 2 \(30 total\)/);
 
-  const onPageIds = [...page1.text.matchAll(/name="memberIds" value="(\d+)" form="schedule-archive-form-students" class="archive-select-checkbox/g)].map((m) => Number(m[1]));
-  const offPageIds = [...page1.text.matchAll(/name="memberIds" value="(\d+)" form="schedule-archive-form-students" class="archive-offpage-checkbox/g)].map((m) => Number(m[1]));
+  const onPageIds = [...page1.text.matchAll(/name="memberIds" value="(\d+)" form="schedule-archive-form-members" class="archive-select-checkbox/g)].map((m) => Number(m[1]));
+  const offPageIds = [...page1.text.matchAll(/name="memberIds" value="(\d+)" form="schedule-archive-form-members" class="archive-offpage-checkbox/g)].map((m) => Number(m[1]));
 
   await t.test('page 1 has exactly PAGE_SIZE visible per-card checkboxes', () => {
     assert.equal(onPageIds.length, PAGE_SIZE);
@@ -82,7 +82,7 @@ test('Student Schedules page 1 of a multi-page list renders an off-page checkbox
 
   await t.test('the off-page checkboxes are unconditionally hidden (no card of their own to sit inside)', () => {
     for (const id of offPageIds) {
-      assert.match(page1.text, new RegExp(`name="memberIds" value="${id}" form="schedule-archive-form-students" class="archive-offpage-checkbox"[^>]*hidden`));
+      assert.match(page1.text, new RegExp(`name="memberIds" value="${id}" form="schedule-archive-form-members" class="archive-offpage-checkbox"[^>]*hidden`));
     }
   });
 
@@ -92,7 +92,7 @@ test('Student Schedules page 1 of a multi-page list renders an off-page checkbox
     assert.equal(allIds.length, 30);
 
     const res = await request(app)
-      .post('/admin/schedule/students/archive')
+      .post('/admin/schedule/members/archive')
       .set('Cookie', freshCookie)
       .type('form')
       .send({ memberIds: allIds, _csrf: csrfToken });
@@ -108,7 +108,7 @@ test('a single-member view (Name dropdown filter) renders no off-page checkboxes
   const { cookie } = await loginAsAdmin();
   const soloId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Solo Filter Student', 'solo-filter-student', 'student')").run()).lastInsertRowid;
 
-  const res = await request(app).get(`/admin/schedule?tab=students&memberId=${soloId}`).set('Cookie', cookie);
+  const res = await request(app).get(`/admin/schedule?tab=members&type=student&memberId=${soloId}`).set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.doesNotMatch(res.text, /class="archive-offpage-checkbox"/);
 });

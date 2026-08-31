@@ -142,8 +142,8 @@ router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) 
 // now deleted) - a second, near-identical rendering of the exact same day
 // grid partials/class-schedule-grid.ejs shows on the *real* Class
 // Schedules tab (/admin/schedule?tab=monday|wednesday, routes/
-// admin-schedule.js), minus that page's Class/Student/Parent Schedules
-// tab bar and its Monday/Wednesday pill toggle - just a bare Day
+// admin-schedule.js), minus that page's Class/Member Schedules tab bar
+// and its Monday/Wednesday pill toggle - just a bare Day
 // <select>. Nothing ever linked to this route directly, but every
 // create/edit/delete/import action elsewhere in this file redirects back
 // to it (`/admin/class-schedule/${day}...`), which meant every single one

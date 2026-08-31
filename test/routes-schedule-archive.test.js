@@ -1,7 +1,7 @@
-// Real HTTP-level coverage for the Student/Parent Schedule archive
-// feature (same "Archive" toggle UX as the Class Schedule grid, applied
-// to the Student/Parent Schedules card grids - routes/admin-schedule.js's
-// POST /schedule/:tab/archive) and the Archive tab's Class/Student/Parent
+// Real HTTP-level coverage for the Member Schedules archive feature (same
+// "Archive" toggle UX as the Class Schedule grid, applied to the merged
+// Member Schedules card grid - routes/admin-schedule.js's POST
+// /schedule/members/archive) and the Archive tab's Class/Student/Parent
 // pill toggle (GET /admin/schedule?tab=archive&type=...). Archiving a
 // member's schedule card snapshots it into member_schedule_archives and
 // unenrolls them from every class they're currently on/staffing - see
@@ -72,7 +72,7 @@ function buildImportBuffer(rows) {
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
-test('POST /admin/schedule/students/archive', async (t) => {
+test('POST /admin/schedule/members/archive unenrolls a student', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   const classBuffer = buildImportBuffer([['Monday', '1', 'Archive Schedule Class', 'Room 1', '', '9:00 AM', '', '', '', '', '', '', '']]);
@@ -89,14 +89,14 @@ test('POST /admin/schedule/students/archive', async (t) => {
     .send({ studentIds: String(student.id), _csrf: csrfToken });
 
   await t.test('rejects with no memberIds selected', async () => {
-    const res = await request(app).post('/admin/schedule/students/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+    const res = await request(app).post('/admin/schedule/members/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
     assert.equal(res.status, 302);
     assert.match(res.headers.location, /error=/);
   });
 
   await t.test('archiving snapshots the schedule and unenrolls the student from every class', async () => {
     const res = await request(app)
-      .post('/admin/schedule/students/archive')
+      .post('/admin/schedule/members/archive')
       .set('Cookie', cookie)
       .type('form')
       .send({ memberIds: String(student.id), _csrf: csrfToken });
@@ -113,7 +113,7 @@ test('POST /admin/schedule/students/archive', async (t) => {
   });
 });
 
-test('POST /admin/schedule/parents/archive unstaffs a teacher from every class', async (t) => {
+test('POST /admin/schedule/members/archive unstaffs a teacher from every class', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
   const classBuffer = buildImportBuffer([['Monday', '2', 'Parent Archive Class', 'Room 2', '', '10:00 AM', '', '', 'Archive Parent Teacher', '', '', '', '']]);
@@ -126,7 +126,7 @@ test('POST /admin/schedule/parents/archive unstaffs a teacher from every class',
 
   await t.test('archiving removes the parent from class_staff and snapshots their schedule', async () => {
     const res = await request(app)
-      .post('/admin/schedule/parents/archive')
+      .post('/admin/schedule/members/archive')
       .set('Cookie', cookie)
       .type('form')
       .send({ memberIds: String(parent.id), _csrf: csrfToken });
@@ -140,6 +140,31 @@ test('POST /admin/schedule/parents/archive unstaffs a teacher from every class',
     assert.ok(archived);
     assert.equal(archived.member_type, 'parent');
     assert.match(archived.monday_schedule || '', /Parent Archive Class/);
+  });
+});
+
+test('POST /admin/schedule/members/archive accepts a mixed student+parent selection in one submit (the merged tab lets both be checked together)', async (t) => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  await addSingleMember(cookie, csrfToken, 'Mixed Archive Kid', 'student');
+  await addSingleMember(cookie, csrfToken, 'Mixed Archive Parent', 'parent');
+  const student = await db.prepare("SELECT id FROM members WHERE name = 'Mixed Archive Kid'").get();
+  const parent = await db.prepare("SELECT id FROM members WHERE name = 'Mixed Archive Parent'").get();
+
+  await t.test('both members get archived from a single mixed-type submit', async () => {
+    const res = await request(app)
+      .post('/admin/schedule/members/archive')
+      .set('Cookie', cookie)
+      .type('form')
+      .send({ memberIds: [String(student.id), String(parent.id)], _csrf: csrfToken });
+    assert.equal(res.status, 302);
+    assert.match(decodeURIComponent(res.headers.location), /Archived 2 member schedule/);
+
+    const studentArchived = await db.prepare("SELECT * FROM member_schedule_archives WHERE member_name = 'Mixed Archive Kid'").get();
+    const parentArchived = await db.prepare("SELECT * FROM member_schedule_archives WHERE member_name = 'Mixed Archive Parent'").get();
+    assert.ok(studentArchived);
+    assert.equal(studentArchived.member_type, 'student');
+    assert.ok(parentArchived);
+    assert.equal(parentArchived.member_type, 'parent');
   });
 });
 
@@ -200,24 +225,24 @@ test('GET /admin/schedule/archive/student/export.csv and delete routes', async (
   });
 });
 
-test('the Student/Parent Schedules grid offers an Archive toggle with hidden per-card checkboxes', async (t) => {
+test('the Member Schedules grid offers an Archive toggle with hidden per-card checkboxes', async (t) => {
   const { cookie } = await loginAsAdmin();
 
-  await t.test('the students tab has the archive form, a hidden Select All checkbox, and a hidden classIds-style memberIds checkbox per card', async () => {
-    const res = await request(app).get('/admin/schedule?tab=students').set('Cookie', cookie);
+  await t.test('has the archive form, a hidden Select All checkbox, and a hidden memberIds checkbox per card', async () => {
+    const res = await request(app).get('/admin/schedule?tab=members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /id="schedule-archive-form-students"/);
-    assert.match(res.text, /action="\/admin\/schedule\/students\/archive"/);
-    assert.match(res.text, /data-archive-controls="schedule-archive-form-students"[^>]*hidden/, 'the Select All/Archive Selected row should start hidden');
-    assert.match(res.text, /data-select-all-for="schedule-archive-form-students"/);
-    assert.match(res.text, /data-archive-toggle="schedule-archive-form-students"/, 'a single Archive toggle button should be present');
-    assert.match(res.text, /name="memberIds"[^>]*form="schedule-archive-form-students"[^>]*hidden/, 'each member checkbox should start hidden');
+    assert.match(res.text, /id="schedule-archive-form-members"/);
+    assert.match(res.text, /action="\/admin\/schedule\/members\/archive"/);
+    assert.match(res.text, /data-archive-controls="schedule-archive-form-members"[^>]*hidden/, 'the Select All/Archive Selected row should start hidden');
+    assert.match(res.text, /data-select-all-for="schedule-archive-form-members"/);
+    assert.match(res.text, /data-archive-toggle="schedule-archive-form-members"/, 'a single Archive toggle button should be present');
+    assert.match(res.text, /name="memberIds"[^>]*form="schedule-archive-form-members"[^>]*hidden/, 'each member checkbox should start hidden');
   });
 
-  await t.test('the parents tab uses its own archive form, independent of the students one', async () => {
-    const res = await request(app).get('/admin/schedule?tab=parents').set('Cookie', cookie);
+  await t.test('the same archive form is used regardless of the Filter popup\'s Member Type - a filtered view is still ?tab=members, just narrowed by ?type=', async () => {
+    const res = await request(app).get('/admin/schedule?tab=members&type=parent').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /id="schedule-archive-form-parents"/);
-    assert.match(res.text, /action="\/admin\/schedule\/parents\/archive"/);
+    assert.match(res.text, /id="schedule-archive-form-members"/);
+    assert.match(res.text, /action="\/admin\/schedule\/members\/archive"/);
   });
 });

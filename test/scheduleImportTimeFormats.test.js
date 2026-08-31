@@ -136,8 +136,9 @@ test('a Student Schedule import row whose Start Time cell is a genuine Excel Tim
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
   const res = await request(app)
-    .post(`/admin/schedule/students/import?_csrf=${csrfToken}`)
+    .post(`/admin/schedule/members/import?_csrf=${csrfToken}`)
     .set('Cookie', cookie)
+    .field('memberType', 'student')
     .attach('file', buffer, 'import.xlsx');
   const notice = new URL(res.headers.location, 'http://localhost').searchParams.get('notice');
   assert.match(notice, /Matched 2 schedule row/, 'both slots must match - neither should be silently dropped as "no matching class"');

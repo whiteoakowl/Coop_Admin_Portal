@@ -60,16 +60,33 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents', 'archive', 'settings'];
+const SCHEDULE_TABS = ['monday', 'wednesday', 'members', 'archive', 'settings'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
+const MEMBER_TYPE_FILTERS = ['student', 'parent'];
 const PAGE_SIZE = 25;
 
 router.get('/schedule', requireAdmin, async (req, res) => {
+  // A real request: "merge Parent + Student Schedules tabs into 'Member
+  // Schedules' with filter popup" - the two separate top-level tabs are
+  // now one Member Schedules tab with a Filter popup (Member Type: All/
+  // Students/Parents, see the ?type= handling below) instead. Old
+  // ?tab=students / ?tab=parents links (bookmarks, the Member profile's
+  // own "back to Schedules" link - see returnType below) still work,
+  // redirected to the merged tab with the matching type filter carried
+  // over so nothing that used to point at just parents (or just
+  // students) suddenly shows everyone.
+  if (req.query.tab === 'students' || req.query.tab === 'parents') {
+    const qs = new URLSearchParams(req.query);
+    qs.set('tab', 'members');
+    qs.set('type', req.query.tab === 'students' ? 'student' : 'parent');
+    return res.redirect('/admin/schedule?' + qs.toString());
+  }
+
   let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
 
-  // Student/Parent Schedules, the Class Archive, and Settings are all
+  // Member Schedules, the Class Archive, and Settings are all
   // full-Admin-only. A Co-op Admin only gets the read-only day grid.
-  if ((tab === 'students' || tab === 'parents' || tab === 'archive' || tab === 'settings') && !res.locals.isFullAdmin) {
+  if ((tab === 'members' || tab === 'archive' || tab === 'settings') && !res.locals.isFullAdmin) {
     tab = 'monday';
   }
 
@@ -97,8 +114,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
 
   // Archive: a pill toggle (Class/Student/Parent) switches between classes
   // archived from either day's grid (see archiveClasses in
-  // utils/classSchedule.js) and members archived from the Student/Parent
-  // Schedules tabs (see archiveMemberSchedules in utils/schedule.js) - two
+  // utils/classSchedule.js) and members archived from the Member
+  // Schedules tab (see archiveMemberSchedules in utils/schedule.js) - two
   // different tables, same "flatten to plain text, drop the FK-linked
   // detail" archive philosophy either way.
   if (tab === 'archive') {
@@ -137,18 +154,21 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     });
   }
 
-  // Student Schedules / Parent Schedules: every active member of that
-  // type, shown as their actual Schedule Card (same design/rendering as
-  // the printable card - see partials/name-tag-badge.ejs), laid out side
-  // by side in alphabetical-by-last-name order. The old free-text search
-  // is now a dropdown of every name in this tab, jumping straight to one
-  // person's card via the memberId filter scheduleList already supports.
-  // Parent tab includes admin/leader members too - a real bug report:
-  // "when viewing parent schedules under parent tab it won't show
-  // admins. wherever there is a parent filter it should include admins
-  // too." Admins regularly teach/assist/floater/staff a team just like
-  // any other adult, so their own schedule belongs on this tab.
-  const memberType = tab === 'parents' ? ['parent', 'admin'] : 'student';
+  // Member Schedules: every active member matching the Filter popup's
+  // Member Type choice (All/Students/Parents - see the dialog in
+  // admin-schedule.ejs), shown as their actual Schedule Card (same
+  // design/rendering as the printable card - see partials/name-tag-
+  // badge.ejs), laid out side by side in alphabetical-by-last-name order.
+  // The old free-text search is a dropdown of every name matching the
+  // current type filter, jumping straight to one person's card via the
+  // memberId filter scheduleList already supports. A Parent-filtered (or
+  // unfiltered) view includes admin/leader members too - a real bug
+  // report: "when viewing parent schedules under parent tab it won't
+  // show admins. wherever there is a parent filter it should include
+  // admins too." Admins regularly teach/assist/floater/staff a team just
+  // like any other adult, so their own schedule belongs here.
+  const typeFilter = MEMBER_TYPE_FILTERS.includes(req.query.type) ? req.query.type : '';
+  const memberType = typeFilter === 'student' ? 'student' : typeFilter === 'parent' ? ['parent', 'admin'] : ['student', 'parent', 'admin'];
   const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
   const filters = { memberType, memberId: selectedMemberId || undefined };
 
@@ -194,6 +214,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     title: 'Schedules',
     tab,
     topTab: tab,
+    typeFilter,
     rows: pageRows,
     totalCount: summarized.length,
     page,
@@ -208,7 +229,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   });
 });
 
-// --- Student/Parent Schedules: bulk import ---
+// --- Member Schedules: bulk import ---
 //
 // One row = one whole member's week, up to SCHEDULE_SLOT_COUNT (8)
 // classes - unlike the per-class roster import (one row = one student), a
@@ -232,7 +253,6 @@ router.get('/schedule', requireAdmin, async (req, res) => {
 // notes if they don't already have any on file - never overwrites an
 // existing value, same non-destructive-merge convention the full-profile
 // Members Import uses.
-const SCHEDULE_IMPORT_TABS = { students: 'student', parents: 'parent' };
 const SCHEDULE_SLOT_COUNT = 8;
 
 function normalizeMatchText(value) {
@@ -271,8 +291,7 @@ function scheduleExampleRow(base, filledSlots) {
 }
 
 router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) => {
-  const tab = req.params.tab;
-  if (!SCHEDULE_IMPORT_TABS[tab]) return res.status(404).send('Not found');
+  if (req.params.tab !== 'members') return res.status(404).send('Not found');
 
   const exampleRow1 = scheduleExampleRow(['Jane', 'Smith', ''], [
     { position: 1, startTime: '9:00 AM', className: 'Art Adventures', room: 'Room 3', days: 'Mon' },
@@ -284,7 +303,7 @@ router.get('/schedule/:tab/import-template.xlsx', requireFullAdmin, (req, res) =
 
   const buffer = buildTemplateWorkbook(scheduleImportHeaders(), [exampleRow1, exampleRow2]);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename="${tab}-schedule-import-template.xlsx"`);
+  res.setHeader('Content-Disposition', 'attachment; filename="member-schedule-import-template.xlsx"');
   res.send(buffer);
 });
 
@@ -323,10 +342,13 @@ function normalizeScheduleImportRow(row) {
 }
 
 router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.single('file'), async (req, res) => {
-  const tab = req.params.tab;
-  const memberType = SCHEDULE_IMPORT_TABS[tab];
-  if (!memberType) return res.status(404).send('Not found');
-  const redirectBase = `/admin/schedule?tab=${tab}`;
+  if (req.params.tab !== 'members') return res.status(404).send('Not found');
+  // The browsing tab is merged (Member Schedules, filtered by Member
+  // Type), but a spreadsheet import still has to know which role to
+  // apply a match under - the "Import As" radio in the dialog (views/
+  // admin-schedule.ejs) carries that instead of the old per-tab mapping.
+  const memberType = req.body.memberType === 'parent' ? 'parent' : 'student';
+  const redirectBase = `/admin/schedule?tab=members&type=${memberType}`;
 
   if (!req.file) {
     return res.redirect(`${redirectBase}&error=` + encodeURIComponent('Please choose a file to import.'));
@@ -436,20 +458,21 @@ router.post('/schedule/:tab/import', requireFullAdmin, uploadScheduleImport.sing
   );
 });
 
-// Archives the checked schedule cards (checkboxes on the Student/Parent
-// Schedules grid, or its "Select All") - unenrolls each member from every
-// class they're currently on, saving a snapshot of what they were on
-// first. See archiveMemberSchedules' own comment in utils/schedule.js.
+// Archives the checked schedule cards (checkboxes on the Member Schedules
+// grid, or its "Select All") - unenrolls each member from every class
+// they're currently on, saving a snapshot of what they were on first. A
+// selection can freely mix students and parents (archiveMemberSchedules
+// already splits them internally), which the merged tab makes possible
+// now that both are browsed together. See archiveMemberSchedules' own
+// comment in utils/schedule.js.
 router.post('/schedule/:tab/archive', requireFullAdmin, async (req, res) => {
-  const tab = req.params.tab;
-  const memberType = SCHEDULE_IMPORT_TABS[tab];
-  if (!memberType) return res.status(404).send('Not found');
+  if (req.params.tab !== 'members') return res.status(404).send('Not found');
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {
-    return res.redirect(`/admin/schedule?tab=${tab}&error=` + encodeURIComponent('Select at least one member to archive.'));
+    return res.redirect('/admin/schedule?tab=members&error=' + encodeURIComponent('Select at least one member to archive.'));
   }
   const count = await archiveMemberSchedules(memberIds);
-  res.redirect(`/admin/schedule?tab=${tab}&notice=` + encodeURIComponent(`Archived ${count} member schedule(s) - see the Archive tab.`));
+  res.redirect('/admin/schedule?tab=members&notice=' + encodeURIComponent(`Archived ${count} member schedule(s) - see the Archive tab.`));
 });
 
 router.get('/schedule/archive/:type/export.csv', requireFullAdmin, async (req, res) => {
@@ -573,7 +596,11 @@ router.get('/schedule/member/:id/manage', requireFullAdmin, async (req, res) => 
     monday,
     wednesday,
     dayLabels: DAY_LABELS,
-    returnTab: member.member_type === 'parent' || member.member_type === 'admin' ? 'parents' : 'students',
+    // "All Schedules" back-link on the merged Member Schedules tab -
+    // carries this member's own type along as the Filter popup's ?type=
+    // so the admin lands back on a sensibly-scoped view instead of
+    // always "All Members".
+    returnType: member.member_type === 'parent' || member.member_type === 'admin' ? 'parent' : 'student',
   });
 });
 

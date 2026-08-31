@@ -3,7 +3,7 @@
 // redirects back to `/admin/class-schedule/:day` on success - a second,
 // near-duplicate rendering of the exact same day grid the real Class
 // Schedules tab (/admin/schedule?tab=monday|wednesday) shows, minus that
-// page's Class/Student/Parent Schedules tab bar and Monday/Wednesday
+// page's Class/Member Schedules tab bar and Monday/Wednesday
 // pill toggle. Every one of those actions was silently landing the admin
 // on the tab-less duplicate instead of back where they started ("the top
 // tabs disappear when editing a class"). Fixed by turning
@@ -47,9 +47,8 @@ async function loginAsAdmin() {
 }
 
 function assertHasTabsAndToggle(html) {
-  assert.match(html, /Class Schedules<\/a>/, 'the Class/Student/Parent Schedules tab bar should be present');
-  assert.match(html, /Student Schedules<\/a>/);
-  assert.match(html, /Parent Schedules<\/a>/);
+  assert.match(html, /Class Schedules<\/a>/, 'the Class/Member Schedules tab bar should be present');
+  assert.match(html, /Member Schedules<\/a>/);
   assert.match(html, /class="day-toggle no-print schedule-day-toggle"/, 'the Monday/Wednesday pill toggle should be present');
 }
 

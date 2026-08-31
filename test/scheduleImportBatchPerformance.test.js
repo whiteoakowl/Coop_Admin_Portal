@@ -1,7 +1,7 @@
 // Real regression coverage for a live-reported production timeout:
-// importing a Student Schedules spreadsheet (POST /schedule/:tab/import)
-// with hundreds of rows failed with Netlify's own "Inactivity Timeout"
-// before the request ever finished.
+// importing a member schedule spreadsheet (POST /schedule/members/import,
+// memberType=student) with hundreds of rows failed with Netlify's own
+// "Inactivity Timeout" before the request ever finished.
 //
 // Root cause, two compounding N+1s in the same loop:
 //   1. The member lookup and the class lookup were both separate
@@ -121,8 +121,9 @@ test('importing 60 students who all share one popular class writes that class\'s
   // shared class - 60 times, not the fixed 2 this asserts.
   const lookups = await countQueries(/SELECT student_id FROM class_enrollments WHERE class_id = \?/, async () => {
     const res = await request(app)
-      .post(`/admin/schedule/students/import?_csrf=${csrfToken}`)
+      .post(`/admin/schedule/members/import?_csrf=${csrfToken}`)
       .set('Cookie', cookie)
+      .field('memberType', 'student')
       .attach('file', buffer, 'import.xlsx');
     const notice = new URL(res.headers.location, 'http://localhost').searchParams.get('notice');
     assert.match(notice, /Matched 60 schedule row/);
@@ -161,7 +162,7 @@ test('member and class lookups happen a fixed number of times per import, not on
     }
     const buffer = buildImportBuffer(rows);
     return countQueries(/SELECT id, name, medical_notes FROM members WHERE member_type|SELECT \* FROM classes$/, async () => {
-      await request(app).post(`/admin/schedule/students/import?_csrf=${csrfToken}`).set('Cookie', cookie).attach('file', buffer, 'import.xlsx');
+      await request(app).post(`/admin/schedule/members/import?_csrf=${csrfToken}`).set('Cookie', cookie).field('memberType', 'student').attach('file', buffer, 'import.xlsx');
     });
   }
 
