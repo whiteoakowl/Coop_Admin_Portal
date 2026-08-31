@@ -25,7 +25,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const app = require('../server');
 const db = require('../db');
 const { createClass, addStaff, gridForDay } = require('../utils/classSchedule');
-const { substituteBoard, classVacancySlots, classVacancySlotId } = require('../utils/substitutes');
+const { substituteBoard, classVacancyEntriesForClass, classVacancySlotId } = require('../utils/substitutes');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -41,8 +41,12 @@ async function makeMember(name, barcode) {
 
 async function vacancySlotsForClass(day, classId) {
   const grid = await gridForDay(day);
-  const hourGroup = grid.find((h) => h.classes.some((c) => c.id === classId));
-  return classVacancySlots(hourGroup).filter((v) => Math.floor(v.slotId / 10000) === classId);
+  let cls;
+  for (const hourGroup of grid) {
+    cls = hourGroup.classes.find((c) => c.id === classId);
+    if (cls) break;
+  }
+  return classVacancyEntriesForClass(cls);
 }
 
 test('assistant_slots=1, 0 signed up: one vacancy slot appears, tagged "Assistant needed (0 of 1 filled)"', async () => {
