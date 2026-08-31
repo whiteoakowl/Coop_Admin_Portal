@@ -1,11 +1,14 @@
-// Real HTTP-level coverage for a real request: "highlight the member row
-// red if they check in that day" on the Setup/Cleanup Assignments roster
-// (partials/setup-assignment-cards.ejs, shared by the live admin
-// Assignments tab and its read-only kiosk-facing view). Mirrors
-// test/routes-setup-absent-highlight.test.js's own setup almost exactly -
-// same setup_dates/assignmentCardsForDate machinery, same partial - just
-// keyed off an actual kiosk check-in (attendance.check_in_time) instead of
-// an absence mark.
+// Real HTTP-level coverage for the Setup/Cleanup Assignments roster's
+// checked-in highlight (partials/setup-assignment-cards.ejs, shared by
+// the live admin Assignments tab and its read-only kiosk-facing view) -
+// class name/precedence only, not color (that's CSS - see styles.css's
+// own comment on the real bug report: it used to share the absent row's
+// red styling, so a member who'd actually shown up got flagged the same
+// as one who never came; now it's green). Mirrors test/routes-setup-
+// absent-highlight.test.js's own setup almost exactly - same
+// setup_dates/assignmentCardsForDate machinery, same partial - just keyed
+// off an actual kiosk check-in (attendance.check_in_time) instead of an
+// absence mark.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -67,7 +70,7 @@ test('utils/classSchedule.js checkedInMemberIdsForDate', async () => {
   assert.equal((await checkedInMemberIdsForDate('')).size, 0, 'an empty date returns an empty set rather than matching everything');
 });
 
-test('Setup/Cleanup Assignments: admin + kiosk views highlight a checked-in member\'s whole row red', async (t) => {
+test('Setup/Cleanup Assignments: admin + kiosk views highlight a checked-in member\'s whole row (green - see styles.css)', async (t) => {
   const cookie = await loginAsAdmin();
 
   for (const day of ['monday', 'wednesday']) {

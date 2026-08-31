@@ -4675,12 +4675,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    per-member table row (partials/setup-assignment-cards.ejs) instead of
    the Teams tab's card-list rows above. */
 .setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
-/* A real request: "highlight the member row red if they check in that
-   day" - same red-bg/red-text pairing as the absent row above (this
-   table only ever shows one of the two at once - see the partial's own
-   comment on precedence), just triggered by m.checkedIn instead of
-   m.absent. */
-.setup-assignment-row-checked-in td { background: var(--red-bg); color: var(--red); }
+/* A real bug report: "setup/cleanup team should highlight red member
+   rows if they are absent. highlight green rows if they are present. it
+   is currently highlighting all rows of people who have checked in red,
+   that's wrong." This used to share the absent row's own red-bg/red-text
+   pairing, just triggered by m.checkedIn instead of m.absent - so a
+   member who'd actually shown up got the same "something's wrong" red
+   flag as one who never came. Green (same pairing as .badge-pill-present/
+   .cell-present elsewhere) reads as "here," red as "not here" - this
+   table only ever shows one of the two at once (see the partial's own
+   comment on precedence). */
+.setup-assignment-row-checked-in td { background: var(--green-bg); color: var(--green); }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and

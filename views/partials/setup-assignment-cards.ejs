@@ -83,13 +83,18 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   equivalent has ever needed real escaping - only a
                   literal, hardcoded class name is ever written either
                   way. %>
-              <%# A real request: "highlight the member row red if they
-                  check in that day" - m.checkedIn (assignmentCardsForDate,
-                  utils/setup.js) computed the same "read from attendance"
-                  way as m.absent just above. Absent wins if somehow both
-                  are true (a corrected status after an earlier check-in),
-                  same plain-control-flow-tag class-attribute pattern as
-                  m.absent for the reason explained above. %>
+              <%# A real bug report: "highlight red member rows if absent,
+                  green rows if present - it is currently highlighting all
+                  rows of people who have checked in red." m.checkedIn
+                  (assignmentCardsForDate, utils/setup.js) is computed the
+                  same "read from attendance" way as m.absent just above -
+                  only the CSS pairing for setup-assignment-row-checked-in
+                  needed to change (red -> green, see styles.css), the
+                  class name/precedence logic itself was already right.
+                  Absent wins if somehow both are true (a corrected status
+                  after an earlier check-in), same plain-control-flow-tag
+                  class-attribute pattern as m.absent for the reason
+                  explained above. %>
               <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } else if (m.checkedIn) { %> class="setup-assignment-row-checked-in"<% } %>>
                 <td class="floater-card-position">
                   <%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
