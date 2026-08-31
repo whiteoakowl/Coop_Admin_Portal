@@ -41,7 +41,7 @@
   tabindex="0"
   aria-label="View <%= s.name %>'s membership profile"
 >
-  <span class="roster-log-name"><%= s.name %><%- include('medical-flag', { member: s }) %></span>
+  <span class="roster-log-name"><a class="member-name-link" href="/admin/members/<%= s.id %>"><%= s.name %></a><%- include('medical-flag', { member: s }) %></span>
   <span class="roster-log-meta">
     <% if (s.family_name) { %><span>The <%= s.family_name %> Family</span><% } %>
     <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>

@@ -97,7 +97,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
                   explained above. %>
               <tr<% if (m.absent) { %> class="setup-assignment-row-absent"<% } else if (m.checkedIn) { %> class="setup-assignment-row-checked-in"<% } %>>
                 <td class="floater-card-position">
-                  <%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
+                  <a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %><% if (m.absent) { %> <span class="floater-card-unassigned">(absent)</span><% } %>
                 </td>
                 <%
                   var slots = [

@@ -83,7 +83,7 @@
                   <% var memberOverdue = m.items.some(function(it) { return it.overdue; }); %>
                   <% m.items.forEach(function(item, i) { %>
                     <tr class="<%= item.overdue ? 'library-overdue-row' : '' %>">
-                      <% if (i === 0) { %><td rowspan="<%= m.items.length %>" class="roster-name-col<%= memberOverdue ? ' library-overdue-row' : '' %>"><%= m.memberName %></td><% } %>
+                      <% if (i === 0) { %><td rowspan="<%= m.items.length %>" class="roster-name-col<%= memberOverdue ? ' library-overdue-row' : '' %>"><a class="member-name-link" href="/admin/members/<%= m.memberId %>"><%= m.memberName %></a></td><% } %>
                       <td><%= item.title %></td>
                       <td><%= item.checkedOutAt %></td>
                       <td><%= item.dueDateLabel || '—' %><% if (item.overdue) { %> <span class="badge-pill badge-pill-absent">Overdue</span><% } %></td>

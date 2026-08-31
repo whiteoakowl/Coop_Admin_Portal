@@ -19,7 +19,7 @@ const {
   deleteMemberScheduleArchive,
   deleteAllMemberScheduleArchives,
 } = require('../utils/schedule');
-const { byLastName } = require('../utils/members');
+const { byLastName, allFamilies } = require('../utils/members');
 const {
   DAY_LABELS: CLASS_DAY_LABELS,
   hoursForDay,
@@ -170,7 +170,13 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   const typeFilter = MEMBER_TYPE_FILTERS.includes(req.query.type) ? req.query.type : '';
   const memberType = typeFilter === 'student' ? 'student' : typeFilter === 'parent' ? ['parent', 'admin'] : ['student', 'parent', 'admin'];
   const selectedMemberId = req.query.memberId ? parseInt(req.query.memberId, 10) : null;
-  const filters = { memberType, memberId: selectedMemberId || undefined };
+  // "add to the filter, filter by family name. then you can see the whole
+  // families schedules at once" - a real request. scheduleList already
+  // supported filters.familyId (the Print route has used it for a while,
+  // see /admin/schedule/print?familyId= below) - this just exposes the
+  // same filter on the main Member Schedules list.
+  const selectedFamilyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const filters = { memberType, memberId: selectedMemberId || undefined, familyId: selectedFamilyId || undefined };
 
   const rows = await scheduleList(filters);
 
@@ -224,6 +230,8 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     cardHeight: CARD_HEIGHT,
     allNames,
     selectedMemberId,
+    families: await allFamilies(),
+    selectedFamilyId,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

@@ -30,7 +30,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
                 <td><%= job.room || '—' %></td>
                 <td>
                   <% if (job.assigned) { %>
-                    <%= job.assigned.name %>
+                    <a class="member-name-link" href="/admin/members/<%= job.assigned.id %>"><%= job.assigned.name %></a>
                   <% } else { %>
                     <span class="floater-card-unassigned">Unassigned</span>
                   <% } %>

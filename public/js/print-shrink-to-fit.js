@@ -233,6 +233,27 @@
   });
   window.addEventListener('afterprint', resetAllForPrint);
 
+  // A real request: "when you click print it needs a real print preview
+  // that shows what the printing will be." [data-shrink-to-fit-on-print]
+  // deliberately only fits inside beforeprint/matchMedia (see
+  // fitAllForPrint's own comment) everywhere else it's used - the live
+  // Attendance roster grid, which needs its on-screen scrollbar left
+  // alone until an actual print starts. admin-setup-teams-print.ejs's
+  // dedicated, read-only preview page (.team-print-preview-page) is a
+  // different case: nothing on it needs a scrollbar, and the whole point
+  // of a preview page is to already look like the real printout before
+  // Print is ever clicked (styles.css's own .team-print-preview-page
+  // rules give it that page-sized, page-per-team look unconditionally,
+  // not just under @media print - see those for the fuller story). Runs
+  // the exact same print-accurate measurement pass beforeprint already
+  // uses (withPrintMeasuring keeps it seeing true print-time layout, not
+  // the ambient on-screen one) on load/resize too, scoped to this one
+  // page by its own body class so nothing else is affected.
+  if (document.body.classList.contains('team-print-preview-page')) {
+    window.addEventListener('load', function () { withPrintMeasuring(fitAllForPrint); });
+    window.addEventListener('resize', function () { withPrintMeasuring(fitAllForPrint); });
+  }
+
   // Belt-and-suspenders, same reasoning as public/js/print-auto.js's own
   // matchMedia fallback: [data-shrink-to-fit-on-print] (the live
   // Attendance roster grid) ONLY ever gets its fit-to-one-page zoom

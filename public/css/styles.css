@@ -4637,6 +4637,71 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: #333;
 }
 
+/* Extends the exact same "the preview screen must show what @media print
+   actually produces" fix above to the rest of the one-team-per-page
+   treatment - a real follow-up request: "setup/cleanup teams when you
+   click print it needs a real print preview that shows what the printing
+   will be." Before this, only .team-print-meta (above) got the preview-
+   page treatment - the per-card header, the one-per-page block layout,
+   and the 14pt/18pt print font sizes were still @media print-only, so
+   this "preview" page looked exactly like the live 5-per-row editable
+   grid right up until an actual print/PDF was produced - nothing about
+   "one team fills its own page" was visible before that point, which is
+   the whole thing being previewed. These three mirror their @media print
+   counterparts (.setup-team-card-grid, .print-header/.print-header-title/
+   -sub, and the 14pt font-size block) a few hundred lines down verbatim -
+   safe to also apply during a real print (redundant with, not
+   contradicting, those rules) since none of this is scoped to the fragile
+   pagination math (page-break-before, the max-height budget) those rules
+   still own. */
+.team-print-preview-page .setup-team-card-grid {
+  display: block;
+}
+.team-print-preview-page .print-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid #000;
+}
+.team-print-preview-page .print-header img { height: 48px; width: 48px; border-radius: 50%; }
+.team-print-preview-page .team-print-page-inner .print-header-title { font-size: 18pt; font-weight: 800; margin: 0; color: #000; }
+.team-print-preview-page .team-print-page-inner .print-header-sub { font-size: 14pt; margin: 0.1rem 0 0; color: #333; }
+.team-print-preview-page .setup-team-card-grid .team-info-title,
+.team-print-preview-page .setup-team-card-grid .team-info-desc-print,
+.team-print-preview-page .setup-team-card-grid .team-print-meta,
+.team-print-preview-page .setup-team-card-grid .team-members-card h4,
+.team-print-preview-page .setup-team-card-grid .team-member-name,
+.team-print-preview-page .setup-team-card-grid .team-member-flag,
+.team-print-preview-page .setup-team-card-grid .team-tasks-card h4,
+.team-print-preview-page .setup-team-card-grid .team-tasks-list {
+  font-size: 14pt;
+}
+
+/* The "looks like an actual page" chrome (width/shadow/border) IS
+   screen-only, unlike the three rules above - real print already gets
+   its true page shape from the browser's own paper size, and giving
+   .team-print-page-fit extra padding/border here would throw off
+   print-shrink-to-fit.js's fitOne(), which measures THIS exact element's
+   clientWidth/clientHeight as the "how much room is there" budget (see
+   that file's own comments on the Chromium pagination quirks a fixed/
+   padded box on this specific element has triggered before) - @media
+   screen keeps that measurement identical to what real print already
+   uses (a plain, unpadded, unbordered box) while still giving the
+   on-screen preview a real edge to visually read as "this is one page". */
+@media screen {
+  .team-print-preview-page .team-print-page-fit {
+    width: 7.5in;
+    max-height: 9.2in;
+    overflow: hidden;
+    margin: 0 auto 1.5rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+}
+
 .team-members-card {
   min-width: 0;
   padding: 0.75rem 0.75rem 0.85rem;
@@ -5623,8 +5688,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    8.5x11in page - print-shrink-to-fit.js measures this box and zooms
    .class-schedule-print-grid down (never up) to land inside it, so a
    busy day's classes shrink to stay on one page instead of spilling onto
-   a second. */
-.class-schedule-print-fit { flex: 1; min-height: 0; overflow: hidden; }
+   a second.
+
+   margin-bottom: 0.3in - a real bug report: "even with fit to page there
+   should still be some blank margins around the top, bottom and side of
+   all the pages printing." A busy day's grid, shrunk right up against
+   this box's own bottom edge, left the last room row printing flush
+   against the physical page edge with no visible bottom margin -
+   confirmed live (Playwright's page.pdf({ preferCSSPageSize: true }), the
+   same harness used throughout this file's own history). Reserving the
+   margin here, on the flex CHILD itself, rather than shrinking .print-
+   page's own height (tried first - confirmed live that even a small
+   reduction there reproduces the exact "box height too close to the true
+   page height confuses Chromium's print pagination" quirk .team-print-
+   page-fit's own comment already documents, except worse: the WHOLE grid
+   vanished off page 1 instead of a trailing blank page) keeps that fixed,
+   already-correct 11in page height untouched - flex:1 just has less room
+   to grow into, so print-shrink-to-fit.js's fitOne() measures a smaller
+   "available height" and shrinks the grid to leave this exact margin. */
+.class-schedule-print-fit { flex: 1; min-height: 0; overflow: hidden; margin-bottom: 0.3in; }
 
 /* Room-by-hour grid, same cross-tab shape as the on-screen
    .class-schedule-room-grid (roomGridForDay) - room stays its own grid
@@ -6090,7 +6172,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      subject to print-shrink-to-fit.js's per-team, per-day-leveled zoom
      exactly as before (see .team-print-page-fit and its data-shrink-to-
      fit-group="teams" above) - a team busy enough to need shrinking still
-     shrinks proportionally down from these sizes, same as always. */
+     shrinks proportionally down from these sizes, same as always.
+
+     Raised to 14pt - a follow-up request once the near-blank/illegible
+     print bug above (see print-shrink-to-fit.js's MIN_SCALE comment) was
+     traced to the shrink math, not the starting size: "start at 14 point
+     font and shrink it from there if needed to fit the whole team on a
+     page." Nothing else about the mechanism changes - this is still just
+     the starting point fitOne() measures against before shrinking. */
   .setup-team-card-grid .team-info-title,
   .setup-team-card-grid .team-info-desc-print,
   .setup-team-card-grid .team-print-meta,
@@ -6099,7 +6188,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .setup-team-card-grid .team-member-flag,
   .setup-team-card-grid .team-tasks-card h4,
   .setup-team-card-grid .team-tasks-list {
-    font-size: 12pt;
+    font-size: 14pt;
   }
   .team-print-page-inner .print-header-title {
     font-size: 18pt;

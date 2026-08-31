@@ -126,7 +126,7 @@
             <% } %>
             <% cls.staff.forEach(function(s) { %>
               <div class="roster-log-row">
-                <span class="roster-log-name"><%= s.name %></span>
+                <span class="roster-log-name"><a class="member-name-link" href="/admin/members/<%= s.id %>"><%= s.name %></a></span>
                 <span class="roster-log-meta">
                   <span class="badge-pill"><%= s.role === 'assistant' ? 'Assistant' : 'Teacher' %></span>
                 </span>

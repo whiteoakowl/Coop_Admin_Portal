@@ -190,12 +190,14 @@
             params.set('tab', tab);
             if (typeFilter) params.set('type', typeFilter);
             if (selectedMemberId) params.set('memberId', selectedMemberId);
+            if (selectedFamilyId) params.set('familyId', selectedFamilyId);
             Object.keys(overrides || {}).forEach(function (k) {
               if (overrides[k] === null || overrides[k] === undefined) params.delete(k);
               else params.set(k, overrides[k]);
             });
             return '?' + params.toString();
           }
+          var selectedFamily = selectedFamilyId ? families.find(function (f) { return f.id === selectedFamilyId; }) : null;
           var typeLabel = typeFilter === 'student' ? 'Student' : typeFilter === 'parent' ? 'Parent' : 'Member';
           var typeLabelPlural = typeFilter === 'student' ? 'students' : typeFilter === 'parent' ? 'parents' : 'members';
         %>
@@ -206,11 +208,11 @@
           <div class="schedule-filters">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('schedule-filter-dialog').showModal()">
               <svg class="icon"><use href="#icon-filter"/></svg>
-              Filter<% if (typeFilter) { %>: <%= typeLabel %>s<% } %>
+              Filter<% if (typeFilter) { %>: <%= typeLabel %>s<% } %><% if (selectedFamily) { %><% if (typeFilter) { %>,<% } else { %>:<% } %> <%= selectedFamily.name %> Family<% } %>
             </button>
             <div class="category-filter schedule-search">
               <label for="schedule-name-select"><%= typeLabel %> Name</label>
-              <select id="schedule-name-select" onchange="window.location = '/admin/schedule?tab=members<%= typeFilter ? '&type=' + typeFilter : '' %>' + (this.value ? '&memberId=' + this.value : '')">
+              <select id="schedule-name-select" onchange="window.location = '/admin/schedule?tab=members<%= typeFilter ? '&type=' + typeFilter : '' %><%= selectedFamilyId ? '&familyId=' + selectedFamilyId : '' %>' + (this.value ? '&memberId=' + this.value : '')">
                 <option value="">All <%= typeLabelPlural %></option>
                 <% allNames.forEach(function(n) { %>
                   <option value="<%= n.id %>" <%= selectedMemberId === n.id ? 'selected' : '' %>><%= n.name %></option>
@@ -252,6 +254,21 @@
               <label class="checkbox-option"><input type="radio" name="type" value="" <%= !typeFilter ? 'checked' : '' %> /> All Members</label>
               <label class="checkbox-option"><input type="radio" name="type" value="student" <%= typeFilter === 'student' ? 'checked' : '' %> /> Students</label>
               <label class="checkbox-option"><input type="radio" name="type" value="parent" <%= typeFilter === 'parent' ? 'checked' : '' %> /> Parents (includes admins)</label>
+            </div>
+            <%
+              // "add to the filter, filter by family name. then you can see
+              // the whole families schedules at once" - a real request.
+              // scheduleList already supports filters.familyId (the Print
+              // route has used it for a while), this just exposes it here.
+            %>
+            <div class="category-filter">
+              <label for="schedule-family-filter-select">Family Name</label>
+              <select id="schedule-family-filter-select" name="familyId">
+                <option value="">All Families</option>
+                <% families.forEach(function(f) { %>
+                  <option value="<%= f.id %>" <%= selectedFamilyId === f.id ? 'selected' : '' %>><%= f.name %> Family</option>
+                <% }); %>
+              </select>
             </div>
             <div class="notes-dialog-actions">
               <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

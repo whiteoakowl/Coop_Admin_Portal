@@ -378,6 +378,7 @@
                 <p class="hint">To make changes, edit this profile on the <a href="/admin/members/<%= row.member.id %>/edit">Members page</a>.</p>
                 <div class="notes-dialog-actions">
                   <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+                  <a class="primary-btn" href="/admin/members/<%= row.member.id %>">View Full Profile</a>
                 </div>
               </dialog>
             <% }); %>

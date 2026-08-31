@@ -164,35 +164,66 @@
         <% if (familyRoster.length > 1) { %>
           <div class="category-filter member-profile-family-select">
             <label for="attendance-family-member-select">Family Member</label>
-            <select id="attendance-family-member-select" onchange="window.location = '/admin/members/' + this.value + '?tab=attendance'">
+            <select id="attendance-family-member-select" onchange="if (this.value === 'all') { window.location = '/admin/members/<%= member.id %>?tab=attendance&family=all'; } else { window.location = '/admin/members/' + this.value + '?tab=attendance'; }">
+              <option value="all" <%= attendanceFamilyAll ? 'selected' : '' %>>All</option>
               <% familyRoster.forEach(function(m) { %>
-                <option value="<%= m.id %>" <%= m.id === member.id ? 'selected' : '' %>><%= m.name %></option>
+                <option value="<%= m.id %>" <%= (!attendanceFamilyAll && m.id === member.id) ? 'selected' : '' %>><%= m.name %></option>
               <% }); %>
             </select>
           </div>
         <% } %>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Number</th></tr>
-            </thead>
-            <tbody>
-              <% if (history.length === 0) { %>
-                <tr><td colspan="6" class="roster-empty">No attendance recorded yet.</td></tr>
-              <% } %>
-              <% history.forEach(function(h) { %>
-                <tr>
-                  <td><%= h.rosterName %></td>
-                  <td><%= h.dateLabel %></td>
-                  <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
-                  <td><%= h.checkInTime || '—' %></td>
-                  <td><%= h.checkOutTime || '—' %></td>
-                  <td><%= h.number ?? '—' %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <% if (attendanceFamilyAll) { %>
+          <% familyAttendanceHistories.forEach(function(fa) { %>
+            <div class="form-section member-profile-family-schedule">
+              <h2 class="member-profile-family-schedule-name"><%= fa.member.name %></h2>
+              <div class="roster-scroll">
+                <table class="roster-table members-table condensed-table">
+                  <thead>
+                    <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Number</th></tr>
+                  </thead>
+                  <tbody>
+                    <% if (fa.history.length === 0) { %>
+                      <tr><td colspan="6" class="roster-empty">No attendance recorded yet.</td></tr>
+                    <% } %>
+                    <% fa.history.forEach(function(h) { %>
+                      <tr>
+                        <td><%= h.rosterName %></td>
+                        <td><%= h.dateLabel %></td>
+                        <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                        <td><%= h.checkInTime || '—' %></td>
+                        <td><%= h.checkOutTime || '—' %></td>
+                        <td><%= h.number ?? '—' %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Number</th></tr>
+              </thead>
+              <tbody>
+                <% if (history.length === 0) { %>
+                  <tr><td colspan="6" class="roster-empty">No attendance recorded yet.</td></tr>
+                <% } %>
+                <% history.forEach(function(h) { %>
+                  <tr>
+                    <td><%= h.rosterName %></td>
+                    <td><%= h.dateLabel %></td>
+                    <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                    <td><%= h.checkInTime || '—' %></td>
+                    <td><%= h.checkOutTime || '—' %></td>
+                    <td><%= h.number ?? '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
       <% } %>
     </div>
   </main>

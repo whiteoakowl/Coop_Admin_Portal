@@ -30,7 +30,7 @@
               <tbody>
                 <% members.forEach(function(m) { %>
                   <tr>
-                    <td><%= m.name %></td>
+                    <td><a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a></td>
                     <td><span class="badge-pill"><%= m.memberType === 'parent' ? 'Parent' : 'Student' %></span></td>
                     <td class="search-found-in-cell">
                       <% if (m.hasAttendance) { %>

@@ -123,6 +123,21 @@ async function attendanceHistoryForMember(memberId) {
     .all(memberId);
 }
 
+// Shared row shaping for the Members profile page's Attendance tab -
+// pulled out so the family-wide "All" view (one call per family member)
+// and the single-member view format their rows identically.
+function formatAttendanceHistory(rows) {
+  return rows.map((r) => ({
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+    status: r.status,
+    checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+    number: r.number,
+  }));
+}
+
 // --- Members page (the full member list) ---
 
 router.get('/members', async (req, res) => {
@@ -475,10 +490,18 @@ router.get('/members/:id', async (req, res) => {
     .get(id);
   const restOfFamily = await familyOf(id);
   const familyRoster = [member, ...restOfFamily].sort(byLastName);
-  // "View All" on the Class Schedule tab's Family Member dropdown - only
-  // meaningful (and only offered by the view) when there's more than one
-  // family member to show side by side.
-  const scheduleFamilyAll = tab === 'schedule' && req.query.family === 'all' && familyRoster.length > 1;
+  // "View All" on the Class Schedule/Attendance tabs' Family Member
+  // dropdown - only meaningful (and only offered by the view) when
+  // there's more than one family member to show side by side. A real
+  // follow-up request: "if its a primary parent or parent, these tabs on
+  // the member profiles will also show the whole families schedules and
+  // Attendance" - a parent's own profile defaults straight to the family
+  // view instead of requiring "All" to be picked explicitly every time
+  // (a student's profile still defaults to just their own schedule/
+  // history, same as before - "All" is still there for them to opt in).
+  const familyAllDefault = familyRoster.length > 1 && member.member_type === 'parent';
+  const scheduleFamilyAll = tab === 'schedule' && familyRoster.length > 1 && (req.query.family === 'all' || familyAllDefault);
+  const attendanceFamilyAll = tab === 'attendance' && familyRoster.length > 1 && (req.query.family === 'all' || familyAllDefault);
 
   const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
   const memberSectionIds = (await sectionIdsForMembers([id]))[id];
@@ -504,15 +527,13 @@ router.get('/members/:id', async (req, res) => {
     familySchedules: scheduleFamilyAll
       ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))
       : null,
-    history: (await attendanceHistoryForMember(id)).map((r) => ({
-      rosterName: r.rosterName,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
-      status: r.status,
-      checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
-      checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
-      number: r.number,
-    })),
+    attendanceFamilyAll,
+    history: attendanceFamilyAll ? null : formatAttendanceHistory(await attendanceHistoryForMember(id)),
+    familyAttendanceHistories: attendanceFamilyAll
+      ? await Promise.all(
+          familyRoster.map(async (m) => ({ member: m, history: formatAttendanceHistory(await attendanceHistoryForMember(m.id)) }))
+        )
+      : null,
   });
 });
 

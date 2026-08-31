@@ -193,7 +193,7 @@
                 <% t.members.forEach(function(m) { %>
                   <div class="team-member-row<%= absentIds.has(m.id) ? ' team-member-row-absent' : '' %>" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <span class="team-member-name-col"><span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><%= m.name %><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
+                    <span class="team-member-name-col"><span class="team-member-name" title="<%= m.name %><%= absentIds.has(m.id) ? ' (absent today)' : '' %>"><a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
                     <%# A real request: "when deleting ... cleanup/signup
                         members from lists it should allow for multiple
                         deletes and then click save before refreshing."
