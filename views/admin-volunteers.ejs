@@ -62,7 +62,10 @@
       <% } else if (!selectedDate) { %>
         <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/volunteers/<%= day %>/archive">Archive</a> tab.</p>
       <% } else { %>
-        <%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>
+        <div id="floater-assign-status" class="alert alert-error no-print" hidden></div>
+        <div id="floater-cards-container" data-selected-date="<%= selectedDate %>">
+          <%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>
+        </div>
       <% } %>
     </div>
 
@@ -185,5 +188,6 @@
     <% } %>
   </main>
   <script src="/js/date-list.js"></script>
+  <script src="/js/floater-assign.js"></script>
 </body>
 </html>

@@ -1,0 +1,6 @@
+<%# Re-fetched by public/js/floater-assign.js after every Assign/Unassign/
+    Approve click and swapped into #floater-cards-container on
+    admin-volunteers.ejs, in place of the old full-page redirect - see
+    routes/admin-volunteers.js's own /fragment route for why this has to
+    recompute the whole grid rather than patch a single row. %>
+<%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>

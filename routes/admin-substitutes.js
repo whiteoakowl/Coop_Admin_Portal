@@ -134,6 +134,21 @@ function slotTypeFromBody(body) {
   return SLOT_TYPES.includes(body.slotType) ? body.slotType : 'class';
 }
 
+// A real request: "make it to where the page doesn't refresh every time
+// you click assign or unassigned - it should simply assign and allow you
+// to continue clicking assignment until you're done." public/js/
+// floater-assign.js now submits these three forms via fetch (marked with
+// the same X-Requested-With: fetch header the codebase already uses for
+// its other auto-save endpoints - see class-settings-autosave.js/
+// attendance-grid.js), and re-fetches the cards grid on success instead of
+// following a redirect. A plain, non-fetch form submit (JS disabled, or
+// any other caller) still gets the original redirect - isFetch is checked
+// per-request rather than assumed, so both keep working off the exact
+// same route.
+function isFetch(req) {
+  return req.get('X-Requested-With') === 'fetch';
+}
+
 router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
@@ -145,9 +160,11 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, asy
     try {
       await setAssignment(date, slotType, slotId, memberId, isOverride);
     } catch (e) {
+      if (isFetch(req)) return res.status(400).json({ ok: false, error: e.message });
       return res.redirect(subUrl(day, { date, error: e.message }));
     }
   }
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect(subUrl(day, { date }));
 });
 
@@ -157,6 +174,7 @@ router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, a
   const slotType = slotTypeFromBody(req.body);
   const slotId = parseInt(req.body.slotId, 10);
   if (isValidISODate(date) && slotId) await clearAssignment(date, slotType, slotId);
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect(subUrl(day, { date }));
 });
 
@@ -169,6 +187,7 @@ router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, as
   const slotType = slotTypeFromBody(req.body);
   const slotId = parseInt(req.body.slotId, 10);
   if (isValidISODate(date) && slotId) await approveAssignment(date, slotType, slotId);
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect(subUrl(day, { date }));
 });
 

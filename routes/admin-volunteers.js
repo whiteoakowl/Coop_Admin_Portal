@@ -60,6 +60,35 @@ function dialogParam(req) {
 // Floater Assignments is the landing page for Volunteers.
 router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volunteers/${defaultDay()}/manage`));
 
+// Shared by the full manage page below and its own /fragment route (see
+// that route's own comment for why a second, cards-only endpoint exists) -
+// this is every bit of substituteBoard's raw output that isn't ready to
+// hand straight to the view: the suggested-floater candidate list (and its
+// "already picked elsewhere this hour"/"still needs an infant flag" work)
+// for every slot, on every hour, for one day+date.
+async function buildHourSections(day, selectedDate) {
+  const infantByMemberId = {};
+  for (const p of await activeParentAndAdminOptions()) infantByMemberId[p.id] = await hasInfantChild(p.id);
+
+  const hourSections = selectedDate ? await substituteBoard(day, selectedDate) : [];
+  hourSections.forEach((hour) => {
+    hour.slots.forEach((slot) => {
+      const candidates = (hour.suggestedFloaters || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        rankLabel: RANK_LABELS[p.rank] || null,
+        infant: !!infantByMemberId[p.id],
+      }));
+      if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
+        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: RANK_LABELS[slot.assigned.rank] || null, infant: slot.assigned.infant });
+      }
+      slot.candidates = candidates;
+      slot.noneAvailable = candidates.length === 0;
+    });
+  });
+  return hourSections;
+}
+
 // Old Teachers/Assistants tabs - that info now lives right on each class's
 // card on the Schedules day grid (and its own manage page's Teachers &
 // Assistants roster), so these are just graceful redirects for anyone with
@@ -92,15 +121,6 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
   const upcomingDates = dates.filter((d) => d >= today);
   const selectedDate = upcomingDates.includes(req.query.date) ? req.query.date : upcomingDates[0] || null;
 
-  // Just an id -> hasInfantChild lookup for the candidate dropdowns built
-  // below (every candidate there is a real Floater List member for that
-  // hour, never "any active parent" - see that loop's own comment).
-  // activeParentAndAdminOptions, not activeParentOptions, so an admin
-  // added to a Floater Team still gets a real (not undefined/falsy-by-
-  // omission) entry in this lookup.
-  const infantByMemberId = {};
-  for (const p of await activeParentAndAdminOptions()) infantByMemberId[p.id] = await hasInfantChild(p.id);
-
   // The chart itself is now the assign UI - every permanent job (whether
   // filled or not) plus any class whose teacher(s) are absent, one row
   // each, so there's a single list instead of a separate "needs a sub"
@@ -109,44 +129,10 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
   // whoever's actually available for this date (excludes anyone checked
   // in absent or excluded via an absence/late form for that date - see
   // absentMemberIdsForDate/absenceFormMemberIdsForDate in
-  // utils/classSchedule.js, both already scoped to `date`).
-  const hourSections = selectedDate ? await substituteBoard(day, selectedDate) : [];
-  hourSections.forEach((hour) => {
-    // A real bug report: "when floaters are removed from the floater
-    // list they should also disappear from the dropdown menu of
-    // suggested floaters." This used to also union in every OTHER active
-    // parent site-wide (activeParentOptions) as a catch-all fallback
-    // tier below the ranked ones - so removing someone from the Floater
-    // List (utils/volunteers.js's removeMemberFromSection) never actually
-    // dropped them from this dropdown, they just fell out of the ranked
-    // group into the unranked "Available" one. hour.suggestedFloaters
-    // (utils/substitutes.js's substituteBoard, via floaterMembersForHour)
-    // is ALREADY the real Floater List for this exact hour, already
-    // rank-sorted, already excludes anyone checked in absent, and already
-    // excludes anyone auto-picked or approved earlier this same hour/day
-    // (usedThisHour/usedToday) - see that same request's second half,
-    // "each dropdown, every hour should always try to suggest someone
-    // different that hasn't been selected before," which that dedup logic
-    // was already built to satisfy. Every candidate here is a real
-    // floater; no separate unranked "everyone else" tier.
-    hour.slots.forEach((slot) => {
-      const candidates = (hour.suggestedFloaters || []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        rankLabel: RANK_LABELS[p.rank] || null,
-        infant: !!infantByMemberId[p.id],
-      }));
-      // The row's own current pick (approved or still-pending-suggested)
-      // always has to be a selectable <option>, even if it's since been
-      // removed from the Floater List, or another slot's own resolution
-      // already marked them "used" for this hour above.
-      if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
-        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: RANK_LABELS[slot.assigned.rank] || null, infant: slot.assigned.infant });
-      }
-      slot.candidates = candidates;
-      slot.noneAvailable = candidates.length === 0;
-    });
-  });
+  // utils/classSchedule.js, both already scoped to `date`). See
+  // buildHourSections above for the candidate-list decoration itself
+  // (shared with the /fragment route below).
+  const hourSections = await buildHourSections(day, selectedDate);
 
   const positionGroups = await groupedPermanentJobsForDay(day);
 
@@ -167,6 +153,28 @@ router.get('/volunteers/:day/manage', requireAdmin, requireDay, async (req, res)
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// A real request: "make it to where the page doesn't refresh every time
+// you click assign or unassigned - it should simply assign and allow you
+// to continue clicking assignment until you're done." routes/admin-
+// substitutes.js's own assign/unassign/approve routes now respond to a
+// fetch-driven POST with JSON instead of a redirect (see that file), and
+// public/js/floater-assign.js re-fetches just this cards grid afterward
+// and swaps it in - a full re-fetch rather than a single-row patch
+// because one assignment can change OTHER slots' own candidate lists
+// this same hour (see buildHourSections' own "used this hour" dedup
+// comment above), so the whole grid has to be recomputed either way.
+router.get('/volunteers/:day/fragment', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const list = await getListByDay(day);
+  if (!list) return res.status(404).send('Not found');
+  const dates = await datesForList(list.id);
+  const today = todayISO();
+  const upcomingDates = dates.filter((d) => d >= today);
+  const selectedDate = upcomingDates.includes(req.query.date) ? req.query.date : upcomingDates[0] || null;
+  const hourSections = await buildHourSections(day, selectedDate);
+  res.render('floater-chart-cards-fragment', { day, selectedDate, hourSections });
 });
 
 router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
