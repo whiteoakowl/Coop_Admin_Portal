@@ -20,9 +20,14 @@ alter table classes drop column if exists notes;
 -- for it too (e.g. to help cover the cost of supplies) - see
 -- utils/classRegistration.js's chargeForConfirmedRegistration and
 -- routes/teacher-portal.js's own self-signup route.
+-- Drop the OLD constraint (the pre-existing Person/Family check) before
+-- the update below, not after - real production data still holding
+-- legacy 'person'/'family' values would otherwise have the update itself
+-- rejected by that old constraint before it ever got the chance to fix
+-- the row up to a value the new constraint accepts.
+alter table classes drop constraint if exists classes_price_per_check;
 update classes set price_per = 'students' where price_per is null or price_per not in ('students', 'students_and_staff');
 alter table classes alter column price_per set default 'students';
-alter table classes drop constraint if exists classes_price_per_check;
 alter table classes add constraint classes_price_per_check check (price_per in ('students', 'students_and_staff'));
 
 -- Mirrors class_registrations.charge_id (students) - lets a teacher/
