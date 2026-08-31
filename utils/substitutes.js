@@ -1,5 +1,5 @@
 const db = require('../db');
-const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate } = require('./classSchedule');
+const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate, floaterPositionsCoveredByClass } = require('./classSchedule');
 const { DAYS, DAY_LABELS, getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
 const { todayISO, weekdayOf, formatTimestamp } = require('./dates');
@@ -152,6 +152,90 @@ function classStaffSlotId(classId, staffMemberId) {
   return classId * 1000000 + staffMemberId;
 }
 
+// Same story as classStaffSlotId above, for a different slot_type
+// ('vacancy') - a real request: "if class assistant says 1 and there are
+// 0 assistants signed for that class, then the positions should appear
+// on the floater list each week until someone is added as an assistant
+// to that class roster... this also works if the assistant number is
+// set to two, only 1 assistant is signed up... then 1 position should
+// show up." A class can have more than one still-open seat for the SAME
+// role at once (e.g. assistant_slots=2, nobody signed up yet), so each
+// needs its own id: roleCode (1=teacher, 2=assistant) keeps the two
+// roles apart on the same class, unitIndex (1-based) keeps multiple
+// open seats for the same role apart. Up to 99 open seats per role per
+// class before this would need widening - no real class gets anywhere
+// close. slot_type already keeps this from colliding with 'job'/'class'
+// slot ids (see the composite (session_date, slot_type, slot_id) key).
+function classVacancySlotId(classId, role, unitIndex) {
+  const roleCode = role === 'teacher' ? 1 : 2;
+  return classId * 10000 + roleCode * 100 + unitIndex;
+}
+
+// One entry per still-open teacher/assistant seat across every class in
+// this hour - teacher_slots/assistant_slots (utils/classSchedule.js's
+// updateClass/createClass; null means "no cap set", not "zero needed",
+// same convention as everywhere else those two columns are read) minus
+// however many are actually on the class's own roster (class_staff) right
+// now. Deliberately NOT date-scoped (unlike a missing-teacher-today
+// slot) - a standing staffing gap needs recruiting every single session
+// until it's actually filled, not just the one day someone happens to be
+// out. Shape matches the missing-teacher-today slots pushed inline in
+// substituteBoard below, minus `assigned`/`overdue` (the caller fills
+// those in per its own read-vs-write needs).
+function classVacancySlots(hourGroup) {
+  const entries = [];
+  hourGroup.classes.forEach((cls) => {
+    [
+      { role: 'teacher', needed: cls.teacher_slots, roleLabel: 'Teacher' },
+      { role: 'assistant', needed: cls.assistant_slots, roleLabel: 'Assistant' },
+    ].forEach(({ role, needed, roleLabel }) => {
+      if (needed == null) return;
+      const filled = cls.staff.filter((s) => s.role === role).length;
+      const short = Math.max(0, needed - filled);
+      for (let unitIndex = 1; unitIndex <= short; unitIndex++) {
+        entries.push({
+          slotType: 'vacancy',
+          slotId: classVacancySlotId(cls.id, role, unitIndex),
+          label: cls.class_name,
+          room: cls.room || '',
+          detail: cls.room ? `Room ${cls.room}` : '',
+          ageGroup: cls.age_group || '',
+          reason: `${roleLabel} needed (${filled} of ${needed} filled)`,
+        });
+      }
+    });
+  });
+  return entries;
+}
+
+// Every class's teacher/assistant, indexed by every hour position that
+// class's own real time overlaps - its own hour_position, plus, for a
+// genuine "double period" class (e.g. Forest Wildlings, Preschool, PreK,
+// Kinder, DnD, Cooking - one row whose own end_time actually reaches into
+// a second hour block), whichever other position(s) that overlap covers.
+// Reuses classSchedule.js's own floaterPositionsCoveredByClass - the same
+// position-overlap logic that already drives clearing a covered class off
+// the Floater Assignments list once a teacher/assistant picks it up. A
+// real request: "if a teacher or assistant is absent for a 2 time slot
+// class... then the position should appear on the floater list both hours
+// the class takes place" - gridForDay only ever files a class under its
+// own single hour_position bucket, so without this a double-period
+// class's missing-teacher/assistant slot only ever reached ONE of the two
+// hours it's actually short-staffed for.
+async function classStaffByHour(grid) {
+  const byHour = {};
+  for (const hourGroup of grid) {
+    for (const cls of hourGroup.classes) {
+      const { positions } = await floaterPositionsCoveredByClass(cls.id);
+      for (const position of positions) {
+        if (!byHour[position]) byHour[position] = [];
+        for (const person of cls.staff) byHour[position].push({ cls, person });
+      }
+    }
+  }
+  return byHour;
+}
+
 // Everyone on the day's Floater Assignments list for a given hour block,
 // ranked (Choose First before Sometimes before Backup Only) - the pool
 // substitute suggestions are drawn from, best candidate first. Hour
@@ -189,7 +273,7 @@ async function hourPositionForSlot(slotType, slotId) {
     const row = await db.prepare('SELECT hour_position AS "hourPosition" FROM permanent_jobs WHERE id = ?').get(slotId);
     return row ? row.hourPosition : null;
   }
-  const classId = Math.floor(slotId / 1000000);
+  const classId = Math.floor(slotId / (slotType === 'vacancy' ? 10000 : 1000000));
   const row = await db.prepare('SELECT hour_position AS "hourPosition" FROM classes WHERE id = ?').get(classId);
   return row ? row.hourPosition : null;
 }
@@ -304,6 +388,7 @@ async function assignedInfo(existing, floaterPool) {
 async function substituteBoard(day, date) {
   const missingById = date ? await missingMemberIdsForDate(date) : new Map();
   const grid = await gridForDay(day);
+  const classStaffByHourPosition = await classStaffByHour(grid);
   const jobs = await permanentJobsForDay(day);
   const jobsByHour = {};
   jobs.forEach((j) => {
@@ -406,29 +491,41 @@ async function substituteBoard(day, date) {
     // assign/accept flow. A "late" status counts the same as "absent"
     // here (see missingMemberIdsForDate) - either way that staff member
     // isn't going to be covering their spot.
-    for (const cls of hourGroup.classes) {
-      for (const person of cls.staff) {
-        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
-        const status = missingById.get(person.id);
-        if (!status) continue;
+    for (const { cls, person } of classStaffByHourPosition[hourPosition] || []) {
+      if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+      const status = missingById.get(person.id);
+      if (!status) continue;
 
-        const slotId = classStaffSlotId(cls.id, person.id);
-        const existing = await resolveSlot('class', slotId, null);
-        const roleLabel = person.role === 'teacher' ? 'Teacher' : 'Assistant';
-        const statusLabel = status === 'late' ? 'running late' : 'absent';
+      const slotId = classStaffSlotId(cls.id, person.id);
+      const existing = await resolveSlot('class', slotId, null);
+      const roleLabel = person.role === 'teacher' ? 'Teacher' : 'Assistant';
+      const statusLabel = status === 'late' ? 'running late' : 'absent';
 
-        slots.push({
-          slotType: 'class',
-          slotId,
-          label: cls.class_name,
-          room: cls.room || '',
-          detail: cls.room ? `Room ${cls.room}` : '',
-          ageGroup: cls.age_group || '',
-          reason: `${roleLabel} ${statusLabel}: ${person.name}`,
-          assigned: await assignedInfo(existing, floaterPool),
-          overdue: await assignedIsOverdue(existing, date, hourGroup.label),
-        });
-      }
+      slots.push({
+        slotType: 'class',
+        slotId,
+        label: cls.class_name,
+        room: cls.room || '',
+        detail: cls.room ? `Room ${cls.room}` : '',
+        ageGroup: cls.age_group || '',
+        reason: `${roleLabel} ${statusLabel}: ${person.name}`,
+        assigned: await assignedInfo(existing, floaterPool),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
+      });
+    }
+
+    // Standing teacher/assistant vacancies - see classVacancySlots' own
+    // comment on why these aren't date-scoped like the "missing today"
+    // slots just above. resolveSlot still only auto-assigns/persists a
+    // pick when a real date is selected (its own `if (!existing && date)`
+    // check), same as every other slot type here.
+    for (const vacancy of classVacancySlots(hourGroup)) {
+      const existing = await resolveSlot('vacancy', vacancy.slotId, null);
+      slots.push({
+        ...vacancy,
+        assigned: await assignedInfo(existing, floaterPool),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
+      });
     }
 
     for (const job of jobsByHour[hourPosition] || []) {
@@ -512,20 +609,31 @@ async function dailyAssignmentCards(day, date) {
 
   const missingById = await missingMemberIdsForDate(date);
   const grid = await gridForDay(day);
+  const classStaffByHourPosition = await classStaffByHour(grid);
   const classesByHour = {};
   for (const hourGroup of grid) {
     const rows = [];
-    for (const cls of hourGroup.classes) {
-      for (const person of cls.staff) {
-        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
-        if (!missingById.has(person.id)) continue;
-        const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
-        rows.push({
-          title: cls.class_name,
-          room: cls.room || '',
-          assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
-        });
-      }
+    for (const { cls, person } of classStaffByHourPosition[hourGroup.position] || []) {
+      if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+      if (!missingById.has(person.id)) continue;
+      const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+      rows.push({
+        title: cls.class_name,
+        room: cls.room || '',
+        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+      });
+    }
+    // Standing teacher/assistant vacancies (see classVacancySlots) - same
+    // "only an approved assignment counts" rule as the class-absence rows
+    // just above, so a still-pending auto-suggestion never shows up in
+    // this historical/read-only record.
+    for (const vacancy of classVacancySlots(hourGroup)) {
+      const existing = await assignmentFor(date, 'vacancy', vacancy.slotId);
+      rows.push({
+        title: vacancy.label,
+        room: vacancy.room,
+        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+      });
     }
     if (rows.length) classesByHour[hourGroup.position] = rows;
   }
@@ -572,6 +680,7 @@ async function dailyAssignmentCardsWithLabels(day, date) {
 async function publicFloaterCardsForDate(day, date) {
   const missingById = await missingMemberIdsForDate(date);
   const grid = await gridForDay(day);
+  const classStaffByHourPosition = await classStaffByHour(grid);
   const jobs = await permanentJobsForDay(day);
   const jobsByHour = {};
   jobs.forEach((j) => {
@@ -583,17 +692,24 @@ async function publicFloaterCardsForDate(day, date) {
   for (const hourGroup of grid) {
     const positions = [];
 
-    for (const cls of hourGroup.classes) {
-      for (const person of cls.staff) {
-        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
-        if (!missingById.has(person.id)) continue;
-        const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
-        positions.push({
-          title: cls.class_name,
-          room: cls.room || '',
-          assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
-        });
-      }
+    for (const { cls, person } of classStaffByHourPosition[hourGroup.position] || []) {
+      if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+      if (!missingById.has(person.id)) continue;
+      const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+      positions.push({
+        title: cls.class_name,
+        room: cls.room || '',
+        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+      });
+    }
+
+    for (const vacancy of classVacancySlots(hourGroup)) {
+      const existing = await assignmentFor(date, 'vacancy', vacancy.slotId);
+      positions.push({
+        title: vacancy.label,
+        room: vacancy.room,
+        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
+      });
     }
 
     for (const job of jobsByHour[hourGroup.position] || []) {
@@ -622,6 +738,7 @@ async function publicFloaterCardsForDate(day, date) {
 async function archivedDateSummaries(day, dates) {
   const jobs = await permanentJobsForDay(day);
   const grid = await gridForDay(day);
+  const classStaffByHourPosition = await classStaffByHour(grid);
   const result = [];
   for (const date of dates) {
     let totalPositions = jobs.length;
@@ -633,14 +750,17 @@ async function archivedDateSummaries(day, dates) {
 
     const missingById = await missingMemberIdsForDate(date);
     for (const hourGroup of grid) {
-      for (const cls of hourGroup.classes) {
-        for (const person of cls.staff) {
-          if (person.role !== 'teacher' && person.role !== 'assistant') continue;
-          if (!missingById.has(person.id)) continue;
-          totalPositions++;
-          const a = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
-          if (a && a.status === 'approved') assignedCount++;
-        }
+      for (const { cls, person } of classStaffByHourPosition[hourGroup.position] || []) {
+        if (person.role !== 'teacher' && person.role !== 'assistant') continue;
+        if (!missingById.has(person.id)) continue;
+        totalPositions++;
+        const a = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
+        if (a && a.status === 'approved') assignedCount++;
+      }
+      for (const vacancy of classVacancySlots(hourGroup)) {
+        totalPositions++;
+        const a = await assignmentFor(date, 'vacancy', vacancy.slotId);
+        if (a && a.status === 'approved') assignedCount++;
       }
     }
 
@@ -684,6 +804,8 @@ async function pendingApprovalsForToday() {
 module.exports = {
   HOUR_POSITIONS,
   classStaffSlotId,
+  classVacancySlotId,
+  classVacancySlots,
   permanentJobsForDay,
   groupedPermanentJobsForDay,
   savePositionGroup,

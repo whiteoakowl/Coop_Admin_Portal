@@ -2,7 +2,7 @@ const db = require('../db');
 const { byLastName, hasInfantChild } = require('./members');
 const { todayISO } = require('./dates');
 const { taskSectionForTeam, refreshBadgesForTeam } = require('./taskList');
-const { absentMemberIdsForDate } = require('./classSchedule');
+const { absentMemberIdsForDate, checkedInMemberIdsForDate } = require('./classSchedule');
 
 async function teamsForDay(day) {
   return db
@@ -282,6 +282,11 @@ async function assignmentCardsForDate(day, date) {
   const teams = await teamsWithMembers(day);
   const assignments = date ? await taskAssignmentsForDate(day, date) : {};
   const absentIds = await absentMemberIdsForDate(date);
+  // A real request: "highlight the member row red if they check in that
+  // day" - lets the Assignments roster flag at a glance who's actually
+  // on-site to do their task, same "compute on read from the attendance
+  // table" shape as absentIds just above.
+  const checkedInIds = await checkedInMemberIdsForDate(date);
   return teams.map((t) => {
     const allOptions = t.taskSection ? t.taskSection.items : [];
     const members = t.members.map((m) => {
@@ -293,6 +298,7 @@ async function assignmentCardsForDate(day, date) {
         name: m.name,
         infant: !!m.infant,
         absent: absentIds.has(m.id),
+        checkedIn: checkedInIds.has(m.id),
         taskItemId: a.taskItemId || null,
         taskItemId2: a.taskItemId2 || null,
         taskNumber: taskItem ? taskItem.number : null,

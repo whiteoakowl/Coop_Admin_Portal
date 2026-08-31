@@ -23,20 +23,48 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
+    <%
+      // One icon per care action, matching the icon already on that
+      // action's own button below - see this file's own <div
+      // class="pet-particles"> comment for why a floating burst, not a
+      // swappable pet part, is what actually sells the action here.
+      var careActionIcon = { feed: 'icon-bone', play: 'icon-ball', bathe: 'icon-droplet' }[careAction];
+      // Which stat bar this action actually raised - feed/hunger,
+      // play/happiness, bathe/cleanliness (see utils/pets.js's own
+      // careStats()) - so the bar gets a one-shot glow tying the stage
+      // animation back to the number that changed.
+      var careStatKey = { feed: 'hunger', play: 'happiness', bathe: 'cleanliness' }[careAction];
+    %>
     <div class="pet-stage">
       <% if (look.image) { %>
         <div class="pet-stage-frame pet-stage-frame--photo">
-          <img class="pet-display-photo<%= notice ? ' pet-display--happy' : '' %>" src="<%= look.image %>" alt="<%= look.label %>" />
+          <img class="pet-display-photo<%= careAction ? ' pet-display--' + careAction : '' %>" src="<%= look.image %>" alt="<%= look.label %>" />
+          <% if (careActionIcon) { %>
+            <div class="pet-impact-ring pet-impact-ring-<%= careAction %>" aria-hidden="true"></div>
+            <div class="pet-particles pet-particles-<%= careAction %>" aria-hidden="true">
+              <svg class="icon pet-particle pet-particle-1"><use href="#<%= careActionIcon %>"/></svg>
+              <svg class="icon pet-particle pet-particle-2"><use href="#<%= careActionIcon %>"/></svg>
+              <svg class="icon pet-particle pet-particle-3"><use href="#<%= careActionIcon %>"/></svg>
+            </div>
+          <% } %>
         </div>
       <% } else { %>
         <div class="pet-stage-frame <%= look.svg.roomTheme %>">
-          <svg class="pet-display<%= notice ? ' pet-display--happy' : '' %>" viewBox="0 0 120 120" style="color: <%= look.svg.hex %>; --eye-color: <%= look.svg.eyeColor %>;">
+          <svg class="pet-display<%= careAction ? ' pet-display--' + careAction : '' %>" viewBox="0 0 120 120" style="color: <%= look.svg.hex %>; --eye-color: <%= look.svg.eyeColor %>;">
             <use href="#pet-body-<%= look.svg.species %>"/>
             <use href="#pet-ears-<%= look.svg.ears %>"/>
             <use href="#pet-eyes-<%= look.svg.eyes %>"/>
             <use href="#pet-mouth-<%= look.svg.mouth %>"/>
             <use href="#pet-accessory-<%= look.svg.accessory %>"/>
           </svg>
+          <% if (careActionIcon) { %>
+            <div class="pet-impact-ring pet-impact-ring-<%= careAction %>" aria-hidden="true"></div>
+            <div class="pet-particles pet-particles-<%= careAction %>" aria-hidden="true">
+              <svg class="icon pet-particle pet-particle-1"><use href="#<%= careActionIcon %>"/></svg>
+              <svg class="icon pet-particle pet-particle-2"><use href="#<%= careActionIcon %>"/></svg>
+              <svg class="icon pet-particle pet-particle-3"><use href="#<%= careActionIcon %>"/></svg>
+            </div>
+          <% } %>
         </div>
       <% } %>
       <a class="roster-action-btn" href="/student/pets/customize">Edit Appearance</a>
@@ -45,15 +73,15 @@
     <div class="pet-care-stats">
       <div class="pet-care-stat">
         <span class="pet-care-stat-label">Hunger</span>
-        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-hunger" style="width: <%= stats.hunger %>%;"></div></div>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-hunger<%= careStatKey === 'hunger' ? ' pet-care-bar-fill--pulse' : '' %>" style="width: <%= stats.hunger %>%;"></div></div>
       </div>
       <div class="pet-care-stat">
         <span class="pet-care-stat-label">Happiness</span>
-        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-happiness" style="width: <%= stats.happiness %>%;"></div></div>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-happiness<%= careStatKey === 'happiness' ? ' pet-care-bar-fill--pulse' : '' %>" style="width: <%= stats.happiness %>%;"></div></div>
       </div>
       <div class="pet-care-stat">
         <span class="pet-care-stat-label">Cleanliness</span>
-        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-cleanliness" style="width: <%= stats.cleanliness %>%;"></div></div>
+        <div class="pet-care-bar"><div class="pet-care-bar-fill pet-care-bar-cleanliness<%= careStatKey === 'cleanliness' ? ' pet-care-bar-fill--pulse' : '' %>" style="width: <%= stats.cleanliness %>%;"></div></div>
       </div>
     </div>
 

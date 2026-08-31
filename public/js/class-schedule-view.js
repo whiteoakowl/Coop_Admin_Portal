@@ -25,7 +25,13 @@
 
   document.addEventListener('click', (e) => {
     const viewBtn = e.target.closest('[data-view-class]');
-    if (viewBtn) {
+    // A real request: "remove the edit button and attendance link
+    // button from the schedule cards" - [data-view-class] now lives on
+    // the whole card (views/partials/class-schedule-grid.ejs), not a
+    // small dedicated button, so a click on the archive checkbox it
+    // also contains bubbles up here too. Selecting a class for archiving
+    // shouldn't also pop open its view/edit dialog.
+    if (viewBtn && !e.target.closest('.class-card-checkbox')) {
       loadClass(viewBtn.getAttribute('data-view-class'));
       return;
     }
@@ -44,6 +50,19 @@
     if (e.target.closest('[data-cancel-edit-btn]')) {
       if (currentClassId) loadClass(currentClassId);
     }
+  });
+
+  // [data-view-class] used to only ever sit on a real <button>, keyboard-
+  // operable for free - now that it's the whole card (a <div>, since a
+  // <button> can't legally contain the archive checkbox it also holds),
+  // Enter/Space need to be wired up by hand to keep it keyboard
+  // accessible.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('[data-view-class]');
+    if (!card || card.tagName === 'BUTTON' || card.tagName === 'A' || e.target.closest('.class-card-checkbox')) return;
+    e.preventDefault();
+    loadClass(card.getAttribute('data-view-class'));
   });
 
   // Add Member (views/class-schedule-view-fragment.ejs's own nested

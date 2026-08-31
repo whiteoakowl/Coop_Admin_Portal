@@ -338,6 +338,8 @@ router.post('/nature-news', uploadNatureNewsPhoto.single('image'), async (req, r
 // only, same scoping as every other Student Portal route (never a
 // client-supplied member/pet id). No pet yet -> the chooser/customize
 // screen; a saved pet -> the dashboard.
+const PET_CARE_ACTIONS = new Set(['feed', 'play', 'bathe']);
+
 router.get('/pets', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const pet = member ? await pets.getPetForMember(member.id) : null;
@@ -350,6 +352,12 @@ router.get('/pets', async (req, res) => {
     levelInfo: pets.levelInfo(pet.xp),
     notice: req.query.notice || null,
     error: req.query.error || null,
+    // Which care button was just pressed (if any) - a real request: "the
+    // image as a whole moves again how do we make this more animated."
+    // Lets the view play a distinct reaction (nibble/bounce/wobble +
+    // floating icon burst) per action instead of one generic bounce for
+    // all three. Whitelisted since it flows straight into a CSS class.
+    careAction: PET_CARE_ACTIONS.has(req.query.action) ? req.query.action : null,
   });
 });
 
@@ -387,7 +395,7 @@ async function careAction(kind, notice, req, res) {
   if (!member) return res.redirect('/student/pets?error=' + encodeURIComponent('No student profile found for your account.'));
   const result = await pets.performCareAction(member.id, kind);
   if (!result.ok) return res.redirect('/student/pets?error=' + encodeURIComponent(result.error));
-  res.redirect('/student/pets?notice=' + encodeURIComponent(notice));
+  res.redirect('/student/pets?notice=' + encodeURIComponent(notice) + '&action=' + kind);
 }
 
 router.post('/pets/feed', (req, res) => careAction('feed', 'Yum! Your pet is happily fed.', req, res));

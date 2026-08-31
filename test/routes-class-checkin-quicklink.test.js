@@ -3,11 +3,18 @@
 // attendance sheet for that specific class (/kiosk/class-checkin/classes/
 // :id/attendance - Check In and Check Out both live there, see routes/
 // kiosk-class-checkin.js), so a teacher/sub doesn't have to click through
-// the kiosk's own day-picker/hour-search to reach their one class. This
-// file covers the two places that link is offered: the Schedules page's
-// class card (views/partials/class-schedule-grid.ejs) and its View modal
-// (views/class-schedule-view-fragment.ejs). The ?next= round-trip through
-// the PIN gate itself is covered in test/routes-kiosk-class-checkin.test.js.
+// the kiosk's own day-picker/hour-search to reach their one class.
+//
+// A later real request: "remove the edit button and attendance link
+// button from the schedule cards to view the titles easier. the
+// attendance link should be on the edit class form" moved this link OFF
+// the Schedules grid's own class card entirely - the card itself is now
+// the whole-card click target for the View modal (views/partials/
+// class-schedule-grid.ejs's own data-view-class, public/js/class-schedule-
+// view.js), not a dedicated button - and the quick link only lives inside
+// that View modal (views/class-schedule-view-fragment.ejs) now. The ?next=
+// round-trip through the PIN gate itself is covered in
+// test/routes-kiosk-class-checkin.test.js.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -39,7 +46,7 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('every class card on the Schedules grid carries its own Class Check-In quick link', async () => {
+test('every class card on the Schedules grid is a whole-card click target into its own View modal (no inline quick link anymore)', async () => {
   const cookie = await loginAsAdmin();
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Quick Link Class', room: 'Room 1' });
 
@@ -49,10 +56,15 @@ test('every class card on the Schedules grid carries its own Class Check-In quic
   // schedule?tab=:day.
   const res = await request(app).get('/admin/schedule?tab=monday').set('Cookie', cookie);
   assert.equal(res.status, 200);
+  assert.doesNotMatch(
+    res.text,
+    new RegExp(`href="/kiosk/class-checkin/classes/${classId}/attendance"`),
+    'the grid card itself no longer links straight to the kiosk attendance sheet - that link moved into the View modal'
+  );
   assert.match(
     res.text,
-    new RegExp(`href="/kiosk/class-checkin/classes/${classId}/attendance"[^>]*target="_blank"`),
-    'the class card should link straight to that class\'s own kiosk attendance sheet, opened in a new tab'
+    new RegExp(`data-view-class="${classId}"`),
+    'the whole card should be the click target that opens the View modal, where the quick link now lives'
   );
 });
 
@@ -66,13 +78,11 @@ test('the class View modal offers the same quick link alongside Export/Print', a
   assert.match(res.text, /Class Check-In Link/);
 });
 
-test('the quick link and the View button share the same visibility guard on the grid (both or neither)', async () => {
+test('neither the old dedicated View button nor the old dedicated quick-link button render on the grid anymore', async () => {
   const cookie = await loginAsAdmin();
   await createClass({ day: 'wednesday', hourPosition: 1, className: 'Guard Check Class', room: 'Room 3' });
 
   const res = await request(app).get('/admin/schedule?tab=wednesday').set('Cookie', cookie);
-  const viewBtnCount = (res.text.match(/class-card-view-btn/g) || []).length;
-  const quickLinkCount = (res.text.match(/class-card-quicklink-btn/g) || []).length;
-  assert.ok(viewBtnCount > 0, 'sanity check: at least one View button rendered');
-  assert.equal(quickLinkCount, viewBtnCount, 'the quick link and View button should appear the same number of times - same visibility guard');
+  assert.doesNotMatch(res.text, /class-card-view-btn/, 'the dedicated Edit/View button was removed - the whole card is the click target now');
+  assert.doesNotMatch(res.text, /class-card-quicklink-btn/, 'the dedicated quick-link button was removed - the attendance link now lives on the View modal instead');
 });

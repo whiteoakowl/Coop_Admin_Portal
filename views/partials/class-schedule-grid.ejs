@@ -365,28 +365,40 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
               <% } else { %>
                 <% cell.classes.forEach(function(cls) { %>
                   <% var cardAbsentCount = cls.students.filter(function(s) { return absentIds.has(s.id); }).length; %>
-                  <div class="class-card" style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);">
+                  <%#
+                    A real request: "remove the edit button and attendance
+                    link button from the schedule cards to view the titles
+                    easier. the attendance link should be on the edit
+                    class form." Both icon buttons are gone - the
+                    attendance quicklink already lived on the class view/
+                    edit dialog too (class-schedule-view-fragment.ejs's own
+                    "Class Check-In Link" in .class-view-roster-actions),
+                    so nothing needed to move there. The card itself is
+                    now the click target that opens that same dialog
+                    (data-view-class, handled by public/js/class-schedule-
+                    view.js's existing delegated click listener - it never
+                    cared whether that attribute lived on a small button
+                    or the whole card), matching the exact same pattern
+                    Parent Portal's own read-only class cards already use
+                    (views/parent-classes.ejs). Can't reuse THAT page's
+                    <button class="class-card-clickable"> wrapper here
+                    though - a <button> can't legally contain the archive
+                    checkbox below, so this stays a <div> with role=button/
+                    tabindex for the same keyboard behavior (class-
+                    schedule-view.js's own keydown handler, added
+                    alongside this). %>
+                  <div
+                    class="class-card<% if (!gridReadOnly) { %> class-card-clickable<% } %>"
+                    style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
+                    <% if (!gridReadOnly) { %>
+                      data-view-class="<%= cls.id %>" role="button" tabindex="0" aria-label="View/edit <%= cls.class_name %>"
+                    <% } %>
+                  >
                     <div class="class-card-header">
                       <% if (!gridReadOnly) { %>
                         <input type="checkbox" name="classIds" value="<%= cls.id %>" form="class-archive-form-<%= day %>" class="class-card-checkbox no-print" aria-label="Select <%= cls.class_name %> for archiving" hidden />
                       <% } %>
                       <h3><%= cls.class_name %></h3>
-                      <% if (!gridReadOnly) { %>
-                        <a
-                          class="icon-btn class-card-quicklink-btn no-print"
-                          href="/kiosk/class-checkin/classes/<%= cls.id %>/attendance"
-                          target="_blank"
-                          aria-label="Class Check-In quick link for <%= cls.class_name %>"
-                          title="Class Check-In quick link - opens this class's check-in/out kiosk screen in a new tab"
-                        ><svg class="icon"><use href="#icon-user-check"/></svg></a>
-                        <button
-                          type="button"
-                          class="icon-btn class-card-view-btn no-print"
-                          data-view-class="<%= cls.id %>"
-                          aria-label="Edit <%= cls.class_name %> details"
-                          title="View/edit class details/roster"
-                        ><svg class="icon"><use href="#icon-edit"/></svg></button>
-                      <% } %>
                     </div>
                     <%# Grade/teacher/assistant only - no student roster here;
                         View opens the full roster (locals gradeLabel/

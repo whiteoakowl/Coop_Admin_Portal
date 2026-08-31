@@ -824,6 +824,20 @@ async function absentMemberIdsForDate(date) {
   );
 }
 
+// Everyone with an actual kiosk check-in recorded on a given date - a real
+// request: "highlight the member row red if they check in that day" on the
+// Setup/Cleanup Assignments roster (see setup.js's assignmentCardsForDate).
+// Same shape as absentMemberIdsForDate above, just keyed off check_in_time
+// instead of status = 'absent'.
+async function checkedInMemberIdsForDate(date) {
+  if (!date) return new Set();
+  return new Set(
+    (
+      await db.prepare(`SELECT DISTINCT member_id FROM attendance WHERE session_date = ? AND check_in_time IS NOT NULL`).all(date)
+    ).map((r) => r.member_id)
+  );
+}
+
 // Everyone who submitted an Absence form (not a Late form - someone
 // running late is still coming) for a given date - classesAtRiskForDay's
 // own narrower "actually won't be there" signal, based specifically on a
@@ -890,16 +904,29 @@ async function missingMemberIdsForDate(date) {
 // here, so they survive every resync instead of getting silently dropped
 // the next time class enrollment/staffing changes.
 async function setRosterMembership(rosterId, memberIdSet) {
-  const existingIds = (
-    await db.prepare("SELECT member_id FROM roster_members WHERE roster_id = ? AND source = 'auto'").all(rosterId)
-  ).map((r) => r.member_id);
-  const existing = new Set(existingIds);
+  // A real bug report: "Could not add member: duplicate key value
+  // violates unique constraint 'roster_members_pkey'" every time a
+  // class's enrollment/staffing changed. roster_members' primary key is
+  // (roster_id, member_id) - it has no idea a 'manual' row (added by
+  // hand via the Attendance page's Add Member popup, or this class's own
+  // roster Add Member dialog) is any different from an 'auto' one. This
+  // used to only check 'auto' rows for "already here", so a member
+  // already present via a manual add looked absent and got a second
+  // INSERT attempt for the exact same (roster_id, member_id) pair,
+  // colliding with the row that was already there. Checking every
+  // existing row regardless of source fixes the insert side while the
+  // remove side (below) still only ever considers 'auto' rows, so a
+  // manually-added member still survives every resync exactly as
+  // documented above.
+  const rows = await db.prepare('SELECT member_id, source FROM roster_members WHERE roster_id = ?').all(rosterId);
+  const allExistingIds = new Set(rows.map((r) => r.member_id));
+  const autoIds = rows.filter((r) => r.source === 'auto').map((r) => r.member_id);
   const insert = db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')");
   const remove = db.prepare("DELETE FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'");
   for (const memberId of memberIdSet) {
-    if (!existing.has(memberId)) await insert.run(rosterId, memberId);
+    if (!allExistingIds.has(memberId)) await insert.run(rosterId, memberId);
   }
-  for (const memberId of existingIds) {
+  for (const memberId of autoIds) {
     if (!memberIdSet.has(memberId)) await remove.run(rosterId, memberId);
   }
 }
@@ -1811,6 +1838,7 @@ module.exports = {
   setEnrollment,
   addStaff,
   removeFromFloaterForHour,
+  floaterPositionsCoveredByClass,
   autoAssignFloatersForDay,
   removeNonPrimaryParentsFromFloaterTeams,
   familyAttendanceWindowsForDay,
@@ -1822,6 +1850,7 @@ module.exports = {
   classesNeedingStaffForDay,
   classesAtRiskForDay,
   absentMemberIdsForDate,
+  checkedInMemberIdsForDate,
   absenceFormMemberIdsForDate,
   absenceFormAbsentMemberIdsForDate,
   missingMemberIdsForDate,

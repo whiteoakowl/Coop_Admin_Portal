@@ -4653,6 +4653,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    per-member table row (partials/setup-assignment-cards.ejs) instead of
    the Teams tab's card-list rows above. */
 .setup-assignment-row-absent td { background: var(--red-bg); color: var(--red); }
+/* A real request: "highlight the member row red if they check in that
+   day" - same red-bg/red-text pairing as the absent row above (this
+   table only ever shows one of the two at once - see the partial's own
+   comment on precedence), just triggered by m.checkedIn instead of
+   m.absent. */
+.setup-assignment-row-checked-in td { background: var(--red-bg); color: var(--red); }
 
 /* A member row staged for removal (public/js/team-member-remove-toggle.js)
    but not yet saved - a real request: "allow for multiple deletes and
@@ -5189,11 +5195,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid .class-card-line { font-size: 0.66rem; }
   .class-schedule-room-grid .class-card-pill-label,
   .class-schedule-room-grid .class-card .badge-pill { font-size: 0.62rem; }
-  /* Smaller still on a phone - the pair only needs to be big enough to
-     tap accurately, not full icon-btn/desktop size, and every bit of
-     width saved here is width the title gets back before wrapping. */
-  .class-schedule-room-grid .class-card-view-btn,
-  .class-schedule-room-grid .class-card-quicklink-btn { width: 1.3rem; height: 1.3rem; font-size: 0.7rem; }
 }
 
 /* A real request: "shrink the calendar grid on mobile view so you can see
@@ -5223,8 +5224,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid .class-card-line { font-size: 0.56rem; }
   .class-schedule-room-grid .class-card-pill-label,
   .class-schedule-room-grid .class-card .badge-pill { font-size: 0.52rem; padding: 0.1rem 0.3rem; }
-  .class-schedule-room-grid .class-card-view-btn,
-  .class-schedule-room-grid .class-card-quicklink-btn { width: 1.1rem; height: 1.1rem; font-size: 0.6rem; }
 }
 
 /* Create/Edit Class form - the form itself takes 1/3 of the page, the
@@ -5245,18 +5244,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-manage-form-col { min-width: 0; }
 }
 
-/* "View" button on each class card, and the Class Check-In quick link
-   next to it - both small square icon buttons (a real request: "change
-   the view button to a small square icon like the check in link icon"),
-   so they read as one matched pair instead of a text pill next to an
-   icon. View opens the class's own popup (fetched as an HTML fragment -
-   see public/js/class-schedule-view.js); the quick link opens that
-   class's kiosk attendance screen (Check In/Check Out) in a new tab,
-   skipping the kiosk's own day-picker/hour-search. .icon-btn's default
-   2rem square reads oversized on this compact card, so both are scaled
-   down to match. */
-.class-card-view-btn,
-.class-card-quicklink-btn { flex-shrink: 0; width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
+/* A real request: "remove the edit button and attendance link button
+   from the schedule cards to view the titles easier" - the small icon
+   buttons that used to sit here (View, and a Class Check-In quick link -
+   both now removed, the quick link already living on the class view/
+   edit dialog too) are gone; the whole card is the click target for
+   that same dialog instead (views/partials/class-schedule-grid.ejs's own
+   data-view-class, public/js/class-schedule-view.js). Same
+   cursor/hover/focus treatment as Parent Portal's own read-only class
+   cards (.class-card-clickable, parent-classes.ejs) - this one's a <div>
+   rather than that page's <button> (can't put a <button> around the
+   archive checkbox this card also holds), so cursor/outline need setting
+   explicitly instead of coming from button defaults. */
+.class-card-clickable { cursor: pointer; }
+.class-card-clickable:hover,
+.class-card-clickable:focus-visible { box-shadow: 0 0 0 2px var(--brand) inset; }
+.class-card-clickable:focus-visible { outline: 2px solid var(--brand-dark); outline-offset: 2px; }
 .class-view-dialog {
   width: min(1100px, 95vw);
   max-height: 90vh;
@@ -7016,9 +7019,21 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   animation: pet-breathe 3.6s ease-in-out infinite;
   transform-origin: 50% 85%;
 }
-.pet-display.pet-display--happy, .pet-display-photo.pet-display--happy { animation: pet-breathe 3.6s ease-in-out infinite, pet-happy-bounce 0.7s ease-in-out 2; }
+/* A distinct one-shot reaction per care action - a real request: "the
+   pet image moves but the pet doesn't... how do we make this more
+   animated." Feed/Play/Bathe used to all share one generic "happy
+   bounce," so every button looked identical; each now gets its own
+   motion (paired with its own floating-icon burst below) so the
+   *action* reads, not just "something happened." Layered on top of the
+   base pet-breathe idle loop rather than replacing it. */
+.pet-display.pet-display--play, .pet-display-photo.pet-display--play { animation: pet-breathe 3.6s ease-in-out infinite, pet-happy-bounce 0.7s cubic-bezier(.34,1.56,.64,1) 2; }
+.pet-display.pet-display--feed, .pet-display-photo.pet-display--feed { animation: pet-breathe 3.6s ease-in-out infinite, pet-nibble 1.1s ease-in-out 1; }
+.pet-display.pet-display--bathe, .pet-display-photo.pet-display--bathe { animation: pet-breathe 3.6s ease-in-out infinite, pet-wobble 0.9s ease-in-out 1; }
 @media (prefers-reduced-motion: reduce) {
-  .pet-display, .pet-display.pet-display--happy, .pet-display-photo, .pet-display-photo.pet-display--happy { animation: none; }
+  .pet-display, .pet-display-photo,
+  .pet-display.pet-display--play, .pet-display-photo.pet-display--play,
+  .pet-display.pet-display--feed, .pet-display-photo.pet-display--feed,
+  .pet-display.pet-display--bathe, .pet-display-photo.pet-display--bathe { animation: none; }
 }
 
 /* Small idle "alive" motion - blink + a limb/tail wiggle - layered onto
@@ -7049,6 +7064,76 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 @keyframes pet-wiggle {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(6deg); }
+}
+/* Feed: a little downward "peck" toward the bowl, twice. */
+@keyframes pet-nibble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(5%) rotate(-4deg); }
+  40% { transform: translateY(0) rotate(0deg); }
+  60% { transform: translateY(5%) rotate(4deg); }
+  80% { transform: translateY(0) rotate(0deg); }
+}
+/* Bathe: a side-to-side shake, like shaking off water. */
+@keyframes pet-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-7deg); }
+  40% { transform: rotate(7deg); }
+  60% { transform: rotate(-5deg); }
+  80% { transform: rotate(5deg); }
+}
+
+/* A quick radial "impact" pop behind the pet the instant a care action
+   lands - a cheap extra beat of "juice" (games/UI-animation term for
+   satisfying feedback) layered under the particle burst below, the same
+   trick a lot of mobile game hit/pickup effects use: a ring that
+   expands and fades in well under a second reads as impact even though
+   nothing about the pet's shape actually changed. */
+.pet-impact-ring {
+  position: absolute; top: 50%; left: 50%; width: 60%; height: 60%;
+  transform: translate(-50%, -50%) scale(0.3); border-radius: 50%;
+  border: 3px solid currentColor; opacity: 0; pointer-events: none; z-index: 1;
+  animation: pet-impact-ring 0.6s ease-out both;
+}
+.pet-impact-ring-feed { color: #b9773a; }
+.pet-impact-ring-bathe { color: #4a90d9; }
+.pet-impact-ring-play { color: var(--brand-dark); }
+@keyframes pet-impact-ring {
+  0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-impact-ring { display: none; }
+}
+
+/* Floating icon burst over the pet when a care action lands - the
+   thing that actually sells "feed/play/bathe happened" on a flat photo
+   pet that has no swappable parts to animate individually (see
+   utils/pets.js's own PET_LOOKS comment on why: a photoreal image can't
+   be decomposed the way flat SVG could). Three of the same icon used on
+   that action's button (icon-bone/icon-ball/icon-droplet), staggered
+   and rising/fading out over the stage. */
+.pet-particles { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
+.pet-particle { position: absolute; width: 1.6rem; height: 1.6rem; opacity: 0; }
+.pet-particles-feed .pet-particle { color: #b9773a; animation: pet-particle-rise 1.1s ease-out both; }
+.pet-particles-bathe .pet-particle { color: #4a90d9; animation: pet-particle-rise 1.1s ease-out both; }
+.pet-particles-play .pet-particle { color: var(--brand-dark); animation: pet-particle-bounce 1.1s ease-out both; }
+.pet-particle-1 { left: 22%; bottom: 30%; animation-delay: 0s; }
+.pet-particle-2 { left: 48%; bottom: 38%; animation-delay: 0.15s; }
+.pet-particle-3 { left: 70%; bottom: 30%; animation-delay: 0.3s; }
+@keyframes pet-particle-rise {
+  0% { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-70px) scale(1) rotate(14deg); }
+}
+@keyframes pet-particle-bounce {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  25% { opacity: 1; transform: translateY(-42px) scale(1.08); }
+  55% { transform: translateY(-12px) scale(0.96); }
+  80% { transform: translateY(-30px) scale(1.02); }
+  100% { opacity: 0; transform: translateY(-55px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-particles { display: none; }
 }
 
 /* Customize screen only: a quick pop when a trait choice changes (see
@@ -7112,6 +7197,19 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .pet-care-bar-hunger { background: var(--yellow-solid); }
 .pet-care-bar-happiness { background: var(--green); }
 .pet-care-bar-cleanliness { background: var(--brand); }
+/* A one-shot glow on whichever stat bar the just-pressed action actually
+   raised (hunger<->feed, happiness<->play, cleanliness<->bathe) - ties
+   the stage animation back to the number that changed, so the action
+   reads as having a real effect, not just a cute effect. */
+.pet-care-bar-fill--pulse { animation: pet-bar-pulse 0.6s ease-out; }
+@keyframes pet-bar-pulse {
+  0% { filter: brightness(1); box-shadow: 0 0 0 0 currentColor; }
+  35% { filter: brightness(1.35); box-shadow: 0 0 8px 1px currentColor; }
+  100% { filter: brightness(1); box-shadow: 0 0 0 0 currentColor; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-care-bar-fill--pulse { animation: none; }
+}
 
 .pet-care-actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .pet-care-btn { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 7rem; justify-content: center; }
@@ -7352,7 +7450,7 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .spelling-bee-result-text { font-size: 1.05rem; font-weight: 600; }
 
 .reading-tip-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1.5rem; }
-@media (max-width: 700px) { .reading-tip-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .reading-tip-grid { grid-template-columns: 1fr; } }
 .reading-tip-card {
   display: flex; align-items: flex-start; gap: 0.75rem; padding: var(--card-padding-compact);
   border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm);

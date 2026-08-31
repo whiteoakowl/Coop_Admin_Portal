@@ -30,7 +30,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
               <tr class="<%= slot.noneAvailable ? 'floater-row-noavail' : '' %>">
                 <td class="floater-card-position">
                   <%= slot.label %>
-                  <% if (slot.slotType === 'class' && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
+                  <% if ((slot.slotType === 'class' || slot.slotType === 'vacancy') && slot.reason) { %><span class="floater-slot-reason"><%= slot.reason %></span><% } %>
                 </td>
                 <td><%= slot.room || '—' %></td>
                 <td>

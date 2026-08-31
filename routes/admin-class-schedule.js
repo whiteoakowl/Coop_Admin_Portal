@@ -299,22 +299,34 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent('Class name and hour are required.'));
   }
 
-  await updateClass(id, {
-    day: cls.day,
-    hourPosition,
-    className,
-    room: (req.body.room || '').trim(),
-    ageGroup: [].concat(req.body.ageGroup || []).join(', '),
-    color: req.body.color || cls.color,
-    notes: (req.body.notes || '').trim(),
-    startTime: (req.body.startTime || '').trim(),
-    endTime: (req.body.endTime || '').trim(),
-    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
-    registrationOpen: req.body.registrationOpen === '1',
-    description: sanitizePostBody(req.body.description || ''),
-    ...registrationFieldsFromBody(req.body),
-  });
-  await saveClassSections(id, req.body);
+  try {
+    await updateClass(id, {
+      day: cls.day,
+      hourPosition,
+      className,
+      room: (req.body.room || '').trim(),
+      ageGroup: [].concat(req.body.ageGroup || []).join(', '),
+      color: req.body.color || cls.color,
+      notes: (req.body.notes || '').trim(),
+      startTime: (req.body.startTime || '').trim(),
+      endTime: (req.body.endTime || '').trim(),
+      capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+      registrationOpen: req.body.registrationOpen === '1',
+      description: sanitizePostBody(req.body.description || ''),
+      ...registrationFieldsFromBody(req.body),
+    });
+    await saveClassSections(id, req.body);
+  } catch (err) {
+    // A real bug report: saving a class (e.g. after setting an assistant
+    // slot count) landed on the generic "Something went wrong" error
+    // page instead of back on the grid - updateClass's own
+    // syncDayMemberRosters call had no error handling here, unlike the
+    // roster/add route just below (see its own comment on the same
+    // underlying setRosterMembership bug, now fixed at its source).
+    // Surfacing the real reason here too if anything else ever goes
+    // wrong in this same save path.
+    return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not save class: ${err.message}`));
+  }
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
 });
 
