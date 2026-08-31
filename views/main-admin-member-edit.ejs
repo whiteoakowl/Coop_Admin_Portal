@@ -125,13 +125,27 @@
 
       <%# A real request (Approvals tab): "you can click the name and
           view their membership form and edit, add portal settings etc.
-          save." Only rendered in edit mode for a member who already has
-          a portal account (locals.portalAccount - undefined entirely on
-          the /new "create" form, which has never had an account yet). %>
-      <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
+          save." Only rendered in edit mode (locals.portalAccount is
+          undefined entirely on the /new "create" form, which has no
+          member id yet to attach an account to). A real later request:
+          "No creating users. All Members should already have an
+          account. Each member profile should have a space for
+          password." - so this box now covers BOTH a member who already
+          has a portal account (change their password, manage roles) and
+          one who doesn't yet (set a password here to create their
+          account on Save, using the Email field above as their login -
+          see routes/main-admin-members.js's own POST /:id/edit). %>
+      <% if (typeof portalAccount !== 'undefined') { %>
         <div class="manage-section">
           <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
-          <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
+          <% if (portalAccount) { %>
+            <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
+          <% } else { %>
+            <p class="hint">No portal account yet. Set a password below to create one, using this member's Email address above as their login.</p>
+          <% } %>
+          <label class="member-form-full"><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
+            <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
+          </label>
           <% if (allRoles.length === 0) { %>
             <p class="hint">No roles defined yet.</p>
           <% } else { %>

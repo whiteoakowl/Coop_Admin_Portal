@@ -10,7 +10,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
 const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
 const { easternInputToUtcText, formatTimestamp, isValidISODate } = require('../utils/dates');
 const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry } = require('../utils/academics');
@@ -233,51 +232,17 @@ router.post('/users/:id/reactivate', requirePortalPermission('manage_users'), as
   res.redirect('/main-admin/users?notice=' + encodeURIComponent('Account reactivated.'));
 });
 
-// Admin-created accounts - the second signup path (alongside public
-// self-registration): a Main Admin picks an EXISTING member (already in
-// the system from the Members page/Membership Form) and issues them
-// portal login credentials directly, active immediately - no approval
-// queue, since a Main Admin is the one creating it.
-router.get('/users/new', requirePortalPermission('manage_users'), async (req, res) => {
-  const members = await db
-    .prepare(
-      `SELECT m.* FROM members m
-       WHERE m.active = 1 AND NOT EXISTS (SELECT 1 FROM member_accounts ma WHERE ma.member_id = m.id)
-       ORDER BY LOWER(m.name)`
-    )
-    .all();
-  const allRoles = await db.prepare('SELECT id, key, label FROM roles ORDER BY label').all();
-  res.render('main-admin-users-new', { title: 'Create Account', members, allRoles, error: req.query.error || null });
-});
-
-router.post('/users/new', requirePortalPermission('manage_users'), async (req, res) => {
-  const memberId = parseInt(req.body.memberId, 10);
-  const email = (req.body.email || '').trim();
-  const password = req.body.password || '';
-  const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-  const back = '/main-admin/users/new';
-
-  if (!memberId || !email || password.length < 8) {
-    return res.redirect(back + '?error=' + encodeURIComponent('A member, email, and a password of at least 8 characters are required.'));
-  }
-  if (await findAccountByEmail(email)) {
-    return res.redirect(back + '?error=' + encodeURIComponent('That email is already in use.'));
-  }
-  const alreadyHasAccount = await db.prepare('SELECT 1 FROM member_accounts WHERE member_id = ?').get(memberId);
-  if (alreadyHasAccount) {
-    return res.redirect(back + '?error=' + encodeURIComponent('That member already has an account.'));
-  }
-
-  await db.withTransaction(async (tx) => {
-    const info = await tx
-      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)")
-      .run(memberId, email, hashPassword(password), req.portalAccount.id);
-    for (const roleId of roleIds) {
-      await tx.prepare('INSERT INTO member_account_roles (member_account_id, role_id, granted_by_account_id) VALUES (?, ?, ?)').run(info.lastInsertRowid, roleId, req.portalAccount.id);
-    }
-  });
-
-  res.redirect('/main-admin/users?notice=' + encodeURIComponent('Account created.'));
+// A real request: "No creating users. All Members should already have
+// an account. Each member profile should have a space for password." -
+// the standalone "Create Account" flow (pick a member, type an email +
+// password on a separate page) is gone; setting a password now lives
+// directly on the member's own profile (views/main-admin-member-edit.ejs
+// -> this same POST /main-admin/members/:id/edit route creates the
+// member_accounts row on demand the first time a password is set - see
+// that route's own comment). This redirect just keeps an old bookmark/
+// link to the removed page from 404ing.
+router.get('/users/new', requirePortalPermission('manage_users'), (req, res) => {
+  res.redirect('/main-admin/members');
 });
 
 // --- Roles & Permissions (read-focused for this pass - see each role's

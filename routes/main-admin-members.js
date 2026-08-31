@@ -42,6 +42,7 @@ const {
 } = require('../utils/members');
 const { getMemberSchedule } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
+const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
 const {
   resolveFamilyId: resolveIntakeFamilyId,
   createParentMember,
@@ -583,6 +584,27 @@ router.post('/:id/edit', async (req, res) => {
   const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
 
+  // A real request: "No creating users. All Members should already have
+  // an account. Each member profile should have a space for password."
+  // - checked before the UPDATE below so a rejected password doesn't
+  // still silently save the rest of the form with no feedback.
+  const password = req.body.password || '';
+  let portalStatus = (await portalStatusForMembers([id]))[id];
+  if (password) {
+    if (password.length < 8) {
+      return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Password must be at least 8 characters.'));
+    }
+    if (!portalStatus.account) {
+      if (!f.email) {
+        return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('An email address is required to create a portal account.'));
+      }
+      const emailClash = await findAccountByEmail(f.email);
+      if (emailClash) {
+        return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('That email is already in use by another portal account.'));
+      }
+    }
+  }
+
   await db
     .prepare(
       `UPDATE members SET name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
@@ -592,10 +614,22 @@ router.post('/:id/edit', async (req, res) => {
   await setMemberFamily(id, await resolveFamilyId(f));
   await setPrimaryParent(id, f.isPrimaryParent);
 
-  // Portal Settings - only present in the submitted form (and only ever
-  // acted on here) when this member actually has an account; see this
-  // route's own GET handler comment.
-  const portalStatus = (await portalStatusForMembers([id]))[id];
+  if (password) {
+    if (portalStatus.account) {
+      await db.prepare('UPDATE member_accounts SET password_hash = ? WHERE id = ?').run(hashPassword(password), portalStatus.account.id);
+    } else {
+      const info = await db
+        .prepare(
+          "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
+        )
+        .run(id, f.email, hashPassword(password), req.portalAccount.id);
+      portalStatus = { account: { id: info.lastInsertRowid }, roleIds: new Set() };
+    }
+  }
+
+  // Portal Settings' role checkboxes - only meaningful once this member
+  // actually has an account (either already did, or was just created
+  // above by setting a password in this same submit).
   if (portalStatus.account) {
     const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
     await setMemberRoles(id, roleIds, req.portalAccount.id);

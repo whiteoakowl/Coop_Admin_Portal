@@ -10,10 +10,14 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'users' }) %>
-    <div class="roster-toolbar">
-      <h1>Users</h1>
-      <a class="primary-btn" href="/main-admin/users/new">+ Create Account</a>
-    </div>
+    <h1>Users</h1>
+    <%# A real request: "No creating users. All Members should already
+        have an account. Each member profile should have a space for
+        password." - the standalone "Create Account" page is gone; a
+        password is now set directly on a member's own profile
+        (/main-admin/members/:id/edit), which creates this account the
+        first time one is set. %>
+    <p class="hint">Portal accounts are created from each member's own profile - open a member, scroll to Portal Settings, and set a password.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
