@@ -10,7 +10,7 @@
       <img src="/img/logo.png" alt="" />
       <div>
         <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Check In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : 'Name Tag Requests' %></p>
+        <p class="print-header-sub"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical Log' : 'Name Tag Requests' %></p>
       </div>
     </div>
     <h1>Logs</h1>
@@ -20,7 +20,8 @@
 
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/logs?tab=absence">Absence/Late Log</a>
-      <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Check In/Out Log</a>
+      <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Co-op Check-In/Out Log</a>
+      <a class="view-tab<%= tab === 'classcheckinout' ? ' active' : '' %>" href="/admin/logs?tab=classcheckinout">Class Check-In/Out Log</a>
       <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
       <a class="view-tab<%= tab === 'classrisk' ? ' active' : '' %>" href="/admin/logs?tab=classrisk">Class Cancellation Risk</a>
       <a class="view-tab<%= tab === 'substitutes' ? ' active' : '' %>" href="/admin/logs?tab=substitutes">Substitutes Needed</a>
@@ -93,11 +94,11 @@
             <% }); %>
           </tbody>
         </table>
-      <% } else if (tab === 'checkinout') { %>
+      <% } else if (tab === 'checkinout' || tab === 'classcheckinout') { %>
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=checkinout' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+            <select id="date-select" onchange="window.location = '/admin/logs?tab=<%= tab %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
               <option value="">All dates</option>
               <% dates.forEach(function(d) { %>
                 <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -105,7 +106,7 @@
             </select>
           </div>
           <div class="roster-btn-row">
-            <a class="roster-action-btn file-action-btn" href="/admin/logs/checkinout/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
+            <a class="roster-action-btn file-action-btn" href="/admin/logs/<%= tab %>/export.csv<%= dateFilter ? '?date=' + encodeURIComponent(dateFilter) : '' %>">Export</a>
             <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           </div>
         </div>

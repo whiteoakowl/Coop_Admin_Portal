@@ -1619,6 +1619,87 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   .alert-log-body { min-width: 0; }
 }
 
+/* Co-op Admin homepage stat cards - replaces the old plain .totals-card
+   segmented strip up top with 7 individually-colored cards (a real
+   request, with a reference screenshot: Monday cards orange/blue,
+   Wednesday cards purple/blue, bottom row Families/Students/Parents
+   green/blue/orange) - reuses this file's own existing color tokens
+   (--orange/--brand/--purple/--green families) rather than introducing
+   new ones. A 4-column grid naturally left-aligns the 7th+8th slot's
+   gap on row 2 without any extra markup. */
+.dashboard-stat-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+}
+.dashboard-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+.dashboard-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 1.25rem 0.75rem;
+  border-radius: calc(var(--radius) - 2px);
+  min-width: 0;
+}
+.dashboard-stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-stat-icon .icon { width: 26px; height: 26px; }
+.dashboard-stat-label { font-weight: 700; font-size: 0.95rem; line-height: 1.25; }
+.dashboard-stat-value { font-size: 2.25rem; font-weight: 800; line-height: 1; }
+
+.dashboard-stat-orange { background: linear-gradient(160deg, var(--surface), var(--orange-bg)); }
+.dashboard-stat-orange .dashboard-stat-icon { background: var(--orange-bg); color: var(--orange); }
+.dashboard-stat-orange .dashboard-stat-label, .dashboard-stat-orange .dashboard-stat-value { color: var(--orange); }
+
+.dashboard-stat-blue { background: linear-gradient(160deg, var(--surface), var(--brand-soft)); }
+.dashboard-stat-blue .dashboard-stat-icon { background: var(--brand-soft); color: var(--brand-dark); }
+.dashboard-stat-blue .dashboard-stat-label, .dashboard-stat-blue .dashboard-stat-value { color: var(--brand-dark); }
+
+.dashboard-stat-purple { background: linear-gradient(160deg, var(--surface), var(--purple-soft)); }
+.dashboard-stat-purple .dashboard-stat-icon { background: var(--purple-soft); color: var(--purple); }
+.dashboard-stat-purple .dashboard-stat-label, .dashboard-stat-purple .dashboard-stat-value { color: var(--purple); }
+
+.dashboard-stat-green { background: linear-gradient(160deg, var(--surface), var(--green-bg)); }
+.dashboard-stat-green .dashboard-stat-icon { background: var(--green-bg); color: var(--green); }
+.dashboard-stat-green .dashboard-stat-label, .dashboard-stat-green .dashboard-stat-value { color: var(--green); }
+
+@media (max-width: 720px) {
+  /* Mobile: 2 columns instead of 4 - shrinks each card's own padding/
+     icon/font so a phone-width screen never needs a horizontal scroll
+     (same "shrink to fit" pattern .totals-item already used at this
+     breakpoint above). */
+  .dashboard-stat-panel { padding: 0.85rem; }
+  .dashboard-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+  .dashboard-stat-card { padding: 0.85rem 0.5rem; gap: 0.35rem; }
+  .dashboard-stat-icon { width: 42px; height: 42px; }
+  .dashboard-stat-icon .icon { width: 20px; height: 20px; }
+  .dashboard-stat-label { font-size: 0.78rem; }
+  .dashboard-stat-value { font-size: 1.6rem; }
+}
+
+@media (max-width: 480px) {
+  .dashboard-stat-icon { width: 36px; height: 36px; }
+  .dashboard-stat-icon .icon { width: 18px; height: 18px; }
+  .dashboard-stat-label { font-size: 0.7rem; }
+  .dashboard-stat-value { font-size: 1.35rem; }
+}
+
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
 
 /* Alert Log - a running feed of today's substitute-needed, pending-

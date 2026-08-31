@@ -208,26 +208,32 @@ async function dayScheduleCount(memberType, day) {
   ).c;
 }
 
+async function activeMemberTypeCount(memberType) {
+  return (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?').get(memberType)).c;
+}
+
 router.get('/', requireAdmin, async (req, res) => {
   const today = todayISO();
   const previousDate = await previousSessionDate(today);
-  const memberCount = (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1').get()).c;
   const familyCount = (await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c;
-  const [mondayStudentCount, mondayParentCount, wednesdayStudentCount, wednesdayParentCount] = await Promise.all([
+  const [mondayStudentCount, mondayParentCount, wednesdayStudentCount, wednesdayParentCount, studentCount, parentCount] = await Promise.all([
     dayScheduleCount('student', 'monday'),
     dayScheduleCount('parent', 'monday'),
     dayScheduleCount('student', 'wednesday'),
     dayScheduleCount('parent', 'wednesday'),
+    activeMemberTypeCount('student'),
+    activeMemberTypeCount('parent'),
   ]);
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
-    memberCount,
     familyCount,
     mondayStudentCount,
     mondayParentCount,
     wednesdayStudentCount,
     wednesdayParentCount,
+    studentCount,
+    parentCount,
     studentStats: await statsWithTrends('student', today, previousDate),
     parentStats: await statsWithTrends('parent', today, previousDate),
     alerts: await todaysAlerts(),

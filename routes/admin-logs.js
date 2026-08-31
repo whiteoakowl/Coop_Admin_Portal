@@ -11,7 +11,7 @@ const { substituteBoard } = require('../utils/substitutes');
 const { membersWithMedicalNotes, lastNameOf } = require('../utils/members');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 
-const LOG_TABS = ['absence', 'checkinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
+const LOG_TABS = ['absence', 'checkinout', 'classcheckinout', 'nametag', 'classrisk', 'substitutes', 'allergies'];
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
@@ -69,14 +69,28 @@ async function absenceSubmissionDates() {
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }
 
-async function checkinoutLogRows(dateFilter) {
+// A real bug report: "There should be a seperate log for Class Check
+// in/out and co-op check in/out." Both check-in kinds write onto the
+// same attendance/checkouts rows (routes/kiosk.js for the front-door
+// Parent/Student roster, routes/kiosk-class-checkin.js for a single
+// class's own roster) - the only thing distinguishing them afterward is
+// which roster the row belongs to: a class's own roster is always
+// category='Class Roster' (utils/classSchedule.js's ensureClassRoster),
+// while the day-level Parent/Student rosters check-in itself uses are
+// category='Class Schedule' (ensureDayRoster) - anything NOT 'Class
+// Roster'. kind is 'class' or 'coop', never user input.
+function checkinoutCategoryClause(kind) {
+  return kind === 'class' ? "r.category = 'Class Roster'" : "r.category != 'Class Roster'";
+}
+
+async function checkinoutLogRows(dateFilter, kind) {
   let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date,
              a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime", c.number AS number
              FROM attendance a
              JOIN members m ON m.id = a.member_id
              JOIN rosters r ON r.id = a.roster_id
              LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
-             WHERE a.check_in_time IS NOT NULL`;
+             WHERE a.check_in_time IS NOT NULL AND ${checkinoutCategoryClause(kind)}`;
   const params = [];
   if (dateFilter) {
     sql += ' AND a.session_date = ?';
@@ -87,9 +101,14 @@ async function checkinoutLogRows(dateFilter) {
   return db.prepare(sql).all(...params);
 }
 
-async function checkinoutLogDates() {
+async function checkinoutLogDates(kind) {
   return (await db
-    .prepare(`SELECT DISTINCT session_date FROM attendance WHERE check_in_time IS NOT NULL ORDER BY session_date DESC`)
+    .prepare(
+      `SELECT DISTINCT a.session_date FROM attendance a
+       JOIN rosters r ON r.id = a.roster_id
+       WHERE a.check_in_time IS NOT NULL AND ${checkinoutCategoryClause(kind)}
+       ORDER BY a.session_date DESC`
+    )
     .all())
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }
@@ -117,8 +136,9 @@ router.get('/logs', requireAdmin, async (req, res) => {
   const tab = LOG_TABS.includes(req.query.tab) ? req.query.tab : 'absence';
   const dateFilter = req.query.date || '';
 
-  if (tab === 'checkinout') {
-    const allRows = (await checkinoutLogRows(dateFilter)).map((r) => ({
+  if (tab === 'checkinout' || tab === 'classcheckinout') {
+    const kind = tab === 'classcheckinout' ? 'class' : 'coop';
+    const allRows = (await checkinoutLogRows(dateFilter, kind)).map((r) => ({
       memberName: r.memberName,
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),
@@ -129,14 +149,14 @@ router.get('/logs', requireAdmin, async (req, res) => {
     const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
     const pagination = paginate(allRows, parsePage(req.query.page), pageSize);
     return res.render('admin-logs', {
-      title: 'Check In/Out Log',
+      title: kind === 'class' ? 'Class Check-In/Out Log' : 'Co-op Check-In/Out Log',
       tab,
       rows: pagination.items,
       allRows,
       pagination,
       viewingAll: pageSize === Infinity,
-      baseHref: `/admin/logs?tab=checkinout${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
-      dates: await checkinoutLogDates(),
+      baseHref: `/admin/logs?tab=${tab}${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
+      dates: await checkinoutLogDates(kind),
       dateFilter,
       error: req.query.error || null,
       notice: req.query.notice || null,
@@ -277,7 +297,7 @@ router.get('/logs/absence/export.csv', requireAdmin, async (req, res) => {
 
 router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
-  const rows = await checkinoutLogRows(dateFilter);
+  const rows = await checkinoutLogRows(dateFilter, 'coop');
   const lines = [
     toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
     ...rows.map((r) =>
@@ -291,7 +311,26 @@ router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
       ])
     ),
   ];
-  sendCsv(res, 'check-in-out-log.csv', lines);
+  sendCsv(res, 'co-op-check-in-out-log.csv', lines);
+});
+
+router.get('/logs/classcheckinout/export.csv', requireAdmin, async (req, res) => {
+  const dateFilter = req.query.date || '';
+  const rows = await checkinoutLogRows(dateFilter, 'class');
+  const lines = [
+    toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
+    ...rows.map((r) =>
+      toCsvRow([
+        r.memberName,
+        r.rosterName,
+        formatDateLabel(r.date),
+        formatTime(r.checkInTime) || '',
+        r.checkOutTime ? formatTime(r.checkOutTime) : '',
+        r.number ?? '',
+      ])
+    ),
+  ];
+  sendCsv(res, 'class-check-in-out-log.csv', lines);
 });
 
 router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {

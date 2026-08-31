@@ -1,8 +1,11 @@
-// Real HTTP-level coverage for the Home dashboard's totals-card (Total
-// Students / Total Parents / Total Members / Total Families,
-// routes/admin.js's GET / + views/admin-dashboard.ejs) - added alongside
-// this session's Members-page family filter so family count has the same
-// kind of at-a-glance visibility parent/student/member counts already had.
+// Real HTTP-level coverage for the Home dashboard's stat-card panel
+// (Monday/Wednesday Parents/Students, Total Families/Students/Parents -
+// routes/admin.js's GET / + views/admin-dashboard.ejs's
+// .dashboard-stat-panel). Originally added alongside a Members-page
+// family filter so family count had the same kind of at-a-glance
+// visibility parent/student/member counts already had; later redesigned
+// (a real request, with a reference screenshot) into individually-
+// colored cards - see that redesign's own comment in styles.css.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -31,11 +34,11 @@ test.after(() => {
 });
 
 function statValueFor(html, label) {
-  const match = new RegExp(`<span class="stat-value">(\\d+)</span>\\s*<span class="stat-label">${label}</span>`).exec(html);
+  const match = new RegExp(`<span class="dashboard-stat-label">${label}</span>\\s*<span class="dashboard-stat-value">(\\d+)</span>`).exec(html);
   return match ? parseInt(match[1], 10) : null;
 }
 
-test('dashboard totals-card includes Total Families alongside Students/Parents/Members', async () => {
+test('dashboard stat panel includes Total Families alongside Students/Parents', async () => {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
 
@@ -47,14 +50,18 @@ test('dashboard totals-card includes Total Families alongside Students/Parents/M
   assert.equal(statValueFor(res.text, 'Total Families'), 2);
 });
 
-test('dashboard totals-card splits Students/Parents counts by which day they are actually scheduled', async () => {
-  // Real bug report: the first row of dashboard counts used to show one
+test('dashboard stat panel splits Monday/Wednesday Students/Parents counts by which day they are actually scheduled, alongside the flat Total Students/Parents cards', async () => {
+  // Real bug report: the dashboard's day-level counts used to show one
   // flat "Total Students"/"Total Parents" figure (every active member of
-  // that type, scheduled or not). Fixed to show four counts instead - how
-  // many students/parents are actually on Monday's vs Wednesday's
-  // day-level roster (the same 'Class Schedule' roster concept
-  // todayStatsForType() already used for Today's Attendance, just for
-  // both days at once instead of only whichever day happens to be today).
+  // that type, scheduled or not) instead of how many are actually on
+  // Monday's vs Wednesday's day-level roster (the same 'Class Schedule'
+  // roster concept todayStatsForType() already used for Today's
+  // Attendance, just for both days at once instead of only whichever day
+  // happens to be today) - fixed to show the day-scoped counts. A later
+  // redesign (a real request, with a reference screenshot) re-added
+  // separate flat Total Students/Total Parents cards alongside the day
+  // split, not instead of it - both now coexist, so this only checks the
+  // day-scoped counts stay correct, not that the flat labels are absent.
   const { cookie } = await (async () => {
     const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
     return { cookie: loginRes.headers['set-cookie'] };
@@ -93,8 +100,8 @@ test('dashboard totals-card splits Students/Parents counts by which day they are
   assert.equal(res.status, 200);
   assert.ok(statValueFor(res.text, 'Monday Students') >= 1, 'Monday Students should count the Monday-enrolled student');
   assert.ok(statValueFor(res.text, 'Wednesday Students') >= 1, 'Wednesday Students should count the Wednesday-enrolled student once, not per-class');
-  assert.doesNotMatch(res.text, /Total Students/, 'the old flat Total Students figure should be gone, replaced by the day split');
-  assert.doesNotMatch(res.text, /Total Parents/, 'the old flat Total Parents figure should be gone, replaced by the day split');
+  assert.ok(statValueFor(res.text, 'Total Students') >= 2, 'the flat Total Students card should count every active student, day-scheduled or not');
+  assert.ok(statValueFor(res.text, 'Total Parents') !== null, 'the flat Total Parents card should still be present');
 });
 
 async function currentCsrf(cookie) {
