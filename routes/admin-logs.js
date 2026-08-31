@@ -20,16 +20,21 @@ function todayIfSessionDay(day) {
 }
 
 // Every Absence/Late form submission across all rosters, newest first.
+// Reads from absence_submissions - a separate, append-only record of
+// each submission (see that migration's own comment) - rather than the
+// live attendance row a submission first writes, because a member who
+// later checks in for real overwrites that row's status/source straight
+// to 'present'/'kiosk' (a real, intended behavior - see routes/kiosk.js)
+// which used to make the submission vanish from this log too.
 async function allAbsenceSubmissions(dateFilter) {
   let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date, a.status,
              a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
-             FROM attendance a
+             FROM absence_submissions a
              JOIN members m ON m.id = a.member_id
-             JOIN rosters r ON r.id = a.roster_id
-             WHERE a.source = 'absence_form'`;
+             JOIN rosters r ON r.id = a.roster_id`;
   const params = [];
   if (dateFilter) {
-    sql += ' AND a.session_date = ?';
+    sql += ' WHERE a.session_date = ?';
     params.push(dateFilter);
   }
   sql += ' ORDER BY a.session_date DESC';
@@ -59,7 +64,7 @@ async function allAbsenceSubmissions(dateFilter) {
 
 async function absenceSubmissionDates() {
   return (await db
-    .prepare(`SELECT DISTINCT session_date FROM attendance WHERE source = 'absence_form' ORDER BY session_date DESC`)
+    .prepare(`SELECT DISTINCT session_date FROM absence_submissions ORDER BY session_date DESC`)
     .all())
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }

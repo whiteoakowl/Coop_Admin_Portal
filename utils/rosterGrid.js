@@ -74,38 +74,52 @@ async function buildRosterGridData(roster, datesOverride) {
     ? await arrivalDepartureLabelsForMembers(members.map((m) => m.id), roster.schedule_day)
     : null;
 
-  // Each member's suggested Setup/Cleanup task for that date (Setup/Cleanup
-  // > Assignments tab, see setup_task_assignments' own schema comment) -
-  // only meaningful for the day-level Parent/Student rosters (setup_task_
-  // assignments is keyed by day, monday/wednesday, same as arrival/
-  // departure above), not a per-class roster. Shown as "<team name>-#<n>",
-  // <n> being the task's own display "Number" (its 1-indexed position
-  // within its section - see utils/taskList.js's itemsForSection),
-  // computed here with the same ROW_NUMBER()-over-position ordering so it
-  // always matches what the Task List page itself shows for that task,
-  // not the task's permanent barcode/id. Team name is whichever the
-  // section's own linked setup_teams row is titled, falling back to the
-  // section's own title when it isn't linked to a team at all - the same
-  // resolution utils/taskList.js's badgeContextForSection already applies
-  // for printed task badges, so this reads as the same "team" everywhere
-  // else in the app calls it one (a real request: "instead of it just
-  // being #3 [...] it should say Team 1-#3").
+  // Each member's ACTUALLY-SCANNED Setup/Cleanup task for that date - a
+  // real bug report: "should only record the members team and number IF
+  // they checked in and out with their setup/cleanup card. Just because
+  // they were assigned on the setup/cleanup assignment page, it should
+  // not show up on the attendance page." This used to read from
+  // setup_task_assignments (Setup/Cleanup > Assignments tab), which is
+  // just an admin's/auto-suggest's pick of who's SUPPOSED to do which
+  // task - it exists the moment that page saves, whether or not the
+  // member ever actually showed up and scanned their badge. checkouts.
+  // task_item_id (supabase/migrations/20260824180500_attendance_task_
+  // scan.sql) is the real signal instead: it's only ever set by an
+  // actual badge scan, either at checkout (routes/checkout.js's own
+  // /checkout/task-scan) or carried over from a check-in-time scan
+  // (routes/kiosk.js writes attendance.task_item_id there, and checkout
+  // copies it into this same checkouts column - see that migration's own
+  // comment). Only meaningful for the day-level Parent/Student rosters
+  // (task_list_sections is keyed by day, monday/wednesday, same as
+  // arrival/departure above), not a per-class roster. Shown as "<team
+  // name>-#<n>", <n> being the task's own display "Number" (its
+  // 1-indexed position within its section - see utils/taskList.js's
+  // itemsForSection), computed here with the same ROW_NUMBER()-over-
+  // position ordering so it always matches what the Task List page
+  // itself shows for that task, not the task's permanent barcode/id.
+  // Team name is whichever the section's own linked setup_teams row is
+  // titled, falling back to the section's own title when it isn't linked
+  // to a team at all - the same resolution utils/taskList.js's
+  // badgeContextForSection already applies for printed task badges, so
+  // this reads as the same "team" everywhere else in the app calls it
+  // one (a real request: "instead of it just being #3 [...] it should
+  // say Team 1-#3").
   const cleanupByKey = {};
   if (isRealDay && members.length && dates.length) {
     const cleanupRows = await db
       .prepare(
-        `SELECT sta.member_id, sta.session_date, numbered.number, COALESCE(st.title, tls.title) AS "teamName"
-         FROM setup_task_assignments sta
+        `SELECT c.member_id, c.session_date, numbered.number, COALESCE(st.title, tls.title) AS "teamName"
+         FROM checkouts c
          JOIN (
            SELECT id, section_id, ROW_NUMBER() OVER (PARTITION BY section_id ORDER BY position, id) AS number
            FROM task_list_items
            WHERE section_id IN (SELECT id FROM task_list_sections WHERE day = ?)
-         ) numbered ON numbered.id = sta.task_item_id
+         ) numbered ON numbered.id = c.task_item_id
          JOIN task_list_sections tls ON tls.id = numbered.section_id
          LEFT JOIN setup_teams st ON st.id = tls.team_id
-         WHERE sta.day = ? AND sta.session_date IN (${placeholders})`
+         WHERE c.roster_id = ? AND c.session_date IN (${placeholders})`
       )
-      .all(roster.schedule_day, roster.schedule_day, ...dates);
+      .all(roster.schedule_day, roster.id, ...dates);
     for (const r of cleanupRows) cleanupByKey[`${r.member_id}|${r.session_date}`] = { number: Number(r.number), teamName: r.teamName };
   }
 

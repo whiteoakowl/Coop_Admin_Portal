@@ -48,6 +48,9 @@ test.before(async () => {
   const insertAbsence = db.prepare(
     "INSERT INTO attendance (member_id, roster_id, session_date, status, source, reason_category, reason_text) VALUES (?, 2, '2024-03-04', 'absent', 'absence_form', 'personal', 'testing')"
   );
+  const insertAbsenceLog = db.prepare(
+    "INSERT INTO absence_submissions (member_id, roster_id, session_date, status, reason_category, reason_text) VALUES (?, 2, '2024-03-04', 'absent', 'personal', 'testing')"
+  );
   const insertCheckin = db.prepare(
     "INSERT INTO attendance (member_id, roster_id, session_date, status, source, check_in_time) VALUES (?, 4, '2024-03-04', 'present', 'kiosk', ?)"
   );
@@ -57,6 +60,7 @@ test.before(async () => {
     const name = `Log Test Kid ${String(i).padStart(2, '0')}`;
     const memberId = (await insertMember.run(name, `log-test-kid-${i}`)).lastInsertRowid;
     await insertAbsence.run(memberId);
+    await insertAbsenceLog.run(memberId);
     await insertCheckin.run(memberId, Date.now() + i);
     await insertNametag.run(memberId);
   }

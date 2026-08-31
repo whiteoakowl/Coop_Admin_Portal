@@ -1,10 +1,9 @@
 // Feature: the Monday/Wednesday Attendance roster shows each member's
-// suggested Setup/Cleanup task (Setup/Cleanup > Assignments tab, see
-// setup_task_assignments' own schema comment) as a tiny "<team name>-#<n>"
-// print tucked under the P/A/L status circle - same .cell-time treatment
-// as the check-in/out times (see routes-rosters-cell-time-layout.test.js),
-// so it never widens the date column. <n> is the task's own display
-// "Number" - its 1-indexed position within its section (utils/taskList.js's
+// ACTUALLY-SCANNED Setup/Cleanup task as a tiny "<team name>-#<n>" print
+// tucked under the P/A/L status circle - same .cell-time treatment as the
+// check-in/out times (see routes-rosters-cell-time-layout.test.js), so it
+// never widens the date column. <n> is the task's own display "Number" -
+// its 1-indexed position within its section (utils/taskList.js's
 // itemsForSection) - not its permanent id/barcode, so it always matches
 // what the Task List page itself shows for that task. <team name> is
 // whichever the section's own linked setup_teams row is titled, falling
@@ -13,6 +12,19 @@
 // task badges (a real request: "instead of it just being #3 [...] it
 // should say Team 1-#3. the #3 would represent the task number from that
 // team the member completed").
+//
+// A real follow-up bug report: "Should only record the members team and
+// number IF they checked in and out with their setup/cleanup card. Just
+// because they were assigned on the setup/cleanup assignment page, it
+// should not show up on the attendance page." Before that fix, this label
+// was sourced from setup_task_assignments (Setup/Cleanup > Assignments
+// tab) - an admin's/auto-suggest's pick of who's SUPPOSED to do which
+// task, which exists the moment that page saves whether or not the member
+// ever actually showed up and scanned. It now reads checkouts.task_item_id
+// instead (supabase/migrations/20260824180500_attendance_task_scan.sql) -
+// only ever set by a real badge scan, at checkout or carried over from a
+// check-in-time scan. See utils/rosterGrid.js's own comment for the full
+// story.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -47,22 +59,40 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-// Sets up a section with 8 ordered items and assigns a member the LAST one
-// (so its display Number is 8, not its raw id) for the given session date.
-// teamId, when given, links the section to a real setup_teams row - the
-// cleanup label should then use that TEAM's own title, not the section's.
-async function assignEighthTask(memberId, day, sessionDate, teamId) {
+// Creates a section with 8 ordered items (so the LAST one's display Number
+// is 8, not its raw id) and returns that last item's id. teamId, when
+// given, links the section to a real setup_teams row - the cleanup label
+// should then use that TEAM's own title, not the section's.
+async function createEighthTaskItem(day, teamId) {
   const sectionId = (await db.prepare('INSERT INTO task_list_sections (day, title, team_id) VALUES (?, ?, ?)').run(day, 'Snack Table Team', teamId || null)).lastInsertRowid;
   let targetItemId;
   for (let i = 0; i < 8; i++) {
     const itemId = (await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, ?)').run(sectionId, `Task ${i + 1}`, i)).lastInsertRowid;
     if (i === 7) targetItemId = itemId;
   }
+  return targetItemId;
+}
+
+// The OLD (insufficient, per the bug report) signal - an admin/auto-
+// suggest pick on the Setup/Cleanup > Assignments tab. On its own this
+// must NOT make the roster label appear.
+async function recordAssignmentOnly(memberId, day, sessionDate, targetItemId) {
   await db.prepare('INSERT INTO setup_dates (day, session_date) VALUES (?, ?)').run(day, sessionDate);
   await db.prepare('INSERT INTO setup_task_assignments (day, member_id, session_date, task_item_id) VALUES (?, ?, ?, ?)').run(day, memberId, sessionDate, targetItemId);
 }
 
-test('the live Attendance grid shows the member\'s assigned task as tiny "Snack Table Team-#8" under the status circle', async () => {
+// The REAL signal (checkouts.task_item_id) - only ever set by an actual
+// Setup/Cleanup badge scan (routes/checkout.js's /checkout/task-scan, or
+// carried over from a check-in-time scan). Inserted directly here rather
+// than driving the real kiosk scan flow - this test file is about what the
+// roster does with that column, not about the scan endpoints themselves.
+async function recordCheckoutScan(memberId, rosterId, sessionDate, targetItemId) {
+  await db
+    .prepare('INSERT INTO checkouts (member_id, roster_id, session_date, task_item_id, check_out_time) VALUES (?, ?, ?, ?, ?)')
+    .run(memberId, rosterId, sessionDate, targetItemId, Date.now());
+}
+
+test('the live Attendance grid shows the member\'s ACTUALLY-SCANNED task as tiny "Snack Table Team-#8" under the status circle', async () => {
   const { cookie } = await loginAsAdmin();
 
   const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
@@ -71,17 +101,22 @@ test('the live Attendance grid shows the member\'s assigned task as tiny "Snack 
   const today = '2026-02-02';
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
   await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
-  await assignEighthTask(memberId, 'monday', today);
+  const targetItemId = await createEighthTaskItem('monday');
+  await recordCheckoutScan(memberId, rosterId, today, targetItemId);
 
   const res = await request(app).get('/admin/rosters?tab=monday-student').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /Cleanup Task Student/);
 
-  const wrapperRe = /<div class="cell-detailed">\s*<select class="roster-cell-select[^]*?<\/select>\s*<span class="print-only-tag[^]*?<\/span>\s*<span class="cell-time">In [^<]*<\/span>\s*<span class="cell-time">Snack Table Team-#8<\/span>\s*<\/div>/;
+  // A real checkout scan (unlike the old pure-assignment source) also
+  // carries its own check_out_time on the very same checkouts row, so
+  // this cell now legitimately shows an "Out ..." line too, between the
+  // check-in time and the cleanup label.
+  const wrapperRe = /<div class="cell-detailed">\s*<select class="roster-cell-select[^]*?<\/select>\s*<span class="print-only-tag[^]*?<\/span>\s*<span class="cell-time">In [^<]*<\/span>\s*<span class="cell-time">Out [^<]*<\/span>\s*<span class="cell-time">Snack Table Team-#8<\/span>\s*<\/div>/;
   assert.match(
     res.text,
     wrapperRe,
-    'the assigned task\'s display Number (8, its position in the section) and the section\'s own title (this section is not linked to a real team) should render as tiny "Snack Table Team-#8" inside .cell-detailed, right after the check-in/out times'
+    'the scanned task\'s display Number (8, its position in the section) and the section\'s own title (this section is not linked to a real team) should render as tiny "Snack Table Team-#8" inside .cell-detailed, right after the check-in/out times'
   );
 });
 
@@ -95,7 +130,8 @@ test('when the section IS linked to a real Setup/Cleanup team, the label uses th
   const today = '2026-03-02';
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
   await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
-  await assignEighthTask(memberId, 'monday', today, teamId);
+  const targetItemId = await createEighthTaskItem('monday', teamId);
+  await recordCheckoutScan(memberId, rosterId, today, targetItemId);
 
   const res = await request(app).get('/admin/rosters?tab=monday-student').set('Cookie', cookie);
   assert.equal(res.status, 200);
@@ -112,7 +148,7 @@ test('when the section IS linked to a real Setup/Cleanup team, the label uses th
   assert.doesNotMatch(rowHtml, /Snack Table Team-#8/);
 });
 
-test('a member with no Setup/Cleanup assignment for that date shows no "Cleanup #" line', async () => {
+test('a member with no Setup/Cleanup scan for that date shows no "Cleanup #" line', async () => {
   const { cookie } = await loginAsAdmin();
 
   const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
@@ -132,10 +168,41 @@ test('a member with no Setup/Cleanup assignment for that date shows no "Cleanup 
   const rowStart = res.text.indexOf('No Cleanup Task Student');
   const rowEnd = res.text.indexOf('</tr>', rowStart);
   const rowHtml = res.text.slice(rowStart, rowEnd);
-  assert.doesNotMatch(rowHtml, /Cleanup #/, 'no assignment for this date means no "Cleanup #" line in this member\'s own row');
+  assert.doesNotMatch(rowHtml, /Cleanup #/, 'no scan for this date means no "Cleanup #" line in this member\'s own row');
 });
 
-test('the roster CSV export includes a "Cleanup #" column with the assigned task\'s display Number', async () => {
+test('a member ASSIGNED a task on the Setup/Cleanup Assignments tab, but who never actually scanned their badge, shows no "Cleanup #" line', async () => {
+  const { cookie } = await loginAsAdmin();
+
+  const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
+  const memberId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Assigned Not Scanned Student', 'assigned-not-scanned-student', 'student')").run()
+  ).lastInsertRowid;
+  await db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
+  const today = '2026-02-10';
+  await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
+  await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
+  const targetItemId = await createEighthTaskItem('monday');
+  // The assignment exists (someone picked this member for task #8 on the
+  // Assignments tab) but they never scanned their Setup/Cleanup badge -
+  // recordCheckoutScan is deliberately NOT called here.
+  await recordAssignmentOnly(memberId, 'monday', today, targetItemId);
+
+  const res = await request(app).get('/admin/rosters?tab=monday-student').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Assigned Not Scanned Student/);
+
+  const rowStart = res.text.indexOf('Assigned Not Scanned Student');
+  const rowEnd = res.text.indexOf('</tr>', rowStart);
+  const rowHtml = res.text.slice(rowStart, rowEnd);
+  assert.doesNotMatch(
+    rowHtml,
+    /Cleanup #|Snack Table Team/,
+    'being assigned a task is not the same as actually checking in/out with the Setup/Cleanup card - the roster must not show a team/number until a real scan happens'
+  );
+});
+
+test('the roster CSV export includes a "Cleanup #" column with the scanned task\'s display Number', async () => {
   const { cookie } = await loginAsAdmin();
 
   const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
@@ -144,7 +211,8 @@ test('the roster CSV export includes a "Cleanup #" column with the assigned task
   const today = '2026-02-16';
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
   await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
-  await assignEighthTask(memberId, 'monday', today);
+  const targetItemId = await createEighthTaskItem('monday');
+  await recordCheckoutScan(memberId, rosterId, today, targetItemId);
 
   const res = await request(app).get('/admin/roster/monday-student/export.csv').set('Cookie', cookie);
   assert.equal(res.status, 200);
@@ -157,7 +225,7 @@ test('the roster CSV export includes a "Cleanup #" column with the assigned task
 
   const memberRow = lines.find((l) => l.includes('CSV Cleanup Student'));
   const fields = memberRow.split(',').map((f) => f.replace(/^"|"$/g, ''));
-  assert.equal(fields[cleanupColIndex], '8', 'the row should carry the assigned task\'s display Number (8) in that date\'s Cleanup # column');
+  assert.equal(fields[cleanupColIndex], '8', 'the row should carry the scanned task\'s display Number (8) in that date\'s Cleanup # column');
 });
 
 test('an archived roster keeps the "<team>-#" line in its frozen snapshot', async () => {
@@ -169,7 +237,8 @@ test('an archived roster keeps the "<team>-#" line in its frozen snapshot', asyn
   const today = '2026-02-23';
   await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
   await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
-  await assignEighthTask(memberId, 'monday', today);
+  const targetItemId = await createEighthTaskItem('monday');
+  await recordCheckoutScan(memberId, rosterId, today, targetItemId);
 
   await request(app).post('/admin/rosters/monday/archive').set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
 
@@ -177,5 +246,5 @@ test('an archived roster keeps the "<team>-#" line in its frozen snapshot', asyn
   const res = await request(app).get(`/admin/rosters/archive/${archive.id}/view-fragment`).set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /Archive Cleanup Student/);
-  assert.match(res.text, /Snack Table Team-#8/, 'the archived snapshot must keep the assigned task\'s display Number and team label');
+  assert.match(res.text, /Snack Table Team-#8/, 'the archived snapshot must keep the scanned task\'s display Number and team label');
 });

@@ -17,10 +17,60 @@
     });
   }
 
+  // A real request: "there should be a code request to exit full screen
+  // mode" - reuses the shared Class Check-In PIN (routes/admin.js's own
+  // POST /admin/fullscreen/verify-pin) so leaving full screen isn't just
+  // one accidental tap/Esc away on a device left running in kiosk-style
+  // full screen. The dialog markup itself lives once in partials/admin-
+  // nav.ejs (alongside these buttons) rather than being built here, so
+  // its styling stays with the rest of that partial's own dialogs.
+  const pinDialog = document.getElementById('fullscreen-exit-pin-dialog');
+  const pinForm = pinDialog ? pinDialog.querySelector('form') : null;
+  const pinInput = pinDialog ? pinDialog.querySelector('#fullscreen-exit-pin-input') : null;
+  const pinError = pinDialog ? pinDialog.querySelector('#fullscreen-exit-pin-error') : null;
+
+  function requestExit() {
+    if (!pinDialog) { document.exitFullscreen(); return; }
+    if (pinError) pinError.hidden = true;
+    if (pinInput) pinInput.value = '';
+    pinDialog.showModal();
+    if (pinInput) pinInput.focus();
+  }
+
+  if (pinForm) {
+    pinForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pin = pinInput ? pinInput.value.trim() : '';
+      let result;
+      try {
+        const resp = await fetch('/admin/fullscreen/verify-pin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+            'X-CSRF-Token': window.CSRF_TOKEN || '',
+          },
+          body: 'pin=' + encodeURIComponent(pin),
+        });
+        result = await resp.json();
+      } catch (err) {
+        result = { ok: false, error: 'Could not verify PIN. Please try again.' };
+      }
+      if (result.ok) {
+        pinDialog.close();
+        document.exitFullscreen();
+      } else if (pinError) {
+        pinError.textContent = result.error || 'Incorrect PIN.';
+        pinError.hidden = false;
+        if (pinInput) { pinInput.value = ''; pinInput.focus(); }
+      }
+    });
+  }
+
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
       if (document.fullscreenElement) {
-        document.exitFullscreen();
+        requestExit();
       } else {
         document.documentElement.requestFullscreen().catch(() => {});
       }

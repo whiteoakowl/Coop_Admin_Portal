@@ -100,6 +100,19 @@ router.post('/absence/submit', async (req, res) => {
           )
           .run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
       }
+
+      // A separate, append-only record of this submission - see the
+      // absence_submissions migration's own comment. Unlike the
+      // attendance row just written above, this one is never touched
+      // again (in particular, never overwritten if the member later
+      // checks in for real), so admin-logs.js's Absence/Late tab can
+      // still show it happened even after that.
+      await db
+        .prepare(
+          `INSERT INTO absence_submissions (member_id, roster_id, session_date, status, reason_category, reason_text)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .run(student.id, roster.id, sessionDate, status, reasonCategory, reason);
     }
     totalRosters += rosters.length;
     totalSkippedAsPresent += skippedAsPresent;

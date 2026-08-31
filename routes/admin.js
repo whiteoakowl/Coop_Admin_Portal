@@ -8,7 +8,8 @@ const { todayISO, formatDateLabel, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysAlerts } = require('../utils/alerts');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
-const { setClassCheckinPin } = require('../utils/classCheckinPin');
+const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
+const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
 const { computeTrend } = require('../utils/dashboardTrends');
 const {
   listAdminPositions,
@@ -332,6 +333,29 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
   }
   await setClassCheckinPin(newPin);
   await renderSettings(req, res, null, 'Class Check-In PIN updated.', 'classcheckin');
+});
+
+// A real request: "there should be a code request to exit full screen
+// mode" (public/js/fullscreen-toggle.js) - reusing the same shared
+// Class Check-In PIN rather than adding a whole separate secret to
+// manage, per an explicit follow-up ("reuse class check in pin"). Its
+// own rate limiter (not the admin-login one) for the same reason
+// classCheckinPinRateLimit.js exists standalone already: an unrelated
+// admin-login typo on this device shouldn't burn down attempts here, and
+// vice versa. Plain JSON in/out, called from an in-page confirm prompt
+// rather than a full navigation - exiting full screen shouldn't reload
+// the page out from under whatever the admin was doing.
+router.post('/fullscreen/verify-pin', requireAdmin, async (req, res) => {
+  if (fullscreenPinLimiter.isRateLimited(req.ip)) {
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Please wait a few minutes and try again.' });
+  }
+  const pin = (req.body.pin || '').trim();
+  if (!(await verifyClassCheckinPin(pin))) {
+    fullscreenPinLimiter.recordFailure(req.ip);
+    return res.status(401).json({ ok: false, error: 'Incorrect PIN.' });
+  }
+  fullscreenPinLimiter.recordSuccess(req.ip);
+  res.json({ ok: true });
 });
 
 // Admins: a plain list of position titles ("President", "Treasurer",
