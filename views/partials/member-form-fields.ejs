@@ -36,19 +36,37 @@ const US_STATES = [
     <h3><%= typeLabel %> Membership Form</h3>
     <p>Create or update a <%= isAdmin ? 'co-op admin/leader' : isParent ? 'parent/guardian' : 'student' %> membership profile.</p>
   </div>
+  <%# A real request: "Choosing admins should not be on the membership
+      profile, co-op admin portal. It should be on main admin member
+      list edit only." Co-op Admin's own Add/Edit Member form (this
+      partial - views/main-admin-member-edit.ejs has its own separate
+      markup, unaffected) never offers a way to PICK Admin: a
+      new/Parent/Student member only ever gets the 2-way Parent/Student
+      toggle below. The one edge case is editing a member who's already
+      Admin (assigned from Main Admin) - shown as a disabled, still-
+      checked radio (not simply omitted) so the header/theme stays
+      correctly "Admin" (public/js/member-form.js reads whichever radio
+      is :checked) and a hidden input carries the same value through on
+      submit, since a disabled input never posts - Co-op Admin can still
+      edit that member's other fields without silently demoting them to
+      Student the moment this form saves. %>
   <div class="member-type-toggle" role="group" aria-label="Member type">
-    <label class="member-type-toggle-btn member-type-toggle-parent">
-      <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
-      <svg class="icon"><use href="#icon-user"/></svg> Parent
-    </label>
-    <label class="member-type-toggle-btn member-type-toggle-student">
-      <input type="radio" name="memberType" value="student" <%= (!isParent && !isAdmin) ? 'checked' : '' %> />
-      <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
-    </label>
-    <label class="member-type-toggle-btn member-type-toggle-admin">
-      <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> />
-      <svg class="icon"><use href="#icon-badge"/></svg> Admin
-    </label>
+    <% if (isAdmin) { %>
+      <label class="member-type-toggle-btn member-type-toggle-admin">
+        <input type="radio" name="memberType" value="admin" checked disabled />
+        <input type="hidden" name="memberType" value="admin" />
+        <svg class="icon"><use href="#icon-badge"/></svg> Admin
+      </label>
+    <% } else { %>
+      <label class="member-type-toggle-btn member-type-toggle-parent">
+        <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-user"/></svg> Parent
+      </label>
+      <label class="member-type-toggle-btn member-type-toggle-student">
+        <input type="radio" name="memberType" value="student" <%= !isParent ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
+      </label>
+    <% } %>
   </div>
 </div>
 

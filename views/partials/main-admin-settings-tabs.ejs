@@ -1,16 +1,23 @@
 <%
 // Sub-tab bar for Main Admin's Settings area (reached via the gear icon
 // - views/partials/portal-nav.ejs's settingsHref, routes/main-admin.js's
-// /settings redirect). Users, Roles & Permissions, Website, and Quick
-// Links are real separate pages/routes under the hood (unchanged), not
-// panels of one shared template - this is just the tab strip every one
-// of them includes at the top of <main> so switching between them still
-// reads as one settings area. `activeSettingsTab` local: 'users' |
-// 'roles' | 'website' | 'quicklinks'.
+// /settings redirect). Users, Roles & Permissions, Admins, Website, and
+// Quick Links are real separate pages/routes under the hood (unchanged),
+// not panels of one shared template - this is just the tab strip every
+// one of them includes at the top of <main> so switching between them
+// still reads as one settings area. `activeSettingsTab` local: 'users' |
+// 'roles' | 'admins' | 'website' | 'quicklinks'.
 %>
 <div class="view-tabs">
   <a class="view-tab<%= activeSettingsTab === 'users' ? ' active' : '' %>" href="/main-admin/users">Users</a>
   <a class="view-tab<%= activeSettingsTab === 'roles' ? ' active' : '' %>" href="/main-admin/roles">Roles &amp; Permissions</a>
+  <%# A real request: "co-op admin portal. settings gear, admins tab.
+      this tab should be located under the main admin portal settings
+      gear as a tab. it should not be on co-op admin portal." Moved from
+      Co-op Admin's own Settings (routes/admin.js used to have a
+      'leaders' tab there) - unchanged otherwise, still just the Admin
+      Positions/Leaders manager (utils/adminPositions.js). %>
+  <a class="view-tab<%= activeSettingsTab === 'admins' ? ' active' : '' %>" href="/main-admin/admins">Admins</a>
   <a class="view-tab<%= activeSettingsTab === 'website' ? ' active' : '' %>" href="/main-admin/website">Website</a>
   <a class="view-tab<%= activeSettingsTab === 'quicklinks' ? ' active' : '' %>" href="/main-admin/quick-links">Quick Links</a>
 </div>

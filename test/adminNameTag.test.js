@@ -18,6 +18,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -38,6 +40,14 @@ async function loginAsAdmin() {
   const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
   const cookie = loginRes.headers['set-cookie'];
   const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
+  return { cookie, csrfToken };
+}
+
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/main-admin').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
   return { cookie, csrfToken };
 }
@@ -116,10 +126,11 @@ test('Member form: creating an Admin member with positions, and the position pic
   // has no place on the family-intake form at /admin/members/new -
   // "there shouldn't be any lone admins/leaders, or single members," so
   // that form only ever creates parent/student rows. Turning an existing
-  // member INTO an admin (with positions) is still done on their own
-  // edit page (views/admin-member-edit.ejs via views/partials/member-
-  // form-fields.ejs), which still carries the Admin/Student/Parent type
-  // toggle - so create a plain family member first, then edit them.
+  // member INTO an admin is now Main-Admin-only ("Admin roles is only
+  // chosen under settings in main admin portal" / "Choosing admins
+  // should not be on the membership profile, co-op admin portal") - so
+  // create a plain family member first, then promote them via
+  // /main-admin/members/:id/edit, not Co-op Admin's own edit route.
   await request(app)
     .post('/admin/members/new')
     .set('Cookie', cookie)
@@ -134,13 +145,32 @@ test('Member form: creating an Admin member with positions, and the position pic
 
   const newPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);
   assert.equal(newPage.status, 200);
-  assert.match(newPage.text, /value="admin"/, 'expected an Admin option in the member type toggle');
-  assert.match(newPage.text, /President/, 'expected the Settings-managed position in the picker');
+  assert.doesNotMatch(newPage.text, /<input type="radio" name="memberType" value="admin"/, 'Co-op Admin\'s own edit form must never offer a way to pick Admin');
 
-  // A real request: "ability to add unlimited admin positions to a member
-  // profile" - adminPositionIds is a checkbox multi-select now (see
-  // views/partials/member-form-fields.ejs's Admin Positions box), not the
-  // old single <select name="adminPositionId">.
+  const { cookie: mainCookie, csrfToken: mainCsrf } = await loginAsMainAdmin();
+  const promoteRes = await request(app)
+    .post(`/main-admin/members/${created.id}/edit`)
+    .set('Cookie', mainCookie)
+    .type('form')
+    .send({ name: 'Pat President', memberType: 'admin', _csrf: mainCsrf });
+  assert.equal(promoteRes.status, 302);
+
+  let member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
+  assert.equal(member.member_type, 'admin');
+
+  // Once already Admin, Co-op Admin's own edit form still shows (and can
+  // edit) their Admin Positions checklist - see partials/member-form-
+  // fields.ejs's own comment: it never grants/revokes Admin status
+  // itself, but doesn't lock out managing an existing Admin's other
+  // fields, positions included. A real request: "ability to add
+  // unlimited admin positions to a member profile" - adminPositionIds is
+  // a checkbox multi-select (Admin Positions box), not the old single
+  // <select name="adminPositionId">.
+  const adminEditPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);
+  assert.equal(adminEditPage.status, 200);
+  assert.match(adminEditPage.text, /<input type="radio" name="memberType" value="admin" checked disabled/, 'now Admin, shown as a fixed indicator');
+  assert.match(adminEditPage.text, /President/, 'expected the Settings-managed position in the picker');
+
   const createRes = await request(app)
     .post(`/admin/members/${created.id}/edit`)
     .set('Cookie', cookie)
@@ -148,7 +178,7 @@ test('Member form: creating an Admin member with positions, and the position pic
     .send({ name: 'Pat President', memberType: 'admin', adminPositionIds: [String(presidentId), String(treasurerId)], _csrf: csrfToken });
   assert.equal(createRes.status, 302);
 
-  const member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
+  member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
   assert.equal(member.member_type, 'admin');
   const linkedIds = (await db.prepare('SELECT admin_position_id AS "id" FROM member_admin_positions WHERE member_id = ?').all(member.id)).map((r) => r.id);
   assert.deepEqual(new Set(linkedIds), new Set([presidentId, treasurerId]));

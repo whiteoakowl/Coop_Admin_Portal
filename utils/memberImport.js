@@ -149,8 +149,14 @@ async function ensureFamilyForParent(parentId) {
 // one, and collects (never applies) mergeable field updates for rows
 // that matched an existing member by name - those go through
 // applyImportMerges below only after the admin reviews and confirms
-// them.
-async function importMembersFromRows(rows) {
+// them. allowAdminType (default true, Main Admin's own call site) gates
+// whether a row's Type column can create a new 'admin' member - a real
+// request: "Admin roles is only chosen under settings in main admin
+// portal." routes/admin-members.js's own Co-op Admin import passes
+// false, so a spreadsheet row typed "Admin" there falls back to
+// 'student' (same fallback an unrecognized type already gets) instead
+// of silently granting admin status through an import CSV.
+async function importMembersFromRows(rows, allowAdminType = true) {
   let created = 0;
   let skipped = 0;
   const nameToId = {};
@@ -168,7 +174,7 @@ async function importMembersFromRows(rows) {
       continue;
     }
     const typeLower = (r.type || '').toLowerCase();
-    const memberType = MEMBER_TYPES.includes(typeLower) ? typeLower : 'student';
+    const memberType = MEMBER_TYPES.includes(typeLower) && (allowAdminType || typeLower !== 'admin') ? typeLower : 'student';
     const memberCode = await generateMemberCode();
     const info = await db
       .prepare(

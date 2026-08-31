@@ -11,15 +11,6 @@ const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginR
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
 const { computeTrend } = require('../utils/dashboardTrends');
-const {
-  listAdminPositions,
-  addAdminPosition,
-  deleteAdminPosition,
-  addAdminPositionForMember,
-  removeAdminPositionForMember,
-  membersByAdminPosition,
-} = require('../utils/adminPositions');
-const { activeMemberOptions } = require('../utils/members');
 
 // --- Auth ---
 
@@ -252,15 +243,21 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 
 // --- Settings ---
 
-const SETTINGS_TABS = ['account', 'classcheckin', 'leaders', 'quicklinks', 'install', 'documents'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'leaders', 'documents'];
+// A real request: "co-op admin portal. settings gear, admins tab. this
+// tab should be located under the main admin portal settings gear as a
+// tab. it should not be on co-op admin portal." The Admin Positions/
+// Leaders manager (Add Admin Position, Add Leaders) moved to
+// /main-admin/admins (routes/main-admin.js) - 'leaders' is no longer a
+// tab here at all, so this stays 'documents' as the last full-admin-only
+// tab.
+const SETTINGS_TABS = ['account', 'classcheckin', 'quicklinks', 'install', 'documents'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'documents'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links and Install App here - Username/Password manages the
-  // single master admin account, and Documents/Admin & Leaders are
-  // full-Admin-only.
+  // single master admin account, and Documents is full-Admin-only.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
   if (FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
@@ -269,9 +266,6 @@ async function renderSettings(req, res, error, success, activeTab) {
     isFullAdmin,
     activeTab: tab,
     documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
-    adminPositions: await listAdminPositions(),
-    leadersByPosition: await membersByAdminPosition(),
-    memberOptions: await activeMemberOptions(),
     error,
     success,
   });
@@ -364,48 +358,10 @@ router.post('/fullscreen/verify-pin', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Admins: a plain list of position titles ("President", "Treasurer",
-// ...) - the list itself is unchanged from when this tab was still
-// called "Admin & Leaders" (before the member-type admin/lone-member
-// removal below), just relabeled. Prints on a leader's Admin name tag
-// (utils/nameTagData.js's adminPositionLabel) once assigned via Add
-// Leaders below.
-router.post('/settings/admin-positions', requireAdmin, requireFullAdmin, async (req, res) => {
-  const title = (req.body.title || '').trim();
-  if (!title) return renderSettings(req, res, 'Position title is required.', null, 'leaders');
-  await addAdminPosition(title);
-  await renderSettings(req, res, null, `Added "${title}".`, 'leaders');
-});
-
-router.post('/settings/admin-positions/:id/delete', requireAdmin, requireFullAdmin, async (req, res) => {
-  await deleteAdminPosition(parseInt(req.params.id, 10));
-  await renderSettings(req, res, null, 'Position removed.', 'leaders');
-});
-
-// A real request: "there should also be a button that says add leaders.
-// when you click the button it will show a drop down of members for you
-// to choose. click a member then choose which admin position in the
-// dropdown. save button. this adds each admin name next to their
-// position." Choosing "admin" is no longer an option on the member
-// form itself (see #235's own removal of lone-admin/single-member
-// creation) - this Add Leaders picker is the real replacement: any
-// existing member can be assigned an admin position without changing
-// their member_type at all, which is also why member_admin_positions
-// (not members.member_type) has been the source of truth for "who's a
-// leader" all along.
-router.post('/settings/admin-positions/assign', requireAdmin, requireFullAdmin, async (req, res) => {
-  const memberId = parseInt(req.body.memberId, 10);
-  const positionId = parseInt(req.body.positionId, 10);
-  if (!memberId || !positionId) {
-    return renderSettings(req, res, 'Choose both a member and a position.', null, 'leaders');
-  }
-  await addAdminPositionForMember(memberId, positionId);
-  await renderSettings(req, res, null, 'Leader added.', 'leaders');
-});
-
-router.post('/settings/admin-positions/:positionId/members/:memberId/remove', requireAdmin, requireFullAdmin, async (req, res) => {
-  await removeAdminPositionForMember(parseInt(req.params.memberId, 10), parseInt(req.params.positionId, 10));
-  await renderSettings(req, res, null, 'Leader removed.', 'leaders');
-});
+// Admin Positions/Leaders management moved to /main-admin/admins - see
+// routes/main-admin.js. A real request: "co-op admin portal. settings
+// gear, admins tab. this tab should be located under the main admin
+// portal settings gear as a tab. it should not be on co-op admin
+// portal."
 
 module.exports = router;

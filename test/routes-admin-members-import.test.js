@@ -157,4 +157,19 @@ test('POST /admin/members/import', async (t) => {
     const merged = await db.prepare("SELECT birthday FROM members WHERE name = 'Merge Target'").get();
     assert.equal(merged.birthday, '2014-12-25');
   });
+
+  // A real request: "Admin roles is only chosen under settings in main
+  // admin portal." Co-op Admin's own Import (unlike Main Admin's, which
+  // still honors an "Admin" Type cell) falls back to 'student' for a row
+  // typed Admin, same fallback an unrecognized type already gets - see
+  // utils/memberImport.js's own allowAdminType parameter.
+  await t.test('a row typed "Admin" is created as a Student instead, not actually promoted to Admin', async () => {
+    const buffer = buildImportBuffer([['NoPromo', 'ImportRow', 'Admin', '', '', '', '', '', '', '', '', '', '', '']]);
+    const res = await request(app).post('/admin/members/import?_csrf=' + encodeURIComponent(csrfToken)).set('Cookie', cookie).attach('file', buffer, 'admin-type.xlsx');
+    assert.equal(res.status, 302);
+
+    const created = await db.prepare("SELECT member_type FROM members WHERE name = 'NoPromo ImportRow'").get();
+    assert.ok(created, 'the row should still have created a member');
+    assert.equal(created.member_type, 'student', 'an Admin-typed row imported via Co-op Admin must not actually become Admin');
+  });
 });

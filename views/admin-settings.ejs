@@ -15,7 +15,6 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
         <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
-        <a class="view-tab<%= activeTab === 'leaders' ? ' active' : '' %>" href="/admin/settings?tab=leaders">Admins</a>
       <% } %>
       <a class="view-tab<%= activeTab === 'quicklinks' ? ' active' : '' %>" href="/admin/settings?tab=quicklinks">Quick Links</a>
       <a class="view-tab<%= activeTab === 'install' ? ' active' : '' %>" href="/admin/settings?tab=install">Install App</a>
@@ -59,89 +58,6 @@
             <button type="submit" class="primary-btn">Update PIN</button>
           </form>
         </div>
-      <% } else if (activeTab === 'leaders') { %>
-        <div class="manage-section">
-          <h2>Add Admin Position</h2>
-          <p class="hint">Positions listed here can be assigned to any member below, and print on that member's Admin name tag.</p>
-          <form method="POST" action="/admin/settings/admin-positions" class="stack-form stack-form-narrow">
-            <label for="adminPositionTitle">Position Title</label>
-            <input id="adminPositionTitle" name="title" type="text" placeholder="e.g. President" required />
-
-            <button type="submit" class="primary-btn">Add Position</button>
-          </form>
-        </div>
-        <div class="manage-section">
-          <div class="grid-box-header">
-            <h2>Admin Positions</h2>
-            <%# A real request: "there should also be a button that says
-                add leaders. when you click the button it will show a
-                drop down of members for you to choose. click a member
-                then choose which admin position in the dropdown. save
-                button. this adds each admin name next to their
-                position." %>
-            <button type="button" class="btn-secondary" onclick="document.getElementById('add-leader-dialog').showModal()">+ Add Leaders</button>
-          </div>
-          <% if (adminPositions.length === 0) { %>
-            <p class="hint">No admin positions added yet.</p>
-          <% } else { %>
-            <table class="roster-table">
-              <thead><tr><th>Title</th><th>Leaders</th><th></th></tr></thead>
-              <tbody>
-                <% adminPositions.forEach(function(p) { %>
-                  <tr>
-                    <td><%= p.title %></td>
-                    <td>
-                      <% var positionLeaders = leadersByPosition[p.id] || []; %>
-                      <% if (positionLeaders.length === 0) { %>
-                        <span class="hint">No one assigned yet.</span>
-                      <% } else { %>
-                        <% positionLeaders.forEach(function(leader) { %>
-                          <form method="POST" action="/admin/settings/admin-positions/<%= p.id %>/members/<%= leader.id %>/remove" class="inline-block-form" data-confirm="Remove <%= leader.name %> from <%= p.title %>?">
-                            <span class="badge-pill">
-                              <%= leader.name %>
-                              <button type="submit" class="badge-pill-x" aria-label="Remove <%= leader.name %> from <%= p.title %>" title="Remove">&times;</button>
-                            </span>
-                          </form>
-                        <% }); %>
-                      <% } %>
-                    </td>
-                    <td>
-                      <form method="POST" action="/admin/settings/admin-positions/<%= p.id %>/delete" data-confirm="Remove &quot;<%= p.title %>&quot;?">
-                        <button type="submit" class="icon-btn" aria-label="Remove <%= p.title %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      </form>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          <% } %>
-        </div>
-
-        <dialog id="add-leader-dialog" class="member-picker-dialog">
-          <form method="POST" action="/admin/settings/admin-positions/assign">
-            <h3>Add Leaders</h3>
-            <label for="add-leader-member">Member
-              <select id="add-leader-member" name="memberId" required>
-                <option value="" disabled selected>Select a member&hellip;</option>
-                <% memberOptions.forEach(function(m) { %>
-                  <option value="<%= m.id %>"><%= m.name %></option>
-                <% }); %>
-              </select>
-            </label>
-            <label for="add-leader-position">Admin Position
-              <select id="add-leader-position" name="positionId" required>
-                <option value="" disabled selected>Select a position&hellip;</option>
-                <% adminPositions.forEach(function(p) { %>
-                  <option value="<%= p.id %>"><%= p.title %></option>
-                <% }); %>
-              </select>
-            </label>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Save</button>
-            </div>
-          </form>
-        </dialog>
       <% } else if (activeTab === 'documents') { %>
         <div class="manage-section">
           <h2>Upload Document</h2>

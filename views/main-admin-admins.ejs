@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <%# A real request: "co-op admin portal. settings gear, admins tab.
+      this tab should be located under the main admin portal settings
+      gear as a tab. it should not be on co-op admin portal." Moved
+      wholesale from Co-op Admin's own Settings > Admins tab
+      (routes/admin.js used to render this same content as its 'leaders'
+      tab) - unchanged content/behavior, just relocated. Manages
+      utils/adminPositions.js's flat list of position titles ("President",
+      "Treasurer", ...) and who holds each one (member_admin_positions) -
+      independent of members.member_type, so this has never been "who's
+      an Admin" itself (that toggle lives on the Main Admin member edit
+      form only - see partials/member-form-fields.ejs's own comment). %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'admins' }) %>
+    <h1>Admins</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <h2>Add Admin Position</h2>
+      <p class="hint">Positions listed here can be assigned to any member below, and print on that member's Admin name tag.</p>
+      <form method="POST" action="/main-admin/admins/positions" class="stack-form stack-form-narrow">
+        <label for="adminPositionTitle">Position Title</label>
+        <input id="adminPositionTitle" name="title" type="text" placeholder="e.g. President" required />
+
+        <button type="submit" class="primary-btn">Add Position</button>
+      </form>
+    </div>
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Admin Positions</h2>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('add-leader-dialog').showModal()">+ Add Leaders</button>
+      </div>
+      <% if (adminPositions.length === 0) { %>
+        <p class="hint">No admin positions added yet.</p>
+      <% } else { %>
+        <table class="roster-table">
+          <thead><tr><th>Title</th><th>Leaders</th><th></th></tr></thead>
+          <tbody>
+            <% adminPositions.forEach(function(p) { %>
+              <tr>
+                <td><%= p.title %></td>
+                <td>
+                  <% var positionLeaders = leadersByPosition[p.id] || []; %>
+                  <% if (positionLeaders.length === 0) { %>
+                    <span class="hint">No one assigned yet.</span>
+                  <% } else { %>
+                    <% positionLeaders.forEach(function(leader) { %>
+                      <form method="POST" action="/main-admin/admins/positions/<%= p.id %>/members/<%= leader.id %>/remove" class="inline-block-form" data-confirm="Remove <%= leader.name %> from <%= p.title %>?">
+                        <span class="badge-pill">
+                          <%= leader.name %>
+                          <button type="submit" class="badge-pill-x" aria-label="Remove <%= leader.name %> from <%= p.title %>" title="Remove">&times;</button>
+                        </span>
+                      </form>
+                    <% }); %>
+                  <% } %>
+                </td>
+                <td>
+                  <form method="POST" action="/main-admin/admins/positions/<%= p.id %>/delete" data-confirm="Remove &quot;<%= p.title %>&quot;?">
+                    <button type="submit" class="icon-btn" aria-label="Remove <%= p.title %>" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <dialog id="add-leader-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/admins/positions/assign">
+        <h3>Add Leaders</h3>
+        <label for="add-leader-member">Member
+          <select id="add-leader-member" name="memberId" required>
+            <option value="" disabled selected>Select a member&hellip;</option>
+            <% memberOptions.forEach(function(m) { %>
+              <option value="<%= m.id %>"><%= m.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label for="add-leader-position">Admin Position
+          <select id="add-leader-position" name="positionId" required>
+            <option value="" disabled selected>Select a position&hellip;</option>
+            <% adminPositions.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.title %></option>
+            <% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

@@ -1,8 +1,11 @@
-// Real HTTP-level coverage for Settings' "Admins" tab (routes/admin.js's
-// POST /settings/admin-positions and /settings/admin-positions/:id/delete,
-// backed by utils/adminPositions.js). Originally "Admin & Leaders" - a
-// real later request renamed it: "there is a tab called admin/leaders.
-// change it to admins."
+// Real HTTP-level coverage for the "Admins" tab (routes/main-admin.js's
+// POST /admins/positions and /admins/positions/:id/delete, backed by
+// utils/adminPositions.js). Originally "Admin & Leaders" on Co-op
+// Admin's own Settings, later just "Admins" there - a real request then
+// moved the whole tab to Main Admin's Settings: "co-op admin portal.
+// settings gear, admins tab. this tab should be located under the main
+// admin portal settings gear as a tab. it should not be on co-op admin
+// portal."
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -16,6 +19,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -29,34 +34,35 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-async function loginAsAdmin() {
-  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
-  const cookie = loginRes.headers['set-cookie'];
-  const page = await request(app).get('/admin/settings?tab=leaders').set('Cookie', cookie);
-  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
-  return { cookie, csrfToken };
+function extractCsrf(html) {
+  return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
 }
 
-test('Settings: Admins tab', async (t) => {
-  const { cookie, csrfToken } = await loginAsAdmin();
+async function loginAsMainAdmin() {
+  const loginRes = await request(app).post('/login').type('form').send({ email: process.env.MAIN_ADMIN_EMAIL, password: process.env.MAIN_ADMIN_PASSWORD, next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/main-admin/admins').set('Cookie', cookie);
+  return { cookie, csrfToken: extractCsrf(page.text) };
+}
+
+async function loginAsCoopAdmin() {
+  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+  return loginRes.headers['set-cookie'];
+}
+
+test('Main Admin Settings: Admins tab', async (t) => {
+  const { cookie, csrfToken } = await loginAsMainAdmin();
 
   await t.test('the tab is offered and starts empty', async () => {
-    const res = await request(app).get('/admin/settings?tab=leaders').set('Cookie', cookie);
+    const res = await request(app).get('/main-admin/admins').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    // A real request: "there is a tab called admin/leaders. change it to
-    // admins."
     assert.match(res.text, />Admins<\/a>/);
     assert.match(res.text, /No admin positions added yet\./);
   });
 
   await t.test('adding a position lists it', async () => {
-    // routes/admin.js's Settings POST handlers render the page directly
-    // (via renderSettings) rather than redirecting - same convention the
-    // existing Class Check-In PIN tab already uses, so a successful add
-    // is a 200 with the new position already in the response body, not a
-    // 302.
     const res = await request(app)
-      .post('/admin/settings/admin-positions')
+      .post('/main-admin/admins/positions')
       .set('Cookie', cookie)
       .type('form')
       .send({ title: 'President', _csrf: csrfToken });
@@ -65,35 +71,38 @@ test('Settings: Admins tab', async (t) => {
     assert.doesNotMatch(res.text, /No admin positions added yet\./);
   });
 
-  await t.test('the new position shows up in the member form dropdown', async () => {
-    // Admin Positions has no place on the family-intake form at
-    // /admin/members/new ("there shouldn't be any lone admins/leaders,
-    // or single members" - that form only ever creates parent/student
-    // rows). The checklist still lives on the EDIT form (views/admin-
-    // member-edit.ejs via views/partials/member-form-fields.ejs), always
-    // rendered there (just hidden via CSS until the Admin radio is
-    // picked) regardless of the member's current type - so any member's
-    // edit page shows it.
+  await t.test('the new position shows up in the (Co-op Admin) member edit form dropdown', async () => {
+    // Admin Positions still lives in utils/adminPositions.js, shared by
+    // both portals' member data - only the Settings UI for MANAGING the
+    // list of positions moved to Main Admin. Co-op Admin's own member
+    // edit form (views/partials/member-form-fields.ejs) still shows an
+    // existing Admin's position checkboxes (just never lets anyone
+    // become Admin from there in the first place - see that partial's
+    // own comment).
+    const coopCookie = await loginAsCoopAdmin();
+    const coopPage = await request(app).get('/admin/members/new').set('Cookie', coopCookie);
+    const coopCsrf = extractCsrf(coopPage.text);
     await request(app)
       .post('/admin/members/new')
-      .set('Cookie', cookie)
+      .set('Cookie', coopCookie)
       .type('form')
       .send({
         newFamilyName: 'PositionDropdownCheck',
         'parents[0][name]': 'Position Dropdown Parent',
         'children[0][name]': 'Position Dropdown Kid',
-        _csrf: csrfToken,
+        _csrf: coopCsrf,
       });
     const member = await db.prepare("SELECT id FROM members WHERE name = 'Position Dropdown Parent'").get();
+    assert.ok(member, 'the new parent should have been created');
 
-    const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', cookie);
+    const res = await request(app).get(`/admin/members/${member.id}/edit`).set('Cookie', coopCookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /President/);
   });
 
   await t.test('adding a duplicate title is a no-op, not an error', async () => {
     const res = await request(app)
-      .post('/admin/settings/admin-positions')
+      .post('/main-admin/admins/positions')
       .set('Cookie', cookie)
       .type('form')
       .send({ title: 'President', _csrf: csrfToken });
@@ -103,15 +112,29 @@ test('Settings: Admins tab', async (t) => {
   });
 
   await t.test('deleting a position removes it from the list', async () => {
-    const listPage = await request(app).get('/admin/settings?tab=leaders').set('Cookie', cookie);
-    const idMatch = /\/admin\/settings\/admin-positions\/(\d+)\/delete/.exec(listPage.text);
+    const listPage = await request(app).get('/main-admin/admins').set('Cookie', cookie);
+    const idMatch = /\/main-admin\/admins\/positions\/(\d+)\/delete/.exec(listPage.text);
     assert.ok(idMatch, 'expected a delete form with the position id in its action');
     const res = await request(app)
-      .post(`/admin/settings/admin-positions/${idMatch[1]}/delete`)
+      .post(`/main-admin/admins/positions/${idMatch[1]}/delete`)
       .set('Cookie', cookie)
       .type('form')
       .send({ _csrf: csrfToken });
     assert.equal(res.status, 200);
     assert.match(res.text, /No admin positions added yet\./);
   });
+});
+
+test('Co-op Admin Settings no longer offers an Admins tab', async () => {
+  const cookie = await loginAsCoopAdmin();
+  const res = await request(app).get('/admin/settings').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /tab=leaders/);
+  assert.doesNotMatch(res.text, />Admins<\/a>/);
+
+  // The old tab query param should just fall back to the default tab,
+  // not error or still render admin-position content.
+  const oldTabRes = await request(app).get('/admin/settings?tab=leaders').set('Cookie', cookie);
+  assert.equal(oldTabRes.status, 200);
+  assert.doesNotMatch(oldTabRes.text, /Add Admin Position/);
 });

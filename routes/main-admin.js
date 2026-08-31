@@ -21,6 +21,15 @@ const babysitters = require('../utils/babysitters');
 const photos = require('../utils/photos');
 const directory = require('../utils/directory');
 const classifieds = require('../utils/classifieds');
+const {
+  listAdminPositions,
+  addAdminPosition,
+  deleteAdminPosition,
+  addAdminPositionForMember,
+  removeAdminPositionForMember,
+  membersByAdminPosition,
+} = require('../utils/adminPositions');
+const { activeMemberOptions } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'));
 
@@ -110,6 +119,53 @@ router.get('/settings', requirePortalPermission('manage_users'), (req, res) => {
 // sees regardless of full-admin status (routes/admin.js's renderSettings).
 router.get('/quick-links', (req, res) => {
   res.render('main-admin-quick-links', { title: 'Quick Links' });
+});
+
+// --- Admins (moved from Co-op Admin's own Settings > Admins tab - a
+// real request: "co-op admin portal. settings gear, admins tab. this
+// tab should be located under the main admin portal settings gear as a
+// tab. it should not be on co-op admin portal.") ---
+
+async function renderAdmins(req, res, error, notice) {
+  res.render('main-admin-admins', {
+    title: 'Admins',
+    adminPositions: await listAdminPositions(),
+    leadersByPosition: await membersByAdminPosition(),
+    memberOptions: await activeMemberOptions(),
+    error,
+    notice,
+  });
+}
+
+router.get('/admins', requirePortalPermission('manage_users'), async (req, res) => {
+  await renderAdmins(req, res, req.query.error || null, req.query.notice || null);
+});
+
+router.post('/admins/positions', requirePortalPermission('manage_users'), async (req, res) => {
+  const title = (req.body.title || '').trim();
+  if (!title) return renderAdmins(req, res, 'Position title is required.', null);
+  await addAdminPosition(title);
+  await renderAdmins(req, res, null, `Added "${title}".`);
+});
+
+router.post('/admins/positions/:id/delete', requirePortalPermission('manage_users'), async (req, res) => {
+  await deleteAdminPosition(parseInt(req.params.id, 10));
+  await renderAdmins(req, res, null, 'Position removed.');
+});
+
+router.post('/admins/positions/assign', requirePortalPermission('manage_users'), async (req, res) => {
+  const memberId = parseInt(req.body.memberId, 10);
+  const positionId = parseInt(req.body.positionId, 10);
+  if (!memberId || !positionId) {
+    return renderAdmins(req, res, 'Choose both a member and a position.', null);
+  }
+  await addAdminPositionForMember(memberId, positionId);
+  await renderAdmins(req, res, null, 'Leader added.');
+});
+
+router.post('/admins/positions/:positionId/members/:memberId/remove', requirePortalPermission('manage_users'), async (req, res) => {
+  await removeAdminPositionForMember(parseInt(req.params.memberId, 10), parseInt(req.params.positionId, 10));
+  await renderAdmins(req, res, null, 'Leader removed.');
 });
 
 // --- Users ---

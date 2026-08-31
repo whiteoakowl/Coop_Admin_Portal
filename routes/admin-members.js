@@ -574,7 +574,19 @@ router.post('/members/:id/edit', uploadMemberPhoto((req) => `/admin/members/${re
   if (clash) {
     return res.redirect(`/admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
   }
-  const existing = await db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT photo_path, member_type FROM members WHERE id = ?').get(id);
+  // A real request: "Choosing admins should not be on the membership
+  // profile, co-op admin portal. It should be on main admin member
+  // list edit only." partials/member-form-fields.ejs already never
+  // renders a way to PICK Admin here - this is the server-side half of
+  // that same boundary, for a raw request that skips the form entirely.
+  // Admin status can only be carried through unchanged (an existing
+  // Admin's other fields still save normally), never granted or revoked
+  // from this route.
+  if (existing && (f.memberType === 'admin') !== (existing.member_type === 'admin')) {
+    f.memberType = existing.member_type;
+    if (f.memberType !== 'admin') f.adminPositionIds = null;
+  }
   const photoPath = req.file ? await savePhotoFile(req.file) : existing ? existing.photo_path : null;
   // A newly uploaded photo replaces the old one in photo_path below - the
   // old file itself isn't referenced anywhere else once that happens, so
@@ -622,7 +634,7 @@ router.post('/members/import', upload.single('file'), async (req, res) => {
     return res.redirect('/admin/members?error=' + encodeURIComponent('Could not read that file. Please use the example spreadsheet format.'));
   }
 
-  const { mergeCandidates, summary } = await memberImport.importMembersFromRows(rows);
+  const { mergeCandidates, summary } = await memberImport.importMembersFromRows(rows, false);
 
   if (mergeCandidates.length === 0) {
     return res.redirect('/admin/members?notice=' + encodeURIComponent(summary));
