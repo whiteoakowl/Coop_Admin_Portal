@@ -121,10 +121,23 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/:id/delete', requireAdm
   res.redirect(subUrl(day, { date: req.body.date, notice: job ? `Deleted "${job.title}".` : 'Job deleted.' }));
 });
 
+// 'vacancy' (a class's own unfilled teacher/assistant slot count - see
+// utils/substitutes.js's own classVacancySlots) is a real, valid slot
+// type alongside 'class' and 'job', not a fallback case - this used to
+// collapse any slotType other than 'job' down to 'class', which silently
+// misfiled every vacancy-position Assign/Unassign/Approve click under
+// slotType='class' with a vacancy-shaped slotId that never matches
+// anything on read, so the click looked like it worked (a normal
+// redirect) but never actually saved.
+const SLOT_TYPES = ['class', 'job', 'vacancy'];
+function slotTypeFromBody(body) {
+  return SLOT_TYPES.includes(body.slotType) ? body.slotType : 'class';
+}
+
 router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
-  const slotType = req.body.slotType === 'job' ? 'job' : 'class';
+  const slotType = slotTypeFromBody(req.body);
   const slotId = parseInt(req.body.slotId, 10);
   const memberId = parseInt(req.body.memberId, 10);
   const isOverride = req.body.isOverride === '1';
@@ -141,7 +154,7 @@ router.post('/volunteers/:day/substitutes/assign', requireAdmin, requireDay, asy
 router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
-  const slotType = req.body.slotType === 'job' ? 'job' : 'class';
+  const slotType = slotTypeFromBody(req.body);
   const slotId = parseInt(req.body.slotId, 10);
   if (isValidISODate(date) && slotId) await clearAssignment(date, slotType, slotId);
   res.redirect(subUrl(day, { date }));
@@ -153,7 +166,7 @@ router.post('/volunteers/:day/substitutes/unassign', requireAdmin, requireDay, a
 router.post('/volunteers/:day/substitutes/approve', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const date = req.body.date;
-  const slotType = req.body.slotType === 'job' ? 'job' : 'class';
+  const slotType = slotTypeFromBody(req.body);
   const slotId = parseInt(req.body.slotId, 10);
   if (isValidISODate(date) && slotId) await approveAssignment(date, slotType, slotId);
   res.redirect(subUrl(day, { date }));
