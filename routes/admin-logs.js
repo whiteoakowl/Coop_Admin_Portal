@@ -89,7 +89,7 @@ async function checkinoutLogDates() {
     .map((r) => ({ date: r.session_date, label: formatDateLabel(r.session_date) }));
 }
 
-const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
+const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
 
 async function nameTagSubmissions(showArchived, dateFilter) {

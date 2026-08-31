@@ -4,8 +4,16 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+  // A real bug report: "there are two chat tabs on student portal. there
+  // should only be one." - see forums-list.ejs's own comment on this
+  // exact fix (portalTitle:'Chat' otherwise pulls in portal-nav.ejs's
+  // generic default community list, duplicating this page's own Chat
+  // entry below).
+  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Chat',
+    portalTitle: isStudentPortalAccount ? 'Student Portal' : 'Chat',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/forums', icon: 'users', label: 'Chat' },

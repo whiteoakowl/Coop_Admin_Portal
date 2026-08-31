@@ -9,46 +9,73 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Welcome, <%= member.name %></h1>
 
-    <section class="portal-dashboard-section">
-      <h2>Word of the Week</h2>
-      <div class="word-of-week-grid">
-        <div class="word-of-week-card">
-          <span class="word-of-week-level">Elementary</span>
-          <strong class="word-of-week-word"><%= words.elementary.word %></strong>
-          <p class="hint"><%= words.elementary.definition %></p>
-        </div>
-        <div class="word-of-week-card">
-          <span class="word-of-week-level">Middle School</span>
-          <strong class="word-of-week-word"><%= words.middle.word %></strong>
-          <p class="hint"><%= words.middle.definition %></p>
-        </div>
-        <div class="word-of-week-card">
-          <span class="word-of-week-level">High School</span>
-          <strong class="word-of-week-word"><%= words.high.word %></strong>
-          <p class="hint"><%= words.high.definition %></p>
-        </div>
-      </div>
-    </section>
+    <%
+      // A real request: "make it look exactly like these photos" (a
+      // reference screenshot) - a card-styled header with a title icon
+      // and the current week's date, then one row per level: a colored
+      // circle icon, a colored badge/word/pronunciation-with-speaker-icon
+      // block, and the definition to its right, divided by a vertical
+      // rule. A later real request: "desktop it should be smaller width.
+      // announcements first, vocab word next to it on right" - the
+      // widget now always sits in a narrow side column (see
+      // .home-top-grid below) rather than full page width, so the
+      // compact row-per-level layout (this reference's own mobile
+      // treatment) is used at every width now, not just <640px - a wide
+      // 3-column layout would have nowhere near enough room in that
+      // column even on a big desktop monitor.
+      var WORD_OF_WEEK_LEVELS = [
+        { key: 'elementary', label: 'Elementary', className: 'word-of-week-green', icon: 'icon-sprout' },
+        { key: 'middle', label: 'Middle School', className: 'word-of-week-blue', icon: 'icon-book' },
+        { key: 'high', label: 'High School', className: 'word-of-week-purple', icon: 'icon-graduation-cap' },
+      ];
+    %>
+    <div class="home-top-grid">
+      <section class="portal-dashboard-section home-top-grid-announcements">
+        <h2>Announcements</h2>
+        <% if (announcements.length === 0) { %>
+          <p class="roster-empty">No announcements right now.</p>
+        <% } else { %>
+          <div class="site-announcement-list">
+            <% announcements.forEach(function(a) { %>
+              <div class="site-announcement-card">
+                <span class="site-announcement-date">
+                  <%= a.dateLabel %>
+                  <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
+                </span>
+                <h3><%= a.title %></h3>
+                <div class="forum-editable-display"><%- a.body %></div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </section>
 
-    <section class="portal-dashboard-section">
-      <h2>Announcements</h2>
-      <% if (announcements.length === 0) { %>
-        <p class="roster-empty">No announcements right now.</p>
-      <% } else { %>
-        <div class="site-announcement-list">
-          <% announcements.forEach(function(a) { %>
-            <div class="site-announcement-card">
-              <span class="site-announcement-date">
-                <%= a.dateLabel %>
-                <% if (a.isNew) { %><span class="badge-pill badge-pill-present">New</span><% } %>
-              </span>
-              <h3><%= a.title %></h3>
-              <div class="forum-editable-display"><%- a.body %></div>
+      <section class="portal-dashboard-section word-of-week-widget home-top-grid-word">
+        <div class="word-of-week-header">
+          <div class="word-of-week-header-title">
+            <span class="word-of-week-header-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+            <h2>Word of the Week</h2>
+          </div>
+          <span class="word-of-week-header-date"><svg class="icon"><use href="#icon-calendar-check"/></svg> <%= wordOfWeekDateLabel %></span>
+        </div>
+        <div class="word-of-week-grid">
+          <% WORD_OF_WEEK_LEVELS.forEach(function(level) { %>
+            <% var w = words[level.key]; %>
+            <div class="word-of-week-card <%= level.className %>">
+              <span class="word-of-week-circle-icon"><svg class="icon"><use href="#<%= level.icon %>"/></svg></span>
+              <div class="word-of-week-body">
+                <div class="word-of-week-text">
+                  <span class="word-of-week-badge"><%= level.label %></span>
+                  <strong class="word-of-week-word"><%= w.word %></strong>
+                  <span class="word-of-week-pronunciation"><svg class="icon"><use href="#icon-volume"/></svg> <%= w.pronunciation %></span>
+                </div>
+                <p class="word-of-week-definition"><%= w.definition %></p>
+              </div>
             </div>
           <% }); %>
         </div>
-      <% } %>
-    </section>
+      </section>
+    </div>
 
     <div class="portal-dashboard-grid">
       <section class="portal-dashboard-card">

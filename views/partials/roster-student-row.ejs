@@ -3,11 +3,44 @@
 // rosters each student member line should have registration date/time,
 // birthday, grade, allergy symbol, mail icon button to email, and phone
 // number, parent name. make sure this is all reduced in size to fit on
-// the mobile screen as well." locals: s (an enriched student - see
-// routes/admin-class-schedule.js's enrichRosterStudents), classId,
-// removeAction (the form action for the trash icon).
+// the mobile screen as well." Desktop keeps that full one-line-per-
+// student layout (.roster-log-meta below).
+//
+// A later real request asked for a genuinely different MOBILE layout
+// instead of just a smaller version of the same row: "on mobile view
+// have small organized cards for each student. listing name, grade,
+// email button, trash can button. when you click on each student on the
+// roster it will popup the parents information... their full
+// information, birthday, grade level, signup date and time. Basically
+// their membership profile information." styles.css's own
+// max-width:640px block hides .roster-log-meta and shows
+// .roster-log-grade-badge instead, and makes the whole row a click
+// target - public/js/roster-student-profile.js (mobile-only, same
+// matchMedia guard roster-btn-row-grid.js already uses) reads this row's
+// own data-* attributes and populates the ONE shared dialog the caller
+// declares per class (partials/roster-student-profile-dialog.ejs),
+// rather than a per-student fetch.
+//
+// locals: s (an enriched student - see routes/admin-class-schedule.js's
+// enrichRosterStudents), classId, removeAction (the form action for the
+// trash icon).
 %>
-<div class="roster-log-row roster-log-row-rich">
+<div
+  class="roster-log-row roster-log-row-rich"
+  data-roster-student-card
+  data-profile-dialog="roster-student-profile-dialog-<%= classId %>"
+  data-name="<%= s.name %>"
+  data-family="<%= s.family_name ? 'The ' + s.family_name + ' Family' : '' %>"
+  data-grade="<%= s.grade_level || '' %>"
+  data-birthday="<%= s.birthday || '' %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %>"
+  data-registered="<%= s.enrolledAtLabel || '' %>"
+  data-parent-name="<%= s.parentName || '' %>"
+  data-parent-phone="<%= s.parentPhone || '' %>"
+  data-parent-email="<%= s.parentEmail || '' %>"
+  role="button"
+  tabindex="0"
+  aria-label="View <%= s.name %>'s membership profile"
+>
   <span class="roster-log-name"><%= s.name %><%- include('medical-flag', { member: s }) %></span>
   <span class="roster-log-meta">
     <% if (s.family_name) { %><span>The <%= s.family_name %> Family</span><% } %>
@@ -17,6 +50,7 @@
     <% if (s.parentName) { %><span><%= s.parentName %></span><% } %>
     <% if (s.parentPhone) { %><span><%= s.parentPhone %></span><% } %>
   </span>
+  <% if (s.grade_level) { %><span class="roster-log-grade-badge"><%= s.grade_level %></span><% } %>
   <div class="roster-log-row-actions no-print">
     <% if (s.parentEmail) { %>
       <a class="icon-btn" href="mailto:<%= s.parentEmail %>" aria-label="Email <%= s.parentName || s.name %>" title="Email <%= s.parentName || s.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>

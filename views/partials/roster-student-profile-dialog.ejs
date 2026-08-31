@@ -1,0 +1,22 @@
+<%
+// The popup public/js/roster-student-profile.js opens when a student's
+// mobile roster card is tapped (see partials/roster-student-row.ejs's own
+// data-* attributes) - one shared dialog per class roster rather than one
+// per student row, populated client-side from whichever card was tapped
+// instead of a per-student fetch. locals: classId.
+%>
+<dialog id="roster-student-profile-dialog-<%= classId %>" class="member-picker-dialog roster-student-profile-dialog">
+  <div class="roster-student-profile-header">
+    <h3 data-profile-field="name"></h3>
+    <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+  </div>
+  <dl class="roster-student-profile-fields">
+    <div data-profile-row="family"><dt>Family</dt><dd data-profile-field="family"></dd></div>
+    <div data-profile-row="grade"><dt>Grade</dt><dd data-profile-field="grade"></dd></div>
+    <div data-profile-row="birthday"><dt>Birthday</dt><dd data-profile-field="birthday"></dd></div>
+    <div data-profile-row="registered"><dt>Signup Date/Time</dt><dd data-profile-field="registered"></dd></div>
+    <div data-profile-row="parent-name"><dt>Parent</dt><dd data-profile-field="parent-name"></dd></div>
+    <div data-profile-row="parent-phone"><dt>Parent Phone</dt><dd data-profile-field="parent-phone"></dd></div>
+    <div data-profile-row="parent-email"><dt>Parent Email</dt><dd data-profile-field="parent-email"></dd></div>
+  </dl>
+</dialog>

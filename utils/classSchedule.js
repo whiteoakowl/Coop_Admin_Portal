@@ -2,6 +2,7 @@ const db = require('../db');
 const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 const { byLastName } = require('./members');
+const { amountPaidForCharge, cancelCharge } = require('./payments');
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -449,12 +450,23 @@ async function renameRoom(day, oldName, newName) {
   }
 }
 
+// createClass/updateClass both still take the full field set, including
+// the 6 registration/cancellation fields (registrationOpen,
+// allowParentRegister, allowTeacherRegister, allowStudentRegister,
+// allowCancel, autoRefundOnCancel) - a real request moved those OFF the
+// Class Details form onto their own Settings tab (see
+// updateClassSettings below), but updateClass's own SQL still sets every
+// column in one UPDATE. The route layer is what changed: routes/admin-
+// class-schedule.js's edit-class handler now passes through the class's
+// EXISTING values for those 6 fields (since its own form no longer
+// submits them) rather than letting them silently reset to defaults just
+// because a name/room/description edit doesn't carry them anymore.
 async function createClass(fields) {
   const info = await db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, notes, start_time, end_time, capacity, registration_open, description,
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, start_time, end_time, capacity, registration_open, description,
          allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -463,7 +475,6 @@ async function createClass(fields) {
       fields.room || null,
       fields.ageGroup || null,
       fields.color || (await nextPaletteColor()),
-      fields.notes || null,
       fields.startTime || null,
       fields.endTime || null,
       fields.capacity || null,
@@ -478,7 +489,7 @@ async function createClass(fields) {
       fields.allowCancel === false ? 0 : 1,
       fields.autoRefundOnCancel ? 1 : 0,
       fields.priceCents || null,
-      fields.pricePer === 'family' ? 'family' : 'person'
+      fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students'
     );
   const id = info.lastInsertRowid;
   await ensureClassRoster(id);
@@ -488,7 +499,7 @@ async function createClass(fields) {
 async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, notes = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
        allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?
      WHERE id = ?`
   ).run(
@@ -498,7 +509,6 @@ async function updateClass(id, fields) {
     fields.room || null,
     fields.ageGroup || null,
     fields.color || '#EE9A4D',
-    fields.notes || null,
     fields.startTime || null,
     fields.endTime || null,
     fields.capacity || null,
@@ -513,7 +523,7 @@ async function updateClass(id, fields) {
     fields.allowCancel === false ? 0 : 1,
     fields.autoRefundOnCancel ? 1 : 0,
     fields.priceCents || null,
-    fields.pricePer === 'family' ? 'family' : 'person',
+    fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.
@@ -525,6 +535,29 @@ async function updateClass(id, fields) {
   // it) and the new one.
   await syncDayMemberRosters(fields.day);
   if (before && before.day && before.day !== fields.day) await syncDayMemberRosters(before.day);
+}
+
+// The 6 registration/cancellation toggles the Schedules > Settings tab
+// edits one class-row-at-a-time, auto-saving on each checkbox click (see
+// public/js/class-settings-autosave.js) rather than through the full
+// Class Details form's Save button - a real request moved them off that
+// form entirely: "settings like that should be under a tab labeled
+// settings." Keyed by the same field name the form/JS already uses, so
+// the route can validate against this exact allowlist instead of ever
+// interpolating a column name straight from the request body.
+const CLASS_SETTINGS_FIELDS = {
+  registrationOpen: 'registration_open',
+  allowParentRegister: 'allow_parent_register',
+  allowTeacherRegister: 'allow_teacher_register',
+  allowStudentRegister: 'allow_student_register',
+  allowCancel: 'allow_cancel',
+  autoRefundOnCancel: 'auto_refund_on_cancel',
+};
+
+async function updateClassSettings(id, field, value) {
+  const column = CLASS_SETTINGS_FIELDS[field];
+  if (!column) throw new Error(`Unknown class setting field: ${field}`);
+  await db.prepare(`UPDATE classes SET ${column} = ? WHERE id = ?`).run(value ? 1 : 0, id);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing
@@ -572,7 +605,7 @@ async function archiveClasses(classIds) {
         cls.room,
         cls.age_group,
         cls.color,
-        cls.notes,
+        cls.description,
         cls.start_time,
         cls.end_time,
         teacherNames,
@@ -697,8 +730,23 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
+// A class priced 'students_and_staff' charges a teacher/assistant who
+// self-signs up the same way it charges an enrolled student (see
+// routes/teacher-portal.js's own join route) - removing them shouldn't
+// leave an orphaned pending charge behind, mirroring class_registrations'
+// own charge_id cleanup (utils/classRegistration.js's settleChargeOnCancel).
+// Only ever cancels a still-UNPAID charge; an already-paid one is left
+// exactly as-is for a Main Admin to refund by hand if that's warranted -
+// same "don't auto-refund on an admin-initiated removal" caution
+// settleChargeOnCancel itself only relaxes when the class's own
+// auto_refund_on_cancel is set, which this admin-side removal path has
+// no equivalent signal for.
 async function removeStaff(classId, memberId) {
+  const staffRow = await db.prepare('SELECT charge_id FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, memberId);
   await db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, memberId);
+  if (staffRow && staffRow.charge_id && (await amountPaidForCharge(staffRow.charge_id)) <= 0) {
+    await cancelCharge(staffRow.charge_id);
+  }
   await syncClassRosterMembers(classId);
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
   if (cls) await syncDayMemberRosters(cls.day);
@@ -1830,6 +1878,7 @@ module.exports = {
   createClass,
   colorForClassName,
   updateClass,
+  updateClassSettings,
   deleteClass,
   archiveClasses,
   listClassArchives,

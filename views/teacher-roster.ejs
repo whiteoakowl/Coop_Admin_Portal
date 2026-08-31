@@ -21,7 +21,7 @@
     <p class="hint"><a href="/teacher">&larr; Back to Teacher Portal</a></p>
     <h1><%= cls.class_name %></h1>
     <p class="hint"><%= cls.dayLabel %> &middot; <%= cls.timeLabel %> &middot; <%= cls.gradeLabel || 'All grades' %> &middot; Room <%= cls.room || 'Unassigned' %></p>
-    <% if (cls.notes) { %><p class="hint"><%= cls.notes %></p><% } %>
+    <% if (cls.description) { %><p class="hint forum-editable-display"><%- cls.description %></p><% } %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

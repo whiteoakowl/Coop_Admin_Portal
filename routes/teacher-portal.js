@@ -9,7 +9,8 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList } = require('../utils/classSchedule');
+const { allClassesList, removeStaff } = require('../utils/classSchedule');
+const { createCharge } = require('../utils/payments');
 const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
 const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
 const { byLastName } = require('../utils/members');
@@ -125,7 +126,21 @@ router.post('/classes/:id/join', async (req, res) => {
   }
 
   await db.prepare('INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, ?)').run(classId, member.id, role);
-  res.redirect(back + '?notice=' + encodeURIComponent(`Signed up as ${role} for "${cls.class_name}".`));
+
+  // A real request: a class priced 'students_and_staff' charges a
+  // teacher/assistant who signs up the same class fee students pay (e.g.
+  // to help cover the cost of supplies), not just the enrolled students -
+  // see utils/classRegistration.js's own chargeForConfirmedRegistration
+  // for the student-side equivalent this mirrors. Unpriced classes
+  // (price_cents null) and classes still priced 'students'-only never
+  // charge staff at all.
+  let notice = `Signed up as ${role} for "${cls.class_name}".`;
+  if (cls.price_per === 'students_and_staff' && cls.price_cents != null) {
+    const chargeId = await createCharge(member.id, req.portalAccount.id, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents);
+    await db.prepare('UPDATE class_staff SET charge_id = ? WHERE class_id = ? AND member_id = ?').run(chargeId, classId, member.id);
+    notice += ` A charge of $${(cls.price_cents / 100).toFixed(2)} has been added to your account.`;
+  }
+  res.redirect(back + '?notice=' + encodeURIComponent(notice));
 });
 
 router.post('/classes/:id/leave', async (req, res) => {
@@ -134,7 +149,11 @@ router.post('/classes/:id/leave', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect(back + '?error=' + encodeURIComponent('No profile found for your account.'));
 
-  await db.prepare('DELETE FROM class_staff WHERE class_id = ? AND member_id = ?').run(classId, member.id);
+  // removeStaff (not a raw DELETE) so a self-signup that paid to join a
+  // 'students_and_staff'-priced class (see the /classes/:id/join route
+  // below) gets the same unpaid-charge cleanup admin-side removal already
+  // gets, rather than leaving an orphaned pending charge behind.
+  await removeStaff(classId, member.id);
   res.redirect(back + '?notice=' + encodeURIComponent('Removed from that class.'));
 });
 

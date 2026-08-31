@@ -34,15 +34,31 @@
       <%# Same shape as routes/admin-members.js's own bulk-permissions form -
           see that file's own comment. %>
       <form id="permissions-bulk-form" method="POST" action="/main-admin/members/bulk-permissions"></form>
-      <form id="members-select-form" method="POST" action="/main-admin/members/bulk-delete"></form>
+      <%# Default action is the safe one (Archive) rather than Delete -
+          public/js/members-bulk-actions.js always overwrites this with
+          whichever dropdown option was actually picked before submitting,
+          but a bare fallback submit (see that file's own comment on
+          submitter-less requestSubmit()) should never land on the
+          destructive route now that Delete isn't even offered here. %>
+      <form id="members-select-form" method="POST" action="/main-admin/members/bulk-archive"></form>
 
       <%# A real request: "add member button, edit permissions button,
           edit, import, export buttons should be under the member tab
           above filter." Members tab only - Archive doesn't add/import
           members. %>
       <% if (activeTab === 'members') { %>
-        <div class="roster-btn-row no-print">
-          <a class="primary-btn" href="/main-admin/members/new">+ Add Member</a>
+        <%# A real request: "mobile the buttons should all be the same size
+            as the smaller buttons. keep the same height and make the
+            width bigger as necessary to fit text. should fit in 2 clean
+            rows." Same roster-btn-row-fit-text treatment already used for
+            every other toolbar with a mix of short/long button labels
+            (Attendance, Setup/Cleanup, Class Edit) - see styles.css's own
+            comment on that class. + Add Member switches from primary-btn
+            to roster-action-btn so it's sized the same as its neighbors
+            here too, matching Setup/Cleanup's own "Edit Dates"
+            precedent. %>
+        <div class="roster-btn-row roster-btn-row-fit-text no-print">
+          <a class="roster-action-btn" href="/main-admin/members/new">+ Add Member</a>
           <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
           <button type="submit" form="permissions-bulk-form" class="roster-action-btn" data-permissions-save="members-table" hidden>Save Permissions</button>
           <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit" aria-pressed="false">Edit</button>
@@ -92,7 +108,14 @@
             you can select individusl, all or none, a dropdown also
             appears and says actions, delete or archive are the
             options." Members tab only - Archive already has its own
-            per-row Reactivate button below. %>
+            per-row Reactivate button below.
+            A later real request: "remove trash button from each member.
+            you must archive the member and then they can be deleted
+            while archived" - Delete dropped from this Members-tab
+            dropdown for the same reason it was dropped from the per-row
+            actions below; the bulk-delete route (routes/main-admin-
+            members.js's own POST /bulk-delete) is otherwise unreferenced
+            now, kept only so a per-row Archive-tab Delete still works. %>
         <% if (activeTab === 'members') { %>
           <div class="class-schedule-archive-controls" data-archive-controls="members-select-form" hidden>
             <label class="checkbox-option class-schedule-select-all">
@@ -101,12 +124,6 @@
             </label>
             <select data-bulk-action-select form="members-select-form" aria-label="Actions">
               <option value="">Actions</option>
-              <option
-                value="delete"
-                data-bulk-action="/main-admin/members/bulk-delete"
-                data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters and attendance history. This cannot be undone."
-                data-bulk-confirm-yes-label="Yes, Delete"
-              >Delete</option>
               <option
                 value="archive"
                 data-bulk-action="/main-admin/members/bulk-archive"
@@ -204,6 +221,14 @@
                       <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
                     <% } %>
                   </td>
+                  <%# A real request: "no edit button, clicking the members
+                      name opens their profile to edit." The Name link
+                      already went to the member's profile page
+                      (main-admin-member-profile.ejs, with its own rich
+                      schedule/rosters/attendance history) - that page has
+                      its own prominent Edit button up top, so the
+                      separate per-row pencil icon below was pure
+                      duplication of a click already one tap away. %>
                   <td class="roster-name-col members-col-name">
                     <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
                     <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
@@ -260,13 +285,29 @@
                     <div class="actions-btn-row">
                       <%# A real request: "there should be a mail icon on each
                           member line so that you can click and email the
-                          member." %>
+                          member." email opens the phone/desktop's own
+                          default mail app (mailto:) - same as a click
+                          anywhere else in the app. %>
                       <% if (m.email) { %>
                         <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
                       <% } else { %>
                         <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
                       <% } %>
-                      <a class="icon-btn" href="/main-admin/members/<%= m.id %>/edit" aria-label="Edit <%= m.name %>" title="Edit"><svg class="icon"><use href="#icon-edit"/></svg></a>
+                      <%# A real request: "add a phone icon, linked to their
+                          phone number. phone icon opens on your personal
+                          cellphone to call or text." tel: is the same
+                          "hand off to whatever the device's own phone app
+                          is" mechanism mailto: already uses for email. %>
+                      <% if (m.phone) { %>
+                        <a class="icon-btn" href="tel:<%= m.phone %>" aria-label="Call or text <%= m.name %>" title="Call or text <%= m.name %>"><svg class="icon"><use href="#icon-phone"/></svg></a>
+                      <% } else { %>
+                        <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No phone on file"><svg class="icon"><use href="#icon-phone"/></svg></span>
+                      <% } %>
+                      <%# A real request: "no edit button, clicking the
+                          members name opens their profile to edit" - the
+                          Name link (above) already opens the member's
+                          profile page, which has its own Edit button, so
+                          the separate pencil icon here was redundant. %>
                       <% if (showArchived) { %>
                         <%# A real request: "next to each members name
                             under archive there should be a button that
@@ -275,14 +316,21 @@
                         <form method="POST" action="/main-admin/members/<%= m.id %>/unarchive" class="inline-block-form">
                           <button type="submit" class="roster-action-btn" aria-label="Reactivate <%= m.name %>" title="Reactivate">Reactivate</button>
                         </form>
+                        <%# A real request: "remove trash button from each
+                            member. you must archive the member and then
+                            they can be deleted while archived." - the
+                            per-row Delete button only exists here, on the
+                            Archive tab, never on the live Members tab. %>
+                        <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
+                          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
                       <% } else { %>
+                        <%# A real request: "change archive icon to
+                            something for like archive." %>
                         <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
-                          <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-lock"/></svg></button>
+                          <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-archive"/></svg></button>
                         </form>
                       <% } %>
-                      <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
-                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      </form>
                     </div>
                   </td>
                 </tr>

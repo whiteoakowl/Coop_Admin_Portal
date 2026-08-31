@@ -30,8 +30,8 @@
             <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/assignments">Wednesday</a>
           </div>
         </div>
-        <div class="roster-btn-row">
-          <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+        <div class="roster-btn-row roster-btn-row-fit-text">
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/assignments/export.csv<%= selectedDate ? '?date=' + selectedDate : '' %>">Export</a>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
           <a class="roster-action-btn" href="/admin/setup/<%= day %>/archive">Archive</a>

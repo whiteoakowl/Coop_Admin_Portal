@@ -188,68 +188,30 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <% }); %>
     </div>
 
-    <span class="class-form-section-label">Class Description <span class="optional-tag">(internal notes)</span></span>
-    <div class="class-form-textarea-wrap">
-      <textarea name="notes" rows="4" placeholder="Enter class description&hellip;" maxlength="500" oninput="this.nextElementSibling.textContent = this.value.length + '/500'"></textarea>
-      <span class="class-form-char-count">0/500</span>
-    </div>
-
-    <span class="class-form-section-label">Parent Portal Registration</span>
-    <div class="class-form-row">
-      <div class="class-form-field">
-        <span class="class-form-field-label">Capacity <span class="optional-tag">(optional - blank means unlimited)</span></span>
-        <input type="number" name="capacity" min="0" placeholder="e.g. 12" />
-      </div>
-      <div class="class-form-field">
-        <label class="grade-pill"><input type="checkbox" name="registrationOpen" value="1" /> Open for parent registration</label>
-      </div>
-    </div>
     <div class="class-form-textarea-wrap member-form-full" data-forum-editor>
-      <span class="class-form-field-label">Public Description <span class="optional-tag">(shown to parents browsing classes)</span></span>
+      <span class="class-form-field-label">Class Description <span class="optional-tag">(shown to parents browsing classes)</span></span>
       <%- include('forum-editor-toolbar') %>
       <div class="forum-editable" data-forum-editable contenteditable="true"></div>
       <input type="hidden" name="description" data-forum-body-input />
     </div>
 
-    <span class="class-form-section-label">Who Can Register</span>
-    <div class="class-form-row">
+    <span class="class-form-section-label">Class Size</span>
+    <div class="class-form-row class-edit-slots-row">
       <div class="class-form-field">
-        <input type="hidden" name="allowParentRegister" value="off" />
-        <label class="grade-pill"><input type="checkbox" name="allowParentRegister" value="1" checked /> Parents can register</label>
+        <span class="class-form-field-label"># of Students Allowed <span class="optional-tag">(optional - blank means unlimited)</span></span>
+        <input type="number" name="capacity" min="0" placeholder="e.g. 12" />
       </div>
       <div class="class-form-field">
-        <input type="hidden" name="allowTeacherRegister" value="off" />
-        <label class="grade-pill"><input type="checkbox" name="allowTeacherRegister" value="1" checked /> Teachers/assistants can self sign-up</label>
-      </div>
-      <div class="class-form-field">
-        <label class="grade-pill"><input type="checkbox" name="allowStudentRegister" value="1" /> Students can self-register</label>
-      </div>
-    </div>
-
-    <span class="class-form-section-label">Teacher / Assistant Slots &amp; Class Size</span>
-    <div class="class-form-row">
-      <div class="class-form-field">
-        <span class="class-form-field-label">Teacher slots <span class="optional-tag">(optional)</span></span>
+        <span class="class-form-field-label"># of Teachers Allowed <span class="optional-tag">(optional)</span></span>
         <input type="number" name="teacherSlots" min="0" placeholder="e.g. 1" />
       </div>
       <div class="class-form-field">
-        <span class="class-form-field-label">Assistant slots <span class="optional-tag">(optional)</span></span>
+        <span class="class-form-field-label"># of Class Assistants Allowed <span class="optional-tag">(optional)</span></span>
         <input type="number" name="assistantSlots" min="0" placeholder="e.g. 3" />
       </div>
       <div class="class-form-field">
-        <span class="class-form-field-label">Minimum to run <span class="optional-tag">(optional)</span></span>
+        <span class="class-form-field-label">Minimum Students Needed <span class="optional-tag">(optional)</span></span>
         <input type="number" name="minCapacity" min="0" placeholder="e.g. 4" />
-      </div>
-    </div>
-
-    <span class="class-form-section-label">Cancellation</span>
-    <div class="class-form-row">
-      <div class="class-form-field">
-        <input type="hidden" name="allowCancel" value="off" />
-        <label class="grade-pill"><input type="checkbox" name="allowCancel" value="1" checked /> Members can cancel their registration</label>
-      </div>
-      <div class="class-form-field">
-        <label class="grade-pill"><input type="checkbox" name="autoRefundOnCancel" value="1" /> Auto-refund a paid charge on cancel</label>
       </div>
     </div>
 
@@ -262,8 +224,8 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       <div class="class-form-field">
         <span class="class-form-field-label">Charged per</span>
         <select name="pricePer">
-          <option value="person">Person</option>
-          <option value="family">Family</option>
+          <option value="students">Students</option>
+          <option value="students_and_staff">Students and Teachers/Assistants</option>
         </select>
       </div>
     </div>

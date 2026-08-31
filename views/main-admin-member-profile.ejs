@@ -43,10 +43,10 @@
           <% } %>
         </p>
         <p><strong>Portal Roles:</strong>
-          <% if (portalRoles === null) { %>
+          <% if (memberPortalRoles === null) { %>
             No portal account
-          <% } else if (portalRoles.length === 0) { %>—<% } else { %>
-            <% portalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
+          <% } else if (memberPortalRoles.length === 0) { %>—<% } else { %>
+            <% memberPortalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
           <% } %>
         </p>
         <a class="roster-action-btn" href="/main-admin/members?q=<%= encodeURIComponent(member.name) %>">Edit Permissions</a>

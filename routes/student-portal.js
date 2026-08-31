@@ -93,7 +93,8 @@ router.get('/', async (req, res) => {
   const announcements = await announcementsForAccount(req.portalAccount.id);
   const natureNewsLatest = await natureNews.listApproved(3);
   const words = wordOfWeek.wordsOfTheWeek();
-  res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words });
+  const wordOfWeekDateLabel = wordOfWeek.currentWeekDateLabel();
+  res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words, wordOfWeekDateLabel });
 });
 
 router.get('/classes', async (req, res) => {

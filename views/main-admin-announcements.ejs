@@ -38,7 +38,7 @@
       </div>
       <div class="member-form-full">
         <span class="checkbox-group-label">Send to</span>
-        <div class="checkbox-group">
+        <div class="checkbox-group checkbox-group-stack">
           <label><input type="checkbox" name="targets" value="everyone" /> Everyone (all active members)</label>
           <% roles.forEach(function(r) { %>
             <label><input type="checkbox" name="targets" value="<%= r.key %>" /> <%= r.label %></label>

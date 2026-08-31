@@ -21,6 +21,7 @@
         <a class="view-tab<%= topTab === 'students' ? ' active' : '' %>" href="/admin/schedule?tab=students">Student Schedules</a>
         <a class="view-tab<%= topTab === 'parents' ? ' active' : '' %>" href="/admin/schedule?tab=parents">Parent Schedules</a>
         <a class="view-tab<%= topTab === 'archive' ? ' active' : '' %>" href="/admin/schedule?tab=archive">Archive</a>
+        <a class="view-tab<%= topTab === 'settings' ? ' active' : '' %>" href="/admin/schedule?tab=settings">Settings</a>
       <% } %>
     </div>
 
@@ -142,6 +143,47 @@
             </div>
           <% } %>
         <% } %>
+      <% } else if (tab === 'settings') { %>
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <p class="hint">Registration and cancellation settings for every class, across both days - toggle a checkbox to save it immediately. Open a class's own card on its Monday/Wednesday Schedules tab to edit its name, room, time, roster, or pricing.</p>
+
+        <% if (classes.length === 0) { %>
+          <p class="roster-empty">No classes yet - add one from the Monday or Wednesday Schedules tab.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table class-settings-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Class</th>
+                  <th>Open for Registration</th>
+                  <th>Parents Can Register</th>
+                  <th>Teachers/Assistants Can Self Sign-Up</th>
+                  <th>Students Can Self-Register</th>
+                  <th>Members Can Cancel</th>
+                  <th>Auto-Refund on Cancel</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% classes.forEach(function(c) { %>
+                  <tr>
+                    <td><%= dayLabels[c.day] || c.day %></td>
+                    <td><%= c.class_name %></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="registrationOpen" <%= c.registration_open ? 'checked' : '' %> aria-label="Open for parent registration - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentRegister" <%= c.allow_parent_register ? 'checked' : '' %> aria-label="Parents can register - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowTeacherRegister" <%= c.allow_teacher_register ? 'checked' : '' %> aria-label="Teachers/assistants can self sign-up - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowStudentRegister" <%= c.allow_student_register ? 'checked' : '' %> aria-label="Students can self-register - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowCancel" <%= c.allow_cancel ? 'checked' : '' %> aria-label="Members can cancel their registration - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="autoRefundOnCancel" <%= c.auto_refund_on_cancel ? 'checked' : '' %> aria-label="Auto-refund a paid charge on cancel - <%= c.class_name %>" /></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint no-print" id="class-settings-save-status" role="status"></p>
+        <% } %>
       <% } else { %>
         <%
           function buildQuery(overrides) {
@@ -262,5 +304,6 @@
   <script src="/js/schedule.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/forum-editor.js"></script>
+  <script src="/js/class-settings-autosave.js"></script>
 </body>
 </html>

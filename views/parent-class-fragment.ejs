@@ -29,7 +29,7 @@
       <span class="badge-pill badge-pill-present"><%= seatsLeft %> seat<%= seatsLeft === 1 ? '' : 's' %> left</span>
     <% } %>
     <% if (cls.price_cents != null) { %>
-      <span class="badge-pill">$<%= (cls.price_cents / 100).toFixed(2) %> <%= cls.price_per === 'family' ? '/ family' : '/ student' %></span>
+      <span class="badge-pill">$<%= (cls.price_cents / 100).toFixed(2) %> / student</span>
     <% } %>
   </div>
 

@@ -4,6 +4,29 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+  // A real bug report: "student portal, mobile. dashboard panel tab bar
+  // should still be on the bottom. its not visible on calendar page."
+  // /events is a genuinely public page (no requirePortalAuth - see
+  // routes/events.js), so it can't assume a signed-in visitor belongs to
+  // any one portal the way every other page in a specific portal can -
+  // hence the plain public site-header below, not partials/portal-nav,
+  // for a logged-out visitor or one signed in without a student role. A
+  // signed-in student specifically gets their own portal-nav shell
+  // instead (portalTitle: 'Student Portal' - the one title portal-nav.ejs
+  // itself special-cases to STUDENT_NAV_LINKS/COMMUNITY_LINKS_STUDENT,
+  // same as every native /student/* page), so their own bottom tab bar
+  // (Home/Calendar/Chat/Classes/...) stays put here exactly like it does
+  // everywhere else in their portal, instead of vanishing onto this one
+  // shared page. Scoped to student accounts only - broadening this to
+  // Parent/Teacher too would need their own (currently still per-page,
+  // not centralized) navLinks arrays repeated here, a larger change than
+  // this bug report asked for.
+  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  %>
+  <% if (isStudentPortalAccount) { %>
+    <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -20,8 +43,9 @@
       <% } %>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (isStudentPortalAccount) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
         <h1>Events</h1>

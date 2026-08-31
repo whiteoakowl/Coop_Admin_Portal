@@ -35,17 +35,20 @@
               <th>Day / Time</th>
               <th>Teachers</th>
               <th>Assistants</th>
+              <th>Fee</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             <% openClasses.forEach(function(c) { %>
               <% var counts = countsByClass[c.id]; %>
+              <% var chargesStaff = c.price_per === 'students_and_staff' && c.price_cents != null; %>
               <tr>
                 <td class="roster-name-col"><strong><%= c.class_name %></strong></td>
                 <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
                 <td><%= counts.teacher %><%= c.teacher_slots != null ? ' / ' + c.teacher_slots : '' %></td>
                 <td><%= counts.assistant %><%= c.assistant_slots != null ? ' / ' + c.assistant_slots : '' %></td>
+                <td><%= chargesStaff ? '$' + (c.price_cents / 100).toFixed(2) : '—' %></td>
                 <td>
                   <div class="actions-btn-row">
                     <% if (c.teacher_slots == null || counts.teacher < c.teacher_slots) { %>

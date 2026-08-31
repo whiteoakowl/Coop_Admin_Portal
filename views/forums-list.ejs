@@ -4,8 +4,22 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+  // A real bug report: "there are two chat tabs on student portal.
+  // there should only be one." A signed-in student landed here with
+  // portalTitle:'Chat' below falling through to portal-nav.ejs's own
+  // generic default communityLinks list (Events/Chat/Member Directory/...)
+  // instead of the empty COMMUNITY_LINKS_STUDENT that every native
+  // /student/* page gets - stacking a second, redundant "Chat" entry
+  // (from that generic list) underneath the one this page's own navLinks
+  // below already shows. portalTitle:'Student Portal' is the one value
+  // portal-nav.ejs special-cases straight to STUDENT_NAV_LINKS/
+  // COMMUNITY_LINKS_STUDENT (ignoring navLinks entirely for that case),
+  // restoring the student's own single normal tab bar here too.
+  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Chat',
+    portalTitle: isStudentPortalAccount ? 'Student Portal' : 'Chat',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/forums', icon: 'users', label: 'Chat' },

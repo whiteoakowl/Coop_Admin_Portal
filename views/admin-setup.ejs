@@ -32,7 +32,7 @@
           <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/admin/setup/monday/manage">Monday</a>
           <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/admin/setup/wednesday/manage">Wednesday</a>
         </div>
-        <div class="roster-btn-row">
+        <div class="roster-btn-row roster-btn-row-fit-text">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-team-dialog').showModal()">+ Create New Team</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
           <a class="roster-action-btn file-action-btn" href="/admin/setup/<%= day %>/export.csv">Export</a>

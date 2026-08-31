@@ -24,7 +24,7 @@ router.use(requireFullAdmin);
 const DESIGN_TYPES = ['student', 'parent', 'admin', 'scheduleCard', 'setupCleanup', 'custom'];
 const TABS = ['design', 'print', 'requests'];
 
-const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
+const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'Both' };
 
 // Name Tag Requests: every public Name Tag Request form submission (lost

@@ -158,7 +158,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(onRoster, 'the newly staffed teacher should be on Monday\'s auto Parent roster after import');
   });
 
-  await t.test('Class Start/End Time and Description land on the class row, and a 2nd Teacher is staffed alongside the first', async () => {
+  await t.test('Class Start/End Time and the single merged Description land on the class row, and a 2nd Teacher is staffed alongside the first', async () => {
     await addSingleMember(cookie, csrfToken, 'Pat Second', 'parent');
     const buffer = buildImportBuffer([
       ['Monday', '3', 'Music Time', 'Room 5', '2nd', '9:00 AM', '9:45 AM', 'Singing and instruments', 'Jane Teacher', 'Pat Second', '', '', ''],
@@ -173,7 +173,7 @@ test('POST /admin/class-schedule/monday/import', async (t) => {
     assert.ok(cls, 'the class should have been created');
     assert.equal(cls.start_time, '9:00 AM');
     assert.equal(cls.end_time, '9:45 AM');
-    assert.equal(cls.notes, 'Singing and instruments');
+    assert.equal(cls.description, 'Singing and instruments');
 
     const teachers = (await db
       .prepare("SELECT m.name FROM class_staff cs JOIN members m ON m.id = cs.member_id WHERE cs.class_id = ? AND cs.role = 'teacher'")

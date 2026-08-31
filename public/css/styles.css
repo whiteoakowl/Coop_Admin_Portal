@@ -1194,6 +1194,17 @@ body.public-page .roster-empty {
 
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
 
+/* Communication > Announcements "Send to" checkboxes: on mobile these wrap
+   into a ragged, hard-to-scan mix of columns since the labels vary a lot in
+   length (role names vs. "Everyone (all active members)"). Stack them in a
+   single left-aligned column instead, matching every other mobile checkbox
+   list in the app; desktop keeps the wrapping row layout above. Scoped to
+   this modifier class rather than .checkbox-group itself so the kiosk
+   Name Tag / Absence forms' own checkbox-group usage is untouched. */
+@media (max-width: 640px) {
+  .checkbox-group-stack { flex-direction: column; align-items: flex-start; }
+}
+
 .cleanup-team-day-group { margin-top: 0.85rem; }
 .cleanup-team-day-group:first-child { margin-top: 0.5rem; }
 .cleanup-team-day-heading { margin: 0 0 0.15rem; font-size: 0.9rem; font-weight: 700; color: var(--brand-dark); }
@@ -2140,6 +2151,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
+
+/* Schedules > Settings tab - one row per class, six auto-saving checkbox
+   columns (see public/js/class-settings-autosave.js) - centered/wrapped
+   headers read better as a checkbox grid than the table's own default
+   left-aligned, single-line text cells. */
+.class-settings-table th:not(:first-child):not(:nth-child(2)),
+.class-settings-table td:not(:first-child):not(:nth-child(2)) {
+  text-align: center;
+}
+.class-settings-table th { white-space: normal; max-width: 9rem; }
+.class-settings-table input[type="checkbox"] { width: 1.15rem; height: 1.15rem; }
 
 /* Arrival/Departure, shown as small text under a member's name instead of
    their own frozen columns (utils/schedule.js's arrivalDepartureLabels
@@ -4967,6 +4989,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-form-section-label.required::after { content: " *"; color: var(--red); font-weight: 700; }
 .class-form-section-hint { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.82rem; }
 
+/* # of Students/Teachers/Class Assistants Allowed + Minimum Students
+   Needed - a real request: "these options shoild all be next to the
+   capcity/# of students allowed. on desktop view they should be in a
+   row. on mobile view they should be stacked in a column to the left."
+   Shared by all 3 Class Details forms (Add Class dialog, View/Edit
+   popup, standalone Manage page) via the same class name, even though
+   each sits in a different parent layout (.class-form-row's own flex vs.
+   .member-form-full's grid cell) - setting display here directly rather
+   than relying on either parent's own default keeps all 3 forms in sync
+   with one rule instead of three near-duplicates. */
+.class-edit-slots-row { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin-bottom: 0; }
+.class-edit-slots-row > label,
+.class-edit-slots-row > .class-form-field { flex: 1 1 150px; }
+@media (max-width: 640px) {
+  .class-edit-slots-row { flex-direction: column; align-items: stretch; }
+  .class-edit-slots-row > label,
+  .class-edit-slots-row > .class-form-field { flex: 1 1 auto; text-align: left; }
+}
+
 /* Circular color swatches, selected one ringed + checkmarked - replaces a
    plain native color input. */
 /* flex-wrap + min-width: 0 so a full row of 12 swatches wraps onto more
@@ -5324,6 +5365,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .class-view-roster-actions { margin-top: 0.25rem; }
 
+/* A real bug report (the Class Edit popup's own Add Member/Import/
+   Export/Print/Allergies-Medical/Class Check-In Link row, 6 buttons):
+   on mobile, a toolbar's buttons inherited .roster-btn-row's shared
+   equal-width grid (see styles.css's own max-width:640px block +
+   public/js/roster-btn-row-grid.js) - every column forced to the same
+   width regardless of label length wrapped a long label like "Class
+   Check-In Link" onto 2-3 lines, stretching that row's height far past
+   its neighbors and reading as broken rather than intentional. A later
+   bug report asked for the identical fix on two more toolbars
+   (Attendance's own Allergies/Medical button, Setup/Cleanup's own row),
+   so this is a reusable second class - "roster-btn-row-fit-text" -
+   any .roster-btn-row toolbar can add alongside its own, not a one-off
+   scoped to a single page. Overrides to a plain wrapping flex row
+   instead: each button sized to its own single-line text (white-space:
+   nowrap) rather than a forced equal column width, so every button ends
+   up the same HEIGHT (no more multi-line wrapping) while widths vary
+   exactly as much as each label needs. Higher specificity (two classes)
+   than the shared .roster-btn-row rule wins the cascade; roster-btn-row-
+   grid.js's own inline grid-template-columns is harmlessly ignored once
+   display is flex instead of grid. */
+@media (max-width: 640px) {
+  .roster-btn-row-fit-text {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .roster-btn-row-fit-text.roster-btn-row > .roster-action-btn,
+  .roster-btn-row-fit-text.roster-btn-row > form > .roster-action-btn {
+    width: auto;
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+}
+
 /* Parent Portal's Classes grid: same room x hour grid as Co-op Admin's
    own Class Schedule (.class-schedule-room-grid/.class-card above -
    reused as-is, unchanged, so it looks like the same grid), but every
@@ -5464,12 +5539,53 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    icons (mail + trash) sit in their own tight flex group. */
 .roster-log-row-rich .roster-log-meta { flex-wrap: wrap; row-gap: 0.2rem; }
 .roster-log-row-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
-@media (max-width: 640px) {
-  .roster-log-row-rich { padding: 0.4rem 0.6rem; gap: 0.5rem; }
-  .roster-log-row-rich .roster-log-name { font-size: 0.9rem; }
-  .roster-log-row-rich .roster-log-meta { font-size: 0.7rem; gap: 0.35rem; }
-  .roster-log-row-rich .icon-btn { width: 1.6rem; height: 1.6rem; }
+
+/* Grade-only badge - hidden on desktop (.roster-log-meta already shows
+   every field, grade included, there), shown ONLY on mobile below,
+   replacing that whole line - see roster-log-row-rich's own comment. */
+.roster-log-grade-badge {
+  display: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--brand-soft);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
 }
+
+/* A later real request: "on mobile view have small organized cards for
+   each student. listing name, grade, email button, trash can button.
+   when you click on each student on the roster it will popup the
+   parents information... their full information, birthday, grade
+   level, signup date and time." Collapses the rich row down to just
+   Name + Grade badge + the two action icons, and turns the whole card
+   into a click target (public/js/roster-student-profile.js) that opens
+   partials/roster-student-profile-dialog.ejs with everything else this
+   row already carries in its own data-* attributes. */
+@media (max-width: 640px) {
+  .roster-log-row-rich { padding: 0.4rem 0.6rem; gap: 0.5rem; cursor: pointer; }
+  .roster-log-row-rich .roster-log-name { font-size: 0.9rem; flex-basis: auto; }
+  .roster-log-row-rich .roster-log-meta { display: none; }
+  .roster-log-row-rich .roster-log-grade-badge { display: inline-block; }
+  .roster-log-row-rich .icon-btn { width: 1.6rem; height: 1.6rem; }
+  .roster-log-row-rich:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+
+/* The student profile popup a mobile roster card opens - a plain member-
+   picker-dialog shell (same base styling every other small info dialog
+   in this app already uses) with its own header (name + close) and a
+   simple label/value field list, each row hidden entirely when that
+   field has nothing on file (public/js/roster-student-profile.js sets
+   [hidden] rather than leaving an empty value showing). */
+.roster-student-profile-dialog { max-width: 22rem; }
+.roster-student-profile-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
+.roster-student-profile-header h3 { margin: 0; }
+.roster-student-profile-header .class-form-dialog-close { position: static; }
+.roster-student-profile-fields { display: flex; flex-direction: column; gap: 0.6rem; margin: 0; }
+.roster-student-profile-fields > div { display: flex; flex-direction: column; gap: 0.1rem; }
+.roster-student-profile-fields dt { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.roster-student-profile-fields dd { margin: 0; font-size: 0.95rem; color: var(--ink); }
 .medical-flag {
   display: inline-flex;
   align-items: center;
@@ -6719,20 +6835,73 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .permission-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 1rem; }
 .portal-dashboard-card-wide { max-width: 720px; margin-bottom: 1.5rem; }
 
+/* Student Portal home: Announcements + Word of the Week side by side - a
+   real request: "desktop it should be smaller width. announcements first,
+   vocab word next to it on right." Announcements gets the wider column
+   (2fr), Word of the Week the narrower one (1fr) - collapses to a single
+   stacked column at the same "2-column grids collapse to 1" breakpoint
+   every other 2-column dashboard layout in this file uses (see this
+   file's own header comment on the 4 sanctioned breakpoints). Markup
+   order already puts Announcements first, so the mobile stack reads
+   Announcements-then-Word-of-the-Week too, not just the desktop columns. */
+.home-top-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; align-items: start; }
+@media (max-width: 860px) {
+  .home-top-grid { grid-template-columns: 1fr; }
+}
+
 /* Word of the Week - a real request: "show a word of the week. system
    generates a new word every sunday. it will actually show 3 words. one
    for elementary level, one for middle school level and one for high
-   school level, each level will be labeled." */
-.word-of-week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-.word-of-week-card {
-  padding: 1.1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface);
-  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.3rem;
+   school level, each level will be labeled." A later real request:
+   "make it look exactly like these photos" (a reference screenshot,
+   desktop + mobile) - card header with a title icon + the week's date,
+   then one row per level: a colored circle icon, a badge/word/
+   pronunciation block, and the definition to its right past a vertical
+   rule. Now that the widget always sits in the narrow column of
+   .home-top-grid above (never full page width - see that rule's own
+   comment), this single compact row layout is used at every width, not
+   just <640px - reuses this file's own green/brand-blue/purple token
+   trio (see the :root block's own "reuse the named tokens" rule) rather
+   than inventing a 4th color system just for this one widget. */
+.word-of-week-widget { padding: var(--card-padding); border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); }
+.word-of-week-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding-bottom: 0.9rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.word-of-week-header-title { display: flex; align-items: center; gap: 0.6rem; }
+.word-of-week-header-title h2 { margin: 0; letter-spacing: 0.02em; font-size: 1.05rem; }
+.word-of-week-header-icon {
+  display: flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex-shrink: 0;
+  border-radius: 9px; background: var(--purple); color: #fff;
 }
-.word-of-week-level {
-  align-self: flex-start; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px;
-  background: var(--purple-soft); color: var(--purple);
+.word-of-week-header-icon .icon { width: 1.05rem; height: 1.05rem; }
+.word-of-week-header-date { display: flex; align-items: center; gap: 0.35rem; color: var(--muted-dark); font-size: 0.8rem; white-space: nowrap; }
+.word-of-week-header-date .icon { width: 0.9rem; height: 0.9rem; }
+
+.word-of-week-grid { display: flex; flex-direction: column; }
+.word-of-week-card { display: flex; align-items: flex-start; gap: 0.85rem; width: 100%; padding: 1rem 0; border-top: 1px solid var(--border); }
+.word-of-week-card:first-child { padding-top: 0; border-top: none; }
+.word-of-week-circle-icon {
+  display: flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+  border-radius: 50%; margin-top: 0.1rem;
 }
-.word-of-week-word { font-size: 1.3rem; }
+.word-of-week-circle-icon .icon { width: 1.2rem; height: 1.2rem; }
+.word-of-week-body { display: flex; align-items: flex-start; gap: 0.75rem; flex: 1; min-width: 0; flex-wrap: wrap; }
+.word-of-week-text { flex: 0 0 auto; padding-right: 0.75rem; border-right: 1px solid var(--border); }
+.word-of-week-badge { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; padding: 0.15rem 0.55rem; border-radius: 999px; margin-bottom: 0.4rem; }
+.word-of-week-word { display: block; font-size: 1.35rem; line-height: 1.15; margin-bottom: 0.3rem; }
+.word-of-week-pronunciation { display: flex; align-items: center; gap: 0.3rem; color: var(--muted-dark); font-size: 0.82rem; white-space: nowrap; }
+.word-of-week-pronunciation .icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.word-of-week-definition { flex: 1; min-width: 120px; margin: 0; color: var(--ink); font-size: 0.88rem; line-height: 1.4; }
+
+.word-of-week-green .word-of-week-badge { background: var(--green-bg); color: var(--green); }
+.word-of-week-green .word-of-week-word { color: var(--green); }
+.word-of-week-green .word-of-week-circle-icon { background: var(--green-bg); color: var(--green); }
+
+.word-of-week-blue .word-of-week-badge { background: var(--brand-soft); color: var(--brand-dark); }
+.word-of-week-blue .word-of-week-word { color: var(--brand-dark); }
+.word-of-week-blue .word-of-week-circle-icon { background: var(--brand-soft); color: var(--brand-dark); }
+
+.word-of-week-purple .word-of-week-badge { background: var(--purple-soft); color: var(--purple); }
+.word-of-week-purple .word-of-week-word { color: var(--purple); }
+.word-of-week-purple .word-of-week-circle-icon { background: var(--purple-soft); color: var(--purple); }
 
 /* Events List/Calendar view toggle - the month grid needs taller cells
    than a normal .roster-table row (each day can hold several event

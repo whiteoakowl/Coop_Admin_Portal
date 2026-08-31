@@ -18,6 +18,17 @@
       .then((html) => {
         dialog.innerHTML = html;
         if (!dialog.open) dialog.showModal();
+        // A real bug report: a fragment's own .roster-btn-row toolbar
+        // (e.g. the Class Schedule view popup's Add Member/Import/Export/
+        // Print/Allergies/Class Check-In row) rendered as one full-width
+        // button per row on mobile instead of the same balanced ≤4-per-row
+        // grid every other toolbar gets - public/js/roster-btn-row-grid.js
+        // only ever lays those out on the page's own load/resize events,
+        // which have already long since fired by the time a fragment gets
+        // fetched into a dialog well after page load. Dispatching a
+        // synthetic resize reuses that exact same listener instead of
+        // needing a second, parallel layout mechanism just for dialogs.
+        window.dispatchEvent(new Event('resize'));
       });
   }
 

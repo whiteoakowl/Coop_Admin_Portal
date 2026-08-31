@@ -63,7 +63,11 @@
         <h2>What Do You Need?</h2>
         <div class="radio-group">
           <label class="radio-option">
-            <input type="radio" name="requestType" value="lost_tag" <%= formValues.requestType === 'lost_tag' ? 'checked' : '' %> required />
+            <input type="radio" name="requestType" value="new_tag" <%= formValues.requestType === 'new_tag' ? 'checked' : '' %> required />
+            New Name Tag
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="requestType" value="lost_tag" <%= formValues.requestType === 'lost_tag' ? 'checked' : '' %> />
             Lost Name Tag
           </label>
           <label class="radio-option">

@@ -33,6 +33,7 @@ const {
   addStaff,
   syncDayMemberRosters,
   listClassArchives,
+  allClassesList,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -59,16 +60,16 @@ const uploadDesignImage = multer({
   fileFilter: imageFileFilter,
 });
 
-const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents', 'archive'];
+const SCHEDULE_TABS = ['monday', 'wednesday', 'students', 'parents', 'archive', 'settings'];
 const ARCHIVE_TYPES = ['class', 'student', 'parent'];
 const PAGE_SIZE = 25;
 
 router.get('/schedule', requireAdmin, async (req, res) => {
   let tab = SCHEDULE_TABS.includes(req.query.tab) ? req.query.tab : 'monday';
 
-  // Student/Parent Schedules and the Class Archive are full-Admin-only. A
-  // Co-op Admin only gets the read-only day grid.
-  if ((tab === 'students' || tab === 'parents' || tab === 'archive') && !res.locals.isFullAdmin) {
+  // Student/Parent Schedules, the Class Archive, and Settings are all
+  // full-Admin-only. A Co-op Admin only gets the read-only day grid.
+  if ((tab === 'students' || tab === 'parents' || tab === 'archive' || tab === 'settings') && !res.locals.isFullAdmin) {
     tab = 'monday';
   }
 
@@ -109,6 +110,27 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       topTab: 'archive',
       archiveType,
       archives,
+      dayLabels: CLASS_DAY_LABELS,
+      error: req.query.error || null,
+      notice: req.query.notice || null,
+    });
+  }
+
+  // Schedules > Settings tab - a real request: "settings like that should
+  // be under a tab labeled settings. this settings tab appears after the
+  // archive tab under schedules." Registration Open, Who Can Register
+  // (parent/teacher/student), and Cancellation policy moved off the Class
+  // Details form (they used to clutter the same popup as class name/room/
+  // time) onto this one table instead - every class across both days,
+  // each toggle auto-saving individually (routes/admin-class-schedule.js's
+  // own /settings route + public/js/class-settings-autosave.js) rather
+  // than needing the class's own Edit popup opened just to flip one flag.
+  if (tab === 'settings') {
+    return res.render('admin-schedule', {
+      title: 'Schedules',
+      tab,
+      topTab: 'settings',
+      classes: await allClassesList(null),
       dayLabels: CLASS_DAY_LABELS,
       error: req.query.error || null,
       notice: req.query.notice || null,

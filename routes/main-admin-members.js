@@ -533,7 +533,14 @@ router.get('/:id', async (req, res) => {
     rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
     memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
-    portalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
+    // Named memberPortalRoles, not portalRoles - that name is already the
+    // LOGGED-IN admin's own roles, implicitly supplied via res.locals for
+    // partials/portal-nav.ejs's portal-switcher (see that file's own
+    // comment). Reusing it here for the profile SUBJECT's roles instead
+    // shadowed the real one and crashed portal-nav.ejs's `.length` check
+    // (portalRoles ending up `null`, not `[]`) for the common case of a
+    // member with no portal account of their own.
+    memberPortalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
     history: (await attendanceHistoryForMember(id)).map((r) => ({
       rosterName: r.rosterName,
       dateLabel: formatDateLabel(r.date),

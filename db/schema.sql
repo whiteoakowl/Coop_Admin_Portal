@@ -268,7 +268,7 @@ CREATE INDEX IF NOT EXISTS idx_task_list_items_section ON task_list_items(sectio
 CREATE TABLE IF NOT EXISTS name_tag_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  request_type TEXT NOT NULL CHECK(request_type IN ('lost_tag','schedule_change')),
+  request_type TEXT NOT NULL CHECK(request_type IN ('lost_tag','schedule_change','new_tag')),
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday','both')),
   description TEXT,
   archived INTEGER NOT NULL DEFAULT 0,

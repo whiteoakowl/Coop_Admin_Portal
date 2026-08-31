@@ -18,28 +18,23 @@ const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = requi
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
 
-// Creates (or, for 'family' pricing, reuses a sibling's already-created)
-// the payment_charges row for a student who just became 'confirmed' in a
-// priced class - shared by both the initial registration and waitlist
-// promotion (a promoted registration owes money starting now, exactly
-// the same as registering straight into an open seat would have), so
-// neither path can silently skip billing. Returns null for an unpriced
-// class. Must be called with the open transaction handle (`tx`) - see
-// createCharge's own comment on why.
+// Creates the payment_charges row for a student who just became
+// 'confirmed' in a priced class - shared by both the initial registration
+// and waitlist promotion (a promoted registration owes money starting
+// now, exactly the same as registering straight into an open seat would
+// have), so neither path can silently skip billing. Returns null for an
+// unpriced class. Must be called with the open transaction handle (`tx`)
+// - see createCharge's own comment on why.
+//
+// price_per no longer has a 'family' option (siblings sharing one
+// charge) - that behavior turned out to be an EVENTS-only concept that
+// had leaked onto the class pricing form; classes always bill each
+// enrolled student their own separate charge now. price_per instead
+// controls whether a teacher/assistant who signs up ALSO gets charged
+// (see routes/teacher-portal.js's own join route) - 'students' vs
+// 'students_and_staff'.
 async function chargeForConfirmedRegistration(tx, cls, student, accountId) {
   if (cls.price_cents == null) return null;
-  let reuseCharge = null;
-  if (cls.price_per === 'family' && student.family_id) {
-    reuseCharge = await tx
-      .prepare(
-        `SELECT cr.charge_id FROM class_registrations cr
-         JOIN members m ON m.id = cr.student_id
-         WHERE cr.class_id = ? AND m.family_id = ? AND cr.status != 'cancelled' AND cr.charge_id IS NOT NULL
-         LIMIT 1`
-      )
-      .get(cls.id, student.family_id);
-  }
-  if (reuseCharge) return reuseCharge.charge_id;
   return createCharge(student.id, accountId, 'class_registration', cls.id, `${cls.class_name} - class registration`, cls.price_cents, tx);
 }
 

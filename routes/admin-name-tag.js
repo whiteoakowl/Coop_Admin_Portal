@@ -21,7 +21,7 @@ const { DAY_LABELS: BASE_DAY_LABELS } = require('../utils/days');
 const { byLastName } = require('../utils/members');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
-const REQUEST_TYPE_LABELS = { lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
+const REQUEST_TYPE_LABELS = { new_tag: 'New Name Tag', lost_tag: 'Lost Name Tag', schedule_change: 'Schedule Change' };
 // A name tag request can also be filed for "both" days, unlike every other
 // :day-scoped feature - extend the shared Monday/Wednesday labels rather
 // than redefining them.

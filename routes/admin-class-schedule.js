@@ -29,6 +29,7 @@ const {
   createClass,
   colorForClassName,
   updateClass,
+  updateClassSettings,
   deleteClass,
   archiveClasses,
   listClassArchives,
@@ -76,6 +77,17 @@ async function enrichRosterStudents(students) {
 // companion input carries 'off' when the visible checkbox is unchecked -
 // see the view's own comment) while allow_student_register/auto_refund_
 // on_cancel (default-off) are read as plain presence checks.
+//
+// A real request moved allowParentRegister/allowTeacherRegister/
+// allowStudentRegister/allowCancel/autoRefundOnCancel (and
+// registrationOpen, read separately below) OFF the Create/Edit Class
+// forms onto their own Schedules > Settings tab - the Create route below
+// still relies on this function's defaults (a brand new class with none
+// of those inputs on its form correctly falls back to the same defaults
+// the old checked/unchecked markup used to bake in), but the Edit route
+// now overrides every one of those 6 with the class's own EXISTING value
+// afterward, since its own form no longer submits them at all (see that
+// route's own comment).
 function registrationFieldsFromBody(body) {
   return {
     allowParentRegister: body.allowParentRegister !== 'off',
@@ -87,7 +99,7 @@ function registrationFieldsFromBody(body) {
     allowCancel: body.allowCancel !== 'off',
     autoRefundOnCancel: body.autoRefundOnCancel === '1',
     priceCents: body.priceDollars ? Math.round(parseFloat(body.priceDollars) * 100) : null,
-    pricePer: body.pricePer === 'family' ? 'family' : 'person',
+    pricePer: body.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
   };
 }
 
@@ -211,7 +223,6 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     room: (req.body.room || '').trim(),
     ageGroup: [].concat(req.body.ageGroup || []).join(', '),
     color: req.body.color || null,
-    notes: (req.body.notes || '').trim(),
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
     capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
@@ -307,13 +318,23 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
       room: (req.body.room || '').trim(),
       ageGroup: [].concat(req.body.ageGroup || []).join(', '),
       color: req.body.color || cls.color,
-      notes: (req.body.notes || '').trim(),
       startTime: (req.body.startTime || '').trim(),
       endTime: (req.body.endTime || '').trim(),
       capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
-      registrationOpen: req.body.registrationOpen === '1',
       description: sanitizePostBody(req.body.description || ''),
       ...registrationFieldsFromBody(req.body),
+      // Registration Open, Who Can Register, and Cancellation now live on
+      // the Settings tab's own auto-saving form (see the /settings route
+      // below) - this Class Details save no longer carries any of those 6
+      // fields at all, so preserve whatever's already on the class rather
+      // than letting registrationFieldsFromBody's create-time defaults
+      // silently reset them just because this save doesn't mention them.
+      registrationOpen: !!cls.registration_open,
+      allowParentRegister: !!cls.allow_parent_register,
+      allowTeacherRegister: !!cls.allow_teacher_register,
+      allowStudentRegister: !!cls.allow_student_register,
+      allowCancel: !!cls.allow_cancel,
+      autoRefundOnCancel: !!cls.auto_refund_on_cancel,
     });
     await saveClassSections(id, req.body);
   } catch (err) {
@@ -328,6 +349,22 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not save class: ${err.message}`));
   }
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
+});
+
+// Schedules > Settings tab (views/admin-schedule.ejs, tab==='settings') -
+// one checkbox per class per field, auto-saving on change (public/js/
+// class-settings-autosave.js, same fetch-on-change pattern attendance-
+// grid.js already uses), rather than a Save button per row. `field` is
+// checked against updateClassSettings' own CLASS_SETTINGS_FIELDS
+// allowlist there - this route never interpolates a column name itself.
+router.post('/class-schedule/classes/:id/settings', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  try {
+    await updateClassSettings(id, req.body.field, req.body.value === '1');
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  res.json({ ok: true });
 });
 
 router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, res) => {
@@ -356,7 +393,7 @@ router.post('/class-schedule/:day/archive', requireFullAdmin, requireDay, async 
 router.get('/class-schedule/archive/export.csv', requireFullAdmin, async (req, res) => {
   const archives = await listClassArchives();
   const lines = [
-    toCsvRow(['Day', 'Class Name', 'Room', 'Grade', 'Start Time', 'End Time', 'Teachers', 'Assistants', 'Students', 'Notes', 'Archived At']),
+    toCsvRow(['Day', 'Class Name', 'Room', 'Grade', 'Start Time', 'End Time', 'Teachers', 'Assistants', 'Students', 'Description', 'Archived At']),
     ...archives.map((a) =>
       toCsvRow([
         DAY_LABELS[a.day] || a.day,
@@ -725,7 +762,7 @@ router.post('/class-schedule/:day/import', requireFullAdmin, requireDay, upload.
       color: await colorForClassName(rowDay, r.room, r.className, r.ageGroup),
       startTime: rowStartTime,
       endTime: r.endTime,
-      notes: r.description,
+      description: r.description,
     });
     created++;
     touchedDays.add(rowDay);

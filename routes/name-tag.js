@@ -4,7 +4,7 @@ const db = require('../db');
 const { activeMemberOptions, familyGroupsByMember, loadFamilyMemberAnyType } = require('../utils/members');
 const { createRateLimiter } = require('../utils/rateLimit');
 
-const REQUEST_TYPES = ['lost_tag', 'schedule_change'];
+const REQUEST_TYPES = ['lost_tag', 'schedule_change', 'new_tag'];
 const DAYS = ['monday', 'wednesday', 'both'];
 
 // Same reasoning as absence.js's own limiter - generous for real use,
@@ -65,7 +65,7 @@ router.post('/name-tag/submit', async (req, res) => {
   }
   if (targets.length === 0) return fail('Please select at least one name.');
 
-  if (!requestType) return fail('Please select Lost Name Tag or Schedule Change.');
+  if (!requestType) return fail('Please select New Name Tag, Lost Name Tag, or Schedule Change.');
   if (!day) return fail('Please select Monday, Wednesday, or Both.');
 
   const insert = db.prepare('INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, ?, ?, ?)');

@@ -66,62 +66,26 @@
               </div>
             </div>
 
-            <label class="member-form-full">Class Description <span class="hint">(internal notes)</span>
-              <textarea name="notes" rows="4"><%= cls.notes || '' %></textarea>
-            </label>
-
-            <label>Capacity <span class="hint">(blank = unlimited)</span>
-              <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
-            </label>
-            <div>
-              <label class="roster-checkbox-label">Parent Portal Registration</label>
-              <label class="grade-pill"><input type="checkbox" name="registrationOpen" value="1" <%= cls.registration_open ? 'checked' : '' %> /> Open for parent registration</label>
-            </div>
             <div class="member-form-full" data-forum-editor>
-              <label>Public Description <span class="hint">(shown to parents browsing classes)</span></label>
+              <label>Class Description <span class="hint">(shown to parents browsing classes)</span></label>
               <%- include('partials/forum-editor-toolbar') %>
               <div class="forum-editable" data-forum-editable contenteditable="true"><%- cls.description || '' %></div>
               <input type="hidden" name="description" data-forum-body-input />
             </div>
 
-            <div class="member-form-full">
-              <label class="roster-checkbox-label">Who Can Register</label>
-              <div class="class-form-row">
-                <div class="class-form-field">
-                  <input type="hidden" name="allowParentRegister" value="off" />
-                  <label class="grade-pill"><input type="checkbox" name="allowParentRegister" value="1" <%= cls.allow_parent_register ? 'checked' : '' %> /> Parents can register</label>
-                </div>
-                <div class="class-form-field">
-                  <input type="hidden" name="allowTeacherRegister" value="off" />
-                  <label class="grade-pill"><input type="checkbox" name="allowTeacherRegister" value="1" <%= cls.allow_teacher_register ? 'checked' : '' %> /> Teachers/assistants can self sign-up</label>
-                </div>
-                <div class="class-form-field">
-                  <label class="grade-pill"><input type="checkbox" name="allowStudentRegister" value="1" <%= cls.allow_student_register ? 'checked' : '' %> /> Students can self-register</label>
-                </div>
-              </div>
-            </div>
-
-            <label>Teacher slots <span class="hint">(optional)</span>
-              <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
-            </label>
-            <label>Assistant slots <span class="hint">(optional)</span>
-              <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
-            </label>
-            <label>Minimum to run <span class="hint">(optional)</span>
-              <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" />
-            </label>
-
-            <div class="member-form-full">
-              <label class="roster-checkbox-label">Cancellation</label>
-              <div class="class-form-row">
-                <div class="class-form-field">
-                  <input type="hidden" name="allowCancel" value="off" />
-                  <label class="grade-pill"><input type="checkbox" name="allowCancel" value="1" <%= cls.allow_cancel ? 'checked' : '' %> /> Members can cancel their registration</label>
-                </div>
-                <div class="class-form-field">
-                  <label class="grade-pill"><input type="checkbox" name="autoRefundOnCancel" value="1" <%= cls.auto_refund_on_cancel ? 'checked' : '' %> /> Auto-refund a paid charge on cancel</label>
-                </div>
-              </div>
+            <div class="member-form-full class-edit-slots-row">
+              <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
+                <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
+              </label>
+              <label># of Teachers Allowed <span class="hint">(optional)</span>
+                <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
+              </label>
+              <label># of Class Assistants Allowed <span class="hint">(optional)</span>
+                <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
+              </label>
+              <label>Minimum Students Needed <span class="hint">(optional)</span>
+                <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" />
+              </label>
             </div>
 
             <label>Price ($) <span class="hint">(blank = free)</span>
@@ -129,8 +93,8 @@
             </label>
             <label>Charged per
               <select name="pricePer">
-                <option value="person" <%= cls.price_per !== 'family' ? 'selected' : '' %>>Person</option>
-                <option value="family" <%= cls.price_per === 'family' ? 'selected' : '' %>>Family</option>
+                <option value="students" <%= cls.price_per !== 'students_and_staff' ? 'selected' : '' %>>Students</option>
+                <option value="students_and_staff" <%= cls.price_per === 'students_and_staff' ? 'selected' : '' %>>Students and Teachers/Assistants</option>
               </select>
             </label>
 
@@ -184,9 +148,10 @@
               <p class="roster-log-empty">No students enrolled yet.</p>
             <% } %>
             <% enrolledStudents.forEach(function(s) { %>
-              <%- include('partials/roster-student-row', { s: s, removeAction: '/admin/class-schedule/classes/' + cls.id + '/enrollment/' + s.id + '/remove' }) %>
+              <%- include('partials/roster-student-row', { s: s, classId: cls.id, removeAction: '/admin/class-schedule/classes/' + cls.id + '/enrollment/' + s.id + '/remove' }) %>
             <% }); %>
           </div>
+          <%- include('partials/roster-student-profile-dialog', { classId: cls.id }) %>
         </div>
       </div>
     </div>
