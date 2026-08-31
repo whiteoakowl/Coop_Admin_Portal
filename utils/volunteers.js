@@ -7,6 +7,18 @@ async function getListByDay(day) {
   return db.prepare('SELECT * FROM volunteer_lists WHERE day = ?').get(day);
 }
 
+// Floater Assignments (volunteer_members) only ever gets a parent added to
+// it via the Volunteers admin page, never from a member's own profile - so
+// there's nothing here to sync, only to clear if they're no longer a
+// parent. Shared by both portals' own member Add/Edit forms (routes/
+// admin-members.js, routes/main-admin-members.js) so converting a member
+// away from parent can't leave stale floater rows behind from just one of
+// the two.
+async function clearVolunteerMembershipIfNotParent(memberId, memberType) {
+  if (memberType === 'parent') return;
+  await db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
+}
+
 async function sectionsForList(listId) {
   return db.prepare('SELECT * FROM volunteer_sections WHERE volunteer_list_id = ? ORDER BY position').all(listId);
 }
@@ -183,6 +195,7 @@ module.exports = {
   DAY_LABELS,
   isValidDay,
   defaultDay,
+  clearVolunteerMembershipIfNotParent,
   RANKS,
   RANK_LABELS,
   RANK_ORDER,

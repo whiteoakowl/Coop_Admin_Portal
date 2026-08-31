@@ -1,15 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const db = require('../db');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
-const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
-const { createStorageClient } = require('../utils/storage');
-const { saveUpload, removeUpload } = require('../utils/uploadBackend');
+const { spreadsheetFileFilter } = require('../utils/uploads');
+const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const { getTemplate, badgeDataForMember } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
@@ -26,6 +23,7 @@ const {
   byLastName,
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
+const { allSetupTeams, cleanupTeamIdsForMember } = require('../utils/setup');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
@@ -34,6 +32,7 @@ const { portalStatusForMembers, sectionIdsForMembers } = require('../utils/porta
 const { resolveFamilyId, createParentMember, createChildMember, uploadIntakePhotos, parseArrayField } = require('../utils/memberIntake');
 const membershipFormFields = require('../utils/membershipFormFields');
 const memberImport = require('../utils/memberImport');
+const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 
 router.use(requireFullAdmin);
 
@@ -43,69 +42,6 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 102
 // team fields, just an optional Admin Position (see memberFormFields below
 // and views/partials/member-form-fields.ejs's 3-way toggle).
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
-
-// Member profile photos - go to Supabase Storage when configured, local
-// disk otherwise (see utils/uploadBackend.js and MIGRATION.md). multer
-// uses memoryStorage now regardless of backend, since a Storage upload
-// needs the raw buffer anyway and the local-disk path writes that same
-// buffer itself (via saveUpload) rather than letting multer write it.
-const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
-const MEMBER_PHOTOS_BUCKET = 'member-photos';
-const storageClient = createStorageClient();
-// Only needed as a local-disk fallback - a serverless deployment's
-// filesystem is read-only outside /tmp, so this must not run when
-// Storage is actually configured.
-if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
-
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const uploadPhoto = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_PHOTO_BYTES },
-  fileFilter: imageFileFilter,
-});
-
-// A photo over the limit above makes multer.single() itself throw a
-// MulterError (LIMIT_FILE_SIZE), which - unlike imageFileFilter rejecting
-// a wrong file TYPE (that just leaves req.file undefined) - was never
-// caught anywhere, so it fell through to server.js's generic catch-all
-// error handler: a bare 500 page that threw away every other field the
-// admin had just typed (name, address, medical notes, family). Same fix
-// as routes/admin-documents.js's own uploadDocument wrapper, parametrized
-// by redirect target since /members/new and /members/:id/edit each redirect
-// back to their own page on error.
-function uploadMemberPhoto(redirectTo) {
-  return function (req, res, next) {
-    uploadPhoto.single('photo')(req, res, (err) => {
-      if (err && err.code === 'LIMIT_FILE_SIZE') {
-        return res.redirect(`${redirectTo(req)}?error=` + encodeURIComponent(`That photo is too large - photos are limited to ${MAX_PHOTO_BYTES / (1024 * 1024)}MB.`));
-      }
-      next(err);
-    });
-  };
-}
-
-// Saves an uploaded photo (Storage or local disk, see above) and returns
-// the key to store in photo_path.
-function savePhotoFile(file) {
-  return saveUpload({
-    client: storageClient,
-    bucket: MEMBER_PHOTOS_BUCKET,
-    localDir: PHOTO_DIR,
-    buffer: file.buffer,
-    originalName: file.originalname,
-    contentType: file.mimetype,
-  });
-}
-
-// Removes a member's stored photo given the key/path in photo_path -
-// called whenever a photo is replaced or the member itself is deleted, so
-// an old photo of a real child or parent doesn't sit around forever with
-// no way to remove it once it's no longer referenced anywhere. Silently
-// no-ops for null/already-missing files (deleting a member who never had
-// a photo is the common case, not an error).
-function deletePhotoFile(photoPath) {
-  return removeUpload({ client: storageClient, bucket: MEMBER_PHOTOS_BUCKET, localDir: PHOTO_DIR, key: photoPath });
-}
 
 // Every attendance record for this member across every roster they're on,
 // newest first - the Members profile page's Attendance tab.
@@ -302,33 +238,6 @@ async function syncCleanupTeams(memberId, teamIds) {
   if (!teamIds) return;
   const link = db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING');
   for (const teamId of teamIds) await link.run(teamId, memberId);
-}
-
-// Floater Assignments (volunteer_members) only ever gets a parent added to
-// it via the Volunteers admin page, never from a member's own profile - so
-// there's nothing here to sync, only to clear if they're no longer a
-// parent, for the same "converted away from parent" staleness as above.
-async function clearVolunteerMembershipIfNotParent(memberId, memberType) {
-  if (memberType === 'parent') return;
-  await db.prepare('DELETE FROM volunteer_members WHERE member_id = ?').run(memberId);
-}
-
-// memberCount included for the form's "Setup Team - 2 members" checklist
-// display, same idea as allFamilies() in utils/members.js.
-async function allSetupTeams() {
-  return db
-    .prepare(
-      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS "memberCount"
-       FROM setup_teams t
-       LEFT JOIN setup_team_members stm ON stm.team_id = t.id
-       GROUP BY t.id
-       ORDER BY t.day, LOWER(t.title)`
-    )
-    .all();
-}
-
-async function cleanupTeamIdsForMember(memberId) {
-  return (await db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId)).map((r) => r.team_id);
 }
 
 // A family only shows up on the "Choose a Family" dropdown once it's been

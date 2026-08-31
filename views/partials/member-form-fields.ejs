@@ -6,7 +6,19 @@
 //
 // locals: member, mode ('create'|'edit'), families (with memberCount),
 // memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
-// gradeLevels, adminPositions, memberAdminPositionIds
+// gradeLevels, adminPositions, memberAdminPositionIds, allowAdminType
+//
+// allowAdminType: "Choosing admins should not be on the membership
+// profile, co-op admin portal. It should be on main admin member list
+// edit only." Co-op Admin's own Add/Edit Member form (views/
+// admin-member-edit.ejs) omits this local entirely, so it defaults to
+// false below and this partial keeps its original Co-op-Admin-only
+// restricted behavior (no way to pick Admin, see the toggle markup
+// further down). Main Admin's own edit form (views/
+// main-admin-member-edit.ejs) is the one place admin promotion/
+// demotion should happen, so it passes allowAdminType: true to get the
+// full 3-way Parent/Student/Admin toggle instead.
+const allowAdminType = typeof locals.allowAdminType !== 'undefined' && locals.allowAdminType;
 const isParent = member.member_type === 'parent';
 // 'admin' - co-op staff/leaders who mainly just need a printable badge
 // (see members.member_type's own schema comment) - a real request added
@@ -38,9 +50,8 @@ const US_STATES = [
   </div>
   <%# A real request: "Choosing admins should not be on the membership
       profile, co-op admin portal. It should be on main admin member
-      list edit only." Co-op Admin's own Add/Edit Member form (this
-      partial - views/main-admin-member-edit.ejs has its own separate
-      markup, unaffected) never offers a way to PICK Admin: a
+      list edit only." When allowAdminType is false (Co-op Admin's own
+      Add/Edit Member form), this never offers a way to PICK Admin: a
       new/Parent/Student member only ever gets the 2-way Parent/Student
       toggle below. The one edge case is editing a member who's already
       Admin (assigned from Main Admin) - shown as a disabled, still-
@@ -49,9 +60,25 @@ const US_STATES = [
       is :checked) and a hidden input carries the same value through on
       submit, since a disabled input never posts - Co-op Admin can still
       edit that member's other fields without silently demoting them to
-      Student the moment this form saves. %>
+      Student the moment this form saves. Main Admin's own edit form
+      passes allowAdminType: true and gets the full interactive 3-way
+      toggle instead, since that's the one place promotion/demotion
+      should happen. %>
   <div class="member-type-toggle" role="group" aria-label="Member type">
-    <% if (isAdmin) { %>
+    <% if (allowAdminType) { %>
+      <label class="member-type-toggle-btn member-type-toggle-parent">
+        <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-user"/></svg> Parent
+      </label>
+      <label class="member-type-toggle-btn member-type-toggle-student">
+        <input type="radio" name="memberType" value="student" <%= (!isParent && !isAdmin) ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
+      </label>
+      <label class="member-type-toggle-btn member-type-toggle-admin">
+        <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> />
+        <svg class="icon"><use href="#icon-badge"/></svg> Admin
+      </label>
+    <% } else if (isAdmin) { %>
       <label class="member-type-toggle-btn member-type-toggle-admin">
         <input type="radio" name="memberType" value="admin" checked disabled />
         <input type="hidden" name="memberType" value="admin" />
@@ -214,7 +241,7 @@ const US_STATES = [
   <div class="manage-section member-form-section-box member-form-section-purple" id="admin-only-fields" data-admin-only style="<%= isAdmin ? '' : 'display:none;' %>">
     <h2><svg class="icon"><use href="#icon-badge"/></svg> Admin Positions</h2>
     <% if (adminPositions.length === 0) { %>
-      <p class="hint">No positions added yet - add some under <a href="/admin/settings?tab=leaders">Settings &gt; Admins</a>.</p>
+      <p class="hint">No positions added yet - add some under <a href="/main-admin/admins">Main Admin &gt; Admins</a>.</p>
     <% } else { %>
       <label class="member-form-full">Add a Position
         <select data-position-picker>

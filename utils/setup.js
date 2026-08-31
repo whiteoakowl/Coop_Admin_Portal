@@ -16,6 +16,27 @@ async function teamsForDay(day) {
     .all(day);
 }
 
+// Every Setup/Cleanup team with its member count - shared by both
+// portals' own member Add/Edit form ("Setup Team - 2 members"
+// checklist), pulled out here so routes/admin-members.js and
+// routes/main-admin-members.js can't drift into two different queries
+// for the same list.
+async function allSetupTeams() {
+  return db
+    .prepare(
+      `SELECT t.id, t.day, t.title, COUNT(stm.member_id) AS "memberCount"
+       FROM setup_teams t
+       LEFT JOIN setup_team_members stm ON stm.team_id = t.id
+       GROUP BY t.id
+       ORDER BY t.day, LOWER(t.title)`
+    )
+    .all();
+}
+
+async function cleanupTeamIdsForMember(memberId) {
+  return (await db.prepare('SELECT team_id FROM setup_team_members WHERE member_id = ?').all(memberId)).map((r) => r.team_id);
+}
+
 async function membersForTeam(teamId) {
   const members = await db
     .prepare(
@@ -351,6 +372,8 @@ async function assignmentCardsForDate(day, date) {
 
 module.exports = {
   teamsForDay,
+  allSetupTeams,
+  cleanupTeamIdsForMember,
   membersForTeam,
   setTeamLeader,
   updateTeam,

@@ -9,14 +9,20 @@
 // generation, active/archived filtering) can't drift between the two -
 // only the route wiring, auth gate, and view are new.
 //
-// Scoped down from /admin/members's full feature set on purpose: no
-// photo upload or printable name-tag/schedule-card generation here -
-// those stay print/file-heavy legacy-portal-only features. CSV export
-// and Excel bulk import DO live here too now - a real request: "add
-// member button, edit permissions button, edit, import, export buttons
-// should be under the member tab" - sharing utils/memberImport.js's
-// logic with routes/admin-members.js's own identical feature rather
-// than a second, drifting copy.
+// A real later request: "Membership forms on the co-op admin page
+// should be the same as the main admin member profiles." The Add/Edit
+// Member form here now shares views/partials/member-form-fields.ejs
+// with routes/admin-members.js's own edit page (photo upload, Setup
+// Team checklist, and - Main-Admin-only - the Admin Positions checklist
+// included), rather than the separate, scoped-down markup this file
+// used to render on its own. Printable name-tag/schedule-card generation
+// still stay Co-op-Admin-only (print/file-heavy features tied to the
+// physical badge system, not membership data itself). CSV export and
+// Excel bulk import live here too - a real request: "add member button,
+// edit permissions button, edit, import, export buttons should be under
+// the member tab" - sharing utils/memberImport.js's logic with
+// routes/admin-members.js's own identical feature rather than a second,
+// drifting copy.
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -25,12 +31,12 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const { formatDateLabel, formatDateNumeric, ageFromBirthday, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
-const { createStorageClient } = require('../utils/storage');
-const { removeUpload } = require('../utils/uploadBackend');
 const { spreadsheetFileFilter } = require('../utils/uploads');
+const { uploadMemberPhoto, savePhotoFile, deletePhotoFile } = require('../utils/memberPhoto');
+const { allSetupTeams, cleanupTeamIdsForMember } = require('../utils/setup');
+const { listAdminPositions, adminPositionIdsForMember, syncMemberAdminPositions } = require('../utils/adminPositions');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 const memberImport = require('../utils/memberImport');
-const path = require('path');
 const {
   familyOf,
   allFamilies,
@@ -42,6 +48,7 @@ const {
 } = require('../utils/members');
 const { getMemberSchedule } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
+const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
 const {
   resolveFamilyId: resolveIntakeFamilyId,
@@ -58,17 +65,7 @@ const { sanitizePostBody } = require('../utils/sanitizeHtml');
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_members'));
 
 const MEMBER_TYPES = ['student', 'parent', 'admin'];
-const MEMBER_PHOTOS_BUCKET = 'member-photos';
-const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
 const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
-const storageClient = createStorageClient();
-
-// Only used here to clean up an existing photo on delete (see
-// deleteMemberById below) - this file never writes a new one, so there's
-// no matching savePhotoFile/multer setup, just the removal half.
-function deletePhotoFile(photoPath) {
-  return removeUpload({ client: storageClient, bucket: MEMBER_PHOTOS_BUCKET, localDir: PHOTO_DIR, key: photoPath });
-}
 
 async function attendanceHistoryForMember(memberId) {
   return db
@@ -358,12 +355,28 @@ router.post('/bulk-archive', async (req, res) => {
 // DELETE SET NULL, so deleting a family here only ungroups its members,
 // never deletes the members themselves). ---
 
+// Same wantsJson branch as routes/admin-members.js's own identical
+// /members/families/new - the shared "+ Add New Family" dialog (public/
+// js/member-form.js's initAddFamilyDialog) posts here with
+// Accept: application/json from the Add/Edit Member form now that this
+// page shares that markup too (see this file's own top comment).
 router.post('/families/new', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/members?error=' + encodeURIComponent('Family name is required.'));
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
+
+  if (!name) {
+    const message = 'Family name is required.';
+    if (wantsJson) return res.status(400).json({ error: message });
+    return res.redirect('/main-admin/members?error=' + encodeURIComponent(message));
+  }
   const exists = await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?)').get(name);
-  if (exists) return res.redirect('/main-admin/members?error=' + encodeURIComponent(`"${name}" family already exists.`));
-  await db.prepare('INSERT INTO families (name) VALUES (?)').run(name);
+  if (exists) {
+    const message = `"${name}" family already exists.`;
+    if (wantsJson) return res.status(409).json({ error: message });
+    return res.redirect('/main-admin/members?error=' + encodeURIComponent(message));
+  }
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(name)).lastInsertRowid;
+  if (wantsJson) return res.json({ id: familyId, name });
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`"${name}" family added.`));
 });
 
@@ -405,7 +418,31 @@ function memberFormFields(req) {
     familyIdRaw: Number.isInteger(familyIdRaw) ? familyIdRaw : null,
     newFamilyName,
     isPrimaryParent: req.body.isPrimaryParent === '1',
+    // Same shape as routes/admin-members.js's own memberFormFields, now
+    // that the two portals' edit forms share partials/member-form-
+    // fields.ejs - see this file's own top comment.
+    cleanupTeamIds:
+      memberType === 'parent'
+        ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
+        : null,
+    adminPositionIds:
+      memberType === 'admin'
+        ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
+        : null,
   };
+}
+
+// Keeps setup_team_members in sync with the Cleanup Team checkboxes on a
+// parent's profile - same shape as routes/admin-members.js's own
+// syncCleanupTeams. Always clears existing rows first (not just when
+// teamIds is a real list) so converting an existing parent to student/
+// admin drops their stale team membership instead of leaving them stuck
+// on a chart they can no longer manage from their own profile.
+async function syncCleanupTeams(memberId, teamIds) {
+  await db.prepare('DELETE FROM setup_team_members WHERE member_id = ?').run(memberId);
+  if (!teamIds) return;
+  const link = db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?) ON CONFLICT (team_id, member_id) DO NOTHING');
+  for (const teamId of teamIds) await link.run(teamId, memberId);
 }
 
 // A typed "new family" name (see main-admin-member-edit.ejs's own field)
@@ -428,13 +465,10 @@ async function resolveFamilyId(f) {
 // Membership Form (routes/membership.js) and Co-op Admin's own Add
 // Member (routes/admin-members.js) - a real request: "Add member and
 // membership request form should be the same." Editing an EXISTING
-// member (GET/POST /:id/edit below) is unaffected - it keeps its own
-// single-person main-admin-member-edit.ejs form and this file's own
-// resolveFamilyId/memberFormFields helpers.
-async function allSetupTeams() {
-  return db.prepare('SELECT id, day, title FROM setup_teams ORDER BY day, LOWER(title)').all();
-}
-
+// member (GET/POST /:id/edit below) now ALSO shares its own field
+// markup with Co-op Admin's edit form (partials/member-form-fields.ejs -
+// see this file's own top comment), including utils/setup.js's own
+// allSetupTeams imported above.
 router.get('/new', async (req, res) => {
   res.render('member-intake-form', {
     title: 'Add Member',
@@ -570,6 +604,10 @@ router.get('/:id/edit', async (req, res) => {
     families: await allFamilies(),
     memberFamilyId: member.family_id,
     gradeLevels: GRADE_LEVELS,
+    setupTeams: await allSetupTeams(),
+    memberCleanupTeamIds: await cleanupTeamIdsForMember(id),
+    adminPositions: await listAdminPositions(),
+    memberAdminPositionIds: await adminPositionIdsForMember(id),
     portalAccount: portalStatus.account,
     portalRoleIds: portalStatus.roleIds,
     allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
@@ -577,12 +615,17 @@ router.get('/:id/edit', async (req, res) => {
   });
 });
 
-router.post('/:id/edit', async (req, res) => {
+router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.params.id}/edit`), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const f = memberFormFields(req);
   if (!f.name) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
+  const existing = await db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
+  const photoPath = req.file ? await savePhotoFile(req.file) : existing ? existing.photo_path : null;
+  // A newly uploaded photo replaces the old one in photo_path below - see
+  // routes/admin-members.js's own identical POST /members/:id/edit.
+  if (req.file && existing && existing.photo_path) await deletePhotoFile(existing.photo_path);
 
   // A real request: "No creating users. All Members should already have
   // an account. Each member profile should have a space for password."
@@ -608,9 +651,12 @@ router.post('/:id/edit', async (req, res) => {
   await db
     .prepare(
       `UPDATE members SET name = ?, member_type = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?,
-         birthday = ?, grade_level = ?, medical_notes = ? WHERE id = ?`
+         photo_path = ?, birthday = ?, grade_level = ?, medical_notes = ? WHERE id = ?`
     )
-    .run(f.name, f.memberType, f.address, f.city, f.state, f.zip, f.phone, f.email, f.birthday, f.gradeLevel, f.medicalNotes, id);
+    .run(f.name, f.memberType, f.address, f.city, f.state, f.zip, f.phone, f.email, photoPath, f.birthday, f.gradeLevel, f.medicalNotes, id);
+  await syncCleanupTeams(id, f.cleanupTeamIds);
+  await syncMemberAdminPositions(id, f.adminPositionIds);
+  await clearVolunteerMembershipIfNotParent(id, f.memberType);
   await setMemberFamily(id, await resolveFamilyId(f));
   await setPrimaryParent(id, f.isPrimaryParent);
 

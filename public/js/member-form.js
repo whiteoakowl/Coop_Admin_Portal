@@ -1,4 +1,9 @@
-// Powers the full Add/Edit Membership Form page (views/admin-member-edit.ejs).
+// Powers the full Add/Edit Membership Form page - shared by both portals'
+// own edit forms (views/admin-member-edit.ejs, views/
+// main-admin-member-edit.ejs), which both include the same partials/
+// member-form-fields.ejs markup. The "+ Add New Family" dialog posts to
+// whichever portal's own families/new endpoint the including page sets via
+// the form's data-add-family-url attribute.
 const MEMBER_TYPE_META = {
   student: { icon: 'graduation-cap', title: 'Student Membership Form', subtitle: 'Create or update a student membership profile.', headerClass: 'member-form-header-student', boxClass: 'member-form-section-blue' },
   parent: { icon: 'users', title: 'Parent Membership Form', subtitle: 'Create or update a parent/guardian membership profile.', headerClass: 'member-form-header-parent', boxClass: 'member-form-section-green' },
@@ -69,7 +74,7 @@ function initAddFamilyDialog(form) {
     const name = (new FormData(addForm).get('name') || '').toString().trim();
     if (errorEl) errorEl.hidden = true;
 
-    fetch('/admin/members/families/new', {
+    fetch(form.dataset.addFamilyUrl || '/admin/members/families/new', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {

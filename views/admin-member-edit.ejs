@@ -17,6 +17,7 @@
         enctype="multipart/form-data"
         id="member-form"
         class="member-edit-form member-edit-form-page"
+        data-add-family-url="/admin/members/families/new"
       >
         <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels }) %>
 
