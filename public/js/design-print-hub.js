@@ -40,6 +40,7 @@
   const sections = {
     scheduleCards: document.getElementById('print-schedule-cards-section'),
     nameTags: document.getElementById('print-name-tags-section'),
+    nameTagRequests: document.getElementById('print-nameTagRequests-section'),
     cardsBoth: document.getElementById('print-cardsBoth-section'),
     cardsDuplex: document.getElementById('print-cardsDuplex-section'),
     barcodes: document.getElementById('print-barcodes-section'),
@@ -152,6 +153,7 @@
 
   wireBulkMemberList('schedule-print-list', 'schedule-print-filter-select', 'schedule-print-select-all-checkbox', null, 'schedule-print-search-input');
   wireBulkMemberList('name-tag-bulk-list', 'name-tag-bulk-filter-select', 'name-tag-select-all-checkbox', 'name-tag-select-none-checkbox');
+  wireBulkMemberList('name-tag-requests-bulk-list', undefined, 'name-tag-requests-select-all-checkbox', 'name-tag-requests-select-none-checkbox');
   wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
   wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
   wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');

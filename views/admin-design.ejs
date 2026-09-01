@@ -232,6 +232,7 @@
           <select class="name-tag-type-select" id="print-type-select">
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
+            <option value="nameTagRequests">Name Tag Requests</option>
             <option value="cardsBoth">Name Tags + Schedule Cards</option>
             <option value="cardsDuplex">Name Tags + Schedule Cards (Front &amp; Back)</option>
             <option value="barcodes">Barcodes Only</option>
@@ -314,6 +315,50 @@
             <div class="roster-scroll print-picker-scroll">
               <%- include('partials/print-picker-table', { members: members, listId: 'name-tag-bulk-list', skipRows: true }) %>
             </div>
+          </form>
+        </div>
+
+        <%# A real request: "add a dropdown choice called name tag
+            requests. when you choose this option it will show the names
+            of the people currently on the nametag request log that need
+            to be printed." One row per member with an open (unarchived)
+            request (see admin-design.js's own pendingNameTagRequests -
+            deliberately independent of the Requests tab's own date/
+            archived filters), reusing the exact same bulk /admin/name-
+            tag/print flow the Name Tags panel above already uses. %>
+        <div id="print-nameTagRequests-section" hidden>
+          <form method="POST" action="/admin/name-tag/print" target="_blank" id="name-tag-requests-print-form" data-bulk-print-refresh>
+            <% if (pendingNameTagRequests.length === 0) { %>
+              <p class="roster-empty">No name tag requests need printing right now.</p>
+            <% } else { %>
+              <div class="name-tag-bulk-filter">
+                <label class="checkbox-option name-tag-select-all">
+                  <input type="checkbox" id="name-tag-requests-select-all-checkbox" />
+                  Select All
+                </label>
+                <label class="checkbox-option name-tag-select-none">
+                  <input type="checkbox" id="name-tag-requests-select-none-checkbox" />
+                  Select None
+                </label>
+                <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
+              </div>
+              <div class="roster-scroll print-picker-scroll">
+                <table class="roster-table members-table condensed-table" id="name-tag-requests-bulk-list">
+                  <thead>
+                    <tr><th></th><th>Name</th><th>Request</th></tr>
+                  </thead>
+                  <tbody>
+                    <% pendingNameTagRequests.forEach(function(p) { %>
+                      <tr class="print-picker-row" data-name="<%= p.memberName.toLowerCase() %>">
+                        <td><input type="checkbox" name="memberIds" value="<%= p.memberId %>" /></td>
+                        <td><%= p.memberName %></td>
+                        <td><%= p.requestSummary %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
           </form>
         </div>
 

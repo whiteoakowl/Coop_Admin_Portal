@@ -37,7 +37,7 @@ const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'B
 // this is a second, independent way to reach the same underlying
 // name_tag_requests data, not a replacement for it.
 async function nameTagSubmissions(showArchived, dateFilter) {
-  let sql = `SELECT n.id AS id, m.name AS "memberName", n.request_type AS "requestType", n.day AS day,
+  let sql = `SELECT n.id AS id, n.member_id AS "memberId", m.name AS "memberName", n.request_type AS "requestType", n.day AS day,
              n.description AS description, n.created_at AS "createdAt"
              FROM name_tag_requests n
              JOIN members m ON m.id = n.member_id
@@ -104,6 +104,26 @@ router.get('/design', async (req, res) => {
   const requestsPageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
   const requestsPagination = paginate(allSubmissions, parsePage(req.query.page), requestsPageSize);
 
+  // Print tab's own "Name Tag Requests" option - a real request: "add a
+  // dropdown choice called name tag requests. when you choose this
+  // option it will show the names of the people currently on the
+  // nametag request log that need to be printed." Always the full,
+  // unarchived request log regardless of the Requests tab's own
+  // date/archived filters above (this is a "what still needs printing
+  // right now" picker, not another view of that tab). One row per
+  // member, not per request - a member with more than one open request
+  // (e.g. both a Lost Tag and a Schedule Change) would otherwise get two
+  // duplicate checkboxes for the same person.
+  const pendingByMember = new Map();
+  for (const r of await nameTagSubmissions(false, '')) {
+    const label = REQUEST_TYPE_LABELS[r.requestType] || r.requestType;
+    if (!pendingByMember.has(r.memberId)) pendingByMember.set(r.memberId, { memberId: r.memberId, memberName: r.memberName, requestLabels: [] });
+    pendingByMember.get(r.memberId).requestLabels.push(label);
+  }
+  const pendingNameTagRequests = [...pendingByMember.values()]
+    .map((p) => ({ memberId: p.memberId, memberName: p.memberName, requestSummary: p.requestLabels.join(', ') }))
+    .sort((a, b) => a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' }));
+
   res.render('admin-design', {
     title: 'Design / Print',
     tab,
@@ -118,6 +138,7 @@ router.get('/design', async (req, res) => {
     notice: req.query.notice || null,
     setupCleanupBadges: await listMiscBadges('setupCleanup'),
     customBadges: await listMiscBadges('custom'),
+    pendingNameTagRequests,
     submissions: requestsPagination.items,
     allSubmissions,
     pagination: requestsPagination,
