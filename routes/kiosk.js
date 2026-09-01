@@ -221,6 +221,61 @@ router.post('/checkin/task-scan', async (req, res) => {
     await update.run(taskItemId, now, member.id, r.id, today);
   }
 
+  // A real request: "after parent scans their setup/cleanup badge it
+  // should ask if they have a 2nd setup/cleanup badge to scan, with yes
+  // and no buttons." message already carries the eventual "all done"
+  // text so a "No" answer (see public/js/kiosk-checkin.js) can show it
+  // immediately with no second round trip - needsSecondBadgeChoice just
+  // tells the client to ask before actually finishing.
+  res.json({ ok: true, name: member.name, needsSecondBadgeChoice: true, message: `Thank you for checking in, ${member.name}!` });
+});
+
+// Step 3 (optional): a member covering two Setup/Cleanup jobs the same
+// day (see setup_task_assignments.task_item_id_2's own comment) scans a
+// second badge after answering "Yes" to the step-2 prompt above. Mirrors
+// /checkin/task-scan exactly, writing onto task_item_id_2/
+// task_scanned_at_2 instead of the first slot.
+router.post('/checkin/task-scan-2', async (req, res) => {
+  if (checkinLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-ins from this device right now. Please wait a moment and try again.' });
+  }
+  checkinLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const now = Date.now();
+  const taskItemId = task ? task.id : null;
+  const update = db.prepare('UPDATE attendance SET task_item_id_2 = ?, task_scanned_at_2 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  for (const r of rosters) {
+    await update.run(taskItemId, now, member.id, r.id, today);
+  }
+
   res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
 

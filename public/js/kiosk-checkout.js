@@ -12,16 +12,12 @@
 
   const stepScan = document.getElementById('step-scan');
   const stepTask = document.getElementById('step-task');
-  const memberNameEls = stepTask.querySelectorAll('.task-member-name');
+  const stepSecondBadge = document.getElementById('step-second-badge');
+  const stepTask2 = document.getElementById('step-task-2');
+  const secondBadgeYesBtn = document.getElementById('second-badge-yes-btn');
+  const secondBadgeNoBtn = document.getElementById('second-badge-no-btn');
   const cancelBtn = document.getElementById('cancel-btn');
-
-  const taskForm = document.getElementById('task-scan-form');
-  const taskInput = document.getElementById('task-barcode-input');
-  const taskResult = document.getElementById('task-kiosk-result');
-  const taskStatus = document.getElementById('task-kiosk-status');
-  const taskInstructions = document.getElementById('task-kiosk-instructions');
-  const taskIcon = taskStatus.querySelector('.kiosk-status-icon');
-  const taskManualSubmitBtn = document.getElementById('task-manual-submit-btn');
+  const cancelBtn2 = document.getElementById('cancel-btn-2');
 
   keepInputFocused(input);
   initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
@@ -31,15 +27,15 @@
   // only looks within the root it's given, so the two steps' identical
   // panel names never cross-toggle each other.
   const chooser = initKioskMethodChooser(stepScan);
-
-  keepInputFocused(taskInput);
-  initIdKeypad(document.getElementById('task-id-keypad'), taskInput, taskForm);
-  const taskChooser = initKioskMethodChooser(stepTask);
-
   manualSubmitBtn.addEventListener('click', () => scanForm.requestSubmit());
-  taskManualSubmitBtn.addEventListener('click', () => taskForm.requestSubmit());
 
   let currentMemberId = null;
+  // Set on step-task's own success (see wireTaskStep's onSuccess below) -
+  // held onto in case the "Do you have a 2nd badge?" answer is "No" (see
+  // secondBadgeNoBtn below), so that path can show it without a second
+  // round trip to the server.
+  let pendingFinalMessage = '';
+  let lastTaskMethod = 'scanner';
 
   function setState(state, message, iconId) {
     status.className = 'kiosk-status kiosk-status-' + state;
@@ -47,21 +43,112 @@
     instructions.textContent = message;
   }
 
-  function setTaskState(state, message, iconId) {
-    taskStatus.className = 'kiosk-status kiosk-status-' + state;
-    taskIcon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
-    taskInstructions.textContent = message;
+  // A real request: "after parent scans their setup/cleanup badge it
+  // should ask if they have a 2nd setup/cleanup badge to scan, with yes
+  // and no buttons... after the 2nd badge entry the screen says thank
+  // you!" step-task (badge 1) and step-task-2 (badge 2) are identical
+  // panels (same task-* classes - see kiosk-checkout.ejs's own comment
+  // on step-task), so this wires up either one from the element it's
+  // given instead of writing the same chooser/keypad/fetch logic twice.
+  function wireTaskStep(stepEl, endpoint, onSuccess) {
+    const memberNameEls = stepEl.querySelectorAll('.task-member-name');
+    const form = stepEl.querySelector('.task-scan-form');
+    const taskInput = form.querySelector('.task-barcode-input');
+    const taskResult = stepEl.querySelector('.task-kiosk-result');
+    const taskStatus = stepEl.querySelector('.task-kiosk-status');
+    const taskInstructions = stepEl.querySelector('.task-kiosk-instructions');
+    const taskIcon = taskStatus.querySelector('.kiosk-status-icon');
+    const taskManualSubmitBtn = stepEl.querySelector('.task-manual-submit-btn');
+
+    keepInputFocused(taskInput);
+    initIdKeypad(stepEl.querySelector('.task-id-keypad'), taskInput, form);
+    const taskChooser = initKioskMethodChooser(stepEl);
+    taskManualSubmitBtn.addEventListener('click', () => form.requestSubmit());
+
+    function setTaskState(state, message, iconId) {
+      taskStatus.className = 'kiosk-status kiosk-status-' + state;
+      taskIcon.innerHTML = '<svg class="icon' + (iconId === 'loader' ? ' icon-spin' : '') + '"><use href="#icon-' + iconId + '"/></svg>';
+      taskInstructions.textContent = message;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const barcode = taskInput.value.trim();
+      taskInput.value = '';
+      if (!barcode || !currentMemberId) return;
+
+      const activePanel = stepEl.querySelector('[data-method-panel]:not([hidden])');
+      const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
+
+      stepEl.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+      taskResult.hidden = false;
+      setTaskState('loading', 'Checking…', 'loader');
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'memberId=' + encodeURIComponent(currentMemberId) + '&barcode=' + encodeURIComponent(barcode),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          onSuccess(data, activeMethod);
+          return;
+        }
+        setTaskState('error', data.message, 'x-circle');
+        setTimeout(() => {
+          taskResult.hidden = true;
+          taskChooser.showPanel(activeMethod);
+        }, 2500);
+      } catch (err) {
+        setTaskState('error', 'Connection error. Please try again.', 'x-circle');
+        setTimeout(() => {
+          taskResult.hidden = true;
+          taskChooser.showPanel(activeMethod);
+        }, 2500);
+      }
+    });
+
+    return {
+      chooser: taskChooser,
+      setName(name) { memberNameEls.forEach((el) => { el.textContent = name; }); },
+      showFinal(message) {
+        taskResult.hidden = false;
+        setTaskState('success', message, 'check-circle');
+        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+      },
+      reset() {
+        taskResult.hidden = true;
+        taskInput.value = '';
+        taskChooser.showChooser();
+      },
+    };
   }
+
+  const task2 = wireTaskStep(stepTask2, '/kiosk/checkout/task-scan-2', (data) => {
+    task2.showFinal(data.message);
+  });
+
+  // Step 2 (parents only): scan the Setup/Cleanup badge for the task just
+  // completed. On success, ask whether there's a 2nd badge (step-second-
+  // badge below) instead of finishing right away.
+  const task1 = wireTaskStep(stepTask, '/kiosk/checkout/task-scan', (data, activeMethod) => {
+    pendingFinalMessage = data.message;
+    lastTaskMethod = activeMethod;
+    stepTask.classList.add('kiosk-hidden');
+    stepSecondBadge.classList.remove('kiosk-hidden');
+  });
 
   function resetToScan() {
     currentMemberId = null;
     stepTask.classList.add('kiosk-hidden');
+    stepSecondBadge.classList.add('kiosk-hidden');
+    stepTask2.classList.add('kiosk-hidden');
     stepScan.classList.remove('kiosk-hidden');
     result.hidden = true;
     chooser.showChooser();
-    taskResult.hidden = true;
-    taskInput.value = '';
-    taskChooser.showChooser();
+    task1.reset();
+    task2.reset();
   }
 
   // Step 1: scan the member's own name tag. Students are checked out
@@ -109,14 +196,15 @@
       }
 
       currentMemberId = data.memberId;
-      memberNameEls.forEach((el) => { el.textContent = data.name; });
+      task1.setName(data.name);
+      task2.setName(data.name);
       result.hidden = true;
       stepScan.classList.add('kiosk-hidden');
       stepTask.classList.remove('kiosk-hidden');
       // A real request: jump straight into the same method (scanner or
       // manual) just used for the member's own ID, instead of making
       // them pick a method again for the Setup/Cleanup badge.
-      taskChooser.showPanel(activeMethod);
+      task1.chooser.showPanel(activeMethod);
     } catch (err) {
       setState('error', 'Connection error. Please try again.', 'x-circle');
       setTimeout(() => {
@@ -126,46 +214,25 @@
     }
   });
 
-  // Step 2 (parents only): scan the Setup/Cleanup badge for the task just
-  // completed.
-  taskForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const barcode = taskInput.value.trim();
-    taskInput.value = '';
-    if (!barcode || !currentMemberId) return;
+  // A real request: "after parent scans their setup/cleanup badge it
+  // should ask if they have a 2nd setup/cleanup badge to scan, with yes
+  // and no buttons. if they select yes, it allows them to scan their
+  // barcode... after the 2nd badge entry the screen says thank you! ...
+  // if they select no, it's says thank you!"
+  secondBadgeNoBtn.addEventListener('click', () => {
+    stepSecondBadge.classList.add('kiosk-hidden');
+    stepTask.classList.remove('kiosk-hidden');
+    task1.showFinal(pendingFinalMessage);
+  });
 
-    const activePanel = stepTask.querySelector('[data-method-panel]:not([hidden])');
-    const activeMethod = activePanel ? activePanel.dataset.methodPanel : 'scanner';
-
-    stepTask.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
-    taskResult.hidden = false;
-    setTaskState('loading', 'Checking…', 'loader');
-
-    try {
-      const res = await fetch('/kiosk/checkout/task-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'memberId=' + encodeURIComponent(currentMemberId) + '&barcode=' + encodeURIComponent(barcode),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTaskState('success', data.message, 'check-circle');
-        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
-        return;
-      }
-      setTaskState('error', data.message, 'x-circle');
-      setTimeout(() => {
-        taskResult.hidden = true;
-        taskChooser.showPanel(activeMethod);
-      }, 2500);
-    } catch (err) {
-      setTaskState('error', 'Connection error. Please try again.', 'x-circle');
-      setTimeout(() => {
-        taskResult.hidden = true;
-        taskChooser.showPanel(activeMethod);
-      }, 2500);
-    }
+  secondBadgeYesBtn.addEventListener('click', () => {
+    stepSecondBadge.classList.add('kiosk-hidden');
+    stepTask2.classList.remove('kiosk-hidden');
+    // Same method-matching idea as the jump into badge 1 above - reuses
+    // whichever method (scanner/manual) badge 1 was just scanned with.
+    task2.chooser.showPanel(lastTaskMethod);
   });
 
   cancelBtn.addEventListener('click', resetToScan);
+  cancelBtn2.addEventListener('click', resetToScan);
 })();

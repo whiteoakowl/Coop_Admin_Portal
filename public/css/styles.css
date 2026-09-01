@@ -763,6 +763,16 @@ textarea:focus-visible,
 .kiosk-method-btn-manual:hover { border-color: var(--btn-green-hover); }
 .kiosk-method-btn-manual .landing-icon { color: #2f4a20; }
 
+/* A real request: "after parent scans their setup/cleanup badge it
+   should ask if they have a 2nd setup/cleanup badge to scan, with yes
+   and no buttons." A plain 2-choice prompt (step-second-badge in
+   kiosk-checkin.ejs/kiosk-checkout.ejs), reusing .primary-btn/
+   .btn-secondary (Yes/No) sized up for a kiosk touchscreen instead of
+   their normal form-button size. */
+.kiosk-yesno-buttons { display: flex; justify-content: center; gap: 1rem; margin-top: 0.5rem; }
+.kiosk-yesno-buttons .primary-btn,
+.kiosk-yesno-buttons .btn-secondary { margin-top: 0; min-width: 140px; padding: 1rem 2rem; font-size: 1.15rem; }
+
 /* "Back" link out of a chosen method, back to the button row above -
    plain-text style so it doesn't compete with the method buttons or
    panel's own primary action for attention. */

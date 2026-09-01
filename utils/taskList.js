@@ -270,15 +270,25 @@ async function findSetupCleanupBypassBadge(barcode) {
 // deliberately reusable by anyone without their own card, any number of
 // times a day, so callers should only invoke this for a real
 // findTaskItemByBarcode result, never for a bypass scan.
+//
+// Also checks each table's own "2nd badge" slot (task_item_id_2 - a real
+// request: "after parent scans their setup/cleanup badge it should ask
+// if they have a 2nd setup/cleanup badge to scan") - a task scanned as
+// someone's SECOND badge is just as logged as one scanned as their
+// first, so it has to block a different member's scan of that same
+// badge in either slot too.
 async function taskAlreadyLoggedByAnotherMember(taskItemId, date, memberId) {
   const row = await db
     .prepare(
-      `SELECT member_id FROM attendance WHERE task_item_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL AND member_id != ?
+      `SELECT member_id FROM attendance
+        WHERE session_date = ? AND member_id != ?
+          AND ((task_item_id = ? AND task_scanned_at IS NOT NULL) OR (task_item_id_2 = ? AND task_scanned_at_2 IS NOT NULL))
        UNION
-       SELECT member_id FROM checkouts WHERE task_item_id = ? AND session_date = ? AND member_id != ?
+       SELECT member_id FROM checkouts
+        WHERE session_date = ? AND member_id != ? AND (task_item_id = ? OR task_item_id_2 = ?)
        LIMIT 1`
     )
-    .get(taskItemId, date, memberId, taskItemId, date, memberId);
+    .get(date, memberId, taskItemId, taskItemId, date, memberId, taskItemId, taskItemId);
   return !!row;
 }
 

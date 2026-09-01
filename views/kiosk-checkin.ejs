@@ -81,7 +81,13 @@
          public/js/kiosk-checkin.js jumps straight to whichever method
          panel matches step-scan's own (data-back-to-chooser still lets
          someone switch if they need to), so this step never makes them
-         pick a method twice. -->
+         pick a method twice.
+
+         The task-* classes below (alongside this panel's own ids, kept
+         for aria-label/uniqueness) are what public/js/kiosk-checkin.js's
+         shared wireTaskStep() queries by, so this exact block can be
+         reused verbatim as step-task-2 further down for the optional
+         2nd badge. -->
     <div id="step-task" class="kiosk-panel kiosk-hidden">
       <div class="kiosk-method-choice">
         <div class="kiosk-method-buttons">
@@ -104,19 +110,20 @@
       <div data-method-panel="manual" hidden>
         <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
         <p class="kiosk-instructions">Hi <span class="task-member-name">-</span>, please enter your Setup/Cleanup badge ID number</p>
-        <div id="task-id-keypad"></div>
-        <button type="button" id="task-manual-submit-btn" class="primary-btn">Submit</button>
+        <div class="task-id-keypad" id="task-id-keypad"></div>
+        <button type="button" class="task-manual-submit-btn primary-btn" id="task-manual-submit-btn">Submit</button>
       </div>
 
-      <div id="task-kiosk-result" hidden>
-        <div id="task-kiosk-status" class="kiosk-status kiosk-status-idle">
+      <div class="task-kiosk-result" id="task-kiosk-result" hidden>
+        <div class="task-kiosk-status kiosk-status kiosk-status-idle" id="task-kiosk-status">
           <span class="kiosk-status-icon"></span>
         </div>
-        <p id="task-kiosk-instructions" class="kiosk-instructions"></p>
+        <p class="task-kiosk-instructions kiosk-instructions" id="task-kiosk-instructions"></p>
       </div>
 
-      <form id="task-scan-form" autocomplete="off">
+      <form class="task-scan-form" id="task-scan-form" autocomplete="off">
         <input
+          class="task-barcode-input"
           id="task-barcode-input"
           name="barcode"
           type="text"
@@ -129,6 +136,78 @@
       </form>
 
       <button id="cancel-btn" type="button" class="kiosk-cancel-btn">Cancel</button>
+    </div>
+
+    <!-- A real request: "after parent scans their setup/cleanup badge it
+         should ask if they have a 2nd setup/cleanup badge to scan, with
+         yes and no buttons. if they select yes, it allows them to scan
+         their barcode. if they are entering I'd numbers, it will show a
+         keypad and allow them to enter their ID number. after the 2nd
+         badge entry the screen says thank, you! and goes back to the
+         home screen. if they select no, it's says thank you! and goes
+         back to the home screen." A member covering two Setup/Cleanup
+         jobs the same day (setup_task_assignments.task_item_id_2) needs
+         a way to log both - shown right after step-task's own badge
+         scan succeeds instead of finishing immediately. -->
+    <div id="step-second-badge" class="kiosk-panel kiosk-hidden">
+      <p class="kiosk-instructions">Do you have a 2nd Setup/Cleanup badge to scan?</p>
+      <div class="kiosk-yesno-buttons">
+        <button type="button" id="second-badge-yes-btn" class="primary-btn">Yes</button>
+        <button type="button" id="second-badge-no-btn" class="btn-secondary">No</button>
+      </div>
+    </div>
+
+    <!-- Badge #2 - an exact copy of step-task above (same task-* classes,
+         see that panel's own comment), reused by public/js/kiosk-
+         checkin.js's shared wireTaskStep() for the second scan. -->
+    <div id="step-task-2" class="kiosk-panel kiosk-hidden">
+      <div class="kiosk-method-choice">
+        <div class="kiosk-method-buttons">
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-barcode"/></svg></span>
+            <span class="landing-label">Barcode Scanner</span>
+          </button>
+          <button type="button" class="kiosk-method-btn kiosk-method-btn-manual" data-method="manual">
+            <span class="landing-icon"><svg class="icon"><use href="#icon-grid"/></svg></span>
+            <span class="landing-label">Manually Enter ID #</span>
+          </button>
+        </div>
+      </div>
+
+      <div data-method-panel="scanner" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-instructions">Hi <span class="task-member-name">-</span>, please scan your 2nd Setup/Cleanup badge</p>
+      </div>
+
+      <div data-method-panel="manual" hidden>
+        <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-instructions">Hi <span class="task-member-name">-</span>, please enter your 2nd Setup/Cleanup badge ID number</p>
+        <div class="task-id-keypad" id="task-id-keypad-2"></div>
+        <button type="button" class="task-manual-submit-btn primary-btn" id="task-manual-submit-btn-2">Submit</button>
+      </div>
+
+      <div class="task-kiosk-result" id="task-kiosk-result-2" hidden>
+        <div class="task-kiosk-status kiosk-status kiosk-status-idle" id="task-kiosk-status-2">
+          <span class="kiosk-status-icon"></span>
+        </div>
+        <p class="task-kiosk-instructions kiosk-instructions" id="task-kiosk-instructions-2"></p>
+      </div>
+
+      <form class="task-scan-form" id="task-scan-form-2" autocomplete="off">
+        <input
+          class="task-barcode-input"
+          id="task-barcode-input-2"
+          name="barcode"
+          type="text"
+          aria-label="Scan your 2nd Setup/Cleanup badge"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          inputmode="none"
+        />
+      </form>
+
+      <button id="cancel-btn-2" type="button" class="kiosk-cancel-btn">Cancel</button>
     </div>
   </main>
   <script src="/js/kiosk-common.js"></script>

@@ -21,17 +21,22 @@ router.get('/checkout', (req, res) => {
 
 // Records this member's checkout across every roster they're scheduled on
 // today - taskItemId is null for students (who never scan one) and for a
-// parent whose scanned task barcode wasn't recognized.
-async function recordCheckout(member, rosters, today, taskItemId) {
+// parent whose scanned task barcode wasn't recognized. taskItemId2 (a
+// real request: "after parent scans their setup/cleanup badge it should
+// ask if they have a 2nd setup/cleanup badge to scan") is null unless a
+// second badge was scanned - see /checkout/task-scan-2 below - or
+// carried over from an already-logged check-in-time scan (see
+// /checkout/scan's alreadyLogged branch).
+async function recordCheckout(member, rosters, today, taskItemId, taskItemId2) {
   const upsert = db.prepare(
-    `INSERT INTO checkouts (member_id, roster_id, session_date, task_item_id, check_out_time)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO checkouts (member_id, roster_id, session_date, task_item_id, task_item_id_2, check_out_time)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(member_id, roster_id, session_date)
-     DO UPDATE SET task_item_id = excluded.task_item_id, check_out_time = excluded.check_out_time, recorded_at = now_text()`
+     DO UPDATE SET task_item_id = excluded.task_item_id, task_item_id_2 = excluded.task_item_id_2, check_out_time = excluded.check_out_time, recorded_at = now_text()`
   );
   const now = Date.now();
   for (const roster of rosters) {
-    await upsert.run(member.id, roster.id, today, taskItemId, now);
+    await upsert.run(member.id, roster.id, today, taskItemId, taskItemId2 || null, now);
   }
 }
 
@@ -106,10 +111,10 @@ router.post('/checkout/scan', async (req, res) => {
   // findSetupCleanupBypassBadge's own comment), which must still count
   // as logged.
   const alreadyLogged = await db
-    .prepare('SELECT task_item_id FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
+    .prepare('SELECT task_item_id, task_item_id_2 FROM attendance WHERE member_id = ? AND session_date = ? AND task_scanned_at IS NOT NULL LIMIT 1')
     .get(member.id, today);
   if (alreadyLogged) {
-    await recordCheckout(member, rosters, today, alreadyLogged.task_item_id);
+    await recordCheckout(member, rosters, today, alreadyLogged.task_item_id, alreadyLogged.task_item_id_2);
     return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
   }
 
@@ -166,6 +171,60 @@ router.post('/checkout/task-scan', async (req, res) => {
   }
 
   await recordCheckout(member, rosters, today, task ? task.id : null);
+  // A real request: "after parent scans their setup/cleanup badge it
+  // should ask if they have a 2nd setup/cleanup badge to scan, with yes
+  // and no buttons." message already carries the eventual "all done"
+  // text so a "No" answer (see public/js/kiosk-checkout.js) can show it
+  // immediately with no second round trip.
+  res.json({ ok: true, name: member.name, needsSecondBadgeChoice: true, message: `Thank you for checking out, ${member.name}! Have a great day!` });
+});
+
+// Step 3 (optional): a parent covering two Setup/Cleanup jobs the same
+// day scans a second badge after answering "Yes" to the step-2 prompt
+// above. Mirrors /checkout/task-scan almost exactly, except the
+// checkouts row already exists (created by /checkout/task-scan itself,
+// which is also this member's actual checkout timestamp) so this only
+// ever UPDATEs the second slot, never re-inserts.
+router.post('/checkout/task-scan-2', async (req, res) => {
+  if (checkoutLimiter.isLimited(req.ip)) {
+    return res.json({ ok: false, message: 'Too many check-outs from this device right now. Please wait a moment and try again.' });
+  }
+  checkoutLimiter.recordAttempt(req.ip);
+
+  const memberId = parseInt(req.body.memberId, 10);
+  const barcode = (req.body.barcode || '').trim();
+  const today = todayISO();
+
+  if (!barcode) {
+    return res.json({ ok: false, message: 'No barcode scanned.' });
+  }
+
+  const member = await db.prepare('SELECT * FROM members WHERE id = ? AND active = 1').get(memberId);
+  if (!member) {
+    return res.json({ ok: false, message: 'Member not found.' });
+  }
+
+  const task = await findTaskItemByBarcode(barcode);
+  const bypass = task ? null : await findSetupCleanupBypassBadge(barcode);
+  if (!task && !bypass) {
+    return res.json({ ok: false, message: 'Barcode not recognized. Please see an attendant.' });
+  }
+
+  if (task && (await taskAlreadyLoggedByAnotherMember(task.id, today, member.id))) {
+    return res.json({ ok: false, message: `"${task.description}" has already been logged today. Please scan a different Setup/Cleanup badge.` });
+  }
+
+  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
+  }
+
+  const taskItemId2 = task ? task.id : null;
+  const update = db.prepare('UPDATE checkouts SET task_item_id_2 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
+  for (const r of rosters) {
+    await update.run(taskItemId2, member.id, r.id, today);
+  }
+
   res.json({ ok: true, name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
 });
 
