@@ -8,7 +8,32 @@
 // entry - see gradeLevelLabel/setupCleanupJobLabels' own comments).
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+// A real bug this file itself had: unlike every sibling nameTag*.test.js
+// file, it never set DB_PATH before requiring utils/nameTagData.js (whose
+// own top-level `require('../db')` needs it) - so it silently fell
+// through to db/index.js's "DB_PATH unset" branch, which opens the real
+// PERSISTENT on-disk PGlite instance at data/pglite (the one a plain
+// `node server.js` run actually uses) instead of an isolated throwaway
+// one. Harmless when nothing else has that directory open, but a real
+// hang once something else does (PGlite's own file lock never clears) -
+// confirmed live: this file hung indefinitely under exactly that
+// condition. splitNameLines itself needs no database at all; this is
+// purely about not touching the real one just by requiring its module.
+const testDbPath = path.join(os.tmpdir(), `name-tag-split-name-lines-test-db-${process.pid}.db`);
+process.env.DB_PATH = testDbPath;
+process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
+
 const { splitNameLines } = require('../utils/nameTagData');
+
+test.after(() => {
+  fs.rmSync(testDbPath, { force: true });
+  fs.rmSync(`${testDbPath}-wal`, { force: true });
+  fs.rmSync(`${testDbPath}-shm`, { force: true });
+});
 
 test('splitNameLines splits a two-word name into [first, last]', () => {
   assert.deepEqual(splitNameLines('Jessica Adema'), ['Jessica', 'Adema']);

@@ -53,6 +53,37 @@ async function cleanupTeamsForParents(memberIds) {
   return byMember;
 }
 
+// A real request: "when someone is assigned to a setup/cleanup team it
+// will be listed on all of the parents/adults name tags on that families
+// account" - name tags specifically (badgeDataForMember(s) below), not
+// every other cleanupTeamRowsForParent(s) caller (the parent/student
+// portal's own name-tag print flows already go through badgeDataForMember(s)
+// too, so this covers them the same way). DISTINCT because two family
+// members sharing the same team would otherwise list that team twice.
+async function cleanupTeamRowsForFamilies(familyIds) {
+  if (familyIds.length === 0) return {};
+  const placeholders = familyIds.map(() => '?').join(',');
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT m.family_id AS "familyId", st.day, st.title FROM setup_teams st
+       JOIN setup_team_members stm ON stm.team_id = st.id
+       JOIN members m ON m.id = stm.member_id
+       WHERE m.family_id IN (${placeholders}) ORDER BY st.day, st.title`
+    )
+    .all(...familyIds);
+  const byFamily = {};
+  for (const row of rows) {
+    if (!byFamily[row.familyId]) byFamily[row.familyId] = [];
+    byFamily[row.familyId].push({ day: row.day, title: row.title });
+  }
+  return byFamily;
+}
+
+async function cleanupTeamRowsForFamily(familyId) {
+  if (familyId == null) return [];
+  return (await cleanupTeamRowsForFamilies([familyId]))[familyId] || [];
+}
+
 // A real request: a parent's own Monday/Wednesday setup/cleanup job needs
 // to show on their name tag, day by day (not the old cleanupTeam field's
 // "both days smashed into one comma list" - a parent on Chairs Monday and
@@ -149,7 +180,10 @@ function memberCodeLabel(member) {
 async function badgeDataForMember(member) {
   const memberCode = memberCodeLabel(member);
   if (member.member_type === 'parent') {
-    const teamRows = await cleanupTeamRowsForParent(member.id);
+    // Family-wide, not just this one parent - see cleanupTeamRowsForFamilies'
+    // own comment. A family-less parent (family_id null) falls back to
+    // just their own assignment, the same as before this change.
+    const teamRows = member.family_id != null ? await cleanupTeamRowsForFamily(member.family_id) : await cleanupTeamRowsForParent(member.id);
     return {
       name: splitNameLines(member.name),
       cleanupTeam: teamRows.map((r) => r.title).join(', '),
@@ -186,15 +220,22 @@ async function badgeDataForMember(member) {
 // ~800-member bulk print time out. Returns
 // { [memberId]: <same shape badgeDataForMember returns> }.
 async function badgeDataForMembers(members) {
-  const parentIds = members.filter((m) => m.member_type === 'parent').map((m) => m.id);
-  const teamRowsByParent = await cleanupTeamRowsForParents(parentIds);
+  const parents = members.filter((m) => m.member_type === 'parent');
+  // Family-wide (see cleanupTeamRowsForFamilies' own comment) for parents
+  // with a family, one batched query for every distinct family instead of
+  // one per parent; family-less parents (family_id null) fall back to
+  // their own assignment via the plain per-parent lookup, same as before.
+  const familyIds = [...new Set(parents.filter((m) => m.family_id != null).map((m) => m.family_id))];
+  const teamRowsByFamily = await cleanupTeamRowsForFamilies(familyIds);
+  const familylessParentIds = parents.filter((m) => m.family_id == null).map((m) => m.id);
+  const teamRowsByParent = await cleanupTeamRowsForParents(familylessParentIds);
   const adminIds = members.filter((m) => m.member_type === 'admin').map((m) => m.id);
   const positionTitlesByMember = await adminPositionTitlesForMembers(adminIds);
   const result = {};
   for (const member of members) {
     const memberCode = memberCodeLabel(member);
     if (member.member_type === 'parent') {
-      const teamRows = teamRowsByParent[member.id] || [];
+      const teamRows = (member.family_id != null ? teamRowsByFamily[member.family_id] : teamRowsByParent[member.id]) || [];
       result[member.id] = {
         name: splitNameLines(member.name),
         cleanupTeam: teamRows.map((r) => r.title).join(', '),
