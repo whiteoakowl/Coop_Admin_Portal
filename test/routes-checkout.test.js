@@ -68,7 +68,7 @@ test('checkout kiosk - students', async (t) => {
     const res = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'Checkout Kid' });
     assert.equal(res.body.ok, true);
     assert.equal(res.body.memberType, 'student');
-    assert.match(res.body.message, /Have a great day, Checkout Kid!/);
+    assert.match(res.body.message, /Thank you for checking out, Checkout Kid! Have a great day!/);
 
     const checkout = await db
       .prepare('SELECT * FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')
@@ -125,7 +125,7 @@ test('checkout kiosk - parents', async (t) => {
       .type('form')
       .send({ memberId: String(memberId), barcode: '999001' });
     assert.equal(res.body.ok, true);
-    assert.match(res.body.message, /Have a great day, Task Scan Parent!/);
+    assert.match(res.body.message, /Thank you for checking out, Task Scan Parent! Have a great day!/);
 
     const checkout = await db
       .prepare('SELECT * FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')

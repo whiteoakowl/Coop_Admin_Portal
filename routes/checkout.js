@@ -90,7 +90,7 @@ router.post('/checkout/scan', async (req, res) => {
 
   if (member.member_type === 'student') {
     await recordCheckout(member, rosters, today, null);
-    return res.json({ ok: true, memberType: 'student', name: member.name, message: `Have a great day, ${member.name}!` });
+    return res.json({ ok: true, memberType: 'student', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
   }
 
   // A real request: "add a dropdown menu to each setup/cleanup team list
@@ -110,7 +110,7 @@ router.post('/checkout/scan', async (req, res) => {
     .get(member.id, today);
   if (alreadyLogged) {
     await recordCheckout(member, rosters, today, alreadyLogged.task_item_id);
-    return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Have a great day, ${member.name}!` });
+    return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
   }
 
   res.json({ ok: true, memberType: 'parent', memberId: member.id, name: member.name });
@@ -166,7 +166,7 @@ router.post('/checkout/task-scan', async (req, res) => {
   }
 
   await recordCheckout(member, rosters, today, task ? task.id : null);
-  res.json({ ok: true, name: member.name, message: `Have a great day, ${member.name}!` });
+  res.json({ ok: true, name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
 });
 
 module.exports = router;

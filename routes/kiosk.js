@@ -136,7 +136,7 @@ router.post('/checkin/scan', async (req, res) => {
     }
   }
 
-  res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });
+  res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
 
 // Step 2 ("log on check in" members only): scan the Setup/Cleanup badge
@@ -196,7 +196,7 @@ router.post('/checkin/task-scan', async (req, res) => {
     await update.run(taskItemId, now, member.id, r.id, today);
   }
 
-  res.json({ ok: true, name: member.name, message: `Welcome to Co-op, ${member.name}!` });
+  res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
 
 // --- Find a Parent ---

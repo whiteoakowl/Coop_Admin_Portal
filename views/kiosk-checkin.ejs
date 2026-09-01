@@ -35,6 +35,7 @@
 
       <div data-method-panel="manual" hidden>
         <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-scan-now-text">Please enter your ID number</p>
         <div id="id-keypad"></div>
         <button type="button" id="manual-submit-btn" class="primary-btn">Submit</button>
       </div>
@@ -71,9 +72,17 @@
          Same two-method shape as step-scan, just for a task's barcode
          instead of a member's - mirrors kiosk-checkout.ejs's own
          step-task exactly. -->
+    <!-- A real request: "if the check in/out needs to ask the parent to
+         scan their setup/cleanup badge then after scanning their ID it
+         will immediately say please scan your setup/cleanup badge. if
+         they select ID, then after they enter their ID and click
+         submit, it will immediately say please enter your setup/cleanup
+         badge ID number." No chooser here anymore for that reason -
+         public/js/kiosk-checkin.js jumps straight to whichever method
+         panel matches step-scan's own (data-back-to-chooser still lets
+         someone switch if they need to), so this step never makes them
+         pick a method twice. -->
     <div id="step-task" class="kiosk-panel kiosk-hidden">
-      <p class="kiosk-instructions">Hi <span id="member-name">-</span>, scan your Setup/Cleanup badge</p>
-
       <div class="kiosk-method-choice">
         <div class="kiosk-method-buttons">
           <button type="button" class="kiosk-method-btn kiosk-method-btn-scanner" data-method="scanner">
@@ -89,11 +98,12 @@
 
       <div data-method-panel="scanner" hidden>
         <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
-        <p class="kiosk-scan-now-text">Scan badge now</p>
+        <p class="kiosk-instructions">Hi <span class="task-member-name">-</span>, please scan your Setup/Cleanup badge</p>
       </div>
 
       <div data-method-panel="manual" hidden>
         <button type="button" class="kiosk-method-back" data-back-to-chooser>&lsaquo; Change Method</button>
+        <p class="kiosk-instructions">Hi <span class="task-member-name">-</span>, please enter your Setup/Cleanup badge ID number</p>
         <div id="task-id-keypad"></div>
         <button type="button" id="task-manual-submit-btn" class="primary-btn">Submit</button>
       </div>

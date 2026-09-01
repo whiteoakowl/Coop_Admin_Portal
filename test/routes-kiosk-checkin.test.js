@@ -65,7 +65,7 @@ test('kiosk check-in scan', async (t) => {
     const res = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'Scan Test Kid' });
     assert.equal(res.body.ok, true);
     assert.equal(res.body.name, 'Scan Test Kid');
-    assert.match(res.body.message, /Welcome to Co-op, Scan Test Kid/);
+    assert.match(res.body.message, /Thank you for checking in, Scan Test Kid/);
 
     const attendance = await db
       .prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')

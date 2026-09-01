@@ -12,7 +12,7 @@
 
   const stepScan = document.getElementById('step-scan');
   const stepTask = document.getElementById('step-task');
-  const memberNameEl = document.getElementById('member-name');
+  const memberNameEls = stepTask.querySelectorAll('.task-member-name');
   const cancelBtn = document.getElementById('cancel-btn');
 
   const taskForm = document.getElementById('task-scan-form');
@@ -102,10 +102,14 @@
 
       if (data.memberType === 'parent-taskscan') {
         currentMemberId = data.memberId;
-        memberNameEl.textContent = data.name;
+        memberNameEls.forEach((el) => { el.textContent = data.name; });
         result.hidden = true;
         stepScan.classList.add('kiosk-hidden');
         stepTask.classList.remove('kiosk-hidden');
+        // A real request: jump straight into the same method (scanner
+        // or manual) just used for the member's own ID, instead of
+        // making them pick a method again for the Setup/Cleanup badge.
+        taskChooser.showPanel(activeMethod);
         return;
       }
 

@@ -98,7 +98,7 @@ test('checkout: scanning the bypass badge instead of a task barcode still checks
     .type('form')
     .send({ memberId: String(memberId), barcode: badge.barcode });
   assert.equal(res.body.ok, true);
-  assert.match(res.body.message, /Have a great day, Bypass Card Parent!/);
+  assert.match(res.body.message, /Thank you for checking out, Bypass Card Parent! Have a great day!/);
 
   const checkout = await db
     .prepare('SELECT * FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?')

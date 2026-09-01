@@ -162,7 +162,7 @@ test('a member on a "log on check in" team scans their badge at check-in, and ch
       .type('form')
       .send({ memberId: String(memberId), barcode: '999101' });
     assert.equal(taskScanRes.body.ok, true);
-    assert.match(taskScanRes.body.message, /Welcome to Co-op, Checkin Task Parent!/);
+    assert.match(taskScanRes.body.message, /Thank you for checking in, Checkin Task Parent!/);
 
     const attendance = await db.prepare('SELECT * FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(memberId, rosterId, todayISO());
     assert.equal(attendance.task_item_id, taskId);
@@ -173,7 +173,7 @@ test('a member on a "log on check in" team scans their badge at check-in, and ch
     const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'checkin-task-parent-1' });
     assert.equal(checkoutRes.body.ok, true);
     assert.equal(checkoutRes.body.memberType, 'parent-already-logged');
-    assert.match(checkoutRes.body.message, /Have a great day, Checkin Task Parent!/);
+    assert.match(checkoutRes.body.message, /Thank you for checking out, Checkin Task Parent! Have a great day!/);
 
     const checkout = await db.prepare('SELECT * FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(memberId, rosterId, todayISO());
     assert.ok(checkout, 'expected a checkout row even though the task step ran at check-in');
@@ -213,7 +213,7 @@ test('a member on a "log on check out" team (or no team at all) keeps the origin
     const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'checkout-timing-parent-1' });
     assert.equal(checkinRes.body.ok, true);
     assert.notEqual(checkinRes.body.memberType, 'parent-taskscan', 'a "checkout" team should not route to the check-in task-scan step');
-    assert.match(checkinRes.body.message, /Welcome to Co-op/);
+    assert.match(checkinRes.body.message, /Thank you for checking in/);
 
     const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'checkout-timing-parent-1' });
     assert.equal(checkoutRes.body.memberType, 'parent', 'still the original two-step flow - not yet checked out');
@@ -227,7 +227,7 @@ test('a member on a "log on check out" team (or no team at all) keeps the origin
     await scheduleParentTodayOnMonday(memberId);
 
     const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'no-team-parent-1' });
-    assert.match(checkinRes.body.message, /Welcome to Co-op/);
+    assert.match(checkinRes.body.message, /Thank you for checking in/);
 
     const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'no-team-parent-1' });
     assert.equal(checkoutRes.body.memberType, 'parent');
@@ -247,9 +247,9 @@ test('a student is never asked to scan a Setup/Cleanup badge, even if somehow pl
 
   const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'guard-student-1' });
   assert.notEqual(checkinRes.body.memberType, 'parent-taskscan');
-  assert.match(checkinRes.body.message, /Welcome to Co-op/);
+  assert.match(checkinRes.body.message, /Thank you for checking in/);
 
   const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'guard-student-1' });
   assert.equal(checkoutRes.body.memberType, 'student');
-  assert.match(checkoutRes.body.message, /Have a great day/);
+  assert.match(checkoutRes.body.message, /Thank you for checking out/);
 });
