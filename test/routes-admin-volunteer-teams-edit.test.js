@@ -63,7 +63,15 @@ test('Floater Teams: 4 hour cards, rank/remove start locked, hour title is edita
   });
 
   await t.test('the rank select and the remove-member trash icon both start locked', () => {
-    assert.match(res.text, /<select name="rank" class="team-member-rank-select" onchange="this\.form\.requestSubmit\(\)" disabled>/);
+    // A real request: "when edit the floater list and changing the
+    // choose first, sometimes and backup drop down it should stay on
+    // that screen and not refresh until I click the check mark to save
+    // the card." The select no longer owns/auto-submits its own form -
+    // it's tied to the card's shared hour-edit-form via form="..." (see
+    // test/routes-floater-team-rank-batch-save.test.js for the actual
+    // batched-save behavior this markup change enables).
+    assert.match(res.text, new RegExp(`<select name="rank_${memberId}" class="team-member-rank-select" form="hour-edit-form-${section.id}" disabled>`));
+    assert.doesNotMatch(res.text, /onchange="this\.form\.requestSubmit\(\)"/);
     assert.match(res.text, /data-edit-toggle-reveal hidden data-member-remove-btn/);
   });
 });

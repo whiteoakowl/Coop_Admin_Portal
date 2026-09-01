@@ -85,13 +85,25 @@
                   <div class="team-member-row" data-member-remove-row>
                     <span class="team-member-avatar"><%= m.name.charAt(0).toUpperCase() %></span>
                     <span class="team-member-name-col"><span class="team-member-name" title="<%= m.name %>"><a class="member-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><% if (m.infant) { %> <span class="team-member-flag">(infant)</span><% } %></span><% if (m.phone) { %><span class="team-member-phone"><%= m.phone %></span><% } %></span>
-                    <form method="POST" action="/admin/volunteers/<%= day %>/teams/<%= team.section.id %>/members/<%= m.id %>/rank" class="inline-block-form no-print">
-                      <select name="rank" class="team-member-rank-select" onchange="this.form.requestSubmit()" disabled>
-                        <% ranks.forEach(function(r) { %>
-                          <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
-                        <% }); %>
-                      </select>
-                    </form>
+                    <%# A real request: "when edit the floater list and
+                        changing the choose first, sometimes and backup
+                        drop down it should stay on that screen and not
+                        refresh until I click the check mark to save the
+                        card. I should be able to change several
+                        dropdowns next to each floater before I click
+                        save." Same piggyback-on-the-card's-own-Save
+                        pattern as the removeMemberIds checkbox below
+                        (public/js/team-member-remove-toggle.js's own
+                        comment) - this select lives outside any form of
+                        its own and no longer auto-submits on change;
+                        form="..." ties it to the card's shared hour-
+                        edit-form instead, so any number of pending rank
+                        changes ride along with that one Save. %>
+                    <select name="rank_<%= m.id %>" class="team-member-rank-select" form="hour-edit-form-<%= team.section.id %>" disabled>
+                      <% ranks.forEach(function(r) { %>
+                        <option value="<%= r %>" <%= m.rank === r ? 'selected' : '' %>><%= rankLabels[r] %></option>
+                      <% }); %>
+                    </select>
                     <%# A real request: "when deleting floaters ... it
                         should allow for multiple deletes and then click
                         save before refreshing." This trash icon no longer

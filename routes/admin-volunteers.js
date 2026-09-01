@@ -461,6 +461,23 @@ router.post('/volunteers/:day/teams/:sectionId/hour-label', requireAdmin, requir
   for (const memberId of removeIds) await removeMemberFromSection(list.id, memberId, sectionId);
   if (removeIds.length) await syncDayMemberRosters(day);
 
+  // Batched rank changes staged by each member's own rank <select> - a
+  // real request: "when I edit the floater list and change the choose
+  // first/sometimes/backup dropdown it should stay on that screen and
+  // not refresh until I click the check mark... I should be able to
+  // change several dropdowns... before I click save." Same piggyback-on-
+  // this-Save-submission pattern as removeMemberIds above, one
+  // rank_<memberId> field per member (admin-volunteer-teams.ejs's own
+  // select[name]) instead of each dropdown's own immediate onchange
+  // submit/reload. setSectionRank silently no-ops on an invalid rank
+  // value, so a stray/tampered field can't corrupt anything.
+  for (const [key, value] of Object.entries(req.body)) {
+    if (!key.startsWith('rank_')) continue;
+    const memberId = parseInt(key.slice('rank_'.length), 10);
+    if (!memberId) continue;
+    await setSectionRank(list.id, memberId, sectionId, value);
+  }
+
   await syncMemberSchedulesForDay(day);
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(removeIds.length ? `Hour updated. Removed ${removeIds.length} member(s).` : 'Hour renamed.'));
 });
