@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/student/classes">&larr; My Classes</a></p>
+    <h1><%= cls.class_name %></h1>
+    <p class="hint">
+      <%= cls.dayLabel %> &middot; <%= cls.timeLabel %>
+      <% if (cls.room) { %> &middot; <%= cls.room %><% } %>
+      <% if (cls.teacherNames.length) { %> &middot; <%= cls.teacherNames.join(', ') %><% } %>
+    </p>
+    <% if (cls.description) { %><div class="hint forum-editable-display"><%- cls.description %></div><% } %>
+
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'assignments' ? ' active' : '' %>" href="?tab=assignments">Assignments</a>
+      <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons">Lessons</a>
+      <a class="view-tab<%= tab === 'forum' ? ' active' : '' %>" href="?tab=forum">Class Forum</a>
+      <a class="view-tab<%= tab === 'resources' ? ' active' : '' %>" href="?tab=resources">Resources</a>
+      <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance">Attendance</a>
+      <a class="view-tab<%= tab === 'assessments' ? ' active' : '' %>" href="?tab=assessments">Assessments</a>
+      <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades">Grades</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'assignments') { %>
+        <% if (assignments.length === 0) { %>
+          <p class="roster-empty">No assignments yet.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Assignment</th><th>Due</th><th>Grade</th></tr>
+              </thead>
+              <tbody>
+                <% assignments.forEach(function(a) { %>
+                  <tr>
+                    <td class="roster-name-col">
+                      <strong><%= a.title %></strong>
+                      <% if (a.description) { %><div class="hint"><%= a.description %></div><% } %>
+                    </td>
+                    <td><%= a.dueDateLabel || '—' %></td>
+                    <td>
+                      <% if (!a.graded) { %>
+                        <span class="hint">Not graded yet</span>
+                      <% } else { %>
+                        <strong><%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %></strong>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      <% } else if (tab === 'grades') { %>
+        <% const graded = assignments.filter(function(a) { return a.graded; }); %>
+        <% if (graded.length === 0) { %>
+          <p class="roster-empty">No grades recorded yet.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Assignment</th><th>Score</th><th>Feedback</th></tr>
+              </thead>
+              <tbody>
+                <% graded.forEach(function(a) { %>
+                  <tr>
+                    <td class="roster-name-col"><strong><%= a.title %></strong></td>
+                    <td><strong><%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %></strong></td>
+                    <td><%= a.feedback || '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      <% } else if (tab === 'attendance') { %>
+        <% if (attendance.length === 0) { %>
+          <p class="roster-empty">No attendance recorded yet.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
+              </thead>
+              <tbody>
+                <% attendance.forEach(function(h) { %>
+                  <tr>
+                    <td><%= h.dateLabel %></td>
+                    <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                    <td><%= h.checkInTime || '—' %></td>
+                    <td><%= h.checkOutTime || '—' %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      <% } else if (tab === 'forum') { %>
+        <% if (forumCategory) { %>
+          <p class="hint">This class has its own chat space.</p>
+          <a class="primary-btn" href="/forums/<%= forumCategory.id %>">Open Class Chat</a>
+        <% } else { %>
+          <p class="roster-empty">No chat has been set up for this class yet.</p>
+        <% } %>
+      <% } else if (tab === 'resources') { %>
+        <p class="hint">Class-specific resources aren't set up yet - browse the co-op's full resource library instead.</p>
+        <a class="btn-secondary" href="/student/resources">Go to Resource Links</a>
+      <% } else { %>
+        <p class="roster-empty">Coming soon.</p>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

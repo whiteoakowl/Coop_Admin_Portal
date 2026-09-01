@@ -79,6 +79,30 @@ async function assignmentsForStudent(studentId, currentClassIds) {
   }));
 }
 
+// Every assignment for ONE class, joined to this student's own grade (if
+// any) for it - unlike assignmentsForStudent above, this is correctly
+// scoped to a single class_id and can't pull in an assignment from a
+// different class the student happened to be graded on once. Used by the
+// Student Portal's own class detail page (routes/student-portal.js) for
+// both its Assignments tab (every assignment, graded or not) and its
+// Grades tab (the same rows, just rendered filtered to graded ones).
+async function assignmentsForStudentInClass(studentId, classId) {
+  const rows = await db
+    .prepare(
+      `SELECT ca.*, ag.points_earned, ag.feedback
+       FROM class_assignments ca
+       LEFT JOIN assignment_grades ag ON ag.assignment_id = ca.id AND ag.student_id = ?
+       WHERE ca.class_id = ?
+       ORDER BY ca.due_date IS NULL, ca.due_date DESC, ca.created_at DESC`
+    )
+    .all(studentId, classId);
+  return rows.map((r) => ({
+    ...r,
+    dueDateLabel: r.due_date ? formatDateLabel(r.due_date) : null,
+    graded: r.points_earned != null,
+  }));
+}
+
 async function diplomaForStudent(studentId) {
   return db.prepare('SELECT * FROM diplomas WHERE student_id = ?').get(studentId);
 }
@@ -151,6 +175,7 @@ module.exports = {
   gradebookForAssignment,
   saveGrade,
   assignmentsForStudent,
+  assignmentsForStudentInClass,
   diplomaForStudent,
   allDiplomas,
   issueDiploma,

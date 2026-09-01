@@ -13,6 +13,15 @@ async function getCategory(id) {
   return db.prepare('SELECT c.*, cl.class_name FROM forum_categories c LEFT JOIN classes cl ON cl.id = c.class_id WHERE c.id = ?').get(id);
 }
 
+// The one 'class' category for a given class, if a Main Admin has ever
+// created one (see routes/admin-forums.js) - most classes have none.
+// Used by the Student Portal's own class detail page (routes/student-
+// portal.js) to link out to /forums/:id for its Class Forum tab instead
+// of building a second, class-scoped forum viewer.
+async function categoryForClass(classId) {
+  return db.prepare("SELECT id, name FROM forum_categories WHERE scope = 'class' AND class_id = ?").get(classId);
+}
+
 async function createCategory(data) {
   const info = await db
     .prepare('INSERT INTO forum_categories (name, description, scope, class_id, position) VALUES (?, ?, ?, ?, ?)')
@@ -199,6 +208,7 @@ module.exports = {
   listCategories,
   getCategory,
   createCategory,
+  categoryForClass,
   setCategoryLocked,
   deleteCategory,
   canAccessCategory,

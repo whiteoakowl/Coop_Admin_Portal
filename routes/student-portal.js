@@ -17,9 +17,10 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList } = require('../utils/classSchedule');
-const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
-const { assignmentsForStudent, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
+const { formatFriendlyTimestamp, formatTimestamp, formatDateLabel, formatTime } = require('../utils/dates');
+const { assignmentsForStudent, assignmentsForStudentInClass, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
+const forums = require('../utils/forums');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
 const notifications = require('../utils/notifications');
@@ -171,6 +172,62 @@ router.post('/classes/:id/unregister', async (req, res) => {
   const result = await unregisterFromClass({ classId, studentId: member.id, accountId: req.portalAccount.id });
   if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+});
+
+// This student's own attendance history for one class, via the class's
+// own auto-roster (classes.roster_id, see ensureClassRoster/
+// syncClassRosterMembers in utils/classSchedule.js) - same shape as
+// attendanceHistoryForMember in routes/admin-members.js, just narrowed to
+// one roster_id instead of every roster the member ever appears on.
+async function classAttendanceHistory(memberId, rosterId) {
+  if (!rosterId) return [];
+  const rows = await db
+    .prepare(
+      `SELECT a.session_date AS date, a.status, a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime"
+       FROM attendance a
+       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+       WHERE a.member_id = ? AND a.roster_id = ?
+       ORDER BY a.session_date DESC`
+    )
+    .all(memberId, rosterId);
+  return rows.map((r) => ({
+    dateLabel: formatDateLabel(r.date),
+    status: r.status,
+    statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+    checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+  }));
+}
+
+const CLASS_DETAIL_TABS = ['assignments', 'lessons', 'forum', 'resources', 'attendance', 'assessments', 'grades'];
+
+// One class's own detail page - card-clicked from /student/classes. Read-
+// only for this first pass: Assignments/Grades reuse the real academics
+// data (utils/academics.js) already shown on this student's own
+// /student/assignments page, just scoped to this one class; Attendance
+// reuses the class's own auto-roster the same way admin/kiosk attendance
+// already does. Lessons/Assessments have no data model yet (a real
+// per-class content feature, not yet built) so they render a simple
+// "coming soon" placeholder rather than fabricating content. Class Forum
+// links out to this class's own /forums/:id category when a Main Admin
+// has created one (most classes have none yet) instead of building a
+// second, class-scoped forum viewer next to the one that already exists
+// at /forums. Only ever shows a class this student is actually enrolled
+// in - re-derived from classesForStudent on every request, same
+// never-trust-a-passed-id rule every other route in this file follows.
+router.get('/classes/:id', async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForStudent(member);
+  const cls = classes.find((c) => c.id === classId);
+  if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+
+  const tab = CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'assignments';
+  const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(member.id, classId) : [];
+  const attendance = tab === 'attendance' ? await classAttendanceHistory(member.id, cls.roster_id) : [];
+  const forumCategory = tab === 'forum' ? await forums.categoryForClass(classId) : null;
+
+  res.render('student-class-detail', { title: cls.class_name, cls, tab, assignments, attendance, forumCategory });
 });
 
 router.get('/assignments', async (req, res) => {

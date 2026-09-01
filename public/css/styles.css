@@ -8007,6 +8007,28 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .game-tile-dark .game-tile-preview { background: #1f2937; }
 .game-tile-dark .mini-label, .game-tile-dark .mini-word { color: #f1f5f9; }
 
+/* Student Portal "My Classes" card grid (views/student-classes.ejs) - a
+   real request for a card list instead of the older plain table, filtered
+   by the same Monday/Wednesday/All .day-toggle pill used everywhere else
+   in the app for this exact day choice, just as <button>s here (client-
+   side filter, public/js/classes-day-filter.js) instead of <a> page
+   navigations. */
+button.day-toggle-option { border: 0; background: transparent; cursor: pointer; font-family: inherit; }
+.classes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.class-card {
+  position: relative; display: flex; flex-direction: column; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden; transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.class-card:hover, .class-card:focus-within { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.class-card[hidden] { display: none; }
+.class-card-link { display: block; text-decoration: none; color: inherit; }
+.class-card-color-bar { height: 0.4rem; }
+.class-card-body { padding: 0.85rem 1rem 0.5rem; }
+.class-card-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; }
+.class-card-meta { margin: 0.1rem 0; font-size: 0.82rem; color: var(--muted); }
+.class-card-unregister { padding: 0 1rem 0.85rem; }
+
 /* Mini gameplay mockups - small trusted HTML snippets from each catalog
    entry's own `preview` field (utils/gamesCatalog.js), built entirely
    from these shared helper classes so a tile reads as a little

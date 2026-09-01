@@ -16,38 +16,30 @@
     <% if (classes.length === 0) { %>
       <p class="roster-empty">You're not enrolled in any classes yet.</p>
     <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <thead>
-            <tr>
-              <th>Class</th>
-              <th>Day / Time</th>
-              <th>Room</th>
-              <th>Teacher</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% classes.forEach(function(c) { %>
-              <tr>
-                <td class="roster-name-col">
-                  <strong><%= c.class_name %></strong>
-                  <% if (c.description) { %><div class="hint forum-editable-display"><%- c.description %></div><% } %>
-                </td>
-                <td><%= c.dayLabel %> &middot; <%= c.timeLabel %></td>
-                <td><%= c.room || '—' %></td>
-                <td><%= c.teacherNames.length ? c.teacherNames.join(', ') : '—' %></td>
-                <td>
-                  <% if (c.allow_student_register && c.allow_cancel) { %>
-                    <form method="POST" action="/student/classes/<%= c.id %>/unregister" class="inline-block-form">
-                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
-                    </form>
-                  <% } %>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+      <div class="day-toggle no-print classes-day-filter" role="tablist">
+        <button type="button" class="day-toggle-option active" data-filter="all">All</button>
+        <button type="button" class="day-toggle-option" data-filter="monday">Monday</button>
+        <button type="button" class="day-toggle-option" data-filter="wednesday">Wednesday</button>
+      </div>
+      <div class="classes-grid">
+        <% classes.forEach(function(c) { %>
+          <div class="class-card" data-day="<%= c.day %>">
+            <a class="class-card-link" href="/student/classes/<%= c.id %>">
+              <div class="class-card-color-bar" style="background:<%= c.color %>"></div>
+              <div class="class-card-body">
+                <h3 class="class-card-title"><%= c.class_name %></h3>
+                <p class="class-card-meta"><%= c.dayLabel %> &middot; <%= c.timeLabel %></p>
+                <p class="class-card-meta"><%= c.room || 'No room set' %></p>
+                <p class="class-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+              </div>
+            </a>
+            <% if (c.allow_student_register && c.allow_cancel) { %>
+              <form method="POST" action="/student/classes/<%= c.id %>/unregister" class="class-card-unregister">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+              </form>
+            <% } %>
+          </div>
+        <% }); %>
       </div>
     <% } %>
 
@@ -97,5 +89,6 @@
       </div>
     <% } %>
   </main>
+  <script src="/js/classes-day-filter.js"></script>
 </body>
 </html>
