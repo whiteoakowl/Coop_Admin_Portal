@@ -2,8 +2,10 @@
 // - a real request: "printing, add a dropdown choice called name tag
 // requests. when you choose this option it will show the names of the
 // people currently on the nametag request log that need to be printed."
-// Reuses the exact same /admin/name-tag/print bulk-print flow the Name
-// Tags option already uses, just pre-filtered to members with a still-
+// A later request: "the new printing for name tag requests should be
+// name tag and backside mirror schedule card" - so this reuses the same
+// /admin/design/print-duplex flow the Name Tags + Schedule Cards (Front
+// & Back) option already uses, pre-filtered to members with a still-
 // open (unarchived) request (routes/admin-design.js's own
 // pendingNameTagRequests) - one row per member, not per request, so a
 // member with more than one open request doesn't get duplicate checkboxes.
@@ -84,7 +86,7 @@ test('Print tab offers a "Name Tag Requests" option listing only members with an
   assert.doesNotMatch(section, /Morgan Already Printed/);
 });
 
-test('the Name Tag Requests picker submits to the same bulk /admin/name-tag/print flow', async () => {
+test('the Name Tag Requests panel points at the duplex (name tag front / schedule card back) print form', async () => {
   const cookie = await loginAsAdmin();
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Jamie Print Me', 'Jamie Print Me', 'student')")
@@ -92,13 +94,15 @@ test('the Name Tag Requests picker submits to the same bulk /admin/name-tag/prin
   await db.prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'new_tag', 'monday', 'never had one')").run(memberId);
 
   const page = await request(app).get('/admin/design?tab=print').set('Cookie', cookie);
+  const section = /<div id="print-nameTagRequests-section"[\s\S]*?<\/form>/.exec(page.text)[0];
+  assert.match(section, /<form method="POST" action="\/admin\/design\/print-duplex"/);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 
   const res = await request(app)
-    .post('/admin/name-tag/print')
+    .post('/admin/design/print-duplex')
     .set('Cookie', cookie)
     .type('form')
     .send({ memberIds: String(memberId), _csrf: csrfToken });
   assert.equal(res.status, 200);
-  assert.match(res.text, /Jamie Print Me/);
+  assert.match(res.text, /Print Name Tags \+ Schedule Cards \(Front &amp; Back\)/);
 });

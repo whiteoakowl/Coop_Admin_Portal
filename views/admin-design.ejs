@@ -324,13 +324,17 @@
             to be printed." One row per member with an open (unarchived)
             request (see admin-design.js's own pendingNameTagRequests -
             deliberately independent of the Requests tab's own date/
-            archived filters), reusing the exact same bulk /admin/name-
-            tag/print flow the Name Tags panel above already uses. %>
+            archived filters). A later request: "the new printing for
+            name tag requests should be name tag and backside mirror
+            schedule card" - so this reuses the same duplex flow the
+            Name Tags + Schedule Cards (Front & Back) panel above uses
+            (/admin/design/print-duplex), not the plain name-tag-only one. %>
         <div id="print-nameTagRequests-section" hidden>
-          <form method="POST" action="/admin/name-tag/print" target="_blank" id="name-tag-requests-print-form" data-bulk-print-refresh>
+          <form method="POST" action="/admin/design/print-duplex" target="_blank" id="name-tag-requests-print-form" data-bulk-print-refresh>
             <% if (pendingNameTagRequests.length === 0) { %>
               <p class="roster-empty">No name tag requests need printing right now.</p>
             <% } else { %>
+              <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the long edge) and cut apart for two-sided cards.</p>
               <div class="name-tag-bulk-filter">
                 <label class="checkbox-option name-tag-select-all">
                   <input type="checkbox" id="name-tag-requests-select-all-checkbox" />
