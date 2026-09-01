@@ -2,18 +2,24 @@
 // /forums (server.js). Members-only for every route - no public option,
 // same reasoning as Member Directory. A 'class' category is additionally
 // restricted to that class's own teacher/assistants/enrolled students/
-// their parents (utils/forums.js's canAccessCategory) - checked on every
-// route that touches a category or thread, not just the listing page, so
-// a direct URL to a private class thread can't bypass it.
+// their parents, and any category can ALSO be restricted to specific
+// Sections (utils/forums.js's canAccessCategory) - checked on every route
+// that touches a category or thread, not just the listing page, so a
+// direct URL to a private class thread can't bypass it.
 //
 // Moderation (edit-any/remove/lock/pin/archive/move) lives in this same
 // router rather than a separate admin-only one, gated per-action by
-// req.portalPermissions.has('manage_forum') - manage_forum can be
-// granted to any role (a teacher moderating their own class forum, a
-// coop_admin, not just Main Admin), matching how Main Admin's own Roles
-// & Permissions screen already treats permissions as independent of
-// portal. Category management (create/lock/delete) is Main Admin-only
-// structural setup and lives in routes/admin-forums.js instead.
+// EITHER req.portalPermissions.has('manage_forum') (can be granted to any
+// role - a teacher moderating their own class forum, a coop_admin, not
+// just Main Admin, matching how Main Admin's own Roles & Permissions
+// screen already treats permissions as independent of portal) OR being
+// the one member Main Admin Chat's own Moderate tab assigned to
+// moderate THIS specific category (utils/forums.js's own
+// isCategoryModerator) - e.g. a parent volunteer moderating a single
+// interest-group chat without needing a sitewide permission grant.
+// Category management (create/lock/delete/moderator assignment) is Main
+// Admin-only structural setup and lives in routes/admin-forums.js
+// instead.
 const express = require('express');
 const router = express.Router();
 const { requirePortalAuth } = require('../middleware/portalAuth');
@@ -23,8 +29,11 @@ const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth);
 
-function canModerate(req) {
-  return req.portalPermissions.has('manage_forum');
+async function canModerate(req) {
+  if (req.portalPermissions.has('manage_forum')) return true;
+  if (!req.category) return false;
+  const self = await memberForAccount(req.portalAccount.id);
+  return forums.isCategoryModerator(req.category, self ? self.id : null);
 }
 
 // Loads req.category (verifying it exists and the account's family can
@@ -66,18 +75,18 @@ router.get('/', async (req, res) => {
 
 router.get('/:categoryId', loadCategory, async (req, res) => {
   const threads = await forums.listThreads(req.category.id);
-  res.render('forums-category', { title: req.category.name, category: req.category, threads, canModerate: canModerate(req) });
+  res.render('forums-category', { title: req.category.name, category: req.category, threads, canModerate: await canModerate(req) });
 });
 
 router.get('/:categoryId/new', loadCategory, async (req, res) => {
-  if (req.category.is_locked && !canModerate(req)) {
+  if (req.category.is_locked && !(await canModerate(req))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked - only moderators can start new threads.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
   res.render('forums-new-thread', { title: `New Thread - ${req.category.name}`, category: req.category, error: req.query.error || null });
 });
 
 router.post('/:categoryId/threads', loadCategory, async (req, res) => {
-  if (req.category.is_locked && !canModerate(req)) {
+  if (req.category.is_locked && !(await canModerate(req))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'This chat is locked.', backHref: `/forums/${req.category.id}`, backLabel: 'Back' });
   }
   const title = (req.body.title || '').trim();
@@ -98,16 +107,22 @@ router.get('/threads/:threadId', loadThread, async (req, res) => {
     category: req.category,
     thread: req.thread,
     posts,
-    canModerate: canModerate(req),
+    canModerate: await canModerate(req),
     selfMemberId: self ? self.id : null,
     error: req.query.error || null,
   });
 });
 
 router.post('/threads/:threadId/posts', loadThread, async (req, res) => {
-  const moderator = canModerate(req);
+  const moderator = await canModerate(req);
   if ((req.thread.status !== 'active' || req.thread.is_locked) && !moderator) {
     return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('This thread is locked.'));
+  }
+  // Moderate tab's own "allow comments" checkbox (utils/forums.js's
+  // updateCategorySettings) - a category with it off is announcement-
+  // only: moderators can still reply, everyone else can only read.
+  if (!req.category.allow_comments && !moderator) {
+    return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('Comments are turned off for this chat.'));
   }
   const body = (req.body.body || '').trim();
   if (!body) return res.redirect(`/forums/threads/${req.thread.id}?error=` + encodeURIComponent('A message is required.'));
@@ -125,7 +140,7 @@ router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res
   const post = await forums.getPost(req.params.postId);
   const self = await memberForAccount(req.portalAccount.id);
   const isAuthor = post && self && post.member_id === self.id;
-  if (!post || (!isAuthor && !canModerate(req))) {
+  if (!post || (!isAuthor && !(await canModerate(req)))) {
     return res.status(403).render('403', { title: 'Not Authorized', message: 'You can only edit your own posts.', backHref: `/forums/threads/${req.thread.id}`, backLabel: 'Back' });
   }
   const body = (req.body.body || '').trim();
@@ -135,8 +150,8 @@ router.post('/threads/:threadId/posts/:postId/edit', loadThread, async (req, res
   res.redirect(`/forums/threads/${req.thread.id}`);
 });
 
-function requireModerator(req, res, next) {
-  if (!canModerate(req)) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate chats.", backHref: '/forums', backLabel: 'Back to Chat' });
+async function requireModerator(req, res, next) {
+  if (!(await canModerate(req))) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't have permission to moderate chats.", backHref: '/forums', backLabel: 'Back to Chat' });
   next();
 }
 

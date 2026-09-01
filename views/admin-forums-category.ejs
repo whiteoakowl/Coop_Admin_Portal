@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%# A real request: "admin chat category view shows a list of each
+      thread to click on to read with an archive button at the end." See
+      routes/admin-forums.js's own "Admin thread/post browsing" comment
+      for why this is a separate view from the member-facing forums-
+      category.ejs - this one always stays in Main Admin's own chrome. %>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1><%= category.name %></h1>
+    </div>
+    <p><a href="/main-admin/forums">&larr; Chat</a></p>
+    <% if (category.description) { %><p class="hint"><%= category.description %></p><% } %>
+
+    <% if (threads.length === 0) { %>
+      <p class="roster-empty">No threads yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Thread</th>
+              <th>Started By</th>
+              <th>Replies</th>
+              <th>Last Activity</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% threads.forEach(function(t) { %>
+              <tr>
+                <td class="roster-name-col">
+                  <a href="/main-admin/forums/threads/<%= t.id %>"><%= t.title %></a>
+                  <% if (t.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
+                  <% if (t.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
+                  <% if (t.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
+                </td>
+                <td><%= t.authorName || 'Unknown' %></td>
+                <td><%= t.postCount - 1 %></td>
+                <td><%= t.lastActivityAt %></td>
+                <td>
+                  <% if (t.status !== 'archived') { %>
+                    <form method="POST" action="/main-admin/forums/threads/<%= t.id %>/archive" class="inline-block-form" data-confirm="Archive &quot;<%= t.title %>&quot;?">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Archive</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

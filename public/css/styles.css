@@ -6001,18 +6001,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .schedule-print-table th, .schedule-print-table td { text-align: left; }
 
 /* Family "View All" print (routes/admin-members.js's Class Schedule tab) -
-   one row per family member instead of a full card per member, so a
-   whole family reliably fits on one printed page. */
-.schedule-print-compact-table { width: 100%; border-collapse: collapse; }
-.schedule-print-compact-table th,
-.schedule-print-compact-table td {
-  border: 1px solid var(--border);
-  padding: 0.4rem 0.55rem;
-  text-align: left;
-  vertical-align: top;
-}
-.schedule-print-compact-table th { background: var(--brand-soft); font-size: 0.85rem; }
-.schedule-print-compact-name { font-weight: 700; white-space: nowrap; }
+   a stacked section per family member (name as a heading, same as the
+   single-member print's own .schedule-print-card h2) rather than a shared
+   table with the name as its own column - a real bug report: "the print
+   preview and actual print both bleed of the page horrible[.] instead of
+   a name column put the name above each members class schedule section,
+   that will make more width room so everything fit cleanly on the page."
+   A name column forced nowrap could push the whole table past the page's
+   printable width and bleed off it outright; Monday/Wednesday as two full-
+   width grid columns instead of splitting three ways with a name column
+   gives each real room to fit. .member-schedule-compact-page/.schedule-
+   print-compact-fit below then give this list the same fixed-page-plus-
+   shrink-to-fit shape .class-schedule-print-page's own .print-page uses,
+   so a large family shrinks (never grows) down to actually fit one page
+   instead of spilling past it. */
+.member-schedule-compact-page { height: 11in; min-height: 0; }
+.schedule-print-compact-fit { flex: 1; min-height: 0; overflow: hidden; }
+.schedule-print-member-section { break-inside: avoid; margin-bottom: 0.6rem; }
+.schedule-print-member-section:last-child { margin-bottom: 0; }
+.schedule-print-member-section h3 { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.schedule-print-member-days { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.schedule-print-member-day-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin: 0 0 0.15rem; }
 .schedule-print-compact-line { font-size: 0.85rem; margin-bottom: 0.2rem; }
 .schedule-print-compact-line:last-child { margin-bottom: 0; }
 .schedule-print-compact-time { color: var(--muted); margin-right: 0.35rem; }

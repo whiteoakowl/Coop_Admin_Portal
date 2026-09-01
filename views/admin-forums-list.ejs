@@ -38,7 +38,7 @@
           <div class="team-col">
             <div class="team-info-card">
               <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-              <h3 class="team-info-title"><a href="/forums/<%= c.id %>"><%= c.name %></a></h3>
+              <h3 class="team-info-title"><a href="/main-admin/forums/<%= c.id %>"><%= c.name %></a></h3>
               <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
               <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
               <div class="roster-btn-row">
@@ -53,34 +53,66 @@
         <% }); %>
       </div>
     <% } else if (activeTab === 'moderate') { %>
-      <% if (moderationEntries.length === 0) { %>
-        <p class="roster-empty">No moderation actions yet.</p>
-      <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Moderator</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% moderationEntries.forEach(function(e) { %>
-                <tr>
-                  <td><%= e.created_at %></td>
-                  <td><%= e.memberName || 'Unknown' %></td>
-                  <td><%= e.action %></td>
-                  <td><%= e.target_type %> #<%= e.target_id %></td>
-                  <td><%= e.detail || '' %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+      <%# A real request: "Moderate tab should have a list of the chat
+          categories. when you click each category it show a pop up of
+          the category's name, description, check box - allow comments,
+          checkboxes - select which section can view or all, dropdown
+          menu to select member to moderate." %>
+      <% if (categories.length === 0) { %>
+        <p class="roster-empty">No chats yet &mdash; add one from the New Chat tab.</p>
       <% } %>
+      <div class="team-card-grid">
+        <% categories.forEach(function(c) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+              <h3 class="team-info-title"><%= c.name %></h3>
+              <% if (c.moderatorName) { %><span class="badge-pill">Moderator: <%= c.moderatorName %></span><% } %>
+              <% if (!c.allow_comments) { %><span class="badge-pill badge-pill-gray">Comments Off</span><% } %>
+              <div class="roster-btn-row">
+                <button type="button" class="roster-action-btn" onclick="document.getElementById('moderate-category-<%= c.id %>').showModal()">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <dialog id="moderate-category-<%= c.id %>" class="member-picker-dialog">
+            <form method="POST" action="/main-admin/forums/<%= c.id %>/settings">
+              <h3><%= c.name %></h3>
+              <label for="moderate-name-<%= c.id %>">Category Name
+                <input id="moderate-name-<%= c.id %>" type="text" name="name" value="<%= c.name %>" required />
+              </label>
+              <label for="moderate-description-<%= c.id %>">Description
+                <textarea id="moderate-description-<%= c.id %>" name="description" rows="2"><%= c.description || '' %></textarea>
+              </label>
+              <div class="grade-pill-grid">
+                <label class="grade-pill"><input type="checkbox" name="allowComments" <%= c.allow_comments ? 'checked' : '' %> /> Allow comments</label>
+              </div>
+              <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
+              <% if (allSections.length === 0) { %>
+                <p class="hint">No sections defined yet.</p>
+              <% } else { %>
+                <div class="grade-pill-grid">
+                  <% allSections.forEach(function(s) { %>
+                    <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= categorySectionIds[c.id].includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+                  <% }); %>
+                </div>
+              <% } %>
+              <label for="moderate-moderator-<%= c.id %>">Member to Moderate
+                <select id="moderate-moderator-<%= c.id %>" name="moderatorMemberId">
+                  <option value="">None</option>
+                  <% members.forEach(function(m) { %>
+                    <option value="<%= m.id %>" <%= c.moderator_member_id === m.id ? 'selected' : '' %>><%= m.name %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <div class="notes-dialog-actions">
+                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+                <button type="submit" class="primary-btn">Save</button>
+              </div>
+            </form>
+          </dialog>
+        <% }); %>
+      </div>
     <% } else { %>
       <% if (archived.length === 0) { %>
         <p class="roster-empty">No archived chats.</p>
@@ -98,7 +130,7 @@
             <tbody>
               <% archived.forEach(function(t) { %>
                 <tr>
-                  <td><a href="/forums/<%= t.categoryId %>/threads/<%= t.id %>"><%= t.title %></a></td>
+                  <td><a href="/main-admin/forums/threads/<%= t.id %>"><%= t.title %></a></td>
                   <td><%= t.categoryName || 'Uncategorized' %></td>
                   <td><%= t.authorName || 'Unknown' %></td>
                   <td>
@@ -116,7 +148,14 @@
   </main>
 
   <dialog id="add-category-dialog" class="member-picker-dialog">
-    <form method="POST" action="/main-admin/forums">
+    <%# The "Save" button below is deliberately OUTSIDE this form (associated
+        via its form="..." attribute instead) - the "Existing categories"
+        list right after this form each need their own <form> to delete,
+        and a <form> can never nest inside another <form> (invalid HTML: the
+        browser closes the outer form early at the first nested </form>,
+        which used to leave Save attached to nothing once a category
+        existed - "add one category and it won't let me add more"). %>
+    <form method="POST" action="/main-admin/forums" id="add-forum-category-form">
       <h3>Add Category</h3>
       <label for="add-forum-category-name">Category Name
         <input id="add-forum-category-name" type="text" name="name" placeholder="e.g. Field Trip Planning" required />
@@ -135,24 +174,24 @@
           <% classes.forEach(function(c) { %><option value="<%= c.id %>"><%= c.class_name %></option><% }); %>
         </select>
       </label>
-      <% if (categories.length > 0) { %>
-        <p class="hint">Existing categories</p>
-        <div class="grade-pill-grid">
-          <% categories.forEach(function(c) { %>
-            <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
-              <span class="badge-pill">
-                <%= c.name %>
-                <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.name %>" title="Delete">&times;</button>
-              </span>
-            </form>
-          <% }); %>
-        </div>
-      <% } %>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-        <button type="submit" class="primary-btn">Save</button>
-      </div>
     </form>
+    <% if (categories.length > 0) { %>
+      <p class="hint">Existing categories</p>
+      <div class="grade-pill-grid">
+        <% categories.forEach(function(c) { %>
+          <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">
+            <span class="badge-pill">
+              <%= c.name %>
+              <button type="submit" class="badge-pill-x" aria-label="Delete <%= c.name %>" title="Delete">&times;</button>
+            </span>
+          </form>
+        <% }); %>
+      </div>
+    <% } %>
+    <div class="notes-dialog-actions">
+      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      <button type="submit" form="add-forum-category-form" class="primary-btn">Save</button>
+    </div>
   </dialog>
 </body>
 </html>

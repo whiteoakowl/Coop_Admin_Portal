@@ -109,7 +109,7 @@
       </div>
     <% } %>
 
-    <% if (thread.status === 'active' && (!thread.is_locked || canModerate)) { %>
+    <% if (thread.status === 'active' && (!thread.is_locked || canModerate) && (category.allow_comments || canModerate)) { %>
       <div class="manage-section">
         <div class="grid-box-header"><h2>Reply</h2></div>
         <form method="POST" action="/forums/threads/<%= thread.id %>/posts" data-forum-editor>
@@ -119,6 +119,8 @@
           <button type="submit" class="primary-btn" style="margin-top: 0.75rem;">Post Reply</button>
         </form>
       </div>
+    <% } else if (thread.status === 'active' && !category.allow_comments) { %>
+      <p class="hint">Comments are turned off for this chat.</p>
     <% } else { %>
       <p class="hint">This thread is locked - no new replies.</p>
     <% } %>

@@ -46,7 +46,7 @@ const {
   membersWithDetails,
   byLastName,
 } = require('../utils/members');
-const { getMemberSchedule } = require('../utils/schedule');
+const { getMemberSchedule, scheduleList } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
 const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
@@ -597,6 +597,21 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
   }
 
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
+});
+
+// A real request: "co-op admin portal and main admin portal, members...
+// click the class schedules tab, click print" - Main Admin's own member
+// profile Schedule tab had no print route at all (Co-op Admin's own
+// routes/admin-schedule.js's GET /schedule/print was never mounted under
+// /main-admin). Reuses the exact same admin-schedule-print.ejs view and
+// utils/schedule.js's scheduleList (both already portal-agnostic - the
+// members table itself isn't split per portal) rather than duplicating
+// either, registered ahead of GET /:id below so "schedule-print" is never
+// swallowed as a member id.
+router.get('/schedule-print', async (req, res) => {
+  const familyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const rows = await scheduleList({ memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : null, familyId });
+  res.render('admin-schedule-print', { title: 'Print Schedules', rows, compact: !!familyId });
 });
 
 const PROFILE_TABS = ['profile', 'schedule', 'attendance'];

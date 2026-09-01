@@ -4,13 +4,19 @@
 // implements.
 const db = require('../db');
 const { sanitizePostBody } = require('./sanitizeHtml');
+const { forumCategorySectionIds, sectionIdsForMember, memberSatisfiesRestriction } = require('./sections');
+
+const CATEGORY_SELECT = `SELECT c.*, cl.class_name AS "class_name", mo.name AS "moderatorName"
+   FROM forum_categories c
+   LEFT JOIN classes cl ON cl.id = c.class_id
+   LEFT JOIN members mo ON mo.id = c.moderator_member_id`;
 
 async function listCategories() {
-  return db.prepare('SELECT c.*, cl.class_name FROM forum_categories c LEFT JOIN classes cl ON cl.id = c.class_id ORDER BY c.position, c.id').all();
+  return db.prepare(`${CATEGORY_SELECT} ORDER BY c.position, c.id`).all();
 }
 
 async function getCategory(id) {
-  return db.prepare('SELECT c.*, cl.class_name FROM forum_categories c LEFT JOIN classes cl ON cl.id = c.class_id WHERE c.id = ?').get(id);
+  return db.prepare(`${CATEGORY_SELECT} WHERE c.id = ?`).get(id);
 }
 
 // The one 'class' category for a given class, if a Main Admin has ever
@@ -37,22 +43,66 @@ async function deleteCategory(id) {
   await db.prepare('DELETE FROM forum_categories WHERE id = ?').run(id);
 }
 
-// A 'general' category is open to any signed-in account, any role. A
-// 'class' category is only open to that class's own teacher/assistants
-// (class_staff), enrolled students (class_enrollments), or those
-// students' own parents - who already appear in `family` alongside their
-// enrolled child, since familyForAccount returns the whole family, not
-// just the account's own member row. Read-only reference to Track A's
-// class tables, never altered here.
+// Main Admin Chat's own Moderate tab - a real request: "Moderate tab
+// should have a list of the chat categories[.] when you click each
+// category it show a pop up of the category's name, description, check
+// box - allow comments, checkboxes - select which section can view or
+// all, dropdown menu to select member to moderate." Unlike createCategory
+// above (name/description/scope/class, fixed at creation), every one of
+// these is editable later, any time, from that popup - hence its own
+// function rather than folding into createCategory.
+async function updateCategorySettings(id, data) {
+  await db.withTransaction(async (tx) => {
+    await tx
+      .prepare('UPDATE forum_categories SET name = ?, description = ?, allow_comments = ?, moderator_member_id = ? WHERE id = ?')
+      .run(data.name, data.description || null, data.allowComments ? 1 : 0, data.moderatorMemberId || null, id);
+    await tx.prepare('DELETE FROM forum_category_sections WHERE category_id = ?').run(id);
+    for (const sectionId of data.sectionIds || []) {
+      await tx.prepare('INSERT INTO forum_category_sections (category_id, section_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(id, sectionId);
+    }
+  });
+}
+
+// A 'general' category is open to any signed-in account, any role
+// (subject to the section restriction below); a 'class' category is only
+// open to that class's own teacher/assistants (class_staff), enrolled
+// students (class_enrollments), or those students' own parents - who
+// already appear in `family` alongside their enrolled child, since
+// familyForAccount returns the whole family, not just the account's own
+// member row. Read-only reference to Track A's class tables, never
+// altered here.
+//
+// forum_category_sections then layers an OPTIONAL further restriction on
+// top of whichever of those a category already passed - "select which
+// section can view or all" (Moderate tab's own popup) - checked against
+// the whole family the same way class access is, so a parent whose own
+// section membership differs from their enrolled child's still sees a
+// section-restricted class chat their child belongs to.
 async function canAccessCategory(category, family) {
-  if (category.scope === 'general') return true;
-  const memberIds = family.map((m) => m.id);
-  if (!memberIds.length) return false;
-  const placeholders = memberIds.map(() => '?').join(',');
-  const staffMatch = await db.prepare(`SELECT 1 FROM class_staff WHERE class_id = ? AND member_id IN (${placeholders})`).get(category.class_id, ...memberIds);
-  if (staffMatch) return true;
-  const enrolledMatch = await db.prepare(`SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id IN (${placeholders})`).get(category.class_id, ...memberIds);
-  return !!enrolledMatch;
+  if (category.scope === 'class') {
+    const memberIds = family.map((m) => m.id);
+    if (!memberIds.length) return false;
+    const placeholders = memberIds.map(() => '?').join(',');
+    const staffMatch = await db.prepare(`SELECT 1 FROM class_staff WHERE class_id = ? AND member_id IN (${placeholders})`).get(category.class_id, ...memberIds);
+    const enrolledMatch =
+      staffMatch || (await db.prepare(`SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id IN (${placeholders})`).get(category.class_id, ...memberIds));
+    if (!enrolledMatch) return false;
+  }
+  const restriction = await forumCategorySectionIds(category.id);
+  if (restriction.length === 0) return true;
+  const familySectionIds = new Set();
+  for (const m of family) {
+    for (const sectionId of await sectionIdsForMember(m.id)) familySectionIds.add(sectionId);
+  }
+  return memberSatisfiesRestriction(familySectionIds, restriction);
+}
+
+// True if `memberId` is the one member specifically assigned to moderate
+// THIS category (Moderate tab's own "dropdown menu to select member to
+// moderate") - independent of whether they hold the sitewide manage_forum
+// permission a Main Admin/coop_admin role already grants.
+function isCategoryModerator(category, memberId) {
+  return !!memberId && category.moderator_member_id === memberId;
 }
 
 async function accessibleCategories(family) {
@@ -211,7 +261,9 @@ module.exports = {
   categoryForClass,
   setCategoryLocked,
   deleteCategory,
+  updateCategorySettings,
   canAccessCategory,
+  isCategoryModerator,
   accessibleCategories,
   listThreads,
   getThread,

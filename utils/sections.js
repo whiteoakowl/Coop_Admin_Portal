@@ -1,10 +1,11 @@
 // Shared "is this member allowed into this section-restricted thing"
 // checks - reused by Parent/Student/Teacher Portal class registration
-// (class_sections) and member/public Events (event_sections). A class or
-// event with NO rows in its own join table is unrestricted (open to
-// everyone) - that's the "empty means unrestricted" convention both
-// migrations document on their own join tables, checked here once
-// instead of every call site re-deriving it.
+// (class_sections), member/public Events (event_sections), and Chat
+// category visibility (forum_category_sections). A class/event/category
+// with NO rows in its own join table is unrestricted (open to everyone) -
+// that's the "empty means unrestricted" convention every one of those
+// migrations documents on its own join table, checked here once instead
+// of every call site re-deriving it.
 const db = require('../db');
 
 async function sectionIdsForMember(memberId) {
@@ -12,9 +13,10 @@ async function sectionIdsForMember(memberId) {
   return new Set(rows.map((r) => r.section_id));
 }
 
-// `joinTable` is 'class_sections' or 'event_sections' - both share the
-// exact same (thing_id, section_id) shape, just a different first column
-// name, so this one function covers either.
+// `joinTable` is 'class_sections', 'event_sections', or
+// 'forum_category_sections' - all three share the exact same
+// (thing_id, section_id) shape, just a different first column name, so
+// this one function covers any of them.
 async function restrictedSectionIds(joinTable, idColumn, thingId) {
   const rows = await db.prepare(`SELECT section_id FROM ${joinTable} WHERE ${idColumn} = ?`).all(thingId);
   return rows.map((r) => r.section_id);
@@ -28,6 +30,10 @@ async function eventSectionIds(eventId) {
   return restrictedSectionIds('event_sections', 'event_id', eventId);
 }
 
+async function forumCategorySectionIds(categoryId) {
+  return restrictedSectionIds('forum_category_sections', 'category_id', categoryId);
+}
+
 // True if `memberSectionIds` (a Set, from sectionIdsForMember) satisfies
 // `restrictionIds` (an array, from classSectionIds/eventSectionIds) -
 // unrestricted (empty array) always passes; otherwise the member needs
@@ -37,4 +43,4 @@ function memberSatisfiesRestriction(memberSectionIds, restrictionIds) {
   return restrictionIds.some((id) => memberSectionIds.has(id));
 }
 
-module.exports = { sectionIdsForMember, classSectionIds, eventSectionIds, memberSatisfiesRestriction };
+module.exports = { sectionIdsForMember, classSectionIds, eventSectionIds, forumCategorySectionIds, memberSatisfiesRestriction };

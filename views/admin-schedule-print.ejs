@@ -12,45 +12,61 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <div class="print-page">
+    <div class="print-page <%= compact ? 'member-schedule-compact-page' : '' %>">
       <% if (rows.length === 0) { %>
         <p class="roster-empty">No schedules match your filters.</p>
       <% } else if (compact) { %>
         <%
-          // One row per family member instead of a full card per member -
-          // a family of even 3-4 people already runs the normal per-member
-          // layout below past a single printed page, so "View All" needs
-          // its own dense table: name above the row, Monday and Wednesday
-          // each condensed into that one row's cell.
+          // A real bug report: "the print preview and actual print both
+          // bleed off the page horrible[.] instead of a name column put
+          // the name above each members class schedule section, that will
+          // make more width room so everything fit cleanly on the page."
+          // The old layout was one shared 3-column table (Name/Monday/
+          // Wednesday) with the Name column forced nowrap - a family with
+          // even one longer name forced that column wide enough to push
+          // the whole table past the page's own printable width, which
+          // just bled off the physical page edge (this box has no
+          // overflow:hidden). Each member now gets their own stacked
+          // section (name as a heading above, same as the single-member
+          // print below already does) with Monday/Wednesday as two full-
+          // width columns instead of splitting that width three ways with
+          // a name column - then the whole list is wrapped in the same
+          // real shrink-to-fit (never grow) pass every other one-page
+          // print in this app already uses (public/js/print-shrink-to-
+          // fit.js), so a large family shrinks down to actually fit
+          // instead of spilling off the page, without ever going below
+          // MIN_SCALE's legibility floor.
           function classLines(dayRows) {
             return dayRows.filter(function (c) { return c.class_name || c.time || c.room; });
           }
         %>
-        <table class="roster-table schedule-print-compact-table">
-          <thead><tr><th>Name</th><th>Monday</th><th>Wednesday</th></tr></thead>
-          <tbody>
+        <div class="schedule-print-compact-fit" data-shrink-to-fit>
+          <div class="schedule-print-compact-list">
             <% rows.forEach(function(r) { %>
-              <tr>
-                <td class="schedule-print-compact-name"><%= r.member.name %></td>
-                <% [r.monday, r.wednesday].forEach(function (dayRows) { %>
-                  <% var lines = classLines(dayRows); %>
-                  <td>
-                    <% if (lines.length === 0) { %>
-                      <span class="schedule-print-compact-empty">—</span>
-                    <% } else { %>
-                      <% lines.forEach(function (c) { %>
-                        <div class="schedule-print-compact-line">
-                          <span class="schedule-print-compact-time"><%= c.time || '—' %></span>
-                          <%= c.class_name || '—' %><% if (c.room) { %> (<%= c.room %>)<% } %>
-                        </div>
-                      <% }); %>
-                    <% } %>
-                  </td>
-                <% }); %>
-              </tr>
+              <div class="schedule-print-member-section">
+                <h3><%= r.member.name %></h3>
+                <div class="schedule-print-member-days">
+                  <% [['Monday', r.monday], ['Wednesday', r.wednesday]].forEach(function (entry) { %>
+                    <% var label = entry[0], lines = classLines(entry[1]); %>
+                    <div>
+                      <p class="schedule-print-member-day-label"><%= label %></p>
+                      <% if (lines.length === 0) { %>
+                        <span class="schedule-print-compact-empty">&mdash;</span>
+                      <% } else { %>
+                        <% lines.forEach(function (c) { %>
+                          <div class="schedule-print-compact-line">
+                            <span class="schedule-print-compact-time"><%= c.time || '—' %></span>
+                            <%= c.class_name || '—' %><% if (c.room) { %> (<%= c.room %>)<% } %>
+                          </div>
+                        <% }); %>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                </div>
+              </div>
             <% }); %>
-          </tbody>
-        </table>
+          </div>
+        </div>
       <% } else { %>
         <% rows.forEach(function(r) { %>
           <div class="schedule-print-card">
@@ -77,6 +93,7 @@
       <% } %>
     </div>
   </main>
+  <script src="/js/print-shrink-to-fit.js"></script>
   <script src="/js/print-auto.js"></script>
 </body>
 </html>

@@ -45,7 +45,6 @@ const MAIN_ADMIN_NAV_LINKS = [
   { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
   { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
   { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
-  { href: '/main-admin/nature-news', icon: 'sprout', label: 'Nature News' },
   { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
   { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
@@ -62,6 +61,15 @@ const MAIN_ADMIN_NAV_LINKS = [
   // under /main-admin/training/... against this link's own href.
   { href: '/main-admin/training', icon: 'graduation-cap', label: 'Training' },
 ];
+// Main Admin's own labeled 2nd section, same #class-nav-links mechanism
+// Parent/Student Portal already use for their own "Co-op Classes"/
+// "Activities" grouping (see classLinks/classLinksTitle below) - a real
+// request: "nature news should be under a tab called student portal."
+// Nature News moved out of the flat MAIN_ADMIN_NAV_LINKS list above and
+// into its own labeled group instead of just renaming its top-level tab,
+// so future student-facing-content admin pages have somewhere to land
+// without crowding the main list.
+const MAIN_ADMIN_STUDENT_PORTAL_LINKS = [{ href: '/main-admin/nature-news', icon: 'sprout', label: 'Nature News' }];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled
 // 2nd section "Activities" (see STUDENT_ACTIVITY_LINKS/classLinksTitle
@@ -114,8 +122,8 @@ const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : po
 // pattern as MAIN_ADMIN_NAV_LINKS above) - its own heading text is
 // "Activities" rather than "Co-op Classes" (classLinksTitle, used by
 // the template further down), the only other caller of this section.
-const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
-const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : 'Co-op Classes';
+const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : portalTitle === 'Main Admin' ? MAIN_ADMIN_STUDENT_PORTAL_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
+const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : portalTitle === 'Main Admin' ? 'Student Portal' : 'Co-op Classes';
 
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,

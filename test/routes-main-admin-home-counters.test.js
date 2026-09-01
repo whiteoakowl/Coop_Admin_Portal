@@ -68,7 +68,11 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   // request page. A later request added Membership Requests to this same
   // "Pending Requests" section, reusing the account-approval count/link
   // ("pending requests should also include membership requests and link").
-  assert.match(res.text, /class="totals-item" href="\/main-admin\/users"[^]*?Membership Requests/);
+  // Once every member got their own portal account and the standalone
+  // Users tab was removed, this link was repointed at Members > Approvals
+  // (the same underlying pending member_accounts queue - see
+  // utils/membershipApprovals.js's own header comment).
+  assert.match(res.text, /class="totals-item" href="\/main-admin\/members\?tab=approvals"[^]*?Membership Requests/);
   assert.match(res.text, /href="\/main-admin\/events\?tab=requests"[^]*?Event Requests/);
   assert.match(res.text, /href="\/main-admin\/babysitters\?tab=approvals"[^]*?Babysitter Approvals/);
   assert.match(res.text, /href="\/main-admin\/photos#pending-photos"[^]*?Photo Submissions/);
@@ -84,8 +88,10 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   assert.doesNotMatch(res.text, /Open Co-op Admin/);
   assert.doesNotMatch(res.text, /Manage Users/);
 
-  // The gear dropdown carries all four destinations.
-  assert.match(res.text, /href="\/main-admin\/users">Users</);
+  // The gear dropdown carries the remaining destinations - the standalone
+  // Users tab itself is gone (see test/routes-main-admin-members-profile-
+  // and-accounts.test.js), so it no longer has an entry here either.
+  assert.doesNotMatch(res.text, /href="\/main-admin\/users">Users</);
   assert.match(res.text, /href="\/main-admin\/roles">Roles &amp; Permissions</);
   assert.match(res.text, /href="\/main-admin\/website">Website</);
   assert.match(res.text, /href="\/admin">Co-op Admin Portal</);

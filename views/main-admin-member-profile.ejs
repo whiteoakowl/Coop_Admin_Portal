@@ -116,6 +116,7 @@
               <% }); %>
             </div>
           <% }); %>
+          <a class="roster-action-btn print-action-btn no-print" href="/main-admin/members/schedule-print?familyId=<%= member.family_id %>" target="_blank">Print All Schedules</a>
         <% } else { %>
           <div class="schedule-day-columns">
             <% [['Monday', schedule.monday], ['Wednesday', schedule.wednesday]].forEach(function (entry) { %>
@@ -145,6 +146,7 @@
               </div>
             <% }); %>
           </div>
+          <a class="roster-action-btn print-action-btn no-print" href="/main-admin/members/schedule-print?memberId=<%= member.id %>" target="_blank">Print Schedule</a>
         <% } %>
 
         <h2>Rosters</h2>

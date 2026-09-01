@@ -73,10 +73,15 @@ test('Members Class Schedule tab: "View All" and its compact family print', asyn
     assert.match(res.text, new RegExp(`/admin/schedule/print\\?familyId=${familyId}`));
   });
 
-  await t.test('the compact family print shows one row per family member, not the other family\'s parent', async () => {
+  await t.test('the compact family print shows a stacked name-above-schedule section per family member, not the other family\'s parent', async () => {
     const res = await request(app).get(`/admin/schedule/print?familyId=${familyId}`).set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /schedule-print-compact-table/, 'expected the compact one-row-per-member table, not the per-member card layout');
+    // A real bug report ("bleeds off the page... put the name above each
+    // members class schedule section") replaced the old shared 3-column
+    // (Name/Monday/Wednesday) table with a stacked section per member -
+    // see admin-schedule-print.ejs's own comment on why.
+    assert.match(res.text, /schedule-print-member-section/, 'expected the stacked name-above-schedule section layout, not the old name-column table');
+    assert.doesNotMatch(res.text, /schedule-print-compact-table/);
     assert.match(res.text, /View All Parent/);
     assert.match(res.text, /View All Student/);
     assert.match(res.text, /View All Test Class/);

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%# A real request: "admin can click on each thread to read the post
+      and comments. trash and edit button next to each post and comment
+      for admin to edit." The thread's first post is "the post", every
+      post after it is a "comment"/reply - both get the same Trash/Edit
+      pair here (routes/admin-forums.js's own removePost/editPost, same
+      soft-remove-with-restore utils/forums.js already uses for the
+      member-facing moderation view, not a hard delete). %>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/forums/<%= category.id %>">&larr; <%= category.name %></a></p>
+
+    <div class="grid-box-header">
+      <h1><%= thread.title %>
+        <% if (thread.is_pinned) { %> <span class="badge-pill">Pinned</span><% } %>
+        <% if (thread.is_locked) { %> <span class="badge-pill badge-pill-gray">Locked</span><% } %>
+        <% if (thread.status === 'archived') { %> <span class="badge-pill badge-pill-gray">Archived</span><% } %>
+      </h1>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% posts.forEach(function(p, i) { %>
+      <div class="forum-post <%= p.status === 'removed' ? 'forum-post-removed' : '' %>">
+        <div class="forum-post-header">
+          <span class="forum-post-author"><%= p.authorName || 'Unknown' %></span>
+          <% if (p.authorAdminTitle) { %><span class="badge-pill" title="Admin Position"><%= p.authorAdminTitle %></span><% } %>
+          <span class="hint"><%= i === 0 ? 'Post' : 'Comment' %> &middot; <%= p.created_at %></span>
+          <% if (p.edited_at) { %><span class="hint">(edited)</span><% } %>
+          <% if (p.status === 'removed') { %><span class="badge-pill badge-pill-gray">Removed</span><% } %>
+        </div>
+        <% if (p.status === 'active') { %>
+          <div class="forum-post-body"><%- p.body_html %></div>
+        <% } else { %>
+          <p class="hint">This post was removed.</p>
+        <% } %>
+        <div class="roster-btn-row" style="margin-top: 0.5rem;">
+          <% if (p.status === 'active') { %>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-post-<%= p.id %>').showModal()">Edit</button>
+            <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/remove" class="inline-block-form"><button type="submit" class="roster-action-btn roster-action-btn-danger">Trash</button></form>
+          <% } else { %>
+            <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/restore" class="inline-block-form"><button type="submit" class="roster-action-btn">Restore</button></form>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (p.status === 'active') { %>
+        <dialog id="edit-post-<%= p.id %>" class="member-picker-dialog">
+          <form method="POST" action="/main-admin/forums/threads/<%= thread.id %>/posts/<%= p.id %>/edit" data-forum-editor>
+            <h3>Edit <%= i === 0 ? 'Post' : 'Comment' %></h3>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- p.body_html %></div>
+            <input type="hidden" name="body" data-forum-body-input />
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+        </dialog>
+      <% } %>
+    <% }); %>
+  </main>
+  <script src="/js/forum-editor.js"></script>
+</body>
+</html>
