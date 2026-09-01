@@ -345,6 +345,14 @@ router.post('/settings/class-checkin-pin', requireAdmin, requireFullAdmin, async
 // vice versa. Plain JSON in/out, called from an in-page confirm prompt
 // rather than a full navigation - exiting full screen shouldn't reload
 // the page out from under whatever the admin was doing.
+// A real request: "exiting full screen on kiosk should ask for an id
+// number, otherwise it stays in full screen kiosk mode. the id number is
+// the class check in id number." The kiosk's own equivalent of this
+// route lives at routes/kiosk.js's own POST /fullscreen/verify-pin
+// instead of adding requireAdmin here - the kiosk is deliberately
+// unauthenticated (see that file's own header comment), so this
+// authenticated-admin version stays exactly as it is for every other
+// portal's own Full Screen button.
 router.post('/fullscreen/verify-pin', requireAdmin, async (req, res) => {
   if (fullscreenPinLimiter.isRateLimited(req.ip)) {
     return res.status(429).json({ ok: false, error: 'Too many attempts. Please wait a few minutes and try again.' });

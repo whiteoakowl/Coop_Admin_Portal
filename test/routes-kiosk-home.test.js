@@ -92,4 +92,32 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
   await t.test('the new owl crest logo is used, not the old logo file', () => {
     assert.match(res.text, /<img class="landing-logo-sm" src="\/img\/logo-owl\.png"/);
   });
+
+  // A real bug report: "exiting full screen on kiosk should ask for an
+  // id number, otherwis it's stays in full screen kiosk mode." The Exit
+  // Full Screen button existed with nothing wired to gate it - the PIN
+  // dialog partial was never included on this page at all, so public/js/
+  // fullscreen-toggle.js's own requestExit() fell straight through to
+  // document.exitFullscreen() with no prompt. It now points at the
+  // kiosk's own unauthenticated verify route (the default admin one
+  // would 401/redirect here - the kiosk has no admin session).
+  await t.test('the PIN dialog is included, pointed at the kiosk\'s own unauthenticated verify route', () => {
+    assert.match(res.text, /id="fullscreen-exit-pin-dialog"/);
+    assert.match(res.text, /data-verify-url="\/kiosk\/fullscreen\/verify-pin"/);
+    assert.match(res.text, /<form method="POST" action="\/kiosk\/fullscreen\/verify-pin">/);
+  });
+});
+
+test('POST /kiosk/fullscreen/verify-pin: the kiosk\'s own unauthenticated equivalent of the admin route', async (t) => {
+  await t.test('the correct PIN succeeds with no admin session at all', async () => {
+    const res = await request(app).post('/kiosk/fullscreen/verify-pin').type('form').send({ pin: '0000' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+  });
+
+  await t.test('an incorrect PIN is rejected', async () => {
+    const res = await request(app).post('/kiosk/fullscreen/verify-pin').type('form').send({ pin: '9999' });
+    assert.equal(res.status, 401);
+    assert.equal(res.body.ok, false);
+  });
 });

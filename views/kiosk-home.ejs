@@ -30,6 +30,17 @@
       <span id="fullscreen-toggle-label">Full Screen View</span>
     </button>
   </div>
+  <%# A real request: "exiting full screen on kiosk should ask for an id
+      number, otherwis it's stays in full screen kiosk mode. the id
+      number is the class check in id number." This partial was never
+      included here before, so the button above had nothing to gate it -
+      public/js/fullscreen-toggle.js's own requestExit() falls straight
+      through to document.exitFullscreen() with no dialog at all when
+      #fullscreen-exit-pin-dialog doesn't exist in the page. verifyPinUrl
+      points at the kiosk's own unauthenticated verify route (routes/
+      kiosk.js) instead of the default admin one, which would 403 here -
+      see that partial's own comment. %>
+  <%- include('partials/fullscreen-exit-pin-dialog', { verifyPinUrl: '/kiosk/fullscreen/verify-pin' }) %>
   <footer class="landing-action-bar">
     <a class="landing-action-bar-btn" href="/name-tag"><svg class="icon"><use href="#icon-badge"/></svg><span>Name Tag Form</span></a>
     <a class="landing-action-bar-btn" href="/absence"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Absence/Late Form</span></a>

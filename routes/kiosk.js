@@ -10,6 +10,8 @@ const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { scheduleCardDataForMember, getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { createRateLimiter } = require('../utils/rateLimit');
+const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
+const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
 
 // Both scan endpoints are unauthenticated by design - a member's barcode
 // is their own name specifically so it can be typed at the kiosk as well
@@ -29,6 +31,29 @@ const findParentLimiter = createRateLimiter({ windowMs: 60 * 1000, maxAttempts: 
 // reached via the "Full Kiosk Screen" quick link in admin Settings.
 router.get('/', (req, res) => {
   res.render('kiosk-home', { title: 'Kiosk' });
+});
+
+// A real request: "exiting full screen on kiosk should ask for an id
+// number, otherwis it's stays in full screen kiosk mode. the id number
+// is the class check in id number." public/js/fullscreen-toggle.js
+// already gates every OTHER portal's own Full Screen button behind the
+// shared Class Check-In PIN via routes/admin.js's POST /admin/fullscreen/
+// verify-pin - but that route is requireAdmin, and the kiosk (like every
+// other kiosk route here) has no admin session to satisfy it. Same PIN,
+// same shared classCheckinPinRateLimit instance (so a burst of wrong
+// guesses on one door counts against both), no auth required - matches
+// routes/kiosk-class-checkin.js's own POST /unlock exactly.
+router.post('/fullscreen/verify-pin', async (req, res) => {
+  if (fullscreenPinLimiter.isRateLimited(req.ip)) {
+    return res.status(429).json({ ok: false, error: 'Too many attempts. Please wait a few minutes and try again.' });
+  }
+  const pin = (req.body.pin || '').trim();
+  if (!(await verifyClassCheckinPin(pin))) {
+    fullscreenPinLimiter.recordFailure(req.ip);
+    return res.status(401).json({ ok: false, error: 'Incorrect PIN.' });
+  }
+  fullscreenPinLimiter.recordSuccess(req.ip);
+  res.json({ ok: true });
 });
 
 // --- Check-in kiosk ---

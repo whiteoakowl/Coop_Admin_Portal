@@ -8,11 +8,19 @@
     - pressing Esc still exits full screen instantly with no way for any
     page's JS to intercept that (a deliberate browser security guarantee,
     not something this dialog can close), so this only ever gates the
-    app's own Exit Full Screen button/icon. %>
-<dialog id="fullscreen-exit-pin-dialog" class="confirm-dialog">
+    app's own Exit Full Screen button/icon.
+
+    verifyPinUrl (optional, defaults to the authenticated-admin route
+    above) - the kiosk (views/kiosk-home.ejs) is deliberately
+    unauthenticated, so it passes its own equivalent, unauthenticated
+    route (routes/kiosk.js's own POST /kiosk/fullscreen/verify-pin)
+    instead - see that route's own comment. data-verify-url carries it to
+    fullscreen-toggle.js, which has no other way to know which of the two
+    routes the page it's running on actually needs. %>
+<dialog id="fullscreen-exit-pin-dialog" class="confirm-dialog" data-verify-url="<%= typeof verifyPinUrl !== 'undefined' ? verifyPinUrl : '/admin/fullscreen/verify-pin' %>">
   <div class="confirm-dialog-icon"><svg class="icon"><use href="#icon-minimize"/></svg></div>
   <p class="confirm-dialog-message">Enter the Class Check-In PIN to exit Full Screen View.</p>
-  <form method="POST" action="/admin/fullscreen/verify-pin">
+  <form method="POST" action="<%= typeof verifyPinUrl !== 'undefined' ? verifyPinUrl : '/admin/fullscreen/verify-pin' %>">
     <input
       id="fullscreen-exit-pin-input"
       name="pin"

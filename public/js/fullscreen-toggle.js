@@ -43,7 +43,8 @@
       const pin = pinInput ? pinInput.value.trim() : '';
       let result;
       try {
-        const resp = await fetch('/admin/fullscreen/verify-pin', {
+        const verifyUrl = pinDialog.dataset.verifyUrl || '/admin/fullscreen/verify-pin';
+        const resp = await fetch(verifyUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
