@@ -700,10 +700,18 @@ async function dailyAssignmentCardsWithLabels(day, date) {
 // must never itself be the trigger that writes new suggested assignments
 // into the database. This only ever READS existing substitute_assignments
 // rows (assignmentFor, same as jobAssignmentGrid's own permanent-job
-// reads) and only ever shows one once its status is 'approved' - a
-// still-'pending' suggestion is blanked to "Unassigned" here, same
-// distinction the route already drew for permanent jobs before this
-// existed.
+// reads) and only ever shows one once its status is 'approved'.
+//
+// A real request: "do not show positions that don't have someone
+// assigned. if it is unassigned it's invisible to members. only admins
+// can see it." An unassigned/still-pending position used to render here
+// as "Unassigned" (the same admin-facing wording the shared Archive
+// partial still uses for dailyAssignmentCards) - this function is the
+// ONE place that data feeds the public kiosk (routes/volunteers.js),
+// separate from dailyAssignmentCards/dailyAssignmentCardsWithLabels
+// (Archive tab + print, admin-only), so dropping unassigned rows here
+// only ever affects what a member sees - an admin's own Archive/Chart
+// views are untouched.
 async function publicFloaterCardsForDate(day, date) {
   const missingById = await missingMemberIdsForDate(date);
   const grid = await gridForDay(day);
@@ -724,29 +732,20 @@ async function publicFloaterCardsForDate(day, date) {
       if (person.role !== 'teacher' && person.role !== 'assistant') continue;
       if (!missingById.has(person.id)) continue;
       const existing = await assignmentFor(date, 'class', classStaffSlotId(cls.id, person.id));
-      positions.push({
-        title: cls.class_name,
-        room: cls.room || '',
-        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
-      });
+      if (!existing || existing.status !== 'approved') continue;
+      positions.push({ title: cls.class_name, room: cls.room || '', assigned: await assignedInfo(existing) });
     }
 
     for (const vacancy of classVacancySlotsByHourPosition[hourGroup.position] || []) {
       const existing = await assignmentFor(date, 'vacancy', vacancy.slotId);
-      positions.push({
-        title: vacancy.label,
-        room: vacancy.room,
-        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
-      });
+      if (!existing || existing.status !== 'approved') continue;
+      positions.push({ title: vacancy.label, room: vacancy.room, assigned: await assignedInfo(existing) });
     }
 
     for (const job of jobsByHour[hourGroup.position] || []) {
       const existing = await assignmentFor(date, 'job', job.id);
-      positions.push({
-        title: job.title,
-        room: job.room || '',
-        assigned: existing && existing.status === 'approved' ? await assignedInfo(existing) : null,
-      });
+      if (!existing || existing.status !== 'approved') continue;
+      positions.push({ title: job.title, room: job.room || '', assigned: await assignedInfo(existing) });
     }
 
     if (positions.length > 0) result.push({ position: hourGroup.position, label: hourGroup.label, jobs: positions });

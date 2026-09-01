@@ -71,7 +71,7 @@ test('an approved floater covering a class\'s missing teacher shows up on the pu
   assert.match(rowMatch[0], /Class Coverage Floater/, 'the approved floater\'s name should show, same as an approved permanent job would');
 });
 
-test('a still-pending (not yet approved) class-coverage pick shows the class as Unassigned, not the name', async () => {
+test('a still-pending (not yet approved) class-coverage pick is invisible on the public kiosk, not shown as "Unassigned"', async () => {
   const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
   // Closer than the previous test's own date - closestUpcomingDate always
   // resolves to the EARLIEST upcoming date across every volunteer_dates
@@ -101,10 +101,12 @@ test('a still-pending (not yet approved) class-coverage pick shows the class as 
 
   const res = await request(app).get('/volunteers/monday');
   assert.equal(res.status, 200);
-  const rowMatch = res.text.match(/Pending Sub Class[\s\S]*?<\/tr>/);
-  assert.ok(rowMatch, 'the class should still appear as an open position');
-  assert.doesNotMatch(rowMatch[0], /Pending Coverage Floater/, 'a still-pending pick must not show its name on the public kiosk');
-  assert.match(rowMatch[0], /Unassigned/);
+  // A real request: "do not show positions that don't have someone
+  // assigned. if it is unassigned it's invisible to members. only admins
+  // can see it" - an open/still-pending position must not appear on the
+  // public kiosk at all, not even as "Unassigned".
+  assert.doesNotMatch(res.text, /Pending Sub Class/, 'an unassigned/still-pending position must be invisible on the public kiosk');
+  assert.doesNotMatch(res.text, /Pending Coverage Floater/, 'a still-pending pick must not show its name on the public kiosk either');
 });
 
 test('viewing the public kiosk chart never itself writes a new suggested assignment into the database', async () => {

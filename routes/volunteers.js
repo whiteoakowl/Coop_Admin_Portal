@@ -39,10 +39,14 @@ router.get('/volunteers/:day', async (req, res) => {
   // class's own missing-teacher/assistant coverage, assigned from the
   // separate Substitutes Needed board, never showed up here at all even
   // once approved. publicFloaterCardsForDate (utils/substitutes.js) folds
-  // both position types together, read-only, and already only ever shows
-  // an 'approved' assignment (a still-'pending' auto-suggestion blanks to
-  // "Unassigned" there) - the same "only a confirmed position" guarantee
-  // this route used to apply itself with an extra map() step here.
+  // both position types together, read-only, and only ever includes a
+  // position once it has an 'approved' assignment - a real request: "do
+  // not show positions that don't have someone assigned. if it is
+  // unassigned it's invisible to members. only admins can see it." A
+  // still-'pending' auto-suggestion (or a position with no suggestion at
+  // all) is simply omitted here, not shown as "Unassigned" the way the
+  // admin-only Archive/Chart views still do (dailyAssignmentCards, via
+  // the same shared partials/floater-assignment-cards.ejs).
   const cards = date ? await publicFloaterCardsForDate(day, date) : [];
 
   res.render('volunteers-public', {

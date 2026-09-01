@@ -67,7 +67,7 @@ test('GET /volunteers/:day', async (t) => {
     assert.doesNotMatch(res.text, /No upcoming floater assignments\./);
   });
 
-  await t.test('a real request: floater cards only show a name once it is a confirmed (approved) assignment, not a still-pending suggestion', async () => {
+  await t.test('a real request: floater cards only show a position once it has a confirmed (approved) floater - an unassigned/still-pending one is invisible to members, not shown as "Unassigned"', async () => {
     const { createPermanentJob, setAssignment } = require('../utils/substitutes');
     const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'monday'").get();
     // Closer than the earlier subtest's own future date, so
@@ -90,18 +90,15 @@ test('GET /volunteers/:day', async (t) => {
 
     const res = await request(app).get('/volunteers/monday');
     assert.equal(res.status, 200);
+    // The approved job shows, with the floater's real name...
     assert.match(res.text, /Confirmed Job/);
-    assert.match(res.text, /Still Pending Job/);
-    // The confirmed job's row shows the floater's real name...
     const confirmedRowMatch = res.text.match(/Confirmed Job[\s\S]*?<\/tr>/);
     assert.ok(confirmedRowMatch && /Kiosk Test Floater/.test(confirmedRowMatch[0]), 'approved assignment should show the floater\'s name');
-    // ...but the still-pending job's row must NOT - it should read
-    // "Unassigned" like a genuinely open slot, not leak the auto-
-    // suggested (not yet admin-approved) name to the public kiosk.
-    const pendingRowMatch = res.text.match(/Still Pending Job[\s\S]*?<\/tr>/);
-    assert.ok(pendingRowMatch, 'pending job row should be present');
-    assert.doesNotMatch(pendingRowMatch[0], /Kiosk Test Floater/, 'a still-pending (not yet approved) pick must not show on the public kiosk');
-    assert.match(pendingRowMatch[0], /Unassigned/);
+    // ...but a real request: "do not show positions that don't have
+    // someone assigned. if it is unassigned it's invisible to members.
+    // only admins can see it" - the still-pending job must not appear on
+    // the public kiosk at all, not even as "Unassigned".
+    assert.doesNotMatch(res.text, /Still Pending Job/, 'an unassigned/still-pending position must be invisible on the public kiosk, not shown as "Unassigned"');
   });
 
   await t.test('a missing volunteer_lists row for an otherwise-valid day 404s instead of crashing', async () => {
