@@ -36,6 +36,25 @@
             POST /:id/edit). %>
         <div class="manage-section">
           <h2><svg class="icon"><use href="#icon-sliders"/></svg> Portal Settings</h2>
+
+          <%# A real request: "there should not be an edit permissions
+              button [on the profile page], it should just show the
+              member's sections and portal permissions. When you click
+              the edit button... that is where you can control portal
+              settings per member." Sections scope what an admin can see/
+              manage - independent of whether this member has a portal
+              login of their own, unlike Portal Roles below. %>
+          <p><strong>Sections</strong></p>
+          <% if (allSections.length === 0) { %>
+            <p class="hint">No sections defined yet.</p>
+          <% } else { %>
+            <div class="grade-pill-grid">
+              <% allSections.forEach(function(s) { %>
+                <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= memberSectionIds.has(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+              <% }); %>
+            </div>
+          <% } %>
+
           <% if (portalAccount) { %>
             <p class="hint">Account: <%= portalAccount.email %> &middot; Status: <%= portalAccount.status %></p>
           <% } else { %>
@@ -44,6 +63,7 @@
           <label class="member-form-full"><%= portalAccount ? 'New Password (leave blank to keep the current one)' : 'Password' %>
             <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="<%= portalAccount ? 'Leave blank to keep unchanged' : 'At least 8 characters' %>" />
           </label>
+          <p><strong>Portal Roles</strong></p>
           <% if (allRoles.length === 0) { %>
             <p class="hint">No roles defined yet.</p>
           <% } else { %>

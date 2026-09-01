@@ -9,124 +9,215 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/main-admin/members">&larr; Members</a></p>
+    <p class="subtitle no-print"><a href="/main-admin/members">&larr; Members</a></p>
     <div class="roster-toolbar">
       <h1><%= member.name %></h1>
-      <a class="primary-btn" href="/main-admin/members/<%= member.id %>/edit"><svg class="icon"><use href="#icon-edit"/></svg> Edit</a>
+      <a class="primary-btn no-print" href="/main-admin/members/<%= member.id %>/edit"><svg class="icon"><use href="#icon-edit"/></svg> Edit</a>
     </div>
 
-    <div class="portal-dashboard-grid">
-      <section class="portal-dashboard-card">
-        <h2>Profile</h2>
-        <p><strong>Type:</strong> <%= member.member_type === 'admin' ? 'Admin' : member.member_type === 'parent' ? 'Parent' : 'Student' %><% if (member.is_primary_parent) { %> &middot; Primary Parent<% } %></p>
-        <p><strong>Family:</strong> <%= familyName || '—' %></p>
-        <% if (member.member_type === 'student') { %>
-          <p><strong>Grade:</strong> <%= member.grade_level || '—' %><% if (member.birthdayLabel) { %> &middot; born <%= member.birthdayLabel %><% } %></p>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= tab === 'profile' ? ' active' : '' %>" href="/main-admin/members/<%= member.id %>?tab=profile">Profile</a>
+      <a class="view-tab<%= tab === 'schedule' ? ' active' : '' %>" href="/main-admin/members/<%= member.id %>?tab=schedule">Class Schedule</a>
+      <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="/main-admin/members/<%= member.id %>?tab=attendance">Attendance</a>
+    </div>
+
+    <div class="view-tab-panel">
+      <% if (tab === 'profile') { %>
+        <div class="portal-dashboard-grid">
+          <section class="portal-dashboard-card">
+            <h2>Profile</h2>
+            <p><strong>Type:</strong> <%= member.member_type === 'admin' ? 'Admin' : member.member_type === 'parent' ? 'Parent' : 'Student' %><% if (member.is_primary_parent) { %> &middot; Primary Parent<% } %></p>
+            <p><strong>Family:</strong> <%= familyName || '—' %></p>
+            <% if (member.member_type === 'student') { %>
+              <p><strong>Grade:</strong> <%= member.grade_level || '—' %><% if (member.birthdayLabel) { %> &middot; born <%= member.birthdayLabel %><% } %></p>
+            <% } %>
+            <p><strong>Address:</strong> <%= [member.address, member.city, member.state, member.zip].filter(Boolean).join(', ') || '—' %></p>
+            <p><strong>Phone:</strong> <%= member.phone || '—' %></p>
+            <p><strong>Email:</strong> <%= member.email || '—' %></p>
+            <% if (member.medical_notes) { %><p><strong>Medical/Allergy Notes:</strong> <%= member.medical_notes %></p><% } %>
+          </section>
+
+          <%# A real request: "there should not be an edit permissions
+              button, it should just show the members sections and portal
+              permissions. When you click the edit button on the member's
+              profile that is where you can control portal settings per
+              member." Read-only here on purpose - editing happens on
+              /main-admin/members/:id/edit's own Portal Settings box. %>
+          <section class="portal-dashboard-card">
+            <h2>Portal Permissions</h2>
+            <p><strong>Sections:</strong>
+              <% if (memberSections.length === 0) { %>—<% } else { %>
+                <% memberSections.forEach(function(s) { %><span class="badge-pill"><%= s.name %></span> <% }); %>
+              <% } %>
+            </p>
+            <p><strong>Portal Roles:</strong>
+              <% if (memberPortalRoles === null) { %>
+                No portal account
+              <% } else if (memberPortalRoles.length === 0) { %>—<% } else { %>
+                <% memberPortalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
+              <% } %>
+            </p>
+          </section>
+
+          <% if (familyMembers.length > 1) { %>
+            <section class="portal-dashboard-card">
+              <h2>Family</h2>
+              <ul>
+                <% familyMembers.forEach(function(m) { %>
+                  <li>
+                    <% if (m.id === member.id) { %><strong><%= m.name %></strong> (this member)<% } else { %><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a><% } %>
+                  </li>
+                <% }); %>
+              </ul>
+            </section>
+          <% } %>
+        </div>
+      <% } else if (tab === 'schedule') { %>
+        <% if (familyRoster.length > 1) { %>
+          <div class="category-filter member-profile-family-select">
+            <label for="schedule-family-member-select">Family Member</label>
+            <select id="schedule-family-member-select" onchange="if (this.value === 'all') { window.location = '/main-admin/members/<%= member.id %>?tab=schedule&family=all'; } else { window.location = '/main-admin/members/' + this.value + '?tab=schedule'; }">
+              <option value="all" <%= scheduleFamilyAll ? 'selected' : '' %>>All</option>
+              <% familyRoster.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= (!scheduleFamilyAll && m.id === member.id) ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </div>
         <% } %>
-        <p><strong>Address:</strong> <%= [member.address, member.city, member.state, member.zip].filter(Boolean).join(', ') || '—' %></p>
-        <p><strong>Phone:</strong> <%= member.phone || '—' %></p>
-        <p><strong>Email:</strong> <%= member.email || '—' %></p>
-        <% if (member.medical_notes) { %><p><strong>Medical/Allergy Notes:</strong> <%= member.medical_notes %></p><% } %>
-      </section>
-
-      <%# Admin-only category - a real request: "portal permissions should
-          be an admin only category on each member form/profile." Every
-          view on this route is already Main Admin-only, so this is
-          always shown here; editing happens from the Members list's own
-          "Edit Permissions" bulk mode (see routes/main-admin-members.js's
-          own /bulk-permissions route), not on this page. %>
-      <section class="portal-dashboard-card">
-        <h2>Portal Permissions</h2>
-        <p><strong>Sections:</strong>
-          <% if (memberSections.length === 0) { %>—<% } else { %>
-            <% memberSections.forEach(function(s) { %><span class="badge-pill"><%= s.name %></span> <% }); %>
-          <% } %>
-        </p>
-        <p><strong>Portal Roles:</strong>
-          <% if (memberPortalRoles === null) { %>
-            No portal account
-          <% } else if (memberPortalRoles.length === 0) { %>—<% } else { %>
-            <% memberPortalRoles.forEach(function(r) { %><span class="badge-pill"><%= r.label %></span> <% }); %>
-          <% } %>
-        </p>
-        <a class="roster-action-btn" href="/main-admin/members?q=<%= encodeURIComponent(member.name) %>">Edit Permissions</a>
-      </section>
-
-      <% if (familyMembers.length > 1) { %>
-        <section class="portal-dashboard-card">
-          <h2>Family</h2>
-          <ul>
-            <% familyMembers.forEach(function(m) { %>
-              <li>
-                <% if (m.id === member.id) { %><strong><%= m.name %></strong> (this member)<% } else { %><a href="/main-admin/members/<%= m.id %>"><%= m.name %></a><% } %>
-              </li>
+        <% if (scheduleFamilyAll) { %>
+          <% familySchedules.forEach(function(fs) { %>
+            <div class="schedule-day-columns member-profile-family-schedule">
+              <h2 class="member-profile-family-schedule-name"><%= fs.member.name %></h2>
+              <% [['Monday', fs.schedule.monday], ['Wednesday', fs.schedule.wednesday]].forEach(function (entry) { %>
+                <% var dayLabel = entry[0], rows = entry[1]; %>
+                <div class="form-section">
+                  <h3><%= dayLabel %></h3>
+                  <div class="roster-scroll schedule-table-scroll">
+                    <table class="roster-table condensed-table schedule-edit-table">
+                      <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                      <tbody>
+                        <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                        <% if (!anyRows) { %>
+                          <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                        <% } %>
+                        <% rows.forEach(function (r, i) { %>
+                          <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                          <tr>
+                            <td class="schedule-edit-label"><%= i + 1 %></td>
+                            <td><%= r.time || '—' %></td>
+                            <td><%= r.class_name || '—' %></td>
+                            <td><%= r.room || '—' %></td>
+                          </tr>
+                        <% }); %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="schedule-day-columns">
+            <% [['Monday', schedule.monday], ['Wednesday', schedule.wednesday]].forEach(function (entry) { %>
+              <% var dayLabel = entry[0], rows = entry[1]; %>
+              <div class="form-section">
+                <h3><%= dayLabel %></h3>
+                <div class="roster-scroll schedule-table-scroll">
+                  <table class="roster-table condensed-table schedule-edit-table">
+                    <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+                    <tbody>
+                      <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
+                      <% if (!anyRows) { %>
+                        <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                      <% } %>
+                      <% rows.forEach(function (r, i) { %>
+                        <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                        <tr>
+                          <td class="schedule-edit-label"><%= i + 1 %></td>
+                          <td><%= r.time || '—' %></td>
+                          <td><%= r.class_name || '—' %></td>
+                          <td><%= r.room || '—' %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             <% }); %>
-          </ul>
-        </section>
-      <% } %>
-    </div>
+          </div>
+        <% } %>
 
-    <h2>Class Schedule</h2>
-    <div class="schedule-day-columns">
-      <% [['Monday', schedule.monday], ['Wednesday', schedule.wednesday]].forEach(function (entry) { %>
-        <% var dayLabel = entry[0], rows = entry[1]; %>
-        <div class="form-section">
-          <h3><%= dayLabel %></h3>
-          <div class="roster-scroll schedule-table-scroll">
-            <table class="roster-table condensed-table schedule-edit-table">
-              <thead><tr><th>#</th><th>Time</th><th>Class Name</th><th>Room</th></tr></thead>
+        <h2>Rosters</h2>
+        <% if (!rosters || rosters.length === 0) { %>
+          <p class="roster-empty">Not on any attendance rosters.</p>
+        <% } else { %>
+          <p><%= rosters.map(function(r) { return r.name; }).join(', ') %></p>
+        <% } %>
+      <% } else { %>
+        <% if (familyRoster.length > 1) { %>
+          <div class="category-filter member-profile-family-select">
+            <label for="attendance-family-member-select">Family Member</label>
+            <select id="attendance-family-member-select" onchange="if (this.value === 'all') { window.location = '/main-admin/members/<%= member.id %>?tab=attendance&family=all'; } else { window.location = '/main-admin/members/' + this.value + '?tab=attendance'; }">
+              <option value="all" <%= attendanceFamilyAll ? 'selected' : '' %>>All</option>
+              <% familyRoster.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= (!attendanceFamilyAll && m.id === member.id) ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
+        <% if (attendanceFamilyAll) { %>
+          <% familyAttendanceHistories.forEach(function(fa) { %>
+            <div class="form-section member-profile-family-schedule">
+              <h2 class="member-profile-family-schedule-name"><%= fa.member.name %></h2>
+              <div class="roster-scroll">
+                <table class="roster-table members-table condensed-table">
+                  <thead>
+                    <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
+                  </thead>
+                  <tbody>
+                    <% if (fa.history.length === 0) { %>
+                      <tr><td colspan="5" class="roster-empty">No attendance recorded yet.</td></tr>
+                    <% } %>
+                    <% fa.history.forEach(function(h) { %>
+                      <tr>
+                        <td><%= h.rosterName %></td>
+                        <td><%= h.dateLabel %></td>
+                        <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                        <td><%= h.checkInTime || '—' %></td>
+                        <td><%= h.checkOutTime || '—' %></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table members-table condensed-table">
+              <thead>
+                <tr><th>Roster</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr>
+              </thead>
               <tbody>
-                <% var anyRows = rows.some(function (r) { return r.class_name || r.time || r.room || r.teacher; }); %>
-                <% if (!anyRows) { %>
-                  <tr><td colspan="4" class="roster-empty">No classes on <%= dayLabel %> yet.</td></tr>
+                <% if (history.length === 0) { %>
+                  <tr><td colspan="5" class="roster-empty">No attendance recorded yet.</td></tr>
                 <% } %>
-                <% rows.forEach(function (r, i) { %>
-                  <% if (!r.class_name && !r.time && !r.room && !r.teacher) return; %>
+                <% history.forEach(function(h) { %>
                   <tr>
-                    <td class="schedule-edit-label"><%= i + 1 %></td>
-                    <td><%= r.time || '—' %></td>
-                    <td><%= r.class_name || '—' %></td>
-                    <td><%= r.room || '—' %></td>
+                    <td><%= h.rosterName %></td>
+                    <td><%= h.dateLabel %></td>
+                    <td><span class="status-badge status-badge-<%= h.status %>"><%= h.statusLabel %></span></td>
+                    <td><%= h.checkInTime || '—' %></td>
+                    <td><%= h.checkOutTime || '—' %></td>
                   </tr>
                 <% }); %>
               </tbody>
             </table>
           </div>
-        </div>
-      <% }); %>
+          <p class="hint">Most recent 25 records.</p>
+        <% } %>
+      <% } %>
     </div>
-
-    <h2>Rosters</h2>
-    <% if (!rosters || rosters.length === 0) { %>
-      <p class="roster-empty">Not on any attendance rosters.</p>
-    <% } else { %>
-      <p><%= rosters.map(function(r) { return r.name; }).join(', ') %></p>
-    <% } %>
-
-    <h2>Recent Attendance</h2>
-    <% if (history.length === 0) { %>
-      <p class="roster-empty">No attendance history yet.</p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table condensed-table">
-          <thead><tr><th>Date</th><th>Roster</th><th>Status</th></tr></thead>
-          <tbody>
-            <% history.forEach(function(h) { %>
-              <tr>
-                <td><%= h.dateLabel %></td>
-                <td><%= h.rosterName %></td>
-                <td>
-                  <% if (h.status === 'present') { %><span class="badge-pill badge-pill-present">Present</span>
-                  <% } else if (h.status === 'late') { %><span class="badge-pill badge-pill-pending">Late</span>
-                  <% } else { %><span class="badge-pill badge-pill-absent">Absent</span><% } %>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-      <p class="hint">Most recent 25 records.</p>
-    <% } %>
   </main>
 </body>
 </html>

@@ -105,10 +105,11 @@ router.get('/', async (req, res) => {
 // (see /website below) both dropped out of the top-level nav (every
 // views/main-admin-*.ejs's own navLinks array) and now live only under
 // the gear icon (views/partials/portal-nav.ejs's settingsHref). This
-// bare redirect gives that gear icon one stable URL to open - Users
-// happens to be first since Users existed here before Website did.
+// bare redirect gives that gear icon one stable URL to open - Roles &
+// Permissions is first now that the standalone Users tab is gone (see
+// partials/main-admin-settings-tabs.ejs's own comment on why).
 router.get('/settings', requirePortalPermission('manage_users'), (req, res) => {
-  res.redirect('/main-admin/users');
+  res.redirect('/main-admin/roles');
 });
 
 // A real request: "the co-op admin portal settings quicklinks tab
@@ -165,84 +166,6 @@ router.post('/admins/positions/assign', requirePortalPermission('manage_users'),
 router.post('/admins/positions/:positionId/members/:memberId/remove', requirePortalPermission('manage_users'), async (req, res) => {
   await removeAdminPositionForMember(parseInt(req.params.memberId, 10), parseInt(req.params.positionId, 10));
   await renderAdmins(req, res, null, 'Leader removed.');
-});
-
-// --- Users ---
-
-router.get('/users', requirePortalPermission('manage_users'), async (req, res) => {
-  const accounts = await db
-    .prepare(
-      `SELECT ma.id, ma.email, ma.status, ma.created_at, ma.last_login_at, m.name AS "memberName"
-       FROM member_accounts ma JOIN members m ON m.id = ma.member_id
-       ORDER BY ma.status = 'pending' DESC, LOWER(m.name)`
-    )
-    .all();
-  const roleRows = await db
-    .prepare(`SELECT mar.member_account_id AS "accountId", r.id, r.key, r.label FROM member_account_roles mar JOIN roles r ON r.id = mar.role_id`)
-    .all();
-  const rolesByAccount = {};
-  const roleIdsByAccount = {};
-  roleRows.forEach((r) => {
-    if (!rolesByAccount[r.accountId]) rolesByAccount[r.accountId] = [];
-    if (!roleIdsByAccount[r.accountId]) roleIdsByAccount[r.accountId] = [];
-    rolesByAccount[r.accountId].push(r.label);
-    roleIdsByAccount[r.accountId].push(r.id);
-  });
-  const allRoles = await db.prepare('SELECT id, key, label FROM roles ORDER BY label').all();
-
-  res.render('main-admin-users', {
-    title: 'Users',
-    accounts: accounts.map((a) => ({ ...a, roleLabels: rolesByAccount[a.id] || [], roleIds: roleIdsByAccount[a.id] || [] })),
-    allRoles,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.post('/users/:id/roles', requirePortalPermission('manage_users'), async (req, res) => {
-  const accountId = parseInt(req.params.id, 10);
-  const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
-
-  await db.withTransaction(async (tx) => {
-    await tx.prepare('DELETE FROM member_account_roles WHERE member_account_id = ?').run(accountId);
-    for (const roleId of roleIds) {
-      await tx
-        .prepare('INSERT INTO member_account_roles (member_account_id, role_id, granted_by_account_id) VALUES (?, ?, ?)')
-        .run(accountId, roleId, req.portalAccount.id);
-    }
-  });
-
-  res.redirect('/main-admin/users?notice=' + encodeURIComponent('Roles updated.'));
-});
-
-router.post('/users/:id/approve', requirePortalPermission('manage_users'), async (req, res) => {
-  await db
-    .prepare("UPDATE member_accounts SET status = 'active', approved_at = now_text(), approved_by_account_id = ? WHERE id = ?")
-    .run(req.portalAccount.id, req.params.id);
-  res.redirect('/main-admin/users?notice=' + encodeURIComponent('Account approved.'));
-});
-
-router.post('/users/:id/suspend', requirePortalPermission('manage_users'), async (req, res) => {
-  await db.prepare("UPDATE member_accounts SET status = 'suspended' WHERE id = ?").run(req.params.id);
-  res.redirect('/main-admin/users?notice=' + encodeURIComponent('Account suspended.'));
-});
-
-router.post('/users/:id/reactivate', requirePortalPermission('manage_users'), async (req, res) => {
-  await db.prepare("UPDATE member_accounts SET status = 'active' WHERE id = ?").run(req.params.id);
-  res.redirect('/main-admin/users?notice=' + encodeURIComponent('Account reactivated.'));
-});
-
-// A real request: "No creating users. All Members should already have
-// an account. Each member profile should have a space for password." -
-// the standalone "Create Account" flow (pick a member, type an email +
-// password on a separate page) is gone; setting a password now lives
-// directly on the member's own profile (views/main-admin-member-edit.ejs
-// -> this same POST /main-admin/members/:id/edit route creates the
-// member_accounts row on demand the first time a password is set - see
-// that route's own comment). This redirect just keeps an old bookmark/
-// link to the removed page from 404ing.
-router.get('/users/new', requirePortalPermission('manage_users'), (req, res) => {
-  res.redirect('/main-admin/members');
 });
 
 // --- Roles & Permissions (read-focused for this pass - see each role's

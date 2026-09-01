@@ -51,14 +51,14 @@
     <% if (pendingCount > 0) { %>
       <div class="alert alert-info">
         <%= pendingCount %> account<%= pendingCount === 1 ? '' : 's' %> awaiting approval.
-        <a href="/main-admin/users">Review now &rarr;</a>
+        <a href="/main-admin/members?tab=approvals">Review now &rarr;</a>
       </div>
     <% } %>
 
     <section class="portal-dashboard-section">
       <h2>Pending Requests</h2>
       <div class="totals-card totals-card-links">
-        <a class="totals-item" href="/main-admin/users">
+        <a class="totals-item" href="/main-admin/members?tab=approvals">
           <span class="stat-value"><%= pendingCount %></span>
           <span class="stat-label">Membership Requests</span>
         </a>

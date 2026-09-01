@@ -41,15 +41,12 @@ async function loginAsMainAdmin() {
   return { cookie };
 }
 
-test('the standalone Create Account page is gone', async () => {
-  const { cookie } = await loginAsMainAdmin();
-  const res = await request(app).get('/main-admin/users/new').set('Cookie', cookie);
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /\/main-admin\/members/);
-
-  const usersPage = await request(app).get('/main-admin/users').set('Cookie', cookie);
-  assert.doesNotMatch(usersPage.text, /Create Account/);
-});
+// A later request: "make every member a user... take away user
+// settings." The standalone Users settings tab (account list, role
+// editor, and its own now-doubly-defunct "Create Account" page) is gone
+// entirely - see test/routes-main-admin-settings-tabs-users-removed.test.js
+// for coverage of that removal. This file just keeps covering the
+// per-member password flow that replaced it.
 
 test('setting a password on a member with no account creates one', async (t) => {
   const { cookie } = await loginAsMainAdmin();

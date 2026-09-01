@@ -28,7 +28,7 @@ const router = express.Router();
 const multer = require('multer');
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const { formatDateLabel, formatDateNumeric, ageFromBirthday, isValidISODate } = require('../utils/dates');
+const { formatDateLabel, formatDateNumeric, formatTime, ageFromBirthday, isValidISODate } = require('../utils/dates');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { paginate, parsePage, parsePageSize, DEFAULT_PAGE_SIZE } = require('../utils/pagination');
 const { spreadsheetFileFilter } = require('../utils/uploads');
@@ -80,6 +80,20 @@ async function attendanceHistoryForMember(memberId) {
        LIMIT 25`
     )
     .all(memberId);
+}
+
+// Same shape as routes/admin-members.js's own formatAttendanceHistory -
+// used by both the single-member and family-wide "All" views on the
+// profile page's own Attendance tab.
+function formatAttendanceHistory(rows) {
+  return rows.map((r) => ({
+    rosterName: r.rosterName,
+    dateLabel: formatDateLabel(r.date),
+    statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+    status: r.status,
+    checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+  }));
 }
 
 // --- List ---
@@ -252,6 +266,47 @@ router.post('/bulk-permissions', async (req, res) => {
     await setMemberRoles(memberId, roleIds, req.portalAccount.id);
   }
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Permissions updated for ${memberIds.length} member(s).`));
+});
+
+// A real request: "make every member a user... give everyone the
+// password changeme123. all members will have accounts." One-shot bulk
+// bootstrap: creates a portal account (status 'active', so no separate
+// approval step) for every ACTIVE member who doesn't already have one,
+// using their own email on file as their login. A member with no email
+// can't get one (member_accounts.email is required) - skipped, not
+// silently dropped, so the admin sees exactly how many still need an
+// email added before they can log in.
+router.post('/bulk-create-accounts', async (req, res) => {
+  const members = await db.prepare("SELECT id, email FROM members WHERE active = 1").all();
+  const existingMemberIds = new Set((await db.prepare('SELECT member_id FROM member_accounts').all()).map((r) => r.member_id));
+  const passwordHash = hashPassword('changeme123');
+
+  let created = 0;
+  let skippedNoEmail = 0;
+  let skippedEmailInUse = 0;
+  for (const m of members) {
+    if (existingMemberIds.has(m.id)) continue;
+    const email = (m.email || '').trim();
+    if (!email) {
+      skippedNoEmail += 1;
+      continue;
+    }
+    if (await findAccountByEmail(email)) {
+      skippedEmailInUse += 1;
+      continue;
+    }
+    await db
+      .prepare(
+        "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
+      )
+      .run(m.id, email, passwordHash, req.portalAccount.id);
+    created += 1;
+  }
+
+  const parts = [`Created ${created} account(s) with the password "changeme123".`];
+  if (skippedNoEmail > 0) parts.push(`${skippedNoEmail} member(s) skipped - no email on file.`);
+  if (skippedEmailInUse > 0) parts.push(`${skippedEmailInUse} member(s) skipped - their email is already used by another account.`);
+  res.redirect('/main-admin/members?notice=' + encodeURIComponent(parts.join(' ')));
 });
 
 // --- Approvals (membership requests - member_accounts still 'pending')
@@ -544,16 +599,29 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
 });
 
+const PROFILE_TABS = ['profile', 'schedule', 'attendance'];
+
+// A real request: "class schedule and attendance should be tabs" (the
+// profile page used to just stack every section on one long page) -
+// same view-tabs shape and same family-wide "All" behavior as routes/
+// admin-members.js's own identical GET /members/:id, just rendering
+// main-admin-member-profile.ejs instead. See that route's own comment
+// for the family-view rationale.
 router.get('/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
   member.birthdayLabel = member.birthday ? formatDateNumeric(member.birthday) : null;
+  const tab = PROFILE_TABS.includes(req.query.tab) ? req.query.tab : 'profile';
 
   const family = await db
     .prepare('SELECT f.name AS "familyName" FROM members m LEFT JOIN families f ON f.id = m.family_id WHERE m.id = ?')
     .get(id);
   const restOfFamily = await familyOf(id);
+  const familyRoster = [member, ...restOfFamily].sort(byLastName);
+  const familyAllDefault = familyRoster.length > 1 && member.member_type === 'parent';
+  const scheduleFamilyAll = tab === 'schedule' && familyRoster.length > 1 && (req.query.family === 'all' || familyAllDefault);
+  const attendanceFamilyAll = tab === 'attendance' && familyRoster.length > 1 && (req.query.family === 'all' || familyAllDefault);
 
   const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
   const memberSectionIds = (await sectionIdsForMembers([id]))[id];
@@ -563,10 +631,16 @@ router.get('/:id', async (req, res) => {
   res.render('main-admin-member-profile', {
     title: member.name,
     member,
+    tab,
     familyName: family ? family.familyName : null,
     familyMembers: [member, ...restOfFamily].sort(byLastName),
+    familyRoster,
     rosters: await rostersForMember(id),
     schedule: await getMemberSchedule(id),
+    scheduleFamilyAll,
+    familySchedules: scheduleFamilyAll
+      ? await Promise.all(familyRoster.map(async (m) => ({ member: m, schedule: await getMemberSchedule(m.id) })))
+      : null,
     memberSections: allSections.filter((s) => memberSectionIds.has(s.id)),
     // Named memberPortalRoles, not portalRoles - that name is already the
     // LOGGED-IN admin's own roles, implicitly supplied via res.locals for
@@ -576,12 +650,11 @@ router.get('/:id', async (req, res) => {
     // (portalRoles ending up `null`, not `[]`) for the common case of a
     // member with no portal account of their own.
     memberPortalRoles: portalStatus.account ? allRoles.filter((r) => portalStatus.roleIds.has(r.id)) : null,
-    history: (await attendanceHistoryForMember(id)).map((r) => ({
-      rosterName: r.rosterName,
-      dateLabel: formatDateLabel(r.date),
-      statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
-      status: r.status,
-    })),
+    attendanceFamilyAll,
+    history: attendanceFamilyAll ? null : formatAttendanceHistory(await attendanceHistoryForMember(id)),
+    familyAttendanceHistories: attendanceFamilyAll
+      ? await Promise.all(familyRoster.map(async (m) => ({ member: m, history: formatAttendanceHistory(await attendanceHistoryForMember(m.id)) })))
+      : null,
   });
 });
 
@@ -611,6 +684,16 @@ router.get('/:id/edit', async (req, res) => {
     portalAccount: portalStatus.account,
     portalRoleIds: portalStatus.roleIds,
     allRoles: await db.prepare('SELECT * FROM roles ORDER BY label').all(),
+    // A real request: "there should not be an edit permissions button [on
+    // the profile page], it should just show the member's sections and
+    // portal permissions. When you click the edit button... that is where
+    // you can control portal settings per member." Sections used to only
+    // be editable from the Members list's own bulk "Edit Permissions"
+    // mode (routes/main-admin-members.js's own /bulk-permissions route,
+    // unaffected) - now also editable per-member right here, alongside
+    // the password/role fields this box already had.
+    allSections: await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all(),
+    memberSectionIds: (await sectionIdsForMembers([id]))[id],
     error: req.query.error || null,
   });
 });
@@ -680,6 +763,12 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
     const roleIds = [].concat(req.body.roleIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
     await setMemberRoles(id, roleIds, req.portalAccount.id);
   }
+
+  // Sections - unlike Portal Roles, not gated behind having an account:
+  // Sections scope what an admin can see/manage regardless of whether
+  // this member ever logs into a portal themselves.
+  const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await setMemberSections(id, sectionIds);
 
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(`${f.name} updated.`));
 });

@@ -13,9 +13,9 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
 // A real request: "under main admin portal the users tab should be
 // under the settings icon at the top" (and later, Website too) - Main
 // Admin's own gear icon now opens its own admin-configuration Settings
-// area (views/main-admin-users.ejs's own tab bar, /main-admin/settings
-// redirects there) instead of the generic per-account Settings page
-// (My Privacy, etc.) every other portal's gear still opens.
+// area (partials/main-admin-settings-tabs.ejs's own tab bar, /main-admin/
+// settings redirects there) instead of the generic per-account Settings
+// page (My Privacy, etc.) every other portal's gear still opens.
 const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/portal/settings';
 
 // Main Admin's own primary nav - a real request: "there are many
@@ -261,7 +261,6 @@ const communityLinks =
       <details class="portal-switcher-details">
         <summary><svg class="icon"><use href="#icon-gear"/></svg> Settings</summary>
         <div class="portal-switcher-menu">
-          <a href="/main-admin/users">Users</a>
           <a href="/main-admin/roles">Roles &amp; Permissions</a>
           <a href="/main-admin/website">Website</a>
           <a href="/main-admin/audit-log">Audit Log</a>

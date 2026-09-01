@@ -1,15 +1,21 @@
 <%
 // Sub-tab bar for Main Admin's Settings area (reached via the gear icon
 // - views/partials/portal-nav.ejs's settingsHref, routes/main-admin.js's
-// /settings redirect). Users, Roles & Permissions, Admins, Website, and
-// Quick Links are real separate pages/routes under the hood (unchanged),
-// not panels of one shared template - this is just the tab strip every
-// one of them includes at the top of <main> so switching between them
-// still reads as one settings area. `activeSettingsTab` local: 'users' |
-// 'roles' | 'admins' | 'website' | 'quicklinks'.
+// /settings redirect). Roles & Permissions, Admins, Website, and Quick
+// Links are real separate pages/routes under the hood (unchanged), not
+// panels of one shared template - this is just the tab strip every one
+// of them includes at the top of <main> so switching between them still
+// reads as one settings area. `activeSettingsTab` local: 'roles' |
+// 'admins' | 'website' | 'quicklinks'.
+//
+// A real request: "make every member a user... take away user settings.
+// all members will have accounts." The standalone Users tab (account
+// list + role editor) is gone - every member already has an account
+// managed from their own profile (routes/main-admin-members.js), and
+// membership/account approval already has its own home at Members >
+// Approvals (utils/membershipApprovals.js).
 %>
 <div class="view-tabs">
-  <a class="view-tab<%= activeSettingsTab === 'users' ? ' active' : '' %>" href="/main-admin/users">Users</a>
   <a class="view-tab<%= activeSettingsTab === 'roles' ? ' active' : '' %>" href="/main-admin/roles">Roles &amp; Permissions</a>
   <%# A real request: "co-op admin portal. settings gear, admins tab.
       this tab should be located under the main admin portal settings

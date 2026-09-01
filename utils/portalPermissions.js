@@ -12,9 +12,10 @@
 // member's own portal login holds, NOT the granular permission checkboxes
 // a role itself grants (those stay Main Admin > Roles & Permissions -
 // unchanged) - a member's list-page checkbox toggles their ROLE
-// membership, exactly like the existing /main-admin/users/:id/roles
-// screen (routes/main-admin.js) already does one account at a time, just
-// reachable in bulk from the list instead. Section assignment
+// membership, the same role set both the per-member Edit page and the
+// list's own bulk "Edit Permissions" mode manage (the standalone Users
+// tab that used to do this one account at a time is gone - every member
+// already has an account, managed from their own profile). Section assignment
 // (member_sections) is unrelated to accounts at all - see
 // utils/sections.js's own header comment - so it's always editable
 // regardless of whether a member has a portal login yet.
