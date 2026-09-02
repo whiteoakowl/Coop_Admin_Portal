@@ -72,9 +72,12 @@
             <% } %>
           </div>
 
-          <% if (event.volunteerRoles.length) { %>
+          <% if (event.volunteers_enabled && event.volunteerRoles.length) { %>
             <div class="manage-section">
               <div class="grid-box-header"><h2>Volunteer</h2></div>
+              <% if (event.volunteer_selection_count) { %>
+                <p class="hint">Please select at least <%= event.volunteer_selection_count %> role<%= event.volunteer_selection_count == 1 ? '' : 's' %> to help with this event.</p>
+              <% } %>
               <div class="training-lesson-list">
                 <% event.volunteerRoles.forEach(function(role) { %>
                   <div class="training-lesson-row">
@@ -112,9 +115,12 @@
             </div>
           <% } %>
 
-          <% if (event.donationItems.length) { %>
+          <% if (event.donations_enabled && event.donationItems.length) { %>
             <div class="manage-section">
               <div class="grid-box-header"><h2>Donations Needed</h2></div>
+              <% if (event.donation_selection_count) { %>
+                <p class="hint">Please select at least <%= event.donation_selection_count %> item<%= event.donation_selection_count == 1 ? '' : 's' %> to bring.</p>
+              <% } %>
               <div class="training-lesson-list">
                 <% event.donationItems.forEach(function(item) { %>
                   <div class="training-lesson-row">
@@ -130,6 +136,41 @@
                       </div>
                       <% if (item.remaining > 0) { %>
                         <form method="POST" action="/events/<%= event.id %>/donation-items/<%= item.id %>/claim" class="training-lesson-actions">
+                          <select name="memberId">
+                            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+                          </select>
+                          <input type="number" name="quantity" min="1" value="1" max="<%= item.remaining %>" style="width: 4rem;" />
+                          <button type="submit" class="roster-action-btn">I'll Bring It</button>
+                        </form>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (event.food_enabled && event.foodItems.length) { %>
+            <div class="manage-section">
+              <div class="grid-box-header"><h2>Food Sign-Up</h2></div>
+              <% if (event.food_selection_count) { %>
+                <p class="hint">Please select at least <%= event.food_selection_count %> item<%= event.food_selection_count == 1 ? '' : 's' %> to bring.</p>
+              <% } %>
+              <div class="training-lesson-list">
+                <% event.foodItems.forEach(function(item) { %>
+                  <div class="training-lesson-row">
+                    <div class="training-lesson-row-main">
+                      <svg class="icon"><use href="#icon-badge"/></svg>
+                      <div class="training-lesson-info">
+                        <strong><%= item.item_name %></strong>
+                        <span class="hint">
+                          <%= item.remaining %> still needed
+                          <% if (item.deadline) { %> &middot; needed by <%= item.deadline %><% } %>
+                        </span>
+                        <% if (item.notes) { %><span class="hint"><%= item.notes %></span><% } %>
+                      </div>
+                      <% if (item.remaining > 0) { %>
+                        <form method="POST" action="/events/<%= event.id %>/food-items/<%= item.id %>/claim" class="training-lesson-actions">
                           <select name="memberId">
                             <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
                           </select>

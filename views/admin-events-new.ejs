@@ -23,15 +23,19 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <%
-    // Step definitions drive both the circle strip and the button-label
-    // logic below, so the two can never drift out of sync (a 6th step
-    // added here shows up as a 6th circle automatically).
+    // A real request: "events creation, page one should also have dates
+    // and times for event, dates and times for opening and closing the
+    // event, and location, capacity totals dropdown choosing family or
+    // person capacity, organized by, event image upload. 2rd page should
+    // be ticket pricing. 3th page should be all of the permissions." -
+    // down from the previous 5-step Details/Date & Time/Location/
+    // Tickets/Additional flow to these 3. Step definitions drive both the
+    // circle strip and the button-label logic below, so a step added
+    // here shows up as a circle automatically.
     var wizardSteps = [
       { n: 1, label: 'Details' },
-      { n: 2, label: 'Date & Time' },
-      { n: 3, label: 'Location' },
-      { n: 4, label: 'Tickets' },
-      { n: 5, label: 'Additional' },
+      { n: 2, label: 'Tickets' },
+      { n: 3, label: 'Permissions' },
     ];
     %>
     <div class="event-wizard-steps" data-wizard-steps>
@@ -43,7 +47,7 @@
       <% }); %>
     </div>
 
-    <form id="event-wizard-form" method="POST" action="/main-admin/events">
+    <form id="event-wizard-form" method="POST" action="/main-admin/events" enctype="multipart/form-data">
       <div class="manage-section event-wizard-panel" data-step-panel="1">
         <h2>Event Details</h2>
         <div class="member-form-grid">
@@ -85,26 +89,7 @@
           </div>
         </div>
 
-        <h3 class="event-wizard-subheading">Audience &amp; Restrictions</h3>
-        <div class="member-form-full">
-          <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
-          <div class="grade-pill-grid">
-            <% gradeOptions.forEach(function(g) { %>
-              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
-            <% }); %>
-          </div>
-        </div>
-
-        <div class="event-wizard-footer">
-          <a class="btn-secondary" href="/main-admin/events">Cancel</a>
-          <div class="event-wizard-footer-right">
-            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="manage-section event-wizard-panel" data-step-panel="2" hidden>
-        <h2>Date &amp; Time</h2>
+        <h3 class="event-wizard-subheading">Date &amp; Time</h3>
         <div class="member-form-grid">
           <label>Starts <span class="required-star">*</span>
             <input type="datetime-local" name="startsAt" required />
@@ -120,16 +105,7 @@
           </label>
         </div>
 
-        <div class="event-wizard-footer">
-          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
-          <div class="event-wizard-footer-right">
-            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="manage-section event-wizard-panel" data-step-panel="3" hidden>
-        <h2>Location</h2>
+        <h3 class="event-wizard-subheading">Location &amp; Capacity</h3>
         <div class="member-form-grid">
           <label class="member-form-full">Location (legacy text - prefer the dropdown below)
             <input type="text" name="location" placeholder="e.g., Community Center, 123 Main St" />
@@ -148,25 +124,43 @@
               <option value="public">Public</option>
             </select>
           </label>
+          <label>Capacity <span class="hint">(blank = no limit)</span>
+            <input type="number" name="capacityValue" min="1" placeholder="No limit" />
+          </label>
+          <label>Capacity Counted By
+            <select name="capacityType">
+              <option value="person">Person</option>
+              <option value="family">Family</option>
+            </select>
+          </label>
+          <label>Organized By
+            <input type="text" name="organizedBy" placeholder="e.g., Sanford Homeschoolers" />
+          </label>
+        </div>
+
+        <h3 class="event-wizard-subheading">Event Image</h3>
+        <label class="member-form-full">Choose an Image <span class="hint">(optional)</span>
+          <input type="file" name="image" accept="image/*" />
+        </label>
+
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Tags <span class="hint">(helps people find your event)</span></span>
+          <div data-tag-input="tags" class="tag-input-wrap">
+            <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
+          </div>
         </div>
 
         <div class="event-wizard-footer">
-          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <a class="btn-secondary" href="/main-admin/events">Cancel</a>
           <div class="event-wizard-footer-right">
             <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
           </div>
         </div>
       </div>
 
-      <div class="manage-section event-wizard-panel" data-step-panel="4" hidden>
+      <div class="manage-section event-wizard-panel" data-step-panel="2" hidden>
         <h2>Tickets</h2>
         <div class="member-form-grid">
-          <label>Capacity (people) <span class="hint">(blank = no limit)</span>
-            <input type="number" name="capacity" min="1" placeholder="No limit" />
-          </label>
-          <label>Family Capacity (families) <span class="hint">(blank = no limit)</span>
-            <input type="number" name="familyCapacity" min="1" placeholder="No limit" />
-          </label>
           <label>Price ($) <span class="hint">(blank = free)</span>
             <input type="number" name="priceDollars" min="0" step="0.01" placeholder="e.g. 10.00" />
           </label>
@@ -178,6 +172,29 @@
           </label>
         </div>
 
+        <div class="event-wizard-footer">
+          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
+          <div class="event-wizard-footer-right">
+            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="manage-section event-wizard-panel" data-step-panel="3" hidden>
+        <h2>Permissions</h2>
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
+          <div class="grade-pill-grid">
+            <% gradeOptions.forEach(function(g) { %>
+              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
+            <% }); %>
+          </div>
+        </div>
+
+        <%
+        // A real request: "guests can register should only be a check box
+        // under who can register with parent and student options."
+        %>
         <h3 class="event-wizard-subheading">Who Can Register</h3>
         <div class="class-form-row">
           <div class="class-form-field">
@@ -188,35 +205,8 @@
             <input type="hidden" name="allowChildRegister" value="off" />
             <label class="grade-pill"><input type="checkbox" name="allowChildRegister" value="1" checked /> Kids can register</label>
           </div>
-        </div>
-
-        <div class="event-wizard-footer">
-          <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
-          <div class="event-wizard-footer-right">
-            <button type="button" class="primary-btn" data-next-step>Save &amp; Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="manage-section event-wizard-panel" data-step-panel="5" hidden>
-        <h2>Additional Details</h2>
-        <div class="member-form-grid">
-          <label>Language
-            <select name="language">
-              <option value="">Select language</option>
-              <% languages.forEach(function(l) { %>
-                <option value="<%= l %>"><%= l %></option>
-              <% }); %>
-            </select>
-          </label>
-          <label>Organized By
-            <input type="text" name="organizedBy" placeholder="e.g., Sanford Homeschoolers" />
-          </label>
-          <div class="member-form-full">
-            <span class="roster-checkbox-label">Tags <span class="hint">(helps people find your event)</span></span>
-            <div data-tag-input="tags" class="tag-input-wrap">
-              <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
-            </div>
+          <div class="class-form-field">
+            <label class="grade-pill"><input type="checkbox" name="allowGuestRegister" value="1" /> Guests can register</label>
           </div>
         </div>
 
@@ -228,11 +218,6 @@
             <% }); %>
           </div>
         <% } %>
-
-        <p class="hint event-wizard-media-note">
-          <svg class="icon"><use href="#icon-image"/></svg>
-          An event photo/banner can be added from the event's own page once it's created.
-        </p>
 
         <div class="event-wizard-footer">
           <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>

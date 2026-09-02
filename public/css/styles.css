@@ -7191,11 +7191,6 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .icon-toggle-btn .icon { width: 1.1rem; height: 1.1rem; }
 .icon-toggle-btn.active, .icon-toggle-btn.active:hover { background: #fff; border-color: var(--ink); color: var(--ink); }
 
-/* Item 3 - desktop Events tab strip becomes a dropdown; mobile keeps its
-   own accordion (unchanged) below 640px per .event-tabs-desktop's
-   existing display:none rule. */
-.event-tabs-select { max-width: 20rem; margin-bottom: 1rem; }
-
 /* Item 10 - month/year dropdowns sit inline with Prev/Next. */
 .event-month-select { min-width: 8rem; }
 .event-year-select { min-width: 5.5rem; }
@@ -7226,7 +7221,17 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    redundant label added nothing); the Calendar/List toggle now sits in
    its own row above a single compact Prev/month-select/year-select/Next
    row, with smaller type/padding on that row's buttons and selects so
-   all four fit cleanly without wrapping on a typical screen. */
+   all four fit cleanly without wrapping on a typical screen.
+
+   A follow-up real request: "mobile view calendar prev button, month,
+   year, next button should all fit nicely on one row" - the row already
+   never wraps at desktop/tablet widths (flex-wrap: nowrap above), but a
+   480px-and-under override used to let it wrap anyway, right where it
+   actually needed to stay on one row the most. min-width: 0 lets the two
+   <select>s actually shrink below their intrinsic content width inside
+   the flex row (the default min-width: auto on a flex item is what was
+   forcing the wrap in the first place); Prev/Next drop to icon-only
+   arrows below 480px so the whole row has room to fit. */
 .event-calendar-toolbar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin: 1.25rem 0; }
 .event-calendar-nav-row { flex-wrap: nowrap; }
 .event-calendar-nav-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
@@ -7238,43 +7243,22 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   background-size: 0.65rem;
 }
 @media (max-width: 480px) {
-  .event-calendar-nav-row { flex-wrap: wrap; }
-}
-
-/* A real request: "on mobile, replace the [Events] tabs with stacked
-   expandable bars - click the title to expand it." Below 640px the
-   usual .view-tabs pill strip (.event-tabs-desktop here) hides in favor
-   of .event-mobile-accordion's own full-width bars - see
-   views/admin-events-list.ejs's own comment on why there are two of
-   these blocks (one for the bars before the active tab, one for the
-   bars after) instead of one. */
-.event-mobile-accordion { display: none; }
-@media (max-width: 640px) {
-  .event-tabs-desktop { display: none; }
-  .event-mobile-accordion {
-    display: block;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 0.75rem;
+  .event-calendar-nav-row .event-month-select,
+  .event-calendar-nav-row .event-year-select {
+    min-width: 0;
+    flex: 1 1 0;
+    padding-right: 1.1rem;
   }
-  .event-accordion-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 0.75rem 1rem;
-    background: var(--surface);
-    color: var(--ink);
-    font-weight: 600;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
+  .event-calendar-nav-btn {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.55rem;
+    font-size: 0;
   }
-  .event-mobile-accordion .event-accordion-bar:last-child { border-bottom: none; }
-  .event-accordion-bar-active { background: var(--brand-soft); color: var(--brand-dark); }
-  .event-accordion-chevron { flex-shrink: 0; width: 1.1rem; height: 1.1rem; transition: transform 0.15s ease; }
-  .event-accordion-chevron-closed { transform: rotate(-90deg); }
+  .event-calendar-nav-btn::before {
+    font-size: 0.9rem;
+  }
+  .event-calendar-nav-btn:first-child::before { content: '\2190'; }
+  .event-calendar-nav-btn:last-child::before { content: '\2192'; }
 }
 
 /* Babysitter Directory - profile photo thumbnail, shown both on a

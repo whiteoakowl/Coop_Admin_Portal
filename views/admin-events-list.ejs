@@ -11,7 +11,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Events</h1>
-      <div class="roster-btn-row no-print">
+      <div class="roster-btn-row roster-btn-row-fit-text no-print">
         <% if (activeTab === 'calendar' || activeTab === 'drafts') { %>
           <a class="roster-action-btn" href="/main-admin/events/new">+ New Event</a>
         <% } %>
@@ -24,21 +24,14 @@
     </div>
 
     <%
-      // A real request: "Main Admin Events: Calendar/Drafts/Requests/
-      // Event Attendance/Archive/Settings tabs" (see routes/admin-
-      // events.js's own header comment for what each tab covers), and a
-      // follow-up: "on mobile, replace the tabs with stacked expandable
-      // bars - click the title to expand it." Desktop keeps the usual
-      // .view-tabs pill strip; on mobile it's replaced with this same
-      // list of tabs rendered as full-width bars stacked top to bottom,
-      // with the current tab's bar shown "expanded" (open, its content
-      // directly beneath it) and every other tab shown as a closed bar
-      // you tap to navigate to and expand - see the two
-      // .event-mobile-accordion blocks below (one for the bars before
-      // the active tab, one for the bars after) sandwiching the exact
-      // same content this page already rendered for the desktop tab
-      // panel, so there's no second copy of any tab's markup to keep in
-      // sync.
+      // A real request: "the different tabs should be like the file tabs
+      // on other pages at the top of the page" - the dropdown-select-on-
+      // desktop/stacked-accordion-on-mobile pattern this page used to
+      // have (a one-off, built for this page only) is now the same
+      // `.view-tabs`/`.view-tab` connected-folder-tab strip every other
+      // tabbed admin page already uses (see e.g. views/admin-classifieds-
+      // list.ejs) - it already scrolls horizontally on a narrow screen,
+      // so no separate mobile treatment is needed here either.
       const eventTabDefs = [
         { key: 'calendar', label: 'Calendar' },
         { key: 'drafts', label: 'Drafts' },
@@ -47,28 +40,10 @@
         { key: 'archive', label: 'Archive' },
         { key: 'settings', label: 'Settings' },
       ];
-      const activeTabIndex = eventTabDefs.findIndex(function(t) { return t.key === activeTab; });
     %>
-    <div class="event-tabs-desktop no-print">
-      <select class="event-tabs-select" onchange="if(this.value) window.location.href=this.value;" aria-label="Events section">
-        <% eventTabDefs.forEach(function(t) { %>
-          <option value="/main-admin/events?tab=<%= t.key %>" <%= activeTab === t.key ? 'selected' : '' %>><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> (<%= pendingCount %>)<% } %></option>
-        <% }); %>
-      </select>
-    </div>
-    <div class="event-mobile-accordion no-print">
-      <% eventTabDefs.slice(0, activeTabIndex + 1).forEach(function(t) { %>
-        <% if (t.key === activeTab) { %>
-          <div class="event-accordion-bar event-accordion-bar-active">
-            <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
-            <svg class="icon event-accordion-chevron"><use href="#icon-chevron-down"/></svg>
-          </div>
-        <% } else { %>
-          <a class="event-accordion-bar" href="/main-admin/events?tab=<%= t.key %>">
-            <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
-            <svg class="icon event-accordion-chevron event-accordion-chevron-closed"><use href="#icon-chevron-down"/></svg>
-          </a>
-        <% } %>
+    <div class="view-tabs no-print">
+      <% eventTabDefs.forEach(function(t) { %>
+        <a href="/main-admin/events?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
       <% }); %>
     </div>
 
@@ -468,15 +443,6 @@
         <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
       </div>
     </dialog>
-
-    <div class="event-mobile-accordion no-print">
-      <% eventTabDefs.slice(activeTabIndex + 1).forEach(function(t) { %>
-        <a class="event-accordion-bar" href="/main-admin/events?tab=<%= t.key %>">
-          <span><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></span>
-          <svg class="icon event-accordion-chevron event-accordion-chevron-closed"><use href="#icon-chevron-down"/></svg>
-        </a>
-      <% }); %>
-    </div>
 
     <%# Item 11 - "each event title on the attendance list should be able
         to click and pop up of event settings/creation appears." One
