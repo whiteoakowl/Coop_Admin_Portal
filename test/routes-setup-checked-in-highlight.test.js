@@ -1,14 +1,18 @@
 // Real HTTP-level coverage for the Setup/Cleanup Assignments roster's
-// checked-in highlight (partials/setup-assignment-cards.ejs, shared by
-// the live admin Assignments tab and its read-only kiosk-facing view) -
-// class name/precedence only, not color (that's CSS - see styles.css's
-// own comment on the real bug report: it used to share the absent row's
-// red styling, so a member who'd actually shown up got flagged the same
-// as one who never came; now it's green). Mirrors test/routes-setup-
-// absent-highlight.test.js's own setup almost exactly - same
-// setup_dates/assignmentCardsForDate machinery, same partial - just keyed
-// off an actual kiosk check-in (attendance.check_in_time) instead of an
-// absence mark.
+// checked-in highlight (partials/setup-assignment-cards.ejs) - class
+// name/precedence only, not color (that's CSS - see styles.css's own
+// comment on the real bug report: it used to share the absent row's red
+// styling, so a member who'd actually shown up got flagged the same as
+// one who never came; now it's green). Admin Assignments tab only - a
+// real request: "setup/cleanup team kiosk view. change it to where
+// members only see their team list, leave off the assignments" moved
+// /setup/:day (routes/setup.js) back to the plain standing Teams roster,
+// which never had a checked-in highlight of its own (only the absent one
+// - see test/routes-setup-absent-highlight.test.js). Mirrors that other
+// suite's own admin-side setup almost exactly - same setup_dates/
+// assignmentCardsForDate machinery, same partial - just keyed off an
+// actual kiosk check-in (attendance.check_in_time) instead of an absence
+// mark.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -111,20 +115,6 @@ test('Setup/Cleanup Assignments: admin + kiosk views highlight a checked-in memb
         res.text,
         /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Not Checked In Volunteer/,
         'a member who never checked in is never highlighted'
-      );
-    });
-
-    await t.test(`kiosk public view for ${day}`, async () => {
-      const res = await request(app).get(`/setup/${day}`);
-      assert.equal(res.status, 200);
-      assert.match(
-        res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Checked In Volunteer/,
-        'the checked-in member should be highlighted on the read-only kiosk view too'
-      );
-      assert.doesNotMatch(
-        res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Not Checked In Volunteer/
       );
     });
   }

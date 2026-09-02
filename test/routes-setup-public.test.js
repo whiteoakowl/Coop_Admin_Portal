@@ -1,11 +1,12 @@
 // Real HTTP-level coverage for the public, no-login GET /setup/:day - a
-// real user request: "After clicking the day button it will open to the
-// member view of the assignment cards for the current day or the closest
-// date coming up." Previously this route showed the standing Teams
-// roster (who's on each team, no dates involved); it now shows the same
-// date-scoped Task 1/Task 2 assignment cards the admin Setup/Cleanup
-// Assignments tab shows, read-only (utils/setup.js's assignmentCardsForDate,
-// shared with routes/admin-setup.js).
+// real request: "setup/cleanup team kiosk view. change it to where
+// members only see their team list, leave off the assignments." Shows
+// the standing Teams roster (who's on each team, no dates involved),
+// same shape/markup as the admin manage page - not the date-scoped Task
+// 1/Task 2 assignment cards this route briefly showed instead (that
+// per-date task detail is exactly the "assignments" this member-facing
+// page now leaves off; the admin Setup/Cleanup Assignments tab still has
+// it, untouched).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -23,19 +24,6 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { todayISO, addDays, weekdayOf } = require('../utils/dates');
-
-// A real bug: this test used to hardcode a specific far-future date
-// string as its "upcoming" session date - safely in the future when
-// written, but a literal calendar date eventually stops being "future"
-// as real time passes (exactly what happened here). Computed fresh
-// relative to the real clock every run instead - always a real Monday,
-// always at least 3 weeks out, so it stays valid indefinitely.
-function futureMonday() {
-  let d = addDays(todayISO(), 21);
-  while (weekdayOf(d) !== 1) d = addDays(d, 1);
-  return d;
-}
 
 test.before(() => app.ready);
 test.after(() => {
@@ -58,47 +46,40 @@ test('GET /setup/:day', async (t) => {
     assert.match(res.text, /href="\/setup\/wednesday"/);
   });
 
-  await t.test('a day with no upcoming session dates shows the muted "no assignments" panel', async () => {
+  await t.test('a day with no teams shows the muted "no teams" panel', async () => {
     const res = await request(app).get('/setup/monday');
     assert.equal(res.status, 200);
-    assert.match(res.text, /No upcoming Setup\/Cleanup assignments\./);
+    assert.match(res.text, /No teams set up yet\./);
   });
 
-  await t.test('with a past date and a future date, shows the closest UPCOMING one - never a stale past date', async () => {
+  await t.test('a day with teams shows each team, its leader/description, and its members - no per-date assignment detail', async () => {
     const leader = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Pat Leader', 'setup-public-pat', 'parent')").run();
     const team = await db
-      .prepare("INSERT INTO setup_teams (day, title, leader_id, meeting_time, meeting_location) VALUES ('monday', 'Kitchen Crew', ?, '9:00am', 'Front Lobby')")
+      .prepare(
+        "INSERT INTO setup_teams (day, title, description, leader_id, meeting_time, meeting_location) VALUES ('monday', 'Kitchen Crew', 'Wipe down counters', ?, '9:00am', 'Front Lobby')"
+      )
       .run(leader.lastInsertRowid);
-    const section = await db
-      .prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Kitchen Tasks', ?, 0)")
-      .run(team.lastInsertRowid);
-    await db.prepare('INSERT INTO task_list_items (section_id, description, position) VALUES (?, ?, 0)').run(section.lastInsertRowid, 'Wipe down counters');
     const member = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Jane Smith', 'setup-public-jane', 'parent')").run();
     await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, member.lastInsertRowid);
 
-    await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('monday', '2020-01-01')").run(); // long past
-    await db.prepare('INSERT INTO setup_dates (day, session_date) VALUES (?, ?)').run('monday', futureMonday()); // upcoming
-
     const res = await request(app).get('/setup/monday');
     assert.equal(res.status, 200);
-    assert.doesNotMatch(res.text, /No upcoming Setup\/Cleanup assignments\./);
+    assert.doesNotMatch(res.text, /No teams set up yet\./);
     assert.match(res.text, /Kitchen Crew/);
     assert.match(res.text, /Jane Smith/);
-    // Read-only: no Assign/Unassign controls, just plain "No suggestion"
-    // text for a member with nothing assigned yet for that date - the
-    // same "reassigning happens on the live/admin tab, not here" rule
-    // partials/setup-assignment-cards.ejs's editable flag already
-    // enforces for the Archive view.
-    assert.doesNotMatch(res.text, /floater-assign-btn/);
-    assert.match(res.text, /No suggestion/);
 
     // A real request: "the leader, time, location, all those details
     // should show on the kiosk side when you click the setup/cleanup
     // button" - this is the actual no-login kiosk route, so this is the
     // one place that request is truly verified end to end.
-    assert.match(res.text, /class="floater-card-meta"/);
     assert.match(res.text, /Pat Leader/);
     assert.match(res.text, /9:00am/);
     assert.match(res.text, /Front Lobby/);
+
+    // No per-date task pick detail - that's the "assignments" this page
+    // now leaves off entirely.
+    assert.doesNotMatch(res.text, /floater-assign-btn/);
+    assert.doesNotMatch(res.text, /No suggestion/);
+    assert.doesNotMatch(res.text, /class="floater-card-meta"/);
   });
 });

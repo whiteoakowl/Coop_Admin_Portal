@@ -37,12 +37,12 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Quick Links: Setup/Cleanup Assignments and Floater Assignments point at the member kiosk views, not the admin management pages', async () => {
+test('Quick Links: Setup/Cleanup Teams and Floater Assignments point at the member kiosk views, not the admin management pages', async () => {
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin/settings?tab=quicklinks').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  assert.match(res.text, /<a class="admin-card" href="\/setup" target="_blank">Setup\/Cleanup Assignments<\/a>/);
+  assert.match(res.text, /<a class="admin-card" href="\/setup" target="_blank">Setup\/Cleanup Teams<\/a>/);
   assert.match(res.text, /<a class="admin-card" href="\/volunteers" target="_blank">Floater Assignments<\/a>/);
 
   // Scoped to the Quick Links card grid itself - the admin nav sidebar on
