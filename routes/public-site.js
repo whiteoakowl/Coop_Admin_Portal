@@ -1,8 +1,9 @@
-// The new public marketing homepage - a separate front door for
-// prospective and current families, distinct from the kiosk (moved to
-// /kiosk - see server.js's own note) and the operational Co-op Admin
-// Portal. Read-only for everyone; Main Admin edits the underlying
-// site_settings/announcements/faqs rows from /main-admin/website.
+// The public marketing homepage - a separate front door for prospective
+// and current families, distinct from the kiosk and the operational
+// Co-op Admin Portal. Mounted at /welcome, not the site root - a real
+// request: "homepage should still be kiosk screen for now" (see server.js's
+// own note on that). Read-only for everyone; Main Admin edits the
+// underlying site_settings/announcements/faqs rows from /main-admin/website.
 const express = require('express');
 const router = express.Router();
 const db = require('../db');

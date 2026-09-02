@@ -377,14 +377,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// The site root used to BE the kiosk landing screen (views/index.ejs) -
-// now the new public marketing homepage instead (routes/public-site.js).
-// views/kiosk-home.ejs already renders that exact same kiosk screen,
-// unchanged, at /kiosk (it always has - see that route's own comment),
-// so nothing about the kiosk experience itself was touched; a physical
-// kiosk device just needs its own browser bookmark repointed from / to
-// /kiosk once.
-app.use('/', publicSiteRouter);
+// A real request: "homepage should still be kiosk screen for now" - the
+// site root had briefly moved to the new public marketing homepage
+// (routes/public-site.js), but that's not ready to be the default
+// landing page yet, so / goes back to being the kiosk screen (same
+// render as /kiosk - see kiosk.js's own GET '/' route). The marketing
+// homepage itself isn't gone, just not the default - it's still fully
+// there at /welcome, ready to become the site root again later.
+app.get('/', (req, res) => res.render('kiosk-home', { title: 'Kiosk' }));
+app.use('/welcome', publicSiteRouter);
 app.use('/kiosk', kioskRouter);
 app.use('/kiosk', checkoutRouter);
 app.use('/kiosk/class-checkin', kioskClassCheckinRouter);
