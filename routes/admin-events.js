@@ -23,39 +23,131 @@ const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/s
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
 
+// A real request: "capacity totals dropdown choosing family or person
+// capacity" - one number field (capacityValue) plus a type picker
+// (capacityType) instead of two separate numeric inputs, mapped onto
+// whichever of the existing capacity/family_capacity columns the type
+// picker selects - the other is cleared, so a "1000" left over from a
+// prior save in the field the admin ISN'T using this time can't linger
+// and silently cap registrations.
+function capacityFieldsFromBody(body) {
+  const value = body.capacityValue ? parseInt(body.capacityValue, 10) : null;
+  const isFamily = body.capacityType === 'family';
+  return {
+    capacity: isFamily ? null : value,
+    familyCapacity: isFamily ? value : null,
+  };
+}
+
+// A dropdown of 1-50 (or blank = no minimum) - shared by the Volunteers/
+// Donations/Food selection-count fields below.
+function selectionCountFromBody(value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n >= 1 && n <= 50 ? n : null;
+}
+
 // Shared by the Create/Edit forms and the member-submission approval flow
 // below - the registration-rules field set the events migration added
-// (window dates, family cap, age/grade, adult/child gating, pricing).
+// (window dates, family cap, age/grade, adult/child/guest gating,
+// pricing), plus a real request: "on the volunteer, donations and food
+// pages. there will be a check box for, do you want to include this
+// section? then a dropdown menu of numbers 1-50 that ask, how many
+// volunteer/donation/food items should each family/individual
+// registration select" - three parallel (enabled, selection count) pairs.
 function registrationFieldsFromBody(body) {
   return {
     categoryId: body.categoryId ? parseInt(body.categoryId, 10) : null,
-    familyCapacity: body.familyCapacity ? parseInt(body.familyCapacity, 10) : null,
+    ...capacityFieldsFromBody(body),
     ageGroup: [].concat(body.ageGroup || []).join(', '),
     registrationOpensAt: toSqlTimestamp(body.registrationOpensAt),
     registrationClosesAt: toSqlTimestamp(body.registrationClosesAt),
     allowAdultRegister: body.allowAdultRegister !== 'off',
     allowChildRegister: body.allowChildRegister !== 'off',
+    allowGuestRegister: body.allowGuestRegister === '1',
     priceCents: body.priceDollars ? Math.round(parseFloat(body.priceDollars) * 100) : null,
     pricePer: body.pricePer === 'family' ? 'family' : 'person',
+    // Only the per-event edit page's own Volunteers/Donations/Food tabs
+    // (sectionToggleRoute below) ever submit these fields - the Create
+    // wizard doesn't, so `undefined === '1'` would otherwise always store
+    // false here and silently override the migration's own DEFAULT 1 for
+    // Volunteers/Donations (both already existed live before Food did) on
+    // every new event.
+    volunteersEnabled: body.volunteersEnabled !== undefined ? body.volunteersEnabled === '1' : true,
+    donationsEnabled: body.donationsEnabled !== undefined ? body.donationsEnabled === '1' : true,
+    foodEnabled: body.foodEnabled === '1',
+    volunteerSelectionCount: selectionCountFromBody(body.volunteerSelectionCount),
+    donationSelectionCount: selectionCountFromBody(body.donationSelectionCount),
+    foodSelectionCount: selectionCountFromBody(body.foodSelectionCount),
   };
 }
 
 // The Create New Event wizard's own fields beyond what already existed -
-// slug/type/short description/language/organized-by/tags. Split out from
+// slug/type/short description/organized-by/tags. Split out from
 // registrationFieldsFromBody above since these carry no registration
-// enforcement of their own, purely descriptive.
+// enforcement of their own, purely descriptive. No language field - a
+// real request: "no language option" (events.language itself is left in
+// place, unused, same as every other retired-but-not-dropped column in
+// this schema).
 function wizardFieldsFromBody(body) {
   return {
     slug: (body.slug || '').trim(),
     eventType: (body.eventType || '').trim(),
     shortDescription: (body.shortDescription || '').trim(),
-    language: (body.language || '').trim(),
     organizedBy: (body.organizedBy || '').trim(),
     // Comma-joined TEXT column, same multi-value convention classes.
     // age_group/events.age_group already use - tags arrive as repeated
     // `tags` fields from the wizard's own chip input (public/js/tag-
     // input.js), one per chip, same shape a checkbox-grid submits.
     tags: [].concat(body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
+  };
+}
+
+// updateEvent()/eventFields() read a camelCase `data.*` shape (matching
+// what a form submits) - a raw row from getEvent()/getEventWithDetails()
+// is the DB's own snake_case column names instead. The builder's edit
+// page is now five separate tab forms (a real request: "event details,
+// volunteers, donations, food, settings"), each saving only ITS OWN
+// slice of the event - every one of those partial-save routes below
+// needs the columns it doesn't own carried through unchanged rather than
+// wiped to null, which means starting from the event's REAL current
+// values, not a fresh data object. This is that translation, so each
+// route can do `{ ...eventDataFromRow(event), <the 1-2 fields this tab
+// actually edits> }` instead of hand-listing every other column (and
+// getting the snake_case/camelCase mismatch wrong the way an earlier
+// version of this file did).
+function eventDataFromRow(event) {
+  return {
+    title: event.title,
+    description: event.description,
+    category: event.category,
+    categoryId: event.category_id,
+    location: event.location,
+    locationId: event.location_id,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+    visibility: event.visibility,
+    capacity: event.capacity,
+    familyCapacity: event.family_capacity,
+    ageGroup: event.age_group,
+    registrationOpensAt: event.registration_opens_at,
+    registrationClosesAt: event.registration_closes_at,
+    allowAdultRegister: !!event.allow_adult_register,
+    allowChildRegister: !!event.allow_child_register,
+    allowGuestRegister: !!event.allow_guest_register,
+    priceCents: event.price_cents,
+    pricePer: event.price_per,
+    slug: event.slug,
+    eventType: event.event_type,
+    shortDescription: event.short_description,
+    language: event.language,
+    organizedBy: event.organized_by,
+    tags: event.tags,
+    volunteersEnabled: !!event.volunteers_enabled,
+    donationsEnabled: !!event.donations_enabled,
+    foodEnabled: !!event.food_enabled,
+    volunteerSelectionCount: event.volunteer_selection_count,
+    donationSelectionCount: event.donation_selection_count,
+    foodSelectionCount: event.food_selection_count,
   };
 }
 
@@ -73,6 +165,31 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 function imageUrl(key) {
   if (!key) return null;
   return createStorageClient() ? publicUrl(EVENT_IMAGES_BUCKET, key) : `/uploads/events/${key}`;
+}
+
+// Shared by the Create New Event wizard's own page-1 image upload (a real
+// request: "events creation, page one should also have... event image
+// upload") and the existing per-event Image upload on the builder's
+// Settings tab - both just need "store this file, delete whatever image
+// key was there before, return the new key" with the same storage-
+// backend-agnostic (Supabase Storage or local disk) logic either way.
+async function saveEventImage(file, existingKey) {
+  const client = createStorageClient();
+  let key;
+  if (client) {
+    key = await uploadFile(client, EVENT_IMAGES_BUCKET, file.buffer, file.originalname, file.mimetype);
+  } else {
+    key = generateKey(file.originalname);
+    fs.writeFileSync(path.join(EVENT_IMAGE_DIR, key), file.buffer);
+  }
+  if (existingKey) {
+    if (client) await deleteFile(client, EVENT_IMAGES_BUCKET, existingKey);
+    else {
+      const oldPath = path.join(EVENT_IMAGE_DIR, existingKey);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+  }
+  return key;
 }
 
 // Converts an <input type="datetime-local"> value ("2026-09-01T18:00")
@@ -245,12 +362,17 @@ router.get('/new', async (req, res) => {
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     eventTypes: events.EVENT_TYPES,
-    languages: events.LANGUAGES,
     error: req.query.error || null,
   });
 });
 
-router.post('/', async (req, res) => {
+// multipart/form-data now (not just a plain POST) - a real request:
+// "events creation, page one should also have... event image upload."
+// The image itself can only be saved AFTER the event exists (saveEventImage
+// needs an id-less "existing key" of null, but events.setEventImage needs
+// a real event id) - createEvent runs first, then the file (if any) is
+// uploaded and attached in the same request.
+router.post('/', upload.single('image'), async (req, res) => {
   const title = (req.body.title || '').trim();
   const startsAt = toSqlTimestamp(req.body.startsAt);
   if (!title || !startsAt) {
@@ -271,7 +393,6 @@ router.post('/', async (req, res) => {
       startsAt,
       endsAt: toSqlTimestamp(req.body.endsAt),
       visibility: req.body.visibility === 'public' ? 'public' : 'members',
-      capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
       ...registrationFieldsFromBody(req.body),
       ...wizardFieldsFromBody(req.body),
     },
@@ -279,6 +400,13 @@ router.post('/', async (req, res) => {
     { status }
   );
   await events.setEventSections(id, req.body.sectionIds);
+  if (req.file) {
+    try {
+      await events.setEventImage(id, await saveEventImage(req.file, null));
+    } catch (err) {
+      return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent(`Event saved, but the image upload failed: ${err.message}`));
+    }
+  }
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent(status === 'published' ? 'Event published.' : 'Draft saved.'));
 });
 
@@ -313,12 +441,25 @@ router.post('/import', importUpload.single('file'), async (req, res) => {
   res.redirect('/main-admin/events?tab=drafts&notice=' + encodeURIComponent(notice));
 });
 
+// A real request: "once the event is created when you click to edit the
+// event it show the following tabs at the top, event details, volunteers,
+// donations, food, settings." Same `.view-tabs`/`?tab=` pattern every
+// other tabbed admin page in this app already uses (see admin-events-
+// list.ejs's own tab strip) - the one long single-section page this used
+// to be is now five, each posting to its own already-existing route
+// (this one still handles Event Details' own form; Volunteers/Donations/
+// Food each save through their own settings route below, alongside the
+// existing add-role/add-item routes those tabs already had).
+const BUILDER_TABS = ['details', 'volunteers', 'donations', 'food', 'settings'];
+
 async function loadBuilder(req, res) {
   const event = await events.getEventWithDetails(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  const activeTab = BUILDER_TABS.includes(req.query.tab) ? req.query.tab : 'details';
   res.render('admin-events-builder', {
     title: event.title,
     event,
+    activeTab,
     imageUrl: imageUrl(event.image_key),
     categories: await events.listCategories(),
     locations: await events.listLocations(),
@@ -326,7 +467,6 @@ async function loadBuilder(req, res) {
     gradeOptions: events.GRADE_OPTIONS,
     selectedGrades: events.parseAgeGroupList(event.age_group),
     eventTypes: events.EVENT_TYPES,
-    languages: events.LANGUAGES,
     selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -335,14 +475,20 @@ async function loadBuilder(req, res) {
 
 router.get('/:id/builder', loadBuilder);
 
-router.post('/:id', async (req, res) => {
+// Event Details tab's own save - everything except Volunteers/Donations/
+// Food's own enable+count fields (saved by their own routes below) and
+// Settings' permissions fields (also saved by its own route below), so
+// saving one tab's form never silently overwrites what another tab has.
+router.post('/:id', upload.single('image'), async (req, res) => {
   const id = req.params.id;
   const title = (req.body.title || '').trim();
   const startsAt = toSqlTimestamp(req.body.startsAt);
   if (!title || !startsAt) {
     return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent('Title and start date/time are required.'));
   }
+  const event = await events.getEvent(id);
   await events.updateEvent(id, {
+    ...eventDataFromRow(event),
     title,
     description: sanitizePostBody(req.body.description || ''),
     category: (req.body.category || '').trim(),
@@ -351,13 +497,75 @@ router.post('/:id', async (req, res) => {
     startsAt,
     endsAt: toSqlTimestamp(req.body.endsAt),
     visibility: req.body.visibility === 'public' ? 'public' : 'members',
-    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
-    ...registrationFieldsFromBody(req.body),
-    ...wizardFieldsFromBody(req.body),
+    ...capacityFieldsFromBody(req.body),
+    registrationOpensAt: toSqlTimestamp(req.body.registrationOpensAt),
+    registrationClosesAt: toSqlTimestamp(req.body.registrationClosesAt),
+    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
+    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
+    slug: (req.body.slug || '').trim(),
+    eventType: (req.body.eventType || '').trim(),
+    shortDescription: (req.body.shortDescription || '').trim(),
+    organizedBy: (req.body.organizedBy || '').trim(),
+    tags: [].concat(req.body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
+  });
+  if (req.file) {
+    try {
+      await events.setEventImage(id, await saveEventImage(req.file, event?.image_key));
+    } catch (err) {
+      return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent(`Saved, but the image upload failed: ${err.message}`));
+    }
+  }
+  res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Event details saved.'));
+});
+
+// Settings tab's own save - "permissions will show up again under
+// settings tab on individual event editing": who can register (adult/
+// child/guest), grade restriction, and sections. Deliberately spreads
+// the event's OWN existing values for every column updateEvent() also
+// writes but this form doesn't carry (capacity, pricing, description,
+// etc.) - the same "don't let one tab's save silently blank another
+// tab's fields" guarantee updateEventQuickFields's own comment already
+// explains, just solved here by reading the row back in instead of a
+// second partial-UPDATE query.
+router.post('/:id/permissions', async (req, res) => {
+  const id = req.params.id;
+  const event = await events.getEvent(id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  await events.updateEvent(id, {
+    ...eventDataFromRow(event),
+    ageGroup: [].concat(req.body.ageGroup || []).join(', '),
+    allowAdultRegister: req.body.allowAdultRegister !== 'off',
+    allowChildRegister: req.body.allowChildRegister !== 'off',
+    allowGuestRegister: req.body.allowGuestRegister === '1',
   });
   await events.setEventSections(id, req.body.sectionIds);
-  res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Settings saved.'));
+  res.redirect(`/main-admin/events/${id}/builder?tab=settings&notice=` + encodeURIComponent('Settings saved.'));
 });
+
+// Volunteers/Donations/Food tabs' own "include this section?" + "how many
+// should each registration select?" save - a real request: "there will
+// be a check box for, do you want to include this section? then a
+// dropdown menu of numbers 1-50 that ask, how many volunteer/donation/
+// food items should each family/individual registration select." Same
+// read-the-row-back-first shape as the Settings/permissions route above,
+// for the same reason (this tiny form only carries its own section's two
+// fields).
+function sectionToggleRoute(section) {
+  return async (req, res) => {
+    const id = req.params.id;
+    const event = await events.getEvent(id);
+    if (!event) return res.status(404).render('404', { title: 'Not Found' });
+    await events.updateEvent(id, {
+      ...eventDataFromRow(event),
+      [`${section}Enabled`]: req.body.enabled === '1',
+      [`${section}SelectionCount`]: selectionCountFromBody(req.body.selectionCount),
+    });
+    res.redirect(`/main-admin/events/${id}/builder?tab=${section}&notice=` + encodeURIComponent('Saved.'));
+  };
+}
+router.post('/:id/volunteers-settings', sectionToggleRoute('volunteers'));
+router.post('/:id/donations-settings', sectionToggleRoute('donations'));
+router.post('/:id/food-settings', sectionToggleRoute('food'));
 
 // Item 11 - the Attendance tab's title-click quick-edit popup. Deliberately
 // separate from POST /:id above - see updateEventQuickFields's own
@@ -398,25 +606,12 @@ router.post('/:id/delete', async (req, res) => {
 router.post('/:id/image', upload.single('image'), async (req, res) => {
   const id = req.params.id;
   if (!req.file) return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent('Please choose an image file.'));
-  const client = createStorageClient();
+  const event = await events.getEvent(id);
   let key;
   try {
-    if (client) {
-      key = await uploadFile(client, EVENT_IMAGES_BUCKET, req.file.buffer, req.file.originalname, req.file.mimetype);
-    } else {
-      key = generateKey(req.file.originalname);
-      fs.writeFileSync(path.join(EVENT_IMAGE_DIR, key), req.file.buffer);
-    }
+    key = await saveEventImage(req.file, event?.image_key);
   } catch (err) {
     return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent(`Upload failed: ${err.message}`));
-  }
-  const event = await events.getEvent(id);
-  if (event && event.image_key) {
-    if (client) await deleteFile(client, EVENT_IMAGES_BUCKET, event.image_key);
-    else {
-      const oldPath = path.join(EVENT_IMAGE_DIR, event.image_key);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
   }
   await events.setEventImage(id, key);
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Image updated.'));
@@ -426,7 +621,7 @@ router.post('/:id/image', upload.single('image'), async (req, res) => {
 
 router.post('/:id/volunteer-roles', async (req, res) => {
   const roleName = (req.body.roleName || '').trim();
-  if (!roleName) return res.redirect(`/main-admin/events/${req.params.id}/builder?error=` + encodeURIComponent('Role name is required.'));
+  if (!roleName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&error=` + encodeURIComponent('Role name is required.'));
   await events.addVolunteerRole(req.params.id, {
     roleName,
     slotsNeeded: parseInt(req.body.slotsNeeded, 10) || 1,
@@ -434,7 +629,7 @@ router.post('/:id/volunteer-roles', async (req, res) => {
     location: (req.body.location || '').trim(),
     description: (req.body.description || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Volunteer role added.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role added.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/update', async (req, res) => {
@@ -445,26 +640,26 @@ router.post('/:id/volunteer-roles/:roleId/update', async (req, res) => {
     location: (req.body.location || '').trim(),
     description: (req.body.description || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Volunteer role updated.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role updated.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/delete', async (req, res) => {
   await events.deleteVolunteerRole(req.params.roleId);
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Volunteer role removed.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role removed.'));
 });
 
 // --- Donation items ---
 
 router.post('/:id/donation-items', async (req, res) => {
   const itemName = (req.body.itemName || '').trim();
-  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?error=` + encodeURIComponent('Item name is required.'));
+  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&error=` + encodeURIComponent('Item name is required.'));
   await events.addDonationItem(req.params.id, {
     itemName,
     quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1,
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Donation item added.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item added.'));
 });
 
 router.post('/:id/donation-items/:itemId/update', async (req, res) => {
@@ -474,12 +669,44 @@ router.post('/:id/donation-items/:itemId/update', async (req, res) => {
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Donation item updated.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item updated.'));
 });
 
 router.post('/:id/donation-items/:itemId/delete', async (req, res) => {
   await events.deleteDonationItem(req.params.itemId);
-  res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent('Donation item removed.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item removed.'));
+});
+
+// --- Food items - a real request: "on the volunteer, donations and food
+// pages..." Food is a brand new third section, same shape as Donation
+// Items exactly - see utils/events.js's own comment on that section for
+// the reasoning these mirror 1:1. ---
+
+router.post('/:id/food-items', async (req, res) => {
+  const itemName = (req.body.itemName || '').trim();
+  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&error=` + encodeURIComponent('Item name is required.'));
+  await events.addFoodItem(req.params.id, {
+    itemName,
+    quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1,
+    deadline: req.body.deadline || null,
+    notes: (req.body.notes || '').trim(),
+  });
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item added.'));
+});
+
+router.post('/:id/food-items/:itemId/update', async (req, res) => {
+  await events.updateFoodItem(req.params.itemId, {
+    itemName: (req.body.itemName || '').trim(),
+    quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1,
+    deadline: req.body.deadline || null,
+    notes: (req.body.notes || '').trim(),
+  });
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item updated.'));
+});
+
+router.post('/:id/food-items/:itemId/delete', async (req, res) => {
+  await events.deleteFoodItem(req.params.itemId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item removed.'));
 });
 
 // --- Registrations report, manual check-in/out, and guest registration ---

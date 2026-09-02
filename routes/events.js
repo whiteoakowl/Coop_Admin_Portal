@@ -205,4 +205,20 @@ router.post('/:id/donation-items/:itemId/claim', requirePortalAuth, async (req, 
   res.redirect(back + '?notice=' + encodeURIComponent(notice));
 });
 
+// Food - a real request: "on the volunteer, donations and food pages..."
+// Mirrors the donation-items claim route above exactly.
+router.post('/:id/food-items/:itemId/claim', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
+  }
+  const claimed = await events.claimFoodItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
+  const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
+  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+});
+
 module.exports = router;

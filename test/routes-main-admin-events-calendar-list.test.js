@@ -105,14 +105,16 @@ test('New Event wizard: many more detail fields beyond Title/Starts, and creatin
   assert.match(page.text, /name="endsAt"/);
   assert.match(page.text, /name="categoryId"/);
   assert.match(page.text, /name="visibility"/);
-  assert.match(page.text, /name="capacity"/);
+  assert.match(page.text, /name="capacityValue"/);
+  assert.match(page.text, /name="capacityType"/);
 
   const eventId = await createEvent(admin, {
     description: 'Bring a dish to share.',
     location: 'North Field',
     endsAt: '2027-09-01T20:00',
     visibility: 'public',
-    capacity: '50',
+    capacityValue: '50',
+    capacityType: 'person',
   });
   const builder = await request(app).get(`/main-admin/events/${eventId}/builder`).set('Cookie', admin.cookie);
   assert.match(builder.text, /North Field/);

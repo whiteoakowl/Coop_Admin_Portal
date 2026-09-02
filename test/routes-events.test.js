@@ -138,7 +138,7 @@ test('a signed-in account sees members-only events too', async () => {
 
 test('a parent can register themselves and their family, and capacity waitlists overflow', async () => {
   const admin = await loginAsMainAdmin();
-  const eventId = await createEvent(admin, { title: 'Small Workshop', visibility: 'public', capacity: '1' });
+  const eventId = await createEvent(admin, { title: 'Small Workshop', visibility: 'public', capacityValue: '1', capacityType: 'person' });
   await publishEvent(admin, eventId);
 
   const parent = await createParentAccount(1);

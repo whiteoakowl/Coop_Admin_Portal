@@ -26,12 +26,13 @@ const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 
-// The Create New Event wizard's own Event Type / Language dropdowns - a
-// fixed, short list is plenty for a single co-op (unlike GRADE_OPTIONS/
-// sections, nothing else in the app reads these back to gate anything,
-// they're purely descriptive fields shown on the event).
+// The Create New Event wizard's own Event Type dropdown - a fixed, short
+// list is plenty for a single co-op (unlike GRADE_OPTIONS/sections,
+// nothing else in the app reads this back to gate anything, it's a purely
+// descriptive field shown on the event). No Language list here - a real
+// request: "no language option" (events.language itself is left in
+// place, unused, same as every other retired-but-not-dropped column).
 const EVENT_TYPES = ['In-Person', 'Virtual', 'Hybrid'];
-const LANGUAGES = ['English', 'Spanish', 'Other'];
 
 // A real request: "every list should always be alphabetical according to
 // last name." Every list here carries a person's display name under a
@@ -177,6 +178,22 @@ async function getEventWithDetails(id) {
     item.remaining = Math.max(0, item.quantity_needed - item.quantityClaimed);
   }
 
+  const foodItems = await db.prepare('SELECT * FROM event_food_items WHERE event_id = ? ORDER BY position, id').all(id);
+  for (const item of foodItems) {
+    item.claims = sortByLastNameField(
+      await db
+        .prepare(
+          `SELECT efc.*, m.name AS "memberName" FROM event_food_claims efc
+           JOIN members m ON m.id = efc.member_id
+           WHERE efc.food_item_id = ?`
+        )
+        .all(item.id),
+      'memberName'
+    );
+    item.quantityClaimed = item.claims.reduce((sum, c) => sum + Number(c.quantity_claimed), 0);
+    item.remaining = Math.max(0, item.quantity_needed - item.quantityClaimed);
+  }
+
   const registrationCount = Number(
     (await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(id)).c
   );
@@ -203,6 +220,7 @@ async function getEventWithDetails(id) {
     ...event,
     volunteerRoles: roles,
     donationItems,
+    foodItems,
     registrationCount,
     waitlistCount,
     familyCount,
@@ -229,6 +247,7 @@ function eventFields(data) {
     data.registrationClosesAt || null,
     data.allowAdultRegister ? 1 : 0,
     data.allowChildRegister ? 1 : 0,
+    data.allowGuestRegister ? 1 : 0,
     data.priceCents ?? null,
     data.pricePer === 'family' ? 'family' : 'person',
     data.slug || null,
@@ -237,6 +256,12 @@ function eventFields(data) {
     data.language || null,
     data.organizedBy || null,
     data.tags || null,
+    data.volunteersEnabled ? 1 : 0,
+    data.donationsEnabled ? 1 : 0,
+    data.foodEnabled ? 1 : 0,
+    data.volunteerSelectionCount ?? null,
+    data.donationSelectionCount ?? null,
+    data.foodSelectionCount ?? null,
   ];
 }
 
@@ -254,10 +279,12 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
       `INSERT INTO events (
          title, description, category, category_id, location, location_id, starts_at, ends_at, visibility, capacity,
          family_capacity, age_group, registration_opens_at, registration_closes_at,
-         allow_adult_register, allow_child_register, price_cents, price_per,
+         allow_adult_register, allow_child_register, allow_guest_register, price_cents, price_per,
          slug, event_type, short_description, language, organized_by, tags,
+         volunteers_enabled, donations_enabled, food_enabled,
+         volunteer_selection_count, donation_selection_count, food_selection_count,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -269,8 +296,10 @@ async function updateEvent(id, data) {
       `UPDATE events SET
          title = ?, description = ?, category = ?, category_id = ?, location = ?, location_id = ?, starts_at = ?, ends_at = ?, visibility = ?, capacity = ?,
          family_capacity = ?, age_group = ?, registration_opens_at = ?, registration_closes_at = ?,
-         allow_adult_register = ?, allow_child_register = ?, price_cents = ?, price_per = ?,
+         allow_adult_register = ?, allow_child_register = ?, allow_guest_register = ?, price_cents = ?, price_per = ?,
          slug = ?, event_type = ?, short_description = ?, language = ?, organized_by = ?, tags = ?,
+         volunteers_enabled = ?, donations_enabled = ?, food_enabled = ?,
+         volunteer_selection_count = ?, donation_selection_count = ?, food_selection_count = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -788,6 +817,45 @@ async function cancelDonationClaim(claimId, memberId) {
   await db.prepare('DELETE FROM event_donation_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
 }
 
+// --- Food items - a real request: "on the volunteer, donations and food
+// pages. there will be a check box for, do you want to include this
+// section? then a dropdown menu of numbers 1-50..." Food is a brand new
+// third section, same shape as Donation Items exactly (a potluck-style
+// sign-up sheet a member claims an item on) - see that section above for
+// the reasoning each of these mirrors 1:1. ---
+
+async function addFoodItem(eventId, data) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_food_items WHERE event_id = ?').get(eventId)).p) + 1;
+  await db
+    .prepare('INSERT INTO event_food_items (event_id, item_name, quantity_needed, deadline, notes, position) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(eventId, data.itemName, data.quantityNeeded || 1, data.deadline || null, data.notes || null, position);
+}
+
+async function updateFoodItem(itemId, data) {
+  await db
+    .prepare('UPDATE event_food_items SET item_name = ?, quantity_needed = ?, deadline = ?, notes = ? WHERE id = ?')
+    .run(data.itemName, data.quantityNeeded || 1, data.deadline || null, data.notes || null, itemId);
+}
+
+async function deleteFoodItem(itemId) {
+  await db.prepare('DELETE FROM event_food_items WHERE id = ?').run(itemId);
+}
+
+async function claimFoodItem(itemId, memberId, quantity, accountId) {
+  const item = await db.prepare('SELECT * FROM event_food_items WHERE id = ?').get(itemId);
+  if (!item) return 0;
+  const claimedSoFar = Number((await db.prepare('SELECT COALESCE(SUM(quantity_claimed), 0) AS q FROM event_food_claims WHERE food_item_id = ?').get(itemId)).q);
+  const remaining = Math.max(0, item.quantity_needed - claimedSoFar);
+  const toClaim = Math.min(remaining, Math.max(1, Number(quantity) || 1));
+  if (toClaim <= 0) return 0;
+  await db.prepare('INSERT INTO event_food_claims (food_item_id, member_id, quantity_claimed, claimed_by_account_id) VALUES (?, ?, ?, ?)').run(itemId, memberId, toClaim, accountId);
+  return toClaim;
+}
+
+async function cancelFoodClaim(claimId, memberId) {
+  await db.prepare('DELETE FROM event_food_claims WHERE id = ? AND member_id = ?').run(claimId, memberId);
+}
+
 // --- CSV export/import (item 5) - a real request: "needs import and
 // export buttons." Datetimes round-trip as plain "YYYY-MM-DD HH:MM"
 // text (the same shape <input type="datetime-local"> already produces
@@ -938,7 +1006,6 @@ function monthGrid(monthParam, eventList) {
 module.exports = {
   GRADE_OPTIONS,
   EVENT_TYPES,
-  LANGUAGES,
   monthGrid,
   sortByLastNameField,
   parseAgeGroupList,
@@ -994,4 +1061,9 @@ module.exports = {
   deleteDonationItem,
   claimDonationItem,
   cancelDonationClaim,
+  addFoodItem,
+  updateFoodItem,
+  deleteFoodItem,
+  claimFoodItem,
+  cancelFoodClaim,
 };
