@@ -70,7 +70,7 @@ const { sweepNameTagImages, sweepScheduleCardImages } = require('../utils/design
 const { createStorageClient, publicUrl } = require('../utils/storage');
 const { saveUpload } = require('../utils/uploadBackend');
 const { jsonScriptSafe } = require('../utils/json');
-const { byLastName, membersWithDetails } = require('../utils/members');
+const { byLastName, membersWithDetails, allFamilies } = require('../utils/members');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
@@ -167,6 +167,11 @@ router.get('/', async (req, res) => {
     tab,
     initialType,
     members,
+    // A real request: "all bulk printing should have filter by family
+    // name" - every member-based Print tab panel below gets its own
+    // Family Name filter select (views/partials/family-filter-select.ejs)
+    // built from this same list.
+    families: await allFamilies(),
     classesForQr,
     qrRoomOptions,
     libraryItems: await allLibraryItems(),

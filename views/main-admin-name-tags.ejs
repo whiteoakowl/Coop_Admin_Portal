@@ -249,6 +249,7 @@
                   <option value="admin">Admins Only</option>
                   <option value="teacher">Teachers Only</option>
                 </select>
+                <%- include('partials/family-filter-select', { id: 'schedule-print-family-select', families: families }) %>
                 <div class="category-filter schedule-search">
                   <label for="schedule-print-search-input">Search</label>
                   <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
@@ -279,6 +280,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'name-tag-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="name-tag-select-all-checkbox" />
                 Select All
@@ -308,6 +310,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'cards-both-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-both-select-all-checkbox" />
                 Select All
@@ -336,6 +339,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'cards-duplex-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-duplex-select-all-checkbox" />
                 Select All
@@ -363,6 +367,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'barcodes-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcodes-select-all-checkbox" />
                 Select All
@@ -391,6 +396,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'barcode-labels-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcode-labels-select-all-checkbox" />
                 Select All

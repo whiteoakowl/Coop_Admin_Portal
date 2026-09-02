@@ -8,7 +8,7 @@ const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_T
 const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
 const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
-const { membersWithDetails, byLastName } = require('../utils/members');
+const { membersWithDetails, byLastName, allFamilies } = require('../utils/members');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
 const { buildCardPairs } = require('../utils/cardPairs');
 const { formatDateLabel, formatTimestamp } = require('../utils/dates');
@@ -120,8 +120,19 @@ router.get('/design', async (req, res) => {
     if (!pendingByMember.has(r.memberId)) pendingByMember.set(r.memberId, { memberId: r.memberId, memberName: r.memberName, requestLabels: [] });
     pendingByMember.get(r.memberId).requestLabels.push(label);
   }
+  // familyId (a real request: "all bulk printing should have filter by
+  // family name") comes from the `members` list already fetched above
+  // (membersWithDetails), not a second query - a requester who's since
+  // gone inactive just has no family_id to filter on, same as any other
+  // member missing from that list.
+  const membersById = new Map(members.map((m) => [m.id, m]));
   const pendingNameTagRequests = [...pendingByMember.values()]
-    .map((p) => ({ memberId: p.memberId, memberName: p.memberName, requestSummary: p.requestLabels.join(', ') }))
+    .map((p) => ({
+      memberId: p.memberId,
+      memberName: p.memberName,
+      requestSummary: p.requestLabels.join(', '),
+      familyId: (membersById.get(p.memberId) || {}).family_id ?? null,
+    }))
     .sort((a, b) => a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' }));
 
   res.render('admin-design', {
@@ -129,6 +140,11 @@ router.get('/design', async (req, res) => {
     tab,
     initialType,
     members,
+    // A real request: "all bulk printing should have filter by family
+    // name" - every member-based Print tab panel below gets its own
+    // Family Name filter select (views/partials/family-filter-select.ejs)
+    // built from this same list.
+    families: await allFamilies(),
     classesForQr,
     qrRoomOptions,
     libraryItems: await allLibraryItems(),

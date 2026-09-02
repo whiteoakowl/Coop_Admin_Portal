@@ -1,0 +1,28 @@
+<%
+// Family Name filter select for a bulk-print member picker - a real
+// request: "all bulk printing should have filter by family name."
+// Reused across every member-based Design/Print panel (Schedule Cards,
+// Name Tags, Name Tags + Schedule Cards front/back, Barcodes Only,
+// Barcode Mailing Labels, Name Tag Requests) so an admin can narrow a
+// picker's checkbox list down to one family before selecting/printing.
+// Client-side filtered against each row's own data-family-id (views/
+// partials/print-picker-table.ejs) by public/js/design-print-hub.js's
+// wireBulkMemberList - the same mechanism the existing Type filter
+// already uses on these same panels, not a page reload. That's
+// deliberately different from the Members/Schedule page's own family
+// filter (views/admin-schedule.ejs), which round-trips a real page
+// reload - there the whole page (and its own server-side query) is
+// scoped to one filter combination at a time; here every panel's full
+// member list is already sitting in the DOM (see print-picker-table.ejs's
+// own comment on why), so re-filtering it in the browser is both
+// consistent with the Type filter beside it and avoids six separate
+// reloads of the same member set. Locals: id (the <select>'s own unique
+// DOM id - every panel needs its own), families (utils/members.js's
+// allFamilies()).
+%>
+<select class="name-tag-bulk-filter-select" id="<%= id %>">
+  <option value="">All Families</option>
+  <% families.forEach(function(f) { %>
+    <option value="<%= f.id %>"><%= f.name %> Family</option>
+  <% }); %>
+</select>
