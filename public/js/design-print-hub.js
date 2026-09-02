@@ -86,24 +86,30 @@
 
   // Member-type-filterable checkbox lists (Name Tags, Cards Both/Duplex,
   // Barcodes, Barcode Labels, and now Schedule Cards): type filter +
-  // optional name search + select-all/select-none, mirrors the bulk print
-  // list wiring in name-tag-editor.js. Shared across every panel since
-  // they're the same member-picker-list markup with different id
-  // prefixes - searchInputId is only passed for Schedule Cards (the one
-  // panel that had a search box before it ever got a type filter; a real
-  // request - "separate primary parent and parent in the dropdown menu of
-  // choices for printing any name tag, schedule card, or barcode" - is
-  // what gave it one), everyone else passes nothing and just gets type
-  // filtering.
-  function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId, searchInputId) {
+  // optional name search + optional family filter + select-all/select-
+  // none, mirrors the bulk print list wiring in name-tag-editor.js.
+  // Shared across every panel since they're the same member-picker-list
+  // markup with different id prefixes - searchInputId is only passed for
+  // Schedule Cards (the one panel that had a search box before it ever
+  // got a type filter; a real request - "separate primary parent and
+  // parent in the dropdown menu of choices for printing any name tag,
+  // schedule card, or barcode" - is what gave it one), everyone else
+  // passes nothing and just gets type (+ family) filtering.
+  // familyFilterSelectId (a real request: "all bulk printing should have
+  // filter by family name" - see views/partials/family-filter-select.ejs)
+  // layers a family match on top of type/search exactly the same way -
+  // a row only shows once it clears every active filter at once.
+  function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId, searchInputId, familyFilterSelectId) {
     const bulkList = document.getElementById(listId);
     if (!bulkList) return;
     const filterSelect = document.getElementById(filterSelectId);
     const searchInput = searchInputId ? document.getElementById(searchInputId) : null;
-    if (filterSelect || searchInput) {
+    const familyFilterSelect = familyFilterSelectId ? document.getElementById(familyFilterSelectId) : null;
+    if (filterSelect || searchInput || familyFilterSelect) {
       const applyFilter = () => {
         const filter = filterSelect ? filterSelect.value : 'all';
         const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const familyId = familyFilterSelect ? familyFilterSelect.value : '';
         bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
           // "Teachers" and "Primary Parents" are their own dataset
           // (data-teacher/data-primary) rather than their own member_type
@@ -117,11 +123,13 @@
             filter === 'all' ||
             (filter === 'teacher' ? row.dataset.teacher === '1' : filter === 'primaryParent' ? row.dataset.primary === '1' : row.dataset.type === filter);
           const searchMatches = !q || row.dataset.name.includes(q);
-          row.style.display = typeMatches && searchMatches ? '' : 'none';
+          const familyMatches = !familyId || row.dataset.familyId === familyId;
+          row.style.display = typeMatches && searchMatches && familyMatches ? '' : 'none';
         });
       };
       if (filterSelect) filterSelect.addEventListener('change', applyFilter);
       if (searchInput) searchInput.addEventListener('input', applyFilter);
+      if (familyFilterSelect) familyFilterSelect.addEventListener('change', applyFilter);
       // A real request: "we usually only need to print primary parent" -
       // the Name Tags filter now defaults to Primary Parents Only (see
       // admin-design.ejs), so the list has to start out already filtered
@@ -151,13 +159,62 @@
     }
   }
 
-  wireBulkMemberList('schedule-print-list', 'schedule-print-filter-select', 'schedule-print-select-all-checkbox', null, 'schedule-print-search-input');
-  wireBulkMemberList('name-tag-bulk-list', 'name-tag-bulk-filter-select', 'name-tag-select-all-checkbox', 'name-tag-select-none-checkbox');
-  wireBulkMemberList('name-tag-requests-bulk-list', undefined, 'name-tag-requests-select-all-checkbox', 'name-tag-requests-select-none-checkbox');
-  wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
-  wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
-  wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
-  wireBulkMemberList('barcode-labels-bulk-list', 'barcode-labels-bulk-filter-select', 'barcode-labels-select-all-checkbox', 'barcode-labels-select-none-checkbox');
+  wireBulkMemberList(
+    'schedule-print-list',
+    'schedule-print-filter-select',
+    'schedule-print-select-all-checkbox',
+    null,
+    'schedule-print-search-input',
+    'schedule-print-family-select'
+  );
+  wireBulkMemberList(
+    'name-tag-bulk-list',
+    'name-tag-bulk-filter-select',
+    'name-tag-select-all-checkbox',
+    'name-tag-select-none-checkbox',
+    undefined,
+    'name-tag-bulk-family-select'
+  );
+  wireBulkMemberList(
+    'name-tag-requests-bulk-list',
+    undefined,
+    'name-tag-requests-select-all-checkbox',
+    'name-tag-requests-select-none-checkbox',
+    undefined,
+    'name-tag-requests-family-select'
+  );
+  wireBulkMemberList(
+    'cards-both-bulk-list',
+    'cards-both-bulk-filter-select',
+    'cards-both-select-all-checkbox',
+    'cards-both-select-none-checkbox',
+    undefined,
+    'cards-both-bulk-family-select'
+  );
+  wireBulkMemberList(
+    'cards-duplex-bulk-list',
+    'cards-duplex-bulk-filter-select',
+    'cards-duplex-select-all-checkbox',
+    'cards-duplex-select-none-checkbox',
+    undefined,
+    'cards-duplex-bulk-family-select'
+  );
+  wireBulkMemberList(
+    'barcodes-bulk-list',
+    'barcodes-bulk-filter-select',
+    'barcodes-select-all-checkbox',
+    'barcodes-select-none-checkbox',
+    undefined,
+    'barcodes-bulk-family-select'
+  );
+  wireBulkMemberList(
+    'barcode-labels-bulk-list',
+    'barcode-labels-bulk-filter-select',
+    'barcode-labels-select-all-checkbox',
+    'barcode-labels-select-none-checkbox',
+    undefined,
+    'barcode-labels-bulk-family-select'
+  );
 
   // Class Check-In QR Codes picker: select-all/select-none plus a Day/Hour
   // filter popup, all over .qr-picker-row (classes, not members - a

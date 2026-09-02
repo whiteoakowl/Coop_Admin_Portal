@@ -12,6 +12,15 @@
 // co-op with enough members. skipRows leaves this one's <tbody> empty;
 // public/js/design-print-hub.js clones the one real (non-skipRows)
 // table's rows into it client-side instead, once, on page load.
+//
+// data-family-id (a real request: "all bulk printing should have filter
+// by family name") backs each panel's own Family Name filter select
+// (views/partials/family-filter-select.ejs) - client-side filtered by
+// design-print-hub.js's wireBulkMemberList, the same mechanism the Type
+// filter already uses on these same rows, so a row narrows on family
+// exactly the same way it already narrows on type/search. Blank (no
+// family) for a member with no family_id, which only ever matches the
+// filter's own default "All Families" option.
 %>
 <% var skipRows = typeof skipRows !== 'undefined' && skipRows; %>
 <table class="roster-table members-table condensed-table" id="<%= listId %>">
@@ -31,7 +40,7 @@
       <tr><td colspan="6" class="roster-empty">No members yet.</td></tr>
     <% } %>
     <% (skipRows ? [] : members).forEach(function(m) { %>
-      <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-primary="<%= m.is_primary_parent ? '1' : '0' %>" data-name="<%= m.name.toLowerCase() %>">
+      <tr class="print-picker-row" data-type="<%= m.member_type %>" data-teacher="<%= m.isTeacher ? '1' : '0' %>" data-primary="<%= m.is_primary_parent ? '1' : '0' %>" data-name="<%= m.name.toLowerCase() %>" data-family-id="<%= m.family_id != null ? m.family_id : '' %>">
         <td><input type="checkbox" name="memberIds" value="<%= m.id %>" /></td>
         <td class="members-col-photo">
           <% if (m.photo_path) { %>

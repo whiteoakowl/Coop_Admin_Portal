@@ -267,6 +267,7 @@
                   <option value="admin">Admins Only</option>
                   <option value="teacher">Teachers Only</option>
                 </select>
+                <%- include('partials/family-filter-select', { id: 'schedule-print-family-select', families: families }) %>
                 <div class="category-filter schedule-search">
                   <label for="schedule-print-search-input">Search</label>
                   <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
@@ -302,6 +303,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'name-tag-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="name-tag-select-all-checkbox" />
                 Select All
@@ -336,6 +338,7 @@
             <% } else { %>
               <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the long edge) and cut apart for two-sided cards.</p>
               <div class="name-tag-bulk-filter">
+                <%- include('partials/family-filter-select', { id: 'name-tag-requests-family-select', families: families }) %>
                 <label class="checkbox-option name-tag-select-all">
                   <input type="checkbox" id="name-tag-requests-select-all-checkbox" />
                   Select All
@@ -353,7 +356,7 @@
                   </thead>
                   <tbody>
                     <% pendingNameTagRequests.forEach(function(p) { %>
-                      <tr class="print-picker-row" data-name="<%= p.memberName.toLowerCase() %>">
+                      <tr class="print-picker-row" data-name="<%= p.memberName.toLowerCase() %>" data-family-id="<%= p.familyId != null ? p.familyId : '' %>">
                         <td><input type="checkbox" name="memberIds" value="<%= p.memberId %>" /></td>
                         <td><%= p.memberName %></td>
                         <td><%= p.requestSummary %></td>
@@ -378,6 +381,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'cards-both-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-both-select-all-checkbox" />
                 Select All
@@ -406,6 +410,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'cards-duplex-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-duplex-select-all-checkbox" />
                 Select All
@@ -433,6 +438,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'barcodes-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcodes-select-all-checkbox" />
                 Select All
@@ -461,6 +467,7 @@
                 <option value="admin">Admins Only</option>
                 <option value="teacher">Teachers Only</option>
               </select>
+              <%- include('partials/family-filter-select', { id: 'barcode-labels-bulk-family-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcode-labels-select-all-checkbox" />
                 Select All
