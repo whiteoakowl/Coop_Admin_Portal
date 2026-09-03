@@ -350,23 +350,37 @@
                             under archive there should be a button that
                             says reactivate to make them a member again
                             and remove them from the archive list." %>
-                        <form method="POST" action="/main-admin/members/<%= m.id %>/unarchive" class="inline-block-form">
-                          <button type="submit" class="roster-action-btn" aria-label="Reactivate <%= m.name %>" title="Reactivate">Reactivate</button>
-                        </form>
+                        <button
+                          type="button"
+                          class="roster-action-btn"
+                          data-member-unarchive-url="/main-admin/members/<%= m.id %>/unarchive"
+                          aria-label="Reactivate <%= m.name %>"
+                          title="Reactivate"
+                        >Reactivate</button>
                         <%# A real request: "remove trash button from each
                             member. you must archive the member and then
                             they can be deleted while archived." - the
                             per-row Delete button only exists here, on the
                             Archive tab, never on the live Members tab. %>
-                        <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
-                          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                        </form>
+                        <button
+                          type="button"
+                          class="icon-btn icon-btn-danger"
+                          data-member-delete-url="/main-admin/members/<%= m.id %>/delete"
+                          data-member-delete-name="<%= m.name %>"
+                          data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone."
+                          aria-label="Delete <%= m.name %>"
+                          title="Delete"
+                        ><svg class="icon"><use href="#icon-trash"/></svg></button>
                       <% } else { %>
                         <%# A real request: "change archive icon to
                             something for like archive." %>
-                        <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
-                          <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-archive"/></svg></button>
-                        </form>
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          data-member-archive-url="/main-admin/members/<%= m.id %>/archive"
+                          aria-label="Archive <%= m.name %>"
+                          title="Archive"
+                        ><svg class="icon"><use href="#icon-archive"/></svg></button>
                       <% } %>
                     </div>
                   </td>
@@ -519,6 +533,7 @@
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
+  <script src="/js/member-row-actions.js"></script>
   <% if (activeTab === 'settings') { %>
     <script src="/js/forum-editor.js"></script>
     <script src="/js/membership-field-type-toggle.js"></script>

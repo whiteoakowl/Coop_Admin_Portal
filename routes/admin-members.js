@@ -709,6 +709,7 @@ async function deleteMemberById(id) {
 
 router.post('/members/:id/delete', async (req, res) => {
   const member = await deleteMemberById(parseInt(req.params.id, 10));
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect(
     '/admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.')
   );
@@ -724,36 +725,66 @@ function memberIdsFromBody(body) {
 // Student/Parent Schedule archive grids' identical Select-All-across-
 // every-page mechanics). ---
 
+// A real request: "any pages, do not refresh the page when clicking
+// button or icons... stay on the screen so you don't have to search for
+// families and members again." These 3 bulk actions are still real page
+// submits (public/js/members-bulk-actions.js sets the form's own action
+// and submits it directly), unlike the per-row actions below - so they
+// still redirect, but back to whatever Filter/Family/search/page
+// querystring the Members list actually had, not always the bare,
+// unfiltered /admin/members - same req.get('Referer') || fallback shape
+// routes/notifications.js already uses. Only trusts a same-page Referer
+// (pathname must actually be /admin/members) so a spoofed header can't
+// send an admin somewhere unexpected.
+function membersRedirectUrl(req, fallbackQuery, extraParams) {
+  let url;
+  try {
+    const referer = new URL(req.get('Referer') || '');
+    url = referer.pathname === '/admin/members' ? referer : new URL(`http://x/admin/members?${fallbackQuery}`);
+  } catch {
+    url = new URL(`http://x/admin/members?${fallbackQuery}`);
+  }
+  url.searchParams.delete('notice');
+  url.searchParams.delete('error');
+  for (const [key, value] of Object.entries(extraParams)) url.searchParams.set(key, value);
+  // encodeURIComponent, not URLSearchParams's own toString() (which
+  // encodes a space as "+") - keeps the %20-style encoding every other
+  // redirect in this file already uses, so an existing notice/error
+  // banner elsewhere that pattern-matches the querystring keeps working.
+  const query = [...url.searchParams].map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+  return url.pathname + (query ? '?' + query : '');
+}
+
 router.post('/members/bulk-delete', async (req, res) => {
   const memberIds = memberIdsFromBody(req.body);
   if (memberIds.length === 0) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one member to delete.'));
+    return res.redirect(membersRedirectUrl(req, '', { error: 'Select at least one member to delete.' }));
   }
   let count = 0;
   for (const id of memberIds) {
     if (await deleteMemberById(id)) count++;
   }
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Deleted ${count} member(s).`));
+  res.redirect(membersRedirectUrl(req, '', { notice: `Deleted ${count} member(s).` }));
 });
 
 router.post('/members/bulk-archive', async (req, res) => {
   const memberIds = memberIdsFromBody(req.body);
   if (memberIds.length === 0) {
-    return res.redirect('/admin/members?error=' + encodeURIComponent('Select at least one member to archive.'));
+    return res.redirect(membersRedirectUrl(req, '', { error: 'Select at least one member to archive.' }));
   }
   const placeholders = memberIds.map(() => '?').join(',');
   await db.prepare(`UPDATE members SET active = 0 WHERE id IN (${placeholders})`).run(...memberIds);
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Archived ${memberIds.length} member(s).`));
+  res.redirect(membersRedirectUrl(req, '', { notice: `Archived ${memberIds.length} member(s).` }));
 });
 
 router.post('/members/bulk-unarchive', async (req, res) => {
   const memberIds = memberIdsFromBody(req.body);
   if (memberIds.length === 0) {
-    return res.redirect('/admin/members?archived=1&error=' + encodeURIComponent('Select at least one member to restore.'));
+    return res.redirect(membersRedirectUrl(req, 'archived=1', { error: 'Select at least one member to restore.' }));
   }
   const placeholders = memberIds.map(() => '?').join(',');
   await db.prepare(`UPDATE members SET active = 1 WHERE id IN (${placeholders})`).run(...memberIds);
-  res.redirect('/admin/members?notice=' + encodeURIComponent(`Restored ${memberIds.length} member(s).`));
+  res.redirect(membersRedirectUrl(req, 'archived=1', { notice: `Restored ${memberIds.length} member(s).` }));
 });
 
 // --- Edit Families dialog (rename or delete a family "name" itself,

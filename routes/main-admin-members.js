@@ -390,10 +390,38 @@ router.post('/settings/membership-fields/:id/delete', async (req, res) => {
 // dropdown also appears and says actions, delete or archive are the
 // options." ---
 
+// A real request: "any pages, do not refresh the page when clicking
+// button or icons... stay on the screen so you don't have to search for
+// families and members again." Mirrors routes/admin-members.js's own
+// copy of this helper - these 2 bulk actions are still real page submits
+// (public/js/members-bulk-actions.js), so they still redirect, but back
+// to whatever Filter/Family/search/page querystring the Members tab
+// actually had, not always the bare, unfiltered /main-admin/members.
+// Only trusts a same-page Referer (pathname must actually be
+// /main-admin/members) so a spoofed header can't send an admin somewhere
+// unexpected.
+function membersRedirectUrl(req, extraParams) {
+  let url;
+  try {
+    const referer = new URL(req.get('Referer') || '');
+    url = referer.pathname === '/main-admin/members' ? referer : new URL('http://x/main-admin/members');
+  } catch {
+    url = new URL('http://x/main-admin/members');
+  }
+  url.searchParams.delete('notice');
+  url.searchParams.delete('error');
+  for (const [key, value] of Object.entries(extraParams)) url.searchParams.set(key, value);
+  // encodeURIComponent, not URLSearchParams's own toString() (which
+  // encodes a space as "+") - keeps the %20-style encoding every other
+  // redirect in this file already uses.
+  const query = [...url.searchParams].map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+  return url.pathname + (query ? '?' + query : '');
+}
+
 router.post('/bulk-delete', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   for (const id of memberIds) await deleteMemberById(id);
-  res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Deleted ${memberIds.length} member(s).`));
+  res.redirect(membersRedirectUrl(req, { notice: `Deleted ${memberIds.length} member(s).` }));
 });
 
 router.post('/bulk-archive', async (req, res) => {
@@ -402,7 +430,7 @@ router.post('/bulk-archive', async (req, res) => {
     const placeholders = memberIds.map(() => '?').join(',');
     await db.prepare(`UPDATE members SET active = 0 WHERE id IN (${placeholders})`).run(...memberIds);
   }
-  res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Archived ${memberIds.length} member(s).`));
+  res.redirect(membersRedirectUrl(req, { notice: `Archived ${memberIds.length} member(s).` }));
 });
 
 // --- Families (add/rename/delete the family "name" itself - see
@@ -842,6 +870,7 @@ async function deleteMemberById(id) {
 
 router.post('/:id/delete', async (req, res) => {
   const member = await deleteMemberById(parseInt(req.params.id, 10));
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.'));
 });
 
@@ -876,6 +905,7 @@ router.post('/:id/request-name-tag', async (req, res) => {
 router.post('/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE members SET active = 0 WHERE id = ?').run(id);
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?notice=' + encodeURIComponent('Member archived.'));
 });
 
@@ -885,6 +915,7 @@ router.post('/:id/archive', async (req, res) => {
 router.post('/:id/unarchive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE members SET active = 1 WHERE id = ?').run(id);
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members?tab=archive&notice=' + encodeURIComponent('Member reactivated.'));
 });
 

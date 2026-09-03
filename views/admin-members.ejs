@@ -271,7 +271,9 @@
                   <button
                     type="button"
                     class="icon-btn"
-                    onclick="document.getElementById('delete-form-<%= m.id %>').requestSubmit();"
+                    data-member-delete-url="/admin/members/<%= m.id %>/delete"
+                    data-member-delete-name="<%= m.name %>"
+                    data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
                     aria-label="Delete <%= m.name %>"
                     title="Delete"
                   ><svg class="icon"><use href="#icon-trash"/></svg></button>
@@ -292,7 +294,6 @@
                     empty and get their innerHTML swapped in on demand. %>
                 <dialog id="cards-dialog-<%= m.id %>" class="badge-preview-dialog"></dialog>
                 <dialog id="schedule-dialog-<%= m.id %>" class="schedule-preview-dialog"></dialog>
-                <form method="POST" action="/admin/members/<%= m.id %>/delete" id="delete-form-<%= m.id %>" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."></form>
               </td>
             </tr>
           <% }); %>
@@ -359,5 +360,6 @@
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
+  <script src="/js/member-row-actions.js"></script>
 </body>
 </html>
