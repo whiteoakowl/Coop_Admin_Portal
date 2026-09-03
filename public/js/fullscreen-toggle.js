@@ -1,19 +1,32 @@
 (function () {
-  // Two buttons can exist on the same page (desktop corner button + mobile
-  // topbar icon, see partials/admin-nav.ejs) - both toggle the same
-  // fullscreen state and stay in sync with each other and with whatever
-  // else changed fullscreen (e.g. Esc).
-  const buttons = [document.getElementById('fullscreen-toggle-btn'), document.getElementById('fullscreen-toggle-btn-mobile')].filter(Boolean);
+  // Several buttons can exist on the same page (desktop corner button +
+  // mobile topbar icon, see partials/admin-nav.ejs - and kiosk-home.ejs's
+  // own "Kiosk Mode" button in its top orange bar (desktop/tablet) and
+  // bottom orange bar (mobile), alongside its small corner icon) - all of
+  // them toggle the same fullscreen state and stay in sync with each
+  // other and with whatever else changed fullscreen (e.g. Esc).
+  const buttons = [
+    document.getElementById('fullscreen-toggle-btn'),
+    document.getElementById('fullscreen-toggle-btn-mobile'),
+    document.getElementById('kiosk-mode-btn'),
+    document.getElementById('kiosk-mode-btn-mobile'),
+  ].filter(Boolean);
   if (buttons.length === 0) return;
 
   function updateButton() {
     const isFullscreen = !!document.fullscreenElement;
     buttons.forEach((btn) => {
-      const label = btn.querySelector('#fullscreen-toggle-label');
-      if (label) label.textContent = isFullscreen ? 'Exit Full Screen View' : 'Full Screen View';
+      // A button can override the generic "Full Screen View" wording with
+      // its own data-label-off/data-label-on (kiosk-home.ejs's big button
+      // says "Start/Exit Kiosk Mode" instead) - everything else about the
+      // toggle (icon, aria-label, actual fullscreen behavior) stays the same.
+      const onText = btn.dataset.labelOn || 'Exit Full Screen View';
+      const offText = btn.dataset.labelOff || 'Full Screen View';
+      const label = btn.querySelector('.fullscreen-toggle-label');
+      if (label) label.textContent = isFullscreen ? onText : offText;
       const iconUse = btn.querySelector('use');
       if (iconUse) iconUse.setAttribute('href', isFullscreen ? '#icon-minimize' : '#icon-maximize');
-      btn.setAttribute('aria-label', isFullscreen ? 'Exit Full Screen View' : 'Full Screen View');
+      btn.setAttribute('aria-label', isFullscreen ? onText : offText);
     });
   }
 

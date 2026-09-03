@@ -1016,6 +1016,24 @@ textarea:focus-visible,
 .landing-top-menu-link:hover { background: rgba(255,255,255,0.4); }
 .landing-top-menu-link .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
 
+/* Kiosk Mode: the one item in each of these two rows (top bar/bottom bar)
+   that's a real <button> instead of an <a> - a real request: "start
+   kiosk mode button should be on the top orange row of buttons on the
+   far right for desktop and tablet. and the bottom orange bar, far right
+   for mobile." Reuses .landing-top-menu-link/.landing-action-bar-btn's
+   own look so it reads as one more item in the row, not a different
+   control - just needs the browser's own default <button> border/
+   background cleared (every other item here is a plain <a>, which never
+   had one to begin with) and its divider kept on the left only.
+   .landing-top-menu-link-end's margin-left: auto is what actually pushes
+   it to the far right of that row - .landing-top-menu centers its <a>s
+   as a group, so a plain flex child would just join that centered
+   cluster instead. The mobile counterpart needs no such push: every
+   .landing-action-bar-btn already stretches evenly (flex: 1 each), so
+   being last in source order already lands it at the row's right edge. */
+#kiosk-mode-btn, #kiosk-mode-btn-mobile { background: none; border-top: none; border-right: none; border-bottom: none; }
+.landing-top-menu-link-end { margin-left: auto; }
+
 .landing-columns { display: flex; justify-content: center; gap: 2rem; margin-top: 1rem; }
 .landing-column { display: flex; flex-direction: column; gap: 1.25rem; }
 .landing-card-wide { width: 260px; padding: 2.75rem 1rem; }
