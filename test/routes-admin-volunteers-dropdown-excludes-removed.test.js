@@ -29,6 +29,20 @@ const app = require('../server');
 const db = require('../db');
 const { getListByDay, sectionsForList, addMemberToSection, removeMemberFromSection } = require('../utils/volunteers');
 const { createPermanentJob } = require('../utils/substitutes');
+const { todayISO, addDays, weekdayOf } = require('../utils/dates');
+
+// routes/admin-volunteers.js's own GET /:day/manage only ever offers
+// today-or-later dates (upcomingDates = dates.filter((d) => d >= today))
+// - a hardcoded past date here would silently make the chart resolve
+// zero rows regardless of what's actually assigned, which is exactly
+// what happened once real "today" caught up to an earlier hardcoded
+// date in this file. Finds the next actual Monday (today included) so
+// this test keeps working indefinitely.
+function nextDateForWeekday(targetDay) {
+  let date = todayISO();
+  while (weekdayOf(date) !== targetDay) date = addDays(date, 1);
+  return date;
+}
 
 test.before(() => app.ready);
 test.after(() => {
@@ -65,8 +79,9 @@ test('a floater removed from the Floater List no longer appears in the assign dr
   await createPermanentJob({ day, hourPosition: 1, title: 'Dropdown Test Job', room: '' });
 
   // Give the day a session date so the chart actually resolves slots
-  // (an unassigned job with no selectedDate renders no rows at all).
-  await db.prepare("INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, '2026-08-31')").run(list.id); // a Monday
+  // (an unassigned job with no selectedDate renders no rows at all) -
+  // must be today or later, see nextDateForWeekday's own comment above.
+  await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, nextDateForWeekday(1)); // Monday
 
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);

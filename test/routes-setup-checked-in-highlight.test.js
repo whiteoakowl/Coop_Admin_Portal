@@ -106,14 +106,17 @@ test('Setup/Cleanup Assignments: admin + kiosk views highlight a checked-in memb
     await t.test(`admin Assignments tab for ${day}`, async () => {
       const res = await request(app).get(`/admin/setup/${day}/assignments`).set('Cookie', cookie);
       assert.equal(res.status, 200);
+      // The member name itself is a clickable link (a later, real
+      // request: "make member names clickable -> profile across every
+      // list surface"), not plain text directly in the <td>.
       assert.match(
         res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Checked In Volunteer/,
+        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Checked In Volunteer/,
         'the checked-in member should be highlighted'
       );
       assert.doesNotMatch(
         res.text,
-        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Not Checked In Volunteer/,
+        /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Not Checked In Volunteer/,
         'a member who never checked in is never highlighted'
       );
     });
@@ -147,11 +150,11 @@ test('Setup/Cleanup Assignments: an absent member is highlighted absent, not che
   // legitimately does contain setup-assignment-row-checked-in elsewhere.
   assert.match(
     res.text,
-    /<tr class="setup-assignment-row-absent">\s*<td class="floater-card-position">\s*Both Flags Volunteer/,
+    /<tr class="setup-assignment-row-absent">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/,
     'absent takes precedence over checked-in when both are true'
   );
   assert.doesNotMatch(
     res.text,
-    /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*Both Flags Volunteer/
+    /<tr class="setup-assignment-row-checked-in">\s*<td class="floater-card-position">\s*<a class="member-name-link"[^>]*>Both Flags Volunteer/
   );
 });

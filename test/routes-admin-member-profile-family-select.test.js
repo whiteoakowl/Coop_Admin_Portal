@@ -58,12 +58,32 @@ test('Member Profile Class Schedule tab', async (t) => {
     assert.doesNotMatch(res.text, /Generated automatically/);
   });
 
-  await t.test('a family member with others in the family gets a Family Member dropdown listing everyone, including themselves, pre-selected', async () => {
+  // A real, later request: "a parent's own profile page shouldn't
+  // require an extra click to see the whole family's schedule" - a
+  // parent viewing their OWN Class Schedule tab now defaults straight to
+  // the family-wide "All" view (routes/admin-members.js's own
+  // familyAllDefault), so "All" is what's pre-selected in the dropdown
+  // for a parent, not their own individual option - see the student case
+  // just below for where the individually-pre-selected behavior this
+  // dropdown was originally built for still applies.
+  await t.test('a parent with others in the family gets a Family Member dropdown listing everyone, defaulting to "All"', async () => {
     const res = await request(app).get(`/admin/members/${parentId}?tab=schedule`).set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /id="schedule-family-member-select"/);
-    assert.match(res.text, new RegExp(`<option value="${parentId}" selected>Select Family Parent</option>`));
+    assert.match(res.text, /<option value="all" selected>All<\/option>/);
+    assert.match(res.text, new RegExp(`<option value="${parentId}" >Select Family Parent</option>`));
     assert.match(res.text, new RegExp(`<option value="${kidId}"[^>]*>Select Family Kid</option>`));
+  });
+
+  // Students don't get the "auto-default to All" treatment (same route
+  // comment as above) - viewing a student's own tab still pre-selects
+  // just themselves, the dropdown's original behavior.
+  await t.test('a student with others in the family gets the dropdown pre-selected to themselves, not "All"', async () => {
+    const res = await request(app).get(`/admin/members/${kidId}?tab=schedule`).set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /<option value="all" >All<\/option>/);
+    assert.match(res.text, new RegExp(`<option value="${kidId}" selected>Select Family Kid</option>`));
+    assert.match(res.text, new RegExp(`<option value="${parentId}"[^>]*>Select Family Parent</option>`));
   });
 
   await t.test('a member with no family at all gets no dropdown (nothing to jump to)', async () => {
@@ -85,15 +105,26 @@ test('Member Profile Attendance tab gets the same Family Member dropdown', async
   const parentId = (await db
     .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Attendance Family Parent', 'att-fam-parent', 'parent', ?)")
     .run(familyId)).lastInsertRowid;
-  await db
+  const kidId = (await db
     .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Attendance Family Kid', 'att-fam-kid', 'student', ?)")
-    .run(familyId);
+    .run(familyId)).lastInsertRowid;
 
-  await t.test('shows the dropdown, defaulting to attendance for whichever member is picked', async () => {
+  // A parent auto-defaults to the family-wide "All" view here too (same
+  // real request/behavior as the Class Schedule tab above), so "All" -
+  // not the parent's own option - is what's pre-selected.
+  await t.test('shows the dropdown, defaulting to "All" for a parent', async () => {
     const res = await request(app).get(`/admin/members/${parentId}?tab=attendance`).set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /id="attendance-family-member-select"/);
     assert.match(res.text, /window\.location = '\/admin\/members\/' \+ this\.value \+ '\?tab=attendance'/);
-    assert.match(res.text, new RegExp(`<option value="${parentId}" selected>Attendance Family Parent</option>`));
+    assert.match(res.text, /<option value="all" selected>All<\/option>/);
+    assert.match(res.text, new RegExp(`<option value="${parentId}" >Attendance Family Parent</option>`));
+  });
+
+  await t.test('a student still gets pre-selected to themselves, not "All"', async () => {
+    const res = await request(app).get(`/admin/members/${kidId}?tab=attendance`).set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    assert.match(res.text, /<option value="all" >All<\/option>/);
+    assert.match(res.text, new RegExp(`<option value="${kidId}" selected>Attendance Family Kid</option>`));
   });
 });

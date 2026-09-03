@@ -40,10 +40,12 @@ async function loginAsAdmin() {
 
 // Pulls each <tr>'s member name and the set of badge labels in its
 // "Found In" cell, in document order - used to tie a specific badge back
-// to the specific member it's supposed to describe.
+// to the specific member it's supposed to describe. The name cell itself
+// is a clickable link (a later, real request: "make member names
+// clickable -> profile across every list surface"), not plain text.
 function memberRows(html) {
   const rows = [];
-  const rowRe = /<tr>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="search-found-in-cell">([\s\S]*?)<\/td>/g;
+  const rowRe = /<tr>\s*<td><a class="member-name-link"[^>]*>([^<]+)<\/a><\/td>[\s\S]*?<td class="search-found-in-cell">([\s\S]*?)<\/td>/g;
   let m;
   while ((m = rowRe.exec(html))) {
     const badges = [...m[2].matchAll(/>([A-Za-z][^<]*)<\/(?:a|span)>/g)].map((b) => b[1].trim());
