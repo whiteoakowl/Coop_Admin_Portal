@@ -407,7 +407,14 @@
     var style = elementBaseStyle(el) + ' overflow:hidden;';
     var rows = (data && data[el.field]) || [];
     var fontSize = num(el.fontSize, 8);
-    var borderColor = el.borderColor || '#dbe8f5';
+    // A real request: "make the lines on the table of the schedule cards
+    // black... make the font black." Neither is admin-configurable (the
+    // table properties panel only ever offered Grid line color/Header
+    // background - see schedule-card-editor.js), so the font color is
+    // set unconditionally here rather than reading an el.color field that
+    // doesn't exist; el.borderColor's own default only matters for a
+    // template saved before the shared DEFAULT_LAYOUT default changed.
+    var borderColor = el.borderColor || '#000000';
     var headerBg = el.headerColor || '#eaf4fd';
     var headers = ['#', 'Time', 'Class Name', 'Room'];
     var colValues = [
@@ -418,7 +425,7 @@
     ];
     var colWidths = tableColumnWidths(headers, colValues);
     function cellStyle(colIndex) {
-      return 'width:' + colWidths[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+      return 'width:' + colWidths[colIndex] + '; padding:1px 3px; border:1px solid ' + esc(borderColor) + '; font-size:' + fontSize + 'px; color:#000000; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
     }
     var html = '<table style="width:100%; height:100%; border-collapse:collapse; table-layout:fixed; font-family:inherit;"><thead><tr style="background:' + esc(headerBg) + ';">';
     headers.forEach(function (label, colIndex) {

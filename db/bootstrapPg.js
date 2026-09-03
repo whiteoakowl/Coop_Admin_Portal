@@ -655,6 +655,48 @@ async function backfillScheduleCardAutoFit(db) {
   await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
 }
 
+// Genuine one-time backfill for an already-deployed database's EXISTING
+// schedule_card_templates row, saved before this real request: "make the
+// lines on the table of the schedule cards black so it stands out more.
+// make the font black. make the blue Monday/Wednesday titles stand out
+// more." (the font-color part needed no backfill - name-tag-render-
+// core.js's renderTableEl now sets it unconditionally, not from a saved
+// field). Only touches a table/label element whose color still exactly
+// matches the OLD default (the barely-visible #dbe8f5 grid line, the
+// muted #2e6da4 day-label) - an admin who already picked their own grid
+// line or label color is left alone, same "only touch what still matches
+// the retired default" rule every backfill in this file follows.
+const SCHEDULE_CARD_OLD_TABLE_BORDER_COLOR = '#dbe8f5';
+const SCHEDULE_CARD_OLD_LABEL_COLOR = '#2e6da4';
+
+async function backfillScheduleCardColors(db) {
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+
+  let changed = false;
+  const elements = layout.elements.map((el) => {
+    if (el.type === 'table' && el.borderColor === SCHEDULE_CARD_OLD_TABLE_BORDER_COLOR) {
+      changed = true;
+      return { ...el, borderColor: '#000000' };
+    }
+    if (el.type === 'text' && el.field === 'custom' && (el.text === 'Monday' || el.text === 'Wednesday') && el.color === SCHEDULE_CARD_OLD_LABEL_COLOR) {
+      changed = true;
+      return { ...el, color: '#0b3d91' };
+    }
+    return el;
+  });
+  if (!changed) return;
+
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify({ ...layout, elements }));
+}
+
 // The split shape this backfill installs - NOT sourced from
 // DEFAULT_LAYOUTS.parent, which now holds the later merged setupCleanupDays
 // shape instead (see backfillParentSetupCleanupMerge below). Kept as its
@@ -810,6 +852,7 @@ module.exports = {
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
+  backfillScheduleCardColors,
   backfillParentSetupCleanupDays,
   backfillParentSetupCleanupMerge,
   backfillParentRemoveLegacyCleanupTeamElement,

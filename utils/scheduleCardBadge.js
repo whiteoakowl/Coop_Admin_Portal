@@ -38,10 +38,19 @@ const DEFAULT_LAYOUT = {
   elements: [
     { id: 'allergy', type: 'text', field: 'allergy', x: 8, y: 5, width: 210, height: 14, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle', autoFitText: true },
     { id: 'parent-phone', type: 'text', field: 'primaryParentPhone', x: 222, y: 5, width: 106, height: 14, fontSize: 8, color: '#5b6b7c', bold: false, align: 'right', valign: 'middle', autoFitText: true },
-    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
-    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
-    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 117, width: 320, height: 11, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
-    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 129, width: 320, height: 79, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+    // A real request: "make the lines on the table of the schedule cards
+    // black so it stands out more. make the font black. make the blue
+    // Monday/Wednesday titles stand out more." borderColor was a barely-
+    // visible light blue (#dbe8f5) - solid black grid lines instead; the
+    // day-label color deepens from a muted #2e6da4 to a richer, more
+    // saturated navy so it actually reads as a header, not just tinted
+    // text (the table's own font color is set unconditionally in
+    // renderTableEl - it isn't admin-configurable, so there's no
+    // corresponding field to change here).
+    { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+    { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
+    { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 117, width: 320, height: 11, fontSize: 9, color: '#0b3d91', bold: true, align: 'center', valign: 'middle' },
+    { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 129, width: 320, height: 79, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' },
   ],
 };
 

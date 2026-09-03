@@ -24,6 +24,7 @@ const {
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,
+  backfillScheduleCardColors,
 } = require('../db/bootstrapPg');
 const { DEFAULT_LAYOUTS } = require('../utils/nameTagBadge');
 const { DEFAULT_LAYOUT: SCHEDULE_CARD_DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
@@ -243,6 +244,61 @@ test('backfillScheduleCardAutoFit is a no-op for a fresh install already seeded 
 
   const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
   assert.equal(after.layout_json, before.layout_json);
+});
+
+// Coverage for a real request: "make the lines on the table of the
+// schedule cards black so it stands out more. make the font black. make
+// the blue Monday/Wednesday titles stand out more." Only the border/label
+// colors are backfilled here (the font color needed no saved field at
+// all - name-tag-render-core.js's renderTableEl now sets it
+// unconditionally).
+test('backfillScheduleCardColors turns the old barely-visible grid line black and deepens the old muted day-label blue, leaving an admin\'s own customized colors untouched', async () => {
+  const db = await createTestDb();
+  const oldColors = {
+    background: '#ffffff',
+    backgroundOpacity: 1,
+    elements: [
+      { id: 'allergy', type: 'text', field: 'allergy', x: 8, y: 5, width: 210, height: 14, fontSize: 11, color: '#dc2626', bold: true, align: 'left', valign: 'middle', autoFitText: true },
+      { id: 'mon-label', type: 'text', field: 'custom', text: 'Monday', x: 8, y: 21, width: 320, height: 11, fontSize: 9, color: '#2e6da4', bold: true, align: 'center', valign: 'middle' },
+      { id: 'mon-table', type: 'table', field: 'mondaySchedule', x: 8, y: 33, width: 320, height: 82, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' },
+      // A custom text element that happens to also read '#2e6da4' but
+      // isn't a day label at all - must be left exactly as saved.
+      { id: 'custom-note', type: 'text', field: 'custom', text: 'Please arrive 10 minutes early', x: 8, y: 200, width: 320, height: 11, fontSize: 7, color: '#2e6da4', bold: false, align: 'center', valign: 'middle' },
+      // An admin who already picked their own grid line color - must be
+      // left exactly as saved, not overwritten to black.
+      { id: 'wed-label', type: 'text', field: 'custom', text: 'Wednesday', x: 8, y: 117, width: 320, height: 11, fontSize: 9, color: '#7a1fa2', bold: true, align: 'center', valign: 'middle' },
+      { id: 'wed-table', type: 'table', field: 'wednesdaySchedule', x: 8, y: 129, width: 320, height: 79, fontSize: 8, borderColor: '#2f9e44', headerColor: '#eaf4fd' },
+    ],
+  };
+  await db.prepare('UPDATE schedule_card_templates SET layout_json = ? WHERE id = 1').run(JSON.stringify(oldColors));
+
+  await backfillScheduleCardColors(db);
+
+  const row = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  const layout = JSON.parse(row.layout_json);
+  assert.equal(layout.elements.find((el) => el.id === 'mon-table').borderColor, '#000000', 'the old default grid line color should turn black');
+  assert.equal(layout.elements.find((el) => el.id === 'mon-label').color, '#0b3d91', 'the old default day-label color should deepen');
+  assert.equal(layout.elements.find((el) => el.id === 'custom-note').color, '#2e6da4', 'a non-day-label custom text element must be untouched even if it happens to share the old color');
+  assert.equal(layout.elements.find((el) => el.id === 'wed-label').color, '#7a1fa2', 'an admin\'s own customized day-label color must be untouched');
+  assert.equal(layout.elements.find((el) => el.id === 'wed-table').borderColor, '#2f9e44', 'an admin\'s own customized grid line color must be untouched');
+  assert.deepEqual(
+    layout.elements.find((el) => el.id === 'allergy'),
+    oldColors.elements.find((el) => el.id === 'allergy'),
+    'an unrelated element must be untouched'
+  );
+});
+
+test('backfillScheduleCardColors is a no-op for a fresh install already seeded with the current default colors', async () => {
+  const db = await createTestDb();
+  const before = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+
+  await backfillScheduleCardColors(db);
+
+  const after = await db.prepare('SELECT layout_json FROM schedule_card_templates WHERE id = 1').get();
+  assert.equal(after.layout_json, before.layout_json);
+  const layout = JSON.parse(after.layout_json);
+  assert.equal(layout.elements.find((el) => el.id === 'mon-table').borderColor, '#000000');
+  assert.equal(layout.elements.find((el) => el.id === 'mon-label').color, '#0b3d91');
 });
 
 // Coverage for a third, later redesign of the Setup/Cleanup badge - a real

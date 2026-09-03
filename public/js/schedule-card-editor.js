@@ -885,7 +885,7 @@
 
     const borderColor = document.createElement('input');
     borderColor.type = 'color';
-    borderColor.value = el.borderColor || '#dbe8f5';
+    borderColor.value = el.borderColor || '#000000';
     borderColor.addEventListener('input', () => {
       el.borderColor = borderColor.value;
       renderCanvas();
@@ -1166,7 +1166,7 @@
 
   function addTable(day) {
     const field = day === 'wednesday' ? 'wednesdaySchedule' : 'mondaySchedule';
-    const el = { id: newId('table'), type: 'table', field, x: 20, y: 20, width: 154, height: 145, fontSize: 8, borderColor: '#dbe8f5', headerColor: '#eaf4fd' };
+    const el = { id: newId('table'), type: 'table', field, x: 20, y: 20, width: 154, height: 145, fontSize: 8, borderColor: '#000000', headerColor: '#eaf4fd' };
     currentLayout().push(el);
     selectedId = el.id;
     renderCanvas();
