@@ -5124,15 +5124,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   width: fit-content;
   max-width: 100%;
   margin: 0 auto 1.5rem;
-  background: var(--orange-bg);
-  color: var(--ink);
+  background: var(--red-bg);
+  color: var(--red);
   border-radius: 16px;
   padding: 1rem 1.75rem;
   font-size: 1.15rem;
-  font-weight: 600;
+  font-weight: 700;
   text-align: center;
 }
-.setup-badge-reminder .icon { width: 1.6em; height: 1.6em; flex-shrink: 0; color: var(--btn-bg); }
+.setup-badge-reminder .icon { width: 1.6em; height: 1.6em; flex-shrink: 0; color: var(--red); }
 @media (max-width: 640px) {
   .setup-badge-reminder { font-size: 1rem; padding: 0.85rem 1.25rem; }
 }
