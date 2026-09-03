@@ -691,6 +691,24 @@ textarea:focus-visible,
   font-size: 1rem;
 }
 
+/* Ends a continuous-scan session on Check In/Check Out (see step-scan in
+   kiosk-checkin.ejs/kiosk-checkout.ejs) - deliberately styled apart from
+   .kiosk-cancel-btn above (that one abandons a single in-progress task
+   scan; this one closes out a whole run of completed scans), so it reads
+   as a positive "wrap up" action rather than a muted escape hatch. */
+.kiosk-done-btn {
+  display: block;
+  margin: 1.5rem auto 0;
+  background: none;
+  border: 1px solid var(--btn-bg);
+  border-radius: 10px;
+  padding: 0.6rem 2rem;
+  color: var(--btn-bg);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.kiosk-done-btn:hover { background: var(--btn-bg); color: var(--ink); }
+
 /* Scan-or-keypad layout shared by every kiosk scan screen (Check In, Check
    Out, Find a Parent, Class Check-In) - the barcode scanner's status circle
    stays on the left (untouched, still a hidden input a hardware scanner

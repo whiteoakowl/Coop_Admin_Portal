@@ -18,6 +18,8 @@
   const secondBadgeNoBtn = document.getElementById('second-badge-no-btn');
   const cancelBtn = document.getElementById('cancel-btn');
   const cancelBtn2 = document.getElementById('cancel-btn-2');
+  const doneBtn = document.getElementById('done-btn');
+  const methodChoice = stepScan.querySelector('.kiosk-method-choice');
 
   keepInputFocused(input);
   initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
@@ -201,8 +203,18 @@
         return;
       }
 
+      // A real request: "when members are scanning that don't need to
+      // scan a setup/cleanup badge, they should be able to continuously
+      // scan" - a member who didn't need step-task above (the common
+      // case: students always, most parents since #219's badge-scan
+      // gate) returns straight to this same ready-to-scan panel instead
+      // of leaving the page, so the next person can scan immediately.
+      // doneBtn below is the deliberate way to end the session.
       setState(data.alreadyChecked ? 'info' : 'success', data.message, data.alreadyChecked ? 'info-circle' : 'check-circle');
-      setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+      setTimeout(() => {
+        result.hidden = true;
+        chooser.showPanel(activeMethod);
+      }, 1500);
     } catch (err) {
       setState('error', 'Connection error. Please try again.', 'x-circle');
       setTimeout(() => {
@@ -210,6 +222,15 @@
         chooser.showPanel(activeMethod);
       }, 2500);
     }
+  });
+
+  doneBtn.addEventListener('click', () => {
+    input.disabled = true;
+    methodChoice.hidden = true;
+    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    result.hidden = false;
+    setState('success', 'Have a great day!', 'check-circle');
+    setTimeout(() => { window.location.href = '/kiosk'; }, 1500);
   });
 
   // A real request: "after parent scans their setup/cleanup badge it

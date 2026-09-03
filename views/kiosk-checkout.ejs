@@ -59,6 +59,18 @@
           inputmode="none"
         />
       </form>
+
+      <%# A real request: "when members are scanning that don't need to
+          scan a setup/cleanup badge, they should be able to continuously
+          scan. there is a button that says done. have a great day!
+          message pops up and goes back to kiosk homepage screen." A
+          member who doesn't need the Setup/Cleanup task-scan step (see
+          step-task above) now returns straight to this same ready-to-
+          scan panel after checking out instead of leaving the page, so
+          the next person can scan right away with no extra taps - this
+          button is how a person (usually whoever's running the door)
+          deliberately ends that session. %>
+      <button id="done-btn" type="button" class="kiosk-done-btn">Done</button>
     </div>
 
     <!-- Parents only - students check out with a single name tag scan (see

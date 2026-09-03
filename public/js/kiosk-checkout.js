@@ -18,6 +18,8 @@
   const secondBadgeNoBtn = document.getElementById('second-badge-no-btn');
   const cancelBtn = document.getElementById('cancel-btn');
   const cancelBtn2 = document.getElementById('cancel-btn-2');
+  const doneBtn = document.getElementById('done-btn');
+  const methodChoice = stepScan.querySelector('.kiosk-method-choice');
 
   keepInputFocused(input);
   initIdKeypad(document.getElementById('id-keypad'), input, scanForm);
@@ -194,9 +196,18 @@
       // added to setup/cleanup teams will be asked" - a team leader, or a
       // parent/admin not on any Setup/Cleanup team at all, never had a
       // badge to scan in the first place.
+      // A real request: "when members are scanning that don't need to
+      // scan a setup/cleanup badge, they should be able to continuously
+      // scan" - returns straight to this same ready-to-scan panel
+      // instead of leaving the page, so the next person can scan
+      // immediately. doneBtn below is the deliberate way to end the
+      // session.
       if (data.memberType === 'student' || data.memberType === 'parent-already-logged' || data.memberType === 'parent-no-badge') {
         setState('success', data.message, 'check-circle');
-        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+        setTimeout(() => {
+          result.hidden = true;
+          chooser.showPanel(activeMethod);
+        }, 1500);
         return;
       }
 
@@ -240,4 +251,13 @@
 
   cancelBtn.addEventListener('click', resetToScan);
   cancelBtn2.addEventListener('click', resetToScan);
+
+  doneBtn.addEventListener('click', () => {
+    input.disabled = true;
+    methodChoice.hidden = true;
+    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    result.hidden = false;
+    setState('success', 'Have a great day!', 'check-circle');
+    setTimeout(() => { window.location.href = '/kiosk'; }, 1500);
+  });
 })();
