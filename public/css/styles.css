@@ -2470,13 +2470,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .members-col-days, .members-col-sections { display: table-cell; }
   /* Beats the base .roster-table td nowrap rule on specificity (two
      classes vs. one) - see that rule's own comment for why nowrap is the
-     right default everywhere else. */
-  .members-table td.members-col-name { white-space: normal; }
+     right default everywhere else.
+     Every selector in this block requires .members-list-table alongside
+     .members-table (added on the Members list's own table - see admin-
+     members.ejs/main-admin-members.ejs/partials/print-picker-table.ejs) -
+     a real bug report: "all log lists ... no longer well balanced." A
+     second real bug report, "when you click view schedule icon on member
+     rows the schedule looks very off," needed a second fix on top of
+     that: each row's Cards/Schedule preview <dialog> (admin-members.ejs's
+     own cards-dialog-<id>/schedule-dialog-<id>) is written right inside
+     that row's own <td>, so its injected content - a whole separate
+     <table class="schedule-print-table"> for the Schedule dialog - is
+     still a plain descendant of the outer .members-list-table in the DOM,
+     dialog or not. A bare "thead"/"tbody tr"/"tbody td" descendant
+     selector doesn't care how deep or through what it reaches, so it hid
+     that inner table's header and flex-card-ified its rows right along
+     with the real Members rows. Every selector below that targets
+     thead/tbody/tr/td now uses ">" (direct child) at each step so it can
+     only ever match the outer table's own thead/tbody/tr/td, never
+     anything nested inside a dialog several levels further down. */
+  .members-table.members-list-table > tbody > tr > td.members-col-name { white-space: normal; }
 
   /* A real request: "shrink font on member rows so that first and last
      name is on the same row and you can see all of the icons in the
      mobile view without sliding side to side." */
-  .members-table th, .members-table td { font-size: 0.8rem; }
+  .members-table.members-list-table > thead > tr > th,
+  .members-table.members-list-table > tbody > tr > td { font-size: 0.8rem; }
 
   /* A real bug report: even with Photo/Family/Rosters already hidden
      above, the 4 action icons (Notes/View Cards/View Schedule/Delete)
@@ -2486,11 +2505,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      first cell (the bulk-select checkbox) spending a full padded column
      on a checkbox that's HTML-hidden (not shown) until Edit mode is
      turned on, so most of the time it's pure wasted width. Tightened
-     scoped to .members-table specifically - .actions-cell/.actions-btn-
-     row/.icon-btn are shared across several other pages (Library,
-     Attendance, Schedules, ...) that aren't part of this bug report and
-     have their own room to spare. */
-  .members-table th, .members-table td { padding: 0.5rem 0.4rem; }
+     scoped to .members-table.members-list-table specifically -
+     .actions-cell/.actions-btn-row/.icon-btn are shared across several
+     other pages (Library, Attendance, Schedules, ...) that aren't part of
+     this bug report and have their own room to spare. */
+  .members-table.members-list-table > thead > tr > th,
+  .members-table.members-list-table > tbody > tr > td { padding: 0.5rem 0.4rem; }
   /* Only collapse the select column while its checkbox is actually
      hidden (public/js/archive-select-toggle.js's own hidden = !activating
      toggle) - Edit mode un-hides it, and a table cell has no other CSS
@@ -2499,11 +2519,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      column's width only when Edit mode is off (the common case) avoids
      squeezing the checkbox itself down to nothing the one time it's
      actually shown and needs to stay tappable. */
-  .members-table td.members-col-select:has(input[hidden]) { padding-left: 0; padding-right: 0; width: 0; }
-  .members-table .actions-cell { gap: 0.3rem; }
-  .members-table .actions-btn-row { gap: 0.3rem; }
-  .members-table .icon-btn { width: 1.7rem; height: 1.7rem; }
-  .members-table .icon-btn .icon { width: 0.9rem; height: 0.9rem; }
+  .members-table.members-list-table > tbody > tr > td.members-col-select:has(input[hidden]) { padding-left: 0; padding-right: 0; width: 0; }
+  .members-table.members-list-table .actions-cell { gap: 0.3rem; }
+  .members-table.members-list-table .actions-btn-row { gap: 0.3rem; }
+  .members-table.members-list-table .icon-btn { width: 1.7rem; height: 1.7rem; }
+  .members-table.members-list-table .icon-btn .icon { width: 0.9rem; height: 0.9rem; }
 
   /* A real request: "name should fit clean and together on first row,
      rosters 2nd column, action buttons in a clean line below the member
@@ -2516,9 +2536,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      information once every column but Name/Days/Actions was already
      hidden above, so it's dropped here rather than fighting a table
      header to line up over a card layout. */
-  .members-table thead { display: none; }
-  .members-table tbody { display: block; width: 100%; }
-  .members-table tbody tr {
+  .members-table.members-list-table > thead { display: none; }
+  .members-table.members-list-table > tbody { display: block; width: 100%; }
+  .members-table.members-list-table > tbody > tr {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -2526,12 +2546,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     row-gap: 0.35rem;
     border-bottom: 1px solid var(--border);
   }
-  .members-table tbody tr:last-child { border-bottom: none; }
-  .members-table tbody td { width: auto; border-bottom: none; }
-  .members-table tbody td.members-col-name { flex: 1 1 auto; min-width: 0; }
-  .members-table tbody td.members-col-days,
-  .members-table tbody td.members-col-sections { flex: 0 0 auto; }
-  .members-table tbody td.actions-cell { flex: 1 1 100%; }
+  .members-table.members-list-table > tbody > tr:last-child { border-bottom: none; }
+  .members-table.members-list-table > tbody > tr > td { width: auto; border-bottom: none; }
+  .members-table.members-list-table > tbody > tr > td.members-col-name { flex: 1 1 auto; min-width: 0; }
+  .members-table.members-list-table > tbody > tr > td.members-col-days,
+  .members-table.members-list-table > tbody > tr > td.members-col-sections { flex: 0 0 auto; }
+  .members-table.members-list-table > tbody > tr > td.actions-cell { flex: 1 1 100%; }
 }
 
 .row-inactive { opacity: 0.5; }
@@ -2562,13 +2582,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Members list family collapse (public/js/members-family-collapse.js) -
    the toggle sits inline before the head row's name link, and a collapsed
    family's other rows are simply hidden. A real bug: at mobile widths
-   (<=640px), the ".members-table tbody tr" flex-card rule above has
-   higher specificity than a bare ".family-row-collapsed" class alone (2
-   elements + 1 class beats 1 class), so it silently won the cascade and
-   forced every "collapsed" row back to visible regardless of state -
-   collapse worked at desktop widths but not mobile/narrow ones. Qualified
-   here the same way to win outright rather than relying on source order. */
-.members-table tbody tr.family-row-collapsed { display: none; }
+   (<=640px), the ".members-table.members-list-table > tbody > tr"
+   flex-card rule above has higher specificity than a bare
+   ".family-row-collapsed" class alone (3 classes beats 1), so it silently
+   won the cascade and forced every "collapsed" row back to visible
+   regardless of state - collapse worked at desktop widths but not
+   mobile/narrow ones. Qualified here the same way to win outright rather
+   than relying on source order - including the same "> tbody > tr" direct-
+   child chain (not a bare descendant combinator), so this never reaches
+   into a row's own Cards/Schedule preview dialog either, the same nested-
+   dialog trap the rest of this block was fixed for above. */
+.members-table.members-list-table > tbody > tr.family-row-collapsed { display: none; }
 .family-collapse-toggle {
   display: inline-flex;
   align-items: center;
