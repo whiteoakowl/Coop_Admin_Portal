@@ -415,19 +415,22 @@ router.post('/volunteers/:day/teams/cleanup', requireAdmin, requireDay, async (r
   res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(notice));
 });
 
+// A real request: "when adding floaters to teams it should have check
+// boxes with each hour so you can choose multiple and save." One Add now
+// places a member on every hour checked at once instead of just one.
 router.post('/volunteers/:day/teams/add-member', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const list = await getListByDay(day);
   if (!list) return res.redirect(`/admin/volunteers/${day}/teams?error=` + encodeURIComponent('Floater list not found.'));
   const memberId = parseInt(req.body.memberId, 10);
-  const sectionId = parseInt(req.body.sectionId, 10);
-  if (memberId && sectionId) {
-    await addMemberToSection(list.id, memberId, sectionId);
+  const sectionIds = [...new Set([].concat(req.body.sectionIds || []).map((id) => parseInt(id, 10)).filter(Boolean))];
+  if (memberId && sectionIds.length > 0) {
+    for (const sectionId of sectionIds) await addMemberToSection(list.id, memberId, sectionId);
     // A floater's own schedule/roster picks this hour up too - see
     // syncDayMemberRosters/syncMemberSchedulesForDay in utils/classSchedule.
     await syncDayMemberRosters(day);
   }
-  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent('Member added.'));
+  res.redirect(`/admin/volunteers/${day}/teams?notice=` + encodeURIComponent(`Member added to ${sectionIds.length} hour(s).`));
 });
 
 // Renames the shared hour label a floater team's card displays (the same

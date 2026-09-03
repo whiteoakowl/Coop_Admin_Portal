@@ -110,7 +110,7 @@ test('removing a member from a Floater Teams hour actually sticks, even though i
       .post('/admin/volunteers/monday/teams/add-member')
       .set('Cookie', cookie)
       .type('form')
-      .send({ memberId: String(parentId), sectionId: String(hour1.id), _csrf: csrfToken });
+      .send({ memberId: String(parentId), 'sectionIds[]': String(hour1.id), _csrf: csrfToken });
 
     let row = await db.prepare('SELECT 1 AS "ok" FROM volunteer_members WHERE volunteer_list_id = ? AND member_id = ? AND section_id = ?').get(list.id, parentId, hour1.id);
     assert.ok(row, 'the explicit re-add should have taken');

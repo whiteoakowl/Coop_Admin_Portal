@@ -125,6 +125,16 @@
       </div>
     </div>
 
+    <%# A real request: "when adding floaters to teams it should have
+        check boxes with each hour so you can choose multiple and save."
+        Was a single-hour <select> - one Add only ever placed a member on
+        one hour, so adding someone available for several hours meant
+        reopening this dialog once per hour. Checkboxes (same
+        .checkbox-row/.checkbox-option markup the Add/Edit Position
+        dialog's own per-hour checkboxes already use) let one Add cover
+        every hour they're available at once - routes/admin-volunteers.js's
+        own /teams/add-member now loops sectionIds[] instead of taking a
+        single sectionId. %>
     <dialog id="add-team-member-dialog" class="member-picker-dialog">
       <form method="POST" action="/admin/volunteers/<%= day %>/teams/add-member">
         <h3>Add Member to a Floater Team</h3>
@@ -136,13 +146,15 @@
             <% }); %>
           </select>
         </label>
-        <label>Hour
-          <select name="sectionId" required>
-            <% teams.forEach(function(t) { %>
-              <option value="<%= t.section.id %>"><%= t.hourLabel %></option>
-            <% }); %>
-          </select>
-        </label>
+        <label>Hour(s)</label>
+        <div class="checkbox-row">
+          <% teams.forEach(function(t) { %>
+            <label class="checkbox-option">
+              <input type="checkbox" name="sectionIds[]" value="<%= t.section.id %>" />
+              <%= t.hourLabel %>
+            </label>
+          <% }); %>
+        </div>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Add</button>
