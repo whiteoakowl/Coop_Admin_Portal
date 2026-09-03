@@ -628,6 +628,23 @@ textarea:focus-visible,
   width: 1px;
 }
 
+/* A real bug report: "setup/cleanup card scan the scanning bar on the
+   check in/out screen, and the buttons are overlapping." .task-barcode-
+   input (kiosk-checkin.ejs/kiosk-checkout.ejs's Setup/Cleanup badge scan
+   step) is the exact same "kept focused so a hardware scanner's own
+   keystrokes land here" input #barcode-input above is - the visible
+   typing UI for this step is the separate manual keypad panel, not this
+   field - but it never got the matching hidden treatment, so it rendered
+   as a plain, full-size, unstyled browser text input sitting in the
+   layout, overlapping the Cancel button below it. */
+.task-barcode-input {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+  height: 1px;
+  width: 1px;
+}
+
 /* Class Check-In's own scan page (views/kiosk-class-checkin-scan.ejs) is
    the one kiosk scan screen where the barcode input must actually be
    visible and typeable - "typing in the name manually" is one of its
