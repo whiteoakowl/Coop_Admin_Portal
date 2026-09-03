@@ -1,10 +1,11 @@
 (function () {
   // Several buttons can exist on the same page (desktop corner button +
   // mobile topbar icon, see partials/admin-nav.ejs - and kiosk-home.ejs's
-  // own "Kiosk Mode" button in its top orange bar (desktop/tablet) and
-  // bottom orange bar (mobile), alongside its small corner icon) - all of
-  // them toggle the same fullscreen state and stay in sync with each
-  // other and with whatever else changed fullscreen (e.g. Esc).
+  // own "Kiosk Mode" button, fixed bottom-right on desktop/tablet and in
+  // the bottom orange bar on mobile, alongside its small Full Screen
+  // View corner icon) - all of them toggle the same fullscreen state and
+  // stay in sync with each other and with whatever else changed
+  // fullscreen (e.g. Esc).
   const buttons = [
     document.getElementById('fullscreen-toggle-btn'),
     document.getElementById('fullscreen-toggle-btn-mobile'),

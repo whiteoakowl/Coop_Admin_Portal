@@ -934,18 +934,20 @@ textarea:focus-visible,
 }
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
-/* kiosk-home.ejs's desktop/tablet-only Class Check In & Out + Admin
-   bottom-right corner group (Full Screen View stays in its own top-right
-   corner, .landing-corner-actions, at every viewport width). Same small
-   pill shape as Find a Parent, just filled green (matching
-   .landing-card-green - color only, these aren't landing-grid tiles). */
+/* kiosk-home.ejs's desktop/tablet-only Kiosk Mode button, fixed to the
+   bottom-right corner of the screen (Full Screen View stays in its own
+   top-right corner, .landing-corner-actions, at every viewport width) -
+   a real request: "on kiosk homepage, tablet snd desktop view, the
+   kiosk button should be bottom right of the screen." Same small pill
+   shape as Find a Parent, just filled orange (matching --btn-bg, the
+   same color the mobile bottom-bar's own Kiosk Mode entry uses). */
 .landing-corner-actions-bottom-right { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
-.class-checkin-corner-btn {
+.kiosk-mode-corner-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--btn-green);
-  border: 1px solid var(--btn-green);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
   border-radius: 999px;
   padding: 0.45rem 1.1rem;
   font-size: 0.85rem;
@@ -954,7 +956,7 @@ textarea:focus-visible,
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   cursor: pointer;
 }
-.class-checkin-corner-btn:hover { background: var(--btn-green-hover); border-color: var(--btn-green-hover); }
+.kiosk-mode-corner-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 .admin-corner-link-green {
   display: inline-flex;
@@ -1016,23 +1018,12 @@ textarea:focus-visible,
 .landing-top-menu-link:hover { background: rgba(255,255,255,0.4); }
 .landing-top-menu-link .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
 
-/* Kiosk Mode: the one item in each of these two rows (top bar/bottom bar)
-   that's a real <button> instead of an <a> - a real request: "start
-   kiosk mode button should be on the top orange row of buttons on the
-   far right for desktop and tablet. and the bottom orange bar, far right
-   for mobile." Reuses .landing-top-menu-link/.landing-action-bar-btn's
-   own look so it reads as one more item in the row, not a different
-   control - just needs the browser's own default <button> border/
-   background cleared (every other item here is a plain <a>, which never
-   had one to begin with) and its divider kept on the left only.
-   .landing-top-menu-link-end's margin-left: auto is what actually pushes
-   it to the far right of that row - .landing-top-menu centers its <a>s
-   as a group, so a plain flex child would just join that centered
-   cluster instead. The mobile counterpart needs no such push: every
-   .landing-action-bar-btn already stretches evenly (flex: 1 each), so
-   being last in source order already lands it at the row's right edge. */
-#kiosk-mode-btn, #kiosk-mode-btn-mobile { background: none; border-top: none; border-right: none; border-bottom: none; }
-.landing-top-menu-link-end { margin-left: auto; }
+/* Kiosk Mode's mobile bottom-bar entry - a real <button> reusing
+   .landing-action-bar-btn's own look (every other item in that row is a
+   plain <a>, which never had a browser default border/background to
+   clear). Its desktop/tablet counterpart lives in its own fixed corner
+   spot instead - see .kiosk-mode-corner-btn below. */
+#kiosk-mode-btn-mobile { background: none; border-top: none; border-right: none; border-bottom: none; }
 
 .landing-columns { display: flex; justify-content: center; gap: 2rem; margin-top: 1rem; }
 .landing-column { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -6711,6 +6702,14 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
    "this is destructive" for an action that's actually a safe save+reset. */
 .confirm-dialog-icon.confirm-icon-safe { background: var(--orange-bg); color: var(--orange); }
 .confirm-dialog-message { margin: 0; font-size: 0.95rem; color: var(--ink); }
+/* A real bug report: "the pin number pop-ups when exiting the kiosk
+   screen the bar is overlapping with text. make sure there is space
+   between." The generic confirm popup goes straight from message to its
+   button row (margin-top below already spaces that out) - the Exit Full
+   Screen PIN dialog is the one case that inserts a text input between
+   them (see partials/fullscreen-exit-pin-dialog.ejs), with nothing
+   supplying the gap above it. */
+#fullscreen-exit-pin-input { margin-top: 1rem; }
 /* A real request: "when you click delete the pop up has buttons that
    should fit on the pop up cleanly and the button size should be
    similar and centered." flex: 0 0 auto (flex-shrink: 0) let each
