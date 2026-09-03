@@ -4,6 +4,7 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { getMemberRostersForDate } = require('../utils/rosters');
 const { findTaskItemByBarcode, findSetupCleanupBypassBadge, taskAlreadyLoggedByAnotherMember } = require('../utils/taskList');
+const { memberNeedsSetupBadgeAtCheckout } = require('../utils/setup');
 const { createRateLimiter } = require('../utils/rateLimit');
 
 // Same reasoning as routes/kiosk.js's checkinLimiter - both scan endpoints
@@ -116,6 +117,20 @@ router.post('/checkout/scan', async (req, res) => {
   if (alreadyLogged) {
     await recordCheckout(member, rosters, today, alreadyLogged.task_item_id, alreadyLogged.task_item_id_2);
     return res.json({ ok: true, memberType: 'parent-already-logged', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
+  }
+
+  // A real request: "if a member is a leader of a setup/cleanup team,
+  // they will not be asked for a setup/cleanup badge for scanning at
+  // check in or out. only members added to setup/cleanup teams will be
+  // asked for a setup/cleanup badge scan." Every parent/admin used to be
+  // asked here with no team check at all - now only an actual (non-
+  // leader) member of a 'checkout'-timing team is. Everyone else
+  // (leaders, and parents on no Setup/Cleanup team at all - e.g.
+  // floaters) finishes checkout immediately, same as a student.
+  const day = rosters.find((r) => r.schedule_day)?.schedule_day || null;
+  if (!day || !(await memberNeedsSetupBadgeAtCheckout(member.id, day))) {
+    await recordCheckout(member, rosters, today, null);
+    return res.json({ ok: true, memberType: 'parent-no-badge', name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
   }
 
   res.json({ ok: true, memberType: 'parent', memberId: member.id, name: member.name });

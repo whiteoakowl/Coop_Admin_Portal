@@ -220,7 +220,12 @@ test('a member on a "log on check out" team (or no team at all) keeps the origin
     assert.equal(checkoutRes.body.memberId, memberId);
   });
 
-  await t.test('a member on no Setup/Cleanup team at all is completely unaffected', async () => {
+  // A real request: "only members added to setup/cleanup teams will be
+  // asked for a setup/cleanup badge scan" - a parent never added to any
+  // Setup/Cleanup team never had a task badge to scan, so checkout now
+  // finishes for them immediately instead of asking (see utils/setup.js's
+  // memberNeedsSetupBadgeAtCheckout).
+  await t.test('a member on no Setup/Cleanup team at all checks out immediately, with no badge-scan step', async () => {
     const { lastInsertRowid: memberId } = await db
       .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Team Parent', 'no-team-parent-1', 'parent')")
       .run();
@@ -230,7 +235,8 @@ test('a member on a "log on check out" team (or no team at all) keeps the origin
     assert.match(checkinRes.body.message, /Thank you for checking in/);
 
     const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'no-team-parent-1' });
-    assert.equal(checkoutRes.body.memberType, 'parent');
+    assert.equal(checkoutRes.body.memberType, 'parent-no-badge');
+    assert.match(checkoutRes.body.message, /Thank you for checking out, No Team Parent! Have a great day!/);
   });
 });
 
@@ -252,4 +258,63 @@ test('a student is never asked to scan a Setup/Cleanup badge, even if somehow pl
   const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'guard-student-1' });
   assert.equal(checkoutRes.body.memberType, 'student');
   assert.match(checkoutRes.body.message, /Thank you for checking out/);
+});
+
+// A real request: "if a member is a leader of a setup/cleanup team, they
+// will not be asked for a setup/cleanup badge for scanning at check in or
+// out. only members added to setup/cleanup teams will be asked for a
+// setup/cleanup badge scan."
+test('a Setup/Cleanup team leader is exempt from the badge-scan step, at both check-in and check-out', async (t) => {
+  await t.test('leader of a "log on check in" team - never routed to the check-in task-scan step', async () => {
+    const teamId = await makeTeam('Leader Checkin Team', 'checkin');
+    const { lastInsertRowid: leaderId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Checkin Leader', 'checkin-leader-1', 'parent')")
+      .run();
+    await db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(leaderId, teamId);
+    await scheduleParentTodayOnMonday(leaderId);
+
+    const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'checkin-leader-1' });
+    assert.notEqual(checkinRes.body.memberType, 'parent-taskscan', 'a team leader should never be routed to the check-in task-scan step');
+    assert.match(checkinRes.body.message, /Thank you for checking in/);
+  });
+
+  await t.test('leader of a "log on check out" team - checkout finishes immediately, no badge-scan ask', async () => {
+    const teamId = await makeTeam('Leader Checkout Team', 'checkout');
+    const { lastInsertRowid: leaderId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Checkout Leader', 'checkout-leader-1', 'parent')")
+      .run();
+    await db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(leaderId, teamId);
+    await scheduleParentTodayOnMonday(leaderId);
+
+    const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'checkout-leader-1' });
+    assert.equal(checkoutRes.body.memberType, 'parent-no-badge');
+    assert.match(checkoutRes.body.message, /Thank you for checking out, Checkout Leader! Have a great day!/);
+  });
+
+  await t.test('a leader who is ALSO a rank-and-file member of that same "log on check in" team is still exempt', async () => {
+    const teamId = await makeTeam('Leader Plus Member Team', 'checkin');
+    const { lastInsertRowid: leaderId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Dual Role Leader', 'dual-role-leader-1', 'parent')")
+      .run();
+    await db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(leaderId, teamId);
+    await addToTeam(teamId, leaderId);
+    await scheduleParentTodayOnMonday(leaderId);
+
+    const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'dual-role-leader-1' });
+    assert.notEqual(checkinRes.body.memberType, 'parent-taskscan', 'leader status wins even when also a plain team member');
+  });
+
+  await t.test('being a leader on a DIFFERENT day does not exempt a member from their own team on today\'s day', async () => {
+    const wedTeam = (await db.prepare("INSERT INTO setup_teams (day, title, task_scan_timing) VALUES ('wednesday', 'Wednesday Only Team', 'checkout')").run()).lastInsertRowid;
+    const { lastInsertRowid: memberId } = await db
+      .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Cross Day Leader', 'cross-day-leader-1', 'parent')")
+      .run();
+    await db.prepare('UPDATE setup_teams SET leader_id = ? WHERE id = ?').run(memberId, wedTeam);
+    const mondayTeam = await makeTeam('Monday Member Team', 'checkout');
+    await addToTeam(mondayTeam, memberId);
+    await scheduleParentTodayOnMonday(memberId);
+
+    const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'cross-day-leader-1' });
+    assert.equal(checkoutRes.body.memberType, 'parent', 'a Monday team member should still be asked, even though they lead an unrelated Wednesday team');
+  });
 });

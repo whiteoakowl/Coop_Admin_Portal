@@ -188,8 +188,13 @@
       // 'parent-already-logged' - a member whose team logs at check-in
       // instead (see public/js/kiosk-checkin.js) already scanned their
       // Setup/Cleanup badge there; checkout is then a single scan just
-      // like a student's, not the two-step flow below.
-      if (data.memberType === 'student' || data.memberType === 'parent-already-logged') {
+      // like a student's, not the two-step flow below. 'parent-no-badge' -
+      // a real request: "if a member is a leader of a setup/cleanup team,
+      // they will not be asked for a setup/cleanup badge... only members
+      // added to setup/cleanup teams will be asked" - a team leader, or a
+      // parent/admin not on any Setup/Cleanup team at all, never had a
+      // badge to scan in the first place.
+      if (data.memberType === 'student' || data.memberType === 'parent-already-logged' || data.memberType === 'parent-no-badge') {
         setState('success', data.message, 'check-circle');
         setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
         return;

@@ -81,6 +81,18 @@ async function updateTeam(teamId, fields) {
   await refreshBadgesForTeam(teamId);
 }
 
+// A real request: "if a member is a leader of a setup/cleanup team, they
+// will not be asked for a setup/cleanup badge for scanning at check in or
+// out. only members added to setup/cleanup teams will be asked for a
+// setup/cleanup badge scan." Leading a team is a supervisory role, not a
+// scan-a-badge-yourself task, so a leader is exempt from the scan step
+// even on a day they're ALSO listed as a rank-and-file setup_team_members
+// row on that same team.
+async function isSetupTeamLeaderForDay(memberId, day) {
+  const row = await db.prepare('SELECT 1 FROM setup_teams WHERE leader_id = ? AND day = ? LIMIT 1').get(memberId, day);
+  return !!row;
+}
+
 // A real request: "add a dropdown menu to each setup/cleanup team list
 // that asks, log on check in or log on check out. choosing one or the
 // other will determine when a member is asked to scan their setup/
@@ -91,13 +103,38 @@ async function updateTeam(teamId, fields) {
 // any team, or only on 'checkout' team(s), keeps that original always-
 // ask-at-checkout behavior. A member on more than one team for the same
 // day (unusual, but not disallowed) only needs ONE of them set to
-// 'checkin' to be asked at check-in.
+// 'checkin' to be asked at check-in. A team leader is exempt - see
+// isSetupTeamLeaderForDay above.
 async function memberScansTaskAtCheckin(memberId, day) {
+  if (await isSetupTeamLeaderForDay(memberId, day)) return false;
   const row = await db
     .prepare(
       `SELECT 1 FROM setup_team_members stm
        JOIN setup_teams st ON st.id = stm.team_id
        WHERE stm.member_id = ? AND st.day = ? AND st.task_scan_timing = 'checkin'
+       LIMIT 1`
+    )
+    .get(memberId, day);
+  return !!row;
+}
+
+// The CHECK OUT-side mirror of memberScansTaskAtCheckin above - a real
+// bug report/request: "only members added to setup/cleanup teams will be
+// asked for a setup/cleanup badge scan." routes/checkout.js used to ask
+// EVERY parent/admin to scan a Setup/Cleanup badge at checkout with no
+// team check at all (not even "are they on a team"), unlike the check-in
+// side which already gated on setup_team_members. Same leader exemption,
+// and only ever true for a team whose task_scan_timing is 'checkout' (the
+// default) - a 'checkin' team member who somehow reaches checkout without
+// having scanned yet is still handled by routes/checkout.js's own
+// already-logged carryover, not asked again here.
+async function memberNeedsSetupBadgeAtCheckout(memberId, day) {
+  if (await isSetupTeamLeaderForDay(memberId, day)) return false;
+  const row = await db
+    .prepare(
+      `SELECT 1 FROM setup_team_members stm
+       JOIN setup_teams st ON st.id = stm.team_id
+       WHERE stm.member_id = ? AND st.day = ? AND st.task_scan_timing = 'checkout'
        LIMIT 1`
     )
     .get(memberId, day);
@@ -377,7 +414,9 @@ module.exports = {
   membersForTeam,
   setTeamLeader,
   updateTeam,
+  isSetupTeamLeaderForDay,
   memberScansTaskAtCheckin,
+  memberNeedsSetupBadgeAtCheckout,
   datesForDay,
   addSetupDates,
   removeSetupDate,
