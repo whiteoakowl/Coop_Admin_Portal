@@ -3,11 +3,18 @@
 // cleanup card can be scanned to bypass the checkout demand for a
 // setup/cleanup card. this will be available in bulk printing. this
 // card isn't linked to any specific member. its just a general bypass
-// card." Covers the seeding (db/bootstrapPg.js's seedIfMissing), the
+// card." Covers the seeding (db/bootstrapPg.js's seedIfMissing) and the
 // checkout-time fallback (routes/checkout.js's task-scan step, via
-// utils/taskList.js's findSetupCleanupBypassBadge), and that it shows up
-// in Design > Print > Setup/Cleanup Badges (routes/admin-misc-badges.js)
-// alongside every real task's own badge.
+// utils/taskList.js's findSetupCleanupBypassBadge).
+//
+// A later real request: "make bypass setup/cleanup cards it's own
+// selection for bulk printing in the dropdown menu" moved it OUT of the
+// regular Setup/Cleanup Badges checklist (routes/admin-misc-badges.js)
+// it used to sit in alongside every real task's own badge, into its own
+// dedicated "how many copies?" print panel instead - see test/routes-
+// bypass-badge-print.test.js for that panel's own coverage. The badge is
+// still fully printable by explicit id through the old general print
+// route too (test 3 below) - only its LISTING moved, not the route.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -63,13 +70,20 @@ test('a general Setup/Cleanup bypass badge is seeded automatically, with a real 
   assert.match(badge.title, /Bypass/i);
 });
 
-test('the bypass badge shows up in Design > Print > Setup/Cleanup Badges, right alongside real task badges', async () => {
+test('the bypass badge no longer shows up in the regular Setup/Cleanup Badges checklist - it has its own dedicated print panel now', async () => {
   const { cookie } = await loginAsAdmin();
   const badge = await getBypassBadge();
   const res = await request(app).get('/admin/design?tab=print').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, new RegExp(`name="badgeIds" value="${badge.id}"`));
-  assert.match(res.text, /Setup\/Cleanup Bypass Card/);
+  const sectionStart = res.text.indexOf('id="print-setupCleanupBadges-section"');
+  const sectionEnd = res.text.indexOf('id="print-bypassBadge-section"');
+  const checklistHtml = res.text.slice(sectionStart, sectionEnd);
+  assert.doesNotMatch(checklistHtml, new RegExp(`name="badgeIds" value="${badge.id}"`));
+  assert.doesNotMatch(checklistHtml, /Setup\/Cleanup Bypass Card/);
+  // Its own panel, further down the page.
+  assert.match(res.text, /id="print-bypassBadge-section"/);
+  assert.match(res.text, /Setup\/Cleanup Bypass Badges<\/h2>/);
+  assert.match(res.text, /Not tied to any specific member or task\./, 'the panel should show the bypass badge\'s own description');
 });
 
 test('printing it renders like any other Setup/Cleanup badge, with its own real barcode value', async () => {

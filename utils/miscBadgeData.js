@@ -40,6 +40,17 @@ async function getMiscBadge(id) {
   return db.prepare('SELECT * FROM misc_badges WHERE id = ?').get(id);
 }
 
+// The one 'setupCleanup' row with no task_item_id - db/bootstrapPg.js's
+// seedIfMissing own comment explains why that's a safe, unambiguous
+// marker for it. A real request: "make bypass setup/cleanup cards it's
+// own selection for bulk printing in the dropdown menu" - this is what
+// that dedicated print flow (routes/admin-misc-badges.js) looks it up
+// by, instead of it being just one row mixed into the regular Setup/
+// Cleanup Badges checklist alongside every real task's own badge.
+async function getSetupCleanupBypassBadge() {
+  return db.prepare("SELECT * FROM misc_badges WHERE badge_type = 'setupCleanup' AND task_item_id IS NULL").get();
+}
+
 // An import always defines the full deck for that badge type, so it
 // replaces whatever list was there before rather than appending to it.
 async function replaceMiscBadges(badgeType, rows) {
@@ -79,6 +90,7 @@ module.exports = {
   saveMiscTemplate,
   listMiscBadges,
   getMiscBadge,
+  getSetupCleanupBypassBadge,
   replaceMiscBadges,
   deleteMiscBadge,
   miscBadgeRowData,

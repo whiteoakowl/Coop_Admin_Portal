@@ -46,6 +46,7 @@
     barcodes: document.getElementById('print-barcodes-section'),
     barcodeLabels: document.getElementById('print-barcodeLabels-section'),
     setupCleanupBadges: document.getElementById('print-setupCleanupBadges-section'),
+    bypassBadge: document.getElementById('print-bypassBadge-section'),
     customBadges: document.getElementById('print-customBadges-section'),
     schedules: document.getElementById('print-schedules-section'),
     classCheckinQr: document.getElementById('print-classCheckinQr-section'),

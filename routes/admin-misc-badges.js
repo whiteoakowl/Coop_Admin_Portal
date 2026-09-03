@@ -5,7 +5,15 @@ const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
-const { isMiscBadgeType, getMiscTemplate, listMiscBadges, replaceMiscBadges, deleteMiscBadge, miscBadgeRowData } = require('../utils/miscBadgeData');
+const {
+  isMiscBadgeType,
+  getMiscTemplate,
+  listMiscBadges,
+  getSetupCleanupBypassBadge,
+  replaceMiscBadges,
+  deleteMiscBadge,
+  miscBadgeRowData,
+} = require('../utils/miscBadgeData');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 
 router.use(requireFullAdmin);
@@ -86,6 +94,41 @@ router.post('/design/badges/:type/import', requireMiscBadgeType, upload.single('
 router.post('/design/badges/:type/delete/:id', requireMiscBadgeType, async (req, res) => {
   await deleteMiscBadge(parseInt(req.params.id, 10));
   res.redirect(`/admin/design?tab=print&print=${req.params.type}Badges`);
+});
+
+// A real request: "make bypass setup/cleanup cards it's own selection
+// for bulk printing in the dropdown menu. it should print 8 cards to a
+// sheet. same size as the name tags and schedule cards." The bypass
+// badge (db/bootstrapPg.js's seedIfMissing) used to be just one row
+// mixed into the regular Setup/Cleanup Badges checklist below alongside
+// every real task's own badge - unlike those, an admin doesn't want to
+// pick it from a list, they want N physical copies to keep on hand at
+// checkout, so this is a quantity form instead. Registered before the
+// generic /design/badges/:type/print below - "bypass" would otherwise
+// match THAT route's own :type param (there's no real 'bypass' misc
+// badge type) and 404 via requireMiscBadgeType before ever reaching
+// this one, same "literal path before :param" rule this app's route
+// files keep re-learning. Renders the exact same admin-misc-badges-print
+// view every other misc badge already prints through - same 8-per-page
+// .badge-sheet grid, same card size, nothing new needed there.
+router.post('/design/badges/bypass/print', async (req, res) => {
+  const bypass = await getSetupCleanupBypassBadge();
+  if (!bypass) {
+    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('No Setup/Cleanup bypass badge found.'));
+  }
+  const quantity = Math.min(50, Math.max(1, parseInt(req.body.quantity, 10) || 1));
+
+  const template = await getMiscTemplate('setupCleanup');
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const html = NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(bypass));
+  const cards = Array.from({ length: quantity }, () => ({ html, bgCss }));
+
+  res.render('admin-misc-badges-print', {
+    title: 'Print Setup/Cleanup Bypass Badges',
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+  });
 });
 
 router.post('/design/badges/:type/print', requireMiscBadgeType, async (req, res) => {

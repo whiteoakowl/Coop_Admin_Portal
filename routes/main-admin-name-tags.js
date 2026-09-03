@@ -61,6 +61,7 @@ const {
   getMiscTemplate,
   saveMiscTemplate,
   listMiscBadges,
+  getSetupCleanupBypassBadge,
   replaceMiscBadges,
   deleteMiscBadge,
   miscBadgeRowData,
@@ -177,9 +178,14 @@ router.get('/', async (req, res) => {
     libraryItems: await allLibraryItems(),
     libraryTypes: await allLibraryTypes(),
     error: req.query.error || null,
-    initialPrintPanel: ['setupCleanupBadges', 'customBadges'].includes(req.query.print) ? req.query.print : null,
+    initialPrintPanel: ['setupCleanupBadges', 'customBadges', 'bypassBadge'].includes(req.query.print) ? req.query.print : null,
     notice: req.query.notice || null,
-    setupCleanupBadges: await listMiscBadges('setupCleanup'),
+    // A real request: "make bypass setup/cleanup cards it's own selection
+    // for bulk printing in the dropdown menu" - it gets its own dedicated
+    // print panel now, so it's filtered out of the regular Setup/Cleanup
+    // Badges checklist here instead of showing up twice.
+    setupCleanupBadges: (await listMiscBadges('setupCleanup')).filter((b) => b.task_item_id != null),
+    bypassBadge: await getSetupCleanupBypassBadge(),
     customBadges: await listMiscBadges('custom'),
     submissions: requestsPagination.items,
     allSubmissions,
@@ -578,6 +584,33 @@ router.post('/badges/:type/import', requireMiscBadgeType, uploadMiscImport.singl
 router.post('/badges/:type/delete/:id', requireMiscBadgeType, async (req, res) => {
   await deleteMiscBadge(parseInt(req.params.id, 10));
   res.redirect(`/main-admin/name-tags?tab=print&print=${req.params.type}Badges`);
+});
+
+// A real request: "make bypass setup/cleanup cards it's own selection
+// for bulk printing in the dropdown menu. it should print 8 cards to a
+// sheet. same size as the name tags and schedule cards." Same reasoning
+// and shape as routes/admin-misc-badges.js's own /design/badges/bypass/
+// print - registered before the generic /badges/:type/print below for
+// the same "literal path before :param" reason (there's no real
+// 'bypass' misc badge type, so requireMiscBadgeType would 404 it first).
+router.post('/badges/bypass/print', async (req, res) => {
+  const bypass = await getSetupCleanupBypassBadge();
+  if (!bypass) {
+    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('No Setup/Cleanup bypass badge found.'));
+  }
+  const quantity = Math.min(50, Math.max(1, parseInt(req.body.quantity, 10) || 1));
+
+  const template = await getMiscTemplate('setupCleanup');
+  const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const html = NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(bypass));
+  const cards = Array.from({ length: quantity }, () => ({ html, bgCss }));
+
+  res.render('main-admin-misc-badges-print', {
+    title: 'Print Setup/Cleanup Bypass Badges',
+    cards,
+    cardWidth: BADGE_WIDTH,
+    cardHeight: BADGE_HEIGHT,
+  });
 });
 
 router.post('/badges/:type/print', requireMiscBadgeType, async (req, res) => {

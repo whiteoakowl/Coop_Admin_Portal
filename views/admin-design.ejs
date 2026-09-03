@@ -238,6 +238,7 @@
             <option value="barcodes">Barcodes Only</option>
             <option value="barcodeLabels">Barcode Mailing Labels</option>
             <option value="setupCleanupBadges" <%= initialPrintPanel === 'setupCleanupBadges' ? 'selected' : '' %>>Setup/Cleanup Badges</option>
+            <option value="bypassBadge" <%= initialPrintPanel === 'bypassBadge' ? 'selected' : '' %>>Setup/Cleanup Bypass Badges</option>
             <option value="customBadges" <%= initialPrintPanel === 'customBadges' ? 'selected' : '' %>>Custom Badges</option>
             <option value="schedules">Schedules</option>
             <option value="classCheckinQr">Class Check-In QR Codes</option>
@@ -486,6 +487,38 @@
 
         <div id="print-setupCleanupBadges-section" hidden>
           <%- include('partials/misc-badge-print-panel', { type: 'setupCleanup', label: 'Setup/Cleanup', badges: setupCleanupBadges }) %>
+        </div>
+
+        <%
+        // A real request: "make bypass setup/cleanup cards it's own
+        // selection for bulk printing in the dropdown menu. it should
+        // print 8 cards to a sheet. same size as the name tags and
+        // schedule cards." Not a pick-from-a-list panel like every other
+        // one here - there's only ever one bypass badge, so this is just
+        // "how many copies do you want" (routes/admin-misc-badges.js's
+        // /design/badges/bypass/print reuses the exact same admin-misc-
+        // badges-print view/8-per-sheet grid every other misc badge
+        // already prints through, so the size/layout is already right).
+        %>
+        <div id="print-bypassBadge-section" class="manage-section" hidden>
+          <h2>Setup/Cleanup Bypass Badges</h2>
+          <% if (!bypassBadge) { %>
+            <p class="hint">No Setup/Cleanup bypass badge found.</p>
+          <% } else { %>
+            <p class="hint"><%= bypassBadge.description %></p>
+            <form method="POST" action="/admin/design/badges/bypass/print" target="_blank">
+              <label>How many copies?
+                <select name="quantity">
+                  <% for (let n = 1; n <= 50; n++) { %>
+                    <option value="<%= n %>" <%= n === 10 ? 'selected' : '' %>><%= n %></option>
+                  <% } %>
+                </select>
+              </label>
+              <div class="roster-btn-row">
+                <button type="submit" class="primary-btn">Print</button>
+              </div>
+            </form>
+          <% } %>
         </div>
 
         <div id="print-customBadges-section" hidden>

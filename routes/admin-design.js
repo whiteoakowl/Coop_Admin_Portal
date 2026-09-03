@@ -6,7 +6,7 @@ const { BADGE_WIDTH, BADGE_HEIGHT, FIELDS_BY_TYPE, SHAPE_TYPES, FONT_FAMILIES, D
 const { getTemplate } = require('../utils/nameTagData');
 const { CARD_WIDTH, CARD_HEIGHT, FIELDS, TABLE_FIELDS, SHAPE_TYPES: CARD_SHAPE_TYPES, FONT_FAMILIES: CARD_FONT_FAMILIES, DEFAULT_LAYOUT } = require('../utils/scheduleCardBadge');
 const { getScheduleCardTemplate } = require('../utils/scheduleCardData');
-const { getMiscTemplate, listMiscBadges } = require('../utils/miscBadgeData');
+const { getMiscTemplate, listMiscBadges, getSetupCleanupBypassBadge } = require('../utils/miscBadgeData');
 const { jsonScriptSafe } = require('../utils/json');
 const { membersWithDetails, byLastName, allFamilies } = require('../utils/members');
 const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -150,9 +150,15 @@ router.get('/design', async (req, res) => {
     libraryItems: await allLibraryItems(),
     libraryTypes: await allLibraryTypes(),
     error: req.query.error || null,
-    initialPrintPanel: ['setupCleanupBadges', 'customBadges'].includes(req.query.print) ? req.query.print : null,
+    initialPrintPanel: ['setupCleanupBadges', 'customBadges', 'bypassBadge'].includes(req.query.print) ? req.query.print : null,
     notice: req.query.notice || null,
-    setupCleanupBadges: await listMiscBadges('setupCleanup'),
+    // A real request: "make bypass setup/cleanup cards it's own selection
+    // for bulk printing in the dropdown menu" - it gets its own dedicated
+    // print panel now (see routes/admin-misc-badges.js's own comment), so
+    // it's filtered out of the regular Setup/Cleanup Badges checklist
+    // here instead of showing up twice.
+    setupCleanupBadges: (await listMiscBadges('setupCleanup')).filter((b) => b.task_item_id != null),
+    bypassBadge: await getSetupCleanupBypassBadge(),
     customBadges: await listMiscBadges('custom'),
     pendingNameTagRequests,
     submissions: requestsPagination.items,
