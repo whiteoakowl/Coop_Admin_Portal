@@ -5723,12 +5723,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    Name + Grade badge + the two action icons, and turns the whole card
    into a click target (public/js/roster-student-profile.js) that opens
    partials/roster-student-profile-dialog.ejs with everything else this
-   row already carries in its own data-* attributes. */
+   row already carries in its own data-* attributes.
+   A further real request: "on mobile, each student's grade level should
+   be top right corner. email and trash icons in a clean row below each
+   name." The flex-wrap layout that replaced left the grade badge and
+   action icons sharing whatever leftover space was on the name's own
+   wrapped line, which could land them side by side unpredictably - a
+   real 2-row grid instead: name and grade share row 1 (grade pinned to
+   the top-right corner), the action icons get their own full-width row
+   2 below, every card the same shape regardless of name length. */
 @media (max-width: 640px) {
-  .roster-log-row-rich { padding: 0.4rem 0.6rem; gap: 0.5rem; cursor: pointer; }
-  .roster-log-row-rich .roster-log-name { font-size: 0.9rem; flex-basis: auto; }
+  .roster-log-row-rich {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 0.35rem;
+    column-gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+  }
+  .roster-log-row-rich .roster-log-name { grid-column: 1; grid-row: 1; font-size: 0.9rem; flex-basis: auto; }
   .roster-log-row-rich .roster-log-meta { display: none; }
-  .roster-log-row-rich .roster-log-grade-badge { display: inline-block; }
+  .roster-log-row-rich .roster-log-grade-badge { display: inline-block; grid-column: 2; grid-row: 1; align-self: start; justify-self: end; }
+  .roster-log-row-rich .roster-log-row-actions { grid-column: 1 / -1; grid-row: 2; }
   .roster-log-row-rich .icon-btn { width: 1.6rem; height: 1.6rem; }
   .roster-log-row-rich:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 }
@@ -6649,6 +6665,16 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
    "this is destructive" for an action that's actually a safe save+reset. */
 .confirm-dialog-icon.confirm-icon-safe { background: var(--orange-bg); color: var(--orange); }
 .confirm-dialog-message { margin: 0; font-size: 0.95rem; color: var(--ink); }
+/* A real request: "when you click delete the pop up has buttons that
+   should fit on the pop up cleanly and the button size should be
+   similar and centered." flex: 0 0 auto (flex-shrink: 0) let each
+   button claim its own natural, text-driven width with nothing to stop
+   two differently-worded buttons ("Cancel" vs "Yes, Delete") landing at
+   different widths, or the pair overflowing the dialog's own narrow
+   min(360px, 90vw) box on a phone since neither could shrink to fit.
+   flex: 1 1 0 instead - equal grow/shrink from a zero basis - splits the
+   row evenly between them: always the same width as each other, and
+   always exactly as wide as the dialog has room for. */
 .confirm-dialog .notes-dialog-actions { justify-content: center; margin-top: 1.25rem; }
 .confirm-dialog .notes-dialog-actions .btn-secondary,
 .confirm-dialog .notes-dialog-actions .roster-action-btn-danger,
@@ -6657,7 +6683,7 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
   padding: 0.55rem 1.1rem;
   font-size: 0.9rem;
   min-width: 0;
-  flex: 0 0 auto;
+  flex: 1 1 0;
 }
 
 @page {
