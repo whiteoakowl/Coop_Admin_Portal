@@ -208,11 +208,10 @@
                     Type -> Roster Day already does. %>
                 <th class="members-col-type">Type</th>
                 <th class="members-col-sections">Sections</th>
-                <th class="members-col-parent">Family</th>
                 <th class="members-col-agegrade">Age/Grade</th>
                 <th class="members-col-contact">Contact</th>
                 <th class="permissions-col">Sections &amp; Portal Permissions</th>
-                <th>Actions</th>
+                <th class="members-actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -243,18 +242,25 @@
                     <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
                   </td>
                   <td class="members-col-type"><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
+                  <%# A real request: "take away the family name column,
+                      rosters if multiple should be stacked underneath each
+                      other in the same column" - same treatment as Co-op
+                      Admin's own Rosters column (admin-members.ejs), here
+                      applied to Sections since that's this page's own
+                      equivalent multi-badge column. %>
                   <td class="members-col-sections">
                     <% var memberSectionIds = sectionIdsByMember[m.id]; %>
                     <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
                     <% if (memberSections.length === 0) { %>
                       <span class="hint">none</span>
                     <% } else { %>
-                      <% memberSections.forEach(function(s) { %>
-                        <span class="badge-pill"><%= s.name %></span>
-                      <% }); %>
+                      <div class="members-col-rosters-stack">
+                        <% memberSections.forEach(function(s) { %>
+                          <span class="badge-pill"><%= s.name %></span>
+                        <% }); %>
+                      </div>
                     <% } %>
                   </td>
-                  <td class="members-col-parent"><%= m.familyName || '—' %></td>
                   <td class="members-col-agegrade">
                     <% if (m.member_type === 'student') { %>
                       <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
@@ -290,7 +296,11 @@
                       <% } %>
                     </details>
                   </td>
-                  <td class="actions-cell">
+                  <%# A real request: "icons at the end of the row should be
+                      visible without scrolling side to side." Pinned to the
+                      right edge of .roster-scroll's own horizontal scroll
+                      (see .members-actions-col in styles.css). %>
+                  <td class="actions-cell members-actions-col">
                     <div class="actions-btn-row">
                       <%# A real request: "there should be a mail icon on each
                           member line so that you can click and email the

@@ -132,10 +132,9 @@
             <th class="members-col-photo"><span class="sr-only">Photo</span></th>
             <th>Name</th>
             <th class="members-col-type">Type</th>
-            <th class="members-col-parent">Family</th>
             <th class="members-col-rosters">Rosters</th>
             <th class="members-col-days">Roster Day</th>
-            <th>Actions</th>
+            <th class="members-actions-col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -164,14 +163,21 @@
                 <% } %>
               </td>
               <td class="members-col-type"><span class="badge-pill"><%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span></td>
-              <td class="members-col-parent"><%= m.familyName || '—' %></td>
+              <%# A real request: "take away the family name column, rosters
+                  if multiple should be stacked underneath each other in the
+                  same column" - .members-col-rosters-stack (styles.css)
+                  swaps the pills from wrapping inline to one per line, so a
+                  member on several rosters grows the row down instead of
+                  wide, keeping this column's own width predictable. %>
               <td class="members-col-rosters">
                 <% if (m.rosters.length === 0) { %>
                   <span class="hint">none</span>
                 <% } else { %>
-                  <% m.rosters.forEach(function(r) { %>
-                    <span class="badge-pill"><%= r.name %></span>
-                  <% }); %>
+                  <div class="members-col-rosters-stack">
+                    <% m.rosters.forEach(function(r) { %>
+                      <span class="badge-pill"><%= r.name %></span>
+                    <% }); %>
+                  </div>
                 <% } %>
               </td>
               <%# Mobile-only replacement for the Type column - a real
@@ -188,7 +194,14 @@
                   <% }); %>
                 <% } %>
               </td>
-              <td class="actions-cell">
+              <%# A real request: "icons at the end of the row should be
+                  visible without scrolling side to side." Pinned to the
+                  right edge of .roster-scroll's own horizontal scroll (see
+                  .members-actions-col in styles.css) - same sticky
+                  technique .roster-name-col already uses to freeze the
+                  Name column on the left, mirrored for the row's other
+                  end. %>
+              <td class="actions-cell members-actions-col">
                 <div class="actions-btn-row">
                   <%# A real request: "there should be a mail icon on each
                       member line so that you can click and email the

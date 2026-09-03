@@ -2435,6 +2435,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .members-print-table { display: none; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; }
 
+/* A real request: "rosters if multiple should be stacked underneath each
+   other in the same column" - Co-op Admin's Rosters column and Main
+   Admin's own equivalent (Sections) both list a member's badge-pills side
+   by side by default, wrapping onto a second line once they run out of
+   row - which reads as a ragged wall of pills rather than a clean list.
+   One per line instead, so the column grows down (predictably) rather
+   than wrapping unevenly. */
+.members-col-rosters-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+
+/* A real request: "icons at the end of the row should be visible without
+   scrolling side to side." Same sticky technique .roster-name-col already
+   uses to freeze the Name column against .roster-scroll's horizontal
+   scroll (see that rule's own comment), mirrored for the row's other end
+   so the action icons are always in view regardless of how many columns
+   sit between them and the Name column. Scoped to .members-list-table
+   specifically, the same way the rest of that table's own rules are (see
+   the mobile flex-card block above) - .actions-cell itself is shared by
+   several other roster-style tables that were never part of this request
+   and shouldn't suddenly get a pinned column of their own. */
+.members-list-table .members-actions-col { position: sticky; right: 0; background: var(--surface); box-shadow: -6px 0 6px -6px rgba(15, 23, 42, 0.25); }
+.members-list-table thead .members-actions-col { background: #f8fafc; }
+.members-list-table .row-primary-parent .members-actions-col { background: var(--brand-soft); }
+
 /* Logs page (Absence/Late, Check In/Out, Name Tag Requests tabs): same
    screen/print table split as Members' .members-list-table/
    .members-print-table above - the on-screen table is paginated
