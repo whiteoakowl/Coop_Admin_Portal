@@ -62,23 +62,9 @@
     <dialog id="edit-dates-dialog" class="volunteer-edit-dialog">
       <h3>Edit Session Dates</h3>
       <div class="roster-scroll">
-        <table class="roster-table members-table condensed-table">
-          <tbody>
-            <% if (dates.length === 0) { %>
-              <tr><td class="roster-empty">No dates yet.</td></tr>
-            <% } %>
-            <% dates.forEach(function(d) { %>
-              <tr>
-                <td><%= d.label %></td>
-                <td class="actions-cell">
-                  <form method="POST" action="/admin/setup/<%= day %>/dates/<%= d.date %>/remove" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any task suggestions for it will be deleted too.">
-                    <button type="submit" class="link-btn link-btn-danger">Remove</button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div id="setup-dates-list">
+          <%- include('setup-dates-fragment', { day, dates }) %>
+        </div>
       </div>
       <form method="POST" action="/admin/setup/<%= day %>/dates/add" class="volunteer-date-add-form">
         <input type="date" name="dates" onchange="if (this.value) this.form.requestSubmit();" />
@@ -88,5 +74,6 @@
       </div>
     </dialog>
   </main>
+  <script src="/js/setup-dates.js"></script>
 </body>
 </html>

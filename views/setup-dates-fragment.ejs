@@ -1,0 +1,23 @@
+<%# The Edit Session Dates dialog's own date list (admin-setup-assignments.ejs's
+    #setup-dates-list) - a separate top-level view (not a plain include) so
+    routes/admin-setup.js's dates/add and dates/:date/remove routes can
+    res.render() this exact same markup back to public/js/setup-dates.js's
+    fetch call, instead of a full page reload closing the dialog every time.
+    See that JS file's own comment for the real request this exists for. %>
+<table class="roster-table members-table condensed-table">
+  <tbody>
+    <% if (dates.length === 0) { %>
+      <tr><td class="roster-empty">No dates yet.</td></tr>
+    <% } %>
+    <% dates.forEach(function(d) { %>
+      <tr>
+        <td><%= d.label %></td>
+        <td class="actions-cell">
+          <form method="POST" action="/admin/setup/<%= day %>/dates/<%= d.date %>/remove" class="inline-block-form setup-date-remove-form" data-confirm="Remove <%= d.label %>? Any task suggestions for it will be deleted too.">
+            <button type="submit" class="link-btn link-btn-danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>

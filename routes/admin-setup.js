@@ -239,10 +239,30 @@ router.get('/setup/:day/assignments', requireAdmin, requireDay, async (req, res)
   });
 });
 
+// A real request: "when adding dates to setup/cleanup it should stay on
+// the pop up and simply immediately update the list with the new date
+// and allow you to continue adding dates while window is still open.
+// same if clicking remove a date, the date should disappear and pop up
+// stay open for further editing and adding." Both routes now render the
+// dialog's own date list back as HTML (see setup-dates-fragment.ejs) for
+// a fetch caller (public/js/setup-dates.js) instead of redirecting - a
+// plain, non-fetch form submit (JS disabled, or any other caller) still
+// gets the original redirect, same isFetch split routes/admin-substitutes.js
+// already established for the Floater Assignments board.
+function isFetch(req) {
+  return req.get('X-Requested-With') === 'fetch';
+}
+
+async function renderDatesFragment(req, res, day) {
+  const dates = (await datesForDay(day)).map((d) => ({ date: d, label: formatDateLabel(d) }));
+  res.render('setup-dates-fragment', { day, dates });
+}
+
 router.post('/setup/:day/dates/add', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const dates = [...new Set([].concat(req.body.dates || []).map((d) => d.trim()).filter(isValidISODate))];
   await addSetupDates(day, dates);
+  if (isFetch(req)) return renderDatesFragment(req, res, day);
   res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Added ${dates.length} date(s).`));
 });
 
@@ -250,6 +270,7 @@ router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (r
   const day = req.params.day;
   const date = req.params.date;
   await removeSetupDate(day, date);
+  if (isFetch(req)) return renderDatesFragment(req, res, day);
   res.redirect(`/admin/setup/${day}/assignments?notice=` + encodeURIComponent(`Removed ${formatDateLabel(date)}.`));
 });
 
