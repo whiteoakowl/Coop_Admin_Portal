@@ -524,19 +524,37 @@ async function resolveFamilyId(f) {
 // markup with Co-op Admin's edit form (partials/member-form-fields.ejs -
 // see this file's own top comment), including utils/setup.js's own
 // allSetupTeams imported above.
+// returnTo is attacker-controllable (a query param / hidden form field),
+// so only ever redirect to it when it's a same-site path - never an
+// absolute or protocol-relative URL (open-redirect).
+function isSafeInternalPath(value) {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+}
+
+// familyId/returnTo query params: only ever sent by the "+ Add Parent or
+// Student" link on an existing member's Edit Profile page (main-admin-
+// member-edit.ejs) - see this section's header comment. Locks the form to
+// that member's own family (no picker, no risk of picking the wrong one
+// or accidentally spinning up a duplicate) and sends the admin back to
+// that same Edit Profile page instead of the Members list on success.
 router.get('/new', async (req, res) => {
+  const presetFamilyId = req.query.familyId ? parseInt(req.query.familyId, 10) : null;
+  const presetFamily = presetFamilyId ? await db.prepare('SELECT * FROM families WHERE id = ?').get(presetFamilyId) : null;
+  const returnTo = isSafeInternalPath(req.query.returnTo) ? req.query.returnTo : null;
   res.render('member-intake-form', {
-    title: 'Add Member',
+    title: presetFamily ? `Add to The ${presetFamily.name} Family` : 'Add Member',
     portal: 'main_admin',
     formAction: '/main-admin/members/new',
-    backHref: '/main-admin/members',
-    submitLabel: 'Add Member',
+    backHref: returnTo || '/main-admin/members',
+    submitLabel: presetFamily ? 'Add to Family' : 'Add Member',
     isAdmin: true,
     families: await allFamilies(),
     setupTeams: await allSetupTeams(),
     gradeLevels: GRADE_LEVELS,
     parentFields: await membershipFormFields.listFields('parent'),
     childFields: await membershipFormFields.listFields('child'),
+    presetFamily,
+    returnTo,
     error: req.query.error || null,
     notice: null,
   });
@@ -544,7 +562,17 @@ router.get('/new', async (req, res) => {
 
 router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, res) => {
   const body = req.body;
-  const back = '/main-admin/members/new';
+  const returnTo = isSafeInternalPath(body.returnTo) ? body.returnTo.trim() : null;
+  const presetFamilyId = body.presetFamilyId ? parseInt(body.presetFamilyId, 10) : null;
+
+  function backTo(error) {
+    const params = new URLSearchParams();
+    if (presetFamilyId) params.set('familyId', String(presetFamilyId));
+    if (returnTo) params.set('returnTo', returnTo);
+    if (error) params.set('error', error);
+    const qs = params.toString();
+    return '/main-admin/members/new' + (qs ? `?${qs}` : '');
+  }
 
   const address = {
     address: (body.address || '').trim() || null,
@@ -557,14 +585,14 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
     .map((p, index) => ({ ...p, index }))
     .filter((p) => p && (p.name || '').trim());
   if (parents.length === 0) {
-    return res.redirect(back + '?error=' + encodeURIComponent('At least one parent/guardian name is required.'));
+    return res.redirect(backTo('At least one parent/guardian name is required.'));
   }
 
   const children = parseArrayField(body, 'children')
     .map((c, index) => ({ ...c, index }))
     .filter((c) => c && (c.name || '').trim());
   if (children.length === 0) {
-    return res.redirect(back + '?error=' + encodeURIComponent('Please add at least one student.'));
+    return res.redirect(backTo('Please add at least one student.'));
   }
 
   const familyId = await resolveIntakeFamilyId({ familyId: body.familyId, newFamilyName: body.newFamilyName, homeschoolDuration: body.homeschoolDuration });
@@ -596,7 +624,9 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
     );
   }
 
-  res.redirect('/main-admin/members?notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
+  const dest = returnTo || '/main-admin/members';
+  const sep = dest.includes('?') ? '&' : '?';
+  res.redirect(dest + sep + 'notice=' + encodeURIComponent(`Added ${parents.length + children.length} member(s).`));
 });
 
 // A real request: "co-op admin portal and main admin portal, members...

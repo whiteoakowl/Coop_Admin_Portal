@@ -27,27 +27,53 @@
         with no standalone/single-member path at all. Add to an existing
         family's own Sections/Portal Permissions from the Members list's
         own "Edit Permissions" button instead of a separate form. %>
-    <p class="hint">Add a whole family in one submission - each parent and child still gets their own individual profile.</p>
+    <%# presetFamily/returnTo: only set by routes/main-admin-members.js's
+        GET /new when opened from an existing member's Edit Profile page
+        ("+ Add Parent or Student" - a real request: "when you click edit
+        profile button, it will allow you to add parents and students just
+        like the membership form"). The other two entry points (Co-op
+        Admin's own /admin/members/new, the public /membership form) never
+        pass these, so guard with typeof rather than requiring every
+        render() call site to pass them. %>
+    <% var presetFamily = typeof presetFamily !== 'undefined' ? presetFamily : null; %>
+    <% var returnTo = typeof returnTo !== 'undefined' ? returnTo : null; %>
+    <p class="hint">
+      <% if (presetFamily) { %>
+        Add another parent or student to The <%= presetFamily.name %> Family - each still gets their own individual profile.
+      <% } else { %>
+        Add a whole family in one submission - each parent and child still gets their own individual profile.
+      <% } %>
+    </p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form method="POST" action="<%= formAction %>" enctype="multipart/form-data" id="member-intake-form" class="stack-form member-form-page-panel">
       <%# "Add/choose family should be at the top of the form." %>
-      <div class="manage-section member-form-section-box member-form-section-green">
-        <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
-        <label class="member-form-full">Select an Existing Family
-          <select name="familyId">
-            <option value="">Choose from available families</option>
-            <% families.forEach(function(f) { %>
-              <option value="<%= f.id %>">The <%= f.name %> Family</option>
-            <% }); %>
-          </select>
-        </label>
-        <label class="member-form-full">Or Create a New Family
-          <input type="text" name="newFamilyName" placeholder="New family last name, e.g. Anderson" />
-        </label>
-      </div>
+      <% if (presetFamily) { %>
+        <div class="manage-section member-form-section-box member-form-section-green">
+          <h2><svg class="icon"><use href="#icon-users"/></svg> Family</h2>
+          <p class="hint">Adding to <strong>The <%= presetFamily.name %> Family</strong>.</p>
+          <input type="hidden" name="familyId" value="<%= presetFamily.id %>" />
+          <input type="hidden" name="presetFamilyId" value="<%= presetFamily.id %>" />
+        </div>
+      <% } else { %>
+        <div class="manage-section member-form-section-box member-form-section-green">
+          <h2><svg class="icon"><use href="#icon-users"/></svg> Choose a Family</h2>
+          <label class="member-form-full">Select an Existing Family
+            <select name="familyId">
+              <option value="">Choose from available families</option>
+              <% families.forEach(function(f) { %>
+                <option value="<%= f.id %>">The <%= f.name %> Family</option>
+              <% }); %>
+            </select>
+          </label>
+          <label class="member-form-full">Or Create a New Family
+            <input type="text" name="newFamilyName" placeholder="New family last name, e.g. Anderson" />
+          </label>
+        </div>
+      <% } %>
+      <% if (returnTo) { %><input type="hidden" name="returnTo" value="<%= returnTo %>" /><% } %>
 
       <div class="manage-section">
         <h2>Family Address</h2>

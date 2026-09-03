@@ -24,6 +24,26 @@
       >
         <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels, adminPositions, memberAdminPositionIds, allowAdminType: true }) %>
 
+        <%# A real request: "when you click on a parent, then click edit
+            profile button, it will allow you to add parents and students
+            just like the membership form when people register to be a
+            member." Reuses the exact same shared family-intake form/
+            route every other "add a member" entry point already uses
+            (see routes/main-admin-members.js's own GET/POST /new and
+            views/member-intake-form.ejs's own header comment), just
+            pre-locked to this member's own family and pointed back at
+            this same Edit Profile page when done - not a separate,
+            duplicated form. %>
+        <div class="manage-section">
+          <h2><svg class="icon"><use href="#icon-users"/></svg> Add to This Family</h2>
+          <% if (memberFamilyId) { %>
+            <p class="hint">Add another parent or student to this family - they get their own individual profile, just like the membership form.</p>
+            <a class="btn-secondary" href="/main-admin/members/new?familyId=<%= memberFamilyId %>&returnTo=<%= encodeURIComponent(`/main-admin/members/${member.id}/edit`) %>">+ Add Parent or Student</a>
+          <% } else { %>
+            <p class="hint">Choose or add a family above and save, then come back here to add more parents or students to it.</p>
+          <% } %>
+        </div>
+
         <%# A real request (Approvals tab): "you can click the name and
             view their membership form and edit, add portal settings etc.
             save." A real later request: "No creating users. All Members
