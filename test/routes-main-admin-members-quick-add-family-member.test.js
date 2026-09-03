@@ -74,14 +74,18 @@ test('a member with no family yet gets no quick-add button (nothing to add onto)
   assert.match(res.text, /Choose or add a family above and save/);
 });
 
-test('POST .../quick-add-family-member with memberType=student creates a student with birthday/grade on the same family', async () => {
+test('POST .../quick-add-family-member with memberType=student creates a student with birthday/grade on the same family, using the parent\'s own address', async () => {
   const cookie = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members/new').set('Cookie', cookie);
   const csrfToken = extractCsrf(page.text);
 
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Quick Add Student Family')").run()).lastInsertRowid;
   const parentId = (
-    await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES ('Student Family Parent', 'quick-add-student-parent', 'parent', ?, 1)").run(familyId)
+    await db
+      .prepare(
+        "INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, address, city, state, zip) VALUES ('Student Family Parent', 'quick-add-student-parent', 'parent', ?, 1, '123 Main St', 'Springfield', 'IL', '62701')"
+      )
+      .run(familyId)
   ).lastInsertRowid;
 
   const res = await request(app)
@@ -99,16 +103,24 @@ test('POST .../quick-add-family-member with memberType=student creates a student
   assert.equal(row.family_id, familyId);
   assert.equal(row.birthday, '2015-04-12');
   assert.equal(row.grade_level, '3rd');
+  assert.equal(row.address, '123 Main St');
+  assert.equal(row.city, 'Springfield');
+  assert.equal(row.state, 'IL');
+  assert.equal(row.zip, '62701');
 });
 
-test('POST .../quick-add-family-member with memberType=parent creates a non-primary parent, ignoring birthday/grade', async () => {
+test('POST .../quick-add-family-member with memberType=parent creates a non-primary parent, ignoring birthday/grade, using the same address', async () => {
   const cookie = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members/new').set('Cookie', cookie);
   const csrfToken = extractCsrf(page.text);
 
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Quick Add Parent Family')").run()).lastInsertRowid;
   const existingParentId = (
-    await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES ('Existing Primary Parent', 'quick-add-existing-parent', 'parent', ?, 1)").run(familyId)
+    await db
+      .prepare(
+        "INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent, address, city, state, zip) VALUES ('Existing Primary Parent', 'quick-add-existing-parent', 'parent', ?, 1, '456 Oak Ave', 'Riverside', 'CA', '92501')"
+      )
+      .run(familyId)
   ).lastInsertRowid;
 
   const res = await request(app)
@@ -126,6 +138,35 @@ test('POST .../quick-add-family-member with memberType=parent creates a non-prim
   assert.equal(row.is_primary_parent, 0);
   assert.equal(row.birthday, null);
   assert.equal(row.grade_level, null);
+  assert.equal(row.address, '456 Oak Ave');
+  assert.equal(row.city, 'Riverside');
+  assert.equal(row.state, 'CA');
+  assert.equal(row.zip, '92501');
+});
+
+test('POST .../quick-add-family-member on a member with a blank address still succeeds, leaving the new member\'s address blank too', async () => {
+  const cookie = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/members/new').set('Cookie', cookie);
+  const csrfToken = extractCsrf(page.text);
+
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Quick Add No Address Family')").run()).lastInsertRowid;
+  const parentId = (
+    await db
+      .prepare("INSERT INTO members (name, barcode, member_type, family_id, is_primary_parent) VALUES ('No Address Parent', 'quick-add-no-address-parent', 'parent', ?, 1)")
+      .run(familyId)
+  ).lastInsertRowid;
+
+  const res = await request(app)
+    .post(`/main-admin/members/${parentId}/quick-add-family-member`)
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ memberType: 'student', name: 'No Address Kid', _csrf: csrfToken });
+
+  assert.equal(res.status, 302);
+  const row = await db.prepare("SELECT * FROM members WHERE name = 'No Address Kid'").get();
+  assert.ok(row);
+  assert.equal(row.address, null);
+  assert.equal(row.city, null);
 });
 
 test('POST .../quick-add-family-member with no name is rejected, nothing created', async () => {

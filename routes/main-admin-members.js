@@ -721,20 +721,27 @@ router.get('/:id/edit', async (req, res) => {
 // main-admin-members.js's own /new, used to create a brand-new family) -
 // this one always adds onto the family of the member whose Edit Profile
 // page it was opened from, and only collects the few fields that form
-// actually asked for here (no address/email/phone/setup team/custom
-// fields), via utils/memberIntake.js's own createParentMember/
-// createChildMember so the new person still gets a real, individual
-// profile the exact same way every other entry point creates one.
+// actually asked for here (no email/phone/setup team/custom fields), via
+// utils/memberIntake.js's own createParentMember/createChildMember so
+// the new person still gets a real, individual profile the exact same
+// way every other entry point creates one. A later real request: "after
+// adding a new member to a family it will create a profile for that
+// member, still connected to the parent, using the same address as the
+// parent" - the new member's address/city/state/zip are copied from
+// this member (the one whose Edit Profile page the dialog was opened
+// from), same as how the full Add Member form's own single "Family
+// Address" section already applies one shared address to every parent/
+// child in that submission.
 router.post('/:id/quick-add-family-member', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const back = `/main-admin/members/${id}/edit`;
-  const member = await db.prepare('SELECT family_id FROM members WHERE id = ?').get(id);
+  const member = await db.prepare('SELECT family_id, address, city, state, zip FROM members WHERE id = ?').get(id);
   if (!member || member.family_id == null) return res.redirect(back + '?error=' + encodeURIComponent('This member has no family yet - choose or add one above and save first.'));
 
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect(back + '?error=' + encodeURIComponent('Name is required.'));
   const memberType = req.body.memberType === 'parent' ? 'parent' : 'student';
-  const address = { address: null, city: null, state: null, zip: null };
+  const address = { address: member.address, city: member.city, state: member.state, zip: member.zip };
 
   if (memberType === 'parent') {
     await createParentMember(member.family_id, address, { name, isPrimaryParent: false });
