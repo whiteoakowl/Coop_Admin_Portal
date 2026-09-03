@@ -851,6 +851,16 @@ router.post('/:id/delete', async (req, res) => {
 // the public routes/name-tag.js form writes to and Design > Print's
 // Name Tag Requests panel reads from - see routes/admin-members.js's
 // own mirror of this route for Co-op Admin's Member List.
+// A real request: "when clicking the icon on member list to send to name
+// tags request log the page should not refresh everytime." isFetch mirrors
+// routes/admin-members.js's own copy of this same helper (from routes/
+// admin-substitutes.js originally) - a fetch() caller (public/js/member-
+// name-tag-request.js) gets JSON back instead of the redirect, so the
+// click never navigates the page.
+function isFetch(req) {
+  return req.get('X-Requested-With') === 'fetch';
+}
+
 router.post('/:id/request-name-tag', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT id FROM members WHERE id = ?').get(id);
@@ -859,6 +869,7 @@ router.post('/:id/request-name-tag', async (req, res) => {
       .prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'new_tag', 'both', 'Added from Member List by admin')")
       .run(id);
   }
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/main-admin/members');
 });
 

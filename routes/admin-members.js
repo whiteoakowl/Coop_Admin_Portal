@@ -597,6 +597,16 @@ router.post('/members/:id/notes', async (req, res) => {
 // routes/name-tag.js form does, so it shows up in Design > Print's
 // Name Tag Requests queue and the Logs > Name Tag Request Log
 // (routes/admin-logs.js) exactly like a parent-submitted request would.
+// A real request: "when clicking the icon on member list to send to name
+// tags request log the page should not refresh everytime." isFetch mirrors
+// routes/admin-substitutes.js's own helper - a fetch() caller (public/js/
+// member-name-tag-request.js) gets JSON back instead of the redirect, so
+// the click never navigates the page; any other caller (no-JS, a future
+// direct link) still gets the original redirect.
+function isFetch(req) {
+  return req.get('X-Requested-With') === 'fetch';
+}
+
 router.post('/members/:id/request-name-tag', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT id FROM members WHERE id = ?').get(id);
@@ -605,6 +615,7 @@ router.post('/members/:id/request-name-tag', async (req, res) => {
       .prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'new_tag', 'both', 'Added from Member List by admin')")
       .run(id);
   }
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect('/admin/members');
 });
 

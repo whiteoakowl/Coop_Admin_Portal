@@ -326,13 +326,20 @@
                           something. when you click it a pop up will
                           appear and ask, do you want to add this name
                           tag to the request log? yes, no buttons, close
-                          windows." Same sitewide data-confirm popup
-                          (public/js/confirm-dialog.js) as everywhere
-                          else - see routes/main-admin-members.js's own
-                          mirror of Co-op Admin's request-name-tag route. %>
-                      <form method="POST" action="/main-admin/members/<%= m.id %>/request-name-tag" class="inline-block-form" data-confirm="Add this name tag to the request log?" data-confirm-safe="1" data-confirm-icon="icon-send" data-confirm-yes-label="Yes" data-confirm-cancel-label="No">
-                        <button type="submit" class="icon-btn" aria-label="Add name tag request for <%= m.name %>" title="Add to Name Tag Request Log"><svg class="icon"><use href="#icon-send"/></svg></button>
-                      </form>
+                          windows." Follow-up request: "the page should
+                          not refresh everytime" - no longer a
+                          data-confirm form; public/js/member-name-tag-
+                          request.js drives the same confirm popup via
+                          window.confirmAction and posts with fetch - see
+                          routes/main-admin-members.js's own mirror of
+                          Co-op Admin's request-name-tag route. %>
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        data-name-tag-request-url="/main-admin/members/<%= m.id %>/request-name-tag"
+                        aria-label="Add name tag request for <%= m.name %>"
+                        title="Add to Name Tag Request Log"
+                      ><svg class="icon"><use href="#icon-send"/></svg></button>
                       <%# A real request: "no edit button, clicking the
                           members name opens their profile to edit" - the
                           Name link (above) already opens the member's
@@ -508,6 +515,7 @@
     <% } %>
   </main>
   <script src="/js/permissions-edit-toggle.js"></script>
+  <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>

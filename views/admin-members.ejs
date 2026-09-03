@@ -222,15 +222,20 @@
                   <%# A real request: "add an icon that shows sending
                       something. when you click it a pop up will appear
                       and ask, do you want to add this name tag to the
-                      request log? yes, no buttons, close windows." Reuses
-                      the sitewide data-confirm popup (public/js/confirm-
-                      dialog.js) - "safe" styling since this isn't a
-                      destructive action - rather than a one-off dialog.
+                      request log? yes, no buttons, close windows." "safe"
+                      styling since this isn't a destructive action.
                       Follow-up request: "if they are already on the log,
                       it should say, this member is already on the name
                       tags request log. and the popup closes" - swaps in
-                      the same dialog's info-only mode (a single OK button,
-                      no form submitted) instead of the Add confirm. %>
+                      the sitewide dialog's info-only mode (a single OK
+                      button, no form submitted) instead of the Add
+                      confirm. Second follow-up: "the page should not
+                      refresh everytime" - no longer a data-confirm form;
+                      public/js/member-name-tag-request.js drives the same
+                      confirm popup via window.confirmAction and posts with
+                      fetch, swapping this same button into the info-only
+                      state above in place on success instead of a full
+                      page reload. %>
                   <% if (pendingNameTagMemberIds.has(m.id)) { %>
                     <button
                       type="button"
@@ -241,14 +246,13 @@
                       title="Add to Name Tag Request Log"
                     ><svg class="icon"><use href="#icon-send"/></svg></button>
                   <% } else { %>
-                    <form method="POST" action="/admin/members/<%= m.id %>/request-name-tag" class="inline-block-form" data-confirm="Add this name tag to the request log?" data-confirm-safe="1" data-confirm-icon="icon-send" data-confirm-yes-label="Yes" data-confirm-cancel-label="No">
-                      <button
-                        type="submit"
-                        class="icon-btn"
-                        aria-label="Add name tag request for <%= m.name %>"
-                        title="Add to Name Tag Request Log"
-                      ><svg class="icon"><use href="#icon-send"/></svg></button>
-                    </form>
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      data-name-tag-request-url="/admin/members/<%= m.id %>/request-name-tag"
+                      aria-label="Add name tag request for <%= m.name %>"
+                      title="Add to Name Tag Request Log"
+                    ><svg class="icon"><use href="#icon-send"/></svg></button>
                   <% } %>
                   <button
                     type="button"
@@ -351,6 +355,7 @@
   <script src="/js/badge-autofit.js"></script>
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/members-dialogs.js"></script>
+  <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-collapse.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>

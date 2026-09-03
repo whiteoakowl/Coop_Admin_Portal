@@ -44,14 +44,14 @@ test('Members list Add-to-Name-Tag-Request-Log icon', async (t) => {
 
   const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Name Tag Request Member', 'name-tag-request-member', 'parent')").run()).lastInsertRowid;
 
-  await t.test('with no pending request, the row shows the Add confirm form', async () => {
+  await t.test('with no pending request, the row shows the Add button', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, new RegExp(`<form method="POST" action="/admin/members/${memberId}/request-name-tag"[^>]*data-confirm="Add this name tag to the request log\\?"`));
+    assert.match(res.text, new RegExp(`data-name-tag-request-url="/admin/members/${memberId}/request-name-tag"`));
     assert.doesNotMatch(res.text, /data-info-message="This member is already on the name tags request log\."/);
   });
 
-  await t.test('POST request-name-tag queues an unarchived request', async () => {
+  await t.test('POST request-name-tag queues an unarchived request and redirects for a plain (non-fetch) submit', async () => {
     const page = await request(app).get('/admin/members').set('Cookie', cookie);
     const csrfToken = extractCsrf(page.text);
     const res = await request(app).post(`/admin/members/${memberId}/request-name-tag`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
@@ -64,15 +64,33 @@ test('Members list Add-to-Name-Tag-Request-Log icon', async (t) => {
   await t.test('once pending, the row shows the info-only "already on the log" button instead', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.doesNotMatch(res.text, new RegExp(`action="/admin/members/${memberId}/request-name-tag"`));
+    assert.doesNotMatch(res.text, new RegExp(`data-name-tag-request-url="/admin/members/${memberId}/request-name-tag"`));
     assert.match(res.text, /data-info-message="This member is already on the name tags request log\."/);
   });
 
-  await t.test('once the request is archived, the row goes back to showing the Add confirm form', async () => {
+  await t.test('once the request is archived, the row goes back to showing the Add button', async () => {
     await db.prepare("UPDATE name_tag_requests SET archived = 1 WHERE member_id = ?").run(memberId);
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, new RegExp(`action="/admin/members/${memberId}/request-name-tag"`));
+    assert.match(res.text, new RegExp(`data-name-tag-request-url="/admin/members/${memberId}/request-name-tag"`));
     assert.doesNotMatch(res.text, /data-info-message="This member is already on the name tags request log\."/);
+  });
+
+  await t.test('a fetch()-style POST (X-Requested-With: fetch) gets JSON back instead of a redirect, so the page never navigates', async () => {
+    const secondMemberId = (
+      await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fetch Name Tag Request Member', 'fetch-name-tag-request-member', 'parent')").run()
+    ).lastInsertRowid;
+    const page = await request(app).get('/admin/members').set('Cookie', cookie);
+    const csrfToken = extractCsrf(page.text);
+    const res = await request(app)
+      .post(`/admin/members/${secondMemberId}/request-name-tag`)
+      .set('Cookie', cookie)
+      .set('X-Requested-With', 'fetch')
+      .set('X-CSRF-Token', csrfToken)
+      .send();
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { ok: true });
+    const row = await db.prepare("SELECT archived FROM name_tag_requests WHERE member_id = ? AND request_type = 'new_tag'").get(secondMemberId);
+    assert.ok(row);
   });
 });
