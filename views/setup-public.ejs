@@ -11,6 +11,16 @@
     <h1><%= dayLabel %> Setup/Cleanup Teams</h1>
   </div>
 
+  <%# A real request: "add message to setup/cleanup team view, kiosk view
+      page. Please meet with your setup/team leader in the designated
+      location to pickup your setup/cleanup task badge." Shown above every
+      team's own card, not per-team, since it applies to whichever team a
+      member is on. %>
+  <div class="setup-badge-reminder">
+    <svg class="icon"><use href="#icon-badge"/></svg>
+    <span>Please meet with your setup/team leader in the designated location to pickup your setup/cleanup task badge.</span>
+  </div>
+
   <% if (teams.length === 0) { %>
     <div class="kiosk-wrap">
       <div class="kiosk-panel kiosk-panel-muted">

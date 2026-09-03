@@ -5050,6 +5050,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: left;
 }
 
+/* A real request: "add message to setup/cleanup team view, kiosk view
+   page. Please meet with your setup/team leader in the designated
+   location to pickup your setup/cleanup task badge." Sits above the team
+   cards (views/setup-public.ejs), same max-width as .kiosk-team-card-grid
+   so it lines up with the grid below it. */
+.setup-badge-reminder {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 1500px;
+  background: var(--orange-bg);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: left;
+}
+.setup-badge-reminder .icon { width: 1.6em; height: 1.6em; flex-shrink: 0; color: var(--btn-bg); }
+@media (max-width: 640px) {
+  .setup-badge-reminder { font-size: 1rem; padding: 0.85rem 1rem; }
+}
+
 /* ---------- Member notes dialog ---------- */
 
 .icon-btn {
