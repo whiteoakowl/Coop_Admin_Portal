@@ -95,4 +95,23 @@ test('GET /setup/:day', async (t) => {
     assert.doesNotMatch(res.text, /No suggestion/);
     assert.doesNotMatch(res.text, /class="floater-card-meta"/);
   });
+
+  // A real request: "should show the next upcoming date like floater
+  // assignments do" - same closestUpcomingDate behavior
+  // routes/volunteers.js already verifies for its own public kiosk view.
+  await t.test('a real request: shows the next upcoming setup date as a subheading', async () => {
+    const noDateRes = await request(app).get('/setup/wednesday');
+    assert.equal(noDateRes.status, 200);
+    assert.doesNotMatch(noDateRes.text, /kiosk-subhead/);
+
+    // Any date strictly after today - real value doesn't matter, only
+    // that it's in the future.
+    const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db.prepare("INSERT INTO setup_dates (day, session_date) VALUES ('wednesday', ?)").run(future);
+
+    const { formatDateLabel } = require('../utils/dates');
+    const res = await request(app).get('/setup/wednesday');
+    assert.equal(res.status, 200);
+    assert.match(res.text, new RegExp(`kiosk-subhead">${formatDateLabel(future)}<`));
+  });
 });

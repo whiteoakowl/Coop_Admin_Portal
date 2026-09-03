@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { isValidDay, DAY_LABELS, defaultDateFor } = require('../utils/days');
+const { closestUpcomingDate, formatDateLabel } = require('../utils/dates');
 const { absentMemberIdsForDate } = require('../utils/classSchedule');
-const { teamsForDay, membersForTeam } = require('../utils/setup');
+const { teamsForDay, membersForTeam, datesForDay } = require('../utils/setup');
 
 // A real request: the kiosk homepage's Setup/Cleanup button used to jump
 // straight to a single auto-picked day - now it shows Monday/Wednesday
@@ -25,10 +26,17 @@ router.get('/setup/:day', async (req, res) => {
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
 
   const teams = await Promise.all((await teamsForDay(day)).map(async (t) => ({ ...t, members: await membersForTeam(t.id) })));
+  // A real request: "should show the next upcoming date like floater
+  // assignments do" - same closestUpcomingDate/formatDateLabel pairing
+  // routes/volunteers.js already uses for its own public kiosk view, just
+  // shown as a subheading here since teams (unlike the floater chart)
+  // aren't themselves date-scoped.
+  const date = closestUpcomingDate(await datesForDay(day));
 
   res.render('setup-public', {
     title: `${DAY_LABELS[day]} Setup/Cleanup Teams`,
     dayLabel: DAY_LABELS[day],
+    dateLabel: date ? formatDateLabel(date) : null,
     teams,
     // Same "only means anything on today's own day" reasoning as the
     // admin manage page (routes/admin-setup.js) - kiosk-home always links
