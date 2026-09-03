@@ -350,6 +350,16 @@
                         <form method="POST" action="/main-admin/members/<%= m.id %>/archive" class="inline-block-form">
                           <button type="submit" class="icon-btn" aria-label="Archive <%= m.name %>" title="Archive"><svg class="icon"><use href="#icon-archive"/></svg></button>
                         </form>
+                        <%# A real request: "the trash can button is missing
+                            from next to each member. co-op admin portal has
+                            the correct symbols for each member." Restores
+                            the same per-row Delete icon Co-op Admin's own
+                            Members list (views/admin-members.ejs) always
+                            shows, alongside (not instead of) Archive above -
+                            deleting no longer requires archiving first. %>
+                        <form method="POST" action="/main-admin/members/<%= m.id %>/delete" class="inline-block-form" data-confirm="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone.">
+                          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= m.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                        </form>
                       <% } %>
                     </div>
                   </td>

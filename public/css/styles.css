@@ -2561,8 +2561,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* Members list family collapse (public/js/members-family-collapse.js) -
    the toggle sits inline before the head row's name link, and a collapsed
-   family's other rows are simply hidden. */
-.family-row-collapsed { display: none; }
+   family's other rows are simply hidden. A real bug: at mobile widths
+   (<=640px), the ".members-table tbody tr" flex-card rule above has
+   higher specificity than a bare ".family-row-collapsed" class alone (2
+   elements + 1 class beats 1 class), so it silently won the cascade and
+   forced every "collapsed" row back to visible regardless of state -
+   collapse worked at desktop widths but not mobile/narrow ones. Qualified
+   here the same way to win outright rather than relying on source order. */
+.members-table tbody tr.family-row-collapsed { display: none; }
 .family-collapse-toggle {
   display: inline-flex;
   align-items: center;
