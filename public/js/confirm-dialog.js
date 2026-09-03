@@ -43,6 +43,7 @@
     yesBtn.textContent = options.yesLabel || 'Yes, Delete';
     yesBtn.classList.toggle('primary-btn', !!options.safe);
     yesBtn.classList.toggle('roster-action-btn-danger', !options.safe);
+    cancelBtn.textContent = options.cancelLabel || 'Cancel';
     if (!dialog.open) dialog.showModal();
   }
 
@@ -57,6 +58,7 @@
       icon: form.dataset.confirmIcon,
       safe: form.dataset.confirmSafe,
       yesLabel: form.dataset.confirmYesLabel,
+      cancelLabel: form.dataset.confirmCancelLabel,
     });
   });
 

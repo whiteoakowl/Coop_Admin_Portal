@@ -2475,6 +2475,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .members-table .actions-btn-row { gap: 0.3rem; }
   .members-table .icon-btn { width: 1.7rem; height: 1.7rem; }
   .members-table .icon-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+  /* A real request: "name should fit clean and together on first row,
+     rosters 2nd column, action buttons in a clean line below the member
+     name." Turns each row into a flex card instead of a plain table row
+     - same <tr>-to-flex-card conversion the Floater Assignments chart's
+     own mobile view already uses (see that rule's own comment) - so Name
+     and the roster-day/section pills share one line, and the action
+     icons (previously squeezed onto that same crowded line) always get
+     a full line to themselves below. The header row carried no extra
+     information once every column but Name/Days/Actions was already
+     hidden above, so it's dropped here rather than fighting a table
+     header to line up over a card layout. */
+  .members-table thead { display: none; }
+  .members-table tbody { display: block; width: 100%; }
+  .members-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.35rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .members-table tbody tr:last-child { border-bottom: none; }
+  .members-table tbody td { width: auto; border-bottom: none; }
+  .members-table tbody td.members-col-name { flex: 1 1 auto; min-width: 0; }
+  .members-table tbody td.members-col-days,
+  .members-table tbody td.members-col-sections { flex: 0 0 auto; }
+  .members-table tbody td.actions-cell { flex: 1 1 100%; }
 }
 
 .row-inactive { opacity: 0.5; }

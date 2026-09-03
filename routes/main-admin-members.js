@@ -804,6 +804,23 @@ router.post('/:id/delete', async (req, res) => {
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(member ? `Deleted "${member.name}".` : 'Member deleted.'));
 });
 
+// A real request: "add an icon that shows sending something. when you
+// click it a pop up will appear and ask, do you want to add this name
+// tag to the request log? yes, no buttons, close windows." Same queue
+// the public routes/name-tag.js form writes to and Design > Print's
+// Name Tag Requests panel reads from - see routes/admin-members.js's
+// own mirror of this route for Co-op Admin's Member List.
+router.post('/:id/request-name-tag', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT id FROM members WHERE id = ?').get(id);
+  if (member) {
+    await db
+      .prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'new_tag', 'both', 'Added from Member List by admin')")
+      .run(id);
+  }
+  res.redirect('/main-admin/members');
+});
+
 router.post('/:id/archive', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.prepare('UPDATE members SET active = 0 WHERE id = ?').run(id);

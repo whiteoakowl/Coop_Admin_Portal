@@ -581,6 +581,24 @@ router.post('/members/:id/notes', async (req, res) => {
   res.redirect('/admin/members');
 });
 
+// A real request: "add an icon that shows sending something. when you
+// click it a pop up will appear and ask, do you want to add this name
+// tag to the request log? yes, no buttons, close windows." Queues a
+// New Name Tag request for this member the same way the public
+// routes/name-tag.js form does, so it shows up in Design > Print's
+// Name Tag Requests queue and the Logs > Name Tag Request Log
+// (routes/admin-logs.js) exactly like a parent-submitted request would.
+router.post('/members/:id/request-name-tag', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const member = await db.prepare('SELECT id FROM members WHERE id = ?').get(id);
+  if (member) {
+    await db
+      .prepare("INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, 'new_tag', 'both', 'Added from Member List by admin')")
+      .run(id);
+  }
+  res.redirect('/admin/members');
+});
+
 const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'sideBySide', 'frontBack'];
 
 // Member profile "Cards" dialog: prints exactly the layout the admin chose
