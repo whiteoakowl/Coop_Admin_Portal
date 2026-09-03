@@ -434,12 +434,6 @@ textarea:focus-visible,
 
 .document-view-frame { width: 100%; height: 100%; border: none; }
 
-/* Bottom-right at desktop/tablet widths, out of the way of the full-width
-   .landing-top-menu bar now spanning the top of the screen - moved back to
-   its original top-right spot in the mobile query below, where there's no
-   top bar to avoid and the bottom is already claimed by .landing-action-bar. */
-.landing-corner-actions { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
-
 .admin-corner-link {
   display: inline-flex;
   align-items: center;
@@ -885,16 +879,7 @@ textarea:focus-visible,
      media-scoped rule and keep the desktop layout visible on mobile. */
   .landing-desktop-only { display: none !important; }
   .landing-has-action-bar { padding-bottom: 5.5rem; }
-  /* .landing-top-menu is hidden here (it's .landing-desktop-only), so
-     there's no fixed bar left to clear, and .landing-corner-actions moves
-     back to its original top-right spot - the bottom is already claimed by
-     .landing-action-bar's own fixed bottom bar. */
   .landing-wrap { padding-top: 0; }
-  .landing-corner-actions { top: 1rem; bottom: auto; }
-  /* Icon-only on mobile - with its text label, this button sits close
-     enough to the centered round logo below it to visually overlap. */
-  .landing-corner-actions #fullscreen-toggle-btn { gap: 0; padding: 0.5rem; }
-  .landing-corner-actions #fullscreen-toggle-label { display: none; }
   .landing-action-bar {
     display: flex;
     position: fixed;

@@ -83,10 +83,16 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
     assert.match(groupMatch[1], /<a class="landing-card landing-card-purple" href="\/setup">/);
   });
 
-  await t.test('Full Screen View is unaffected, still in its own top-right corner group at every viewport width', () => {
-    const topGroupMatch = /<div class="landing-corner-actions">([\s\S]*?)<\/div>/.exec(res.text);
-    assert.ok(topGroupMatch);
-    assert.match(topGroupMatch[1], /id="fullscreen-toggle-btn"/);
+  // A real request: "remove full screen button on all kiosk pages now
+  // that we have the kiosk button." The small standalone Full Screen
+  // View corner icon this page used to also show is gone - the Kiosk
+  // Mode button (#kiosk-mode-btn / #kiosk-mode-btn-mobile) below is the
+  // only fullscreen entry point on the kiosk home page now.
+  await t.test('the old standalone Full Screen View corner button is gone - Kiosk Mode is the only fullscreen entry point', () => {
+    assert.doesNotMatch(res.text, /class="landing-corner-actions"/);
+    assert.doesNotMatch(res.text, /id="fullscreen-toggle-btn"/);
+    assert.match(res.text, /id="kiosk-mode-btn"/);
+    assert.match(res.text, /id="kiosk-mode-btn-mobile"/);
   });
 
   await t.test('the new owl crest logo is used, not the old logo file', () => {

@@ -24,29 +24,27 @@
     <a class="landing-top-menu-link" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Class Check In &amp; Out</a>
     <a class="landing-top-menu-link" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg> Admin</a>
   </nav>
-  <div class="landing-corner-actions">
-    <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn">
-      <svg class="icon"><use href="#icon-maximize"/></svg>
-      <span id="fullscreen-toggle-label" class="fullscreen-toggle-label">Full Screen View</span>
-    </button>
-  </div>
   <%# A real request: "we need to make the kiosk page have an actual
       kiosk button that locks the screen in full screen mode so members
       can't click in the browser. once activated it should stay in kiosk
       mode/full screen through all kiosk pages," refined by a follow-up:
       "on kiosk homepage, tablet snd desktop view, the kiosk button
-      should be bottom right of the screen." Reuses the fixed bottom-
+      should be bottom right of the screen," and later: "remove full
+      screen button on all kiosk pages now that we have the kiosk
+      button." The small standalone "Full Screen View" corner icon
+      (.landing-corner-actions, #fullscreen-toggle-btn) this page used to
+      also show is gone - this Kiosk Mode button is the only fullscreen
+      entry point on the kiosk surface now. Reuses the fixed bottom-
       right corner spot (.landing-corner-actions-bottom-right) an earlier
       kiosk-home design already used for this exact purpose before the
       Class Check In & Out/Admin links moved into .landing-top-menu/
       .landing-action-bar above - desktop/tablet only, since mobile
       already has its own Kiosk Mode entry in the bottom orange action
-      bar below. public/js/fullscreen-toggle.js keeps this button, that
-      mobile one, and the small Full Screen View corner icon all in sync
-      with each other and with real fullscreen state; public/js/
-      fullscreen-nav.js (loaded on every kiosk page) is what actually
-      keeps fullscreen alive across a real page navigation once
-      activated. %>
+      bar below. public/js/fullscreen-toggle.js keeps this button and
+      that mobile one in sync with each other and with real fullscreen
+      state; public/js/fullscreen-nav.js (loaded on every kiosk page) is
+      what actually keeps fullscreen alive across a real page navigation
+      once activated. %>
   <div class="landing-corner-actions-bottom-right landing-desktop-only">
     <button type="button" class="kiosk-mode-corner-btn" id="kiosk-mode-btn" data-label-off="Start Kiosk Mode" data-label-on="Exit Kiosk Mode">
       <svg class="icon"><use href="#icon-maximize"/></svg>
