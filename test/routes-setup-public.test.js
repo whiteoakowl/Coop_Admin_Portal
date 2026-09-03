@@ -52,15 +52,16 @@ test('GET /setup/:day', async (t) => {
     assert.match(res.text, /No teams set up yet\./);
   });
 
-  // A real request: "add message to setup/cleanup team view, kiosk view
-  // page. Please meet with your setup/team leader in the designated
-  // location to pickup your setup/cleanup task badge." Shown regardless
-  // of whether any teams exist yet, since it's a standing instruction for
-  // whoever's viewing the page, not tied to a specific team's own data.
+  // A real request: "message on kiosk view setup/cleanup team page. the
+  // message should read, Please meet with your team leader in the
+  // designated location to pickup your setup/cleanup task badge." Shown
+  // regardless of whether any teams exist yet, since it's a standing
+  // instruction for whoever's viewing the page, not tied to a specific
+  // team's own data.
   await t.test('the badge-pickup reminder is shown above the team cards', async () => {
     const res = await request(app).get('/setup/monday');
     assert.equal(res.status, 200);
-    assert.match(res.text, /Please meet with your setup\/team leader in the designated location to pickup your setup\/cleanup task badge\./);
+    assert.match(res.text, /Please meet with your team leader in the designated location to pickup your setup\/cleanup task badge\./);
   });
 
   await t.test('a day with teams shows each team, its leader/description, and its members - no per-date assignment detail', async () => {
@@ -78,7 +79,7 @@ test('GET /setup/:day', async (t) => {
     assert.doesNotMatch(res.text, /No teams set up yet\./);
     assert.match(res.text, /Kitchen Crew/);
     assert.match(res.text, /Jane Smith/);
-    assert.match(res.text, /Please meet with your setup\/team leader in the designated location to pickup your setup\/cleanup task badge\./);
+    assert.match(res.text, /Please meet with your team leader in the designated location to pickup your setup\/cleanup task badge\./);
 
     // A real request: "the leader, time, location, all those details
     // should show on the kiosk side when you click the setup/cleanup

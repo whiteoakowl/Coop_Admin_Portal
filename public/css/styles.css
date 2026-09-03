@@ -5050,11 +5050,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   text-align: left;
 }
 
-/* A real request: "add message to setup/cleanup team view, kiosk view
-   page. Please meet with your setup/team leader in the designated
-   location to pickup your setup/cleanup task badge." Sits above the team
-   cards (views/setup-public.ejs), same max-width as .kiosk-team-card-grid
-   so it lines up with the grid below it. */
+/* A real request: "message on kiosk view setup/cleanup team page. the
+   message should read, Please meet with your team leader in the
+   designated location to pickup your setup/cleanup task badge." Sits
+   above the team cards (views/setup-public.ejs), same max-width as
+   .kiosk-team-card-grid so it lines up with the grid below it. */
 .setup-badge-reminder {
   display: flex;
   align-items: center;
