@@ -5326,7 +5326,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-form-dialog-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
 .import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
 .member-picker-dialog input[type="file"],
-.member-picker-dialog input[type="text"] {
+.member-picker-dialog input[type="text"],
+.member-picker-dialog input[type="date"] {
   width: 100%;
   margin-bottom: 0.5rem;
 }

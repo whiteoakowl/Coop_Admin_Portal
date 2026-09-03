@@ -12,6 +12,7 @@
     <p class="subtitle"><a href="/main-admin/members">&larr; Members</a></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <div class="member-form-page-panel">
       <form
@@ -24,21 +25,20 @@
       >
         <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels, adminPositions, memberAdminPositionIds, allowAdminType: true }) %>
 
-        <%# A real request: "when you click on a parent, then click edit
-            profile button, it will allow you to add parents and students
-            just like the membership form when people register to be a
-            member." Reuses the exact same shared family-intake form/
-            route every other "add a member" entry point already uses
-            (see routes/main-admin-members.js's own GET/POST /new and
-            views/member-intake-form.ejs's own header comment), just
-            pre-locked to this member's own family and pointed back at
-            this same Edit Profile page when done - not a separate,
-            duplicated form. %>
+        <%# A real request: "when editing a member profile, there is a
+            button that says add parent/student. when you click this
+            button it will ask student or parent, name, if student then
+            it asks birthday and grade. save." A quick-add dialog (see
+            data-quick-add-member-dialog below, outside #member-form for
+            the same reason the Add Family dialog is) that always adds
+            onto this member's own family - each new person still gets
+            their own individual profile via utils/memberIntake.js, just
+            like the full Add Member form does. %>
         <div class="manage-section">
           <h2><svg class="icon"><use href="#icon-users"/></svg> Add to This Family</h2>
           <% if (memberFamilyId) { %>
-            <p class="hint">Add another parent or student to this family - they get their own individual profile, just like the membership form.</p>
-            <a class="btn-secondary" href="/main-admin/members/new?familyId=<%= memberFamilyId %>&returnTo=<%= encodeURIComponent(`/main-admin/members/${member.id}/edit`) %>">+ Add Parent or Student</a>
+            <p class="hint">Add another parent or student to this family - they get their own individual profile.</p>
+            <button type="button" class="btn-secondary" data-quick-add-member-open>+ Add Parent/Student</button>
           <% } else { %>
             <p class="hint">Choose or add a family above and save, then come back here to add more parents or students to it.</p>
           <% } %>
@@ -116,6 +116,47 @@
           <div class="notes-dialog-actions">
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
             <button type="submit" class="primary-btn">Add Family</button>
+          </div>
+        </form>
+      </dialog>
+
+      <%# "add parent/student ... it will ask student or parent, name, if
+          student then it asks birthday and grade. save." A plain form
+          POST (no fetch) to routes/main-admin-members.js's own
+          /:id/quick-add-family-member - simplest way to show the result
+          (a fresh page load re-rendering this same Edit Profile page with
+          a success/error banner), consistent with how every other action
+          on this page already reports back. %>
+      <dialog class="member-picker-dialog" data-quick-add-member-dialog>
+        <form method="POST" action="/main-admin/members/<%= member.id %>/quick-add-family-member" data-quick-add-member-form>
+          <h3>Add Parent/Student</h3>
+          <div class="member-type-toggle" role="group" aria-label="Member type">
+            <label class="member-type-toggle-btn member-type-toggle-student">
+              <input type="radio" name="memberType" value="student" checked data-quick-add-type />
+              <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
+            </label>
+            <label class="member-type-toggle-btn member-type-toggle-parent">
+              <input type="radio" name="memberType" value="parent" data-quick-add-type />
+              <svg class="icon"><use href="#icon-user"/></svg> Parent
+            </label>
+          </div>
+          <label>Name
+            <input type="text" name="name" placeholder="Full name" required />
+          </label>
+          <div data-quick-add-student-fields>
+            <label>Birthday
+              <input type="date" name="birthday" />
+            </label>
+            <label>Grade Level
+              <select name="gradeLevel">
+                <option value="">Select grade level</option>
+                <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+              </select>
+            </label>
+          </div>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
           </div>
         </form>
       </dialog>

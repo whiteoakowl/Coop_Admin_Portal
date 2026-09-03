@@ -103,6 +103,34 @@ function initAddFamilyDialog(form) {
   });
 }
 
+// "add parent/student ... it will ask student or parent, name, if
+// student then it asks birthday and grade. save." Opens the quick-add
+// dialog (main-admin-member-edit.ejs, outside #member-form for the same
+// reason initAddFamilyDialog's own dialog is) and toggles its
+// Birthday/Grade Level fields on or off with the Student/Parent choice -
+// a real submit (no fetch) since there's nothing on this page to patch
+// in place, just a plain page reload showing the result.
+function initQuickAddMemberDialog(form) {
+  const openBtn = form.querySelector('[data-quick-add-member-open]');
+  const dialog = document.querySelector('[data-quick-add-member-dialog]');
+  if (!openBtn || !dialog) return;
+  const addForm = dialog.querySelector('[data-quick-add-member-form]');
+  const studentFields = dialog.querySelector('[data-quick-add-student-fields]');
+
+  function updateForType() {
+    const checked = dialog.querySelector('[data-quick-add-type]:checked');
+    const isStudent = !checked || checked.value === 'student';
+    if (studentFields) studentFields.style.display = isStudent ? '' : 'none';
+  }
+
+  openBtn.addEventListener('click', () => {
+    addForm.reset();
+    updateForType();
+    dialog.showModal();
+  });
+  dialog.querySelectorAll('[data-quick-add-type]').forEach((r) => r.addEventListener('change', updateForType));
+}
+
 // The Setup/Cleanup Team "Add a Team" dropdown (and, the same shape, the
 // Admin Positions "Add a Position" dropdown - a real request: "ability to
 // add unlimited admin positions to a member profile") is a quick-pick
@@ -135,6 +163,7 @@ function initPickerChecklist(form, pickerSelector, checklistSelector) {
 
 function initMemberFormInteractions(form) {
   initAddFamilyDialog(form);
+  initQuickAddMemberDialog(form);
   initPickerChecklist(form, '[data-team-picker]', '[data-team-checklist]');
   initPickerChecklist(form, '[data-position-picker]', '[data-position-checklist]');
 }
