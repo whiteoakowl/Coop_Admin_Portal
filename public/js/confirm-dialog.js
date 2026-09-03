@@ -25,6 +25,12 @@
 // page navigation closing the dialog out from under the admin mid-cleanup.
 // Returns a Promise<boolean> (true = confirmed) instead of re-submitting
 // anything itself - the caller decides what "confirmed" actually does.
+//
+// A third mode, for any <button data-info-message="..."> (e.g. the
+// Members list's "already on the name tags request log" icon - see
+// views/admin-members.ejs), shows the same dialog with a single OK
+// button and no Cancel - purely informational, nothing to submit or
+// resolve.
 (function () {
   const dialog = document.getElementById('confirm-dialog');
   if (!dialog) return;
@@ -44,6 +50,7 @@
     yesBtn.classList.toggle('primary-btn', !!options.safe);
     yesBtn.classList.toggle('roster-action-btn-danger', !options.safe);
     cancelBtn.textContent = options.cancelLabel || 'Cancel';
+    cancelBtn.hidden = !!options.infoOnly;
     if (!dialog.open) dialog.showModal();
   }
 
@@ -59,6 +66,20 @@
       safe: form.dataset.confirmSafe,
       yesLabel: form.dataset.confirmYesLabel,
       cancelLabel: form.dataset.confirmCancelLabel,
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-info-message]');
+    if (!trigger) return;
+    pendingForm = null;
+    pendingResolve = null;
+    open({
+      message: trigger.dataset.infoMessage,
+      icon: trigger.dataset.infoIcon,
+      safe: true,
+      yesLabel: trigger.dataset.infoOkLabel || 'OK',
+      infoOnly: true,
     });
   });
 

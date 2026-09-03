@@ -123,6 +123,14 @@ router.get('/members', async (req, res) => {
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
   const pagination = paginate(withRosters, parsePage(req.query.page), pageSize);
 
+  // A real request: "if they are already on the log, it should say, this
+  // member is already on the name tags request log. and the popup
+  // closes." "On the log" means an active (unarchived) name_tag_requests
+  // row already exists for that member - see the request-name-tag route
+  // below, and routes/admin-design.js's own archived=0 "still needs
+  // printing" queue query.
+  const pendingNameTagMemberIds = new Set((await db.prepare('SELECT DISTINCT member_id FROM name_tag_requests WHERE archived = 0').all()).map((r) => r.member_id));
+
   res.render('admin-members', {
     title: 'Members',
     members: pagination.items,
@@ -142,6 +150,7 @@ router.get('/members', async (req, res) => {
     families: await allFamilies(),
     error: req.query.error || null,
     notice: req.query.notice || null,
+    pendingNameTagMemberIds,
   });
 });
 

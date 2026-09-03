@@ -212,15 +212,31 @@
                       request log? yes, no buttons, close windows." Reuses
                       the sitewide data-confirm popup (public/js/confirm-
                       dialog.js) - "safe" styling since this isn't a
-                      destructive action - rather than a one-off dialog. %>
-                  <form method="POST" action="/admin/members/<%= m.id %>/request-name-tag" class="inline-block-form" data-confirm="Add this name tag to the request log?" data-confirm-safe="1" data-confirm-icon="icon-send" data-confirm-yes-label="Yes" data-confirm-cancel-label="No">
+                      destructive action - rather than a one-off dialog.
+                      Follow-up request: "if they are already on the log,
+                      it should say, this member is already on the name
+                      tags request log. and the popup closes" - swaps in
+                      the same dialog's info-only mode (a single OK button,
+                      no form submitted) instead of the Add confirm. %>
+                  <% if (pendingNameTagMemberIds.has(m.id)) { %>
                     <button
-                      type="submit"
+                      type="button"
                       class="icon-btn"
+                      data-info-message="This member is already on the name tags request log."
+                      data-info-icon="icon-send"
                       aria-label="Add name tag request for <%= m.name %>"
                       title="Add to Name Tag Request Log"
                     ><svg class="icon"><use href="#icon-send"/></svg></button>
-                  </form>
+                  <% } else { %>
+                    <form method="POST" action="/admin/members/<%= m.id %>/request-name-tag" class="inline-block-form" data-confirm="Add this name tag to the request log?" data-confirm-safe="1" data-confirm-icon="icon-send" data-confirm-yes-label="Yes" data-confirm-cancel-label="No">
+                      <button
+                        type="submit"
+                        class="icon-btn"
+                        aria-label="Add name tag request for <%= m.name %>"
+                        title="Add to Name Tag Request Log"
+                      ><svg class="icon"><use href="#icon-send"/></svg></button>
+                    </form>
+                  <% } %>
                   <button
                     type="button"
                     class="icon-btn"
