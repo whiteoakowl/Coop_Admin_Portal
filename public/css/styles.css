@@ -6606,6 +6606,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
        place). */
     zoom: 1 !important;
   }
+  /* A real bug report: "front and back mirror is still showing a blank
+     page every 3rd page when going to print" - traced to "printing it's
+     name tags, blank page, schedule card": a genuine EXTRA blank page
+     inserted between a front (name tags) sheet and its matching back
+     (schedule cards) sheet, confirmed present even in a straight "Save as
+     PDF" export (no physical printer/driver involved at all) - so this is
+     the print-pagination engine itself, not a printer/driver issue. Never
+     reproduced against desktop headless Chromium (this app's own
+     established page.pdf({ preferCSSPageSize: true }) verification
+     method - see .team-print-page-fit's own comment below for the first
+     time this exact failure mode showed up) even at extreme viewport
+     sizes, but DID reproduce on a real mobile device's own "Save as PDF"
+     - different browsers/platforms round print-pagination math right at
+     the page edge differently (again, see .team-print-page-fit's comment
+     - that one was pinned down to a sub-half-inch margin problem). The
+     shared root cause both times: a break-before block whose real height
+     lands very close to the page's true full usable height - min-height:
+     100vh above is exactly that for .badge-sheet-page.badge-sheet (the
+     name tag/schedule card/misc badge bulk print pages - NOT the
+     barcode-only sheet below, which genuinely needs the full page: 6 rows
+     x 1.75in = 10.5in of its own content), since its content (a full
+     8-card .badge-sheet grid: 4 rows x 216px + 0.4in padding on each side
+     = 9.8in) is fixed and bounded, not "at least a page, grow if needed"
+     the way .print-page's genuinely variable content is - it never needed
+     100vh's "reach at least a full page" behavior in the first place.
+     Explicit height instead: comfortably above the content's own real
+     9.8in need (never clips) and comfortably below the full 11in physical
+     page (real margin against exactly the platform-dependent edge-
+     rounding this bug is made of), with no vh involved on any platform. */
+  .badge-sheet-page.badge-sheet {
+    height: 10in;
+    min-height: 0;
+    overflow: hidden;
+  }
 
   /* .avery-label-sheet-page (Library Barcode Labels, Barcode Mailing
      Labels) never got the same "strip the on-screen preview chrome"
