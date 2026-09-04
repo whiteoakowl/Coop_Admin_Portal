@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body class="admin-page roster-view-page attendance-print-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1><%= view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : `${tabLabel} Attendance` %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub"><%= view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : `${tabLabel} Attendance Spreadsheet` %></p>
+      </div>
+    </div>
+
+    <% if (view === 'playgroundLog') { %>
+      <%- include('partials/playground-log-table', { pgDayLabel, pgHourLabel, selectedDate, selectedDateLabel, log }) %>
+    <% } else { %>
+      <%- include('partials/roster-archive-grid-table', { heading: tabLabel, grid }) %>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

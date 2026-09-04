@@ -101,39 +101,15 @@
               <% }); %>
             </select>
           </div>
-          <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+          <%# A real request: "make sure there is a print preview for all
+              attendance print pages" - lands on a dedicated read-only
+              preview page instead of calling window.print() directly on
+              this live, editable tab - see admin-rosters-print.ejs and
+              routes/admin-rosters.js's own GET /rosters/print. %>
+          <a class="roster-action-btn print-action-btn" href="/admin/rosters/print?tab=<%= tab %><%= selectedDate ? '&date=' + selectedDate : '' %>" target="_blank">Print</a>
         </div>
 
-        <div class="grid-box roster-grid-col">
-          <div class="grid-box-header">
-            <h2><%= pgDayLabel %> Playground &mdash; <%= pgHourLabel %></h2>
-          </div>
-          <div class="roster-scroll">
-            <table class="roster-table roster-table-detailed">
-              <thead>
-                <tr>
-                  <th class="roster-name-col">Name</th>
-                  <th>Checked In</th>
-                  <th>Checked Out</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if (!selectedDate) { %>
-                  <tr><td colspan="3" class="roster-empty">No session dates yet for <%= pgDayLabel %> &mdash; add one under the <%= pgDayLabel %> Student roster's Edit Dates.</td></tr>
-                <% } else if (log.length === 0) { %>
-                  <tr><td colspan="3" class="roster-empty">Nobody has checked in to the playground on <%= selectedDateLabel %> yet.</td></tr>
-                <% } %>
-                <% log.forEach(function(row) { %>
-                  <tr>
-                    <td class="roster-name-col"><%= row.name %></td>
-                    <td><%= row.checkInTime || '—' %></td>
-                    <td><%= row.checkOutTime || '—' %></td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <%- include('partials/playground-log-table', { pgDayLabel, pgHourLabel, selectedDate, selectedDateLabel, log }) %>
       </div>
     <% } else if (view === 'archive') { %>
       <div class="view-tab-panel">
@@ -196,7 +172,10 @@
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
         <% } %>
-        <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+        <%# A real request: "make sure there is a print preview for all
+            attendance print pages" - see the playground tab's own matching
+            comment above. %>
+        <a class="roster-action-btn print-action-btn" href="/admin/rosters/print?tab=<%= tab %>" target="_blank">Print</a>
         <button type="button" class="roster-action-btn" data-open-allergy-log><svg class="icon"><use href="#icon-medical-bag"/></svg> Allergies/Medical</button>
         <% if (!classId) { %>
           <form method="POST" action="/admin/rosters/<%= day %>/resync" class="inline-block-form" data-confirm="Resync <%= dayLabel %> Parent/Student rosters and floater auto-assignment from the current class schedule and staffing? Anyone automatically added who no longer belongs (for example, a non-primary parent added under old logic) will be removed. Anyone added by hand via + Add Member is left untouched." data-confirm-yes-label="Yes, Resync" data-confirm-icon="icon-rotate" data-confirm-safe="1">

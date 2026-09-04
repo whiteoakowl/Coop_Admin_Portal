@@ -1,0 +1,34 @@
+<%# Read-only rendering of one playground hour's check-in/check-out log -
+    shared by the live tab (views/admin-rosters.ejs) and its print preview
+    (views/admin-rosters-print.ejs), same "one table, reused by the live
+    page and its print page" shape as partials/roster-archive-grid-table. %>
+<div class="grid-box roster-grid-col">
+  <div class="grid-box-header">
+    <h2><%= pgDayLabel %> Playground &mdash; <%= pgHourLabel %></h2>
+  </div>
+  <div class="roster-scroll">
+    <table class="roster-table roster-table-detailed">
+      <thead>
+        <tr>
+          <th class="roster-name-col">Name</th>
+          <th>Checked In</th>
+          <th>Checked Out</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!selectedDate) { %>
+          <tr><td colspan="3" class="roster-empty">No session dates yet for <%= pgDayLabel %> &mdash; add one under the <%= pgDayLabel %> Student roster's Edit Dates.</td></tr>
+        <% } else if (log.length === 0) { %>
+          <tr><td colspan="3" class="roster-empty">Nobody has checked in to the playground on <%= selectedDateLabel %> yet.</td></tr>
+        <% } %>
+        <% log.forEach(function(row) { %>
+          <tr>
+            <td class="roster-name-col"><%= row.name %></td>
+            <td><%= row.checkInTime || '—' %></td>
+            <td><%= row.checkOutTime || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>

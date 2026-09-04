@@ -379,7 +379,12 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     day = cls.day;
     tabLabel = `${cls.class_name} (${cls.hourLabel})`;
   } else {
-    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-student`;
+    // A real request: "have it land on the parent roster each time you
+    // click the attendance tab. currently it always lands on student
+    // roster" - the nav's own Attendance link (partials/admin-nav.ejs)
+    // has no ?tab= at all, so this fallback is what every plain click
+    // into Attendance actually lands on.
+    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-parent`;
     const cfg = TABS[tab];
     day = cfg.day;
     tabLabel = cfg.label;
@@ -424,6 +429,87 @@ router.get('/rosters', requireAdmin, async (req, res) => {
     availableMembers: await availableMembersForRoster(rosterId, memberTypeForTab(tab)),
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: "make sure there is a print preview for all attendance
+// print pages" - the grid and Playground log Print buttons above used to
+// call window.print() directly on the live, editable page (no review
+// step, and printing every editable control's own dropdown/icon chrome
+// right along with the data) - every other print button in this app
+// already lands on a dedicated, read-only preview page first (see e.g.
+// routes/admin-setup.js's own /teams/print). One combined route for
+// both shapes (day/class grid, and a Playground hour's log) since they
+// share the same admin-rosters-print view, branching the same way the
+// live page's own view === 'grid' | 'playgroundLog' already does.
+//
+// A real follow-up request: "attendance printing the roster can stretch
+// to two pages so the font can be 12 point" - unlike the live page's own
+// data-shrink-to-fit-on-print (public/js/print-shrink-to-fit.js), which
+// scales the WHOLE grid down to guarantee exactly one page, this preview
+// deliberately has no shrink script at all - a plain, unbounded <table>
+// with a real <thead> lets the browser's own print pagination flow a
+// long roster across as many physical pages as it actually needs (with
+// the header row repeating on each), at a fixed, comfortably readable
+// 12pt (see the .attendance-print-page rule in styles.css) instead of
+// shrinking illegibly small to force one page.
+router.get('/rosters/print', requireAdmin, async (req, res) => {
+  const requestedTab = req.query.tab || '';
+
+  const playgroundMatch = /^playground-(monday|wednesday)-([1-4])$/.exec(requestedTab);
+  if (playgroundMatch) {
+    const pgDay = playgroundMatch[1];
+    const pgHour = parseInt(playgroundMatch[2], 10);
+    const rosterId = await ensurePlaygroundRoster(pgDay, pgHour);
+    const studentRosterId = await ensureDayRoster(pgDay, 'student');
+    const pgDates = await rosterDates(studentRosterId);
+    const today = todayISO();
+    const requestedDate = isValidISODate(req.query.date) && pgDates.includes(req.query.date) ? req.query.date : null;
+    const selectedDate = requestedDate || [...pgDates].reverse().find((d) => d <= today) || pgDates[pgDates.length - 1] || null;
+    return res.render('admin-rosters-print', {
+      title: `${DAY_LABELS[pgDay]} Playground Print Preview`,
+      view: 'playgroundLog',
+      pgDayLabel: DAY_LABELS[pgDay],
+      pgHourLabel: await playgroundHourLabel(pgDay, pgHour),
+      selectedDate,
+      selectedDateLabel: selectedDate ? formatDateLabel(selectedDate) : null,
+      log: selectedDate ? await playgroundLogForDate(rosterId, selectedDate) : [],
+    });
+  }
+
+  const classId = classIdFromTab(requestedTab);
+  let tab = requestedTab;
+  let day;
+  let tabLabel;
+  if (classId) {
+    const cls = await classRosterInfo(classId);
+    if (!cls) return res.status(404).render('404', { title: 'Not Found' });
+    day = cls.day;
+    tabLabel = `${cls.class_name} (${cls.hourLabel})`;
+  } else {
+    tab = TABS[requestedTab] ? requestedTab : `${defaultDay()}-parent`;
+    const cfg = TABS[tab];
+    day = cfg.day;
+    tabLabel = cfg.label;
+  }
+
+  const rosterId = await rosterIdForTab(tab);
+  const roster = await db.prepare('SELECT * FROM rosters WHERE id = ?').get(rosterId);
+  if (!roster) return res.status(404).render('404', { title: 'Not Found' });
+  const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
+
+  res.render('admin-rosters-print', {
+    title: `${tabLabel} Print Preview`,
+    view: 'grid',
+    tabLabel,
+    dayLabel: DAY_LABELS[day],
+    // partials/roster-archive-grid-table expects the flattened
+    // { name, ... } row shape archiveGrid already builds for the Archive
+    // print page (row.member.name -> row.name, and the same PII strip -
+    // no reason a printed attendance sheet needs medical notes/photo/
+    // address/phone/email either), not buildRosterGridData's own live
+    // { member: {...}, ... } shape - same helper, reused as-is.
+    grid: archiveGrid(await buildRosterGridData(roster, classId ? dates : undefined)),
   });
 });
 

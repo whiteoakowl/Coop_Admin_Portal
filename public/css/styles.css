@@ -6027,6 +6027,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .event-calendar-table .badge-pill { font-size: 0.55rem; padding: 0.05rem 0.25rem; }
 }
 
+/* Attendance print preview (admin-rosters-print.ejs) - a real request:
+   "attendance printing the roster can stretch to two pages so the font
+   can be 12 point." Unlike the live grid's own data-shrink-to-fit-on-
+   print (which scales the whole table down to force exactly one page,
+   illegibly small for a big roster), this preview page has no shrink
+   script - a plain <table> with a real <thead> lets the browser's own
+   print pagination flow a long roster across as many physical pages as
+   it actually needs, header row repeating on each, at a fixed,
+   comfortably readable size instead. */
+@media print {
+  .attendance-print-page .roster-table-detailed { font-size: 12pt; }
+  .attendance-print-page .grid-box-header h2 { font-size: 14pt; }
+}
+
 .member-profile-dialog {
   width: min(440px, 90vw);
   border: none;
