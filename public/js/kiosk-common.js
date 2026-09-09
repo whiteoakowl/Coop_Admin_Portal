@@ -24,28 +24,48 @@ function keepInputFocused(inputEl) {
   // attribute is documented to also silently swallow real hardware/
   // Bluetooth-keyboard keystrokes on some Android Chrome/WebView versions
   // - not just suppress the on-screen keyboard it's actually meant for.
-  // `readonly` doesn't have that problem: a readonly input still
-  // dispatches real keydown events (it only blocks the DEFAULT character-
-  // insertion action), and flipping the attribute off inside that same
-  // keydown handler lets that very keystroke - and every one after it -
-  // through normally, while a readonly input never triggers the on-
-  // screen keyboard in the first place on any platform tested. Starts
-  // (and returns to, after every submit) readonly so a stray tap from
-  // staff standing at the kiosk never pops the on-screen keyboard either
-  // - only a real keydown, impossible from a touch tap, ever turns it
-  // off. See views/kiosk-*.ejs's own comment on why inputmode="none" was
-  // dropped from these inputs' own markup instead of layering this on
-  // top of it - staying on the belt-and-suspenders side risks the exact
-  // failure mode this fixes still happening on some other Android build.
+  //
+  // First attempt: keep the input `readonly` (which still dispatches real
+  // keydown events - only the DEFAULT character-insertion action is
+  // blocked) and flip `readOnly` off on the very first real keydown, so
+  // that keystroke and every one after it gets inserted normally. That
+  // got further (characters started reaching the field at all) but still
+  // produced a wrong/garbled value on that same tablet: the instant the
+  // field actually became editable mid-scan, Android judged it a normal
+  // editable focused input and started bringing up the on-screen
+  // keyboard, and that keyboard's own appearance mid-burst was racing the
+  // Bluetooth scanner's remaining keystrokes and corrupting them - a
+  // *different* on-screen-keyboard side effect of the exact same
+  // "editable" state the toggle was designed to create.
+  //
+  // This version never makes the field editable at all, so neither
+  // failure mode has anywhere to happen: it stays permanently readonly
+  // (a readonly input never triggers the on-screen keyboard, on any
+  // platform tested) and instead builds the scanned value itself, one
+  // keydown at a time, in a plain JS string - the same technique
+  // kiosk-id-keypad.js already uses to stuff a value into this same
+  // input via script (always allowed, readonly or not) and submit the
+  // form, just fed by real keystrokes instead of on-screen taps. A short
+  // idle reset (below) keeps a stray leftover digit from ever prepending
+  // itself onto a later, unrelated scan.
   inputEl.readOnly = true;
-  inputEl.addEventListener('keydown', () => {
-    inputEl.readOnly = false;
+  let buffer = '';
+  let resetTimer = null;
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(resetTimer);
+      inputEl.value = buffer;
+      buffer = '';
+      if (inputEl.form) inputEl.form.requestSubmit();
+      return;
+    }
+    if (e.key.length === 1) {
+      buffer += e.key;
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { buffer = ''; }, 500);
+    }
   });
-  if (inputEl.form) {
-    inputEl.form.addEventListener('submit', () => {
-      inputEl.readOnly = true;
-    });
-  }
 }
 
 // Wires the "how would you like to scan/enter?" button row shared by
