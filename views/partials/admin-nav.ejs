@@ -99,13 +99,11 @@
   <% } %>
 </nav>
 
-<%- include('admin-alerts-dialog') %>
 <%- include('session-timeout-dialog') %>
 <%- include('confirm-dialog') %>
 <%- include('fullscreen-exit-pin-dialog') %>
 
 <script src="/js/admin-nav.js"></script>
-<script src="/js/alerts.js"></script>
 <%# defer, unlike this file's other scripts - both read window.CSRF_TOKEN,
     which partials/head.ejs's csrf.js sets. csrf.js is itself deferred (it
     sits in <head>, before any DOM these two need exists), and a deferred

@@ -8,42 +8,62 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Dashboard</h1>
 
-    <div class="dashboard-stat-panel">
-      <div class="dashboard-stat-grid">
-        <div class="dashboard-stat-card dashboard-stat-orange">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
-          <span class="dashboard-stat-label">Total Monday Parents</span>
-          <span class="dashboard-stat-value"><%= mondayParentCount %></span>
+    <div class="family-student-counts-card">
+      <div class="family-student-counts-header">
+        <svg class="icon"><use href="#icon-calendar-check"/></svg>
+        <div>
+          <h2>Family &amp; Student Counts</h2>
+          <p class="subtitle">Quick snapshot of key counts for upcoming days.</p>
         </div>
-        <div class="dashboard-stat-card dashboard-stat-blue">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
-          <span class="dashboard-stat-label">Monday Students</span>
-          <span class="dashboard-stat-value"><%= mondayStudentCount %></span>
+      </div>
+      <div class="family-student-counts-columns">
+        <div class="family-student-counts-column">
+          <span class="family-student-day-pill">Monday</span>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Parent Count</span>
+              <span class="family-student-row-value"><%= mondayParentCount %></span>
+            </span>
+          </div>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-green"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Student Count</span>
+              <span class="family-student-row-value"><%= mondayStudentCount %></span>
+            </span>
+          </div>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-purple"><svg class="icon"><use href="#icon-home"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Total Families</span>
+              <span class="family-student-row-value"><%= mondayFamilyCount %></span>
+            </span>
+          </div>
         </div>
-        <div class="dashboard-stat-card dashboard-stat-purple">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
-          <span class="dashboard-stat-label">Wednesday Parents</span>
-          <span class="dashboard-stat-value"><%= wednesdayParentCount %></span>
-        </div>
-        <div class="dashboard-stat-card dashboard-stat-blue">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
-          <span class="dashboard-stat-label">Wednesday Students</span>
-          <span class="dashboard-stat-value"><%= wednesdayStudentCount %></span>
-        </div>
-        <div class="dashboard-stat-card dashboard-stat-green">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-home-heart"/></svg></div>
-          <span class="dashboard-stat-label">Total Families</span>
-          <span class="dashboard-stat-value"><%= familyCount %></span>
-        </div>
-        <div class="dashboard-stat-card dashboard-stat-blue">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
-          <span class="dashboard-stat-label">Total Students</span>
-          <span class="dashboard-stat-value"><%= studentCount %></span>
-        </div>
-        <div class="dashboard-stat-card dashboard-stat-orange">
-          <div class="dashboard-stat-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
-          <span class="dashboard-stat-label">Total Parents</span>
-          <span class="dashboard-stat-value"><%= parentCount %></span>
+        <div class="family-student-counts-column">
+          <span class="family-student-day-pill">Wednesday</span>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Parent Count</span>
+              <span class="family-student-row-value"><%= wednesdayParentCount %></span>
+            </span>
+          </div>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-green"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Student Count</span>
+              <span class="family-student-row-value"><%= wednesdayStudentCount %></span>
+            </span>
+          </div>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-purple"><svg class="icon"><use href="#icon-home"/></svg></span>
+            <span class="family-student-row-text">
+              <span class="family-student-row-label">Total Families</span>
+              <span class="family-student-row-value"><%= wednesdayFamilyCount %></span>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -54,19 +74,60 @@
       <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
     </div>
 
-    <h2 class="dashboard-section-title">Alert Log</h2>
-    <div class="alert-log">
-      <% if (alerts.length === 0) { %>
-        <p class="roster-empty">No active alerts today.</p>
+    <%
+    // A real request: "the alert log should be the same as the daily
+    // alert log on the bottom of the attendance page, showing absent,
+    // late, class cancelation risk, substitutes needed. exactly the
+    // same." Same 4 sections, same markup, same shared functions
+    // (utils/alerts.js) admin-rosters.ejs's own Attendance-page Alerts
+    // box uses - see routes/admin.js's GET / for how absenceAlerts/
+    // classesAtRisk/classesNeedingStaff are computed.
+    %>
+    <h2 class="dashboard-section-title">Alert Log<% if (!alertDayLabel) { %> <span class="hint">(no session today)</span><% } else { %> <span class="hint">&mdash; <%= alertDayLabel %></span><% } %></h2>
+    <div class="manage-section no-print">
+      <h3 class="class-schedule-hour-label">Absence Forms</h3>
+      <% if (absenceAlerts.absences.length === 0) { %>
+        <p class="roster-empty">No absence forms submitted<%= alertDayLabel ? ' for today' : '' %>.</p>
       <% } else { %>
-        <ul class="alert-log-list">
-          <% alerts.forEach(function(a) { %>
-            <li class="alert-log-item alert-log-item-<%= a.severity %>">
-              <svg class="icon alert-log-icon"><use href="#<%= a.severity === 'danger' ? 'icon-x-circle' : 'icon-info-circle' %>"/></svg>
-              <div class="alert-log-body">
-                <span class="alert-log-day"><%= a.dayLabel %></span>
-                <span class="alert-log-message"><a href="<%= a.link %>"><%= a.message %></a></span>
-              </div>
+        <ul class="pending-approvals-list">
+          <% absenceAlerts.absences.forEach(function(a) { %>
+            <li><strong><%= a.memberName %></strong> &mdash; <%= a.reasonLabel %><% if (a.description && a.description !== '—') { %>: <%= a.description %><% } %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Late Forms</h3>
+      <% if (absenceAlerts.lates.length === 0) { %>
+        <p class="roster-empty">No late forms submitted<%= alertDayLabel ? ' for today' : '' %>.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% absenceAlerts.lates.forEach(function(a) { %>
+            <li><strong><%= a.memberName %></strong> &mdash; <%= a.reasonLabel %><% if (a.description && a.description !== '—') { %>: <%= a.description %><% } %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Class Cancellation Risk</h3>
+      <% if (classesAtRisk.length === 0) { %>
+        <p class="roster-empty">No classes are at risk of low attendance.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% classesAtRisk.forEach(function(c) { %>
+            <li><strong><%= c.className %></strong> (<%= c.hourLabel %>) &mdash; <%= c.expectedCount %> of <%= c.enrolledCount %> expected</li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3 class="class-schedule-hour-label">Substitutes Needed</h3>
+      <% if (classesNeedingStaff.length === 0) { %>
+        <p class="roster-empty">Every class has a teacher and an assistant assigned.</p>
+      <% } else { %>
+        <ul class="pending-approvals-list">
+          <% classesNeedingStaff.forEach(function(c) { %>
+            <li>
+              <strong><%= c.className %></strong> (<%= c.hourLabel %>) &mdash;
+              <% if (c.missingTeacher) { %><span class="badge-pill badge-pill-absent">Teacher</span><% } %>
+              <% if (c.missingAssistant) { %><span class="badge-pill badge-pill-pending">Assistant</span><% } %>
             </li>
           <% }); %>
         </ul>

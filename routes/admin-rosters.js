@@ -16,7 +16,7 @@ const {
   HOUR_POSITIONS,
 } = require('../utils/classSchedule');
 const { defaultDay, DAYS, DAY_LABELS, isValidDay, requireDay } = require('../utils/days');
-const { REASON_LABELS } = require('../utils/rosters');
+const { absenceFormSubmissionsForRoster } = require('../utils/alerts');
 const { rosterDates, buildRosterGridData } = require('../utils/rosterGrid');
 const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
 
@@ -27,37 +27,6 @@ const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 function todayIfSessionDay(day) {
   const today = todayISO();
   return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
-}
-
-// Absence/Late form submissions on this roster for one date, split by
-// status - feeds the Attendance page's "Today's Alerts" log. A real
-// request: "absence alerts on the attendance page should only show
-// parents names that are absent" - a student's own absence doesn't
-// affect staffing/floater coverage the way a parent's does, so it's
-// just noise here (member_type = 'parent' only; students marked absent
-// on the very same form still show up fine on the grid itself and in
-// the Logs > Absence tab - this only trims the Alerts box).
-async function absenceFormSubmissionsForRoster(rosterId, date) {
-  if (!date) return { absences: [], lates: [] };
-  const rows = (await db
-    .prepare(
-      `SELECT m.name AS name, a.status, a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
-       FROM attendance a
-       JOIN members m ON m.id = a.member_id
-       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form' AND m.member_type = 'parent'`
-    )
-    .all(rosterId, date))
-    .sort(byLastName)
-    .map((r) => ({
-      memberName: r.name,
-      status: r.status,
-      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
-      description: r.reasonText || '—',
-    }));
-  return {
-    absences: rows.filter((r) => r.status === 'absent'),
-    lates: rows.filter((r) => r.status === 'late'),
-  };
 }
 
 // Attendance is 4 always-existing, schedule-driven rosters (membership

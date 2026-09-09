@@ -1,11 +1,10 @@
-// Real HTTP-level coverage for the Home dashboard's stat-card panel
-// (Monday/Wednesday Parents/Students, Total Families/Students/Parents -
-// routes/admin.js's GET / + views/admin-dashboard.ejs's
-// .dashboard-stat-panel). Originally added alongside a Members-page
-// family filter so family count had the same kind of at-a-glance
-// visibility parent/student/member counts already had; later redesigned
-// (a real request, with a reference screenshot) into individually-
-// colored cards - see that redesign's own comment in styles.css.
+// Real HTTP-level coverage for the Home dashboard's "Family & Student
+// Counts" card (routes/admin.js's GET / + views/admin-dashboard.ejs's
+// .family-student-counts-card) - a real request, with a reference
+// screenshot, to replace the old 7-card Monday/Wednesday/Total stat grid
+// with this single two-column (Monday | Wednesday) card: Parent Count,
+// Student Count, and Total Families, each scoped to that one day instead
+// of a flat site-wide total.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -33,55 +32,105 @@ test.after(() => {
   fs.rmSync(testUploadsDir, { recursive: true, force: true });
 });
 
-function statValueFor(html, label) {
-  const match = new RegExp(`<span class="dashboard-stat-label">${label}</span>\\s*<span class="dashboard-stat-value">(\\d+)</span>`).exec(html);
-  return match ? parseInt(match[1], 10) : null;
+async function loginAsAdmin() {
+  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
+  return loginRes.headers['set-cookie'];
 }
 
-test('dashboard stat panel includes Total Families alongside Students/Parents', async () => {
-  const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
-  const cookie = loginRes.headers['set-cookie'];
+// Every "<label>"/value pair for a given row label appears twice in the
+// card's own HTML - Monday's column first, Wednesday's second (see
+// views/admin-dashboard.ejs) - so index 0/1 of this array are exactly
+// that day split, in that order.
+function statValuesFor(html, label) {
+  const re = new RegExp(`<span class="family-student-row-label">${label}</span>\\s*<span class="family-student-row-value">(\\d+)</span>`, 'g');
+  const values = [];
+  let m;
+  while ((m = re.exec(html))) values.push(parseInt(m[1], 10));
+  return values;
+}
 
-  await db.prepare('INSERT INTO families (name) VALUES (?)').run('Totals Test Family A');
-  await db.prepare('INSERT INTO families (name) VALUES (?)').run('Totals Test Family B');
+async function currentCsrf(cookie) {
+  const page = await request(app).get('/admin').set('Cookie', cookie);
+  return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
+}
 
+test('the Family & Student Counts card renders Monday and Wednesday columns with Parent Count, Student Count, and Total Families', async () => {
+  const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.equal(statValueFor(res.text, 'Total Families'), 2);
+  assert.match(res.text, /Family &amp; Student Counts/);
+  assert.match(res.text, /Quick snapshot of key counts for upcoming days\./);
+  assert.match(res.text, /<span class="family-student-day-pill">Monday<\/span>/);
+  assert.match(res.text, /<span class="family-student-day-pill">Wednesday<\/span>/);
+  assert.equal(statValuesFor(res.text, 'Parent Count').length, 2, 'Parent Count should appear once per day column');
+  assert.equal(statValuesFor(res.text, 'Student Count').length, 2, 'Student Count should appear once per day column');
+  assert.equal(statValuesFor(res.text, 'Total Families').length, 2, 'Total Families should appear once per day column, not a single flat total');
 });
 
-test('dashboard stat panel splits Monday/Wednesday Students/Parents counts by which day they are actually scheduled, alongside the flat Total Students/Parents cards', async () => {
-  // Real bug report: the dashboard's day-level counts used to show one
-  // flat "Total Students"/"Total Parents" figure (every active member of
-  // that type, scheduled or not) instead of how many are actually on
-  // Monday's vs Wednesday's day-level roster (the same 'Class Schedule'
-  // roster concept todayStatsForType() already used for Today's
-  // Attendance, just for both days at once instead of only whichever day
-  // happens to be today) - fixed to show the day-scoped counts. A later
-  // redesign (a real request, with a reference screenshot) re-added
-  // separate flat Total Students/Total Parents cards alongside the day
-  // split, not instead of it - both now coexist, so this only checks the
-  // day-scoped counts stay correct, not that the flat labels are absent.
-  const { cookie } = await (async () => {
-    const loginRes = await request(app).post('/admin/login').type('form').send({ username: 'testadmin', password: 'testpassword123' });
-    return { cookie: loginRes.headers['set-cookie'] };
-  })();
+test('Total Families is scoped per day, not the old flat site-wide family count', async () => {
+  const cookie = await loginAsAdmin();
 
   await request(app)
     .post('/admin/class-schedule/classes/new')
     .set('Cookie', cookie)
     .type('form')
-    .send({ day: 'monday', className: 'Dashboard Split Monday Class', hourPosition: '1', color: '#EE9A4D', _csrf: (await currentCsrf(cookie)) });
+    .send({ day: 'monday', className: 'Dashboard Family Monday Class', hourPosition: '1', color: '#EE9A4D', _csrf: await currentCsrf(cookie) });
   await request(app)
     .post('/admin/class-schedule/classes/new')
     .set('Cookie', cookie)
     .type('form')
-    .send({ day: 'wednesday', className: 'Dashboard Split Wed Class A', hourPosition: '1', color: '#EE9A4D', _csrf: (await currentCsrf(cookie)) });
+    .send({ day: 'wednesday', className: 'Dashboard Family Wed Class', hourPosition: '1', color: '#EE9A4D', _csrf: await currentCsrf(cookie) });
+
+  const mondayClass = await db.prepare("SELECT id FROM classes WHERE class_name = 'Dashboard Family Monday Class'").get();
+  const wedClass = await db.prepare("SELECT id FROM classes WHERE class_name = 'Dashboard Family Wed Class'").get();
+
+  const { lastInsertRowid: familyId } = await db.prepare('INSERT INTO families (name) VALUES (?)').run('Dashboard Family Counts Test Family');
+  const { lastInsertRowid: mondayOnlyStudent } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Dash Family Monday Student', 'dash-family-mon-student', 'student', ?)")
+    .run(familyId);
+
+  // setEnrollment (not a raw INSERT) so it also syncs the day-level
+  // 'Class Schedule' roster that dayFamilyCount() actually reads - this
+  // family only ever shows up under Monday, never Wednesday.
+  await setEnrollment(mondayClass.id, [mondayOnlyStudent]);
+
+  const before = await request(app).get('/admin').set('Cookie', cookie);
+  const [mondayFamiliesBefore, wedFamiliesBefore] = statValuesFor(before.text, 'Total Families');
+
+  const { lastInsertRowid: wedFamilyId } = await db.prepare('INSERT INTO families (name) VALUES (?)').run('Dashboard Family Counts Wed Family');
+  const { lastInsertRowid: wedOnlyStudent } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Dash Family Wed Student', 'dash-family-wed-student', 'student', ?)")
+    .run(wedFamilyId);
+  await setEnrollment(wedClass.id, [wedOnlyStudent]);
+
+  const after = await request(app).get('/admin').set('Cookie', cookie);
+  const [mondayFamiliesAfter, wedFamiliesAfter] = statValuesFor(after.text, 'Total Families');
+
+  assert.equal(mondayFamiliesAfter, mondayFamiliesBefore, "adding a Wednesday-only family shouldn't change Monday's own count");
+  assert.equal(wedFamiliesAfter, wedFamiliesBefore + 1, "Wednesday's count should pick up the new Wednesday-only family");
+});
+
+test('dashboard stat panel splits Monday/Wednesday Students/Parents counts by which day they are actually scheduled', async () => {
+  // Real bug report (carried over from the old 7-card layout, still true
+  // of this card): day-level counts must reflect who's actually on that
+  // day's 'Class Schedule' roster, not a flat site-wide total.
+  const cookie = await loginAsAdmin();
+
   await request(app)
     .post('/admin/class-schedule/classes/new')
     .set('Cookie', cookie)
     .type('form')
-    .send({ day: 'wednesday', className: 'Dashboard Split Wed Class B', hourPosition: '2', color: '#EE9A4D', _csrf: (await currentCsrf(cookie)) });
+    .send({ day: 'monday', className: 'Dashboard Split Monday Class', hourPosition: '2', color: '#EE9A4D', _csrf: await currentCsrf(cookie) });
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ day: 'wednesday', className: 'Dashboard Split Wed Class A', hourPosition: '2', color: '#EE9A4D', _csrf: await currentCsrf(cookie) });
+  await request(app)
+    .post('/admin/class-schedule/classes/new')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ day: 'wednesday', className: 'Dashboard Split Wed Class B', hourPosition: '3', color: '#EE9A4D', _csrf: await currentCsrf(cookie) });
 
   const mondayClass = await db.prepare("SELECT id FROM classes WHERE class_name = 'Dashboard Split Monday Class'").get();
   const wedClassA = await db.prepare("SELECT id FROM classes WHERE class_name = 'Dashboard Split Wed Class A'").get();
@@ -90,21 +139,14 @@ test('dashboard stat panel splits Monday/Wednesday Students/Parents counts by wh
   const mondayStudent = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Dash Split Monday Student', 'dash-split-mon-student', 'student')").run()).lastInsertRowid;
   const wedStudent = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Dash Split Wed Student', 'dash-split-wed-student', 'student')").run()).lastInsertRowid;
   // setEnrollment (not a raw INSERT) so it also syncs the day-level
-  // 'Class Schedule' roster that dayScheduleCount() actually reads -
-  // enrolled in BOTH Wednesday classes, but must still only count once.
+  // 'Class Schedule' roster dayScheduleCount() actually reads - enrolled
+  // in BOTH Wednesday classes, but must still only count once.
   await setEnrollment(mondayClass.id, [mondayStudent]);
   await setEnrollment(wedClassA.id, [wedStudent]);
   await setEnrollment(wedClassB.id, [wedStudent]);
 
   const res = await request(app).get('/admin').set('Cookie', cookie);
-  assert.equal(res.status, 200);
-  assert.ok(statValueFor(res.text, 'Monday Students') >= 1, 'Monday Students should count the Monday-enrolled student');
-  assert.ok(statValueFor(res.text, 'Wednesday Students') >= 1, 'Wednesday Students should count the Wednesday-enrolled student once, not per-class');
-  assert.ok(statValueFor(res.text, 'Total Students') >= 2, 'the flat Total Students card should count every active student, day-scheduled or not');
-  assert.ok(statValueFor(res.text, 'Total Parents') !== null, 'the flat Total Parents card should still be present');
+  const [mondayStudents, wedStudents] = statValuesFor(res.text, 'Student Count');
+  assert.ok(mondayStudents >= 1, 'Monday should count the Monday-enrolled student');
+  assert.ok(wedStudents >= 1, 'Wednesday should count the Wednesday-enrolled student once, not per-class');
 });
-
-async function currentCsrf(cookie) {
-  const page = await request(app).get('/admin').set('Cookie', cookie);
-  return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
-}

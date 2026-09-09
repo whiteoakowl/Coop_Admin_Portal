@@ -6,7 +6,10 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { todayISO, formatDateLabel, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
-const { todaysAlerts } = require('../utils/alerts');
+const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
+const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay } = require('../utils/classSchedule');
+const { substituteBoard } = require('../utils/substitutes');
+const { DAY_LABELS } = require('../utils/days');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const fullscreenPinLimiter = require('../utils/classCheckinPinRateLimit');
@@ -199,35 +202,81 @@ async function dayScheduleCount(memberType, day) {
   ).c;
 }
 
-async function activeMemberTypeCount(memberType) {
-  return (await db.prepare('SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = ?').get(memberType)).c;
+// How many distinct families have anyone (parent or student) on a given
+// day's auto-synced day-level 'Class Schedule' roster - the per-day
+// "Total Families" figure the Family & Student Counts card shows
+// alongside that same day's Parent/Student counts (dayScheduleCount
+// above), instead of the single flat family total the dashboard used to
+// show once, unscoped to either day.
+async function dayFamilyCount(day) {
+  return (
+    await db
+      .prepare(
+        `SELECT COUNT(DISTINCT m.family_id) AS c FROM members m
+         JOIN roster_members rm ON rm.member_id = m.id
+         JOIN rosters r ON r.id = rm.roster_id
+         WHERE m.active = 1 AND m.family_id IS NOT NULL AND r.category = 'Class Schedule' AND r.schedule_day = ?`
+      )
+      .get(day)
+  ).c;
 }
 
 router.get('/', requireAdmin, async (req, res) => {
   const today = todayISO();
   const previousDate = await previousSessionDate(today);
-  const familyCount = (await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c;
-  const [mondayStudentCount, mondayParentCount, wednesdayStudentCount, wednesdayParentCount, studentCount, parentCount] = await Promise.all([
+  const [mondayStudentCount, mondayParentCount, mondayFamilyCount, wednesdayStudentCount, wednesdayParentCount, wednesdayFamilyCount] = await Promise.all([
     dayScheduleCount('student', 'monday'),
     dayScheduleCount('parent', 'monday'),
+    dayFamilyCount('monday'),
     dayScheduleCount('student', 'wednesday'),
     dayScheduleCount('parent', 'wednesday'),
-    activeMemberTypeCount('student'),
-    activeMemberTypeCount('parent'),
+    dayFamilyCount('wednesday'),
   ]);
+
+  // The Alert Log below reuses the exact same functions/format as the
+  // Attendance page's own inline "Alerts" box (utils/alerts.js) - a real
+  // request: "the alert log should be the same as the daily alert log on
+  // the bottom of the attendance page ... exactly the same." Only ever
+  // has something to show on a real session day for either Monday or
+  // Wednesday (a calendar date can only be one of them, never both), so
+  // there's at most one day's worth of sections here, same as visiting
+  // that day's own Attendance tab today would show.
+  const [alertDay] = todaysSessionDays(today);
+  let absenceAlerts = { absences: [], lates: [] };
+  let classesAtRisk = [];
+  let classesNeedingStaff = [];
+  if (alertDay) {
+    const parentRosterId = await ensureDayRoster(alertDay, 'parent');
+    [absenceAlerts, classesAtRisk, classesNeedingStaff] = await Promise.all([
+      absenceFormSubmissionsForRoster(parentRosterId, today),
+      classesAtRiskForDay(alertDay, today),
+      classesNeedingStaffForDay(alertDay, today),
+      // Preserves a real side effect the old sitewide alert popup used to
+      // trigger on every admin page load (routes/admin-substitutes.js's
+      // now-removed /alerts.json, via substituteBoard(day, date)): the
+      // FIRST time a date's floater board is computed, it auto-picks and
+      // persists a 'pending' candidate for every open slot. Without
+      // something still calling substituteBoard for today somewhere, that
+      // auto-fill would only ever happen once an admin opens Floater
+      // Assignments themselves, instead of already being there waiting.
+      substituteBoard(alertDay, today),
+    ]);
+  }
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
-    familyCount,
     mondayStudentCount,
     mondayParentCount,
+    mondayFamilyCount,
     wednesdayStudentCount,
     wednesdayParentCount,
-    studentCount,
-    parentCount,
+    wednesdayFamilyCount,
     studentStats: await statsWithTrends('student', today, previousDate),
     parentStats: await statsWithTrends('parent', today, previousDate),
-    alerts: await todaysAlerts(),
+    alertDayLabel: alertDay ? DAY_LABELS[alertDay] : null,
+    absenceAlerts,
+    classesAtRisk,
+    classesNeedingStaff,
   });
 });
 

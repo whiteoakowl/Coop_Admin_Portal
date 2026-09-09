@@ -1,15 +1,16 @@
-// Single source of truth for "today's alerts": unfilled substitute slots,
-// auto-picked substitute assignments still awaiting admin approval, and
-// classes at risk of low attendance. The Home dashboard's Alert Log and
-// the sitewide alert popup (public/js/alerts.js) both read from this same
-// list, so what shows up in one always matches the other (see CONTEXT.md
-// item "All alert pop ups are triggered by what appears on the alert
-// log").
+// Shared alert-list building blocks for both the Attendance page's own
+// inline "Alerts" box (routes/admin-rosters.js) and the Home dashboard's
+// Alert Log (routes/admin.js) - a real request: "the alert log should be
+// the same as the daily alert log on the bottom of the attendance page,
+// showing absent, late, class cancelation risk, substitutes needed.
+// exactly the same." Both now read the identical functions for the
+// identical day, so there's exactly one "what counts as an alert today"
+// definition instead of two that can drift apart.
 const db = require('../db');
-const { DAYS, DAY_LABELS } = require('./days');
-const { todayISO, weekdayOf } = require('./dates');
-const { substituteBoard } = require('./substitutes');
-const { classesAtRiskForDay } = require('./classSchedule');
+const { byLastName } = require('./members');
+const { REASON_LABELS } = require('./rosters');
+const { DAYS } = require('./days');
+const { weekdayOf } = require('./dates');
 
 const DAY_WEEKDAY = { monday: 1, wednesday: 3 };
 
@@ -46,65 +47,37 @@ async function absenceFormAlertsForDay(day, date) {
     .all(date, day);
 }
 
-async function todaysAlerts() {
-  const date = todayISO();
-  const alerts = [];
-
-  for (const day of todaysSessionDays(date)) {
-    const dayLabel = DAY_LABELS[day];
-    const board = await substituteBoard(day, date);
-    board.forEach((hour) => {
-      hour.slots.forEach((slot) => {
-        if (!slot.assigned) {
-          alerts.push({
-            type: 'sub_needed',
-            severity: 'danger',
-            day,
-            dayLabel,
-            date,
-            message: `${hour.label}: ${slot.label} needs a substitute — no floaters available.`,
-            link: `/admin/volunteers/${day}/manage?date=${encodeURIComponent(date)}`,
-          });
-        } else if (slot.assigned.status === 'pending') {
-          alerts.push({
-            type: 'sub_pending',
-            severity: 'warning',
-            day,
-            dayLabel,
-            date,
-            message: `${hour.label}: ${slot.label} → ${slot.assigned.name} needs approval.`,
-            link: `/admin/volunteers/${day}/manage?date=${encodeURIComponent(date)}`,
-          });
-        }
-      });
-    });
-
-    (await absenceFormAlertsForDay(day, date)).forEach((sub) => {
-      alerts.push({
-        type: sub.status === 'late' ? 'late_form' : 'absence_form',
-        severity: sub.status === 'late' ? 'warning' : 'danger',
-        day,
-        dayLabel,
-        date,
-        message: `${sub.memberName} submitted ${sub.status === 'late' ? 'a late notice' : 'an absence form'} for today.`,
-        link: `/admin/logs?tab=absence&date=${encodeURIComponent(date)}`,
-      });
-    });
-
-    (await classesAtRiskForDay(day, date)).forEach((c) => {
-      alerts.push({
-        type: 'class_risk',
-        severity: 'warning',
-        day,
-        dayLabel,
-        date,
-        message: `${c.hourLabel}: ${c.className} at risk of cancellation — only ${c.expectedCount} expected.`,
-        link: `/admin/logs?tab=classrisk&day=${day}`,
-      });
-    });
-  }
-
-  return alerts;
+// Absence/Late form submissions on one roster for one date, split by
+// status - drives the Attendance page's own inline "Alerts" box AND
+// (as of the request above) the Home dashboard's Alert Log, both reading
+// this exact same function now instead of each having their own slightly
+// different query. A real request: "absence alerts on the attendance
+// page should only show parents names that are absent" - a student's own
+// absence doesn't affect staffing/floater coverage the way a parent's
+// does, so it's just noise here (member_type = 'parent' only; students
+// marked absent on the very same form still show up fine on the grid
+// itself and in the Logs > Absence tab - this only trims the Alerts box).
+async function absenceFormSubmissionsForRoster(rosterId, date) {
+  if (!date) return { absences: [], lates: [] };
+  const rows = (await db
+    .prepare(
+      `SELECT m.name AS name, a.status, a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
+       FROM attendance a
+       JOIN members m ON m.id = a.member_id
+       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form' AND m.member_type = 'parent'`
+    )
+    .all(rosterId, date))
+    .sort(byLastName)
+    .map((r) => ({
+      memberName: r.name,
+      status: r.status,
+      reasonLabel: REASON_LABELS[r.reasonCategory] || '—',
+      description: r.reasonText || '—',
+    }));
+  return {
+    absences: rows.filter((r) => r.status === 'absent'),
+    lates: rows.filter((r) => r.status === 'late'),
+  };
 }
 
-module.exports = { todaysAlerts, absenceFormAlertsForDay };
+module.exports = { todaysSessionDays, absenceFormAlertsForDay, absenceFormSubmissionsForRoster };
