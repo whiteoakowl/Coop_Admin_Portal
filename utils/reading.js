@@ -149,22 +149,28 @@ async function dashboardForMember(memberId) {
   };
 }
 
-// "students will compete with other students" - every active student
-// member ranked by all-time points, regardless of family/class (this
-// app has no notion of reading "sections" to scope it further).
-async function leaderboard(limit = 10) {
+// "students will compete with other students" - every active member of
+// the given type ranked by all-time points, regardless of family/class
+// (this app has no notion of reading "sections" to scope it further).
+// memberType also powers Parent Portal's own separate reading challenge
+// ("their reading challenge will work across all a parents" - a real
+// request for parents to have this same feature among themselves,
+// ranked against other parents only, not the student leaderboard) -
+// same table, same points math, just scoped to 'parent' instead of the
+// default 'student'.
+async function leaderboard(limit = 10, memberType = 'student') {
   const rows = await db
     .prepare(
       `SELECT m.id AS member_id, m.name, COALESCE(SUM(rl.hours), 0) AS hours
        FROM members m
        LEFT JOIN reading_logs rl ON rl.member_id = m.id
-       WHERE m.member_type = 'student' AND m.active = 1
+       WHERE m.member_type = ? AND m.active = 1
        GROUP BY m.id, m.name
        HAVING COALESCE(SUM(rl.hours), 0) > 0
        ORDER BY hours DESC
        LIMIT ?`
     )
-    .all(limit);
+    .all(memberType, limit);
   return rows.map((row, index) => ({
     rank: index + 1,
     memberId: row.member_id,

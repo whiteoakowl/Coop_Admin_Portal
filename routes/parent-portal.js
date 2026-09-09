@@ -37,6 +37,7 @@ const { registerForClass, unregisterFromClass } = require('../utils/classRegistr
 const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
+const reading = require('../utils/reading');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -399,6 +400,64 @@ router.post('/babysitters/:memberId', uploadBabysitterPhoto.single('photo'), asy
     req.portalAccount.id
   );
   res.redirect('/parent/babysitters?notice=' + encodeURIComponent('Submitted for Main Admin review.'));
+});
+
+// Reading Challenge - a real request: "mimic the same reading challenge
+// tabs and pages for parent portal. their reading challenge will work
+// across all a parents" - a SEPARATE reading challenge among parents
+// themselves (not a view into their children's reading), reusing
+// utils/reading.js exactly the way Student Portal's own /student/reading
+// does, just keyed off the signed-in parent's own member row instead of
+// a student's. leaderboard()'s memberType param scopes ranking to
+// 'parent' members only, so parents compete with parents.
+router.get('/reading', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const dashboard = member ? await reading.dashboardForMember(member.id) : null;
+  res.render('parent-reading', {
+    title: 'Reading Challenge',
+    dashboard,
+    reading,
+    today: new Date().toISOString().slice(0, 10),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.get('/achievements', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const dashboard = member ? await reading.dashboardForMember(member.id) : null;
+  res.render('parent-achievements', { title: 'Achievements', dashboard });
+});
+
+router.get('/leaderboard', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const readingLeaders = await reading.leaderboard(5, 'parent');
+  res.render('parent-leaderboard', {
+    title: 'Leaderboard',
+    readingLeaders,
+    memberId: member ? member.id : null,
+  });
+});
+
+router.post('/reading/log', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/parent/reading?error=' + encodeURIComponent('No parent profile found for your account.'));
+  const result = await reading.addLog(member.id, {
+    bookTitle: req.body.book_title,
+    hours: req.body.hours,
+    notes: req.body.notes,
+    logDate: req.body.log_date,
+  });
+  if (!result.ok) return res.redirect('/parent/reading?error=' + encodeURIComponent(result.error));
+  res.redirect('/parent/reading?notice=' + encodeURIComponent(`Logged! You earned ${result.points} points.`));
+});
+
+router.post('/reading/goal', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/parent/reading?error=' + encodeURIComponent('No parent profile found for your account.'));
+  const result = await reading.setWeeklyGoal(member.id, req.body.weekly_goal_hours);
+  if (!result.ok) return res.redirect('/parent/reading?error=' + encodeURIComponent(result.error));
+  res.redirect('/parent/reading?notice=' + encodeURIComponent(`Weekly goal updated to ${result.hours} hours.`));
 });
 
 module.exports = router;

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
+      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Leaderboard</h1>
+    <p class="subtitle">See how you stack up against every parent portal.</p>
+
+    <div class="leaderboard-grid">
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top 5 Reading Hours</h3>
+        <% if (!readingLeaders.length) { %>
+          <p class="hint">No one has logged reading time yet - be the first!</p>
+        <% } else { %>
+          <ol class="reading-leaderboard-list">
+            <% readingLeaders.forEach((row) => { %>
+              <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+                <span class="reading-leaderboard-rank">#<%= row.rank %></span>
+                <span class="reading-leaderboard-name"><%= row.name %><%= row.memberId === memberId ? ' (You)' : '' %></span>
+                <span class="reading-leaderboard-points"><%= row.hours.toLocaleString() %> hrs</span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+
+      <div class="reading-panel reading-leaderboard-panel">
+        <h3>Top 5 Reading Points</h3>
+        <% if (!readingLeaders.length) { %>
+          <p class="hint">No one has logged reading time yet - be the first!</p>
+        <% } else { %>
+          <ol class="reading-leaderboard-list">
+            <% readingLeaders.forEach((row) => { %>
+              <li class="reading-leaderboard-row <%= row.memberId === memberId ? 'reading-leaderboard-row-you' : '' %>">
+                <span class="reading-leaderboard-rank">#<%= row.rank %></span>
+                <span class="reading-leaderboard-name"><%= row.name %><%= row.memberId === memberId ? ' (You)' : '' %></span>
+                <span class="reading-leaderboard-points"><%= row.points.toLocaleString() %> pts</span>
+              </li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
