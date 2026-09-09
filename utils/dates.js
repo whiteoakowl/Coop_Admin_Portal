@@ -190,6 +190,21 @@ function formatFriendlyTimestamp(sqlTimestamp) {
   return `${monthName} ${parts.day}, ${parts.year} ${parts.hour}:${parts.minute}${ampm}`;
 }
 
+// Splits a `now_text()` timestamp string (UTC, "YYYY-MM-DD HH:MM:SS") into
+// separate date/time labels in Eastern time - e.g. the Name Tag Request
+// log's own "Date" and "Time" columns, a real request to split what used
+// to be one combined formatTimestamp() column into two. Same UTC-parse-
+// then-Eastern-format approach as formatTimestamp/formatFriendlyTimestamp
+// above, just returning the two halves separately instead of one string.
+function formatDateAndTime(sqlTimestamp) {
+  if (!sqlTimestamp) return { dateLabel: null, timeLabel: null };
+  const d = new Date(sqlTimestamp.replace(' ', 'T') + 'Z');
+  return {
+    dateLabel: d.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }),
+    timeLabel: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }),
+  };
+}
+
 // Whole-years-old as of today, or null if the birthday isn't a valid date.
 function ageFromBirthday(iso) {
   if (!isValidISODate(iso)) return null;
@@ -227,6 +242,7 @@ module.exports = {
   formatTimeOfDay,
   formatTimestamp,
   formatFriendlyTimestamp,
+  formatDateAndTime,
   ageFromBirthday,
   closestUpcomingDate,
   easternInputToUtcText,

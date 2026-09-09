@@ -114,7 +114,7 @@
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table logs-screen-table">
             <thead>
-              <tr><th>Name</th><th>Roster</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Number</th></tr>
+              <tr><th>Name</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Roster</th><th>Number</th></tr>
             </thead>
             <tbody>
               <% if (rows.length === 0) { %>
@@ -123,10 +123,10 @@
               <% rows.forEach(function(r) { %>
                 <tr>
                   <td><%= r.memberName %></td>
-                  <td><%= r.rosterName %></td>
                   <td><%= r.dateLabel %></td>
                   <td><%= r.checkInTime %></td>
                   <td><%= r.checkOutTime %></td>
+                  <td><%= r.rosterName %></td>
                   <td><%= r.number %></td>
                 </tr>
               <% }); %>
@@ -138,7 +138,7 @@
 
         <table class="roster-table members-table condensed-table logs-print-table">
           <thead>
-            <tr><th>Name</th><th>Roster</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Number</th></tr>
+            <tr><th>Name</th><th>Date</th><th>Check-In Time</th><th>Check-Out Time</th><th>Roster</th><th>Number</th></tr>
           </thead>
           <tbody>
             <% if (allRows.length === 0) { %>
@@ -147,10 +147,10 @@
             <% allRows.forEach(function(r) { %>
               <tr>
                 <td><%= r.memberName %></td>
-                <td><%= r.rosterName %></td>
                 <td><%= r.dateLabel %></td>
                 <td><%= r.checkInTime %></td>
                 <td><%= r.checkOutTime %></td>
+                <td><%= r.rosterName %></td>
                 <td><%= r.number %></td>
               </tr>
             <% }); %>
@@ -180,7 +180,7 @@
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table logs-screen-table">
             <thead>
-              <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th><th>Submitted</th><th></th></tr>
+              <tr><th class="no-print"></th><th>Name</th><th>Description</th><th>Date</th><th>Time</th><th>Day</th><th>Request</th></tr>
             </thead>
             <tbody>
               <% if (submissions.length === 0) { %>
@@ -188,22 +188,17 @@
               <% } %>
               <% submissions.forEach(function(s) { %>
                 <tr>
-                  <td><%= s.timestamp %></td>
-                  <td><%= s.memberName %></td>
-                  <td><%= s.requestTypeLabel %></td>
-                  <td><%= s.dayLabel %></td>
-                  <td><%= s.description %></td>
-                  <%# A real request: "add the date and timestamp to the end
-                      of the row, before the archive icon button" - same
-                      value as the row's own leading Submitted column,
-                      repeated here so it's still visible without scrolling
-                      back to the left edge on a narrow/scrolled table. %>
-                  <td><%= s.timestamp %></td>
                   <td class="no-print">
                     <form method="POST" action="/admin/logs/nametag/<%= s.id %>/<%= showArchived ? 'unarchive' : 'archive' %>">
                       <button type="submit" class="btn-secondary condensed-btn"><%= showArchived ? 'Unarchive' : 'Archive' %></button>
                     </form>
                   </td>
+                  <td><%= s.memberName %></td>
+                  <td><%= s.description %></td>
+                  <td><%= s.dateLabel %></td>
+                  <td><%= s.timeLabel %></td>
+                  <td><%= s.dayLabel %></td>
+                  <td><%= s.requestTypeLabel %></td>
                 </tr>
               <% }); %>
             </tbody>
@@ -218,19 +213,20 @@
             place. %>
         <table class="roster-table members-table condensed-table logs-print-table">
           <thead>
-            <tr><th>Submitted</th><th>Name</th><th>Request</th><th>Day</th><th>Description</th></tr>
+            <tr><th>Name</th><th>Description</th><th>Date</th><th>Time</th><th>Day</th><th>Request</th></tr>
           </thead>
           <tbody>
             <% if (allSubmissions.length === 0) { %>
-              <tr><td colspan="5" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
+              <tr><td colspan="6" class="roster-empty">No <%= showArchived ? 'archived' : '' %> name tag requests yet.</td></tr>
             <% } %>
             <% allSubmissions.forEach(function(s) { %>
               <tr>
-                <td><%= s.timestamp %></td>
                 <td><%= s.memberName %></td>
-                <td><%= s.requestTypeLabel %></td>
-                <td><%= s.dayLabel %></td>
                 <td><%= s.description %></td>
+                <td><%= s.dateLabel %></td>
+                <td><%= s.timeLabel %></td>
+                <td><%= s.dayLabel %></td>
+                <td><%= s.requestTypeLabel %></td>
               </tr>
             <% }); %>
           </tbody>

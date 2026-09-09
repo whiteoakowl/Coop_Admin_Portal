@@ -3099,6 +3099,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    stretching to fill the whole row on its own. */
 .email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
 
+/* Co-op Admin's own Email/Text toolbar row (Filter/Select All/Select
+   None/Create) - a real request: "make sure the buttons are well
+   balanced and the same size, but also fit properly to text, centered
+   and professional." The default .roster-action-btn flex:1 0 auto this
+   row otherwise inherits stretches every button to fill the whole row
+   edge to edge, which is the opposite of "fit properly to text" once
+   there's more than two or three of them on a wide desktop screen -
+   sized to their own content and centered as a group reads as an
+   intentional toolbar instead. */
+.roster-btn-row-centered { justify-content: center; }
+.roster-btn-row-centered .roster-action-btn { flex: 0 0 auto; }
+
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
    switches to a filled dark state while the archived view is showing, so

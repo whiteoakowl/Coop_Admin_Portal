@@ -72,7 +72,7 @@ test('Logs page pagination', async (t) => {
   const cases = [
     { tab: 'absence', printTableCols: 6 },
     { tab: 'checkinout', printTableCols: 6 },
-    { tab: 'nametag', printTableCols: 5 }, // no Archive/Unarchive action column in print
+    { tab: 'nametag', printTableCols: 6 }, // Name/Description/Date/Time/Day/Request - no Archive column in print
   ];
 
   for (const { tab, printTableCols } of cases) {

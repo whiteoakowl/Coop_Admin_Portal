@@ -17,11 +17,11 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <form method="POST" action="/admin/announcements/text/compose" id="email-select-form">
-      <div class="roster-btn-row">
+      <div class="roster-btn-row roster-btn-row-centered">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
         <button type="button" class="roster-action-btn" data-email-select="all">Select All</button>
         <button type="button" class="roster-action-btn" data-email-select="none">Select None</button>
-        <button type="submit" class="primary-btn">Create Text</button>
+        <button type="submit" class="roster-action-btn">Create Text</button>
       </div>
       <p class="hint" id="email-select-count"></p>
 

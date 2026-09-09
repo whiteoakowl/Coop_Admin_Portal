@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
-const { formatDateLabel, formatTime, formatTimestamp, todayISO, weekdayOf } = require('../utils/dates');
+const { formatDateLabel, formatTime, formatDateAndTime, todayISO, weekdayOf } = require('../utils/dates');
 const { REASON_LABELS } = require('../utils/rosters');
 const { toCsvRow, sendCsv } = require('../utils/spreadsheet');
 const { DAY_LABELS, isValidDay, defaultDay } = require('../utils/days');
@@ -19,22 +19,40 @@ function todayIfSessionDay(day) {
   return weekdayOf(today) === DAY_WEEKDAY[day] ? today : null;
 }
 
-// Every Absence/Late form submission across all rosters, newest first.
-// Reads from absence_submissions - a separate, append-only record of
-// each submission (see that migration's own comment) - rather than the
-// live attendance row a submission first writes, because a member who
-// later checks in for real overwrites that row's status/source straight
-// to 'present'/'kiosk' (a real, intended behavior - see routes/kiosk.js)
-// which used to make the submission vanish from this log too.
+// Every Absence/Late form submission, newest first - one row per actual
+// submission event, not per roster. Reads from absence_submissions - a
+// separate, append-only record of each submission (see that migration's
+// own comment) - rather than the live attendance row a submission first
+// writes, because a member who later checks in for real overwrites that
+// row's status/source straight to 'present'/'kiosk' (a real, intended
+// behavior - see routes/kiosk.js) which used to make the submission
+// vanish from this log too.
+//
+// A real bug report: "absence log should only show the original
+// submission of absence from the absence form. it doesn't need to show
+// absence log from classes. absences from the absence form do still
+// appear on each class roster." routes/absence.js writes one
+// absence_submissions row per roster the member belongs to that day
+// (getMemberRostersForDate returns the day-level Parent/Student roster
+// AND every one of that member's own class rosters), so a student
+// enrolled in 3 classes produced 4 near-identical rows here - the same
+// submission listed 4 times, once per roster. The class rosters
+// themselves still show the absence exactly as before (nothing about
+// that changes) - this only trims the standalone admin Log tab back down
+// to the one row that's the actual submission event, by reading just the
+// day-level roster's own copy (category != 'Class Roster', the same
+// distinction checkinoutCategoryClause already draws between a day-level
+// and a per-class roster) instead of every roster's copy.
 async function allAbsenceSubmissions(dateFilter) {
   let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date, a.status,
              a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
              FROM absence_submissions a
              JOIN members m ON m.id = a.member_id
-             JOIN rosters r ON r.id = a.roster_id`;
+             JOIN rosters r ON r.id = a.roster_id
+             WHERE r.category != 'Class Roster'`;
   const params = [];
   if (dateFilter) {
-    sql += ' WHERE a.session_date = ?';
+    sql += ' AND a.session_date = ?';
     params.push(dateFilter);
   }
   sql += ' ORDER BY a.session_date DESC';
@@ -167,7 +185,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
     const showArchived = req.query.archived === '1';
     const allSubmissions = (await nameTagSubmissions(showArchived, dateFilter)).map((r) => ({
       id: r.id,
-      timestamp: formatTimestamp(r.createdAt),
+      ...formatDateAndTime(r.createdAt),
       memberName: r.memberName,
       requestTypeLabel: REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
       dayLabel: NAME_TAG_DAY_LABELS[r.day] || r.day,
@@ -299,14 +317,14 @@ router.get('/logs/checkinout/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const rows = await checkinoutLogRows(dateFilter, 'coop');
   const lines = [
-    toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
+    toCsvRow(['Name', 'Date', 'Check-In Time', 'Check-Out Time', 'Roster', 'Number']),
     ...rows.map((r) =>
       toCsvRow([
         r.memberName,
-        r.rosterName,
         formatDateLabel(r.date),
         formatTime(r.checkInTime) || '',
         r.checkOutTime ? formatTime(r.checkOutTime) : '',
+        r.rosterName,
         r.number ?? '',
       ])
     ),
@@ -318,14 +336,14 @@ router.get('/logs/classcheckinout/export.csv', requireAdmin, async (req, res) =>
   const dateFilter = req.query.date || '';
   const rows = await checkinoutLogRows(dateFilter, 'class');
   const lines = [
-    toCsvRow(['Name', 'Roster', 'Date', 'Check-In Time', 'Check-Out Time', 'Number']),
+    toCsvRow(['Name', 'Date', 'Check-In Time', 'Check-Out Time', 'Roster', 'Number']),
     ...rows.map((r) =>
       toCsvRow([
         r.memberName,
-        r.rosterName,
         formatDateLabel(r.date),
         formatTime(r.checkInTime) || '',
         r.checkOutTime ? formatTime(r.checkOutTime) : '',
+        r.rosterName,
         r.number ?? '',
       ])
     ),
@@ -338,16 +356,18 @@ router.get('/logs/nametag/export.csv', requireAdmin, async (req, res) => {
   const dateFilter = req.query.date || '';
   const submissions = await nameTagSubmissions(showArchived, dateFilter);
   const lines = [
-    toCsvRow(['Submitted', 'Name', 'Request', 'Day', 'Description']),
-    ...submissions.map((r) =>
-      toCsvRow([
-        formatTimestamp(r.createdAt),
+    toCsvRow(['Name', 'Description', 'Date', 'Time', 'Day', 'Request']),
+    ...submissions.map((r) => {
+      const { dateLabel, timeLabel } = formatDateAndTime(r.createdAt);
+      return toCsvRow([
         r.memberName,
-        REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
-        NAME_TAG_DAY_LABELS[r.day] || r.day,
         r.description || '',
-      ])
-    ),
+        dateLabel,
+        timeLabel,
+        NAME_TAG_DAY_LABELS[r.day] || r.day,
+        REQUEST_TYPE_LABELS[r.requestType] || r.requestType,
+      ]);
+    }),
   ];
   sendCsv(res, `name-tag-${showArchived ? 'archived' : 'requests'}.csv`, lines);
 });
