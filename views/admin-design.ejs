@@ -260,15 +260,7 @@
                     every other bulk print panel already has, combined with
                     its own existing search box (see design-print-hub.js's
                     wireBulkMemberList). %>
-                <select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">
-                  <option value="all">All</option>
-                  <option value="student">Students Only</option>
-                  <option value="primaryParent">Primary Parents Only</option>
-                  <option value="parent">Parents Only</option>
-                  <option value="admin">Admins Only</option>
-                  <option value="teacher">Teachers Only</option>
-                </select>
-                <%- include('partials/family-filter-select', { id: 'schedule-print-family-select', families: families }) %>
+                <%- include('partials/bulk-print-filter-select', { id: 'schedule-print-filter-select', families: families }) %>
                 <div class="category-filter schedule-search">
                   <label for="schedule-print-search-input">Search</label>
                   <input type="search" id="schedule-print-search-input" placeholder="Search by member name&hellip;" />
@@ -296,15 +288,7 @@
                   common case), with Parents Only (every parent, primary or
                   not) still available for the rare time a full family print
                   is actually wanted. %>
-              <select class="name-tag-bulk-filter-select" id="name-tag-bulk-filter-select">
-                <option value="all">All</option>
-                <option value="student">Students Only</option>
-                <option value="primaryParent" selected>Primary Parents Only</option>
-                <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
-                <option value="teacher">Teachers Only</option>
-              </select>
-              <%- include('partials/family-filter-select', { id: 'name-tag-bulk-family-select', families: families }) %>
+              <%- include('partials/bulk-print-filter-select', { id: 'name-tag-bulk-filter-select', families: families, defaultValue: 'primaryParent' }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="name-tag-select-all-checkbox" />
                 Select All
@@ -374,15 +358,7 @@
           <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form" data-bulk-print-refresh>
             <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
             <div class="name-tag-bulk-filter">
-              <select class="name-tag-bulk-filter-select" id="cards-both-bulk-filter-select">
-                <option value="all">All</option>
-                <option value="student">Students Only</option>
-                <option value="primaryParent">Primary Parents Only</option>
-                <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
-                <option value="teacher">Teachers Only</option>
-              </select>
-              <%- include('partials/family-filter-select', { id: 'cards-both-bulk-family-select', families: families }) %>
+              <%- include('partials/bulk-print-filter-select', { id: 'cards-both-bulk-filter-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-both-select-all-checkbox" />
                 Select All
@@ -403,15 +379,7 @@
           <form method="POST" action="/admin/design/print-duplex" target="_blank" id="cards-duplex-print-form" data-bulk-print-refresh>
             <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the long edge) and cut apart for two-sided cards.</p>
             <div class="name-tag-bulk-filter">
-              <select class="name-tag-bulk-filter-select" id="cards-duplex-bulk-filter-select">
-                <option value="all">All</option>
-                <option value="student">Students Only</option>
-                <option value="primaryParent">Primary Parents Only</option>
-                <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
-                <option value="teacher">Teachers Only</option>
-              </select>
-              <%- include('partials/family-filter-select', { id: 'cards-duplex-bulk-family-select', families: families }) %>
+              <%- include('partials/bulk-print-filter-select', { id: 'cards-duplex-bulk-filter-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="cards-duplex-select-all-checkbox" />
                 Select All
@@ -431,15 +399,7 @@
         <div id="print-barcodes-section" hidden>
           <form method="POST" action="/admin/name-tag/print-barcodes" target="_blank" id="barcodes-print-form" data-bulk-print-refresh>
             <div class="name-tag-bulk-filter">
-              <select class="name-tag-bulk-filter-select" id="barcodes-bulk-filter-select">
-                <option value="all">All</option>
-                <option value="student">Students Only</option>
-                <option value="primaryParent">Primary Parents Only</option>
-                <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
-                <option value="teacher">Teachers Only</option>
-              </select>
-              <%- include('partials/family-filter-select', { id: 'barcodes-bulk-family-select', families: families }) %>
+              <%- include('partials/bulk-print-filter-select', { id: 'barcodes-bulk-filter-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcodes-select-all-checkbox" />
                 Select All
@@ -460,15 +420,7 @@
           <form method="POST" action="/admin/name-tag/print-barcode-labels" target="_blank" id="barcode-labels-print-form" data-bulk-print-refresh>
             <p class="hint">Barcode, name, and ID number per label - sized for Avery 08160-style address label sheets (1in x 2-5/8in, 30 per sheet).</p>
             <div class="name-tag-bulk-filter">
-              <select class="name-tag-bulk-filter-select" id="barcode-labels-bulk-filter-select">
-                <option value="all">All</option>
-                <option value="student">Students Only</option>
-                <option value="primaryParent">Primary Parents Only</option>
-                <option value="parent">Parents Only</option>
-                <option value="admin">Admins Only</option>
-                <option value="teacher">Teachers Only</option>
-              </select>
-              <%- include('partials/family-filter-select', { id: 'barcode-labels-bulk-family-select', families: families }) %>
+              <%- include('partials/bulk-print-filter-select', { id: 'barcode-labels-bulk-filter-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">
                 <input type="checkbox" id="barcode-labels-select-all-checkbox" />
                 Select All

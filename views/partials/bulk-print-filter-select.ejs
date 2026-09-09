@@ -1,0 +1,34 @@
+<%
+// Combined Type + Family filter for a bulk-print member picker - a real
+// request: "bulk printing, there are currently two dropdown filters, we
+// only need one, combine them." Replaces the separate Type select
+// (student/primaryParent/parent/admin/teacher) and Family select
+// (partials/family-filter-select.ejs) that used to sit side by side on
+// every one of these panels - both filtered the exact same picker list
+// as two independent, ANDed facets (see design-print-hub.js's own
+// wireBulkMemberList), which is exactly what made them collapsible into
+// one control instead of two. Family options carry a "family:<id>" value
+// (Type option values stay the bare member-type/teacher/primaryParent
+// strings, unchanged) so wireBulkMemberList can tell which facet a
+// selection belongs to from the single value alone. Locals: id (the
+// <select>'s own unique DOM id - every panel needs its own), families
+// (utils/members.js's allFamilies()), defaultValue (optional - e.g.
+// 'primaryParent' for the Name Tags panel, which defaults to that
+// instead of "All").
+%>
+<% var defaultValue = typeof defaultValue !== 'undefined' ? defaultValue : null; %>
+<select class="name-tag-bulk-filter-select" id="<%= id %>">
+  <option value="all"<% if (!defaultValue || defaultValue === 'all') { %> selected<% } %>>All</option>
+  <optgroup label="Type">
+    <option value="student"<% if (defaultValue === 'student') { %> selected<% } %>>Students Only</option>
+    <option value="primaryParent"<% if (defaultValue === 'primaryParent') { %> selected<% } %>>Primary Parents Only</option>
+    <option value="parent"<% if (defaultValue === 'parent') { %> selected<% } %>>Parents Only</option>
+    <option value="admin"<% if (defaultValue === 'admin') { %> selected<% } %>>Admins Only</option>
+    <option value="teacher"<% if (defaultValue === 'teacher') { %> selected<% } %>>Teachers Only</option>
+  </optgroup>
+  <optgroup label="Family">
+    <% families.forEach(function(f) { %>
+      <option value="family:<%= f.id %>"><%= f.name %> Family</option>
+    <% }); %>
+  </optgroup>
+</select>

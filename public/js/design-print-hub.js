@@ -100,17 +100,30 @@
   // filter by family name" - see views/partials/family-filter-select.ejs)
   // layers a family match on top of type/search exactly the same way -
   // a row only shows once it clears every active filter at once.
+  //
+  // A later real request: "bulk printing, there are currently two
+  // dropdown filters, we only need one, combine them." Every panel that
+  // had both a Type select and a separate Family select now has just
+  // one (views/partials/bulk-print-filter-select.ejs), whose Family
+  // options carry a "family:<id>" value instead of a bare id - filter
+  // still reads that single value below and splits it back into a type
+  // filter and a family id itself. Name Tag Requests is the one
+  // remaining panel that only ever had a Family select (no Type facet
+  // to combine it with), so it still passes its own separate
+  // familyFilterSelectId unchanged.
   function wireBulkMemberList(listId, filterSelectId, selectAllId, selectNoneId, searchInputId, familyFilterSelectId) {
     const bulkList = document.getElementById(listId);
     if (!bulkList) return;
-    const filterSelect = document.getElementById(filterSelectId);
+    const filterSelect = filterSelectId ? document.getElementById(filterSelectId) : null;
     const searchInput = searchInputId ? document.getElementById(searchInputId) : null;
     const familyFilterSelect = familyFilterSelectId ? document.getElementById(familyFilterSelectId) : null;
     if (filterSelect || searchInput || familyFilterSelect) {
       const applyFilter = () => {
-        const filter = filterSelect ? filterSelect.value : 'all';
+        const raw = filterSelect ? filterSelect.value : 'all';
+        const isFamilyValue = raw.indexOf('family:') === 0;
+        const filter = isFamilyValue ? 'all' : raw;
         const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
-        const familyId = familyFilterSelect ? familyFilterSelect.value : '';
+        const familyId = familyFilterSelect ? familyFilterSelect.value : isFamilyValue ? raw.slice('family:'.length) : '';
         bulkList.querySelectorAll('.print-picker-row').forEach((row) => {
           // "Teachers" and "Primary Parents" are their own dataset
           // (data-teacher/data-primary) rather than their own member_type
@@ -165,17 +178,9 @@
     'schedule-print-filter-select',
     'schedule-print-select-all-checkbox',
     null,
-    'schedule-print-search-input',
-    'schedule-print-family-select'
+    'schedule-print-search-input'
   );
-  wireBulkMemberList(
-    'name-tag-bulk-list',
-    'name-tag-bulk-filter-select',
-    'name-tag-select-all-checkbox',
-    'name-tag-select-none-checkbox',
-    undefined,
-    'name-tag-bulk-family-select'
-  );
+  wireBulkMemberList('name-tag-bulk-list', 'name-tag-bulk-filter-select', 'name-tag-select-all-checkbox', 'name-tag-select-none-checkbox');
   wireBulkMemberList(
     'name-tag-requests-bulk-list',
     undefined,
@@ -184,37 +189,14 @@
     undefined,
     'name-tag-requests-family-select'
   );
-  wireBulkMemberList(
-    'cards-both-bulk-list',
-    'cards-both-bulk-filter-select',
-    'cards-both-select-all-checkbox',
-    'cards-both-select-none-checkbox',
-    undefined,
-    'cards-both-bulk-family-select'
-  );
-  wireBulkMemberList(
-    'cards-duplex-bulk-list',
-    'cards-duplex-bulk-filter-select',
-    'cards-duplex-select-all-checkbox',
-    'cards-duplex-select-none-checkbox',
-    undefined,
-    'cards-duplex-bulk-family-select'
-  );
-  wireBulkMemberList(
-    'barcodes-bulk-list',
-    'barcodes-bulk-filter-select',
-    'barcodes-select-all-checkbox',
-    'barcodes-select-none-checkbox',
-    undefined,
-    'barcodes-bulk-family-select'
-  );
+  wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
+  wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
+  wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
   wireBulkMemberList(
     'barcode-labels-bulk-list',
     'barcode-labels-bulk-filter-select',
     'barcode-labels-select-all-checkbox',
-    'barcode-labels-select-none-checkbox',
-    undefined,
-    'barcode-labels-bulk-family-select'
+    'barcode-labels-select-none-checkbox'
   );
 
   // Class Check-In QR Codes picker: select-all/select-none plus a Day/Hour

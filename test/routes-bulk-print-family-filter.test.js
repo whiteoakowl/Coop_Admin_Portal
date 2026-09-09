@@ -1,14 +1,19 @@
 // Coverage for a real request: "all bulk printing should have filter by
-// family name." Every member-based bulk print picker on the Design/Print
-// hub (Co-op Admin's /admin/design and Main Admin's /main-admin/name-tags)
-// gets its own Family Name filter select (views/partials/family-filter-
-// select.ejs), built from utils/members.js's allFamilies() and matched
+// family name," and its own follow-up: "there are currently two dropdown
+// filters, we only need one, combine them." Every member-based bulk print
+// picker on the Design/Print hub (Co-op Admin's /admin/design and Main
+// Admin's /main-admin/name-tags) folds Family Name options into its own
+// Type filter select (views/partials/bulk-print-filter-select.ejs, built
+// from utils/members.js's allFamilies()) as a "family:<id>" value, matched
 // client-side against each row's own data-family-id (views/partials/
 // print-picker-table.ejs) by public/js/design-print-hub.js's
-// wireBulkMemberList - the same mechanism the existing Type filter already
-// uses. The filter itself is client-side JS a jsdom-free route test can't
-// exercise directly (same reasoning as test/routes-admin-design-teacher-
-// filter.test.js) - this locks in the markup contract it depends on.
+// wireBulkMemberList. Name Tag Requests is the one exception - it never
+// had a Type filter to combine with, so it still gets its own standalone
+// Family Name select (views/partials/family-filter-select.ejs, plain
+// numeric option values). The filter itself is client-side JS a jsdom-
+// free route test can't exercise directly (same reasoning as
+// test/routes-admin-design-teacher-filter.test.js) - this locks in the
+// markup contract it depends on.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -79,25 +84,26 @@ test('Design/Print hub (Co-op Admin): every member-based print panel offers a Fa
   const res = await request(app).get('/admin/design?tab=print').set('Cookie', cookie);
   assert.equal(res.status, 200);
 
-  // One Family Name filter select per member-based panel: Schedule Cards,
-  // Name Tags, Cards Both, Cards Duplex, Barcodes Only, Barcode Mailing
-  // Labels. Name Tag Requests has its own select too, but only renders
-  // once there's at least one pending request - covered separately below
-  // (with a seeded request) rather than here.
+  // One combined Type + Family filter select per member-based panel:
+  // Schedule Cards, Name Tags, Cards Both, Cards Duplex, Barcodes Only,
+  // Barcode Mailing Labels. Name Tag Requests has its own standalone
+  // Family-only select instead, but only renders once there's at least
+  // one pending request - covered separately below (with a seeded
+  // request) rather than here.
   const expectedIds = [
-    'schedule-print-family-select',
-    'name-tag-bulk-family-select',
-    'cards-both-bulk-family-select',
-    'cards-duplex-bulk-family-select',
-    'barcodes-bulk-family-select',
-    'barcode-labels-bulk-family-select',
+    'schedule-print-filter-select',
+    'name-tag-bulk-filter-select',
+    'cards-both-bulk-filter-select',
+    'cards-duplex-bulk-filter-select',
+    'barcodes-bulk-filter-select',
+    'barcode-labels-bulk-filter-select',
   ];
   for (const id of expectedIds) {
     const selectMatch = new RegExp(`<select class="name-tag-bulk-filter-select" id="${id}">[\\s\\S]*?</select>`).exec(res.text);
-    assert.ok(selectMatch, `expected the ${id} Family Name filter select`);
-    assert.match(selectMatch[0], /<option value="">All Families<\/option>/);
-    assert.match(selectMatch[0], /<option value="\d+">Anderson Family<\/option>/);
-    assert.match(selectMatch[0], /<option value="\d+">Baker Family<\/option>/);
+    assert.ok(selectMatch, `expected the ${id} combined Type + Family filter select`);
+    assert.match(selectMatch[0], /<optgroup label="Family">/);
+    assert.match(selectMatch[0], /<option value="family:\d+">Anderson Family<\/option>/);
+    assert.match(selectMatch[0], /<option value="family:\d+">Baker Family<\/option>/);
   }
 
   // print-picker-table.ejs's real rows (Schedule Cards - the others are
@@ -133,15 +139,17 @@ test('Main Admin Design/Print hub: every member-based print panel offers a Famil
   assert.equal(res.status, 200);
 
   const expectedIds = [
-    'schedule-print-family-select',
-    'name-tag-bulk-family-select',
-    'cards-both-bulk-family-select',
-    'cards-duplex-bulk-family-select',
-    'barcodes-bulk-family-select',
-    'barcode-labels-bulk-family-select',
+    'schedule-print-filter-select',
+    'name-tag-bulk-filter-select',
+    'cards-both-bulk-filter-select',
+    'cards-duplex-bulk-filter-select',
+    'barcodes-bulk-filter-select',
+    'barcode-labels-bulk-filter-select',
   ];
   for (const id of expectedIds) {
-    assert.match(res.text, new RegExp(`<select class="name-tag-bulk-filter-select" id="${id}">`), `expected the ${id} Family Name filter select`);
+    const selectMatch = new RegExp(`<select class="name-tag-bulk-filter-select" id="${id}">[\\s\\S]*?</select>`).exec(res.text);
+    assert.ok(selectMatch, `expected the ${id} combined Type + Family filter select`);
+    assert.match(selectMatch[0], new RegExp(`<option value="family:${fam}">Douglas Family</option>`));
   }
   assert.match(rowAttrs(res.text, memberId), new RegExp(`data-family-id="${fam}"`));
 });
