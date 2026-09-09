@@ -8,8 +8,18 @@
 // Follow-up request: "attendance printing the roster can stretch to two
 // pages so the font can be 12 point" - the live grid's own data-shrink-
 // to-fit-on-print forced everything onto one (illegibly small) page; this
-// preview has no shrink script at all, so a long roster can flow across
-// more than one physical page instead.
+// preview instead starts at 12pt and lets a long roster flow across more
+// than one physical page.
+//
+// Second follow-up: "printing skips the first page. width should fit to
+// page. height should shrink to fit attendance 50 per page." - rows are
+// now split into fixed 50-row .roster-print-chunk groups, each with its
+// own repeated print header and a forced page break before the next one
+// (see routes/admin-rosters.js's own comment on the /rosters/print
+// route, and styles.css's comment on .roster-print-chunk, for why this
+// deliberately does NOT reuse the shrink-to-fit mechanism the Attendance
+// Archive print page uses for the same "page per section" shape - it
+// was found to silently drop rows for a wide/dense enough roster).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -83,6 +93,32 @@ test('GET /admin/rosters/print', async (t) => {
       assert.equal(res.status, 200);
       assert.match(res.text, new RegExp(cls.class_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
+  });
+
+  await t.test('a roster with more than 50 members splits into fixed 50-row print chunks, each with its own repeated header', async () => {
+    const { ensureDayRoster } = require('../utils/classSchedule');
+    const rosterId = await ensureDayRoster('wednesday', 'parent');
+    for (let i = 1; i <= 60; i++) {
+      const memberId = (
+        await db
+          .prepare(`INSERT INTO members (name, barcode, member_type) VALUES ('Print Page Member ${String(i).padStart(2, '0')}', 'print-page-member-${i}', 'parent') RETURNING id`)
+          .get()
+      ).id;
+      await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual')").run(rosterId, memberId);
+    }
+
+    const res = await request(app).get('/admin/rosters/print?tab=wednesday-parent').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+
+    const chunks = res.text.split('roster-print-chunk').length - 1;
+    assert.equal(chunks, 2, 'a 60-member roster should split into exactly 2 print chunks of up to 50 rows each');
+    assert.equal((res.text.match(/Wednesday Parents Attendance Spreadsheet/g) || []).length, 2, 'each chunk repeats its own print header');
+
+    const firstChunkEnd = res.text.indexOf('roster-print-chunk', res.text.indexOf('roster-print-chunk') + 1);
+    const firstChunkHtml = res.text.slice(0, firstChunkEnd);
+    const secondChunkHtml = res.text.slice(firstChunkEnd);
+    assert.equal((firstChunkHtml.match(/<td class="roster-name-col">Print Page Member/g) || []).length, 50, 'first chunk holds 50 rows');
+    assert.equal((secondChunkHtml.match(/<td class="roster-name-col">Print Page Member/g) || []).length, 10, 'second chunk holds the remaining 10 rows');
   });
 
   await t.test('the Playground log Print button links to the preview route with its own tab and selected date', async () => {

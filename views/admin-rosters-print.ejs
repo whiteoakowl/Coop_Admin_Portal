@@ -12,18 +12,28 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : `${tabLabel} Attendance Spreadsheet` %></p>
-      </div>
-    </div>
-
     <% if (view === 'playgroundLog') { %>
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= pgDayLabel %> Playground &mdash; <%= pgHourLabel %></p>
+        </div>
+      </div>
       <%- include('partials/playground-log-table', { pgDayLabel, pgHourLabel, selectedDate, selectedDateLabel, log }) %>
     <% } else { %>
-      <%- include('partials/roster-archive-grid-table', { heading: tabLabel, grid }) %>
+      <% gridPages.forEach(function(pageGrid) { %>
+        <div class="roster-print-chunk">
+          <div class="print-header">
+            <img src="/img/logo.png" alt="" />
+            <div>
+              <p class="print-header-title">Sanford Homeschoolers</p>
+              <p class="print-header-sub"><%= tabLabel %> Attendance Spreadsheet</p>
+            </div>
+          </div>
+          <%- include('partials/roster-archive-grid-table', { heading: tabLabel, grid: pageGrid }) %>
+        </div>
+      <% }); %>
     <% } %>
   </main>
   <script src="/js/print-auto.js"></script>

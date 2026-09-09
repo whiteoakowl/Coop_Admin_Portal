@@ -416,12 +416,10 @@ router.get('/rosters', requireAdmin, async (req, res) => {
 // to two pages so the font can be 12 point" - unlike the live page's own
 // data-shrink-to-fit-on-print (public/js/print-shrink-to-fit.js), which
 // scales the WHOLE grid down to guarantee exactly one page, this preview
-// deliberately has no shrink script at all - a plain, unbounded <table>
-// with a real <thead> lets the browser's own print pagination flow a
-// long roster across as many physical pages as it actually needs (with
-// the header row repeating on each), at a fixed, comfortably readable
-// 12pt (see the .attendance-print-page rule in styles.css) instead of
-// shrinking illegibly small to force one page.
+// starts every page at a fixed, comfortably readable 12pt (see the
+// .attendance-print-page rule in styles.css) and only shrinks a given
+// 50-row page from there if it still doesn't fit - see the "grid" branch
+// below for how pages are split.
 router.get('/rosters/print', requireAdmin, async (req, res) => {
   const requestedTab = req.query.tab || '';
 
@@ -467,18 +465,57 @@ router.get('/rosters/print', requireAdmin, async (req, res) => {
   if (!roster) return res.status(404).render('404', { title: 'Not Found' });
   const dates = classId ? await rosterDates(await ensureDayRoster(day, 'student')) : await rosterDates(rosterId);
 
+  // partials/roster-archive-grid-table expects the flattened { name, ... }
+  // row shape archiveGrid already builds for the Archive print page
+  // (row.member.name -> row.name, and the same PII strip - no reason a
+  // printed attendance sheet needs medical notes/photo/address/phone/email
+  // either), not buildRosterGridData's own live { member: {...}, ... }
+  // shape - same helper, reused as-is.
+  const grid = archiveGrid(await buildRosterGridData(roster, classId ? dates : undefined));
+
+  // A real request: "printing skips the first page. width should fit to
+  // page. height should shrink to fit attendance 50 per page." A big
+  // day-level roster (dozens of members) used to render as ONE unbounded
+  // <table> with no shrink-to-fit at all (a deliberate earlier choice -
+  // see this route's own comment above - to avoid illegibly tiny text),
+  // relying on the browser's own print pagination to flow rows across
+  // however many physical pages they happened to need. That flow-based
+  // approach is what actually caused the "skips first page" bug: the
+  // .grid-box wrapper around the table (styles.css) carries a shared
+  // break-inside: avoid rule (written for Setup/Cleanup's much shorter
+  // card grids), and a roster tall enough to never fit on a single
+  // remaining page gets pushed onto page 2 in one piece, leaving page 1
+  // holding only the print header.
+  //
+  // Splitting rows into fixed 50-row chunks (.roster-print-chunk in the
+  // view, styles.css's own comment on that class has the rest of the
+  // story) directly fixes that: .grid-box's break-inside: avoid is
+  // overridden back to auto inside a chunk, so a chunk that's too tall
+  // for the page it starts on simply lets its own table split across a
+  // physical page boundary (header row repeating) instead of jumping
+  // wholesale to the next page. Each chunk still forces a page break
+  // BEFORE the next one, so chunk boundaries always land on a fresh
+  // sheet. Deliberately NOT wrapped in a shrink-to-fit box (verified live
+  // via Playwright + pdfjs text extraction, per physical page, that the
+  // shrink-to-fit + fixed-height + overflow:hidden combination used
+  // elsewhere on this page silently drops rows once a chunk's real
+  // content still doesn't fit even at print-shrink-to-fit.js's own
+  // legibility floor) - a 50-row chunk landing on more than one physical
+  // page for an unusually wide/dense roster is an honest, lossless
+  // outcome; silently missing attendance rows on a printed record is not.
+  const ROWS_PER_PRINT_PAGE = 50;
+  const gridPages = [];
+  for (let i = 0; i < grid.rows.length || i === 0; i += ROWS_PER_PRINT_PAGE) {
+    gridPages.push({ dateLabels: grid.dateLabels, rows: grid.rows.slice(i, i + ROWS_PER_PRINT_PAGE), summary: grid.summary });
+    if (grid.rows.length === 0) break;
+  }
+
   res.render('admin-rosters-print', {
     title: `${tabLabel} Print Preview`,
     view: 'grid',
     tabLabel,
     dayLabel: DAY_LABELS[day],
-    // partials/roster-archive-grid-table expects the flattened
-    // { name, ... } row shape archiveGrid already builds for the Archive
-    // print page (row.member.name -> row.name, and the same PII strip -
-    // no reason a printed attendance sheet needs medical notes/photo/
-    // address/phone/email either), not buildRosterGridData's own live
-    // { member: {...}, ... } shape - same helper, reused as-is.
-    grid: archiveGrid(await buildRosterGridData(roster, classId ? dates : undefined)),
+    gridPages,
   });
 });
 
