@@ -1647,12 +1647,6 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 @media (max-width: 480px) {
   .totals-item .stat-value { font-size: 1.15rem; }
   .totals-item .stat-label { font-size: 0.62rem; }
-  .analytics-stat-grid { gap: 0.5rem; }
-  .analytics-stat { padding: 0.55rem 0.6rem; min-width: 0; }
-  .analytics-stat-label { font-size: 0.68rem; }
-  .analytics-stat-value { font-size: 1.15rem; }
-  .analytics-stat-of { font-size: 0.75rem; }
-  .trend-badge { font-size: 0.62rem; }
 }
 
 /* Co-op Admin homepage "Family & Student Counts" card - replaces the old
@@ -1666,17 +1660,17 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: 1.75rem;
+  padding: 1.1rem 1.25rem;
   margin-top: 1.5rem;
+  max-width: 480px;
 }
-.family-student-counts-header { display: flex; align-items: flex-start; gap: 0.9rem; margin-bottom: 1.5rem; }
-.family-student-counts-header > .icon { width: 30px; height: 30px; color: var(--ink); flex-shrink: 0; margin-top: 0.15rem; }
-.family-student-counts-header h2 { margin: 0; font-size: 1.4rem; }
-.family-student-counts-header .subtitle { margin: 0.2rem 0 0; color: var(--muted); }
+.family-student-counts-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; }
+.family-student-counts-header > .icon { width: 20px; height: 20px; color: var(--ink); flex-shrink: 0; }
+.family-student-counts-header h2 { margin: 0; font-size: 1.05rem; }
 .family-student-counts-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: 1rem;
   position: relative;
 }
 .family-student-counts-columns::before {
@@ -1693,56 +1687,82 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   background: var(--brand-soft);
   color: var(--brand-dark);
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 0.4rem 1.1rem;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.6rem;
 }
-.family-student-row { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.25rem; }
+/* Today's Attendance card's own two pills - a real request: "parents
+   should be orange, students should be blue" - .family-student-day-pill's
+   own default IS that same blue, so -blue is just an explicit alias of
+   it for clarity at the call site (views/partials/dashboard-type-
+   stats.ejs) rather than relying on the bare class's default color. */
+.family-student-day-pill-orange { background: var(--orange-bg); color: var(--orange); }
+.family-student-day-pill-blue { background: var(--brand-soft); color: var(--brand-dark); }
+.family-student-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; }
 .family-student-row:last-child { margin-bottom: 0; }
 .family-student-row-icon {
-  width: 48px;
-  height: 48px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.family-student-row-icon .icon { width: 22px; height: 22px; }
+.family-student-row-icon .icon { width: 15px; height: 15px; }
 .family-student-row-icon-blue { background: var(--brand-soft); color: var(--brand-dark); }
 .family-student-row-icon-green { background: var(--green-bg); color: var(--green); }
 .family-student-row-icon-purple { background: var(--purple-soft); color: var(--purple); }
-.family-student-row-text { display: flex; flex-direction: column; gap: 0.15rem; }
-.family-student-row-label { color: var(--muted); font-size: 0.95rem; }
-.family-student-row-value { font-size: 1.6rem; font-weight: 800; color: var(--ink); line-height: 1; }
+.family-student-row-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.family-student-row-label { color: var(--muted); font-size: 0.7rem; white-space: nowrap; }
+.family-student-row-value { font-size: 1.05rem; font-weight: 800; color: var(--ink); line-height: 1; }
 
 @media (max-width: 720px) {
-  .family-student-counts-card { padding: 1.1rem; }
-  .family-student-counts-columns { grid-template-columns: 1fr; gap: 1.5rem; }
-  .family-student-counts-columns::before { display: none; }
+  /* A real request: "on mobile the Monday/Wednesday columns should be
+     next to each other" - stays a 2-column grid (not the 1-column stack
+     most of this app's own cards use at this breakpoint), just shrunk
+     further so both columns still fit side by side on a phone screen. */
+  .family-student-counts-card { max-width: none; padding: 0.9rem 0.85rem; }
+  .family-student-counts-columns { gap: 0.6rem; }
+  .family-student-day-pill { font-size: 0.65rem; padding: 0.15rem 0.5rem; margin-bottom: 0.5rem; }
+  .family-student-row { gap: 0.4rem; margin-bottom: 0.45rem; }
+  .family-student-row-icon { width: 26px; height: 26px; }
+  .family-student-row-icon .icon { width: 13px; height: 13px; }
+  .family-student-row-label { font-size: 0.62rem; }
+  .family-student-row-value { font-size: 0.92rem; }
 }
 
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
 
-.dashboard-analytics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
-}
-@media (max-width: 720px) {
-  .dashboard-analytics-grid { grid-template-columns: 1fr; }
-}
-
+/* A real request: "today's attendance counts on the homepage, it should
+   all be on one smaller card. parents in one column and students next
+   to it in another column" - one card (not two separate ones), same
+   two-column-with-divider shape as the Family & Student Counts card
+   above, on both desktop and mobile. */
 .dashboard-analytics-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: var(--card-padding);
+  padding: 1.1rem 1.25rem;
   box-shadow: var(--shadow-sm);
+  max-width: 480px;
 }
-.dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
-.dashboard-analytics-header h2 { margin: 0; }
+.dashboard-analytics-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  position: relative;
+}
+.dashboard-analytics-columns::before {
+  content: '';
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+}
 
 /* Checked In/Checked Out on the top row, Absent/Late on the bottom row -
    a real request: "today's attendance cards should have the soft
@@ -1755,15 +1775,29 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .analytics-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  gap: 0.4rem;
 }
 .analytics-stat {
-  border-radius: 10px;
-  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
 }
-.analytics-stat-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.02em; }
-.analytics-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--ink); }
-.analytics-stat-of { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.analytics-stat-label { display: block; font-size: 0.6rem; font-weight: 700; color: var(--ink); margin-bottom: 0.1rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.analytics-stat-value { font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+.analytics-stat-of { font-size: 0.68rem; font-weight: 600; color: var(--muted); }
+
+@media (max-width: 720px) {
+  /* Same "stay 2 columns, just shrink further" mobile treatment as the
+     Family & Student Counts card above - Parents/Students stay side by
+     side instead of stacking. */
+  .dashboard-analytics-card { max-width: none; padding: 0.9rem 0.85rem; }
+  .dashboard-analytics-columns { gap: 0.6rem; }
+  .analytics-stat-grid { gap: 0.3rem; }
+  .analytics-stat { padding: 0.3rem 0.4rem; min-width: 0; }
+  .analytics-stat-label { font-size: 0.55rem; }
+  .analytics-stat-value { font-size: 0.82rem; }
+  .analytics-stat-of { font-size: 0.6rem; }
+  .trend-badge { font-size: 0.58rem; }
+}
 
 .analytics-stat-checkedin { background: linear-gradient(160deg, var(--surface), var(--green-bg)); }
 .analytics-stat-checkedin .analytics-stat-label, .analytics-stat-checkedin .analytics-stat-value { color: var(--green); }

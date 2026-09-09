@@ -35,7 +35,8 @@ test.after(() => {
 
 // Pulls the "of Y" denominator shown under a stats card's "Checked In" row.
 function ofTotalFor(html, cardLabel) {
-  const afterHeading = html.slice(html.indexOf(`<h2>${cardLabel}</h2>`));
+  const heading = new RegExp(`<span class="family-student-day-pill[^"]*">${cardLabel}</span>`).exec(html);
+  const afterHeading = html.slice(heading ? heading.index : html.length);
   const match = /analytics-stat-checkedin">[\s\S]*?analytics-stat-of"> of (\d+)/.exec(afterHeading);
   return match ? parseInt(match[1], 10) : null;
 }

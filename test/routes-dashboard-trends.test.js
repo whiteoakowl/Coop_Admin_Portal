@@ -42,7 +42,8 @@ async function loginAsAdmin() {
 // Pulls the numeric "Checked In" value shown under the named stats card
 // (e.g. "Students") from the rendered dashboard HTML.
 function checkedInCountFor(html, cardLabel) {
-  const afterHeading = html.slice(html.indexOf(`<h2>${cardLabel}</h2>`));
+  const heading = new RegExp(`<span class="family-student-day-pill[^"]*">${cardLabel}</span>`).exec(html);
+  const afterHeading = html.slice(heading ? heading.index : html.length);
   const match = /analytics-stat-checkedin">[\s\S]*?analytics-stat-value">(\d+)/.exec(afterHeading);
   return match ? parseInt(match[1], 10) : null;
 }

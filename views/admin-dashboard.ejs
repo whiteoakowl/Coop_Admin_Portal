@@ -11,10 +11,7 @@
     <div class="family-student-counts-card">
       <div class="family-student-counts-header">
         <svg class="icon"><use href="#icon-calendar-check"/></svg>
-        <div>
-          <h2>Family &amp; Student Counts</h2>
-          <p class="subtitle">Quick snapshot of key counts for upcoming days.</p>
-        </div>
+        <h2>Family &amp; Student Counts</h2>
       </div>
       <div class="family-student-counts-columns">
         <div class="family-student-counts-column">
@@ -69,9 +66,11 @@
     </div>
 
     <h2 class="dashboard-section-title">Today's Attendance</h2>
-    <div class="dashboard-analytics-grid">
-      <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
-      <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
+    <div class="dashboard-analytics-card">
+      <div class="dashboard-analytics-columns">
+        <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
+        <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
+      </div>
     </div>
 
     <%

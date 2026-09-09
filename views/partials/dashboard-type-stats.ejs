@@ -6,10 +6,8 @@
 // than a misleading comparison against a session that never happened.
 var trendSymbols = { up: '&#9650;', down: '&#9660;', flat: '&#9679;' };
 %>
-<div class="dashboard-analytics-card">
-  <div class="dashboard-analytics-header">
-    <h2><%= label %></h2>
-  </div>
+<div class="dashboard-analytics-column">
+  <span class="family-student-day-pill <%= label === 'Parents' ? 'family-student-day-pill-orange' : 'family-student-day-pill-blue' %>"><%= label %></span>
   <div class="analytics-stat-grid">
     <% [
       { key: 'checkedIn', label: 'Checked In', cellClass: 'analytics-stat-checkedin' },

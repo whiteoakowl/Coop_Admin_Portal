@@ -59,7 +59,6 @@ test('the Family & Student Counts card renders Monday and Wednesday columns with
   const res = await request(app).get('/admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /Family &amp; Student Counts/);
-  assert.match(res.text, /Quick snapshot of key counts for upcoming days\./);
   assert.match(res.text, /<span class="family-student-day-pill">Monday<\/span>/);
   assert.match(res.text, /<span class="family-student-day-pill">Wednesday<\/span>/);
   assert.equal(statValuesFor(res.text, 'Parent Count').length, 2, 'Parent Count should appear once per day column');
