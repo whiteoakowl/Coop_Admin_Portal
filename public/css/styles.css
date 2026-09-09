@@ -1744,26 +1744,38 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .dashboard-analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
 .dashboard-analytics-header h2 { margin: 0; }
 
-/* Checked In/Checked Out on the top row, Absent/Late on the bottom row. */
+/* Checked In/Checked Out on the top row, Absent/Late on the bottom row -
+   a real request: "today's attendance cards should have the soft
+   orange, blue, green and purple used across the website" - the same
+   soft gradient-fill treatment this homepage's own stat cards already
+   use (see the Family & Student Counts card's row icons, and this app's
+   established --orange-bg/--brand-soft/--green-bg/--purple-soft
+   tokens), replacing the old plain-white/left-border-accent look (which
+   also used red/yellow, outside that established quad). */
 .analytics-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
 }
 .analytics-stat {
-  background: #fff;
   border-radius: 10px;
-  border-left: 4px solid var(--border);
   padding: 0.7rem 0.9rem;
 }
 .analytics-stat-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.02em; }
 .analytics-stat-value { font-size: 1.5rem; font-weight: 800; color: var(--ink); }
 .analytics-stat-of { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 
-.analytics-stat-checkedin { border-left-color: var(--green); }
-.analytics-stat-checkedout { border-left-color: var(--brand-dark); }
-.analytics-stat-late { border-left-color: var(--yellow-solid); }
-.analytics-stat-absent { border-left-color: var(--red); }
+.analytics-stat-checkedin { background: linear-gradient(160deg, var(--surface), var(--green-bg)); }
+.analytics-stat-checkedin .analytics-stat-label, .analytics-stat-checkedin .analytics-stat-value { color: var(--green); }
+
+.analytics-stat-checkedout { background: linear-gradient(160deg, var(--surface), var(--brand-soft)); }
+.analytics-stat-checkedout .analytics-stat-label, .analytics-stat-checkedout .analytics-stat-value { color: var(--brand-dark); }
+
+.analytics-stat-absent { background: linear-gradient(160deg, var(--surface), var(--orange-bg)); }
+.analytics-stat-absent .analytics-stat-label, .analytics-stat-absent .analytics-stat-value { color: var(--orange); }
+
+.analytics-stat-late { background: linear-gradient(160deg, var(--surface), var(--purple-soft)); }
+.analytics-stat-late .analytics-stat-label, .analytics-stat-late .analytics-stat-value { color: var(--purple); }
 
 /* Trend badges (views/partials/dashboard-type-stats.ejs) - a stat's
    count this session vs. the same stat last session. Neutral gray for
