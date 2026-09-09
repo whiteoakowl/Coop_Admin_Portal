@@ -40,6 +40,22 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// A real bug report: this file's own tests hardcoded a fixed calendar date
+// ('2026-09-07', "a Monday") that was in the future when written but is
+// now in the past - GET /fragment's own upcomingDates filter (routes/
+// admin-volunteers.js) excludes any date < today, so its test started
+// failing (rendering the empty "Add a position above first" state)
+// purely because real time caught up to the hardcoded literal, nothing to
+// do with the feature itself. Computed fresh each run instead, so this
+// can't go stale again - still lands on a real Monday (day: 'monday' is
+// used throughout this file) since some of the app's own date logic
+// (utils/substitutes.js's DAY_WEEKDAY) does care about the actual weekday.
+function nextMonday() {
+  const d = new Date();
+  d.setDate(d.getDate() + (((1 - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 function extractCsrf(html) {
   return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
 }
@@ -51,7 +67,7 @@ test('assign via fetch (X-Requested-With header) returns JSON instead of redirec
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fetch Floater', 'fetch-floater-assign', 'parent')")
     .run();
-  const date = '2026-09-07'; // a Monday
+  const date = nextMonday();
   const { classVacancySlotId } = require('../utils/substitutes');
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
@@ -80,7 +96,7 @@ test('assign via fetch surfaces a conflict error as JSON with a 400, not a redir
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Double Booked Floater', 'fetch-floater-conflict', 'parent')")
     .run();
-  const date = '2026-09-07';
+  const date = nextMonday();
   const { classVacancySlotId, approveAssignment } = require('../utils/substitutes');
   const slotIdA = classVacancySlotId(classA, 'assistant', 1);
   const slotIdB = classVacancySlotId(classB, 'assistant', 1);
@@ -114,7 +130,7 @@ test('unassign via fetch returns JSON and deletes the assignment', async () => {
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fetch Floater Two', 'fetch-floater-unassign', 'parent')")
     .run();
-  const date = '2026-09-07';
+  const date = nextMonday();
   const { classVacancySlotId } = require('../utils/substitutes');
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
@@ -148,7 +164,7 @@ test('a plain (non-fetch) form POST still gets the original redirect, unaffected
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Plain Post Floater', 'plain-post-floater', 'parent')")
     .run();
-  const date = '2026-09-07';
+  const date = nextMonday();
   const { classVacancySlotId } = require('../utils/substitutes');
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
@@ -172,7 +188,7 @@ test('/fragment returns just the cards grid HTML (no <html>/<body>), reflecting 
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fragment Floater', 'fragment-floater', 'parent')")
     .run();
-  const date = '2026-09-07';
+  const date = nextMonday();
   const { classVacancySlotId } = require('../utils/substitutes');
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
