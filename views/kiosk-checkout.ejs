@@ -56,7 +56,15 @@
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
-          inputmode="none"
+          <%# Deliberately no inputmode attribute here - see public/js/
+              kiosk-common.js's own keepInputFocused() comment: the
+              on-screen-keyboard-suppressing value it used to carry is
+              documented to also silently block real hardware/Bluetooth-
+              scanner keystrokes from reaching this input at all on some
+              Android Chrome/WebView versions. That JS toggles this
+              input's own `readonly` instead, which suppresses the
+              on-screen keyboard just as reliably without that failure
+              mode. %>
         />
       </form>
 
@@ -137,7 +145,15 @@
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
-          inputmode="none"
+          <%# Deliberately no inputmode attribute here - see public/js/
+              kiosk-common.js's own keepInputFocused() comment: the
+              on-screen-keyboard-suppressing value it used to carry is
+              documented to also silently block real hardware/Bluetooth-
+              scanner keystrokes from reaching this input at all on some
+              Android Chrome/WebView versions. That JS toggles this
+              input's own `readonly` instead, which suppresses the
+              on-screen keyboard just as reliably without that failure
+              mode. %>
         />
       </form>
 
@@ -206,7 +222,15 @@
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
-          inputmode="none"
+          <%# Deliberately no inputmode attribute here - see public/js/
+              kiosk-common.js's own keepInputFocused() comment: the
+              on-screen-keyboard-suppressing value it used to carry is
+              documented to also silently block real hardware/Bluetooth-
+              scanner keystrokes from reaching this input at all on some
+              Android Chrome/WebView versions. That JS toggles this
+              input's own `readonly` instead, which suppresses the
+              on-screen keyboard just as reliably without that failure
+              mode. %>
         />
       </form>
 
