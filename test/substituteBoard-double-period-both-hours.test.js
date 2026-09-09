@@ -42,6 +42,18 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-09-07'/'2026-09-09' were
+// in the future when this file was written but aren't anymore. Computed
+// fresh each run so this can't go stale again - targetDow (0=Sunday...
+// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
+// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 async function setHourTimes(cookie, day, startTimes, endTimes) {
   const page = await request(app).get(`/admin/schedule?tab=${day}`).set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
@@ -67,7 +79,7 @@ test('a double-period class\'s missing-teacher slot appears on substituteBoard f
   ).lastInsertRowid;
   await addStaff(classId, teacherId, 'teacher');
 
-  const date = '2026-09-07'; // a Monday
+  const date = nextWeekday(1); // a Monday
   const rosterId = (await db.prepare("INSERT INTO rosters (name, category) VALUES ('Double Period Roster', 'Class Schedule')").run()).lastInsertRowid;
   await db
     .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'kiosk')")
@@ -119,7 +131,7 @@ test('the Archive tab (dailyAssignmentCardsWithLabels) and the public kiosk view
   ).lastInsertRowid;
   await addStaff(classId, assistantId, 'assistant');
 
-  const date = '2026-09-09'; // a Wednesday
+  const date = nextWeekday(3); // a Wednesday
   const rosterId = (await db.prepare("INSERT INTO rosters (name, category) VALUES ('Cooking Roster', 'Class Schedule')").run()).lastInsertRowid;
   await db
     .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'kiosk')")

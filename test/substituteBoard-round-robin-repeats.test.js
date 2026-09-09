@@ -47,6 +47,18 @@ async function makeParent(name, barcode) {
   return (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'parent')").run(name, barcode)).lastInsertRowid;
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-08-31'/'2026-09-02' were
+// in the future when this file was written but aren't anymore. Computed
+// fresh each run so this can't go stale again - targetDow (0=Sunday...
+// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
+// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 test('substituteBoard keeps rotating through a small floater pool once every member has had one turn, instead of clumping repeats onto one person', async () => {
   const day = 'monday';
   const list = await getListByDay(day);
@@ -68,7 +80,7 @@ test('substituteBoard keeps rotating through a small floater pool once every mem
     await createPermanentJob({ day, hourPosition, title: `RR Job Hour ${hourPosition}`, room: 'Room' });
   }
 
-  const date = '2026-08-31'; // a Monday
+  const date = nextWeekday(1); // a Monday
   const board = await substituteBoard(day, date);
   const counts = { [alpha]: 0, [beta]: 0 };
   for (const hour of board) {
@@ -96,7 +108,7 @@ test('substituteBoard still auto-picks a Backup Only floater when they are the o
 
   await createPermanentJob({ day, hourPosition: 1, title: 'RR Backup Only Job', room: 'Room' });
 
-  const date = '2026-09-02'; // a Wednesday
+  const date = nextWeekday(3); // a Wednesday
   const board = await substituteBoard(day, date);
   const hour1Result = board.find((h) => h.position === 1);
   const slot = hour1Result.slots.find((s) => s.label === 'RR Backup Only Job');

@@ -51,6 +51,18 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-09-07'/'2026-09-09' were
+// in the future when this file was written but aren't anymore. Computed
+// fresh each run so this can't go stale again - targetDow (0=Sunday...
+// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
+// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 async function setHourTimes(cookie, day, startTimes, endTimes) {
   const page = await request(app).get(`/admin/schedule?tab=${day}`).set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
@@ -72,7 +84,7 @@ test('a double-period class\'s standing vacancy (unfilled teacher_slots) appears
     day, hourPosition: 3, className: 'Preschool Vacancy Class', room: 'Room P', startTime: '11:00 AM', endTime: '12:30 PM', teacherSlots: 1,
   });
 
-  const date = '2026-09-07'; // a Monday
+  const date = nextWeekday(1); // a Monday
   const slotId = classVacancySlotId(classId, 'teacher', 1);
 
   const board = await substituteBoard(day, date);
@@ -116,7 +128,7 @@ test('the Archive tab, the public kiosk view, and archivedDateSummaries also sur
     day, hourPosition: 2, className: 'DnD Vacancy Class', room: 'Library', startTime: '2:00 PM', endTime: '3:30 PM', assistantSlots: 1,
   });
 
-  const date = '2026-09-09'; // a Wednesday
+  const date = nextWeekday(3); // a Wednesday
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
   const { setAssignment } = require('../utils/substitutes');

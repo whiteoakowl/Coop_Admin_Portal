@@ -42,6 +42,18 @@ async function makeParent(name, barcode) {
   return (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'parent')").run(name, barcode)).lastInsertRowid;
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-08-31'/'2026-09-02' were
+// in the future when this file was written but aren't anymore. Computed
+// fresh each run so this can't go stale again - targetDow (0=Sunday...
+// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
+// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 test('a stale pending auto-suggestion clears itself once its own floater is removed from the Floater List, instead of staying pinned forever', async () => {
   const day = 'monday';
   const list = await getListByDay(day);
@@ -51,7 +63,7 @@ test('a stale pending auto-suggestion clears itself once its own floater is remo
   await addMemberToSection(list.id, lonely, hour1.id);
   await createPermanentJob({ day, hourPosition: 1, title: 'Stale Pending Job', room: 'R' });
 
-  const date = '2026-08-31'; // a Monday
+  const date = nextWeekday(1); // a Monday
   let board = await substituteBoard(day, date);
   let slot = board.find((h) => h.position === 1).slots.find((s) => s.label === 'Stale Pending Job');
   assert.ok(slot.assigned, 'the only candidate should get auto-picked');
@@ -75,7 +87,7 @@ test('an APPROVED pick is never auto-cleared just because the person later leave
   await addMemberToSection(list.id, chosen, hour1.id);
   await createPermanentJob({ day, hourPosition: 1, title: 'Approved Pick Job', room: 'R' });
 
-  const date = '2026-09-02'; // a Wednesday
+  const date = nextWeekday(3); // a Wednesday
   await setAssignment(date, 'job', (await db.prepare("SELECT id FROM permanent_jobs WHERE day = ? AND title = 'Approved Pick Job'").get(day)).id, chosen, false);
 
   await removeMemberFromSection(list.id, chosen, hour1.id);

@@ -52,6 +52,18 @@ function extractCsrf(html) {
   return /name="csrf-token" content="([^"]*)"/.exec(html)[1];
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-09-07'/'2026-09-09' were
+// in the future when this file was written but aren't anymore. Computed
+// fresh each run so this can't go stale again - targetDow (0=Sunday...
+// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
+// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 test('assigning a member to a vacancy slot actually persists (not silently rewritten to slotType=class)', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
@@ -59,7 +71,7 @@ test('assigning a member to a vacancy slot actually persists (not silently rewri
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Vacancy Floater', 'vacancy-floater-assign', 'parent')")
     .run();
-  const date = '2026-09-07'; // a Monday
+  const date = nextWeekday(1); // a Monday
   const slotId = classVacancySlotId(classId, 'assistant', 1);
 
   const page = await request(app).get(`/admin/volunteers/${day}/manage?date=${date}`).set('Cookie', cookie);
@@ -90,7 +102,7 @@ test('approving and unassigning a vacancy slot also use slotType=vacancy correct
   const { lastInsertRowid: memberId } = await db
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Vacancy Floater Two', 'vacancy-floater-approve', 'parent')")
     .run();
-  const date = '2026-09-09'; // a Wednesday
+  const date = nextWeekday(3); // a Wednesday
   const slotId = classVacancySlotId(classId, 'teacher', 1);
 
   const page = await request(app).get(`/admin/volunteers/${day}/manage?date=${date}`).set('Cookie', cookie);

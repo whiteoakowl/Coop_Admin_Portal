@@ -36,6 +36,18 @@ async function makeParent(name, barcode) {
   return (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES (?, ?, 'parent')").run(name, barcode)).lastInsertRowid;
 }
 
+// Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
+// assign.test.js's own nextMonday() comment: '2026-08-31' was in the future
+// when this file was written but isn't anymore. Computed fresh each run so
+// this can't go stale again - targetDow (0=Sunday...6=Saturday) lands on
+// the correct real weekday since utils/substitutes.js's own DAY_WEEKDAY
+// check cares about it (1=Monday below).
+function nextWeekday(targetDow) {
+  const d = new Date();
+  d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
+  return d.toISOString().slice(0, 10);
+}
+
 test('substituteBoard spreads auto-picks across hours instead of reusing the same top-ranked person every time', async () => {
   const day = 'monday';
   const list = await getListByDay(day);
@@ -56,7 +68,7 @@ test('substituteBoard spreads auto-picks across hours instead of reusing the sam
   await createPermanentJob({ day, hourPosition: 1, title: 'Vary Test Job Hour 1', room: 'Room 1' });
   await createPermanentJob({ day, hourPosition: 2, title: 'Vary Test Job Hour 2', room: 'Room 2' });
 
-  const date = '2026-08-31'; // a Monday
+  const date = nextWeekday(1); // a Monday
   const board = await substituteBoard(day, date);
   const hour1Result = board.find((h) => h.position === 1);
   const hour2Result = board.find((h) => h.position === 2);
