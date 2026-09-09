@@ -8,7 +8,17 @@
 // separate "needs a substitute" section) - a dropdown of available
 // candidates (already rank-sorted and filtered to whoever's actually free
 // this date - see routes/admin-volunteers.js) plus an Accept/Unassign
-// button. Locals: day, selectedDate, hourSections.
+// button. Locals: day, dayLabel, selectedDate, hourSections.
+//
+// A real request: "floater printing. each page should have a header,
+// each page should be an hour that fits to page." On screen this stays
+// the existing 2x2 .floater-chart-cards-grid, but each hour is now
+// wrapped in its own .floater-print-page - print-only CSS (styles.css)
+// turns the grid to one column and page-breaks before every wrapper but
+// the first, and each wrapper carries its own repeated, print-only
+// .print-header (hidden on screen, same class/markup every other
+// print-capable page uses) so a printed set of hour pages doesn't rely
+// on a single top-of-document header landing on just one of them.
 var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
 %>
 <% if (hourSections.length === 0) { %>
@@ -17,6 +27,14 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
   <div class="floater-cards-grid floater-chart-cards-grid">
     <% hourSections.forEach(function(hour, idx) { %>
       <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <div class="floater-print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= dayLabel %> Floater Assignments</p>
+        </div>
+      </div>
       <div class="floater-card floater-card-<%= accent %>">
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
@@ -63,6 +81,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
           <svg class="icon"><use href="#icon-users"/></svg>
           <%= hour.slots.length %> Position<%= hour.slots.length === 1 ? '' : 's' %>
         </div>
+      </div>
       </div>
     <% }); %>
   </div>

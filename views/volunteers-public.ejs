@@ -22,7 +22,7 @@
     </div>
   <% } else { %>
     <div class="kiosk-wrap volunteer-public-wrap">
-      <%- include('partials/floater-assignment-cards', { cards: cards }) %>
+      <%- include('partials/floater-assignment-cards', { cards: cards, dayLabel: dayLabel, dateLabel: dateLabel }) %>
     </div>
   <% } %>
   <script src="/js/idle-redirect.js"></script>

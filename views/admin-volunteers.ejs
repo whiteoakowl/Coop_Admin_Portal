@@ -7,14 +7,6 @@
 <body class="admin-page floater-assignments-print-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> Floater Assignments</p>
-      </div>
-    </div>
-
     <h1>Floater Assignments</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -64,7 +56,7 @@
       <% } else { %>
         <div id="floater-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="floater-cards-container" data-selected-date="<%= selectedDate %>">
-          <%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>
+          <%- include('partials/floater-chart-cards', { day, dayLabel, selectedDate, hourSections }) %>
         </div>
       <% } %>
     </div>

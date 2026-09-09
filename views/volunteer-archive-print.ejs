@@ -13,15 +13,7 @@
     </div>
 
     <div class="print-page volunteer-archive-print-page">
-      <div class="print-header">
-        <img src="/img/logo.png" alt="" />
-        <div>
-          <p class="print-header-title">Sanford Homeschoolers</p>
-          <p class="print-header-sub"><%= dayLabel %> Floater Assignments &mdash; <%= dateLabel %></p>
-        </div>
-      </div>
-
-      <%- include('partials/floater-assignment-cards', { cards: cards }) %>
+      <%- include('partials/floater-assignment-cards', { cards: cards, dayLabel: dayLabel, dateLabel: dateLabel }) %>
     </div>
   </main>
   <script src="/js/print-auto.js"></script>

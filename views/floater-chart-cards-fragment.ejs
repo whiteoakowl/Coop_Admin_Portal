@@ -3,4 +3,4 @@
     admin-volunteers.ejs, in place of the old full-page redirect - see
     routes/admin-volunteers.js's own /fragment route for why this has to
     recompute the whole grid rather than patch a single row. %>
-<%- include('partials/floater-chart-cards', { day, selectedDate, hourSections }) %>
+<%- include('partials/floater-chart-cards', { day, dayLabel, selectedDate, hourSections }) %>

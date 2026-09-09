@@ -187,7 +187,7 @@ router.get('/volunteers/:day/fragment', requireAdmin, requireDay, async (req, re
   const upcomingDates = dates.filter((d) => d >= today);
   const selectedDate = upcomingDates.includes(req.query.date) ? req.query.date : upcomingDates[0] || null;
   const hourSections = await buildHourSections(day, selectedDate);
-  res.render('floater-chart-cards-fragment', { day, selectedDate, hourSections });
+  res.render('floater-chart-cards-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, hourSections });
 });
 
 router.post('/volunteers/:day/dates/add', requireAdmin, requireDay, async (req, res) => {

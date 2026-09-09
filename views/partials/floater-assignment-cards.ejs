@@ -2,10 +2,22 @@
 // One card per hour block, each listing every position for that hour -
 // Position, Room, Floater Assigned - read-only (reassigning happens on
 // the live Chart tab's own cards, not here). Shared by the Archive
-// popup and the Archive print page (a past date) - same partial, same
-// look, everywhere this data is shown. Locals: cards
-// (utils/substitutes.js dailyAssignmentCards, each hour's `label`
-// merged in by the route).
+// popup, the public kiosk view, and the Archive print page (a past
+// date) - same partial, same look, everywhere this data is shown.
+// Locals: cards (utils/substitutes.js dailyAssignmentCards, each hour's
+// `label` merged in by the route), dayLabel and (optionally) dateLabel
+// for the per-page print header - only actually rendered under @media
+// print, so callers that never print, like the kiosk view, can simply
+// omit them.
+//
+// A real request: "floater printing. each page should have a header,
+// each page should be an hour that fits to page." Each hour is wrapped
+// in its own .floater-print-page - print-only CSS (styles.css) turns
+// the grid to one column and page-breaks before every wrapper but the
+// first, and each wrapper carries its own repeated, print-only
+// .print-header instead of relying on volunteer-archive-print.ejs's own
+// single top-of-document header, which would otherwise only land on
+// whichever one page happens to hold it.
 var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
 %>
 <% if (cards.length === 0) { %>
@@ -14,6 +26,14 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
   <div class="floater-cards-grid">
     <% cards.forEach(function(hour, idx) { %>
       <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <div class="floater-print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= typeof dayLabel !== 'undefined' ? dayLabel : '' %> Floater Assignments<% if (typeof dateLabel !== 'undefined' && dateLabel) { %> &mdash; <%= dateLabel %><% } %></p>
+        </div>
+      </div>
       <div class="floater-card floater-card-<%= accent %>">
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-clock"/></svg></span>
@@ -43,6 +63,7 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
           <svg class="icon"><use href="#icon-users"/></svg>
           <%= hour.jobs.length %> Assignment<%= hour.jobs.length === 1 ? '' : 's' %>
         </div>
+      </div>
       </div>
     <% }); %>
   </div>

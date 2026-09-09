@@ -6503,6 +6503,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     gap: 0.5rem !important;
   }
 
+  /* Floater Assignments (Chart tab's live print, and the Archive print
+     page - partials/floater-chart-cards.ejs and partials/floater-
+     assignment-cards.ejs): a real request - "floater printing. each page
+     should have a header, each page should be an hour that fits to
+     page." Unlike Floater Teams above (always exactly 4 fixed hour
+     cards, deliberately kept 2-per-row on one page), Floater Assignments
+     used the same 2-column grid for what's really a report meant to be
+     handed out one hour at a time - cramped on paper, and the org header
+     only ever landed on whichever one page happened to hold it. The grid
+     collapses to a single column so each wrapper spans the full page
+     width, and every .floater-print-page but the first forces a page
+     break before it - one hour, its own repeated print-header, one page.
+     Same ":not(:first-child)" shape as .team-print-page-fit above and
+     for the same reason: breaking before the very first thing in the
+     document would otherwise leave page 1 blank. */
+  .floater-cards-grid,
+  .floater-chart-cards-grid,
+  .volunteer-archive-print-page .floater-cards-grid {
+    display: block !important;
+  }
+  .floater-print-page:not(:first-child) {
+    page-break-before: always;
+    break-before: page;
+  }
+
   /* Setup/Cleanup Teams: a real request - "printing the setup cleanup
      teams should be one team per page[, ]reduced to fit one whole team
      card per page." Unlike Floater Teams' fixed 4 hour cards (always
