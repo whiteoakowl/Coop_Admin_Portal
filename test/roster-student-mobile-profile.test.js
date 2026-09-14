@@ -67,7 +67,7 @@ test('a class roster row carries the student\'s full profile as data-* attribute
   assert.match(res.text, /data-name="Roster Profile Student"/);
   assert.match(res.text, /data-family="The Roster Profile Family"/);
   assert.match(res.text, /data-grade="5th"/);
-  assert.match(res.text, /data-birthday="2015-04-02/);
+  assert.match(res.text, /data-birthday="04\/02\/2015/, 'birthday should render as month\/day\/year, not the raw ISO date');
   assert.match(res.text, /data-parent-name="Roster Profile Parent"/);
   assert.match(res.text, /data-parent-phone="555-1212"/);
   assert.match(res.text, /data-parent-email="parent@example.com"/);
@@ -77,6 +77,18 @@ test('a class roster row carries the student\'s full profile as data-* attribute
   assert.match(res.text, /data-profile-field="name"/);
   assert.match(res.text, /data-profile-row="birthday"/);
   assert.match(res.text, /data-profile-row="parent-email"/);
+
+  // A real request: "for the class roster it doesn't need to list the
+  // family name. Birthday should be month/date/year." The dense visible
+  // .roster-log-meta line (not the mobile popup's own labeled Family
+  // field, which data-family above already confirmed stays intact)
+  // should show the formatted birthday and skip the family line
+  // entirely.
+  const metaStart = res.text.indexOf('class="roster-log-meta"');
+  const metaEnd = res.text.indexOf('class="roster-log-row-actions', metaStart);
+  const metaHtml = res.text.slice(metaStart, metaEnd);
+  assert.doesNotMatch(metaHtml, /Roster Profile Family/, 'the visible roster line should not list the family name');
+  assert.match(metaHtml, /04\/02\/2015/, 'the visible roster line should show the birthday as month\/day\/year');
 });
 
 test('a class with no enrolled students still renders its own (empty-state) profile dialog, not a missing one', async () => {

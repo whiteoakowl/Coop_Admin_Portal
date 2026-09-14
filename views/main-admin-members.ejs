@@ -96,7 +96,7 @@
         </form>
         <div class="category-filter" style="margin: 0;">
           <label for="type-select">Filter</label>
-          <select id="type-select" onchange="window.location = this.value">
+          <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
             <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
             <option value="/main-admin/members?tab=<%= activeTab %>&type=parent" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
             <option value="/main-admin/members?tab=<%= activeTab %>&type=student" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>

@@ -5856,12 +5856,43 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A real request: "on class rosters each student member line should
    have registration date/time, birthday, grade, allergy symbol, mail
    icon button to email, and phone number, parent name. make sure this
-   is all reduced in size to fit on the mobile screen as well." A rich
-   roster row (views/partials/roster-student-row.ejs) crams more meta
-   fields onto one line than a plain .roster-log-row ever needed to, so
-   its meta wraps freely instead of forcing one line, and its own action
-   icons (mail + trash) sit in their own tight flex group. */
-.roster-log-row-rich .roster-log-meta { flex-wrap: wrap; row-gap: 0.2rem; }
+   is all reduced in size to fit on the mobile screen as well."
+   A later real bug report: "desktop view of roster - the member lines
+   aren't clean and you can't even see all the buttons." Root cause: a
+   rich row's six-ish optional meta fields (family, grade, birthday,
+   registered date, parent name, parent phone) sat in .roster-log-meta
+   as a flex SIBLING of .roster-log-name inside a plain, non-wrapping
+   flex row - and .roster-log-meta's own flex-shrink: 0 meant it always
+   claimed its full, unwrapped, one-line width no matter how little room
+   was left, even on a real ~1100px-wide admin-main column. The ONLY
+   item allowed to shrink was the name (flex: 1 1 auto; min-width: 0),
+   so on anything but a very wide monitor it got squeezed to a literal
+   0px-wide column - forcing every character of the name onto its own
+   line, and since the row's height then grew to fit that tall, narrow
+   name, align-items: center landed the single-line meta block visually
+   on top of the middle of the wrapped name instead of beside it. The
+   action buttons (also flex-shrink: 0) had nowhere further to go and
+   spilled off the right edge of the card.
+   Fixed with a real 2-row grid instead of asking flexbox's greedy,
+   unwrap-first line-packing to do something it isn't suited for: row 1
+   is always Name (its own minmax(10rem, 1fr) column, so it can shrink
+   under real pressure but never below a readable floor) beside Actions
+   (an auto column sized to its own content, so the buttons are never
+   the ones asked to give up space); row 2 is the full-width meta line,
+   which still wraps its own pills across as many lines as it needs via
+   the flex-wrap already set below - the one difference is it now wraps
+   INSIDE its own dedicated row instead of being squeezed into sharing
+   row 1 with the name. */
+.roster-log-row-rich {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  column-gap: 0.75rem;
+  row-gap: 0.35rem;
+  align-items: center;
+}
+.roster-log-row-rich .roster-log-name { grid-column: 1; grid-row: 1; }
+.roster-log-row-rich .roster-log-row-actions { grid-column: 2; grid-row: 1; }
+.roster-log-row-rich .roster-log-meta { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; row-gap: 0.2rem; }
 .roster-log-row-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
 
 /* Grade-only badge - hidden on desktop (.roster-log-meta already shows

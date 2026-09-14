@@ -22,7 +22,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/design?tab=requests<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+            <select id="date-select" onchange="window.fullscreenNavigate('/admin/design?tab=requests<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : ''))">
               <option value="">All dates</option>
               <% dates.forEach(function(d) { %>
                 <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>

@@ -212,7 +212,7 @@
             </button>
             <div class="category-filter schedule-search">
               <label for="schedule-name-select"><%= typeLabel %> Name</label>
-              <select id="schedule-name-select" onchange="window.location = '/admin/schedule?tab=members<%= typeFilter ? '&type=' + typeFilter : '' %><%= selectedFamilyId ? '&familyId=' + selectedFamilyId : '' %>' + (this.value ? '&memberId=' + this.value : '')">
+              <select id="schedule-name-select" onchange="window.fullscreenNavigate('/admin/schedule?tab=members<%= typeFilter ? '&type=' + typeFilter : '' %><%= selectedFamilyId ? '&familyId=' + selectedFamilyId : '' %>' + (this.value ? '&memberId=' + this.value : ''))">
                 <option value="">All <%= typeLabelPlural %></option>
                 <% allNames.forEach(function(n) { %>
                   <option value="<%= n.id %>" <%= selectedMemberId === n.id ? 'selected' : '' %>><%= n.name %></option>

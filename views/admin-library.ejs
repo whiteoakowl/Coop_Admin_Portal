@@ -103,7 +103,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="type-select">Filter by type</label>
-            <select id="type-select" onchange="window.location = '/admin/library?tab=titles' + (this.value ? '&type=' + encodeURIComponent(this.value) : '')">
+            <select id="type-select" onchange="window.fullscreenNavigate('/admin/library?tab=titles' + (this.value ? '&type=' + encodeURIComponent(this.value) : ''))">
               <option value="" <%= !typeFilter ? 'selected' : '' %>>All</option>
               <% types.forEach(function(t) { %>
                 <option value="<%= t %>" <%= typeFilter === t ? 'selected' : '' %>><%= t %></option>

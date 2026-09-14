@@ -40,7 +40,7 @@
       <div class="roster-toolbar no-print">
         <div class="category-filter" style="margin: 0;">
           <label for="chart-date-select">Choose Date</label>
-          <select id="chart-date-select" onchange="window.location = '/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : '')">
+          <select id="chart-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : ''))">
             <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
             <% upcomingDates.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>

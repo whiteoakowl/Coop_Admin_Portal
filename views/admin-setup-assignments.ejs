@@ -41,7 +41,7 @@
       <div class="roster-toolbar no-print">
         <div class="category-filter" style="margin: 0;">
           <label for="assignments-date-select">Choose Date</label>
-          <select id="assignments-date-select" onchange="window.location = '/admin/setup/<%= day %>/assignments' + (this.value ? '?date=' + this.value : '')">
+          <select id="assignments-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/assignments' + (this.value ? '?date=' + this.value : ''))">
             <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
             <% upcomingDates.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>

@@ -32,7 +32,7 @@
   data-name="<%= s.name %>"
   data-family="<%= s.family_name ? 'The ' + s.family_name + ' Family' : '' %>"
   data-grade="<%= s.grade_level || '' %>"
-  data-birthday="<%= s.birthday || '' %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %>"
+  data-birthday="<%= s.birthdayLabel || '' %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %>"
   data-registered="<%= s.enrolledAtLabel || '' %>"
   data-parent-name="<%= s.parentName || '' %>"
   data-parent-phone="<%= s.parentPhone || '' %>"
@@ -42,10 +42,14 @@
   aria-label="View <%= s.name %>'s membership profile"
 >
   <span class="roster-log-name"><a class="member-name-link" href="/admin/members/<%= s.id %>"><%= s.name %></a><%- include('medical-flag', { member: s }) %></span>
+  <%# A real request: "for the class roster it doesn't need to list the
+      family name." Dropped from this dense one-line meta list only -
+      data-family stays on the row itself, so the mobile profile popup
+      (a deliberate "full membership info" surface, not a scan list)
+      still shows it as its own labeled field. %>
   <span class="roster-log-meta">
-    <% if (s.family_name) { %><span>The <%= s.family_name %> Family</span><% } %>
     <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
-    <% if (s.birthday) { %><span><%= s.birthday %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %></span><% } %>
+    <% if (s.birthdayLabel) { %><span><%= s.birthdayLabel %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %></span><% } %>
     <% if (s.enrolledAtLabel) { %><span>Registered <%= s.enrolledAtLabel %></span><% } %>
     <% if (s.parentName) { %><span><%= s.parentName %></span><% } %>
     <% if (s.parentPhone) { %><span><%= s.parentPhone %></span><% } %>

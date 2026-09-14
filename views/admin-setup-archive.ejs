@@ -26,7 +26,7 @@
         </div>
         <div class="category-filter" style="margin: 0;">
           <label for="setup-archive-date-select">Choose Date</label>
-          <select id="setup-archive-date-select" onchange="window.location = '/admin/setup/<%= day %>/archive' + (this.value ? '?date=' + this.value : '')">
+          <select id="setup-archive-date-select" onchange="window.fullscreenNavigate('/admin/setup/<%= day %>/archive' + (this.value ? '?date=' + this.value : ''))">
             <option value="">All dates</option>
             <% dateOptions.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>

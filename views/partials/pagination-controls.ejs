@@ -37,7 +37,7 @@ var isViewingAll = typeof viewingAll !== 'undefined' && viewingAll;
           <select
             class="pagination-page-select"
             aria-label="Jump to page"
-            onchange="window.location = '<%= baseHref %>page=' + this.value"
+            onchange="window.fullscreenNavigate('<%= baseHref %>page=' + this.value)"
           >
             <% for (var p = 1; p <= pagination.totalPages; p++) { %>
               <option value="<%= p %>"<%= p === pagination.currentPage ? ' selected' : '' %>><%= p %></option>

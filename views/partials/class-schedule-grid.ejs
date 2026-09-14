@@ -19,7 +19,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         type="date"
         id="date-select-<%= day %>"
         value="<%= selectedDate %>"
-        onchange="window.location = '<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : '')"
+        onchange="window.fullscreenNavigate('<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : ''))"
       />
     </div>
     <div class="category-filter">

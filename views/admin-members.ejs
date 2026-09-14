@@ -98,7 +98,7 @@
           now with a Roster Day group alongside Type/Family. %>
       <div class="category-filter" style="margin: 0;">
         <label for="type-select">Filter</label>
-        <select id="type-select" onchange="window.location = this.value">
+        <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
           <option value="<%= memberHref({ type: '', family: '', day: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter) ? 'selected' : '' %>>All</option>
           <option value="<%= memberHref({ type: 'parent', family: '', day: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
           <option value="<%= memberHref({ type: 'student', family: '', day: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>

@@ -36,7 +36,7 @@
                 current values, not just its own - so picking an Hour
                 keeps whatever Day is already chosen, and vice versa
                 (either filter, or both together). %>
-            <select id="class-roster-day-select" onchange="window.location = '/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : '')">
+            <select id="class-roster-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (this.value ? '&day=' + this.value : '') + (document.getElementById('class-roster-hour-select').value ? '&hour=' + document.getElementById('class-roster-hour-select').value : ''))">
               <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
               <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
               <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
@@ -44,7 +44,7 @@
           </div>
           <div class="category-filter" style="margin: 0;">
             <label for="class-roster-hour-select">Hour</label>
-            <select id="class-roster-hour-select" onchange="window.location = '/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (this.value ? '&hour=' + this.value : '')">
+            <select id="class-roster-hour-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=classes' + (document.getElementById('class-roster-day-select').value ? '&day=' + document.getElementById('class-roster-day-select').value : '') + (this.value ? '&hour=' + this.value : ''))">
               <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
               <% hourPositions.forEach(function(h) { %>
                 <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>
@@ -92,7 +92,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="playground-date-select">Session Date</label>
-            <select id="playground-date-select" onchange="window.location = '/admin/rosters?tab=playground-<%= pgDay %>-<%= pgHour %>' + (this.value ? '&date=' + this.value : '')">
+            <select id="playground-date-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=playground-<%= pgDay %>-<%= pgHour %>' + (this.value ? '&date=' + this.value : ''))">
               <% if (pgDates.length === 0) { %>
                 <option value="">No session dates yet</option>
               <% } %>
@@ -116,7 +116,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="roster-archive-day-select">Day</label>
-            <select id="roster-archive-day-select" onchange="window.location = '/admin/rosters?tab=archive' + (this.value ? '&day=' + this.value : '')">
+            <select id="roster-archive-day-select" onchange="window.fullscreenNavigate('/admin/rosters?tab=archive' + (this.value ? '&day=' + this.value : ''))">
               <option value="" <%= !dayFilter ? 'selected' : '' %>>Monday &amp; Wednesday</option>
               <option value="monday" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
               <option value="wednesday" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>

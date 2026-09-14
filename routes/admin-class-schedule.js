@@ -5,7 +5,7 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
-const { ageFromBirthday, formatFriendlyTimestamp } = require('../utils/dates');
+const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric } = require('../utils/dates');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter } = require('../utils/uploads');
@@ -60,6 +60,7 @@ async function enrichRosterStudents(students) {
     return {
       ...s,
       age: ageFromBirthday(s.birthday),
+      birthdayLabel: s.birthday ? formatDateNumeric(s.birthday) : null,
       enrolledAtLabel: s.enrolled_at ? formatFriendlyTimestamp(s.enrolled_at) : null,
       parentName: parent ? parent.name : null,
       parentPhone: parent ? parent.phone : null,

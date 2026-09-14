@@ -33,7 +33,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=absence' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+            <select id="date-select" onchange="window.fullscreenNavigate('/admin/logs?tab=absence' + (this.value ? '&date=' + encodeURIComponent(this.value) : ''))">
               <option value="">All dates</option>
               <% dates.forEach(function(d) { %>
                 <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -99,7 +99,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=<%= tab %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+            <select id="date-select" onchange="window.fullscreenNavigate('/admin/logs?tab=<%= tab %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : ''))">
               <option value="">All dates</option>
               <% dates.forEach(function(d) { %>
                 <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -161,7 +161,7 @@
         <div class="roster-toolbar no-print">
           <div class="category-filter" style="margin: 0;">
             <label for="date-select">Date</label>
-            <select id="date-select" onchange="window.location = '/admin/logs?tab=nametag<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : '')">
+            <select id="date-select" onchange="window.fullscreenNavigate('/admin/logs?tab=nametag<%= showArchived ? '&archived=1' : '' %>' + (this.value ? '&date=' + encodeURIComponent(this.value) : ''))">
               <option value="">All dates</option>
               <% dates.forEach(function(d) { %>
                 <option value="<%= d.date %>" <%= dateFilter === d.date ? 'selected' : '' %>><%= d.label %></option>
@@ -261,7 +261,7 @@
                 type="date"
                 id="sub-log-date"
                 value="<%= dateFilter %>"
-                onchange="window.location = '/admin/logs?tab=substitutes&day=<%= day %>' + (this.value ? '&date=' + this.value : '')"
+                onchange="window.fullscreenNavigate('/admin/logs?tab=substitutes&day=<%= day %>' + (this.value ? '&date=' + this.value : ''))"
               />
             </div>
           </div>
