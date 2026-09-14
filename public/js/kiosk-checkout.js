@@ -117,7 +117,7 @@
       showFinal(message) {
         taskResult.hidden = false;
         setTaskState('success', message, 'check-circle');
-        setTimeout(() => { window.location.href = '/kiosk'; }, 1800);
+        setTimeout(() => { window.fullscreenNavigate('/kiosk'); }, 1800);
       },
       reset() {
         taskResult.hidden = true;
@@ -258,6 +258,6 @@
     stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
     result.hidden = false;
     setState('success', 'Have a great day!', 'check-circle');
-    setTimeout(() => { window.location.href = '/kiosk'; }, 1500);
+    setTimeout(() => { window.fullscreenNavigate('/kiosk'); }, 1500);
   });
 })();

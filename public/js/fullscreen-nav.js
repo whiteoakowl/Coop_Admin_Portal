@@ -100,4 +100,25 @@
   window.addEventListener('popstate', () => {
     go(window.location.pathname + window.location.search, false);
   });
+
+  // A real bug report: "when the kiosk screen times out it does not stay
+  // in kiosk mode." The click interception above only ever catches real
+  // <a href> clicks - it does nothing for the several kiosk scripts
+  // (idle-redirect.js, and the "return to /kiosk after a few seconds"
+  // timers in kiosk-checkin.js/kiosk-checkout.js/absence.js/name-tag.js/
+  // kiosk-find-parent.js) that send the viewer back to the kiosk home
+  // screen with a plain `window.location.href = ...` assignment instead
+  // of a click - a real navigation exactly like typing a URL, which
+  // destroys the top-level document (and with it, fullscreen) the same
+  // as any other full page load. Exposed here so every one of those call
+  // sites can go through the same in-place content swap the click
+  // handler above uses, instead of each reimplementing its own
+  // fullscreen-is-fullscreen check.
+  window.fullscreenNavigate = function (url) {
+    if (isFullscreen()) {
+      go(url, true);
+    } else {
+      window.location.href = url;
+    }
+  };
 })();

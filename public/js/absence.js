@@ -8,13 +8,13 @@
     const goHome = resultDialog.dataset.redirectHome === '1';
     resultDialog.querySelector('.alert-popup-ok').addEventListener('click', () => {
       if (goHome) {
-        window.location.href = '/kiosk';
+        window.fullscreenNavigate('/kiosk');
       } else {
         resultDialog.close();
       }
     });
     if (goHome) {
-      setTimeout(() => { window.location.href = '/kiosk'; }, 4000);
+      setTimeout(() => { window.fullscreenNavigate('/kiosk'); }, 4000);
     }
   }
 

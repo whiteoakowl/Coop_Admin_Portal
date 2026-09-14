@@ -32,7 +32,7 @@
   manualSubmitBtn.addEventListener('click', () => form.requestSubmit());
 
   document.querySelectorAll('[data-complete]').forEach((btn) => {
-    btn.addEventListener('click', () => { window.location.href = '/kiosk'; });
+    btn.addEventListener('click', () => { window.fullscreenNavigate('/kiosk'); });
   });
 
   document.querySelectorAll('[data-method]').forEach((btn) => {

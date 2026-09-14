@@ -8,7 +8,13 @@
   function reset() {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      window.location.href = '/kiosk';
+      // window.fullscreenNavigate (public/js/fullscreen-nav.js, loaded
+      // after this script on every page that uses data-idle-redirect)
+      // swaps content in place instead of doing a real navigation while
+      // in fullscreen kiosk mode, so a timeout doesn't kick the viewer
+      // out of it - see that file's own comment for why a plain
+      // window.location.href assignment here would.
+      window.fullscreenNavigate('/kiosk');
     }, timeoutMs);
   }
 

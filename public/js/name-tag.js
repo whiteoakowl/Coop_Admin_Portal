@@ -4,7 +4,7 @@
 
   if (form.dataset.redirectHome === '1') {
     setTimeout(() => {
-      window.location.href = '/kiosk';
+      window.fullscreenNavigate('/kiosk');
     }, 2000);
   }
 
