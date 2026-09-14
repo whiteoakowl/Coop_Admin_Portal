@@ -8,7 +8,7 @@
   <main id="main-content" tabindex="-1" class="form-wrap">
     <div class="kiosk-inline-header">
       <a href="/kiosk/class-checkin/classes" class="kiosk-home kiosk-home-inline">&larr; Back to Days</a>
-      <form method="POST" action="/kiosk/class-checkin/lock">
+      <form method="POST" action="/kiosk/class-checkin/lock" data-preserve-fullscreen>
         <button type="submit" class="btn-secondary">Done</button>
       </form>
     </div>
@@ -18,7 +18,7 @@
     <div class="roster-toolbar no-print">
       <div class="category-filter" style="margin: 0;">
         <label for="kiosk-class-hour-select">Hour</label>
-        <select id="kiosk-class-hour-select" onchange="window.location = '/kiosk/class-checkin/classes/<%= day %>' + (this.value ? '?hour=' + this.value : '')">
+        <select id="kiosk-class-hour-select" onchange="window.fullscreenNavigate('/kiosk/class-checkin/classes/<%= day %>' + (this.value ? '?hour=' + this.value : ''))">
           <option value="" <%= !hourFilter ? 'selected' : '' %>>All Hours</option>
           <% hourPositions.forEach(function(h) { %>
             <option value="<%= h %>" <%= hourFilter === h ? 'selected' : '' %>>Hour <%= h %></option>

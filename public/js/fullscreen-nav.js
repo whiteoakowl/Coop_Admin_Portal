@@ -121,4 +121,64 @@
       window.location.href = url;
     }
   };
+
+  // Same problem, for a plain <form> submit instead of a link click or a
+  // window.location.href assignment - a real bug report: "when you click
+  // any done or continue buttons in kiosk mode it automatically exits
+  // kiosk mode." A handful of kiosk screens (the Class Check-In/
+  // Playground "Done" buttons that lock back to the PIN gate, and the PIN
+  // form's own "Unlock") are plain <form method="POST"> elements with no
+  // JS of their own at all - the browser's native submission is exactly
+  // as real a navigation as clicking a link, and just as fatal to
+  // fullscreen. Opt-in via data-preserve-fullscreen (rather than a
+  // blanket listener on every form) so this never risks double-handling
+  // a form that already manages its own submission via fetch elsewhere
+  // in the app (e.g. kiosk-checkin.js's scan forms) - preventDefault()
+  // here wouldn't stop that form's own submit listener from also
+  // running.
+  document.addEventListener(
+    'submit',
+    (e) => {
+      if (!isFullscreen()) return;
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-preserve-fullscreen')) return;
+      // File uploads need a real multipart body - URLSearchParams would
+      // silently drop the file data. None of today's opted-in forms
+      // upload files, but skip instead of mangling one if that ever
+      // changes.
+      if ((form.enctype || '').toLowerCase() === 'multipart/form-data') return;
+      let url;
+      try {
+        url = new URL(form.getAttribute('action') || '', window.location.href);
+      } catch (err) {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+      e.preventDefault();
+      const method = (form.getAttribute('method') || 'GET').toUpperCase();
+      if (method === 'GET') {
+        const params = new URLSearchParams(new FormData(form));
+        const qs = params.toString();
+        go(url.pathname + (qs ? '?' + qs : ''), true);
+        return;
+      }
+      const params = new URLSearchParams();
+      new FormData(form).forEach((value, key) => {
+        if (typeof value === 'string') params.append(key, value);
+      });
+      fetch(url.pathname, {
+        method,
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('form nav failed: ' + res.status);
+          return res.text().then((html) => ({ html, finalUrl: res.url }));
+        })
+        .then(({ html, finalUrl }) => swap(html, finalUrl, true))
+        .catch(() => { form.submit(); });
+    },
+    true
+  );
 })();

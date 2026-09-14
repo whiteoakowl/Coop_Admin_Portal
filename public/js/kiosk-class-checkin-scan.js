@@ -52,7 +52,7 @@
 
   document.querySelectorAll('[data-complete]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      window.location.href = completeUrl;
+      window.fullscreenNavigate(completeUrl);
     });
   });
 
