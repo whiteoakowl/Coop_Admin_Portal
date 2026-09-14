@@ -890,12 +890,14 @@ textarea:focus-visible,
    icon-on-top/label-below - so the two "mobile bottom nav" patterns in the
    app read as one consistent design instead of two different ones. */
 .landing-action-bar { display: none; }
+.landing-mobile-only { display: none; }
 @media (max-width: 640px) {
   /* !important: elements this hides (e.g. .landing-top-menu,
      .landing-columns) set their own unconditional `display` later in
      this file, which would otherwise win the cascade over this
      media-scoped rule and keep the desktop layout visible on mobile. */
   .landing-desktop-only { display: none !important; }
+  .landing-mobile-only { display: flex; }
   .landing-has-action-bar { padding-bottom: 5.5rem; }
   .landing-wrap { padding-top: 0; }
   .landing-action-bar {
@@ -955,12 +957,11 @@ textarea:focus-visible,
 .find-parent-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
 
 /* kiosk-home.ejs's desktop/tablet-only Kiosk Mode button, fixed to the
-   bottom-right corner of the screen (Full Screen View stays in its own
-   top-right corner, .landing-corner-actions, at every viewport width) -
-   a real request: "on kiosk homepage, tablet snd desktop view, the
-   kiosk button should be bottom right of the screen." Same small pill
-   shape as Find a Parent, just filled orange (matching --btn-bg, the
-   same color the mobile bottom-bar's own Kiosk Mode entry uses). */
+   bottom-right corner of the screen - a real request: "on kiosk
+   homepage, tablet snd desktop view, the kiosk button should be bottom
+   right of the screen." Same small pill shape as Find a Parent, just
+   filled orange (matching --btn-bg, the same color mobile's own Kiosk
+   Mode button below uses). */
 .landing-corner-actions-bottom-right { position: fixed; bottom: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10; }
 .kiosk-mode-corner-btn {
   display: inline-flex;
@@ -977,6 +978,28 @@ textarea:focus-visible,
   cursor: pointer;
 }
 .kiosk-mode-corner-btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+
+/* A real request: "on mobile view, the kiosk button should not be on
+   the bottom orange bar. It should be its own button at the top right
+   of the screen." Mobile's own copy of the Kiosk Mode button used to
+   live as one more item inside .landing-action-bar (the bottom orange
+   bar) - moved to this fixed top-right spot instead, mirroring the
+   desktop/tablet button's own bottom-right corner treatment above but
+   at the opposite corner (top-right was already the app-wide convention
+   for a lone fullscreen-style corner control before this page's own
+   redesign consolidated everything into that bottom bar). Icon-only at
+   this size (see .kiosk-mode-corner-btn-icon-only) - a full text pill
+   this close to the top edge would crowd the page content and the
+   status bar/notch area on a real phone. .landing-mobile-only is the
+   inverse of .landing-desktop-only above: hidden by default (see that
+   base rule declared up near .landing-action-bar, BEFORE the max-width:
+   640px query below overrides it back to visible - the reverse order
+   would let this rule's own display: none win the cascade tie against
+   the media-scoped one purely by coming later in the file, the exact
+   trap that query's own comment already warns about for .landing-
+   desktop-only). */
+.landing-corner-actions-top-right { position: fixed; top: 1rem; right: 1rem; z-index: 10; }
+.kiosk-mode-corner-btn-icon-only { padding: 0.6rem; }
 
 .admin-corner-link-green {
   display: inline-flex;
@@ -3113,10 +3136,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
-   switches to a filled dark state while the archived view is showing, so
-   it reads as a pressed toggle rather than a plain button. */
+   switches to a pressed-looking state while the archived view is
+   showing, so it reads as a toggle rather than a plain button.
+   A real bug report: "on name tag logs, when you click on the archived
+   button it turns black, it should be white" - the old filled-dark
+   state (background: var(--ink)) never also switched the button's own
+   text color off .roster-action-btn's default color: #000, so the
+   label went black-on-near-black and effectively disappeared. Same
+   white-when-active treatment .icon-toggle-btn.active already uses
+   (the Events Calendar/List toggle) - a white fill with a dark border/
+   text reads just as clearly as "pressed" without the contrast bug. */
 .archived-toggle-btn.active,
-.archived-toggle-btn.active:hover { background: var(--ink); border-color: var(--ink); }
+.archived-toggle-btn.active:hover { background: #fff; border-color: var(--ink); color: var(--ink); }
 
 /* Import CSV / Export CSV are the same "work with a file" action
    everywhere in the app, and now share the same primary orange as
@@ -5882,15 +5913,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    which still wraps its own pills across as many lines as it needs via
    the flex-wrap already set below - the one difference is it now wraps
    INSIDE its own dedicated row instead of being squeezed into sharing
-   row 1 with the name. */
+   row 1 with the name.
+   A follow-up real request: "email and trash button should be in line
+   next to each name" - the name column's minmax(10rem, 1fr) used to
+   stretch to fill the row's full width, pushing Actions all the way out
+   to the far right edge instead of sitting right beside the name. Both
+   columns are now auto-sized to their own content instead, so Actions
+   sits immediately after whatever width the name actually needs; any
+   leftover row width past that just stays blank instead of being
+   claimed by either column. The base .roster-log-name rule's own
+   min-width: 0 (needed by the plain, still-flex .roster-log-row this
+   class doesn't use) is overridden back to min-width: auto here - an
+   auto grid track with no min-width override can still shrink a name
+   all the way to 0 given enough pressure, the same collapse this whole
+   rule block exists to prevent; with Actions now a small, effectively
+   fixed-width sibling instead of a big non-shrinking meta block, name's
+   own natural min-content floor (its longest unbreakable word) is never
+   actually reached at any real column/dialog width anyway. */
 .roster-log-row-rich {
   display: grid;
-  grid-template-columns: minmax(10rem, 1fr) auto;
-  column-gap: 0.75rem;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 0.5rem;
   row-gap: 0.35rem;
   align-items: center;
 }
-.roster-log-row-rich .roster-log-name { grid-column: 1; grid-row: 1; }
+.roster-log-row-rich .roster-log-name { grid-column: 1; grid-row: 1; min-width: auto; }
 .roster-log-row-rich .roster-log-row-actions { grid-column: 2; grid-row: 1; }
 .roster-log-row-rich .roster-log-meta { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; row-gap: 0.2rem; }
 .roster-log-row-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }

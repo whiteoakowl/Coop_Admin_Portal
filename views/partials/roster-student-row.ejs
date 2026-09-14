@@ -47,12 +47,14 @@
       data-family stays on the row itself, so the mobile profile popup
       (a deliberate "full membership info" surface, not a scan list)
       still shows it as its own labeled field. %>
+  <%# A real request: "registration date and time should be the last
+      columns." %>
   <span class="roster-log-meta">
     <% if (s.grade_level) { %><span><%= s.grade_level %></span><% } %>
     <% if (s.birthdayLabel) { %><span><%= s.birthdayLabel %><% if (s.age !== null && s.age !== undefined) { %> (<%= s.age %> yrs)<% } %></span><% } %>
-    <% if (s.enrolledAtLabel) { %><span>Registered <%= s.enrolledAtLabel %></span><% } %>
     <% if (s.parentName) { %><span><%= s.parentName %></span><% } %>
     <% if (s.parentPhone) { %><span><%= s.parentPhone %></span><% } %>
+    <% if (s.enrolledAtLabel) { %><span>Registered <%= s.enrolledAtLabel %></span><% } %>
   </span>
   <% if (s.grade_level) { %><span class="roster-log-grade-badge"><%= s.grade_level %></span><% } %>
   <div class="roster-log-row-actions no-print">

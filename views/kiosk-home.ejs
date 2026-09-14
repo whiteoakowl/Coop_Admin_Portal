@@ -38,17 +38,30 @@
       right corner spot (.landing-corner-actions-bottom-right) an earlier
       kiosk-home design already used for this exact purpose before the
       Class Check In & Out/Admin links moved into .landing-top-menu/
-      .landing-action-bar above - desktop/tablet only, since mobile
-      already has its own Kiosk Mode entry in the bottom orange action
-      bar below. public/js/fullscreen-toggle.js keeps this button and
-      that mobile one in sync with each other and with real fullscreen
-      state; public/js/fullscreen-nav.js (loaded on every kiosk page) is
-      what actually keeps fullscreen alive across a real page navigation
-      once activated. %>
+      .landing-action-bar above - desktop/tablet only (a later request
+      moved mobile's own copy of this button out of that bottom bar
+      entirely - see its own comment further down). public/js/fullscreen-
+      toggle.js keeps this button and mobile's own copy in sync with each
+      other and with real fullscreen state; public/js/fullscreen-nav.js
+      (loaded on every kiosk page) is what actually keeps fullscreen
+      alive across a real page navigation once activated. %>
   <div class="landing-corner-actions-bottom-right landing-desktop-only">
     <button type="button" class="kiosk-mode-corner-btn" id="kiosk-mode-btn" data-label-off="Start Kiosk Mode" data-label-on="Exit Kiosk Mode">
       <svg class="icon"><use href="#icon-maximize"/></svg>
       <span class="fullscreen-toggle-label">Start Kiosk Mode</span>
+    </button>
+  </div>
+  <%# A real request: "on mobile view, the kiosk button should not be on
+      the bottom orange bar. It should be its own button at the top
+      right of the screen. This only affects mobile view." Desktop/
+      tablet keeps its own bottom-right pill above, untouched - only the
+      mobile copy of this same button (same id, same fullscreen-toggle.js
+      wiring) moves, from a shared slot in .landing-action-bar down below
+      to its own fixed top-right corner spot, icon-only (no room for a
+      text label up here without crowding the page content underneath). %>
+  <div class="landing-corner-actions-top-right landing-mobile-only">
+    <button type="button" class="kiosk-mode-corner-btn kiosk-mode-corner-btn-icon-only" id="kiosk-mode-btn-mobile" data-label-off="Start Kiosk Mode" data-label-on="Exit Kiosk Mode" aria-label="Start Kiosk Mode">
+      <svg class="icon"><use href="#icon-maximize"/></svg>
     </button>
   </div>
   <%# A real request: "exiting full screen on kiosk should ask for an id
@@ -68,14 +81,6 @@
     <a class="landing-action-bar-btn" href="/kiosk/find-parent"><svg class="icon"><use href="#icon-search"/></svg><span>Find a Parent</span></a>
     <a class="landing-action-bar-btn" href="/kiosk/class-checkin"><svg class="icon"><use href="#icon-graduation-cap"/></svg><span>Class Check In &amp; Out</span></a>
     <a class="landing-action-bar-btn" href="/admin"><svg class="icon"><use href="#icon-lock"/></svg><span>Admin</span></a>
-    <%# Same Kiosk Mode button as the desktop/tablet bottom-right corner
-        button above - "bottom orange bar, far right for mobile."
-        .landing-action-bar-btn items already stretch evenly (flex: 1
-        each), so being last in source order already puts it at the far
-        right edge with no extra CSS. %>
-    <button type="button" class="landing-action-bar-btn" id="kiosk-mode-btn-mobile" data-label-off="Start Kiosk Mode" data-label-on="Exit Kiosk Mode">
-      <svg class="icon"><use href="#icon-maximize"/></svg><span class="fullscreen-toggle-label">Start Kiosk Mode</span>
-    </button>
   </footer>
   <main id="main-content" tabindex="-1" class="landing-wrap">
     <div class="landing-banner">

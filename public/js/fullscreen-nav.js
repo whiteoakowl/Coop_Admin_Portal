@@ -166,6 +166,16 @@
       new FormData(form).forEach((value, key) => {
         if (typeof value === 'string') params.append(key, value);
       });
+      // A POST that just re-renders the same form with an error (e.g. an
+      // incorrect PIN - no server-side redirect at all) has fetch's own
+      // res.url equal to this same POST target, not a real destination
+      // page. Pushing that non-navigable, POST-only URL into history
+      // would be a live foot-gun the very next time this exact scenario
+      // happens: hitting reload (or forward, after back) would issue a
+      // GET to a URL only ever wired as a POST route, 404ing instead of
+      // showing the retry form. Only push when the fetch actually landed
+      // somewhere else (a genuine redirect to a real page).
+      const requestHref = window.location.origin + url.pathname;
       fetch(url.pathname, {
         method,
         credentials: 'same-origin',
@@ -176,7 +186,7 @@
           if (!res.ok) throw new Error('form nav failed: ' + res.status);
           return res.text().then((html) => ({ html, finalUrl: res.url }));
         })
-        .then(({ html, finalUrl }) => swap(html, finalUrl, true))
+        .then(({ html, finalUrl }) => swap(html, finalUrl, finalUrl !== requestHref))
         .catch(() => { form.submit(); });
     },
     true

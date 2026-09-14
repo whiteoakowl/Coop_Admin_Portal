@@ -151,6 +151,45 @@
     chooser.showChooser();
     task1.reset();
     task2.reset();
+    armIdleTimer();
+  }
+
+  // A real request: "when people are checking in and out and don't need
+  // a setup/cleanup card we set it up to where members can continuously
+  // scan. If that screen sits idle for more than 15 seconds it should
+  // return to homescreen even if the member didn't click continue." Only
+  // ever runs while genuinely sitting on the ready-to-scan panel
+  // (stepScan showing, no result message up) - the other steps (a
+  // Setup/Cleanup badge scan, the 2nd-badge yes/no question) already
+  // have their own short-lived timeouts and shouldn't get cut off by an
+  // unrelated idle clock mid-flow, so the activity listeners below only
+  // ever re-arm the timer while isReadyToScan() is true, and the timer
+  // itself is cleared the instant a real scan starts (see scanForm's own
+  // submit handler) rather than left ticking through it.
+  function isReadyToScan() {
+    return !stepScan.classList.contains('kiosk-hidden') && result.hidden;
+  }
+  let idleTimer = null;
+  function clearIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  function armIdleTimer() {
+    clearIdleTimer();
+    idleTimer = setTimeout(finishSession, 15000);
+  }
+  ['click', 'touchstart', 'scroll', 'mousemove', 'keydown'].forEach((evt) => {
+    document.addEventListener(evt, () => { if (isReadyToScan()) armIdleTimer(); }, { passive: true });
+  });
+
+  function finishSession() {
+    clearIdleTimer();
+    input.disabled = true;
+    methodChoice.hidden = true;
+    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
+    result.hidden = false;
+    setState('success', 'Have a great day!', 'check-circle');
+    setTimeout(() => { window.fullscreenNavigate('/kiosk'); }, 1500);
   }
 
   // Step 1: scan the member's own name tag. Students are checked out
@@ -158,6 +197,7 @@
   // step-task to scan the Setup/Cleanup badge for the task they completed.
   scanForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    clearIdleTimer();
     const barcode = input.value.trim();
     input.value = '';
     if (!barcode) return;
@@ -183,6 +223,7 @@
         setTimeout(() => {
           result.hidden = true;
           chooser.showPanel(activeMethod);
+          armIdleTimer();
         }, 2500);
         return;
       }
@@ -207,6 +248,7 @@
         setTimeout(() => {
           result.hidden = true;
           chooser.showPanel(activeMethod);
+          armIdleTimer();
         }, 1500);
         return;
       }
@@ -226,6 +268,7 @@
       setTimeout(() => {
         result.hidden = true;
         chooser.showPanel(activeMethod);
+        armIdleTimer();
       }, 2500);
     }
   });
@@ -252,12 +295,7 @@
   cancelBtn.addEventListener('click', resetToScan);
   cancelBtn2.addEventListener('click', resetToScan);
 
-  doneBtn.addEventListener('click', () => {
-    input.disabled = true;
-    methodChoice.hidden = true;
-    stepScan.querySelectorAll('[data-method-panel]').forEach((p) => { p.hidden = true; });
-    result.hidden = false;
-    setState('success', 'Have a great day!', 'check-circle');
-    setTimeout(() => { window.fullscreenNavigate('/kiosk'); }, 1500);
-  });
+  doneBtn.addEventListener('click', finishSession);
+
+  armIdleTimer();
 })();

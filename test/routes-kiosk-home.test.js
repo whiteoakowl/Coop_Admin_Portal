@@ -95,6 +95,22 @@ test('kiosk home: mobile grid/action bar and desktop/tablet top menu/columns bot
     assert.match(res.text, /id="kiosk-mode-btn-mobile"/);
   });
 
+  // A real request: "on mobile view, the kiosk button should not be on
+  // the bottom orange bar. It should be its own button at the top right
+  // of the screen." Mobile's own copy used to be one more item inside
+  // the bottom .landing-action-bar (see that group's own assertions
+  // above, which no longer include it) - now its own fixed top-right
+  // corner group, matching desktop/tablet's bottom-right one in shape.
+  await t.test("mobile's own Kiosk Mode button lives in its own top-right corner group, not inside the bottom action bar", () => {
+    const barMatch = /<footer class="landing-action-bar">([\s\S]*?)<\/footer>/.exec(res.text);
+    assert.ok(barMatch);
+    assert.doesNotMatch(barMatch[1], /kiosk-mode-btn-mobile/, 'the bottom action bar should no longer carry the mobile Kiosk Mode button');
+
+    const cornerMatch = /<div class="landing-corner-actions-top-right landing-mobile-only">([\s\S]*?)<\/div>/.exec(res.text);
+    assert.ok(cornerMatch, 'expected a dedicated top-right mobile-only corner group');
+    assert.match(cornerMatch[1], /id="kiosk-mode-btn-mobile"/);
+  });
+
   await t.test('the new owl crest logo is used, not the old logo file', () => {
     assert.match(res.text, /<img class="landing-logo-sm" src="\/img\/logo-owl\.png"/);
   });
