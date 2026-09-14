@@ -101,6 +101,34 @@ async function itemsForSection(sectionId) {
   return items.map((item, i) => ({ ...item, number: i + 1 }));
 }
 
+// Batched version of itemsForSection's own item.number (1-indexed
+// position within its section), looked up directly by task_item_id
+// instead of walking one section's items - for call sites (utils/
+// miscBadgeData.js's badge print routes) that start from a list of
+// misc_badges rows, each already carrying its own task_item_id but not
+// its section's item ordering. Same ROW_NUMBER()-over-position math
+// utils/rosterGrid.js already uses for the attendance roster's "Team
+// 1-#3", so this always matches what the Task List page and the roster
+// both call this same task's number - not a separately-stored value
+// that could drift out of sync with either.
+async function taskNumbersByItemId(itemIds) {
+  const ids = itemIds.filter((id) => id != null);
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await db
+    .prepare(
+      `SELECT id, number FROM (
+         SELECT id, section_id, ROW_NUMBER() OVER (PARTITION BY section_id ORDER BY position, id) AS number
+         FROM task_list_items
+       ) numbered
+       WHERE id IN (${placeholders})`
+    )
+    .all(...ids);
+  const map = {};
+  for (const row of rows) map[row.id] = Number(row.number);
+  return map;
+}
+
 async function getSection(id) {
   return db.prepare('SELECT * FROM task_list_sections WHERE id = ?').get(id);
 }
@@ -295,6 +323,7 @@ async function taskAlreadyLoggedByAnotherMember(taskItemId, date, memberId) {
 module.exports = {
   taskListSectionsForDay,
   itemsForSection,
+  taskNumbersByItemId,
   getSection,
   createSection,
   updateSection,

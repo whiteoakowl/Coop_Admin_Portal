@@ -81,7 +81,7 @@
     // reasoning as parent's own two-line setupCleanupDays placeholder
     // above.
     admin: { name: 'Sam Admin', adminPosition: ['President', 'Fundraising Coordinator'], memberCode: 'ID#012345', barcodeValue: '0123456789' },
-    setupCleanup: { day: 'Monday', title: 'Snack Table', leaderLabel: 'Leader: Jordan Parent', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345' },
+    setupCleanup: { day: 'Monday', title: 'Snack Table', leaderLabel: 'Leader: Jordan Parent', description: 'Set up the snack table and chairs before 9am.', barcodeValue: '012345', taskNumber: '3' },
     custom: { badgeNumber: '', title: 'Sample Badge', description: 'Custom badge text goes here.' },
   };
 

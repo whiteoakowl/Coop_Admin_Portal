@@ -66,6 +66,7 @@ const {
   deleteMiscBadge,
   miscBadgeRowData,
 } = require('../utils/miscBadgeData');
+const { taskNumbersByItemId } = require('../utils/taskList');
 const { imageFileFilter, spreadsheetFileFilter } = require('../utils/uploads');
 const { sweepNameTagImages, sweepScheduleCardImages } = require('../utils/designImageGC');
 const { createStorageClient, publicUrl } = require('../utils/storage');
@@ -625,8 +626,9 @@ router.post('/badges/:type/print', requireMiscBadgeType, async (req, res) => {
 
   const template = await getMiscTemplate(type);
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
+  const taskNumbers = type === 'setupCleanup' ? await taskNumbersByItemId(rows.map((r) => r.task_item_id)) : {};
   const cards = rows.map((row) => ({
-    html: NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(row)),
+    html: NameTagRenderCore.renderBadgeElements(template.elements, miscBadgeRowData(row, taskNumbers[row.task_item_id])),
     bgCss,
   }));
 

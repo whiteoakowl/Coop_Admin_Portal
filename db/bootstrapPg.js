@@ -521,6 +521,34 @@ async function backfillSetupCleanupBadgeLayout(db) {
 }
 
 // Genuine one-time backfill for an already-deployed database's EXISTING
+// misc_badge_templates 'setupCleanup' row - a real request: "the task #
+// should be in the top right corner of the badge." Same shape as
+// backfillMiscBadgeBarcode above (only ADDS one missing element to an
+// otherwise-untouched, possibly hand-customized layout) rather than
+// backfillSetupCleanupBadgeLayout's whole-layout replace - the task-number
+// element is purely additive, nothing else about the existing layout's
+// fields changed. Detects "already migrated" by field, not type, since
+// 'text' is far too generic a type to check alone.
+async function backfillSetupCleanupTaskNumber(db) {
+  const row = await db.prepare("SELECT layout_json FROM misc_badge_templates WHERE badge_type = 'setupCleanup'").get();
+  if (!row) return;
+  let layout;
+  try {
+    layout = normalizeLayout(JSON.parse(row.layout_json));
+  } catch (err) {
+    return;
+  }
+  if (!layout || !Array.isArray(layout.elements)) return;
+  if (layout.elements.some((el) => el.field === 'taskNumber')) return;
+
+  const taskNumberDefault = DEFAULT_LAYOUTS.setupCleanup.elements.find((el) => el.field === 'taskNumber');
+  if (!taskNumberDefault) return;
+  const elements = [...layout.elements, { ...taskNumberDefault }];
+
+  await db.prepare("UPDATE misc_badge_templates SET layout_json = ? WHERE badge_type = 'setupCleanup'").run(JSON.stringify({ ...layout, elements }));
+}
+
+// Genuine one-time backfill for an already-deployed database's EXISTING
 // misc_badges rows for setupCleanup tasks - the redesign above didn't
 // just change the template's layout, it SWAPPED what the underlying
 // title/description columns mean for these rows (title: task text ->
@@ -849,6 +877,7 @@ module.exports = {
   backfillMiscBadgeBarcode,
   backfillSetupCleanupTaskWraps,
   backfillSetupCleanupBadgeLayout,
+  backfillSetupCleanupTaskNumber,
   backfillSetupCleanupBadgeFields,
   backfillScheduleCardAllergy,
   backfillScheduleCardAutoFit,

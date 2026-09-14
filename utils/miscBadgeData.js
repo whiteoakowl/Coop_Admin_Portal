@@ -72,7 +72,11 @@ async function deleteMiscBadge(id) {
 // leader_name columns are always null, so both come back blank here,
 // which is exactly right since the default 'custom' layout has no
 // elements bound to either field anyway.
-function miscBadgeRowData(row) {
+// taskNumber is the task's 1-indexed position within its own Task List
+// section (utils/taskList.js's taskNumbersByItemId) - not a column on
+// misc_badges itself, since a badge row has no idea of its section's
+// ordering on its own, so callers look it up separately and pass it in.
+function miscBadgeRowData(row, taskNumber) {
   return {
     badgeNumber: row.badge_number || '',
     title: row.title || '',
@@ -80,6 +84,7 @@ function miscBadgeRowData(row) {
     barcodeValue: row.barcode || '',
     day: row.day ? DAY_LABELS[row.day] || row.day : '',
     leaderLabel: row.leader_name ? `Leader: ${row.leader_name}` : '',
+    taskNumber: taskNumber != null ? String(taskNumber) : '',
   };
 }
 

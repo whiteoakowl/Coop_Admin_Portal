@@ -99,3 +99,34 @@ test('the printed task/description text does not force single-line shrink-to-fit
   // day/team/leader keep their own autoFitText - only description changed.
   assert.match(res.text, /data-id="team" data-type="text" data-autofit="1"/);
 });
+
+// A real request: "Setup/cleanup badges printing. the task # should be in
+// the top right corner of the badge." taskNumber is the task's 1-indexed
+// position within its own Task List section (utils/taskList.js's
+// itemsForSection/taskNumbersByItemId) - not the badge's own barcode -
+// threaded into miscBadgeRowData by this print route since a misc_badges
+// row alone doesn't carry its section's item ordering.
+test('printing real Setup/Cleanup badges stamps each one with its own task\'s 1-indexed position in its section', async () => {
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const sectionId = await createSection('monday', 'Yard Team', null);
+  const firstItemId = await addItem(sectionId, 'Rake the leaves by the front door');
+  const secondItemId = await addItem(sectionId, 'Sweep the back patio');
+  const thirdItemId = await addItem(sectionId, 'Empty the outdoor trash cans');
+  const firstBadge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(firstItemId);
+  const secondBadge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(secondItemId);
+  const thirdBadge = await db.prepare('SELECT * FROM misc_badges WHERE task_item_id = ?').get(thirdItemId);
+
+  const res = await request(app)
+    .post('/admin/design/badges/setupCleanup/print')
+    .set('Cookie', cookie)
+    .type('form')
+    .send({ badgeIds: [String(firstBadge.id), String(secondBadge.id), String(thirdBadge.id)], _csrf: csrfToken });
+
+  assert.equal(res.status, 200);
+  // Cards print in badge_number (barcode) order, not task position, so
+  // just check the full {1,2,3} set showed up somewhere, not a specific
+  // card-by-card order.
+  const taskNumberEls = [...res.text.matchAll(/data-id="task-number" data-type="text"[\s\S]*?<span class="badge-el-text-inner"[^>]*>([^<]*)<\/span>/g)];
+  assert.equal(taskNumberEls.length, 3, 'each printed card should carry its own task-number element');
+  assert.deepEqual(taskNumberEls.map((m) => m[1].trim()).sort(), ['1', '2', '3']);
+});

@@ -67,9 +67,13 @@ const FIELDS_BY_TYPE = {
   // the generic "Title"/"Description" labels are gone; title/description
   // still bind to the same misc_badges columns, just repurposed (see
   // utils/taskList.js's upsertTaskBadge) to actually mean Team Name/Task
-  // now, and day/leaderLabel are genuinely new fields.
+  // now, and day/leaderLabel are genuinely new fields. taskNumber was
+  // added later still (see DEFAULT_LAYOUTS.setupCleanup's own comment) -
+  // a different value than the old badgeNumber, so its return here isn't
+  // a reversal of the bug report above.
   setupCleanup: [
     { field: 'day', label: 'Day' },
+    { field: 'taskNumber', label: 'Task #' },
     { field: 'title', label: 'Team Name' },
     { field: 'leaderLabel', label: 'Leader' },
     { field: 'description', label: 'Task' },
@@ -223,11 +227,23 @@ const DEFAULT_LAYOUTS = {
   // however many lines it needs within its own already-generous 78px-tall
   // box (deliberately sized as the tallest field here for exactly this
   // kind of longer text) instead of shrinking to fit one line.
+  // A real request: "the task # should be in the top right corner of the
+  // badge." Not the same badgeNumber the redesign above dropped (that
+  // was the task's own raw 6-digit barcode value, "redundant with the
+  // barcode itself") - taskNumber is the task's 1-indexed position
+  // within its own Task List section (the same "#3" utils/taskList.js's
+  // itemsForSection already computes for the admin Task List table and
+  // the attendance roster's own "Team 1-#3" - see utils/rosterGrid.js's
+  // comment), threaded in at print time by whichever route renders this
+  // template (routes/admin-misc-badges.js and routes/main-admin-name-
+  // tags.js's own print handlers) since a misc_badges row alone doesn't
+  // carry its section's item ordering.
   setupCleanup: {
     background: '#ffffff',
     backgroundOpacity: 1,
     elements: [
       { id: 'day', type: 'text', field: 'day', x: 8, y: 6, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: true, align: 'center', valign: 'middle' },
+      { id: 'task-number', type: 'text', field: 'taskNumber', x: 288, y: 6, width: 40, height: 16, fontSize: 12, color: '#1c2530', bold: true, align: 'right', valign: 'middle' },
       { id: 'team', type: 'text', field: 'title', x: 8, y: 24, width: 320, height: 32, fontSize: 17, color: '#1c2530', bold: true, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'leader', type: 'text', field: 'leaderLabel', x: 8, y: 58, width: 320, height: 16, fontSize: 11, color: '#5b6b7c', bold: false, align: 'center', valign: 'middle', autoFitText: true },
       { id: 'task', type: 'text', field: 'description', x: 8, y: 76, width: 320, height: 78, fontSize: 14, color: '#1c2530', bold: false, align: 'center', valign: 'middle' },
