@@ -30,6 +30,7 @@ const {
 } = require('../utils/volunteers');
 const {
   substituteBoard,
+  assignedHourCountsForDate,
   jobAssignmentGrid,
   dailyAssignmentCardsWithLabels,
   archivedDateSummaries,
@@ -63,37 +64,51 @@ router.get('/volunteers', requireAdmin, (req, res) => res.redirect(`/admin/volun
 // Shared by the full manage page below and its own /fragment route (see
 // that route's own comment for why a second, cards-only endpoint exists) -
 // this is every bit of substituteBoard's raw output that isn't ready to
-// hand straight to the view: the suggested-floater candidate list (and its
-// "already picked elsewhere this hour"/"still needs an infant flag" work)
-// for every slot, on every hour, for one day+date.
+// hand straight to the view: each slot's own plain candidate list (and its
+// "already picked elsewhere this hour"/"still needs an infant flag"/"how
+// many other hour cards today" work) for every slot, on every hour, for
+// one day+date.
 async function buildHourSections(day, selectedDate) {
   const hourSections = selectedDate ? await substituteBoard(day, selectedDate) : [];
+  // A real request: "when someone is assigned it should show (1) next to
+  // their name... if they are assigned a job on 2 hour cards that day it
+  // will say (2)." One lookup for the whole day rather than per-hour,
+  // since it's the same total regardless of which hour's dropdown is
+  // asking.
+  const assignedHourCounts = selectedDate ? await assignedHourCountsForDate(selectedDate) : {};
 
   // A real, measured slowdown: this used to compute an infant flag for
   // EVERY active parent/admin site-wide (2 extra queries each via
   // hasInfantChild -> familyOf) on every page load, regardless of how
   // many of them are actually offered as a candidate here - ~300ms with
   // 250 parents in the org vs ~15ms once scoped down to just the members
-  // who actually appear in one of this page's own suggestedFloaters
+  // who actually appear in one of this page's own availableFloaters
   // lists (usually a handful). slot.assigned already carries its own
   // infant flag from assignedInfo (utils/substitutes.js), unaffected.
   const candidateIds = new Set();
   hourSections.forEach((hour) => {
-    (hour.suggestedFloaters || []).forEach((p) => candidateIds.add(p.id));
+    (hour.availableFloaters || []).forEach((p) => candidateIds.add(p.id));
   });
   const infantByMemberId = {};
   for (const id of candidateIds) infantByMemberId[id] = await hasInfantChild(id);
 
   hourSections.forEach((hour) => {
     hour.slots.forEach((slot) => {
-      const candidates = (hour.suggestedFloaters || []).map((p) => ({
+      const candidates = (hour.availableFloaters || []).map((p) => ({
         id: p.id,
         name: p.name,
         rankLabel: RANK_LABELS[p.rank] || null,
         infant: !!infantByMemberId[p.id],
+        assignedHourCount: assignedHourCounts[p.id] || 0,
       }));
       if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
-        candidates.unshift({ id: slot.assigned.id, name: slot.assigned.name, rankLabel: RANK_LABELS[slot.assigned.rank] || null, infant: slot.assigned.infant });
+        candidates.unshift({
+          id: slot.assigned.id,
+          name: slot.assigned.name,
+          rankLabel: RANK_LABELS[slot.assigned.rank] || null,
+          infant: slot.assigned.infant,
+          assignedHourCount: assignedHourCounts[slot.assigned.id] || 0,
+        });
       }
       slot.candidates = candidates;
       slot.noneAvailable = candidates.length === 0;

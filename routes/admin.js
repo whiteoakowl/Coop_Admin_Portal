@@ -8,7 +8,6 @@ const { todayISO, formatDateLabel, weekdayOf } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
 const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay } = require('../utils/classSchedule');
-const { substituteBoard } = require('../utils/substitutes');
 const { DAY_LABELS } = require('../utils/days');
 const { isRateLimited, recordFailure, recordSuccess } = require('../utils/loginRateLimit');
 const { setClassCheckinPin, verifyClassCheckinPin } = require('../utils/classCheckinPin');
@@ -251,15 +250,6 @@ router.get('/', requireAdmin, async (req, res) => {
       absenceFormSubmissionsForRoster(parentRosterId, today),
       classesAtRiskForDay(alertDay, today),
       classesNeedingStaffForDay(alertDay, today),
-      // Preserves a real side effect the old sitewide alert popup used to
-      // trigger on every admin page load (routes/admin-substitutes.js's
-      // now-removed /alerts.json, via substituteBoard(day, date)): the
-      // FIRST time a date's floater board is computed, it auto-picks and
-      // persists a 'pending' candidate for every open slot. Without
-      // something still calling substituteBoard for today somewhere, that
-      // auto-fill would only ever happen once an admin opens Floater
-      // Assignments themselves, instead of already being there waiting.
-      substituteBoard(alertDay, today),
     ]);
   }
 

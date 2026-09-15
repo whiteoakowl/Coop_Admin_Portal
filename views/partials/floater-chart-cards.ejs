@@ -5,10 +5,13 @@
 // per class's missing teacher/assistant - a class with two people out
 // that hour lists twice, each row tagged with who it's covering for (see
 // slot.reason below). The Floater column is the assign UI itself (no
-// separate "needs a substitute" section) - a dropdown of available
-// candidates (already rank-sorted and filtered to whoever's actually free
-// this date - see routes/admin-volunteers.js) plus an Accept/Unassign
-// button. Locals: day, dayLabel, selectedDate, hourSections.
+// separate "needs a substitute" section) - a plain dropdown of whoever's
+// actually free this date and not already covering another slot this
+// same hour (rank-sorted, but never pre-picked - a real request: "don't
+// suggest floaters. just offer the drop down menu of choices that aren't
+// already assigned" - see routes/admin-volunteers.js) plus an
+// Assign/Unassign button. Locals: day, dayLabel, selectedDate,
+// hourSections.
 //
 // A real request: "floater printing. each page should have a header,
 // each page should be an hour that fits to page." On screen this stays
@@ -62,14 +65,15 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
                       <input type="hidden" name="slotType" value="<%= slot.slotType %>" />
                       <input type="hidden" name="slotId" value="<%= slot.slotId %>" />
                       <input type="hidden" name="isOverride" value="1" />
-                      <select name="memberId" <%= isApproved ? 'disabled' : '' %>>
+                      <select name="memberId" required <%= isApproved ? 'disabled' : '' %>>
+                        <% if (!slot.assigned) { %><option value="" selected disabled>Select a floater…</option><% } %>
                         <% slot.candidates.forEach(function(c) { %>
                           <option value="<%= c.id %>" <%= slot.assigned && slot.assigned.id === c.id ? 'selected' : '' %>>
-                            <%= c.name %> (<%= c.rankLabel || 'Available' %><% if (c.infant) { %>, infant<% } %>)
+                            <%= c.name %> (<%= c.rankLabel || 'Available' %><% if (c.assignedHourCount > 0) { %>, <%= c.assignedHourCount %><% } %><% if (c.infant) { %>, infant<% } %>)
                           </option>
                         <% }); %>
                       </select>
-                      <button type="submit" class="floater-assign-btn<%= isApproved ? ' floater-assign-btn-unassign' : '' %>"><%= isApproved ? 'Unassign' : 'Accept' %></button>
+                      <button type="submit" class="floater-assign-btn<%= isApproved ? ' floater-assign-btn-unassign' : '' %>"><%= isApproved ? 'Unassign' : 'Assign' %></button>
                     </form>
                   <% } %>
                 </td>

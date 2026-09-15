@@ -46,6 +46,7 @@ const {
   backfillParentRemoveLegacyCleanupTeamElement,
   backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
+  backfillRemovePendingSubstituteAssignments,
 } = require('./bootstrapPg');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
@@ -136,6 +137,7 @@ db.ready = schemaReady
   // OWN barcode column back onto its badge row, so any item that didn't
   // have one yet needs that backfill's INSERT to have run first.
   .then(() => backfillSetupCleanupBadgeFields(db))
+  .then(() => backfillRemovePendingSubstituteAssignments(db))
   // Lazily required (not imported at the top of this file, unlike every
   // other backfill above) - utils/classSchedule.js itself does
   // `require('../db')`, and this whole file IS '../db' from that

@@ -1,15 +1,15 @@
 // Real bug report: "when floaters are removed from the floater list they
-// should also disappear from the dropdown menu of suggested floaters on
-// the assignment page." routes/admin-volunteers.js's manage page used to
-// union in every OTHER active parent site-wide (activeParentOptions) as a
-// second, unranked candidate tier below the real Floater List's own
-// suggestions - so removing someone from the Floater List (utils/
-// volunteers.js's removeMemberFromSection) never actually dropped them
-// from the dropdown, they just fell into that unranked "everyone else"
-// group. Every candidate offered now comes straight from
-// hour.suggestedFloaters (utils/substitutes.js's substituteBoard, itself
-// scoped to floaterMembersForHour) - the real Floater List for that exact
-// hour, nothing broader.
+// should also disappear from the dropdown menu on the assignment page."
+// routes/admin-volunteers.js's manage page used to union in every OTHER
+// active parent site-wide (activeParentOptions) as a second, unranked
+// candidate tier below the real Floater List's own names - so removing
+// someone from the Floater List (utils/volunteers.js's
+// removeMemberFromSection) never actually dropped them from the dropdown,
+// they just fell into that unranked "everyone else" group. Every
+// candidate offered now comes straight from hour.availableFloaters
+// (utils/substitutes.js's substituteBoard, itself scoped to
+// floaterMembersForHour) - the real Floater List for that exact hour,
+// nothing broader.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -70,10 +70,6 @@ test('a floater removed from the Floater List no longer appears in the assign dr
   const leaving = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Leaving Floater', 'leave-floater', 'parent', 1)").run()).lastInsertRowid;
   await addMemberToSection(list.id, staying, hour1.id);
   await addMemberToSection(list.id, leaving, hour1.id);
-  // Removed before ever loading the page, so it's never the auto-picked
-  // pending assignment either - the whole point is that an active parent
-  // who ISN'T on the list (any more) shouldn't appear at all, not just
-  // "unless they already got auto-picked."
   await removeMemberFromSection(list.id, leaving, hour1.id);
 
   await createPermanentJob({ day, hourPosition: 1, title: 'Dropdown Test Job', room: '' });

@@ -870,6 +870,21 @@ async function backfillTaskItemBarcodes(db) {
   }
 }
 
+// Genuine one-time cleanup for an already-deployed database - a real
+// request: "don't suggest floaters. just offer the drop down menu of
+// choices that aren't already assigned." substitute_assignments rows left
+// in 'pending' status were the now-removed auto-suggest system's own
+// non-committal guesses (utils/substitutes.js's substituteBoard no longer
+// auto-picks/persists one at all), so any 'pending' row still in the
+// table from before this change is stale - never an admin's own decision,
+// yet still capable of showing as "Awaiting Approval" (views/admin-
+// logs.ejs) or pinning a name into a slot's dropdown that nobody ever
+// actually approved. Never touches 'approved' rows - only ever a genuine
+// admin decision, made through setAssignment.
+async function backfillRemovePendingSubstituteAssignments(db) {
+  await db.prepare("DELETE FROM substitute_assignments WHERE status = 'pending'").run();
+}
+
 module.exports = {
   seedIfMissing,
   backfillNameTagLogo,
@@ -887,4 +902,5 @@ module.exports = {
   backfillParentRemoveLegacyCleanupTeamElement,
   backfillNameTagStackedSizing,
   backfillTaskItemBarcodes,
+  backfillRemovePendingSubstituteAssignments,
 };

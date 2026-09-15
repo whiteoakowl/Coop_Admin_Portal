@@ -1,16 +1,13 @@
-// A real bug report: "the suggested floater name dropdown menus are also
-// not updating as the floater teams are updated." routes-admin-volunteers-
-// dropdown-excludes-removed.test.js already covers removing someone from
-// the Floater List BEFORE any board/dropdown was ever computed for them -
-// this covers the case that test doesn't: substituteBoard auto-picks (and
-// persists as 'pending') a candidate for an open slot the FIRST time a
-// date's board is viewed. resolveSlot only ever auto-picks when no row
-// exists yet, so once that pending row was written, nothing re-checked
-// whether its own person was still even eligible - removing them from the
-// Floater List afterward left the board (and the dropdown built from it in
-// routes/admin-volunteers.js, which always keeps a slot's current pick
-// selectable even once they've dropped out of suggestedFloaters) still
-// showing them as "currently assigned" indefinitely.
+// substituteBoard no longer auto-picks a candidate for an open slot (see
+// utils/substitutes.js's own comment on why - a real request: "don't
+// suggest floaters. just offer the drop down menu of choices that aren't
+// already assigned"), so there's no more auto-suggested 'pending' pick
+// left to go stale when its own floater is later removed from the
+// Floater List - that scenario this file used to cover is gone along
+// with the feature. What's still worth covering: an ADMIN's own approved
+// pick (setAssignment, always 'approved') must never be silently cleared
+// just because that person later leaves the Floater List - only an
+// admin's own later action should ever change it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -28,7 +25,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const app = require('../server');
 const db = require('../db');
 const { getListByDay, sectionsForList, addMemberToSection, removeMemberFromSection } = require('../utils/volunteers');
-const { substituteBoard, createPermanentJob } = require('../utils/substitutes');
+const { substituteBoard, createPermanentJob, setAssignment } = require('../utils/substitutes');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -43,46 +40,22 @@ async function makeParent(name, barcode) {
 }
 
 // Same stale-hardcoded-date bug as test/routes-admin-substitutes-fetch-
-// assign.test.js's own nextMonday() comment: '2026-08-31'/'2026-09-02' were
-// in the future when this file was written but aren't anymore. Computed
-// fresh each run so this can't go stale again - targetDow (0=Sunday...
-// 6=Saturday) lands on the correct real weekday since utils/substitutes.js's
-// own DAY_WEEKDAY check cares about it (1=Monday, 3=Wednesday below).
+// assign.test.js's own nextMonday() comment: '2026-09-02' was in the future
+// when this file was written but isn't anymore. Computed fresh each run so
+// this can't go stale again - targetDow (0=Sunday...6=Saturday) lands on
+// the correct real weekday since utils/substitutes.js's own DAY_WEEKDAY
+// check cares about it (3=Wednesday below).
 function nextWeekday(targetDow) {
   const d = new Date();
   d.setDate(d.getDate() + (((targetDow - d.getDay() + 7) % 7) || 7));
   return d.toISOString().slice(0, 10);
 }
 
-test('a stale pending auto-suggestion clears itself once its own floater is removed from the Floater List, instead of staying pinned forever', async () => {
-  const day = 'monday';
-  const list = await getListByDay(day);
-  const hour1 = (await sectionsForList(list.id)).find((s) => s.position === 1);
-
-  const lonely = await makeParent('Lonely Floater', 'stale-lonely');
-  await addMemberToSection(list.id, lonely, hour1.id);
-  await createPermanentJob({ day, hourPosition: 1, title: 'Stale Pending Job', room: 'R' });
-
-  const date = nextWeekday(1); // a Monday
-  let board = await substituteBoard(day, date);
-  let slot = board.find((h) => h.position === 1).slots.find((s) => s.label === 'Stale Pending Job');
-  assert.ok(slot.assigned, 'the only candidate should get auto-picked');
-  assert.equal(slot.assigned.id, lonely);
-  assert.equal(slot.assigned.status, 'pending', 'an auto-pick is pending, not an admin-approved decision');
-
-  await removeMemberFromSection(list.id, lonely, hour1.id);
-
-  board = await substituteBoard(day, date);
-  slot = board.find((h) => h.position === 1).slots.find((s) => s.label === 'Stale Pending Job');
-  assert.equal(slot.assigned, null, 'with no one left on the list for this hour, the stale pending pick should clear rather than stay pinned to someone no longer eligible');
-});
-
 test('an APPROVED pick is never auto-cleared just because the person later leaves the Floater List - that stays an admin decision', async () => {
-  const day = 'wednesday'; // isolate from the monday test above (shared DB file)
+  const day = 'wednesday';
   const list = await getListByDay(day);
   const hour1 = (await sectionsForList(list.id)).find((s) => s.position === 1);
 
-  const { setAssignment } = require('../utils/substitutes');
   const chosen = await makeParent('Chosen Floater', 'stale-chosen');
   await addMemberToSection(list.id, chosen, hour1.id);
   await createPermanentJob({ day, hourPosition: 1, title: 'Approved Pick Job', room: 'R' });

@@ -5,9 +5,9 @@
 // works if the assistant number is set to two, only 1 assistant is signed
 // up for the class. then 1 position should show up on the floater list as
 // needing to be filled." Covers classVacancySlots directly (the shortfall
-// math) and substituteBoard end-to-end (the slots actually reaching the
-// board, getting an auto-suggested floater once a date is picked, and
-// disappearing again once the roster catches up).
+// math) and substituteBoard end-to-end (the slot actually reaching the
+// board, staying unassigned - no more auto-suggestion - until an admin
+// picks someone, and disappearing again once the roster catches up).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -110,7 +110,7 @@ test('no cap set (teacher_slots/assistant_slots null): never generates a vacancy
   assert.equal(vacancies.length, 0);
 });
 
-test('substituteBoard surfaces the vacancy slot alongside jobs/class-absence slots and auto-suggests a floater once a date is picked', async () => {
+test('substituteBoard surfaces the vacancy slot alongside jobs/class-absence slots, unassigned until an admin picks someone', async () => {
   const day = 'wednesday';
   const classId = await createClass({
     day, hourPosition: 2, className: 'Drama Class', room: 'R12', assistantSlots: 1,
@@ -130,9 +130,8 @@ test('substituteBoard surfaces the vacancy slot alongside jobs/class-absence slo
   assert.ok(slot, 'the vacancy slot should be on the board');
   assert.equal(slot.label, 'Drama Class');
   assert.equal(slot.room, 'R12');
-  assert.ok(slot.assigned, 'the lone eligible floater should get auto-suggested');
-  assert.equal(slot.assigned.id, floater);
-  assert.equal(slot.assigned.status, 'pending');
+  assert.equal(slot.assigned, null, 'nothing auto-picks anymore - the slot starts genuinely unassigned');
+  assert.ok(hour.availableFloaters.some((f) => f.id === floater), 'the eligible floater should still be a listed choice, just not pre-picked');
 
   await addStaff(classId, floater, 'assistant');
   const boardAfter = await substituteBoard(day, date);
