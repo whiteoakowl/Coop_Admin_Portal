@@ -293,6 +293,7 @@ test('Setup/Cleanup Archive', async (t) => {
 
 test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Floater Assignments\' own Accept/Unassign)', async (t) => {
   const { cookie, csrfToken } = await loginAsAdmin();
+  const date = futureMonday();
 
   const team = await db.prepare("INSERT INTO setup_teams (day, title) VALUES ('monday', 'Exclusion Crew')").run();
   const section = await db.prepare("INSERT INTO task_list_sections (day, title, team_id, position) VALUES ('monday', 'Exclusion Tasks', ?, 0)").run(team.lastInsertRowid);
@@ -302,17 +303,17 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
   const bob = await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Bob Exclusion', 'exclusion-bob', 'parent')").run();
   await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, alice.lastInsertRowid);
   await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(team.lastInsertRowid, bob.lastInsertRowid);
-  await request(app).post('/admin/setup/monday/dates/add').set('Cookie', cookie).type('form').send({ dates: '2026-09-14', _csrf: csrfToken });
+  await request(app).post('/admin/setup/monday/dates/add').set('Cookie', cookie).type('form').send({ dates: date, _csrf: csrfToken });
 
   await t.test('Assign locks the slot (static text + Unassign) and removes it from other members\' dropdown options', async () => {
     const res = await request(app)
       .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
       .set('Cookie', cookie)
       .type('form')
-      .send({ date: '2026-09-14', slot: '1', taskItemId: String(item1.lastInsertRowid), _csrf: csrfToken });
+      .send({ date, slot: '1', taskItemId: String(item1.lastInsertRowid), _csrf: csrfToken });
     assert.equal(res.status, 302);
 
-    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
     assert.equal(page.status, 200);
 
     // Alice's own slot 1 is now locked: static text, no dropdown, an Unassign button.
@@ -332,7 +333,7 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
   await t.test('a member\'s own OTHER slot dropdown also excludes whatever they already hold', async () => {
     // Alice's own slot 2 dropdown must not offer Vacuum a second time - she
     // already holds it in slot 1.
-    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
     const aliceSlot2 = extractSlotCell(page.text, alice.lastInsertRowid, 2);
     assert.match(aliceSlot2, /<select/);
     assert.doesNotMatch(aliceSlot2, /Vacuum/, 'slot 2 must not also offer whatever Alice already holds in slot 1');
@@ -344,10 +345,10 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
       .post(`/admin/setup/monday/assignments/${alice.lastInsertRowid}/task`)
       .set('Cookie', cookie)
       .type('form')
-      .send({ date: '2026-09-14', slot: '1', taskItemId: '', _csrf: csrfToken });
+      .send({ date, slot: '1', taskItemId: '', _csrf: csrfToken });
     assert.equal(res.status, 302);
 
-    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
     const aliceSlot1 = extractSlotCell(page.text, alice.lastInsertRowid, 1);
     assert.match(aliceSlot1, /<select/, 'unassigning should bring the dropdown back');
     assert.match(aliceSlot1, /Assign/);
@@ -356,12 +357,12 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
     const bobSlot1 = extractSlotCell(page.text, bob.lastInsertRowid, 1);
     assert.match(bobSlot1, /Vacuum/, 'and it\'s available to Bob too, not just Alice');
 
-    const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', alice.lastInsertRowid, '2026-09-14');
+    const row = await db.prepare('SELECT * FROM setup_task_assignments WHERE day = ? AND member_id = ? AND session_date = ?').get('monday', alice.lastInsertRowid, date);
     assert.equal(row, undefined, 'Alice had no other slot set, so Unassign should have deleted the row entirely');
   });
 
   await t.test('the Task 1/Task 2 column headers replace the old "Suggested Task" labels', async () => {
-    const page = await request(app).get('/admin/setup/monday/assignments?date=2026-09-14').set('Cookie', cookie);
+    const page = await request(app).get(`/admin/setup/monday/assignments?date=${date}`).set('Cookie', cookie);
     assert.match(page.text, /<th>Task 1<\/th><th>Task 2<\/th>/);
     assert.doesNotMatch(page.text, /Suggested Task/);
   });
@@ -371,7 +372,7 @@ test('Setup/Cleanup Assignments: Assign/Unassign + mutual exclusion (mirrors Flo
       .post(`/admin/setup/monday/assignments/team/${team.lastInsertRowid}/save`)
       .set('Cookie', cookie)
       .type('form')
-      .send({ date: '2026-09-14', [`task_1_${bob.lastInsertRowid}`]: String(item2.lastInsertRowid), _csrf: csrfToken });
+      .send({ date, [`task_1_${bob.lastInsertRowid}`]: String(item2.lastInsertRowid), _csrf: csrfToken });
     assert.equal(res.status, 404);
   });
 });
