@@ -32,15 +32,17 @@
 
     <form method="POST" action="/main-admin/announcements/text/compose" id="email-select-form">
       <div class="roster-btn-row email-toolbar-row">
+        <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
+        <label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" /> Select None</label>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
-        <button type="submit" class="primary-btn">Create Text</button>
+        <button type="submit" class="roster-action-btn">Create Text</button>
       </div>
       <p class="hint" id="email-select-count"></p>
 
       <div class="roster-scroll">
         <table class="roster-table condensed-table" id="email-candidate-table">
           <thead>
-            <tr><th><input type="checkbox" id="email-select-all" aria-label="Select all" /></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+            <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
           </thead>
           <tbody>
             <% candidates.forEach(function(c) { %>

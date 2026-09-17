@@ -151,7 +151,7 @@ test('Co-op Admin Communication page: 3 tabs (no Newsletter), checkbox recipient
   assert.match(page.text, /Coop send/);
 });
 
-test('Email/Text tabs render a coming-soon stub on both portals instead of 404ing', async () => {
+test('Email/Text tabs render on both portals instead of 404ing', async () => {
   const main = await loginAsMainAdmin();
   const mainEmail = await request(app).get('/main-admin/announcements/email').set('Cookie', main.cookie);
   assert.equal(mainEmail.status, 200);

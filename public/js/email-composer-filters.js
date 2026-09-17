@@ -4,14 +4,22 @@
 // data-age-group/data-registered, set from utils/emailComposer.js's own
 // listRecipientCandidates()) - see that module's header comment for why.
 // A later request, Main Admin only: "select all or none should be
-// checkboxes not buttons" - views/main-admin-email.ejs and
-// main-admin-text.ejs dropped their Select All/Select None buttons for a
-// single checkbox in the table's header cell that does both jobs
-// (checked = select every visible row, unchecked = clear every visible
-// row). Co-op Admin's own admin-email.ejs/admin-text.ejs still use the
-// original button pair and share this same script, so both wirings stay
-// supported side by side - whichever markup a given page has is what
-// fires.
+// checkboxes not buttons" moved views/main-admin-email.ejs/main-admin-
+// text.ejs from a Select All/Select None button pair to a single checkbox
+// in the table's own header cell that did both jobs (checked = select
+// every visible row, unchecked = clear every visible row). A further real
+// request reversed course on that single combined checkbox: "email tab,
+// add and select all and select none check boxes, neatly on the same
+// row" - two separate checkboxes now, moved out of the table header and
+// into the same toolbar row as Filter/Create Email, matching the
+// Select-All/Select-None CHECKBOX pair (not buttons) every bulk print
+// picker under Design/Print already uses (public/js/design-print-hub.js's
+// own wireBulkMemberList) - Select All stays checked once ticked, Select
+// None is a momentary action that clears everything (including Select
+// All) and un-checks itself right away. Co-op Admin's own admin-
+// email.ejs/admin-text.ejs still use the ORIGINAL button pair and share
+// this same script, so all three wirings stay supported side by side -
+// whichever markup a given page actually has is what fires.
 (function () {
   const table = document.getElementById('email-candidate-table');
   if (!table) return;
@@ -19,6 +27,7 @@
   const rows = Array.from(table.querySelectorAll('[data-email-row]'));
   const countLabel = document.getElementById('email-select-count');
   const selectAllCheckbox = document.getElementById('email-select-all');
+  const selectNoneCheckbox = document.getElementById('email-select-none');
 
   const filterInputs = {
     role: document.getElementById('email-filter-role'),
@@ -50,10 +59,6 @@
     const visibleRows = rows.filter((r) => r.style.display !== 'none');
     const checked = visibleRows.filter((r) => r.querySelector('[data-email-checkbox]').checked).length;
     countLabel.textContent = checked === 0 ? 'No recipients selected.' : `${checked} recipient${checked === 1 ? '' : 's'} selected.`;
-    if (selectAllCheckbox) {
-      selectAllCheckbox.checked = visibleRows.length > 0 && checked === visibleRows.length;
-      selectAllCheckbox.indeterminate = checked > 0 && checked < visibleRows.length;
-    }
   }
 
   Object.values(filterInputs).forEach((input) => input.addEventListener('change', applyFilters));
@@ -68,6 +73,23 @@
         if (row.style.display === 'none') return;
         row.querySelector('[data-email-checkbox]').checked = selectAllCheckbox.checked;
       });
+      updateCount();
+    });
+  }
+
+  // A momentary action, not persistent state - checking it clears every
+  // visible row (and Select All, if it was checked) then immediately
+  // un-checks itself, same as every Select None checkbox under Design/
+  // Print already behaves.
+  if (selectNoneCheckbox) {
+    selectNoneCheckbox.addEventListener('change', () => {
+      if (!selectNoneCheckbox.checked) return;
+      rows.forEach((row) => {
+        if (row.style.display === 'none') return;
+        row.querySelector('[data-email-checkbox]').checked = false;
+      });
+      if (selectAllCheckbox) selectAllCheckbox.checked = false;
+      selectNoneCheckbox.checked = false;
       updateCount();
     });
   }

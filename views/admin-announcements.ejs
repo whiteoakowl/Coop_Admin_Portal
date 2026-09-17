@@ -28,12 +28,12 @@
       </div>
       <div class="member-form-full">
         <span class="checkbox-group-label">Send to</span>
-        <div class="checkbox-group checkbox-group-stack">
-          <label><input type="checkbox" name="targets" value="everyone" /> Everyone (all active members)</label>
+        <div class="checkbox-group checkbox-group-stack checkbox-group-boxed">
+          <label class="checkbox-option"><input type="checkbox" name="targets" value="everyone" /> Everyone (all active members)</label>
           <% roles.forEach(function(r) { %>
-            <label><input type="checkbox" name="targets" value="<%= r.key %>" /> <%= r.label %></label>
+            <label class="checkbox-option"><input type="checkbox" name="targets" value="<%= r.key %>" /> <%= r.label %></label>
           <% }); %>
-          <label><input type="checkbox" name="targets" value="public" /> Public Homepage</label>
+          <label class="checkbox-option"><input type="checkbox" name="targets" value="public" /> Public Homepage</label>
         </div>
       </div>
       <div class="member-form-footer">
