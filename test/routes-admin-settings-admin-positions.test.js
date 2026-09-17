@@ -71,6 +71,19 @@ test('Main Admin Settings: Admins tab', async (t) => {
     assert.doesNotMatch(res.text, /No admin positions added yet\./);
   });
 
+  // A real bug report: "the list of admin positions and names drifts off
+  // the page to the right. Fit to page on mobile." html/body have
+  // overflow-x:hidden as a page-wide backstop (public/css/styles.css), so
+  // a wide table with nowhere to scroll doesn't get a scrollbar - it just
+  // silently clips, taking whatever ran past the viewport edge with it.
+  // Every other roster-shaped table in the app wraps in .roster-scroll
+  // (overflow-x:auto) for exactly this reason - this table was the one
+  // left out.
+  await t.test('the Admin Positions table is wrapped in a horizontally-scrollable container, not left to overflow the page', async () => {
+    const res = await request(app).get('/main-admin/admins').set('Cookie', cookie);
+    assert.match(res.text, /<div class="roster-scroll">\s*<table class="roster-table">/);
+  });
+
   await t.test('the new position shows up in the (Co-op Admin) member edit form dropdown', async () => {
     // Admin Positions still lives in utils/adminPositions.js, shared by
     // both portals' member data - only the Settings UI for MANAGING the

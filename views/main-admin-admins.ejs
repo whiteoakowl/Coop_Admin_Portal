@@ -44,6 +44,7 @@
       <% if (adminPositions.length === 0) { %>
         <p class="hint">No admin positions added yet.</p>
       <% } else { %>
+        <div class="roster-scroll">
         <table class="roster-table">
           <thead><tr><th>Title</th><th>Leaders</th><th></th></tr></thead>
           <tbody>
@@ -74,6 +75,7 @@
             <% }); %>
           </tbody>
         </table>
+        </div>
       <% } %>
     </div>
 
