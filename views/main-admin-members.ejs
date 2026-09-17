@@ -29,8 +29,6 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <% if (activeTab === 'members' || activeTab === 'archive') { %>
-      <p class="hint">The full family/member roster - the same records the Co-op Admin Portal's attendance, rosters, and schedules all draw from.</p>
-
       <%# Same shape as routes/admin-members.js's own bulk-permissions form -
           see that file's own comment. %>
       <form id="permissions-bulk-form" method="POST" action="/main-admin/members/bulk-permissions"></form>
@@ -397,7 +395,6 @@
           view their membership form and edit, add portal settings etc.
           save. each member line should have approve button, deny button
           and trash can symbol to delete the request." %>
-      <p class="hint">Self-registered members awaiting review. Approving flips their account active and sends the Approval Letter (Settings tab); denying sends the Denial Letter without granting access.</p>
       <% if (pending.length === 0) { %>
         <p class="roster-empty">No membership requests awaiting approval.</p>
       <% } else { %>
@@ -438,7 +435,6 @@
           the same text editing icons we added to other chat boxes" -
           same forum-editor-toolbar/forum-editor.js rich-text component
           the Policy Handbook editor below already uses. %>
-      <p class="hint">Use <code>{{name}}</code> anywhere in the subject or body to insert the applicant's name.</p>
       <%
         // The two letters were plain text (newline-separated paragraphs)
         // before this editor existed - dropped straight into a
@@ -487,7 +483,6 @@
           (views/portal-register.ejs) before they can submit. %>
       <div class="manage-section">
         <h2>Policy Handbook</h2>
-        <p class="hint">Shown on the public membership application - an applicant must scroll through this before they can check the "I have read the Policy Handbook" box and submit.</p>
         <form method="POST" action="/main-admin/members/settings/handbook" class="stack-form" data-forum-editor>
           <%- include('partials/forum-editor-toolbar') %>
           <div class="forum-editable" data-forum-editable contenteditable="true"><%- handbookHtml %></div>
@@ -503,7 +498,6 @@
           information on the application, not a checkout. %>
       <div class="manage-section">
         <h2>Membership Fee &amp; Payment</h2>
-        <p class="hint">Shown on the public membership application. Leave the fee at $0 to hide the fee amount and just show the instructions.</p>
         <form method="POST" action="/main-admin/members/settings/payment" class="stack-form">
           <label>Membership Fee (USD)
             <input type="number" name="feeDollars" min="0" step="0.01" value="<%= (paymentInfo.feeCents / 100).toFixed(2) %>" />
@@ -522,7 +516,6 @@
           public self-registration application. %>
       <div class="manage-section">
         <h2>Membership Form Fields</h2>
-        <p class="hint">Extra questions shown on the Parent/Guardian and Student sections of every form that adds a new family member.</p>
         <%- include('partials/membership-fields-manager', { target: 'parent', label: 'Parent', fields: parentFormFields, fieldTypes }) %>
         <%- include('partials/membership-fields-manager', { target: 'child', label: 'Student', fields: childFormFields, fieldTypes }) %>
       </div>

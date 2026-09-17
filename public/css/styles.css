@@ -7515,6 +7515,14 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 
 .main-admin-role-list { display: flex; flex-direction: column; gap: 1.25rem; }
 .permission-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem 1rem; margin: 0.75rem 0 1rem; }
+/* A real request: "click on each admin title and then there will be a
+   popup to check which permissions that admin may have." At
+   .member-picker-dialog's own capped width (420px), the permission
+   grid's 220px column minimum only ever fits one column - a real ~20-item
+   permission list stacks into one long column tall enough to run off a
+   phone screen with no way to reach Save/Close below it, since dialog
+   elements don't scroll their own overflow by default. */
+.role-permissions-dialog { max-height: 85vh; overflow-y: auto; }
 .portal-dashboard-card-wide { max-width: 720px; margin-bottom: 1.5rem; }
 
 /* Student Portal home: Announcements + Word of the Week side by side - a

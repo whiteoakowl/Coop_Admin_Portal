@@ -20,6 +20,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'testadmin';
 process.env.ADMIN_PASSWORD = 'testpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 
 const request = require('supertest');
 const app = require('../server');
@@ -54,4 +56,27 @@ test('Quick Links: Setup/Cleanup Teams and Floater Assignments point at the memb
   const gridHtml = res.text.slice(gridStart, gridEnd);
   assert.doesNotMatch(gridHtml, /href="\/admin\/setup"/, 'should no longer link to the admin-only management page');
   assert.doesNotMatch(gridHtml, /href="\/admin\/volunteers"/, 'should no longer link to the admin-only management page');
+});
+
+// A real request: "all quick links shouldn't say (public link). They are
+// all already public. No description on this page." Every link here is
+// already a public, no-login page by definition (that's the whole point
+// of this list) - the "(public link)" suffix on a few of them was
+// redundant, not a distinction from the others.
+test('Quick Links: no "(public link)" suffix on any card, no page description', async () => {
+  const cookie = await loginAsAdmin();
+  const res = await request(app).get('/admin/settings?tab=quicklinks').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /public link/i);
+  assert.doesNotMatch(res.text, /Kiosk screens, public forms, and admin pages, opened in a new tab\./);
+});
+
+test('Main Admin\'s own Quick Links tab: same cleanup - no "(public link)" suffix, no page description', async () => {
+  const loginRes = await request(app).post('/login').type('form').send({ email: 'mainadmin@coop.local', password: 'changeme123', next: '/main-admin' });
+  const cookie = loginRes.headers['set-cookie'];
+  const res = await request(app).get('/main-admin/quick-links').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /public link/i);
+  assert.doesNotMatch(res.text, /Kiosk screens, public forms, and admin pages, opened in a new tab\./);
+  assert.match(res.text, /<a class="admin-card" href="\/register" target="_blank">Request Membership<\/a>/);
 });

@@ -80,6 +80,30 @@ async function familyForAccount(accountId) {
   return [self, ...rest];
 }
 
+// A real request: "all members should already have a portal account." A
+// brand-new member (created via either portal's own New Member form) now
+// gets an active account automatically at creation time, instead of
+// needing a later /bulk-create-accounts pass (routes/main-admin-
+// members.js's own one-shot retrofit for members added before this
+// existed) - same starting password and the same two skip conditions
+// that bulk pass already established: no email on file to log in with,
+// or that email already belongs to a different account. createdByAccountId
+// is a Main Admin portal account when the caller has one (recorded as who
+// approved it) - Co-op Admin's own separate, older session-based admin
+// login has no such account to attribute it to, so it's null there,
+// which approved_by_account_id already allows.
+async function ensurePortalAccountForMember(memberId, email, createdByAccountId) {
+  const trimmedEmail = (email || '').trim();
+  if (!trimmedEmail) return { status: 'no_email' };
+  if (await findAccountByEmail(trimmedEmail)) return { status: 'email_in_use' };
+  await db
+    .prepare(
+      "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
+    )
+    .run(memberId, trimmedEmail, hashPassword('changeme123'), createdByAccountId || null);
+  return { status: 'created' };
+}
+
 module.exports = {
   findAccountByEmail,
   findAccountById,
@@ -89,4 +113,5 @@ module.exports = {
   permissionsForAccount,
   memberForAccount,
   familyForAccount,
+  ensurePortalAccountForMember,
 };

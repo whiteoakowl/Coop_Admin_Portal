@@ -11,7 +11,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <%- include('partials/main-admin-settings-tabs', { activeSettingsTab: 'website' }) %>
     <h1>Website</h1>
-    <p class="hint">Edit the public homepage's copy, announcements, and FAQs without touching code. <a href="/welcome" target="_blank">View the live site &rarr;</a></p>
+    <p><a href="/welcome" target="_blank">View the live site &rarr;</a></p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
@@ -56,36 +56,6 @@
         moved to /main-admin/announcements (its "Public" Send To
         option). %>
     <p class="hint">Public homepage announcements are now posted and managed from <a href="/main-admin/announcements">Announcements</a>.</p>
-
-    <section class="portal-dashboard-card portal-dashboard-card-wide">
-      <h2>FAQs</h2>
-      <form method="POST" action="/main-admin/website/faqs" class="member-form-grid">
-        <label class="member-form-full">Question
-          <input type="text" name="question" required />
-        </label>
-        <label class="member-form-full">Answer
-          <textarea name="answer" rows="2" required></textarea>
-        </label>
-        <div class="member-form-full">
-          <button type="submit" class="roster-action-btn">Add FAQ</button>
-        </div>
-      </form>
-      <% if (faqs.length === 0) { %>
-        <p class="roster-empty">No FAQs yet.</p>
-      <% } else { %>
-        <div class="site-faq-list">
-          <% faqs.forEach(function(faq) { %>
-            <details class="site-faq-item">
-              <summary><%= faq.question %></summary>
-              <p><%= faq.answer %></p>
-              <form method="POST" action="/main-admin/website/faqs/<%= faq.id %>/delete" data-confirm="Delete this FAQ?">
-                <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-              </form>
-            </details>
-          <% }); %>
-        </div>
-      <% } %>
-    </section>
   </main>
 </body>
 </html>

@@ -22,6 +22,7 @@ const { createStorageClient } = require('./storage');
 const { saveUpload } = require('./uploadBackend');
 const { imageFileFilter } = require('./uploads');
 const membershipFormFields = require('./membershipFormFields');
+const { ensurePortalAccountForMember } = require('./portalAuth');
 
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
 const MEMBER_PHOTOS_BUCKET = 'member-photos';
@@ -134,7 +135,12 @@ async function syncCleanupTeam(memberId, teamId) {
 // Primary Parent on more than one parent block in the same submission,
 // or on a new parent joining a family that already has one, could leave
 // two members both marked primary. Same family-wide clear-first here.
-async function createParentMember(familyId, address, parent) {
+// createdByAccountId: a Main Admin portal account id when the caller has
+// one (routes/main-admin-members.js) - recorded as who approved the new
+// account. Co-op Admin's own separate, older session-based admin login
+// (routes/admin-members.js, routes/membership.js) has no such account to
+// attribute it to, so it's left undefined there.
+async function createParentMember(familyId, address, parent, createdByAccountId) {
   const memberCode = await generateMemberCode();
   if (parent.isPrimaryParent && familyId != null) {
     await db.prepare('UPDATE members SET is_primary_parent = 0 WHERE family_id = ?').run(familyId);
@@ -147,6 +153,13 @@ async function createParentMember(familyId, address, parent) {
     .run(parent.name, memberCode, memberCode, familyId, address.address, address.city, address.state, address.zip, parent.phone || null, parent.email || null, parent.isPrimaryParent ? 1 : 0);
   await syncCleanupTeam(info.lastInsertRowid, parent.cleanupTeamId || null);
   await membershipFormFields.saveFieldValues(info.lastInsertRowid, 'parent', parent.customFieldValues);
+  // A real request: "all members should already have a portal account."
+  // Silently skipped (not surfaced as an error here) when there's no
+  // email to log in with, or that email already belongs to someone
+  // else's account - routes/main-admin-members.js's own /bulk-create-
+  // accounts still exists to retrofit whoever predates this and needs an
+  // email added first.
+  await ensurePortalAccountForMember(info.lastInsertRowid, parent.email, createdByAccountId);
   return info.lastInsertRowid;
 }
 

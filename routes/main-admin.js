@@ -198,8 +198,7 @@ router.post('/roles/:id/permissions', requirePortalPermission('manage_roles'), a
 
 router.get('/website', requirePortalPermission('manage_website'), async (req, res) => {
   const settings = await db.prepare('SELECT * FROM site_settings WHERE id = 1').get();
-  const faqs = await db.prepare('SELECT * FROM faqs ORDER BY position, id').all();
-  res.render('main-admin-website', { title: 'Website', settings, faqs, notice: req.query.notice || null });
+  res.render('main-admin-website', { title: 'Website', settings, notice: req.query.notice || null });
 });
 
 router.post('/website/settings', requirePortalPermission('manage_website'), async (req, res) => {
@@ -224,18 +223,27 @@ router.post('/website/announcements/:id/delete', requirePortalPermission('manage
   res.redirect('/main-admin/announcements?notice=' + encodeURIComponent('Announcement removed.'));
 });
 
-router.post('/website/faqs', requirePortalPermission('manage_website'), async (req, res) => {
-  const question = (req.body.question || '').trim();
-  const answer = (req.body.answer || '').trim();
-  if (!question || !answer) return res.redirect('/main-admin/website?notice=' + encodeURIComponent('Question and answer are required.'));
-  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM faqs').get()).p) + 1;
-  await db.prepare('INSERT INTO faqs (question, answer, position) VALUES (?, ?, ?)').run(question, answer, position);
-  res.redirect('/main-admin/website?notice=' + encodeURIComponent('FAQ added.'));
+// --- FAQ (moved off the Website page onto its own Settings tab - a real
+// request: "faq should be it's own tab under settings, not under website
+// tab.") ---
+
+router.get('/faq', requirePortalPermission('manage_website'), async (req, res) => {
+  const faqs = await db.prepare('SELECT * FROM faqs ORDER BY position, id').all();
+  res.render('main-admin-faq', { title: 'FAQ', faqs, notice: req.query.notice || null });
 });
 
-router.post('/website/faqs/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
+router.post('/faq/add', requirePortalPermission('manage_website'), async (req, res) => {
+  const question = (req.body.question || '').trim();
+  const answer = (req.body.answer || '').trim();
+  if (!question || !answer) return res.redirect('/main-admin/faq?notice=' + encodeURIComponent('Question and answer are required.'));
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM faqs').get()).p) + 1;
+  await db.prepare('INSERT INTO faqs (question, answer, position) VALUES (?, ?, ?)').run(question, answer, position);
+  res.redirect('/main-admin/faq?notice=' + encodeURIComponent('FAQ added.'));
+});
+
+router.post('/faq/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
   await db.prepare('DELETE FROM faqs WHERE id = ?').run(req.params.id);
-  res.redirect('/main-admin/website?notice=' + encodeURIComponent('FAQ removed.'));
+  res.redirect('/main-admin/faq?notice=' + encodeURIComponent('FAQ removed.'));
 });
 
 // --- Registration Windows (staged, group-targeted class registration -

@@ -49,7 +49,7 @@ const {
 const { getMemberSchedule, scheduleList } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
 const { clearVolunteerMembershipIfNotParent } = require('../utils/volunteers');
-const { hashPassword, findAccountByEmail } = require('../utils/portalAuth');
+const { hashPassword, findAccountByEmail, ensurePortalAccountForMember } = require('../utils/portalAuth');
 const {
   resolveFamilyId: resolveIntakeFamilyId,
   createParentMember,
@@ -270,37 +270,28 @@ router.post('/bulk-permissions', async (req, res) => {
 
 // A real request: "make every member a user... give everyone the
 // password changeme123. all members will have accounts." One-shot bulk
-// bootstrap: creates a portal account (status 'active', so no separate
-// approval step) for every ACTIVE member who doesn't already have one,
-// using their own email on file as their login. A member with no email
-// can't get one (member_accounts.email is required) - skipped, not
-// silently dropped, so the admin sees exactly how many still need an
-// email added before they can log in.
+// bootstrap for every member who predates ensurePortalAccountForMember
+// (utils/portalAuth.js - every NEW member gets an account automatically
+// now, at creation time, in both portals' own New Member routes; this is
+// only for retrofitting whoever was already in the system before that):
+// creates a portal account (status 'active', so no separate approval
+// step) for every ACTIVE member who doesn't already have one. A member
+// with no email can't get one (member_accounts.email is required) -
+// skipped, not silently dropped, so the admin sees exactly how many still
+// need an email added before they can log in.
 router.post('/bulk-create-accounts', async (req, res) => {
   const members = await db.prepare("SELECT id, email FROM members WHERE active = 1").all();
   const existingMemberIds = new Set((await db.prepare('SELECT member_id FROM member_accounts').all()).map((r) => r.member_id));
-  const passwordHash = hashPassword('changeme123');
 
   let created = 0;
   let skippedNoEmail = 0;
   let skippedEmailInUse = 0;
   for (const m of members) {
     if (existingMemberIds.has(m.id)) continue;
-    const email = (m.email || '').trim();
-    if (!email) {
-      skippedNoEmail += 1;
-      continue;
-    }
-    if (await findAccountByEmail(email)) {
-      skippedEmailInUse += 1;
-      continue;
-    }
-    await db
-      .prepare(
-        "INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at, approved_by_account_id) VALUES (?, ?, ?, 'active', now_text(), ?)"
-      )
-      .run(m.id, email, passwordHash, req.portalAccount.id);
-    created += 1;
+    const result = await ensurePortalAccountForMember(m.id, m.email, req.portalAccount.id);
+    if (result.status === 'created') created += 1;
+    else if (result.status === 'no_email') skippedNoEmail += 1;
+    else if (result.status === 'email_in_use') skippedEmailInUse += 1;
   }
 
   const parts = [`Created ${created} account(s) with the password "changeme123".`];
@@ -605,7 +596,7 @@ router.post('/new', uploadIntakePhotos('/main-admin/members/new'), async (req, r
       isPrimaryParent: p.isPrimaryParent === '1',
       cleanupTeamId: parseInt(p.cleanupTeamId, 10) || null,
       customFieldValues: p.customFields,
-    });
+    }, req.portalAccount.id);
   }
 
   for (const c of children) {
@@ -772,7 +763,7 @@ router.post('/:id/quick-add-family-member', async (req, res) => {
   const address = { address: member.address, city: member.city, state: member.state, zip: member.zip };
 
   if (memberType === 'parent') {
-    await createParentMember(member.family_id, address, { name, isPrimaryParent: false });
+    await createParentMember(member.family_id, address, { name, isPrimaryParent: false }, req.portalAccount.id);
   } else {
     const birthday = isValidISODate((req.body.birthday || '').trim()) ? req.body.birthday.trim() : null;
     const gradeLevel = GRADE_LEVELS.includes(req.body.gradeLevel) ? req.body.gradeLevel : null;
