@@ -34,6 +34,8 @@ process.env.UPLOADS_DIR = testUploadsDir;
 process.env.SESSION_SECRET = 'a11y-check-secret-not-for-real-use';
 process.env.ADMIN_USERNAME = 'a11ycheckadmin';
 process.env.ADMIN_PASSWORD = 'a11ycheckpassword123';
+process.env.MAIN_ADMIN_EMAIL = 'a11ycheck-mainadmin@coop.local';
+process.env.MAIN_ADMIN_PASSWORD = 'a11ycheckpassword123';
 
 const app = require('../server');
 const db = require('../db');
@@ -48,6 +50,7 @@ let httpServer;
 let base;
 let adminCookies;
 let classCheckinCookies;
+let mainAdminCookies;
 let testClassId;
 let browser;
 
@@ -92,6 +95,18 @@ test.before(async () => {
     redirect: 'manual',
   });
   classCheckinCookies = parseCookies(unlockRes.headers.getSetCookie());
+
+  // Main Admin portal session (req.portalAccount, separate login system
+  // from the Co-op Admin session above) - needed for the mobile page-
+  // tabs popup regression check below, which exercises a Main Admin page
+  // (Members) that has real subpages.
+  const mainAdminLoginRes = await fetch(`${base}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `email=${encodeURIComponent(process.env.MAIN_ADMIN_EMAIL)}&password=${encodeURIComponent(process.env.MAIN_ADMIN_PASSWORD)}`,
+    redirect: 'manual',
+  });
+  mainAdminCookies = parseCookies(mainAdminLoginRes.headers.getSetCookie());
 
   // One real class, enrolled student, and today marked as a session date,
   // so the class list/attendance/scan pages render real content instead
@@ -242,4 +257,43 @@ test('axe-core accessibility check', { timeout: 600000 }, async (t) => {
   await t.test('admin settings (/admin/settings, logged in)', async () => {
     assertClean(await axeCheck('/admin/settings', { cookies: adminCookies }), '/admin/settings');
   });
+});
+
+// A real bug: "when you click on a tab on the bottom orange menu bar,
+// the sub pages list appear as an extension of the orange menu bar. Its
+// not on the page anymore." Root cause: .page-tabs-dialog (views/
+// partials/portal-nav.ejs's mobile subpages popup, public/js/page-
+// tabs.js) also carries the plain .view-tabs class it reuses styling
+// from, and .view-tabs's own base rule ("display: flex", no [open]
+// qualifier) rendered it visible and in-flow the whole time, not just
+// once actually opened via .showModal() - axe-core doesn't check this
+// (color-contrast/ARIA rules, not "is this dialog visible when it
+// shouldn't be"), so it needs its own real-browser check to catch a
+// regression here again.
+test('mobile page-tabs popup stays hidden until opened', { timeout: 30000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    if (mainAdminCookies && mainAdminCookies.length) await context.addCookies(mainAdminCookies);
+    await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
+    // Main Admin's own Members page - has real subpages (Members/
+    // Approvals/Settings/Archive), unlike Co-op Admin's mobile nav (a
+    // flat top-level list with no popup of its own - see admin-nav.ejs).
+    await page.goto(base + '/main-admin/members', { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
+
+    const closed = await page.evaluate(() => {
+      const d = document.querySelector('.page-tabs-dialog');
+      return d && { open: d.open, display: getComputedStyle(d).display };
+    });
+    assert.deepEqual(closed, { open: false, display: 'none' }, 'the popup must be fully hidden before its trigger is ever clicked');
+
+    await page.click('.page-tabs-trigger');
+    const opened = await page.evaluate(() => {
+      const d = document.querySelector('.page-tabs-dialog');
+      return d && { open: d.open, display: getComputedStyle(d).display, position: getComputedStyle(d).position };
+    });
+    assert.deepEqual(opened, { open: true, display: 'flex', position: 'fixed' }, 'clicking the trigger should open it as a real centered modal, not an in-page block');
+  } finally {
+    await context.close();
+  }
 });

@@ -30,7 +30,7 @@ module.exports = [
     // no bundler/transpiler. .stylelintrc.js belongs here too, for the
     // same reason: it's a CommonJS config file Node loads directly, not
     // browser code.
-    files: ['server.js', 'eslint.config.js', '.stylelintrc.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js', 'a11y/**/*.js', 'netlify/**/*.js', 'scripts/**/*.js'],
+    files: ['server.js', 'eslint.config.js', '.stylelintrc.js', 'db/**/*.js', 'middleware/**/*.js', 'routes/**/*.js', 'utils/**/*.js', 'test/**/*.js', 'netlify/**/*.js', 'scripts/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',
@@ -52,6 +52,23 @@ module.exports = [
       ecmaVersion: 2023,
       sourceType: 'script',
       globals: globals.browser,
+    },
+    rules: {
+      'no-unused-vars': unusedVarsRule,
+    },
+  },
+  {
+    // a11y/accessibility-check.js is deliberately dual-environment too -
+    // plain Node code (require, the node:test runner) that also embeds
+    // Playwright page.evaluate() callbacks, whose function BODY actually
+    // runs in the browser page under test (document, getComputedStyle),
+    // not in this Node process - same reasoning as name-tag-render-
+    // core.js's own dual-environment entry below.
+    files: ['a11y/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'commonjs',
+      globals: { ...globals.browser, ...globals.node },
     },
     rules: {
       'no-unused-vars': unusedVarsRule,
