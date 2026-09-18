@@ -1,12 +1,11 @@
 // Real HTTP-level coverage for the per-member Cards dialog's print
 // dropdown (task #88, routes/admin-members.js's /members/:id/cards/print).
-// The four layouts render three genuinely different views (a single-card
-// page, the side-by-side pairs page, and the front-and-back duplex page
-// shared with the bulk Design/Print flow - see utils/cardPairs.js and
-// utils/duplexPrint.js), so a route-level test that only checked "200 OK"
-// would miss a layout silently falling back to the wrong view. Boots the
-// real app (server.js) against a throwaway DB, same pattern as the other
-// test/routes-*.test.js files.
+// The three layouts render genuinely different views (a single-card page
+// and the front-and-back duplex page shared with the bulk Design/Print
+// flow - see utils/duplexPrint.js), so a route-level test that only
+// checked "200 OK" would miss a layout silently falling back to the wrong
+// view. Boots the real app (server.js) against a throwaway DB, same
+// pattern as the other test/routes-*.test.js files.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -58,14 +57,6 @@ test('member Cards dialog print layouts', async (t) => {
     assert.equal(res.status, 200);
     assert.match(res.text, /Schedule Card<\/h2>/);
     assert.doesNotMatch(res.text, /Name Tag<\/h2>/);
-  });
-
-  await t.test('sideBySide renders the pairs view with one row for the member', async () => {
-    const res = await request(app).get(`/admin/members/${memberId}/cards/print?layout=sideBySide`).set('Cookie', cookie);
-    assert.equal(res.status, 200);
-    assert.match(res.text, /member-card-pair-row/);
-    const rowCount = (res.text.match(/member-card-pair-row/g) || []).length;
-    assert.equal(rowCount, 1, 'exactly one pair row for one member');
   });
 
   await t.test('frontBack renders the duplex view: name tag on the front page, schedule card mirrored onto the back page', async () => {

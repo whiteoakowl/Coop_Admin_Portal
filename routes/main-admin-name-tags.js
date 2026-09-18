@@ -474,26 +474,6 @@ router.post('/print-cards', async (req, res) => {
   });
 });
 
-router.post('/print-both', async (req, res) => {
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (memberIds.length === 0) {
-    return res.redirect('/main-admin/name-tags?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
-  }
-
-  const placeholders = memberIds.map(() => '?').join(',');
-  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
-
-  res.render('main-admin-name-tag-both-print', {
-    title: 'Print Name Tags + Schedule Cards',
-    pairs: await buildCardPairs(members),
-    badgeWidth: BADGE_WIDTH,
-    badgeHeight: BADGE_HEIGHT,
-    cardWidth: CARD_WIDTH,
-    cardHeight: CARD_HEIGHT,
-    SCHEDULE_CARD_SAFE_INSET,
-  });
-});
-
 router.post('/print-duplex', async (req, res) => {
   const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
   if (memberIds.length === 0) {

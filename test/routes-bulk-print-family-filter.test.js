@@ -85,15 +85,14 @@ test('Design/Print hub (Co-op Admin): every member-based print panel offers a Fa
   assert.equal(res.status, 200);
 
   // One combined Type + Family filter select per member-based panel:
-  // Schedule Cards, Name Tags, Cards Both, Cards Duplex, Barcodes Only,
-  // Barcode Mailing Labels. Name Tag Requests has its own standalone
-  // Family-only select instead, but only renders once there's at least
-  // one pending request - covered separately below (with a seeded
-  // request) rather than here.
+  // Schedule Cards, Name Tags, Cards Duplex, Barcodes Only, Barcode
+  // Mailing Labels. Name Tag Requests has its own standalone Family-only
+  // select instead, but only renders once there's at least one pending
+  // request - covered separately below (with a seeded request) rather
+  // than here.
   const expectedIds = [
     'schedule-print-filter-select',
     'name-tag-bulk-filter-select',
-    'cards-both-bulk-filter-select',
     'cards-duplex-bulk-filter-select',
     'barcodes-bulk-filter-select',
     'barcode-labels-bulk-filter-select',
@@ -141,7 +140,6 @@ test('Main Admin Design/Print hub: every member-based print panel offers a Famil
   const expectedIds = [
     'schedule-print-filter-select',
     'name-tag-bulk-filter-select',
-    'cards-both-bulk-filter-select',
     'cards-duplex-bulk-filter-select',
     'barcodes-bulk-filter-select',
     'barcode-labels-bulk-filter-select',

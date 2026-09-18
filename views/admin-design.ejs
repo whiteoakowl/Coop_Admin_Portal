@@ -233,7 +233,6 @@
             <option value="scheduleCards">Schedule Cards</option>
             <option value="nameTags">Name Tags</option>
             <option value="nameTagRequests">Name Tag Requests</option>
-            <option value="cardsBoth">Name Tags + Schedule Cards</option>
             <option value="cardsDuplex">Name Tags + Schedule Cards (Front &amp; Back)</option>
             <option value="barcodes">Barcodes Only</option>
             <option value="barcodeLabels">Barcode Mailing Labels</option>
@@ -354,30 +353,9 @@
           </form>
         </div>
 
-        <div id="print-cardsBoth-section" hidden>
-          <form method="POST" action="/admin/design/print-both" target="_blank" id="cards-both-print-form" data-bulk-print-refresh>
-            <p class="hint">Prints each selected member's Name Tag and Schedule Card side by side.</p>
-            <div class="name-tag-bulk-filter">
-              <%- include('partials/bulk-print-filter-select', { id: 'cards-both-bulk-filter-select', families: families }) %>
-              <label class="checkbox-option name-tag-select-all">
-                <input type="checkbox" id="cards-both-select-all-checkbox" />
-                Select All
-              </label>
-              <label class="checkbox-option name-tag-select-none">
-                <input type="checkbox" id="cards-both-select-none-checkbox" />
-                Select None
-              </label>
-              <button type="submit" class="primary-btn name-tag-bulk-submit">Print</button>
-            </div>
-            <div class="roster-scroll print-picker-scroll">
-              <%- include('partials/print-picker-table', { members: members, listId: 'cards-both-bulk-list', skipRows: true }) %>
-            </div>
-          </form>
-        </div>
-
         <div id="print-cardsDuplex-section" hidden>
           <form method="POST" action="/admin/design/print-duplex" target="_blank" id="cards-duplex-print-form" data-bulk-print-refresh>
-            <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions - print double-sided (flip on the long edge) and cut apart for two-sided cards.</p>
+            <p class="hint">Prints each selected member's Name Tag on the front of a sheet and their Schedule Card on the back, in matching positions. Printer settings: Step 1 - flip on long edge. Step 2 - print double sided. Then cut apart for two-sided cards.</p>
             <div class="name-tag-bulk-filter">
               <%- include('partials/bulk-print-filter-select', { id: 'cards-duplex-bulk-filter-select', families: families }) %>
               <label class="checkbox-option name-tag-select-all">

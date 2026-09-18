@@ -228,30 +228,6 @@ router.post('/design/requests/:id/unarchive', async (req, res) => {
   res.redirect('/admin/design?tab=requests&archived=1');
 });
 
-// Bulk "Name Tags + Schedule Cards" print: each selected member's two
-// cards side by side, one row per member - unlike the separate bulk Name
-// Tag / Schedule Card sheets (8-per-page grids of one card type), this is
-// a comparison/cut-together layout, so it isn't pinned to that grid.
-router.post('/design/print-both', async (req, res) => {
-  const memberIds = [].concat(req.body.memberIds || []).map((id) => parseInt(id, 10)).filter(Boolean);
-  if (memberIds.length === 0) {
-    return res.redirect('/admin/design?tab=print&error=' + encodeURIComponent('Select at least one member to print.'));
-  }
-
-  const placeholders = memberIds.map(() => '?').join(',');
-  const members = (await db.prepare(`SELECT * FROM members WHERE id IN (${placeholders})`).all(...memberIds)).sort(byLastName);
-
-  res.render('admin-name-tag-both-print', {
-    title: 'Print Name Tags + Schedule Cards',
-    pairs: await buildCardPairs(members),
-    badgeWidth: BADGE_WIDTH,
-    badgeHeight: BADGE_HEIGHT,
-    cardWidth: CARD_WIDTH,
-    cardHeight: CARD_HEIGHT,
-    SCHEDULE_CARD_SAFE_INSET,
-  });
-});
-
 // Bulk "Name Tags + Schedule Cards, Front & Back" print: name tags fill
 // the front of each sheet, the matching schedule cards fill the back
 // (see utils/duplexPrint.js), so printing double-sided and cutting along

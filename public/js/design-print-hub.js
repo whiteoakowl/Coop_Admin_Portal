@@ -41,7 +41,6 @@
     scheduleCards: document.getElementById('print-schedule-cards-section'),
     nameTags: document.getElementById('print-name-tags-section'),
     nameTagRequests: document.getElementById('print-nameTagRequests-section'),
-    cardsBoth: document.getElementById('print-cardsBoth-section'),
     cardsDuplex: document.getElementById('print-cardsDuplex-section'),
     barcodes: document.getElementById('print-barcodes-section'),
     barcodeLabels: document.getElementById('print-barcodeLabels-section'),
@@ -77,7 +76,7 @@
   const sourceList = document.getElementById('schedule-print-list');
   if (sourceList) {
     const sourceRows = sourceList.querySelectorAll('tbody tr');
-    ['name-tag-bulk-list', 'cards-both-bulk-list', 'cards-duplex-bulk-list', 'barcodes-bulk-list', 'barcode-labels-bulk-list'].forEach((listId) => {
+    ['name-tag-bulk-list', 'cards-duplex-bulk-list', 'barcodes-bulk-list', 'barcode-labels-bulk-list'].forEach((listId) => {
       const target = document.getElementById(listId);
       const tbody = target && target.querySelector('tbody');
       if (!tbody) return;
@@ -189,7 +188,6 @@
     undefined,
     'name-tag-requests-family-select'
   );
-  wireBulkMemberList('cards-both-bulk-list', 'cards-both-bulk-filter-select', 'cards-both-select-all-checkbox', 'cards-both-select-none-checkbox');
   wireBulkMemberList('cards-duplex-bulk-list', 'cards-duplex-bulk-filter-select', 'cards-duplex-select-all-checkbox', 'cards-duplex-select-none-checkbox');
   wireBulkMemberList('barcodes-bulk-list', 'barcodes-bulk-filter-select', 'barcodes-select-all-checkbox', 'barcodes-select-none-checkbox');
   wireBulkMemberList(
@@ -478,7 +476,7 @@
     });
   }
 
-  ['schedule-print-form', 'bulk-print-form', 'cards-both-print-form', 'cards-duplex-print-form', 'barcodes-print-form', 'barcode-labels-print-form'].forEach(wireChunkedSubmit);
+  ['schedule-print-form', 'bulk-print-form', 'cards-duplex-print-form', 'barcodes-print-form', 'barcode-labels-print-form'].forEach(wireChunkedSubmit);
 
   // No preview iframe on this hub - every bulk print form here just
   // submits normally (target="_blank"), opening the print page in its

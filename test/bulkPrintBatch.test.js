@@ -17,7 +17,7 @@
 // name-tag.js's /name-tag/print, routes/admin-schedule.js's
 // /schedule/print-cards and its Student/Parent Schedules grid, and
 // utils/cardPairs.js's buildCardPairs, shared by routes/admin-design.js's
-// /design/print-both and /design/print-duplex).
+// /design/print-duplex).
 //
 // This file proves two things for a single mixed batch (multiple parents
 // with different cleanup teams, a family with a primary and a secondary
@@ -195,12 +195,12 @@ test('the bulk print routes render every member of a mixed batch correctly (HTTP
   assert.equal(scheduleCardRes.status, 200);
   assert.match(scheduleCardRes.text, /Tree nut allergy/, 'the student\'s schedule card should show their allergy');
 
-  const bothRes = await request(app)
-    .post('/admin/design/print-both')
+  const duplexRes = await request(app)
+    .post('/admin/design/print-duplex')
     .set('Cookie', cookie)
     .type('form')
     .send({ memberIds: [parentId, studentId], _csrf: csrfToken });
-  assert.equal(bothRes.status, 200);
-  assert.match(bothRes.text, /Route Team/);
-  assert.match(bothRes.text, /Tree nut allergy/);
+  assert.equal(duplexRes.status, 200);
+  assert.match(duplexRes.text, /Route Team/);
+  assert.match(duplexRes.text, /Tree nut allergy/);
 });

@@ -619,36 +619,23 @@ router.post('/members/:id/request-name-tag', async (req, res) => {
   res.redirect('/admin/members');
 });
 
-const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'sideBySide', 'frontBack'];
+const CARD_PRINT_LAYOUTS = ['nameTag', 'scheduleCard', 'frontBack'];
 
 // Member profile "Cards" dialog: prints exactly the layout the admin chose
 // from the dropdown (member-cards-fragment.ejs) - a single card, or both
-// cards together (side by side for a quick look, or front-and-back for a
-// double-sided cut-out card - see utils/duplexPrint.js). Every member type
-// can have a class schedule, so Schedule Card is available regardless of
-// type. "Side by side" and "front and back" reuse the exact same
-// buildCardPairs/buildDuplexPages helpers and views the bulk Design/Print
-// flows use (routes/admin-design.js), just with a single-member list, so a
-// member's cards always print identically whether they were printed one
-// at a time here or in a bulk batch there.
+// cards together front-and-back for a double-sided cut-out card (see
+// utils/duplexPrint.js). Every member type can have a class schedule, so
+// Schedule Card is available regardless of type. "Front and back" reuses
+// the exact same buildCardPairs/buildDuplexPages helpers and views the
+// bulk Design/Print flows use (routes/admin-design.js), just with a
+// single-member list, so a member's cards always print identically
+// whether they were printed one at a time here or in a bulk batch there.
 router.get('/members/:id/cards/print', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(id);
   if (!member) return res.status(404).send('Not found');
 
   const layout = CARD_PRINT_LAYOUTS.includes(req.query.layout) ? req.query.layout : 'nameTag';
-
-  if (layout === 'sideBySide') {
-    return res.render('admin-name-tag-both-print', {
-      title: `Cards - ${member.name}`,
-      pairs: await buildCardPairs([member]),
-      badgeWidth: BADGE_WIDTH,
-      badgeHeight: BADGE_HEIGHT,
-      cardWidth: CARD_WIDTH,
-      cardHeight: CARD_HEIGHT,
-      SCHEDULE_CARD_SAFE_INSET,
-    });
-  }
 
   if (layout === 'frontBack') {
     const { frontPages, backPages } = buildDuplexPages(await buildCardPairs([member]));

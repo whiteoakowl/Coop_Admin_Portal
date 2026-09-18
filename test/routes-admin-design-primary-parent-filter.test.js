@@ -62,11 +62,10 @@ test('Design/Print hub offers Primary Parents Only on every member-based print p
 
   // A real request: "did you finish separating primary parent and parent
   // in the dropdown menu of choices for printing any name tag, schedule
-  // card, or barcode?" - Cards Both, Cards Duplex, Barcodes Only, and
-  // Barcode Mailing Labels all had a type filter already (just no primary-
-  // parent option); Schedule Cards had no type filter at all (search only)
-  // until now.
+  // card, or barcode?" - Cards Duplex, Barcodes Only, and Barcode Mailing
+  // Labels all had a type filter already (just no primary-parent option);
+  // Schedule Cards had no type filter at all (search only) until now.
   const primaryParentOptionCount = (res.text.match(/<option value="primaryParent"[^>]*>Primary Parents Only<\/option>/g) || []).length;
-  assert.equal(primaryParentOptionCount, 6, 'Schedule Cards, Name Tags, Cards Both, Cards Duplex, Barcodes Only, and Barcode Labels should each offer it');
+  assert.equal(primaryParentOptionCount, 5, 'Schedule Cards, Name Tags, Cards Duplex, Barcodes Only, and Barcode Labels should each offer it');
   assert.match(res.text, /<select class="name-tag-bulk-filter-select" id="schedule-print-filter-select">/, 'Schedule Cards should now have its own type filter select');
 });
