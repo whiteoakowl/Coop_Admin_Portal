@@ -19,11 +19,18 @@
 
     <%# A real request: "Only admin can add classifieds categories...
         Admin Classifieds gets tabs: Categories, Archive, Requests." %>
-    <div class="view-tabs">
+    <%# A real request: "instead of the tabs on each page, make them
+        subpages under each menu tab" (desktop, see views/partials/
+        portal-nav.ejs) / "when you click the tab below a menu will pop
+        up" (mobile, see public/js/page-tabs.js) - same tab links either
+        way, just moved out of this inline strip. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'requests' ? 'Requests' : activeTab === 'archive' ? 'Archive' : 'Categories' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a href="/main-admin/classifieds?tab=categories" class="view-tab <%= activeTab === 'categories' ? 'active' : '' %>">Categories</a>
       <a href="/main-admin/classifieds?tab=requests" class="view-tab <%= activeTab === 'requests' ? 'active' : '' %>">Requests<% if (requests.length > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= requests.length %></span><% } %></a>
       <a href="/main-admin/classifieds?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

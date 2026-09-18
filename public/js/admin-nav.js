@@ -30,7 +30,15 @@
   // visible at a time depending on viewport width), so each is highlighted
   // independently.
   function highlightNav(containerSelector) {
-    const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a'));
+    // .admin-nav-subpages links (views/partials/portal-nav.ejs's own
+    // .admin-nav-group subpage lists) carry their own ?tab= query-param
+    // semantics that plain pathname-prefix matching can't tell apart -
+    // e.g. Members' bare href and its own Approvals subpage's href share
+    // the exact same pathname, so this generic matcher would wrongly
+    // mark the bare "default tab" link active even while on Approvals.
+    // public/js/admin-nav-accordion.js already highlights those
+    // correctly on its own; this only needs to leave them alone.
+    const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a')).filter((a) => !a.closest('.admin-nav-subpages'));
     const activeLink = bestMatch(links, (a) => matchPrefixes(a, a.getAttribute('href')));
     if (activeLink) activeLink.classList.add('active');
   }

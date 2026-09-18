@@ -19,11 +19,18 @@
     <%# A real request: "main admin portal chat should have the tabs new
         chat, moderate, archive." See routes/admin-forums.js's own header
         comment for what each tab covers. %>
-    <div class="view-tabs">
+    <%# A real request: "instead of the tabs on each page, make them
+        subpages under each menu tab" (desktop, see views/partials/
+        portal-nav.ejs) / "when you click the tab below a menu will pop
+        up" (mobile, see public/js/page-tabs.js) - same tab links either
+        way, just moved out of this inline strip. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'moderate' ? 'Moderate' : activeTab === 'archive' ? 'Archive' : 'New Chat' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a href="/main-admin/forums?tab=new" class="view-tab <%= activeTab === 'new' ? 'active' : '' %>">New Chat</a>
       <a href="/main-admin/forums?tab=moderate" class="view-tab <%= activeTab === 'moderate' ? 'active' : '' %>">Moderate</a>
       <a href="/main-admin/forums?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

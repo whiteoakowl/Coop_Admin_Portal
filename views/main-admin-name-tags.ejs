@@ -13,11 +13,18 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <div class="view-tabs no-print">
+    <%# A real request: "instead of the tabs on each page, make them
+        subpages under each menu tab" (desktop, see views/partials/
+        portal-nav.ejs) / "when you click the tab below a menu will pop
+        up" (mobile, see public/js/page-tabs.js) - same tab links either
+        way, just moved out of this inline strip. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'print' ? 'Print' : tab === 'requests' ? 'Requests' : 'Design' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/main-admin/name-tags?tab=design">Design</a>
       <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/main-admin/name-tags?tab=print">Print</a>
       <a class="view-tab<%= tab === 'requests' ? ' active' : '' %>" href="/main-admin/name-tags?tab=requests">Requests</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <div class="view-tab-panel">
       <% if (tab === 'requests') { %>

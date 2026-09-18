@@ -24,14 +24,11 @@
     </div>
 
     <%
-      // A real request: "the different tabs should be like the file tabs
-      // on other pages at the top of the page" - the dropdown-select-on-
-      // desktop/stacked-accordion-on-mobile pattern this page used to
-      // have (a one-off, built for this page only) is now the same
-      // `.view-tabs`/`.view-tab` connected-folder-tab strip every other
-      // tabbed admin page already uses (see e.g. views/admin-classifieds-
-      // list.ejs) - it already scrolls horizontally on a narrow screen,
-      // so no separate mobile treatment is needed here either.
+      // A real request: "instead of the tabs on each page, make them
+      // subpages under each menu tab" (desktop, see views/partials/
+      // portal-nav.ejs) / "when you click the tab below a menu will pop
+      // up" (mobile, see public/js/page-tabs.js) - same tab links
+      // either way, just moved out of this inline strip.
       const eventTabDefs = [
         { key: 'calendar', label: 'Calendar' },
         { key: 'drafts', label: 'Drafts' },
@@ -40,12 +37,15 @@
         { key: 'archive', label: 'Archive' },
         { key: 'settings', label: 'Settings' },
       ];
+      const activeEventTab = eventTabDefs.find((t) => t.key === activeTab) || eventTabDefs[0];
     %>
-    <div class="view-tabs no-print">
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeEventTab.label %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <% eventTabDefs.forEach(function(t) { %>
         <a href="/main-admin/events?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
       <% }); %>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

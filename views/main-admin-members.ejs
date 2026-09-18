@@ -14,16 +14,21 @@
     <%# A real request: "under members in main admin portal there should
         be a tab that says approvals... there should be another tab
         under main admin members that says settings... main admin
-        protal members should also have an archive tab." A second real
-        request: "shrink the tabs to be seen fully on mobile view" -
-        public/js/fit-tabs.js (now loaded globally, see views/partials/
-        portal-nav.ejs) shrinks this row's font/padding to fit. %>
-    <div class="view-tabs">
+        protal members should also have an archive tab." A later real
+        request replaced this inline strip: on desktop these same tabs
+        are now subpages under the sidebar's own Members menu item (see
+        views/partials/portal-nav.ejs's own MAIN_ADMIN_NAV_LINKS/
+        admin-nav-accordion.js), and on mobile they collapse into the
+        popup dialog below (public/js/page-tabs.js) instead of showing
+        this whole strip inline - same tab links either way, just moved. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label">Members</span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab<%= activeTab === 'members' ? ' active' : '' %>" href="/main-admin/members?tab=members">Members</a>
       <a class="view-tab<%= activeTab === 'approvals' ? ' active' : '' %>" href="/main-admin/members?tab=approvals">Approvals<%= (typeof pending !== 'undefined' && pending.length) ? ' (' + pending.length + ')' : '' %></a>
       <a class="view-tab<%= activeTab === 'settings' ? ' active' : '' %>" href="/main-admin/members?tab=settings">Settings</a>
       <a class="view-tab<%= activeTab === 'archive' ? ' active' : '' %>" href="/main-admin/members?tab=archive">Archive</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

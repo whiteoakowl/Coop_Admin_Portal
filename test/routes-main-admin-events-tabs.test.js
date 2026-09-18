@@ -49,7 +49,12 @@ test('Events list: renders the shared .view-tabs strip (not the old dropdown/acc
   const page = await request(app).get('/main-admin/events?tab=requests').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
 
-  assert.match(page.text, /<div class="view-tabs no-print">/);
+  // A later real request moved this strip out of an inline page div: on
+  // desktop these tabs are now subpages under the sidebar's own Events
+  // menu item (views/partials/portal-nav.ejs), and on mobile they
+  // collapse into a popup dialog (public/js/page-tabs.js) - same
+  // .view-tab links either way, just inside a <dialog> instead.
+  assert.match(page.text, /<dialog class="view-tabs page-tabs-dialog no-print">/);
   assert.doesNotMatch(page.text, /event-tabs-desktop/, 'the old desktop dropdown markup should be gone');
   assert.doesNotMatch(page.text, /event-mobile-accordion/, 'the old mobile accordion markup should be gone');
 

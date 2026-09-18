@@ -10,12 +10,19 @@
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Communication</h1>
-    <div class="view-tabs">
+    <%# A real request: "instead of the tabs on each page, make them
+        subpages under each menu tab" (desktop, see views/partials/
+        portal-nav.ejs) / "when you click the tab below a menu will pop
+        up" (mobile, see public/js/page-tabs.js) - same tab links either
+        way, just moved out of this inline strip. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label">Announcements</span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab active" href="/main-admin/announcements">Announcements</a>
       <a class="view-tab" href="/main-admin/announcements/email">Email</a>
       <a class="view-tab" href="/main-admin/announcements/text">Text</a>
       <a class="view-tab" href="/main-admin/newsletter">Newsletter</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <p class="hint">
       Sends a notification to signed-in members - it shows up as an Announcement on their portal home page. Check

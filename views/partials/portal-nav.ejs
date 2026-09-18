@@ -36,21 +36,75 @@ const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/p
 // for 16 total. Member Directory/Newsletter/Notifications/Audit Log
 // still reachable by their own direct URL, just no longer a standing nav
 // tab.
+// A real request: "instead of the tabs on each page, make them subpages
+// under each menu tab. When you click the menu tab the sub pages
+// selection expands" (desktop), and "when you click the tab below a menu
+// will pop up showing the different page choices" (mobile, see each
+// converted page's own page-tabs-trigger/page-tabs-dialog markup - the
+// EXACT same tab links these pages already render, just moved out of
+// their own inline .view-tabs strip). `link.href` still points at the
+// bare top-level page (unchanged - still what the mobile bottom tab bar
+// below links to), `subpages` is the same set of tabs each of those
+// pages' own route already recognizes via ?tab=; the first entry in each
+// list always uses the bare href (no ?tab=) since that's each route's
+// own default when no tab query param is present at all, letting
+// admin-nav-accordion.js's active-highlighting match on that instead of
+// hardcoding each route's own default tab name a second time here.
 const MAIN_ADMIN_NAV_LINKS = [
   { href: '/main-admin', icon: 'home', label: 'Home' },
-  { href: '/main-admin/members', icon: 'users', label: 'Members' },
+  { href: '/main-admin/members', icon: 'users', label: 'Members', subpages: [
+    { href: '/main-admin/members', label: 'Members' },
+    { href: '/main-admin/members?tab=approvals', label: 'Approvals' },
+    { href: '/main-admin/members?tab=archive', label: 'Archive' },
+    { href: '/main-admin/members?tab=settings', label: 'Settings' },
+  ] },
   { href: '/main-admin/accounting', icon: 'file-text', label: 'Accounting' },
-  { href: '/main-admin/announcements', icon: 'bell', label: 'Communication' },
-  { href: '/main-admin/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/main-admin/forums', icon: 'users', label: 'Chat' },
-  { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags' },
+  { href: '/main-admin/announcements', icon: 'bell', label: 'Communication', subpages: [
+    { href: '/main-admin/announcements', label: 'Announcements' },
+    { href: '/main-admin/announcements/email', label: 'Email' },
+    { href: '/main-admin/announcements/text', label: 'Text' },
+    { href: '/main-admin/newsletter', label: 'Newsletter' },
+  ] },
+  { href: '/main-admin/events', icon: 'calendar-check', label: 'Events', subpages: [
+    { href: '/main-admin/events', label: 'Calendar' },
+    { href: '/main-admin/events?tab=drafts', label: 'Drafts' },
+    { href: '/main-admin/events?tab=requests', label: 'Requests' },
+    { href: '/main-admin/events?tab=attendance', label: 'Event Attendance' },
+    { href: '/main-admin/events?tab=archive', label: 'Archive' },
+    { href: '/main-admin/events?tab=settings', label: 'Settings' },
+  ] },
+  { href: '/main-admin/forums', icon: 'users', label: 'Chat', subpages: [
+    { href: '/main-admin/forums', label: 'New Chat' },
+    { href: '/main-admin/forums?tab=moderate', label: 'Moderate' },
+    { href: '/main-admin/forums?tab=archive', label: 'Archive' },
+  ] },
+  { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags', subpages: [
+    { href: '/main-admin/name-tags', label: 'Design' },
+    { href: '/main-admin/name-tags?tab=print', label: 'Print' },
+    { href: '/main-admin/name-tags?tab=requests', label: 'Requests' },
+  ] },
   { href: '/main-admin/photos', icon: 'image', label: 'Photos' },
-  { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links' },
-  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory' },
-  { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/main-admin/resource-links', icon: 'book', label: 'Resource Links', subpages: [
+    { href: '/main-admin/resource-links', label: 'Resources' },
+    { href: '/main-admin/resource-links?tab=approvals', label: 'Approvals' },
+  ] },
+  { href: '/main-admin/directory', icon: 'map-pin', label: 'Business Directory', subpages: [
+    { href: '/main-admin/directory', label: 'Directory' },
+    { href: '/main-admin/directory?tab=requests', label: 'Requests' },
+    { href: '/main-admin/directory?tab=archive', label: 'Archive' },
+  ] },
+  { href: '/main-admin/classifieds', icon: 'tag', label: 'Classifieds', subpages: [
+    { href: '/main-admin/classifieds', label: 'Categories' },
+    { href: '/main-admin/classifieds?tab=requests', label: 'Requests' },
+    { href: '/main-admin/classifieds?tab=archive', label: 'Archive' },
+  ] },
   { href: '/main-admin/store', icon: 'tag', label: 'Shop' },
   { href: '/main-admin/forms', icon: 'clipboard-list', label: 'Custom Forms' },
-  { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters' },
+  { href: '/main-admin/babysitters', icon: 'user', label: 'Babysitters', subpages: [
+    { href: '/main-admin/babysitters', label: 'Babysitter' },
+    { href: '/main-admin/babysitters?tab=approvals', label: 'Approvals' },
+    { href: '/main-admin/babysitters?tab=settings', label: 'Settings' },
+  ] },
   { href: '/main-admin/publications', icon: 'book', label: 'Publications' },
   { href: '/main-admin/academics', icon: 'graduation-cap', label: 'Academics' },
   // Same Training & Learning module as Co-op Admin's own Training tab
@@ -238,7 +292,18 @@ const communityLinks =
   <p class="portal-nav-title"><%= portalTitle %></p>
   <nav id="admin-nav-links">
     <% primaryNavLinks.forEach(function(link) { %>
-      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+      <% if (link.subpages && link.subpages.length) { %>
+        <details class="admin-nav-group">
+          <summary><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %> <svg class="icon admin-nav-group-chevron"><use href="#icon-chevron-down"/></svg></summary>
+          <div class="admin-nav-subpages">
+            <% link.subpages.forEach(function(sp) { %>
+              <a href="<%= sp.href %>"><%= sp.label %></a>
+            <% }); %>
+          </div>
+        </details>
+      <% } else { %>
+        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+      <% } %>
     <% }); %>
   </nav>
   <% if (classLinks) { %>
@@ -368,3 +433,13 @@ const communityLinks =
 <script src="/js/roster-btn-row-grid.js"></script>
 <script src="/js/fullscreen-toggle.js"></script>
 <script src="/js/fullscreen-nav.js"></script>
+<%# A real request: "instead of the tabs on each page, make them subpages
+    under each menu tab" (desktop) / "when you click the tab below a menu
+    will pop up" (mobile) - admin-nav-accordion.js drives the .admin-nav-
+    group <details> above (auto-open + highlight the current subpage +
+    exclusive open-one-at-a-time), page-tabs.js drives each converted
+    page's own .page-tabs-trigger/.page-tabs-dialog pair. Loaded here,
+    once, for every portal that shares this partial, same as every other
+    script above - both no-op on a page with neither element. %>
+<script src="/js/admin-nav-accordion.js"></script>
+<script src="/js/page-tabs.js"></script>

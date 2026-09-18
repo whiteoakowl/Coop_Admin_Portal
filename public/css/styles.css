@@ -1405,6 +1405,49 @@ body.public-page .roster-empty {
 }
 .admin-sidebar nav a.active .icon { opacity: 1; }
 
+/* A real request: "instead of the tabs on each page, make them subpages
+   under each menu tab. When you click the menu tab the sub pages
+   selection expands." Each .admin-nav-group is a <details>/<summary> (see
+   admin-nav-accordion.js for the "only one open at a time" exclusivity),
+   styled to match the plain nav links above it exactly except for the
+   chevron and the native details marker, which is hidden in favor of it. */
+.admin-nav-group summary {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 0.15s ease;
+}
+.admin-nav-group summary::-webkit-details-marker { display: none; }
+.admin-nav-group summary .icon { opacity: 0.75; }
+.admin-nav-group summary:hover { background: rgba(255,255,255,0.4); }
+.admin-nav-group.has-active-subpage summary {
+  background: var(--surface);
+  color: var(--brand-darker);
+  box-shadow: var(--shadow-sm);
+}
+.admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
+.admin-nav-group-chevron { width: 0.9em; height: 0.9em; margin-left: auto; transition: transform 0.15s ease; }
+.admin-nav-group[open] .admin-nav-group-chevron { transform: rotate(180deg); }
+.admin-nav-subpages { display: flex; flex-direction: column; padding-left: 1.9rem; margin: 0.1rem 0 0.3rem; }
+.admin-nav-subpages a {
+  display: block;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+.admin-nav-subpages a:hover { background: rgba(255,255,255,0.4); }
+.admin-nav-subpages a.active { background: var(--surface); color: var(--brand-darker); font-weight: 700; }
+
 .logout-form { margin: 0; }
 
 /* Search + Full Screen toggle - a real bug report: as a plain
@@ -2122,6 +2165,79 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 }
 .view-tab-panel .admin-card-grid:last-child,
 .view-tab-panel .roster-scroll:last-child { margin-bottom: 0; }
+
+/* A real request: "mobile view instead of tabs on all the pages. when
+   you click the tab below a menu will pop up showing the different page
+   choices." Desktop already gets these same tabs as subpages under the
+   matching sidebar menu item instead (see .admin-nav-group above), so
+   the trigger stays hidden there - only .page-tabs-dialog's own <dialog>
+   default (closed unless .showModal() is called, see public/js/page-
+   tabs.js) matters on desktop, which is exactly "not shown at all". */
+.page-tabs-trigger {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  padding: 0.7rem 1rem;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.page-tabs-trigger .icon { width: 1.1em; height: 1.1em; flex-shrink: 0; }
+/* .page-tabs-dialog stays a .view-tabs (reuses its own .view-tab children
+   unchanged - see public/js/page-tabs.js) but as a popup list it needs
+   its own layout, not .view-tabs's base horizontal-scrolling flex row -
+   these overrides win the cascade since they're declared after (and are
+   more specific than) that base rule. */
+.page-tabs-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  margin: auto;
+  width: min(320px, calc(100vw - 2.5rem));
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+.page-tabs-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.page-tabs-dialog .view-tab {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  top: 0;
+}
+.page-tabs-dialog .view-tab:hover { background: var(--brand-soft); color: var(--ink); }
+.page-tabs-dialog .view-tab.active { background: var(--brand-soft); color: var(--brand-dark); }
+.page-tabs-dialog-close {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.9rem;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+@media (max-width: 860px) {
+  .page-tabs-trigger { display: flex; }
+}
 
 .roster-toolbar {
   display: flex;
