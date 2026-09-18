@@ -14,9 +14,21 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
+    <%# A real bug report: "when you click the back button it goes to
+        something went wrong then the kiosk homepage." This page had no
+        real link back to the Attendance list it's reached from - only
+        "Back to Event" (the builder) - so getting back to Attendance
+        meant relying on the browser's own back button, which (this app's
+        own fullscreen-nav.js intercepts every back/forward navigation
+        while the page happens to be in real browser fullscreen, e.g. via
+        the corner "Full Screen View" toggle every admin page has) can
+        land on a stale or failing fetch instead of a real page load in
+        that state. A real, explicit link is never at the mercy of
+        browser history or fullscreen interception either way. %>
     <div class="roster-toolbar">
       <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">&larr; Back to Event</a>
+        <a class="roster-action-btn" href="/main-admin/events?tab=attendance">&larr; Back to Attendance</a>
+        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">Back to Event</a>
       </div>
     </div>
 

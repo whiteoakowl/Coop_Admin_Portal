@@ -44,7 +44,7 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Events list: renders the shared .view-tabs strip (not the old dropdown/accordion) with all 6 tabs, active one marked', async () => {
+test('Events list: renders the shared .view-tabs strip (not the old dropdown/accordion) with all 5 tabs, active one marked', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/events?tab=requests').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
@@ -58,7 +58,7 @@ test('Events list: renders the shared .view-tabs strip (not the old dropdown/acc
   assert.doesNotMatch(page.text, /event-tabs-desktop/, 'the old desktop dropdown markup should be gone');
   assert.doesNotMatch(page.text, /event-mobile-accordion/, 'the old mobile accordion markup should be gone');
 
-  ['Calendar', 'Drafts', 'Event Attendance', 'Archive', 'Settings'].forEach((label) => {
+  ['Calendar', 'Drafts', 'Event Attendance', 'Settings'].forEach((label) => {
     assert.match(page.text, new RegExp(`class="view-tab ">${label}<`));
   });
   assert.match(page.text, /class="view-tab active">Requests/);
@@ -66,10 +66,28 @@ test('Events list: renders the shared .view-tabs strip (not the old dropdown/acc
 
 test('Events list: clicking a tab link navigates and marks the new tab active', async () => {
   const admin = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/events?tab=archive').set('Cookie', admin.cookie);
+  const page = await request(app).get('/main-admin/events?tab=settings').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="view-tab active">Archive/);
+  assert.match(page.text, /class="view-tab active">Settings/);
   assert.match(page.text, /<a href="\/main-admin\/events\?tab=calendar" class="view-tab ">Calendar<\/a>/);
+});
+
+test('Events list: the Archive tab is gone - not a needed feature', async () => {
+  const admin = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/events').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  // Other sections (Classifieds, Directory, Chat, Members) keep their own
+  // "Archive" subpage in the shared sidebar rendered on every page, so
+  // this only checks the Events page-tabs dialog/route itself, not the
+  // page as a whole.
+  assert.doesNotMatch(page.text, /main-admin\/events\?tab=archive/);
+  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print">([\s\S]*?)<\/dialog>/.exec(page.text);
+  assert.ok(dialogMatch, 'the Events page-tabs dialog should exist');
+  assert.doesNotMatch(dialogMatch[1], />Archive</);
+
+  const archiveTab = await request(app).get('/main-admin/events?tab=archive').set('Cookie', admin.cookie);
+  assert.equal(archiveTab.status, 200);
+  assert.match(archiveTab.text, /class="view-tab active">Calendar/, 'an unrecognized tab param falls back to Calendar');
 });
 
 test('Events builder (per-event edit page): renders its own .view-tabs strip with the 5 real request tabs', async () => {

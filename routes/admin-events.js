@@ -206,16 +206,19 @@ function toSqlTimestamp(datetimeLocal) {
 }
 
 // A real request: "Main Admin Events: Calendar/Drafts/Requests/Event
-// Attendance/Archive/Settings tabs." Calendar = published (live) events
-// on a real month grid (utils/events.js's own monthGrid, shared with the
-// member-facing /events?view=calendar); Drafts = created-but-not-yet-
-// published events (status 'draft', decided submissions included -
-// pending ones stay on Requests only); Requests = member submissions
-// awaiting a yes/no (the former standalone /pending page); Attendance =
-// a jumping-off point to each published event's own check-in/registrations
-// page (routes below, unchanged); Archive = cancelled events; Settings =
-// event categories (the former standalone /categories page).
-const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'archive', 'settings'];
+// Attendance/Archive/Settings tabs," later: "remove archive tab, it's
+// not a needed feature." Calendar = published (live) events on a real
+// month grid (utils/events.js's own monthGrid, shared with the member-
+// facing /events?view=calendar); Drafts = created-but-not-yet-published
+// events (status 'draft', decided submissions included - pending ones
+// stay on Requests only); Requests = member submissions awaiting a
+// yes/no (the former standalone /pending page); Attendance = a jumping-
+// off point to each published event's own check-in/registrations page
+// (routes below, unchanged); Settings = event categories (the former
+// standalone /categories page). Cancelling an event is still possible
+// from its own builder page (the /:id/status route below is unchanged) -
+// only the dedicated tab for BROWSING every cancelled event is gone.
+const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'settings'];
 
 router.get('/', async (req, res) => {
   const activeTab = EVENTS_TABS.includes(req.query.tab) ? req.query.tab : 'calendar';
@@ -228,7 +231,6 @@ router.get('/', async (req, res) => {
   let drafts = [];
   let requests = [];
   let attendance = [];
-  let archived = [];
   // Always loaded (not just for the Settings tab) - the New Event
   // dialog's own Category/Location dropdowns are reachable from the
   // Calendar and Drafts tabs too.
@@ -255,8 +257,6 @@ router.get('/', async (req, res) => {
     attendance = await Promise.all(
       published.map(async (e) => ({ ...e, startsLabel: formatFriendlyTimestamp(e.starts_at), registrationCount: await events.registrationCountForEvent(e.id) }))
     );
-  } else if (activeTab === 'archive') {
-    archived = await events.listEvents({ status: 'cancelled' });
   }
 
   res.render('admin-events-list', {
@@ -270,7 +270,6 @@ router.get('/', async (req, res) => {
     drafts,
     requests,
     attendance,
-    archived,
     categories,
     locations,
     eventSettings,

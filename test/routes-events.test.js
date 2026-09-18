@@ -110,6 +110,22 @@ test('main admin can create, publish, and manage an event', async () => {
   assert.equal(event.visibility, 'public');
 });
 
+test('Event Attendance (registrations) page: a real link back to the Attendance list, not just the browser back button', async () => {
+  // A real bug report: "when you click the back button it goes to
+  // something went wrong then the kiosk homepage." A real <a> link back
+  // to the Attendance list this page is reached from is never at the
+  // mercy of browser history/fullscreen-nav.js's own back interception -
+  // see views/admin-events-registrations.ejs's own comment.
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await publishEvent(admin, eventId);
+
+  const res = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<a class="roster-action-btn" href="\/main-admin\/events\?tab=attendance">&larr; Back to Attendance<\/a>/);
+  assert.match(res.text, new RegExp(`<a class="roster-action-btn" href="/main-admin/events/${eventId}/builder">Back to Event</a>`));
+});
+
 test('a signed-out visitor sees only public events, not members-only ones', async () => {
   const admin = await loginAsMainAdmin();
   const publicEventId = await createEvent(admin, { title: 'Public Bake Sale', visibility: 'public' });

@@ -71,7 +71,7 @@ test('Members/Communication/Events/Name Tags/Resource Links/Directory/Classified
     { url: '/main-admin/announcements/email', tabCount: 4 },
     { url: '/main-admin/announcements/text', tabCount: 4 },
     { url: '/main-admin/newsletter', tabCount: 4 },
-    { url: '/main-admin/events', tabCount: 6 },
+    { url: '/main-admin/events', tabCount: 5 },
     { url: '/main-admin/name-tags', tabCount: 3 },
     { url: '/main-admin/resource-links', tabCount: 2 },
     { url: '/main-admin/directory', tabCount: 3 },

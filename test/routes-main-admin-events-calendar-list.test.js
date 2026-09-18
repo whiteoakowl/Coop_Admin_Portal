@@ -72,6 +72,14 @@ test('Calendar tab: toggle row sits above a single Prev/month-select/year-select
   assert.match(toolbarHtml, /Next &rarr;/);
   assert.match(toolbarHtml, /id="event-month-select"/);
   assert.match(toolbarHtml, /id="event-year-select"/);
+  // A real request: "mobile view. the row should be small left arrow,
+  // month drop down, year drop down, small right arrow. all in one row
+  // neatly." public/js/roster-btn-row-grid.js's generic mobile column
+  // count only counts .roster-action-btn children, missing the two
+  // <select>s here entirely, so without data-fixed-columns it wrongly
+  // split this row into two (see that script's own comment on this exact
+  // element for the full trace).
+  assert.match(toolbarHtml, /<div class="roster-btn-row event-calendar-nav-row" data-fixed-columns="4">/);
 });
 
 test('Calendar tab: List/Calendar view toggle switches rendering and preserves the month in the URL', async () => {
