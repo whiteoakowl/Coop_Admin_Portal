@@ -12,6 +12,7 @@ const { requirePortalAuth } = require('../middleware/portalAuth');
 const { familyForAccount } = require('../utils/portalAuth');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const events = require('../utils/events');
+const signupLists = require('../utils/committeesAndSignupLists');
 const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
@@ -127,6 +128,13 @@ router.get('/:id', async (req, res) => {
         .all(event.id, req.portalAccount.id)
     : [];
 
+  // A real request: "be able to attach these lists to events" - see
+  // routes/main-admin-volunteers.js/utils/committeesAndSignupLists.js.
+  const attachedSignUpLists = await signupLists.signUpListsForEvent(event.id);
+  for (const list of attachedSignUpLists) list.items = await signupLists.itemsForSignUpList(list.id);
+  const attachedVolunteerLists = await signupLists.volunteerListsForEvent(event.id);
+  for (const list of attachedVolunteerLists) list.shifts = await signupLists.shiftsForVolunteerList(list.id);
+
   res.render('events-detail', {
     title: event.title,
     settings,
@@ -134,9 +142,12 @@ router.get('/:id', async (req, res) => {
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,
     family,
+    familyIds,
     registeredMemberIds: myRegistrations.map((r) => r.member_id),
     volunteeredKey: myVolunteerSignups.map((s) => `${s.volunteer_role_id}:${s.member_id}`),
     myGuestRegistrations,
+    attachedSignUpLists,
+    attachedVolunteerLists,
     isRegistrationWindowOpen: await events.isRegistrationWindowOpen(event),
     priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
     error: req.query.error || null,
@@ -265,6 +276,51 @@ router.post('/:id/food-items/:itemId/claim', requirePortalAuth, async (req, res)
   const claimed = await events.claimFoodItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
   const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
   res.redirect(back + '?notice=' + encodeURIComponent(notice));
+});
+
+// A real request: "be able to attach these lists to events" (Main
+// Admin's own Sign-Up Lists/Volunteer Lists, see utils/
+// committeesAndSignupLists.js) - once a list carries this event's own id,
+// members see it right on the event page and can claim an item/shift the
+// same way they already claim a donation/food item above.
+router.post('/:id/signup-list-items/:itemId/claim', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + '?error=' + encodeURIComponent('You can only claim an item as yourself or your own family.'));
+  }
+  const claimed = await signupLists.claimSignUpItem(req.params.itemId, memberId, req.body.quantity, req.portalAccount.id);
+  const notice = claimed > 0 ? `Thank you - ${claimed} claimed.` : 'That item no longer needs any more - thank you for checking!';
+  res.redirect(back + '?notice=' + encodeURIComponent(notice));
+});
+
+router.post('/:id/volunteer-list-shifts/:shiftId/signup', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + '?error=' + encodeURIComponent('You can only sign up yourself or your own family.'));
+  }
+  await signupLists.signUpForShift(req.params.shiftId, memberId, req.portalAccount.id);
+  res.redirect(back + '?notice=' + encodeURIComponent('Signed up - thank you for volunteering!'));
+});
+
+router.post('/:id/volunteer-list-shifts/:shiftId/cancel', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.body.memberId, 10);
+  const back = `/events/${eventId}`;
+
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s volunteer signups.'));
+  }
+  await signupLists.cancelShiftSignup(req.params.shiftId, memberId);
+  res.redirect(back + '?notice=' + encodeURIComponent('Volunteer signup cancelled.'));
 });
 
 module.exports = router;

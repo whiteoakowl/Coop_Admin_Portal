@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/volunteers?tab=signup-lists">&larr; Back to Sign-Up Lists</a></p>
+    <div class="grid-box-header">
+      <h1><%= list.title %></h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-list-dialog').showModal()">Edit</button>
+    </div>
+    <% if (list.description) { %><p><%= list.description %></p><% } %>
+    <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="grid-box-header">
+      <h2>Items</h2>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-item-dialog').showModal()">+ Add Item</button>
+    </div>
+
+    <% if (items.length === 0) { %>
+      <p class="roster-empty">No items yet &mdash; add one above.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Item</th><th>Needed</th><th>Claimed</th><th>Claimed By</th><th></th></tr></thead>
+          <tbody>
+            <% items.forEach(function(item) { %>
+              <tr>
+                <td class="roster-name-col"><%= item.item_name %><% if (item.notes) { %> <span class="hint"><%= item.notes %></span><% } %></td>
+                <td><%= item.quantity_needed %></td>
+                <td><%= item.quantityClaimed %></td>
+                <td><%= item.claims.map(function(c) { return c.memberName + (c.quantity_claimed > 1 ? ' (' + c.quantity_claimed + ')' : ''); }).join(', ') || '—' %></td>
+                <td>
+                  <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Remove &quot;<%= item.item_name %>&quot;?">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <dialog id="add-item-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items">
+        <h3>Add Item</h3>
+        <label>Item Name
+          <input type="text" name="itemName" required />
+        </label>
+        <label>Quantity Needed
+          <input type="number" name="quantityNeeded" min="1" value="1" />
+        </label>
+        <label>Notes <span class="hint">(optional)</span>
+          <input type="text" name="notes" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-list-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/update">
+        <h3>Edit List</h3>
+        <label>Title
+          <input type="text" name="title" value="<%= list.title %>" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3"><%= list.description || '' %></textarea>
+        </label>
+        <label>Attach to Event <span class="hint">(optional)</span>
+          <select name="eventId">
+            <option value="">None</option>
+            <% events.forEach(function(e) { %><option value="<%= e.id %>" <%= list.event_id === e.id ? 'selected' : '' %>><%= e.title %></option><% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

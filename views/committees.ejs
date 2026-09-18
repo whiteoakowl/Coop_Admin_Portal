@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/welcome">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <a class="primary-btn" href="/portal">My Portals</a>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/portal">&larr; My Portals</a></p>
+        <h1>Committee Sign Up</h1>
+        <p class="hint">Choose a committee position below to volunteer for it. You can sign up any member of your own family.</p>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <% if (committees.length === 0) { %>
+          <p class="roster-empty">No committees are open for sign up right now.</p>
+        <% } %>
+
+        <% committees.forEach(function(committee) { %>
+          <div class="manage-section">
+            <div class="grid-box-header"><h2><%= committee.name %></h2></div>
+            <% if (committee.description) { %><p><%= committee.description %></p><% } %>
+            <% if (committee.leader_name) { %><p class="hint">Committee Leader: <%= committee.leader_name %><% if (committee.contact_info) { %> &middot; <%= committee.contact_info %><% } %></p><% } %>
+
+            <% if (committee.positions.length === 0) { %>
+              <p class="hint">No open positions yet.</p>
+            <% } else { %>
+              <div class="roster-scroll">
+                <table class="roster-table condensed-table">
+                  <thead><tr><th>Position</th><th>Volunteers</th><th></th></tr></thead>
+                  <tbody>
+                    <% committee.positions.forEach(function(position) { %>
+                      <% var mySignups = position.signups.filter(function(s) { return familyIds.indexOf(s.member_id) !== -1; }); %>
+                      <tr>
+                        <td class="roster-name-col"><%= position.position_name %><% if (position.slots_needed) { %> <span class="hint">(<%= position.signups.length %>/<%= position.slots_needed %>)</span><% } %></td>
+                        <td><%= position.signups.map(function(s) { return s.memberName; }).join(', ') || '—' %></td>
+                        <td>
+                          <div class="roster-btn-row">
+                            <% family.forEach(function(m) { %>
+                              <% if (mySignups.some(function(s) { return s.member_id === m.id; })) { %>
+                                <form method="POST" action="/committees/<%= position.id %>/cancel" class="inline-block-form">
+                                  <input type="hidden" name="memberId" value="<%= m.id %>" />
+                                  <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                                </form>
+                              <% } else { %>
+                                <form method="POST" action="/committees/<%= position.id %>/signup" class="inline-block-form">
+                                  <input type="hidden" name="memberId" value="<%= m.id %>" />
+                                  <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
+                                </form>
+                              <% } %>
+                            <% }); %>
+                          </div>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

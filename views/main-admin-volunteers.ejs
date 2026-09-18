@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Volunteers</h1>
+
+    <%# A real request: "instead of the tabs on each page, make them
+        subpages under each menu tab" (desktop, see views/partials/
+        portal-nav.ejs) / "when you click the tab below a menu will pop
+        up" (mobile, see public/js/page-tabs.js) - same tab links either
+        way, just moved out of this inline strip. %>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'signup-lists' ? 'Sign-Up Lists' : activeTab === 'volunteer-lists' ? 'Volunteer Lists' : 'Committees' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
+      <a class="view-tab<%= activeTab === 'committees' ? ' active' : '' %>" href="/main-admin/volunteers?tab=committees">Committees</a>
+      <a class="view-tab<%= activeTab === 'signup-lists' ? ' active' : '' %>" href="/main-admin/volunteers?tab=signup-lists">Sign-Up Lists</a>
+      <a class="view-tab<%= activeTab === 'volunteer-lists' ? ' active' : '' %>" href="/main-admin/volunteers?tab=volunteer-lists">Volunteer Lists</a>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (activeTab === 'committees') { %>
+      <div class="grid-box-header">
+        <h2>Committees</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-committee-dialog').showModal()">+ Add Committee</button>
+      </div>
+
+      <% if (committees.length === 0) { %>
+        <p class="roster-empty">No committees yet &mdash; add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Name</th><th>Leader</th><th>Volunteers</th><th>Enabled</th><th></th></tr></thead>
+            <tbody>
+              <% committees.forEach(function(c) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/volunteers/committees/<%= c.id %>"><%= c.name %></a></td>
+                  <td><%= c.leader_name || '—' %></td>
+                  <td><%= c.signupCount %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/volunteers/committees/<%= c.id %>/enabled" class="inline-block-form">
+                      <input type="hidden" name="enabled" value="<%= c.enabled ? '0' : '1' %>" />
+                      <label class="checkbox-option">
+                        <input type="checkbox" onchange="this.form.requestSubmit()" <%= c.enabled ? 'checked' : '' %> />
+                      </label>
+                    </form>
+                  </td>
+                  <td>
+                    <div class="roster-btn-row">
+                      <a class="roster-action-btn" href="/main-admin/volunteers/committees/<%= c.id %>">Edit</a>
+                      <form method="POST" action="/main-admin/volunteers/committees/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This cannot be undone.">
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <dialog id="add-committee-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/volunteers/committees">
+          <h3>Add Committee</h3>
+          <label>Name
+            <input type="text" name="name" required />
+          </label>
+          <label>Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+          <label>Leader Name
+            <input type="text" name="leaderName" />
+          </label>
+          <label>Contact Info
+            <input type="text" name="contactInfo" />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Create</button>
+          </div>
+        </form>
+      </dialog>
+    <% } else if (activeTab === 'signup-lists') { %>
+      <div class="grid-box-header">
+        <h2>Sign-Up Lists</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-signup-list-dialog').showModal()">+ Add List</button>
+      </div>
+      <p class="hint">Create a list of things for people to sign up for (e.g. potluck dishes or supplies), optionally attached to one event.</p>
+
+      <% if (signUpLists.length === 0) { %>
+        <p class="roster-empty">No sign-up lists yet &mdash; add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Title</th><th>Event</th><th></th></tr></thead>
+            <tbody>
+              <% signUpLists.forEach(function(l) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/volunteers/signup-lists/<%= l.id %>"><%= l.title %></a></td>
+                  <td><%= l.eventTitle || '—' %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/volunteers/signup-lists/<%= l.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= l.title %>&quot;? This cannot be undone.">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <dialog id="add-signup-list-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/volunteers/signup-lists">
+          <h3>Add Sign-Up List</h3>
+          <label>Title
+            <input type="text" name="title" required />
+          </label>
+          <label>Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+          <label>Attach to Event <span class="hint">(optional)</span>
+            <select name="eventId">
+              <option value="">None</option>
+              <% events.forEach(function(e) { %><option value="<%= e.id %>"><%= e.title %></option><% }); %>
+            </select>
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Create</button>
+          </div>
+        </form>
+      </dialog>
+    <% } else { %>
+      <div class="grid-box-header">
+        <h2>Volunteer Lists</h2>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-volunteer-list-dialog').showModal()">+ Add List</button>
+      </div>
+      <p class="hint">Create a list of jobs by date or hour that members can sign up for, optionally attached to one event.</p>
+
+      <% if (volunteerLists.length === 0) { %>
+        <p class="roster-empty">No volunteer lists yet &mdash; add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Title</th><th>Event</th><th></th></tr></thead>
+            <tbody>
+              <% volunteerLists.forEach(function(l) { %>
+                <tr>
+                  <td class="roster-name-col"><a href="/main-admin/volunteers/volunteer-lists/<%= l.id %>"><%= l.title %></a></td>
+                  <td><%= l.eventTitle || '—' %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/volunteers/volunteer-lists/<%= l.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= l.title %>&quot;? This cannot be undone.">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <dialog id="add-volunteer-list-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/volunteers/volunteer-lists">
+          <h3>Add Volunteer List</h3>
+          <label>Title
+            <input type="text" name="title" required />
+          </label>
+          <label>Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+          <label>Attach to Event <span class="hint">(optional)</span>
+            <select name="eventId">
+              <option value="">None</option>
+              <% events.forEach(function(e) { %><option value="<%= e.id %>"><%= e.title %></option><% }); %>
+            </select>
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Create</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
+  </main>
+</body>
+</html>

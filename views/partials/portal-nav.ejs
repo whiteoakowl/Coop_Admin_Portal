@@ -77,6 +77,13 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/forums?tab=moderate', label: 'Moderate' },
     { href: '/main-admin/forums?tab=archive', label: 'Archive' },
   ] },
+  // A real request: "main admin portal, volunteer tab, sub pages
+  // committees, sign up list, volunteer list."
+  { href: '/main-admin/volunteers', icon: 'users', label: 'Volunteers', subpages: [
+    { href: '/main-admin/volunteers', label: 'Committees' },
+    { href: '/main-admin/volunteers?tab=signup-lists', label: 'Sign-Up Lists' },
+    { href: '/main-admin/volunteers?tab=volunteer-lists', label: 'Volunteer Lists' },
+  ] },
   { href: '/main-admin/name-tags', icon: 'badge', label: 'Name Tags', subpages: [
     { href: '/main-admin/name-tags', label: 'Design' },
     { href: '/main-admin/name-tags?tab=print', label: 'Print' },

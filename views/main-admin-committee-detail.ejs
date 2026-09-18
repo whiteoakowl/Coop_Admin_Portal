@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/volunteers?tab=committees">&larr; Back to Committees</a></p>
+    <div class="grid-box-header">
+      <h1><%= committee.name %></h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-committee-dialog').showModal()">Edit</button>
+    </div>
+    <% if (committee.description) { %><p><%= committee.description %></p><% } %>
+    <% if (committee.leader_name || committee.contact_info) { %>
+      <p class="hint">
+        <% if (committee.leader_name) { %>Leader: <%= committee.leader_name %><% } %>
+        <% if (committee.contact_info) { %> &middot; <%= committee.contact_info %><% } %>
+      </p>
+    <% } %>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="grid-box-header">
+      <h2>Positions</h2>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-position-dialog').showModal()">+ Add Position</button>
+    </div>
+
+    <% if (positions.length === 0) { %>
+      <p class="roster-empty">No positions yet &mdash; add one above.</p>
+    <% } else { %>
+      <% positions.forEach(function(position) { %>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h3><%= position.position_name %><% if (position.slots_needed) { %> <span class="hint">(<%= position.signups.length %>/<%= position.slots_needed %>)</span><% } %></h3>
+            <div class="roster-btn-row">
+              <label class="checkbox-option email-select-all">
+                <input type="checkbox" class="committee-select-all" data-position="<%= position.id %>" />
+                Select All
+              </label>
+              <button type="button" class="roster-action-btn committee-email-selected" data-position="<%= position.id %>">Email Selected</button>
+              <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/positions/<%= position.id %>/delete" class="inline-block-form" data-confirm="Remove position &quot;<%= position.position_name %>&quot;?">
+                <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </form>
+            </div>
+          </div>
+          <% if (position.signups.length === 0) { %>
+            <p class="roster-empty">No one has signed up yet.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table condensed-table" data-committee-position-table="<%= position.id %>">
+                <thead><tr><th></th><th>Name</th><th></th></tr></thead>
+                <tbody>
+                  <% position.signups.forEach(function(s) { %>
+                    <tr>
+                      <td><input type="checkbox" class="committee-member-checkbox" data-email="<%= s.memberEmail || '' %>" /></td>
+                      <td class="roster-name-col"><%= s.memberName %></td>
+                      <td><% if (s.memberEmail) { %><a class="roster-action-btn" href="mailto:<%= s.memberEmail %>">Email</a><% } %></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+
+    <dialog id="add-position-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/positions">
+        <h3>Add Position</h3>
+        <label>Position Name
+          <input type="text" name="positionName" required />
+        </label>
+        <label>Slots Needed <span class="hint">(optional)</span>
+          <input type="number" name="slotsNeeded" min="1" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-committee-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/update">
+        <h3>Edit Committee</h3>
+        <label>Name
+          <input type="text" name="name" value="<%= committee.name %>" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3"><%= committee.description || '' %></textarea>
+        </label>
+        <label>Leader Name
+          <input type="text" name="leaderName" value="<%= committee.leader_name || '' %>" />
+        </label>
+        <label>Contact Info
+          <input type="text" name="contactInfo" value="<%= committee.contact_info || '' %>" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+  <script>
+    // A real request: "click on each committee and you can view who is
+    // signed up for that committee and email button next to each member
+    // or select all email button, checkboxes." Select All just checks
+    // every row's own checkbox (same momentary/no-persisted-state
+    // pattern public/js/design-print-hub.js's own wireBulkMemberList
+    // uses); Email Selected opens one mailto: link BCCing every checked
+    // row's address, same plain mailto: convention the per-member Email
+    // button (and views/main-admin-members.ejs's own) already uses -
+    // this app has no bulk-recipient email campaign feature scoped to an
+    // arbitrary ad-hoc list of members outside a real send/notification
+    // record, so a real desktop/mobile mail app is what actually sends.
+    (function () {
+      document.querySelectorAll('[data-committee-position-table]').forEach(function (table) {
+        var positionId = table.dataset.committeePositionTable;
+        var selectAll = document.querySelector('.committee-select-all[data-position="' + positionId + '"]');
+        var emailBtn = document.querySelector('.committee-email-selected[data-position="' + positionId + '"]');
+        if (selectAll) {
+          selectAll.addEventListener('change', function () {
+            table.querySelectorAll('.committee-member-checkbox').forEach(function (cb) { cb.checked = selectAll.checked; });
+          });
+        }
+        if (emailBtn) {
+          emailBtn.addEventListener('click', function () {
+            var emails = Array.from(table.querySelectorAll('.committee-member-checkbox:checked'))
+              .map(function (cb) { return cb.dataset.email; })
+              .filter(Boolean);
+            if (emails.length === 0) return;
+            window.location.href = 'mailto:?bcc=' + encodeURIComponent(emails.join(','));
+          });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

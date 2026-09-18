@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p><a href="/main-admin/volunteers?tab=volunteer-lists">&larr; Back to Volunteer Lists</a></p>
+    <div class="grid-box-header">
+      <h1><%= list.title %></h1>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-list-dialog').showModal()">Edit</button>
+    </div>
+    <% if (list.description) { %><p><%= list.description %></p><% } %>
+    <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="grid-box-header">
+      <h2>Shifts</h2>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-shift-dialog').showModal()">+ Add Shift</button>
+    </div>
+
+    <% if (shifts.length === 0) { %>
+      <p class="roster-empty">No shifts yet &mdash; add one above.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Job</th><th>Date</th><th>Time</th><th>Signed Up</th><th></th></tr></thead>
+          <tbody>
+            <% shifts.forEach(function(shift) { %>
+              <tr>
+                <td class="roster-name-col"><%= shift.job_name %></td>
+                <td><%= shift.shift_date || '—' %></td>
+                <td><%= (shift.start_time || shift.end_time) ? (shift.start_time || '') + (shift.end_time ? ' - ' + shift.end_time : '') : '—' %></td>
+                <td><%= shift.signups.map(function(s) { return s.memberName; }).join(', ') || '—' %> <span class="hint">(<%= shift.signups.length %>/<%= shift.slots_needed %>)</span></td>
+                <td>
+                  <form method="POST" action="/main-admin/volunteers/volunteer-lists/<%= list.id %>/shifts/<%= shift.id %>/delete" class="inline-block-form" data-confirm="Remove &quot;<%= shift.job_name %>&quot;?">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <dialog id="add-shift-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/volunteer-lists/<%= list.id %>/shifts">
+        <h3>Add Shift</h3>
+        <label>Job Name
+          <input type="text" name="jobName" required />
+        </label>
+        <label>Date <span class="hint">(optional)</span>
+          <input type="date" name="shiftDate" />
+        </label>
+        <label>Start Time <span class="hint">(optional)</span>
+          <input type="time" name="startTime" />
+        </label>
+        <label>End Time <span class="hint">(optional)</span>
+          <input type="time" name="endTime" />
+        </label>
+        <label>Slots Needed
+          <input type="number" name="slotsNeeded" min="1" value="1" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-list-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/volunteer-lists/<%= list.id %>/update">
+        <h3>Edit List</h3>
+        <label>Title
+          <input type="text" name="title" value="<%= list.title %>" required />
+        </label>
+        <label>Description
+          <textarea name="description" rows="3"><%= list.description || '' %></textarea>
+        </label>
+        <label>Attach to Event <span class="hint">(optional)</span>
+          <select name="eventId">
+            <option value="">None</option>
+            <% events.forEach(function(e) { %><option value="<%= e.id %>" <%= list.event_id === e.id ? 'selected' : '' %>><%= e.title %></option><% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

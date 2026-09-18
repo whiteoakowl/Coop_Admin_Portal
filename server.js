@@ -125,6 +125,11 @@ const mainAdminAnnouncementsRouter = require('./routes/main-admin-announcements'
 const mainAdminResourceLinksRouter = require('./routes/main-admin-resource-links');
 // Babysitter Directory approval queue - same sibling-router shape.
 const mainAdminBabysittersRouter = require('./routes/main-admin-babysitters');
+// Committees, Sign-Up Lists, and Volunteer Lists - same sibling-router shape.
+const mainAdminVolunteersRouter = require('./routes/main-admin-volunteers');
+// Member-facing Committees browsing/signup - same sibling-router shape as
+// routes/events.js (mounted at /events).
+const committeesRouter = require('./routes/committees');
 // Named groups of members (independent of Family) that Events/Classes can
 // optionally restrict registration to - same sibling-router shape.
 const mainAdminSectionsRouter = require('./routes/main-admin-sections');
@@ -401,6 +406,8 @@ app.use('/main-admin/members', mainAdminMembersRouter);
 app.use('/main-admin/announcements', mainAdminAnnouncementsRouter);
 app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);
 app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
+app.use('/main-admin/volunteers', mainAdminVolunteersRouter);
+app.use('/committees', committeesRouter);
 app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/main-admin', mainAdminTrainingRouter);

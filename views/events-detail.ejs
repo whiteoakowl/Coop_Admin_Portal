@@ -222,6 +222,80 @@
               </div>
             </div>
           <% } %>
+
+          <%# A real request: "be able to attach these lists to events" -
+              Main Admin's own Sign-Up Lists/Volunteer Lists (routes/
+              main-admin-volunteers.js), shown here exactly like the
+              Donations/Food sections above once attached to this event. %>
+          <% attachedSignUpLists.forEach(function(list) { %>
+            <div class="manage-section">
+              <div class="grid-box-header"><h2><%= list.title %></h2></div>
+              <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
+              <div class="training-lesson-list">
+                <% list.items.forEach(function(item) { %>
+                  <% var remaining = item.quantity_needed - item.quantityClaimed; %>
+                  <div class="training-lesson-row">
+                    <div class="training-lesson-row-main">
+                      <svg class="icon"><use href="#icon-badge"/></svg>
+                      <div class="training-lesson-info">
+                        <strong><%= item.item_name %></strong>
+                        <span class="hint"><%= remaining %> still needed<% if (item.notes) { %> &middot; <%= item.notes %><% } %></span>
+                      </div>
+                      <% if (remaining > 0) { %>
+                        <form method="POST" action="/events/<%= event.id %>/signup-list-items/<%= item.id %>/claim" class="training-lesson-actions">
+                          <select name="memberId">
+                            <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+                          </select>
+                          <input type="number" name="quantity" min="1" value="1" max="<%= remaining %>" style="width: 4rem;" />
+                          <button type="submit" class="roster-action-btn">Sign Up</button>
+                        </form>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+
+          <% attachedVolunteerLists.forEach(function(list) { %>
+            <div class="manage-section">
+              <div class="grid-box-header"><h2><%= list.title %></h2></div>
+              <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
+              <div class="training-lesson-list">
+                <% list.shifts.forEach(function(shift) { %>
+                  <% var mySignups = shift.signups.filter(function(s) { return familyIds.indexOf(s.member_id) !== -1; }); %>
+                  <div class="training-lesson-row">
+                    <div class="training-lesson-row-main">
+                      <svg class="icon"><use href="#icon-badge"/></svg>
+                      <div class="training-lesson-info">
+                        <strong><%= shift.job_name %></strong>
+                        <span class="hint">
+                          <% if (shift.shift_date) { %><%= shift.shift_date %><% } %>
+                          <% if (shift.start_time || shift.end_time) { %> <%= shift.start_time || '' %><% if (shift.end_time) { %> - <%= shift.end_time %><% } %><% } %>
+                          &middot; <%= shift.signups.length %>/<%= shift.slots_needed %> filled
+                        </span>
+                      </div>
+                      <div class="training-lesson-actions">
+                        <% family.forEach(function(m) { %>
+                          <% if (mySignups.some(function(s) { return s.member_id === m.id; })) { %>
+                            <form method="POST" action="/events/<%= event.id %>/volunteer-list-shifts/<%= shift.id %>/cancel" class="inline-block-form">
+                              <input type="hidden" name="memberId" value="<%= m.id %>" />
+                              <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                            </form>
+                          <% } else if (shift.signups.length < shift.slots_needed) { %>
+                            <form method="POST" action="/events/<%= event.id %>/volunteer-list-shifts/<%= shift.id %>/signup" class="inline-block-form">
+                              <input type="hidden" name="memberId" value="<%= m.id %>" />
+                              <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
+                            </form>
+                          <% } %>
+                        <% }); %>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
         <% } %>
       </div>
     </section>
