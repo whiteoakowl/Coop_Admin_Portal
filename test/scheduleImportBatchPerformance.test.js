@@ -110,15 +110,18 @@ test('importing 60 students who all share one popular class writes that class\'s
   const buffer = buildImportBuffer(rows);
 
   // `SELECT student_id FROM class_enrollments WHERE class_id = ?` runs
-  // twice, total, when setEnrollment is genuinely called for a class:
-  // once as this route's own batched "what's already enrolled" check
-  // (used to decide whether that class needs a write at all), once more
-  // inside setEnrollment itself (utils/classSchedule.js's
-  // syncClassRosterMembers, called after its transaction commits - its
-  // own DELETE+reinsert runs on the transaction's dedicated connection,
-  // not this shared one, so it isn't directly observable here the same
-  // way). Before the fix, setEnrollment ran once PER STUDENT for a
-  // shared class - 60 times, not the fixed 2 this asserts.
+  // three times, total, when setEnrollment is genuinely called for a
+  // class: once as this route's own batched "what's already enrolled"
+  // check (used to decide whether that class needs a write at all), once
+  // more inside setEnrollment itself to diff old vs. new enrollment
+  // (so a manual roster removal only gets cleared for students genuinely
+  // NEW to the class, not everyone already on it - see
+  // roster_manual_removals), and once more inside syncClassRosterMembers,
+  // called after setEnrollment's transaction commits (its own
+  // DELETE+reinsert runs on the transaction's dedicated connection, not
+  // this shared one, so it isn't directly observable here the same way).
+  // Before the fix, setEnrollment ran once PER STUDENT for a shared class
+  // - 60 times, not the fixed 3 this asserts.
   const lookups = await countQueries(/SELECT student_id FROM class_enrollments WHERE class_id = \?/, async () => {
     const res = await request(app)
       .post(`/admin/schedule/members/import?_csrf=${csrfToken}`)
@@ -129,7 +132,7 @@ test('importing 60 students who all share one popular class writes that class\'s
     assert.match(notice, /Matched 60 schedule row/);
   });
 
-  assert.equal(lookups, 2, `one shared class's roster should be read/written a fixed number of times for the whole import, not once per student (got ${lookups})`);
+  assert.equal(lookups, 3, `one shared class's roster should be read/written a fixed number of times for the whole import, not once per student (got ${lookups})`);
 
   const enrolledCount = (await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id WHERE c.class_name = ?').get('Popular Import Class')).c;
   assert.equal(Number(enrolledCount), 60);
