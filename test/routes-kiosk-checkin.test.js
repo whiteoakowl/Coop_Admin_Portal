@@ -19,7 +19,7 @@ process.env.SESSION_SECRET = 'test-secret-not-for-real-use';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { todayISO } = require('../utils/dates');
+const { todayISO, weekdayOf } = require('../utils/dates');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -49,12 +49,40 @@ test('kiosk check-in scan', async (t) => {
     assert.equal(Number((await db.prepare('SELECT COUNT(*) AS n FROM attendance').get()).n), 0);
   });
 
-  await t.test('a member not scheduled on any roster today is rejected', async () => {
-    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Unscheduled Kid', 'Unscheduled Kid', 'student')").run();
-    const res = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'Unscheduled Kid' });
-    assert.equal(res.body.ok, false);
-    assert.match(res.body.message, /not scheduled for a roster today/);
-  });
+  // A real request: "even if a member doesn't have a schedule they should
+  // still be able to check in and out and they will automatically be
+  // added to the roster for that day." Only meaningful on an actual
+  // meeting day (utils/rosters.js's own ensureMemberOnTodayRoster no-ops
+  // otherwise) - this branches on the real weekday the suite happens to
+  // run on rather than skipping, since either branch is real coverage:
+  // auto-add-and-succeed on a Monday/Wednesday, still-rejected any other
+  // day (there's no day-level roster to add anyone to).
+  const todayIsSessionDay = [1, 3].includes(weekdayOf(todayISO()));
+  await t.test(
+    todayIsSessionDay
+      ? 'a member not scheduled on any roster is automatically added to today\'s day-level roster and checked in'
+      : 'a member not scheduled on any roster is rejected on a non-meeting day',
+    async () => {
+      const { lastInsertRowid: memberId } = await db
+        .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Unscheduled Kid', 'Unscheduled Kid', 'student')")
+        .run();
+      const res = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'Unscheduled Kid' });
+      if (todayIsSessionDay) {
+        assert.equal(res.body.ok, true);
+        assert.match(res.body.message, /Thank you for checking in, Unscheduled Kid/);
+        const onRoster = await db
+          .prepare(
+            `SELECT 1 FROM roster_members rm JOIN rosters r ON r.id = rm.roster_id
+             WHERE rm.member_id = ? AND r.schedule_day = ? AND r.category = 'Class Schedule'`
+          )
+          .get(memberId, weekdayOf(todayISO()) === 1 ? 'monday' : 'wednesday');
+        assert.ok(onRoster, "expected the member to have been added to today's day-level Student roster");
+      } else {
+        assert.equal(res.body.ok, false);
+        assert.match(res.body.message, /not scheduled for a roster today/);
+      }
+    }
+  );
 
   await t.test('a valid scan marks the member present and returns a welcome message', async () => {
     const { lastInsertRowid: memberId } = await db

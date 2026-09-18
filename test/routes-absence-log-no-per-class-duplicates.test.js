@@ -88,16 +88,25 @@ test('one absence form submission across a day roster + 2 class rosters shows up
     const cookie = await loginAsAdmin();
     const res = await request(app).get('/admin/logs?tab=absence').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    // Both the on-screen table and its always-full print counterpart are
-    // in the same document at once (see .logs-screen-table/.logs-print-
-    // table in styles.css) - scope the occurrence count to just the
-    // screen table's own <tbody>, or it would always double-count.
-    const screenTableMatch = /<table class="roster-table members-table condensed-table logs-screen-table">[\s\S]*?<\/table>/.exec(res.text);
-    assert.ok(screenTableMatch, 'expected to find the screen table');
-    const screenTableHtml = screenTableMatch[0];
-    const occurrences = (screenTableHtml.match(/Multi Class Absence Member/g) || []).length;
-    assert.equal(occurrences, 1, 'the member should appear exactly once in the Absence Log, not once per roster');
-    assert.match(screenTableHtml, /Monday Parents/, 'the one row shown should be attributed to the day-level roster');
-    assert.doesNotMatch(screenTableHtml, /Absence Dup Class/, 'no per-class roster row should appear in the standalone Log tab');
+    // Both the on-screen family-group accordion and its always-full print
+    // table counterpart are in the same document at once (see .absence-
+    // family-groups/.logs-print-table in styles.css) - scope the
+    // occurrence count to just the on-screen accordion, or it would
+    // always double-count.
+    const screenMatch = /<div class="absence-family-groups no-print">[\s\S]*?(?=<table class="roster-table members-table condensed-table logs-print-table">)/.exec(res.text);
+    assert.ok(screenMatch, 'expected to find the on-screen family-group accordion');
+    const screenHtml = screenMatch[0];
+    // One group (this member has no family, so the group is just them),
+    // containing exactly one member row - not once per roster. The
+    // member's own name legitimately appears twice within that one group
+    // (once as the group's own header/label, once on their one member
+    // row inside it), so this counts groups and rows instead of raw name
+    // text occurrences.
+    const groupCount = (screenHtml.match(/class="absence-family-group"/g) || []).length;
+    assert.equal(groupCount, 1, 'expected exactly one family group, not once per roster');
+    const memberRowCount = (screenHtml.match(/class="absence-member-row"/g) || []).length;
+    assert.equal(memberRowCount, 1, 'expected exactly one member row inside that group, not once per roster');
+    assert.match(screenHtml, /Monday Parents/, 'the one row shown should be attributed to the day-level roster');
+    assert.doesNotMatch(screenHtml, /Absence Dup Class/, 'no per-class roster row should appear in the standalone Log tab');
   });
 });

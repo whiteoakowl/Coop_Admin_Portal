@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
-const { getMemberRostersForDate } = require('../utils/rosters');
+const { getMemberRostersForDate, ensureMemberOnTodayRoster } = require('../utils/rosters');
 const { familyOf } = require('../utils/members');
 const { memberScansTaskAtCheckin } = require('../utils/setup');
 const { findTaskItemByBarcode, findSetupCleanupBypassBadge, taskAlreadyLoggedByAnotherMember } = require('../utils/taskList');
@@ -91,7 +91,17 @@ router.post('/checkin/scan', async (req, res) => {
   // checkin.js) - two independent presence signals by design, not two
   // paths to the same one, so "checked in at the front door" and
   // "actually sat in this specific classroom" stay distinguishable.
-  const rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  // A real request: "even if a member doesn't have a schedule they
+  // should still be able to check in and out and they will
+  // automatically be added to the roster for that day." A no-op on any
+  // day this doesn't apply to (utils/rosters.js's own
+  // ensureMemberOnTodayRoster) - the second lookup only finds something
+  // new when it actually added the member to today's day-level roster.
+  let rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  if (rosters.length === 0) {
+    await ensureMemberOnTodayRoster(member, today);
+    rosters = (await getMemberRostersForDate(member.id, today)).filter((r) => r.category !== 'Class Roster');
+  }
   if (rosters.length === 0) {
     return res.json({ ok: false, message: `${member.name} is not scheduled for a roster today.` });
   }

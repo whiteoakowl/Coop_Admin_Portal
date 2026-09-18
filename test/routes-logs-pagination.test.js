@@ -70,16 +70,34 @@ test('Logs page pagination', async (t) => {
   const cookie = await loginAsAdmin();
 
   const cases = [
-    { tab: 'absence', printTableCols: 6 },
-    { tab: 'checkinout', printTableCols: 6 },
-    { tab: 'nametag', printTableCols: 6 }, // Name/Description/Date/Time/Day/Request - no Archive column in print
+    // Absence/Late Log now groups on-screen by family+date instead of a
+    // plain table (a real request, with a reference design - each of
+    // these 60 members has no family, so each is still its own solo
+    // group, one-for-one with the old one-row-per-member count). Its
+    // print table (always the full, unpaginated list, same as every
+    // other tab here) is untouched - still plain <td> rows, a distinct
+    // needle from the on-screen accordion's own markup.
+    { tab: 'absence', printTableCols: 6, screenNeedle: 'class="absence-family-name">Log Test Kid', printNeedle: '<td>Log Test Kid' },
+    { tab: 'checkinout', printTableCols: 6, screenNeedle: '<td>Log Test Kid', printNeedle: '<td>Log Test Kid' },
+    { tab: 'nametag', printTableCols: 6, screenNeedle: '<td>Log Test Kid', printNeedle: '<td>Log Test Kid' }, // Name/Description/Date/Time/Day/Request - no Archive column in print
   ];
 
-  for (const { tab, printTableCols } of cases) {
+  for (const { tab, printTableCols, screenNeedle, printNeedle } of cases) {
+    // checkinout/nametag still render one shared needle for BOTH the
+    // screen table and the print table (screen + print both count
+    // toward the same total); absence's on-screen accordion uses its
+    // own distinct markup, so its two counts are independent instead.
+    const sharedNeedle = screenNeedle === printNeedle;
+
     await t.test(`${tab}: page 1 shows 50 on screen, all 60 in the print table`, async () => {
       const res = await request(app).get(`/admin/logs?tab=${tab}`).set('Cookie', cookie);
       assert.equal(res.status, 200);
-      assert.equal(countOccurrences(res.text, '<td>Log Test Kid'), 50 + 60, 'screen (50) + print (60) = 110');
+      if (sharedNeedle) {
+        assert.equal(countOccurrences(res.text, screenNeedle), 50 + 60, 'screen (50) + print (60) = 110');
+      } else {
+        assert.equal(countOccurrences(res.text, screenNeedle), 50, 'screen shows 50');
+        assert.equal(countOccurrences(res.text, printNeedle), 60, 'print table always shows all 60');
+      }
       assert.match(res.text, /Showing 1&ndash;50 of 60/);
       // The old static "Page N of M" text is now an interactive dropdown
       // (a real request: "a drop down to choose page number") - option 1
@@ -91,7 +109,12 @@ test('Logs page pagination', async (t) => {
     await t.test(`${tab}: page 2 shows the remaining 10 on screen, still all 60 in the print table`, async () => {
       const res = await request(app).get(`/admin/logs?tab=${tab}&page=2`).set('Cookie', cookie);
       assert.equal(res.status, 200);
-      assert.equal(countOccurrences(res.text, '<td>Log Test Kid'), 10 + 60, 'screen (10) + print (60) = 70');
+      if (sharedNeedle) {
+        assert.equal(countOccurrences(res.text, screenNeedle), 10 + 60, 'screen (10) + print (60) = 70');
+      } else {
+        assert.equal(countOccurrences(res.text, screenNeedle), 10, 'screen shows the remaining 10');
+        assert.equal(countOccurrences(res.text, printNeedle), 60, 'print table always shows all 60');
+      }
       assert.match(res.text, /Showing 51&ndash;60 of 60/);
     });
 

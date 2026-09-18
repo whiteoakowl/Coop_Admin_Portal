@@ -44,10 +44,12 @@ function todayIfSessionDay(day) {
 // distinction checkinoutCategoryClause already draws between a day-level
 // and a per-class roster) instead of every roster's copy.
 async function allAbsenceSubmissions(dateFilter) {
-  let sql = `SELECT m.name AS "memberName", r.name AS "rosterName", a.session_date AS date, a.status,
+  let sql = `SELECT m.name AS "memberName", m.family_id AS "familyId", f.name AS "familyName",
+             r.name AS "rosterName", a.session_date AS date, a.status,
              a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
              FROM absence_submissions a
              JOIN members m ON m.id = a.member_id
+             LEFT JOIN families f ON f.id = m.family_id
              JOIN rosters r ON r.id = a.roster_id
              WHERE r.category != 'Class Roster'`;
   const params = [];
@@ -62,6 +64,8 @@ async function allAbsenceSubmissions(dateFilter) {
     .all(...params))
     .map((r) => ({
       memberName: r.memberName,
+      familyId: r.familyId,
+      familyName: r.familyName,
       rosterName: r.rosterName,
       date: r.date,
       dateLabel: formatDateLabel(r.date),
@@ -78,6 +82,31 @@ async function allAbsenceSubmissions(dateFilter) {
         lastNameOf(a.memberName).localeCompare(lastNameOf(b.memberName), undefined, { sensitivity: 'base' }) ||
         a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' })
     );
+}
+
+// A real request, with a reference design: "only show family name and
+// dropdown to show all members in that family marked absent... new
+// family entry for every day a family submits for absence." Groups the
+// flat per-member submissions above by (family, date) - a family with
+// members absent/late on two different days gets two separate group
+// entries, one per day, each expanding to just that day's own members
+// (not the family's whole history). A member with no family becomes
+// their own solo group, keyed off their own id rather than a shared
+// null family_id (which would otherwise incorrectly lump every familyless
+// member's submissions together).
+function groupAbsenceSubmissionsByFamilyAndDate(submissions) {
+  const groups = new Map();
+  for (const s of submissions) {
+    const key = `${s.familyId != null ? `f${s.familyId}` : `solo-${s.memberName}`}|${s.date}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, familyName: s.familyName || s.memberName, date: s.date, dateLabel: s.dateLabel, members: [] });
+    }
+    groups.get(key).members.push(s);
+  }
+  // Insertion order already follows allAbsenceSubmissions' own date-desc/
+  // last-name sort, so the first member seen in each group also fixes
+  // that group's own overall sort position - no separate re-sort needed.
+  return Array.from(groups.values());
 }
 
 async function absenceSubmissionDates() {
@@ -265,18 +294,20 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 
   const allSubmissions = await allAbsenceSubmissions(dateFilter);
+  const allFamilyGroups = groupAbsenceSubmissionsByFamilyAndDate(allSubmissions);
   const pageSize = parsePageSize(req.query.pageSize, DEFAULT_PAGE_SIZE);
-  const pagination = paginate(allSubmissions, parsePage(req.query.page), pageSize);
+  const pagination = paginate(allFamilyGroups, parsePage(req.query.page), pageSize);
   res.render('admin-logs', {
     title: 'Absence/Late Log',
     tab,
-    submissions: pagination.items,
+    familyGroups: pagination.items,
     allSubmissions,
     pagination,
     viewingAll: pageSize === Infinity,
     baseHref: `/admin/logs?tab=absence${dateFilter ? `&date=${encodeURIComponent(dateFilter)}` : ''}&`,
     dates: await absenceSubmissionDates(),
     dateFilter,
+    dateFilterLabel: dateFilter ? formatDateLabel(dateFilter) : 'All dates',
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
