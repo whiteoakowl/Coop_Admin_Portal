@@ -34,18 +34,26 @@
       toggles.push(toggle);
     });
 
+    // A real request: "when you click on a family it highlights the
+    // family in soft blue" - the same click that expands a family also
+    // marks its own head row + every (even still-collapsed) member row
+    // as highlighted, so the group reads as one unit while it's open.
     let openToggle = null;
     toggles.forEach((toggle) => {
+      const headRow = toggle.closest('.member-row-card');
+      toggle.__allRows = headRow ? [headRow, ...toggle.__restRows] : toggle.__restRows;
       toggle.addEventListener('click', () => {
         const wasOpen = toggle.getAttribute('aria-expanded') === 'true';
 
         if (openToggle && openToggle !== toggle) {
           openToggle.__restRows.forEach((row) => row.classList.add('member-row-collapsed'));
+          openToggle.__allRows.forEach((row) => row.classList.remove('member-family-highlighted'));
           openToggle.setAttribute('aria-expanded', 'false');
           openToggle.setAttribute('aria-label', openToggle.getAttribute('aria-label').replace('Hide', 'Show'));
         }
 
         toggle.__restRows.forEach((row) => row.classList.toggle('member-row-collapsed', wasOpen));
+        toggle.__allRows.forEach((row) => row.classList.toggle('member-family-highlighted', !wasOpen));
         toggle.setAttribute('aria-expanded', String(!wasOpen));
         openToggle = wasOpen ? null : toggle;
       });

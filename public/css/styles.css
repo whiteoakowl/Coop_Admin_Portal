@@ -2983,6 +2983,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  flex-shrink: 0;
   margin-left: 0.4rem;
   padding: 0.1rem 0.5rem;
   border-radius: 999px;
@@ -3051,6 +3052,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Grade level + age under a student's name on the Members list. */
 .member-row-subline { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
 .member-row-subline .icon { width: 12px; height: 12px; flex-shrink: 0; }
+/* A real request: "icons in a row below the name" - every small fact
+   line (grade/age, sections, family, roster) used to be its own stacked
+   .member-row-subline; they now share one wrapping row instead, so each
+   one's own margin-top (meant for stacking directly under the name) is
+   reset in favor of the row's own gap. */
+.member-row-icon-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.85rem; margin-top: 0.2rem; }
+.member-row-icon-row .member-row-subline { margin-top: 0; }
 
 /* ---------- Members list (card design) ----------
    A real request, with a reference screenshot, to replace the old
@@ -3141,6 +3149,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* A member row nested under a family's head gets a slight indent so it
    visually reads as belonging to that family once expanded. */
 .member-row-card[data-family-member="1"] { margin-left: 1.5rem; }
+/* A real request: "when you click on a family it highlights the family
+   in soft blue" - public/js/members-family-accordion.js toggles this on
+   every row in a family's group (head + members) together with its own
+   expand/collapse, same soft-blue "active" convention as .icon-btn-active
+   etc. elsewhere in this app. */
+.member-row-card.member-family-highlighted { background: var(--brand-soft); border-color: var(--brand); }
 
 .member-avatar {
   width: 44px;
@@ -3165,9 +3179,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
 .member-row-body { flex: 1; min-width: 0; }
 .member-row-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
-.member-row-name-link { font-weight: 700; color: var(--ink); text-decoration: none; }
+/* A real request: "shrink everything on mobile to ensure first and last
+   name fit on one line clean" - the name itself never wraps mid-word;
+   if the row is too narrow for name + badges together, the badges wrap
+   to their own line below instead (still "next to" the name reading
+   top to bottom), never the name splitting across two lines. */
+.member-row-name-link { font-weight: 700; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .member-row-name-link:hover { text-decoration: underline; }
-.member-role-badge { display: inline-flex; align-items: center; gap: 0.25rem; }
+.member-role-badge { display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .member-role-badge .icon { width: 11px; height: 11px; }
 
 .badge-pill-blue { background: var(--brand-soft); color: var(--brand-dark); }
@@ -3252,11 +3271,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .permissions-mode-on .member-row-permissions { display: block; }
 
 @media (max-width: 720px) {
-  .member-row-card { padding: 0.7rem 0.7rem; gap: 0.6rem; }
-  .member-avatar { width: 38px; height: 38px; font-size: 0.78rem; }
+  .member-row-card { padding: 0.7rem 0.7rem; gap: 0.5rem; }
+  .member-avatar { width: 34px; height: 34px; font-size: 0.72rem; }
   .member-row-card[data-family-member="1"] { margin-left: 1rem; }
   .members-add-family-icon { width: 34px; height: 34px; }
   .members-add-family-icon .icon { width: 17px; height: 17px; }
+  /* A real request: "shrink everything on mobile to ensure first and
+     last name fit on one line clean" - a smaller name/badge/icon scale
+     leaves more of a narrow phone's width for the name itself. */
+  .member-row-topline { gap: 0.3rem; }
+  .member-row-name-link { font-size: 0.92rem; }
+  .member-role-badge { font-size: 0.68rem; padding: 0.1rem 0.45rem; }
+  .member-role-badge .icon { width: 9px; height: 9px; }
+  .primary-parent-badge { font-size: 0.62rem; padding: 0.08rem 0.4rem; margin-left: 0.2rem; }
+  .member-row-icon-row { gap: 0.2rem 0.6rem; }
+  .member-row-subline { font-size: 0.72rem; }
 }
 
 .member-form-header {

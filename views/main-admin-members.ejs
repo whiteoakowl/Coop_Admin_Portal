@@ -237,7 +237,7 @@
               <% if (activeTab === 'members') { %>
                 <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
               <% } %>
-              <span class="member-avatar member-avatar-<%= avatarColorFor(m.id) %>">
+              <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
                 <% if (m.photo_path) { %>
                   <img src="<%= photoUrl(m.photo_path) %>" alt="" />
                 <% } else { %>
@@ -253,22 +253,26 @@
                       schedule/rosters/attendance history), which has its
                       own prominent Edit button up top. %>
                   <a class="member-row-name-link" href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
-                  <span class="badge-pill badge-pill-<%= avatarColorFor(m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+                  <span class="badge-pill badge-pill-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
                   <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
                 </div>
-                <% if (m.member_type === 'student') { %>
-                  <span class="member-row-subline"><svg class="icon"><use href="#icon-graduation-cap"/></svg> <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %></span>
-                <% } %>
-                <%# A real request: "instead of showing type on the member
-                    row mobile view show the sections a family is listed
-                    in." %>
+                <%# A real request: "icons in a row below the name" - grade/
+                    age and sections used to be their own stacked rows; a
+                    phone-or-email text line used to sit here too, but the
+                    row's own phone/mail icon buttons (below) already cover
+                    that, so it's redundant and dropped rather than shown
+                    twice. %>
                 <% var memberSectionIds = sectionIdsByMember[m.id]; %>
                 <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
-                <% if (memberSections.length > 0) { %>
-                  <span class="member-row-subline"><svg class="icon"><use href="#icon-clipboard-list"/></svg> <%= memberSections.map(function(s) { return s.name; }).join(', ') %></span>
-                <% } %>
-                <% if (m.phone || m.email) { %>
-                  <span class="member-row-subline"><svg class="icon"><use href="#icon-phone"/></svg> <%= m.phone || m.email %></span>
+                <% if (m.member_type === 'student' || memberSections.length > 0) { %>
+                  <div class="member-row-icon-row">
+                    <% if (m.member_type === 'student') { %>
+                      <span class="member-row-subline"><svg class="icon"><use href="#icon-graduation-cap"/></svg> <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %></span>
+                    <% } %>
+                    <% if (memberSections.length > 0) { %>
+                      <span class="member-row-subline"><svg class="icon"><use href="#icon-clipboard-list"/></svg> <%= memberSections.map(function(s) { return s.name; }).join(', ') %></span>
+                    <% } %>
+                  </div>
                 <% } %>
                 <%# Main Admin's own Sections/Portal Permissions editor -
                     only shown in Edit Permissions mode (public/js/

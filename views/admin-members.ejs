@@ -175,7 +175,7 @@
             data-family-member="<%= isFamilyHead ? '' : '1' %>"
           >
             <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
-            <span class="member-avatar member-avatar-<%= avatarColorFor(m.id) %>">
+            <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
               <% if (m.photo_path) { %>
                 <img src="<%= photoUrl(m.photo_path) %>" alt="" />
               <% } else { %>
@@ -185,25 +185,34 @@
             <div class="member-row-body">
               <div class="member-row-topline">
                 <a class="member-row-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
-                <span class="badge-pill badge-pill-<%= avatarColorFor(m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
+                <span class="badge-pill badge-pill-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
                 <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
                 <%# A real request: "this will then add their admin title
                     label next to their name on member lists." %>
                 <% if (m.adminTitle) { %><span class="badge-pill" title="Admin Position"><%= m.adminTitle %></span><% } %>
               </div>
-              <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>
-                <span class="member-row-subline">
-                  <svg class="icon"><use href="#icon-graduation-cap"/></svg>
-                  <%= [m.grade_level || null, m.age !== null ? (m.age + (m.age === 1 ? ' year old' : ' years old')) : null].filter(Boolean).join(' · ') %>
-                </span>
-              <% } else if (m.familyName) { %>
-                <span class="member-row-subline"><svg class="icon"><use href="#icon-home"/></svg> <%= m.familyName %></span>
-              <% } %>
-              <% if (m.rosters.length > 0) { %>
-                <span class="member-row-subline">
-                  <svg class="icon"><use href="#icon-calendar-check"/></svg>
-                  <%= m.rosters.map(function(r) { return r.name; }).join(', ') %>
-                </span>
+              <%# A real request: "icons in a row below the name" - every
+                  small fact line (grade/age or family, roster) used to be
+                  its own stacked row; now they share one wrapping row so
+                  the card reads as name+badges on line one, everything
+                  else compact underneath. %>
+              <% if ((m.member_type === 'student' && (m.grade_level || m.age !== null)) || m.familyName || m.rosters.length > 0) { %>
+                <div class="member-row-icon-row">
+                  <% if (m.member_type === 'student' && (m.grade_level || m.age !== null)) { %>
+                    <span class="member-row-subline">
+                      <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+                      <%= [m.grade_level || null, m.age !== null ? (m.age + (m.age === 1 ? ' year old' : ' years old')) : null].filter(Boolean).join(' · ') %>
+                    </span>
+                  <% } else if (m.familyName) { %>
+                    <span class="member-row-subline"><svg class="icon"><use href="#icon-home"/></svg> <%= m.familyName %></span>
+                  <% } %>
+                  <% if (m.rosters.length > 0) { %>
+                    <span class="member-row-subline">
+                      <svg class="icon"><use href="#icon-calendar-check"/></svg>
+                      <%= m.rosters.map(function(r) { return r.name; }).join(', ') %>
+                    </span>
+                  <% } %>
+                </div>
               <% } %>
             </div>
             <div class="member-row-actions no-print">
