@@ -17,7 +17,9 @@
 //    routes/forums.js (allow_comments gates replies; forum_category_
 //    sections extends canAccessCategory; a category's own
 //    moderator_member_id lets that one member moderate without
-//    manage_forum).
+//    manage_forum). A later real request dropped the Moderate tab
+//    entirely - this same settings popup now lives on the chat group's
+//    own page (admin-forums-category.ejs) instead.
 //
 // 3. "when you click on the chat category it should open an admin view
 //    of the threads in that category... it should stay in the main admin
@@ -96,16 +98,22 @@ test('the Add Category dialog has no nested <form> - Save is associated via form
   assert.match(res.text, /<button type="submit" form="add-forum-category-form" class="primary-btn">Save<\/button>/);
 });
 
-test('Moderate tab lists categories with an Edit button, no old moderation-log table', async () => {
+test('the chat group page (not a Moderate tab) has an Edit button opening the settings popup', async () => {
+  // A later real request dropped the Moderate tab entirely: "edit button
+  // should be on chat group page. no moderation tab/subpage." Same
+  // settings popup (name/description/allow comments/sections/moderator),
+  // now reached from admin-forums-category.ejs instead of a separate tab.
   const admin = await loginAsMainAdmin();
   await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Moderate Tab Test Chat', scope: 'general', _csrf: admin.csrfToken });
   const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Moderate Tab Test Chat'").get();
 
-  const res = await request(app).get('/main-admin/forums?tab=moderate').set('Cookie', admin.cookie);
+  const listRes = await request(app).get('/main-admin/forums?tab=new').set('Cookie', admin.cookie);
+  assert.doesNotMatch(listRes.text, /Moderate</, 'the Moderate tab link itself must be gone');
+
+  const res = await request(app).get(`/main-admin/forums/${category.id}`).set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Moderate Tab Test Chat/);
-  assert.match(res.text, new RegExp(`id="moderate-category-${category.id}"`));
-  assert.match(res.text, /action="\/main-admin\/forums\/\d+\/settings"/);
+  assert.match(res.text, /id="edit-chat-group-dialog"/);
+  assert.match(res.text, new RegExp(`action="/main-admin/forums/${category.id}/settings"`));
   assert.doesNotMatch(res.text, /<th>Moderator<\/th>/);
 });
 

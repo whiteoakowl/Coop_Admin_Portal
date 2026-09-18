@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { todayISO, formatDateLabel, weekdayOf } = require('../utils/dates');
+const { todayISO, formatDateLabel, formatShortDateLabel, weekdayOf, isValidISODate } = require('../utils/dates');
 const { buildTemplateWorkbook } = require('../utils/spreadsheet');
 const { todaysSessionDays, absenceFormSubmissionsForRoster } = require('../utils/alerts');
 const { ensureDayRoster, classesAtRiskForDay, classesNeedingStaffForDay } = require('../utils/classSchedule');
@@ -221,7 +221,16 @@ async function dayFamilyCount(day) {
 }
 
 router.get('/', requireAdmin, async (req, res) => {
-  const today = todayISO();
+  // A real request: match a provided design with a date picker atop the
+  // Co-op Member Counts card - Today's Attendance/the Alert Log below it
+  // already work off an arbitrary date (statsWithTrends/todaysSessionDays
+  // take one as a plain parameter, not "real today" specifically), so
+  // picking a different one here genuinely shows that day's own numbers
+  // rather than being a decorative label. Co-op Member Counts itself
+  // isn't date-scoped data at all (Monday/Wednesday enrollment totals,
+  // not a per-day historical snapshot), so it stays the same regardless
+  // of which date is selected - only Attendance/Alert Log move.
+  const today = isValidISODate(req.query.date) ? req.query.date : todayISO();
   const previousDate = await previousSessionDate(today);
   const [mondayStudentCount, mondayParentCount, mondayFamilyCount, wednesdayStudentCount, wednesdayParentCount, wednesdayFamilyCount] = await Promise.all([
     dayScheduleCount('student', 'monday'),
@@ -255,6 +264,9 @@ router.get('/', requireAdmin, async (req, res) => {
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
+    selectedDate: today,
+    selectedDateLabel: formatShortDateLabel(today),
+    todayIso: todayISO(),
     mondayStudentCount,
     mondayParentCount,
     mondayFamilyCount,
@@ -410,5 +422,16 @@ router.post('/fullscreen/verify-pin', requireAdmin, async (req, res) => {
 // gear, admins tab. this tab should be located under the main admin
 // portal settings gear as a tab. it should not be on co-op admin
 // portal."
+
+// todayStatsForType's own "of Y" denominator no longer renders anywhere
+// (the Home dashboard's Today's Attendance card - a real request, with a
+// reference screenshot - dropped it along with the KPI trend badges), but
+// the day-scoped-denominator bug it exists to prevent is still real
+// business logic worth pinning down directly rather than losing coverage
+// entirely. Attached to the exported router (a function - this doesn't
+// change how server.js's own `app.use(router)` sees it) so
+// test/routes-dashboard-today-total.test.js can call it straight instead
+// of scraping HTML for markup that's no longer there.
+router.todayStatsForType = todayStatsForType;
 
 module.exports = router;

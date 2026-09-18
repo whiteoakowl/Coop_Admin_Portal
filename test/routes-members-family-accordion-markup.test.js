@@ -1,9 +1,9 @@
-// Real HTTP-level coverage for the Members list's family-collapse markup
-// (public/js/members-family-collapse.js groups rows by this attribute and
-// hides every member but the head-of-family one) - the actual show/hide
-// toggle behavior is pure client-side JS this suite has no browser to
-// exercise, but the server-rendered data-family-key attribute it depends
-// on is real, testable HTML output.
+// Real HTTP-level coverage for the Members list's family-accordion markup
+// (public/js/members-family-accordion.js groups cards by this attribute
+// and hides every member but the head-of-family one) - the actual show/
+// hide toggle behavior is pure client-side JS this suite has no browser
+// to exercise, but the server-rendered data-family-key attribute it
+// depends on is real, testable HTML output.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -57,7 +57,7 @@ test('Members list: same-family rows share a data-family-key, solo members get a
   assert.equal(res.status, 200);
 
   function keyFor(memberId) {
-    const re = new RegExp(`<tr class="[^"]*" data-family-key="([^"]+)">[\\s\\S]*?</tr>`, 'g');
+    const re = /<div\s+class="member-row-card"\s+data-family-key="([^"]+)"[^>]*>[\s\S]*?<\/dialog>\s*<\/div>/g;
     let match;
     while ((match = re.exec(res.text))) {
       if (match[0].includes(`/admin/members/${memberId}"`)) return match[1];

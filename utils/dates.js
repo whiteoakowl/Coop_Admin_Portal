@@ -105,8 +105,17 @@ function formatDateLabel(iso) {
 
 function formatDateLong(iso) {
   const d = parseISO(iso);
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  return `${WEEKDAY_SHORT[d.getDay()]}, ${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+// "Apr 29, 2025" - the Co-op Admin dashboard's own date-picker label (a
+// real request to match a provided design), short-month + year but no
+// weekday, unlike formatDateLabel ("Wed 4/29", no year) and formatDateLong
+// ("Wed, April 29, 2025", full month name) - a genuinely different shape
+// from either existing formatter, not a small variation of one.
+function formatShortDateLabel(iso) {
+  const d = parseISO(iso);
+  return `${MONTHS_LONG[d.getMonth()].slice(0, 3)} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 // A real request: a student's imported birthday showed on the Members
@@ -237,6 +246,7 @@ module.exports = {
   isValidISODate,
   formatDateLabel,
   formatDateLong,
+  formatShortDateLabel,
   formatDateNumeric,
   formatTime,
   formatTimeOfDay,

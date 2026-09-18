@@ -27,6 +27,14 @@
 // forum_moderation_actions log table (utils/forums.js's own
 // moderationLog() - left in place, just no longer rendered here) with
 // the category-settings list+popup below.
+//
+// A further real request: "add category button should say add chat
+// group. subcategory tab should say chat groups. edit button should be
+// on chat group page. no moderation tab/subpage." Dropped the Moderate
+// tab entirely - its per-category settings popup (name/description/
+// allow comments/sections/moderator) now lives behind an Edit button on
+// the chat group's own page (admin-forums-category.ejs) instead, so
+// there's only ever one place to reach it.
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -37,7 +45,7 @@ const { forumCategorySectionIds } = require('../utils/sections');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forum'));
 
-const FORUMS_TABS = ['new', 'moderate', 'archive'];
+const FORUMS_TABS = ['new', 'archive'];
 
 router.get('/', async (req, res) => {
   const activeTab = FORUMS_TABS.includes(req.query.tab) ? req.query.tab : 'new';
@@ -46,23 +54,15 @@ router.get('/', async (req, res) => {
 
   let categories = [];
   let classes = [];
-  let allSections = [];
-  let members = [];
-  let categorySectionIds = {};
   let archived = [];
   if (activeTab === 'new') {
     categories = await forums.listCategories();
     classes = await db.prepare('SELECT id, class_name FROM classes ORDER BY LOWER(class_name)').all();
-  } else if (activeTab === 'moderate') {
-    categories = await forums.listCategories();
-    allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
-    members = await activeMemberOptions();
-    for (const c of categories) categorySectionIds[c.id] = await forumCategorySectionIds(c.id);
   } else {
     archived = await forums.archivedThreads();
   }
 
-  res.render('admin-forums-list', { title: 'Chat', activeTab, categories, classes, allSections, members, categorySectionIds, archived, notice, error });
+  res.render('admin-forums-list', { title: 'Chat', activeTab, categories, classes, archived, notice, error });
 });
 
 router.post('/', async (req, res) => {
@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
   if (!name) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Name is required.'));
   if (scope === 'class' && !req.body.classId) return res.redirect('/main-admin/forums?error=' + encodeURIComponent('Choose a class for a private class chat.'));
   await forums.createCategory({ name, description: (req.body.description || '').trim(), scope, classId: req.body.classId ? parseInt(req.body.classId, 10) : null });
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Category added.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group added.'));
 });
 
 router.post('/:id/lock', async (req, res) => {
@@ -86,13 +86,15 @@ router.post('/:id/unlock', async (req, res) => {
 
 router.post('/:id/delete', async (req, res) => {
   await forums.deleteCategory(req.params.id);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Category deleted.'));
+  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group deleted.'));
 });
 
-// Moderate tab's own popup - see this file's own header comment.
+// The chat group page's own Edit popup - see this file's own header
+// comment (used to be the removed Moderate tab's popup, same fields,
+// just reached from the group's own page now).
 router.post('/:id/settings', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/forums?tab=moderate&error=' + encodeURIComponent('Name is required.'));
+  if (!name) return res.redirect(`/main-admin/forums/${req.params.id}?error=` + encodeURIComponent('Name is required.'));
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await forums.updateCategorySettings(req.params.id, {
     name,
@@ -101,7 +103,7 @@ router.post('/:id/settings', async (req, res) => {
     sectionIds,
     moderatorMemberId: req.body.moderatorMemberId ? parseInt(req.body.moderatorMemberId, 10) : null,
   });
-  res.redirect('/main-admin/forums?tab=moderate&notice=' + encodeURIComponent('Chat settings updated.'));
+  res.redirect(`/main-admin/forums/${req.params.id}?notice=` + encodeURIComponent('Chat group settings updated.'));
 });
 
 // Archive tab's own "restore" action - see archivedThreads()'s comment in
@@ -135,7 +137,22 @@ router.get('/:id', async (req, res) => {
   const category = await forums.getCategory(req.params.id);
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
   const threads = await forums.listThreads(category.id);
-  res.render('admin-forums-category', { title: category.name, category, threads });
+  // Feeds the page's own Edit popup (this file's own header comment) -
+  // the same name/description/allow comments/sections/moderator fields
+  // the removed Moderate tab used to edit.
+  const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const members = await activeMemberOptions();
+  const sectionIds = await forumCategorySectionIds(category.id);
+  res.render('admin-forums-category', {
+    title: category.name,
+    category,
+    threads,
+    allSections,
+    members,
+    sectionIds,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
 });
 
 router.get('/threads/:threadId', async (req, res) => {

@@ -12,22 +12,26 @@
     <div class="grid-box-header">
       <h1>Chat</h1>
       <% if (activeTab === 'new') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Chat Group</button>
       <% } %>
     </div>
 
     <%# A real request: "main admin portal chat should have the tabs new
         chat, moderate, archive." See routes/admin-forums.js's own header
-        comment for what each tab covers. %>
+        comment for what each tab covers. A further real request:
+        "subcategory tab should say chat groups... no moderation tab/
+        subpage" - "New Chat" (this tab really just lists the chat
+        groups, not a compose form) renamed to "Chat Groups", and
+        Moderate dropped entirely once its own per-category settings
+        popup moved onto each chat group's own page instead. %>
     <%# A real request: "instead of the tabs on each page, make them
         subpages under each menu tab" (desktop, see views/partials/
         portal-nav.ejs) / "when you click the tab below a menu will pop
         up" (mobile, see public/js/page-tabs.js) - same tab links either
         way, just moved out of this inline strip. %>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'moderate' ? 'Moderate' : activeTab === 'archive' ? 'Archive' : 'New Chat' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'archive' ? 'Archive' : 'Chat Groups' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
     <dialog class="view-tabs page-tabs-dialog no-print">
-      <a href="/main-admin/forums?tab=new" class="view-tab <%= activeTab === 'new' ? 'active' : '' %>">New Chat</a>
-      <a href="/main-admin/forums?tab=moderate" class="view-tab <%= activeTab === 'moderate' ? 'active' : '' %>">Moderate</a>
+      <a href="/main-admin/forums?tab=new" class="view-tab <%= activeTab === 'new' ? 'active' : '' %>">Chat Groups</a>
       <a href="/main-admin/forums?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
       <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
     </dialog>
@@ -37,7 +41,7 @@
 
     <% if (activeTab === 'new') { %>
       <% if (categories.length === 0) { %>
-        <p class="roster-empty">No chats yet &mdash; add a category above.</p>
+        <p class="roster-empty">No chat groups yet &mdash; add one above.</p>
       <% } %>
 
       <div class="team-card-grid">
@@ -57,67 +61,6 @@
               </div>
             </div>
           </div>
-        <% }); %>
-      </div>
-    <% } else if (activeTab === 'moderate') { %>
-      <%# A real request: "Moderate tab should have a list of the chat
-          categories. when you click each category it show a pop up of
-          the category's name, description, check box - allow comments,
-          checkboxes - select which section can view or all, dropdown
-          menu to select member to moderate." %>
-      <% if (categories.length === 0) { %>
-        <p class="roster-empty">No chats yet &mdash; add one from the New Chat tab.</p>
-      <% } %>
-      <div class="team-card-grid">
-        <% categories.forEach(function(c) { %>
-          <div class="team-col">
-            <div class="team-info-card">
-              <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-              <h3 class="team-info-title"><%= c.name %></h3>
-              <% if (c.moderatorName) { %><span class="badge-pill">Moderator: <%= c.moderatorName %></span><% } %>
-              <% if (!c.allow_comments) { %><span class="badge-pill badge-pill-gray">Comments Off</span><% } %>
-              <div class="roster-btn-row">
-                <button type="button" class="roster-action-btn" onclick="document.getElementById('moderate-category-<%= c.id %>').showModal()">Edit</button>
-              </div>
-            </div>
-          </div>
-
-          <dialog id="moderate-category-<%= c.id %>" class="member-picker-dialog">
-            <form method="POST" action="/main-admin/forums/<%= c.id %>/settings">
-              <h3><%= c.name %></h3>
-              <label for="moderate-name-<%= c.id %>">Category Name
-                <input id="moderate-name-<%= c.id %>" type="text" name="name" value="<%= c.name %>" required />
-              </label>
-              <label for="moderate-description-<%= c.id %>">Description
-                <textarea id="moderate-description-<%= c.id %>" name="description" rows="2"><%= c.description || '' %></textarea>
-              </label>
-              <div class="grade-pill-grid">
-                <label class="grade-pill"><input type="checkbox" name="allowComments" <%= c.allow_comments ? 'checked' : '' %> /> Allow comments</label>
-              </div>
-              <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
-              <% if (allSections.length === 0) { %>
-                <p class="hint">No sections defined yet.</p>
-              <% } else { %>
-                <div class="grade-pill-grid">
-                  <% allSections.forEach(function(s) { %>
-                    <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= categorySectionIds[c.id].includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-                  <% }); %>
-                </div>
-              <% } %>
-              <label for="moderate-moderator-<%= c.id %>">Member to Moderate
-                <select id="moderate-moderator-<%= c.id %>" name="moderatorMemberId">
-                  <option value="">None</option>
-                  <% members.forEach(function(m) { %>
-                    <option value="<%= m.id %>" <%= c.moderator_member_id === m.id ? 'selected' : '' %>><%= m.name %></option>
-                  <% }); %>
-                </select>
-              </label>
-              <div class="notes-dialog-actions">
-                <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-                <button type="submit" class="primary-btn">Save</button>
-              </div>
-            </form>
-          </dialog>
         <% }); %>
       </div>
     <% } else { %>
@@ -163,8 +106,8 @@
         which used to leave Save attached to nothing once a category
         existed - "add one category and it won't let me add more"). %>
     <form method="POST" action="/main-admin/forums" id="add-forum-category-form">
-      <h3>Add Category</h3>
-      <label for="add-forum-category-name">Category Name
+      <h3>Add Chat Group</h3>
+      <label for="add-forum-category-name">Chat Group Name
         <input id="add-forum-category-name" type="text" name="name" placeholder="e.g. Field Trip Planning" required />
       </label>
       <label for="add-forum-category-description">Description
@@ -183,7 +126,7 @@
       </label>
     </form>
     <% if (categories.length > 0) { %>
-      <p class="hint">Existing categories</p>
+      <p class="hint">Existing chat groups</p>
       <div class="grade-pill-grid">
         <% categories.forEach(function(c) { %>
           <form method="POST" action="/main-admin/forums/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= c.name %>&quot;? This removes every thread and post in it. This cannot be undone.">

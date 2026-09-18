@@ -1796,12 +1796,84 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   flex-shrink: 0;
 }
 .family-student-row-icon .icon { width: 15px; height: 15px; }
+/* A real request, with a reference screenshot: every row icon in a day's
+   column takes that day's own color (Monday orange, Wednesday blue)
+   rather than varying by Parents/Students/Families - --accent/--brand-
+   dark are this app's own established solid Co-op Admin orange/blue
+   (admin-nav's own sidebar/topbar use the same tokens), paired here with
+   their soft tint for the circle background. */
+.family-student-row-icon-orange { background: var(--orange-bg); color: var(--accent-dark); }
 .family-student-row-icon-blue { background: var(--brand-soft); color: var(--brand-dark); }
-.family-student-row-icon-green { background: var(--green-bg); color: var(--green); }
-.family-student-row-icon-purple { background: var(--purple-soft); color: var(--purple); }
-.family-student-row-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-.family-student-row-label { color: var(--muted); font-size: 0.7rem; white-space: nowrap; }
-.family-student-row-value { font-size: 1.05rem; font-weight: 800; color: var(--ink); line-height: 1; }
+.family-student-row-label { flex: 1; min-width: 0; color: var(--ink); font-size: 0.85rem; }
+.family-student-row-value { font-size: 1.15rem; font-weight: 800; color: var(--ink); line-height: 1; }
+
+/* Co-op Member Counts card's own date picker - a real request: match a
+   provided design where the header shows a short "Apr 29, 2025" label
+   with a chevron, but tapping anywhere on it opens the native date
+   picker (the native <input type="date"> sits invisibly on top, full
+   size, rather than this being a decorative label). */
+.dashboard-date-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dashboard-date-picker .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.dashboard-date-picker input[type="date"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Full-width colored day header bar - a real request, with a reference
+   screenshot: solid Co-op Admin orange/blue (same --accent/--brand-dark
+   tokens the sidebar/topbar already use) with white text and an icon in
+   a translucent white circle, replacing the small tinted
+   .family-student-day-pill (still used by partials/dashboard-type-
+   stats.ejs elsewhere) with a bar spanning the whole column. */
+.family-student-day-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  margin-bottom: 0.7rem;
+}
+.family-student-day-header-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.family-student-day-header-icon .icon { width: 14px; height: 14px; color: #fff; }
+/* var(--accent), this app's usual solid Co-op Admin orange, is too light
+   for white text at this size/weight (2.01:1, axe flags it) - var(--orange)
+   is this app's OTHER established orange (already used as an accessible
+   "text on tint" color, e.g. .badge-pill-absent), and clears 4.5:1 against
+   white here as a solid fill instead. */
+.family-student-day-header-orange { background: var(--orange); }
+.family-student-day-header-blue { background: var(--brand-dark); }
 
 @media (max-width: 720px) {
   /* A real request: "on mobile the Monday/Wednesday columns should be
@@ -1811,11 +1883,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   .family-student-counts-card { max-width: none; padding: 0.9rem 0.85rem; }
   .family-student-counts-columns { gap: 0.6rem; }
   .family-student-day-pill { font-size: 0.65rem; padding: 0.15rem 0.5rem; margin-bottom: 0.5rem; }
+  .family-student-day-header { font-size: 0.78rem; padding: 0.45rem 0.6rem; margin-bottom: 0.55rem; gap: 0.35rem; }
+  .family-student-day-header-icon { width: 21px; height: 21px; }
+  .family-student-day-header-icon .icon { width: 11px; height: 11px; }
   .family-student-row { gap: 0.4rem; margin-bottom: 0.45rem; }
   .family-student-row-icon { width: 26px; height: 26px; }
   .family-student-row-icon .icon { width: 13px; height: 13px; }
-  .family-student-row-label { font-size: 0.62rem; }
-  .family-student-row-value { font-size: 0.92rem; }
+  .family-student-row-label { font-size: 0.72rem; }
+  .family-student-row-value { font-size: 0.95rem; }
+  .dashboard-date-picker { font-size: 0.68rem; padding: 0.25rem 0.5rem; gap: 0.25rem; }
 }
 
 .dashboard-section-title { margin: 1.5rem 0 0.75rem; }
@@ -1895,6 +1971,85 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 
 .analytics-stat-late { background: linear-gradient(160deg, var(--surface), var(--purple-soft)); }
 .analytics-stat-late .analytics-stat-label, .analytics-stat-late .analytics-stat-value { color: var(--purple); }
+
+/* "Today's Attendance" dashboard card - a real request: match a provided
+   design with 4 full-width status rows (Checked In/Out, Absent, Late),
+   each a link to that date's roster, showing Students + Parents side by
+   side instead of the two-column split above (partials/dashboard-type-
+   stats.ejs, still used elsewhere - just not this card anymore). Same
+   green/blue/orange/purple soft-gradient language as .analytics-stat-*. */
+.attendance-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  margin-bottom: 0.6rem;
+  text-decoration: none;
+  color: inherit;
+}
+.attendance-status-row:last-child { margin-bottom: 0; }
+.attendance-status-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+.attendance-status-icon .icon { width: 18px; height: 18px; }
+.attendance-status-label { font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+/* Two stat blocks (Students | Parents), each icon+label on top and a big
+   bold value below, side by side with a vertical divider between them -
+   a real request, with a reference screenshot, matching the same
+   divider trick .family-student-counts-columns/.dashboard-analytics-
+   columns already use between their own two columns. */
+.attendance-status-counts { display: flex; align-items: center; gap: 0.9rem; margin-left: auto; position: relative; }
+.attendance-status-counts::before {
+  content: '';
+  position: absolute;
+  top: 0.1rem;
+  bottom: 0.1rem;
+  left: 50%;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.attendance-status-count { display: flex; flex-direction: column; gap: 0.15rem; align-items: flex-start; min-width: 3.4rem; }
+.attendance-status-count-label { display: flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.attendance-status-count-label .icon { width: 12px; height: 12px; }
+.attendance-status-count-value { font-size: 1.2rem; font-weight: 800; color: var(--ink); line-height: 1; }
+/* Reuses #icon-chevron-down (the sprite has no #icon-chevron-right) and
+   rotates it to point right instead. */
+.attendance-status-chevron { width: 14px; height: 14px; flex-shrink: 0; transform: rotate(-90deg); color: var(--muted); }
+
+.attendance-status-row-checkedin { background: linear-gradient(160deg, var(--surface), var(--green-bg)); }
+.attendance-status-row-checkedin .attendance-status-icon { background: var(--green); }
+.attendance-status-row-checkedin .attendance-status-label { color: var(--green); }
+
+.attendance-status-row-checkedout { background: linear-gradient(160deg, var(--surface), var(--brand-soft)); }
+.attendance-status-row-checkedout .attendance-status-icon { background: var(--brand-dark); }
+.attendance-status-row-checkedout .attendance-status-label { color: var(--brand-dark); }
+
+.attendance-status-row-absent { background: linear-gradient(160deg, var(--surface), var(--orange-bg)); }
+.attendance-status-row-absent .attendance-status-icon { background: var(--accent); }
+.attendance-status-row-absent .attendance-status-label { color: var(--accent-dark); }
+
+.attendance-status-row-late { background: linear-gradient(160deg, var(--surface), var(--purple-soft)); }
+.attendance-status-row-late .attendance-status-icon { background: var(--purple); }
+.attendance-status-row-late .attendance-status-label { color: var(--purple); }
+
+@media (max-width: 720px) {
+  .attendance-status-row { padding: 0.55rem 0.6rem; gap: 0.5rem; }
+  .attendance-status-icon { width: 28px; height: 28px; }
+  .attendance-status-icon .icon { width: 15px; height: 15px; }
+  .attendance-status-label { font-size: 0.78rem; }
+  .attendance-status-counts { gap: 0.6rem; }
+  .attendance-status-count { min-width: 2.8rem; }
+  .attendance-status-count-label { font-size: 0.6rem; }
+  .attendance-status-count-value { font-size: 1rem; }
+}
 
 /* Trend badges (views/partials/dashboard-type-stats.ejs) - a stat's
    count this session vs. the same stat last session. Neutral gray for
@@ -2828,7 +2983,215 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-name-link:hover { text-decoration: underline; }
 
 /* Grade level + age under a student's name on the Members list. */
-.member-row-subline { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+.member-row-subline { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+.member-row-subline .icon { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* ---------- Members list (card design) ----------
+   A real request, with a reference screenshot, to replace the old
+   Members table (.members-table.members-list-table etc. above, now
+   unused - both admin-members.ejs and main-admin-members.ejs were its
+   only real callers) with one card per member on every screen size, not
+   just a mobile-narrow layout: a search bar, an "Add a Family" card, a
+   MEMBERS label with a count pill, and each member as its own card
+   (colored initials avatar, name, a colored role badge, a subline, and a
+   row of action icons) - with a family's non-head members collapsed
+   under their primary parent (or first-sorting member) until its own
+   chevron is clicked, only one family open at a time (public/js/
+   members-family-accordion.js). */
+.members-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.members-search-bar .icon {
+  position: absolute;
+  left: 0.9rem;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.members-search-bar input[type="search"] {
+  width: 100%;
+  padding: 0.6rem 0.9rem 0.6rem 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt, #f3f4f6);
+  font-size: 0.9rem;
+}
+
+.members-add-family-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: var(--brand-soft);
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.1rem;
+  cursor: pointer;
+  text-align: left;
+}
+.members-add-family-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.members-add-family-icon .icon { width: 20px; height: 20px; }
+.members-add-family-text { flex: 1; min-width: 0; }
+.members-add-family-title { display: block; font-weight: 700; color: var(--ink); }
+/* var(--muted) (#64748b) falls just short of AA contrast (4.5:1) against
+   this card's own light-blue background - #55617a clears it (5.58:1)
+   while staying visually the same "muted hint" weight. */
+.members-add-family-subtitle { display: block; font-size: 0.78rem; color: #55617a; margin-top: 0.1rem; }
+.members-add-family-card > .icon { width: 18px; height: 18px; color: var(--muted); flex-shrink: 0; }
+
+.members-section-label-row { display: flex; align-items: center; justify-content: space-between; margin: 0 0 0.6rem; }
+.members-section-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* Same AA-contrast fix as .members-add-family-subtitle above - #55617a
+   instead of var(--muted) against this pill's own light gray background. */
+.members-count-pill { background: var(--surface-alt, #f3f4f6); color: #55617a; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.7rem; border-radius: 999px; }
+
+.member-row-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 0.9rem;
+  margin-bottom: 0.65rem;
+}
+.member-row-card.member-row-collapsed { display: none; }
+/* A member row nested under a family's head gets a slight indent so it
+   visually reads as belonging to that family once expanded. */
+.member-row-card[data-family-member="1"] { margin-left: 1.5rem; }
+
+.member-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+.member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.member-avatar-blue { background: var(--brand-dark); }
+.member-avatar-green { background: var(--green); }
+.member-avatar-purple { background: var(--purple); }
+.member-avatar-red { background: var(--red); }
+.member-avatar-orange { background: var(--accent-dark); }
+.member-avatar-gold { background: var(--yellow); }
+
+.member-row-body { flex: 1; min-width: 0; }
+.member-row-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.member-row-name-link { font-weight: 700; color: var(--ink); text-decoration: none; }
+.member-row-name-link:hover { text-decoration: underline; }
+.member-role-badge { display: inline-flex; align-items: center; gap: 0.25rem; }
+.member-role-badge .icon { width: 11px; height: 11px; }
+
+.badge-pill-blue { background: var(--brand-soft); color: var(--brand-dark); }
+.badge-pill-purple { background: var(--purple-soft); color: var(--purple); }
+.badge-pill-gold { background: var(--yellow-bg); color: var(--yellow); }
+
+.member-row-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; margin-top: 0.1rem; }
+
+/* The "more" overflow menu (email/send stay inline as their own icon
+   buttons - Notes, Cards, Schedule, Archive/Delete move in here so a
+   card stays a compact single row like the reference screenshot instead
+   of listing every action as its own icon). Plain <details>/<summary> -
+   consistent with .permissions-cell-group's own disclosure pattern
+   elsewhere on this same page - closed by public/js/members-family-
+   accordion.js on an outside click since <details> alone doesn't do that. */
+.member-row-menu { position: relative; }
+.member-row-menu > summary { list-style: none; cursor: pointer; }
+.member-row-menu > summary::-webkit-details-marker { display: none; }
+.member-row-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.3rem);
+  z-index: 20;
+  min-width: 11rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+}
+.member-row-menu-list button,
+.member-row-menu-list a,
+.member-row-menu-list form {
+  display: flex;
+}
+.member-row-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.member-row-menu-item:hover { background: var(--brand-soft); }
+.member-row-menu-item .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.member-row-menu-item-danger { color: var(--red); }
+.member-row-menu-item-danger:hover { background: var(--red-bg); }
+
+.family-accordion-toggle {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.family-accordion-toggle:hover { background: var(--brand-soft); color: var(--ink); }
+.family-accordion-toggle .icon { width: 16px; height: 16px; transition: transform 0.15s ease; }
+.family-accordion-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.member-row-chevron-spacer { width: 28px; height: 28px; flex-shrink: 0; }
+
+/* Main Admin's own per-member Sections/Portal Permissions editor - same
+   concept as the old .permissions-col table cell, just living inside the
+   card body instead, shown only in Edit Permissions mode (routes/main-
+   admin-members.js's own permissions-mode-on toggle, unchanged - see
+   public/js/permissions-edit-toggle.js). */
+.member-row-permissions { display: none; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); }
+.permissions-mode-on .member-row-permissions { display: block; }
+
+@media (max-width: 720px) {
+  .member-row-card { padding: 0.7rem 0.7rem; gap: 0.6rem; }
+  .member-avatar { width: 38px; height: 38px; font-size: 0.78rem; }
+  .member-row-card[data-family-member="1"] { margin-left: 1rem; }
+  .members-add-family-icon { width: 34px; height: 34px; }
+  .members-add-family-icon .icon { width: 17px; height: 17px; }
+}
 
 .member-form-header {
   display: flex;
@@ -7755,10 +8118,16 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .event-calendar-table td { vertical-align: top; height: 5.5rem; width: 14.28%; }
 .event-calendar-table .badge-pill { font-size: 0.7rem; white-space: normal; text-align: left; overflow-wrap: break-word; }
 @media (max-width: 640px) {
-  .event-calendar-table { min-width: 30rem; }
-  .event-calendar-table th, .event-calendar-table td { padding: 0.35rem 0.3rem; font-size: 0.75rem; }
-  .event-calendar-table td { height: 4rem; }
-  .event-calendar-table .badge-pill { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
+  /* A real request: "event calendar on mobile should fit to screen
+     without scroll bar left to right." This min-width used to force the
+     table wider than most phone screens (30rem = 480px, over a typical
+     ~360-414px viewport), guaranteeing the exact horizontal scrollbar
+     being complained about - table-layout:fixed + .roster-table's own
+     width:100% above already make every column shrink to fit the
+     viewport on their own without it. */
+  .event-calendar-table th, .event-calendar-table td { padding: 0.2rem 0.15rem; font-size: 0.62rem; }
+  .event-calendar-table td { height: 3rem; }
+  .event-calendar-table .badge-pill { font-size: 0.5rem; padding: 0.05rem 0.2rem; }
 }
 
 /* Item 2 - square icon-only Calendar View/List View toggle buttons. A

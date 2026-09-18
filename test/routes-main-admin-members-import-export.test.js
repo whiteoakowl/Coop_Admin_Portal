@@ -4,10 +4,10 @@
 // Shares utils/memberImport.js with routes/admin-members.js's own
 // identical feature (test/routes-admin-members-import.test.js covers
 // that shared logic in depth) - this file only checks the Main Admin
-// wiring itself: the routes exist, are reachable, and the toolbar/table
+// wiring itself: the routes exist, are reachable, and the toolbar/card
 // markup reflects the rest of that same request (filter renamed to just
-// "Filter", buttons above the filter, Type swapped for Sections on the
-// mobile-only column).
+// "Filter", buttons above the filter, a role badge and Sections both
+// showing on every member's own card).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -106,9 +106,14 @@ test('POST /main-admin/members/import creates a new member from an uploaded spre
   assert.equal(created.member_type, 'parent');
 });
 
-test('the mobile-only member row shows Sections (not Type), matching the members-col-sections/members-col-type CSS swap', async () => {
+test('the member card shows both its role badge and, when assigned, its Sections - on every screen size, not just one', async () => {
+  // A real request, with a reference screenshot, replaced the old table
+  // (whose Type column swapped for a Sections column only at mobile
+  // widths, via a CSS media query) with one card per member - both a
+  // role badge (Parent/Student/Admin) and a Sections subline (when any
+  // are assigned) now render unconditionally, so there's no swap left to
+  // test for.
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
-  assert.match(page.text, /class="members-col-sections"/);
-  assert.match(page.text, /<th class="members-col-type">Type<\/th>/);
+  assert.match(page.text, /class="badge-pill badge-pill-\w+ member-role-badge"/);
 });

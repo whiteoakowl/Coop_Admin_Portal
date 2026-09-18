@@ -368,6 +368,18 @@ async function generateMemberCode(dbHandle = db) {
   return code;
 }
 
+// A stable color for a member's avatar circle/role badge on the Members
+// list (a real request, with a reference screenshot, showing each row
+// with a different colored initials avatar) - keyed off the member's own
+// id so it's the same color every reload rather than reshuffling, and
+// with no "assigned color" column to add just for this. Six colors is
+// plenty to make adjacent rows read as visually distinct; repeating past
+// six members is fine since nothing depends on uniqueness.
+const AVATAR_COLORS = ['blue', 'green', 'purple', 'red', 'orange', 'gold'];
+function avatarColorFor(memberId) {
+  return AVATAR_COLORS[memberId % AVATAR_COLORS.length];
+}
+
 module.exports = {
   parseNamesFromUpload,
   findMemberByName,
@@ -391,4 +403,5 @@ module.exports = {
   lastNameOf,
   byLastName,
   generateMemberCode,
+  avatarColorFor,
 };

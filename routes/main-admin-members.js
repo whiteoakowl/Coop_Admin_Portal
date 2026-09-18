@@ -45,6 +45,7 @@ const {
   rostersForMember,
   membersWithDetails,
   byLastName,
+  avatarColorFor,
 } = require('../utils/members');
 const { getMemberSchedule, scheduleList } = require('../utils/schedule');
 const { portalStatusForMembers, sectionIdsForMembers, setMemberSections, setMemberRoles } = require('../utils/portalPermissions');
@@ -175,6 +176,7 @@ router.get('/', async (req, res) => {
     roles,
     sectionIdsByMember,
     portalStatusByMember,
+    avatarColorFor,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

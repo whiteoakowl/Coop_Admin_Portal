@@ -1,10 +1,9 @@
-// Real HTTP-level coverage for the Home dashboard's "Family & Student
+// Real HTTP-level coverage for the Home dashboard's "Co-op Member
 // Counts" card (routes/admin.js's GET / + views/admin-dashboard.ejs's
 // .family-student-counts-card) - a real request, with a reference
-// screenshot, to replace the old 7-card Monday/Wednesday/Total stat grid
-// with this single two-column (Monday | Wednesday) card: Parent Count,
-// Student Count, and Total Families, each scoped to that one day instead
-// of a flat site-wide total.
+// screenshot, for a single two-column (Monday | Wednesday) card: Parents,
+// Students, and Families, each scoped to that one day instead of a flat
+// site-wide total.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -54,19 +53,19 @@ async function currentCsrf(cookie) {
   return /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 }
 
-test('the Family & Student Counts card renders Monday and Wednesday columns with Parent Count, Student Count, and Total Families', async () => {
+test('the Co-op Member Counts card renders Monday and Wednesday columns with Parents, Students, and Families', async () => {
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Family &amp; Student Counts/);
-  assert.match(res.text, /<span class="family-student-day-pill">Monday<\/span>/);
-  assert.match(res.text, /<span class="family-student-day-pill">Wednesday<\/span>/);
-  assert.equal(statValuesFor(res.text, 'Parent Count').length, 2, 'Parent Count should appear once per day column');
-  assert.equal(statValuesFor(res.text, 'Student Count').length, 2, 'Student Count should appear once per day column');
-  assert.equal(statValuesFor(res.text, 'Total Families').length, 2, 'Total Families should appear once per day column, not a single flat total');
+  assert.match(res.text, /Co-op Member Counts/);
+  assert.match(res.text, /family-student-day-header family-student-day-header-orange">[\s\S]*?Monday/);
+  assert.match(res.text, /family-student-day-header family-student-day-header-blue">[\s\S]*?Wednesday/);
+  assert.equal(statValuesFor(res.text, 'Parents').length, 2, 'Parents should appear once per day column');
+  assert.equal(statValuesFor(res.text, 'Students').length, 2, 'Students should appear once per day column');
+  assert.equal(statValuesFor(res.text, 'Families').length, 2, 'Families should appear once per day column, not a single flat total');
 });
 
-test('Total Families is scoped per day, not the old flat site-wide family count', async () => {
+test('Families is scoped per day, not the old flat site-wide family count', async () => {
   const cookie = await loginAsAdmin();
 
   await request(app)
@@ -94,7 +93,7 @@ test('Total Families is scoped per day, not the old flat site-wide family count'
   await setEnrollment(mondayClass.id, [mondayOnlyStudent]);
 
   const before = await request(app).get('/admin').set('Cookie', cookie);
-  const [mondayFamiliesBefore, wedFamiliesBefore] = statValuesFor(before.text, 'Total Families');
+  const [mondayFamiliesBefore, wedFamiliesBefore] = statValuesFor(before.text, 'Families');
 
   const { lastInsertRowid: wedFamilyId } = await db.prepare('INSERT INTO families (name) VALUES (?)').run('Dashboard Family Counts Wed Family');
   const { lastInsertRowid: wedOnlyStudent } = await db
@@ -103,7 +102,7 @@ test('Total Families is scoped per day, not the old flat site-wide family count'
   await setEnrollment(wedClass.id, [wedOnlyStudent]);
 
   const after = await request(app).get('/admin').set('Cookie', cookie);
-  const [mondayFamiliesAfter, wedFamiliesAfter] = statValuesFor(after.text, 'Total Families');
+  const [mondayFamiliesAfter, wedFamiliesAfter] = statValuesFor(after.text, 'Families');
 
   assert.equal(mondayFamiliesAfter, mondayFamiliesBefore, "adding a Wednesday-only family shouldn't change Monday's own count");
   assert.equal(wedFamiliesAfter, wedFamiliesBefore + 1, "Wednesday's count should pick up the new Wednesday-only family");
@@ -145,7 +144,7 @@ test('dashboard stat panel splits Monday/Wednesday Students/Parents counts by wh
   await setEnrollment(wedClassB.id, [wedStudent]);
 
   const res = await request(app).get('/admin').set('Cookie', cookie);
-  const [mondayStudents, wedStudents] = statValuesFor(res.text, 'Student Count');
+  const [mondayStudents, wedStudents] = statValuesFor(res.text, 'Students');
   assert.ok(mondayStudents >= 1, 'Monday should count the Monday-enrolled student');
   assert.ok(wedStudents >= 1, 'Wednesday should count the Wednesday-enrolled student once, not per-class');
 });

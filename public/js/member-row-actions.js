@@ -19,23 +19,23 @@
 (function () {
   if (!window.confirmAction) return;
 
-  // The family-collapse toggle (public/js/members-family-collapse.js)
-  // lives on the family's own head row - if a row that's about to be
-  // removed was that head, its sibling rows (already hidden via
-  // .family-row-collapsed, with no toggle of their own) would be
+  // The family-accordion toggle (public/js/members-family-accordion.js)
+  // lives on the family's own head card - if a card that's about to be
+  // removed was that head, its sibling cards (already hidden via
+  // .member-row-collapsed, with no toggle of their own) would be
   // orphaned with nothing left to un-collapse them. Simplest safe fix:
-  // un-collapse the whole family group before removing any of its rows,
-  // rather than trying to re-target the toggle at a new head row -
+  // un-collapse the whole family group before removing any of its cards,
+  // rather than trying to re-target the toggle at a new head card -
   // worst case the family just shows fully expanded until the next
   // reload, never permanently hidden.
   function uncollapseFamily(row) {
     const key = row.dataset.familyKey;
     if (!key || !window.CSS || !CSS.escape) return;
-    document.querySelectorAll(`tr[data-family-key="${CSS.escape(key)}"]`).forEach((r) => r.classList.remove('family-row-collapsed'));
+    document.querySelectorAll(`[data-family-key="${CSS.escape(key)}"]`).forEach((r) => r.classList.remove('member-row-collapsed'));
   }
 
   function removeRow(btn) {
-    const row = btn.closest('tr');
+    const row = btn.closest('.member-row-card');
     if (!row) return;
     uncollapseFamily(row);
     row.remove();

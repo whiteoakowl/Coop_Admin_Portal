@@ -21,6 +21,7 @@ const {
   rostersForMember,
   membersWithDetails,
   byLastName,
+  avatarColorFor,
 } = require('../utils/members');
 const { GRADE_LEVELS } = require('../utils/classSchedule');
 const { allSetupTeams, cleanupTeamIdsForMember } = require('../utils/setup');
@@ -80,6 +81,11 @@ router.get('/members', async (req, res) => {
   const typeFilter = MEMBER_TYPES.includes(req.query.type) ? req.query.type : '';
   const familyFilter = parseInt(req.query.family, 10) || null;
   const dayFilter = ['monday', 'wednesday'].includes(req.query.day) ? req.query.day : '';
+  // A real request, with a reference screenshot, for a search bar on the
+  // Members page - same "filter the already-fetched list by name" shape
+  // Main Admin's own Members page (routes/main-admin-members.js) already
+  // uses, just added here too for parity.
+  const q = (req.query.q || '').trim().toLowerCase();
   // "Archive" (see /members/bulk-archive below) sets active = 0 on a
   // member rather than deleting them - a soft, undoable removal from the
   // active list, unlike the "Delete Selected" button which is permanent.
@@ -113,6 +119,7 @@ router.get('/members', async (req, res) => {
     rosterDays: [...new Set(m.rosters.map((r) => r.schedule_day).filter(Boolean))],
   }));
   if (dayFilter) withRosters = withRosters.filter((m) => m.rosterDays.includes(dayFilter));
+  if (q) withRosters = withRosters.filter((m) => m.name.toLowerCase().includes(q));
   // The on-screen table only gets the current page's slice - the print
   // table (admin-members.ejs's separate .members-print-table) still gets
   // every filtered member, since a printed roster is meant to show the
@@ -142,15 +149,18 @@ router.get('/members', async (req, res) => {
       (typeFilter ? `type=${typeFilter}&` : '') +
       (familyFilter ? `family=${familyFilter}&` : '') +
       (dayFilter ? `day=${dayFilter}&` : '') +
-      (showArchived ? `archived=1&` : ''),
+      (showArchived ? `archived=1&` : '') +
+      (q ? `q=${encodeURIComponent(q)}&` : ''),
     typeFilter,
     familyFilter,
     dayFilter,
     showArchived,
+    q: req.query.q || '',
     families: await allFamilies(),
     error: req.query.error || null,
     notice: req.query.notice || null,
     pendingNameTagMemberIds,
+    avatarColorFor,
   });
 });
 

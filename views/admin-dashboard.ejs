@@ -8,69 +8,104 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Dashboard</h1>
 
+    <%# A real request: match a provided design - "Co-op Member Counts"
+        (was "Family & Student Counts"), a date picker in its own header
+        (drives Today's Attendance/the Alert Log below - see routes/
+        admin.js's own comment on why Co-op Member Counts itself doesn't
+        change with it), and a full-width colored header bar per day
+        instead of the small pill this used to open each column with. %>
     <div class="family-student-counts-card">
       <div class="family-student-counts-header">
-        <svg class="icon"><use href="#icon-calendar-check"/></svg>
-        <h2>Family &amp; Student Counts</h2>
+        <svg class="icon"><use href="#icon-users"/></svg>
+        <h2>Co-op Member Counts</h2>
+        <form method="GET" action="/admin" class="dashboard-date-picker">
+          <svg class="icon"><use href="#icon-calendar-check"/></svg>
+          <span class="dashboard-date-picker-label"><%= selectedDateLabel %></span>
+          <svg class="icon"><use href="#icon-chevron-down"/></svg>
+          <input type="date" name="date" value="<%= selectedDate %>" aria-label="Choose a date" onchange="this.form.requestSubmit()" />
+        </form>
       </div>
       <div class="family-student-counts-columns">
         <div class="family-student-counts-column">
-          <span class="family-student-day-pill">Monday</span>
-          <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Parent Count</span>
-              <span class="family-student-row-value"><%= mondayParentCount %></span>
-            </span>
+          <div class="family-student-day-header family-student-day-header-orange">
+            <span class="family-student-day-header-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+            Monday
           </div>
           <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-green"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Student Count</span>
-              <span class="family-student-row-value"><%= mondayStudentCount %></span>
-            </span>
+            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-users"/></svg></span>
+            <span class="family-student-row-label">Parents</span>
+            <span class="family-student-row-value"><%= mondayParentCount %></span>
           </div>
           <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-purple"><svg class="icon"><use href="#icon-home"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Total Families</span>
-              <span class="family-student-row-value"><%= mondayFamilyCount %></span>
-            </span>
+            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+            <span class="family-student-row-label">Students</span>
+            <span class="family-student-row-value"><%= mondayStudentCount %></span>
+          </div>
+          <div class="family-student-row">
+            <span class="family-student-row-icon family-student-row-icon-orange"><svg class="icon"><use href="#icon-home"/></svg></span>
+            <span class="family-student-row-label">Families</span>
+            <span class="family-student-row-value"><%= mondayFamilyCount %></span>
           </div>
         </div>
         <div class="family-student-counts-column">
-          <span class="family-student-day-pill">Wednesday</span>
+          <div class="family-student-day-header family-student-day-header-blue">
+            <span class="family-student-day-header-icon"><svg class="icon"><use href="#icon-calendar-check"/></svg></span>
+            Wednesday
+          </div>
           <div class="family-student-row">
             <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-users"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Parent Count</span>
-              <span class="family-student-row-value"><%= wednesdayParentCount %></span>
-            </span>
+            <span class="family-student-row-label">Parents</span>
+            <span class="family-student-row-value"><%= wednesdayParentCount %></span>
           </div>
           <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-green"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Student Count</span>
-              <span class="family-student-row-value"><%= wednesdayStudentCount %></span>
-            </span>
+            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+            <span class="family-student-row-label">Students</span>
+            <span class="family-student-row-value"><%= wednesdayStudentCount %></span>
           </div>
           <div class="family-student-row">
-            <span class="family-student-row-icon family-student-row-icon-purple"><svg class="icon"><use href="#icon-home"/></svg></span>
-            <span class="family-student-row-text">
-              <span class="family-student-row-label">Total Families</span>
-              <span class="family-student-row-value"><%= wednesdayFamilyCount %></span>
-            </span>
+            <span class="family-student-row-icon family-student-row-icon-blue"><svg class="icon"><use href="#icon-home"/></svg></span>
+            <span class="family-student-row-label">Families</span>
+            <span class="family-student-row-value"><%= wednesdayFamilyCount %></span>
           </div>
         </div>
       </div>
     </div>
 
-    <h2 class="dashboard-section-title">Today's Attendance</h2>
+    <%# A real request: match a provided design - 4 status rows (Checked
+        In/Checked Out/Absent/Late), each showing Students + Parents
+        together, instead of the previous Parents-column/Students-column
+        split (partials/dashboard-type-stats.ejs, no longer used here -
+        still correct, just a different shape than this page wants now). %>
+    <h2 class="dashboard-section-title"><svg class="icon"><use href="#icon-calendar-check"/></svg> Today's Attendance<% if (selectedDate !== todayIso) { %> <span class="hint">&mdash; <%= selectedDateLabel %></span><% } %></h2>
     <div class="dashboard-analytics-card">
-      <div class="dashboard-analytics-columns">
-        <%- include('partials/dashboard-type-stats', { label: 'Parents', stats: parentStats }) %>
-        <%- include('partials/dashboard-type-stats', { label: 'Students', stats: studentStats }) %>
-      </div>
+      <%
+      // Each row is built from the same shape (icon/label/color + the two
+      // Student/Parent counts) rather than repeating this markup 4 times
+      // with only the icon/label/counts changed.
+      var attendanceRows = [
+        { key: 'checkedin', icon: 'icon-check', label: 'Checked In', students: studentStats.checkedIn, parents: parentStats.checkedIn },
+        { key: 'checkedout', icon: 'icon-log-out', label: 'Checked Out', students: studentStats.checkedOut, parents: parentStats.checkedOut },
+        { key: 'absent', icon: 'icon-minus', label: 'Absent', students: studentStats.absent, parents: parentStats.absent },
+        { key: 'late', icon: 'icon-clock', label: 'Late', students: studentStats.late, parents: parentStats.late },
+      ];
+      %>
+      <% attendanceRows.forEach(function(row) { %>
+        <a class="attendance-status-row attendance-status-row-<%= row.key %>" href="/admin/rosters?date=<%= selectedDate %>">
+          <span class="attendance-status-icon"><svg class="icon"><use href="#<%= row.icon %>"/></svg></span>
+          <span class="attendance-status-label"><%= row.label %></span>
+          <span class="attendance-status-counts">
+            <span class="attendance-status-count">
+              <span class="attendance-status-count-label"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Students</span>
+              <span class="attendance-status-count-value"><%= row.students %></span>
+            </span>
+            <span class="attendance-status-count">
+              <span class="attendance-status-count-label"><svg class="icon"><use href="#icon-users"/></svg> Parents</span>
+              <span class="attendance-status-count-value"><%= row.parents %></span>
+            </span>
+          </span>
+          <svg class="icon attendance-status-chevron"><use href="#icon-chevron-down"/></svg>
+        </a>
+      <% }); %>
     </div>
 
     <%

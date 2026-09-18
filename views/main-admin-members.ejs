@@ -91,12 +91,15 @@
         </dialog>
       <% } %>
 
+      <form method="GET" action="/main-admin/members" class="members-search-bar no-print">
+        <input type="hidden" name="tab" value="<%= activeTab %>" />
+        <input type="hidden" name="type" value="<%= typeFilter %>" />
+        <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
+        <svg class="icon"><use href="#icon-search"/></svg>
+        <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
+      </form>
+
       <div class="roster-toolbar no-print">
-        <form method="GET" action="/main-admin/members" class="category-filter" style="margin: 0;">
-          <input type="hidden" name="tab" value="<%= activeTab %>" />
-          <label for="q-input">Search by name</label>
-          <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" />
-        </form>
         <div class="category-filter" style="margin: 0;">
           <label for="type-select">Filter</label>
           <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
@@ -149,15 +152,36 @@
       </div>
 
       <% if (activeTab === 'members') { %>
-        <details class="manage-section" style="margin-bottom: 1rem;">
-          <summary><svg class="icon"><use href="#icon-users"/></svg> Add a Family</summary>
-          <form method="POST" action="/main-admin/members/families/new" class="stack-form" style="margin-top: 0.75rem;">
+        <%# A real request, with a reference screenshot: an "Add a Family"
+            card above the member list, same shape as Co-op Admin's own
+            (views/admin-members.ejs) - posts to the same route this used
+            to reach via a plain <details> disclosure. The existing
+            rename/delete family-management table moves into its own
+            "Manage Families" disclosure right below, unchanged. %>
+        <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('add-family-dialog').showModal()">
+          <span class="members-add-family-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+          <span class="members-add-family-text">
+            <span class="members-add-family-title">Add a Family</span>
+            <span class="members-add-family-subtitle">Create a family group and invite members</span>
+          </span>
+          <svg class="icon"><use href="#icon-chevron-down"/></svg>
+        </button>
+        <dialog id="add-family-dialog" class="notes-dialog">
+          <form method="POST" action="/main-admin/members/families/new">
+            <h3>Add a Family</h3>
             <label class="member-form-full">Family Name
               <input type="text" name="name" placeholder="e.g. Smith" required />
             </label>
-            <button type="submit" class="primary-btn">Add Family</button>
+            <div class="notes-dialog-actions">
+              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+              <button type="submit" class="primary-btn">Add Family</button>
+            </div>
           </form>
-          <% if (families.length > 0) { %>
+        </dialog>
+
+        <% if (families.length > 0) { %>
+          <details class="manage-section" style="margin-bottom: 1rem;">
+            <summary><svg class="icon"><use href="#icon-users"/></svg> Manage Families</summary>
             <table class="roster-table condensed-table" style="margin-top: 1rem;">
               <thead><tr><th>Family</th><th>Active Members</th><th>Actions</th></tr></thead>
               <tbody>
@@ -179,218 +203,171 @@
                 <% }); %>
               </tbody>
             </table>
-          <% } %>
-        </details>
+          </details>
+        <% } %>
       <% } %>
+
+      <div class="members-section-label-row">
+        <span class="members-section-label"><%= showArchived ? 'ARCHIVE' : 'MEMBERS' %></span>
+        <span class="members-count-pill"><%= pagination.totalItems %> member<%= pagination.totalItems === 1 ? '' : 's' %></span>
+      </div>
 
       <% if (members.length === 0) { %>
         <p class="roster-empty"><%= showArchived ? 'No archived members.' : 'No members match this filter yet.' %></p>
       <% } else { %>
-        <div class="roster-scroll">
-          <%# A real request: "member list on main admin should look like
-              the member list on co-op admin" - same photo-thumb column and
-              data-family-key/members-col-name/members-list-table markup
-              public/js/members-family-collapse.js (already shared with
-              views/admin-members.ejs) needs to collapse each family down
-              to just its primary parent's row, click to expand. members
-              arrives already sorted primary-parent-first per family (see
-              utils/members.js's membersWithDetails -> sortMembersByFamily),
-              same as Co-op Admin's own list. %>
-          <table id="members-table" class="roster-table members-table members-list-table condensed-table">
-            <thead>
-              <tr>
-                <% if (activeTab === 'members') { %><th class="no-print"><span class="sr-only">Select</span></th><% } %>
-                <th class="members-col-photo"><span class="sr-only">Photo</span></th>
-                <th>Name</th>
-                <%# A real request: "instead of showing type on the member
-                    row mobile view show the sections a family is listed
-                    in." Type stays the desktop column; .members-col-
-                    sections (hidden on desktop, shown only on mobile -
-                    see public/css/styles.css's own comment) takes its
-                    place there, same swap admin-members.ejs's own
-                    Type -> Roster Day already does. %>
-                <th class="members-col-type">Type</th>
-                <th class="members-col-sections">Sections</th>
-                <th class="members-col-agegrade">Age/Grade</th>
-                <th class="members-col-contact">Contact</th>
-                <th class="permissions-col">Sections &amp; Portal Permissions</th>
-                <th class="members-actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% members.forEach(function(m) { %>
-                <tr data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>">
-                  <% if (activeTab === 'members') { %>
-                    <td class="no-print">
-                      <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
-                    </td>
-                  <% } %>
-                  <td class="members-col-photo">
-                    <% if (m.photo_path) { %>
-                      <img class="member-thumb" src="<%= photoUrl(m.photo_path) %>" alt="" />
-                    <% } else { %>
-                      <span class="member-thumb-placeholder"><%= m.name.charAt(0).toUpperCase() %></span>
-                    <% } %>
-                  </td>
+        <%# A real request, with a reference screenshot: cards (colored
+            initials avatar, name, a colored role badge, a subline, and a
+            row of action icons) instead of a table, same shape as Co-op
+            Admin's own Members list (views/admin-members.ejs) - a
+            family's non-head members collapse under their primary
+            parent (or first-sorting member) until its own chevron is
+            clicked, only one family open at a time (public/js/members-
+            family-accordion.js, shared with that page). members arrives
+            already sorted primary-parent-first per family (see utils/
+            members.js's membersWithDetails -> sortMembersByFamily). %>
+        <div id="members-table">
+          <% members.forEach(function(m) { %>
+            <% var familySize = members.filter(function(x) { return x.family_id != null && x.family_id === m.family_id; }).length; %>
+            <% var isFamilyHead = m.is_primary_parent || m.family_id == null || familySize < 2; %>
+            <div
+              class="member-row-card"
+              data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>"
+              data-family-member="<%= isFamilyHead ? '' : '1' %>"
+            >
+              <% if (activeTab === 'members') { %>
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
+              <% } %>
+              <span class="member-avatar member-avatar-<%= avatarColorFor(m.id) %>">
+                <% if (m.photo_path) { %>
+                  <img src="<%= photoUrl(m.photo_path) %>" alt="" />
+                <% } else { %>
+                  <%= m.name.charAt(0).toUpperCase() %>
+                <% } %>
+              </span>
+              <div class="member-row-body">
+                <div class="member-row-topline">
                   <%# A real request: "no edit button, clicking the members
                       name opens their profile to edit." The Name link
-                      already went to the member's profile page
-                      (main-admin-member-profile.ejs, with its own rich
-                      schedule/rosters/attendance history) - that page has
-                      its own prominent Edit button up top, so the
-                      separate per-row pencil icon below was pure
-                      duplication of a click already one tap away. %>
-                  <td class="roster-name-col members-col-name">
-                    <a href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
-                    <% if (m.is_primary_parent) { %><span class="badge-pill" title="Primary Parent"><svg class="icon"><use href="#icon-star"/></svg></span><% } %>
-                  </td>
-                  <td class="members-col-type"><%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></td>
-                  <%# A real request: "take away the family name column,
-                      rosters if multiple should be stacked underneath each
-                      other in the same column" - same treatment as Co-op
-                      Admin's own Rosters column (admin-members.ejs), here
-                      applied to Sections since that's this page's own
-                      equivalent multi-badge column. %>
-                  <td class="members-col-sections">
-                    <% var memberSectionIds = sectionIdsByMember[m.id]; %>
-                    <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
-                    <% if (memberSections.length === 0) { %>
-                      <span class="hint">none</span>
+                      already goes to the member's profile page (main-
+                      admin-member-profile.ejs, with its own rich
+                      schedule/rosters/attendance history), which has its
+                      own prominent Edit button up top. %>
+                  <a class="member-row-name-link" href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
+                  <span class="badge-pill badge-pill-<%= avatarColorFor(m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
+                  <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+                </div>
+                <% if (m.member_type === 'student') { %>
+                  <span class="member-row-subline"><svg class="icon"><use href="#icon-graduation-cap"/></svg> <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %></span>
+                <% } %>
+                <%# A real request: "instead of showing type on the member
+                    row mobile view show the sections a family is listed
+                    in." %>
+                <% var memberSectionIds = sectionIdsByMember[m.id]; %>
+                <% var memberSections = memberSectionIds ? sections.filter(function(s) { return memberSectionIds.has(s.id); }) : []; %>
+                <% if (memberSections.length > 0) { %>
+                  <span class="member-row-subline"><svg class="icon"><use href="#icon-clipboard-list"/></svg> <%= memberSections.map(function(s) { return s.name; }).join(', ') %></span>
+                <% } %>
+                <% if (m.phone || m.email) { %>
+                  <span class="member-row-subline"><svg class="icon"><use href="#icon-phone"/></svg> <%= m.phone || m.email %></span>
+                <% } %>
+                <%# Main Admin's own Sections/Portal Permissions editor -
+                    only shown in Edit Permissions mode (public/js/
+                    permissions-edit-toggle.js toggles .permissions-mode-on
+                    on #members-table above, same as the old table cell
+                    this replaces). %>
+                <div class="member-row-permissions">
+                  <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
+                  <details class="permissions-cell-group">
+                    <summary>Sections</summary>
+                    <% if (sections.length === 0) { %>
+                      <p class="hint">No sections yet.</p>
                     <% } else { %>
-                      <div class="members-col-rosters-stack">
-                        <% memberSections.forEach(function(s) { %>
-                          <span class="badge-pill"><%= s.name %></span>
-                        <% }); %>
-                      </div>
+                      <% sections.forEach(function(s) { %>
+                        <label class="checkbox-option">
+                          <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
+                          <%= s.name %>
+                        </label>
+                      <% }); %>
                     <% } %>
-                  </td>
-                  <td class="members-col-agegrade">
-                    <% if (m.member_type === 'student') { %>
-                      <%= m.grade_level || '—' %><% if (m.age != null) { %> &middot; age <%= m.age %><% } %>
-                    <% } else { %>—<% } %>
-                  </td>
-                  <td class="members-col-contact"><%= m.phone || m.email || '—' %></td>
-                  <td class="permissions-col">
-                    <input type="hidden" name="memberIds[]" value="<%= m.id %>" form="permissions-bulk-form" />
-                    <details class="permissions-cell-group">
-                      <summary>Sections</summary>
-                      <% if (sections.length === 0) { %>
-                        <p class="hint">No sections yet.</p>
-                      <% } else { %>
-                        <% sections.forEach(function(s) { %>
-                          <label class="checkbox-option">
-                            <input type="checkbox" name="sections_<%= m.id %>[]" value="<%= s.id %>" form="permissions-bulk-form" <%= sectionIdsByMember[m.id] && sectionIdsByMember[m.id].has(s.id) ? 'checked' : '' %> />
-                            <%= s.name %>
-                          </label>
-                        <% }); %>
-                      <% } %>
-                    </details>
-                    <details class="permissions-cell-group">
-                      <summary>Portal Permissions</summary>
-                      <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
-                        <% roles.forEach(function(r) { %>
-                          <label class="checkbox-option">
-                            <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
-                            <%= r.label %>
-                          </label>
-                        <% }); %>
-                      <% } else { %>
-                        <p class="hint">No portal account &mdash; use the "Create Accounts" button above, or add a password on this member's own <a href="/main-admin/members/<%= m.id %>/edit">Edit</a> page.</p>
-                      <% } %>
-                    </details>
-                  </td>
-                  <%# A real request: "icons at the end of the row should be
-                      visible without scrolling side to side." Pinned to the
-                      right edge of .roster-scroll's own horizontal scroll
-                      (see .members-actions-col in styles.css). %>
-                  <td class="actions-cell members-actions-col">
-                    <div class="actions-btn-row">
-                      <%# A real request: "there should be a mail icon on each
-                          member line so that you can click and email the
-                          member." email opens the phone/desktop's own
-                          default mail app (mailto:) - same as a click
-                          anywhere else in the app. %>
-                      <% if (m.email) { %>
-                        <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
-                      <% } else { %>
-                        <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
-                      <% } %>
-                      <%# A real request: "add a phone icon, linked to their
-                          phone number. phone icon opens on your personal
-                          cellphone to call or text." tel: is the same
-                          "hand off to whatever the device's own phone app
-                          is" mechanism mailto: already uses for email. %>
-                      <% if (m.phone) { %>
-                        <a class="icon-btn" href="tel:<%= m.phone %>" aria-label="Call or text <%= m.name %>" title="Call or text <%= m.name %>"><svg class="icon"><use href="#icon-phone"/></svg></a>
-                      <% } else { %>
-                        <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No phone on file"><svg class="icon"><use href="#icon-phone"/></svg></span>
-                      <% } %>
-                      <%# A real request: "add an icon that shows sending
-                          something. when you click it a pop up will
-                          appear and ask, do you want to add this name
-                          tag to the request log? yes, no buttons, close
-                          windows." Follow-up request: "the page should
-                          not refresh everytime" - no longer a
-                          data-confirm form; public/js/member-name-tag-
-                          request.js drives the same confirm popup via
-                          window.confirmAction and posts with fetch - see
-                          routes/main-admin-members.js's own mirror of
-                          Co-op Admin's request-name-tag route. %>
+                  </details>
+                  <details class="permissions-cell-group">
+                    <summary>Portal Permissions</summary>
+                    <% if (portalStatusByMember[m.id] && portalStatusByMember[m.id].account) { %>
+                      <% roles.forEach(function(r) { %>
+                        <label class="checkbox-option">
+                          <input type="checkbox" name="roles_<%= m.id %>[]" value="<%= r.id %>" form="permissions-bulk-form" <%= portalStatusByMember[m.id].roleIds.has(r.id) ? 'checked' : '' %> />
+                          <%= r.label %>
+                        </label>
+                      <% }); %>
+                    <% } else { %>
+                      <p class="hint">No portal account &mdash; use the "Create Accounts" button above, or add a password on this member's own <a href="/main-admin/members/<%= m.id %>/edit">Edit</a> page.</p>
+                    <% } %>
+                  </details>
+                </div>
+              </div>
+              <div class="member-row-actions no-print">
+                <% if (m.email) { %>
+                  <a class="icon-btn" href="mailto:<%= m.email %>" aria-label="Email <%= m.name %>" title="Email <%= m.name %>"><svg class="icon"><use href="#icon-mail"/></svg></a>
+                <% } else { %>
+                  <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No email on file"><svg class="icon"><use href="#icon-mail"/></svg></span>
+                <% } %>
+                <%# A real request: "add a phone icon, linked to their
+                    phone number. phone icon opens on your personal
+                    cellphone to call or text." tel: is the same
+                    "hand off to whatever the device's own phone app is"
+                    mechanism mailto: already uses for email. %>
+                <% if (m.phone) { %>
+                  <a class="icon-btn" href="tel:<%= m.phone %>" aria-label="Call or text <%= m.name %>" title="Call or text <%= m.name %>"><svg class="icon"><use href="#icon-phone"/></svg></a>
+                <% } else { %>
+                  <span class="icon-btn icon-btn-disabled" aria-hidden="true" title="No phone on file"><svg class="icon"><use href="#icon-phone"/></svg></span>
+                <% } %>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  data-name-tag-request-url="/main-admin/members/<%= m.id %>/request-name-tag"
+                  aria-label="Add name tag request for <%= m.name %>"
+                  title="Add to Name Tag Request Log"
+                ><svg class="icon"><use href="#icon-send"/></svg></button>
+                <details class="member-row-menu">
+                  <summary class="icon-btn" aria-label="More actions for <%= m.name %>" title="More"><svg class="icon"><use href="#icon-more"/></svg></summary>
+                  <div class="member-row-menu-list">
+                    <% if (showArchived) { %>
+                      <%# A real request: "next to each members name under
+                          archive there should be a button that says
+                          reactivate to make them a member again and
+                          remove them from the archive list." %>
+                      <button type="button" class="member-row-menu-item" data-member-unarchive-url="/main-admin/members/<%= m.id %>/unarchive">
+                        <svg class="icon"><use href="#icon-undo"/></svg> Reactivate
+                      </button>
+                      <%# A real request: "remove trash button from each
+                          member. you must archive the member and then
+                          they can be deleted while archived." - Delete
+                          only exists here, on the Archive tab, never on
+                          the live Members tab. %>
                       <button
                         type="button"
-                        class="icon-btn"
-                        data-name-tag-request-url="/main-admin/members/<%= m.id %>/request-name-tag"
-                        aria-label="Add name tag request for <%= m.name %>"
-                        title="Add to Name Tag Request Log"
-                      ><svg class="icon"><use href="#icon-send"/></svg></button>
-                      <%# A real request: "no edit button, clicking the
-                          members name opens their profile to edit" - the
-                          Name link (above) already opens the member's
-                          profile page, which has its own Edit button, so
-                          the separate pencil icon here was redundant. %>
-                      <% if (showArchived) { %>
-                        <%# A real request: "next to each members name
-                            under archive there should be a button that
-                            says reactivate to make them a member again
-                            and remove them from the archive list." %>
-                        <button
-                          type="button"
-                          class="roster-action-btn"
-                          data-member-unarchive-url="/main-admin/members/<%= m.id %>/unarchive"
-                          aria-label="Reactivate <%= m.name %>"
-                          title="Reactivate"
-                        >Reactivate</button>
-                        <%# A real request: "remove trash button from each
-                            member. you must archive the member and then
-                            they can be deleted while archived." - the
-                            per-row Delete button only exists here, on the
-                            Archive tab, never on the live Members tab. %>
-                        <button
-                          type="button"
-                          class="icon-btn icon-btn-danger"
-                          data-member-delete-url="/main-admin/members/<%= m.id %>/delete"
-                          data-member-delete-name="<%= m.name %>"
-                          data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone."
-                          aria-label="Delete <%= m.name %>"
-                          title="Delete"
-                        ><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      <% } else { %>
-                        <%# A real request: "change archive icon to
-                            something for like archive." %>
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          data-member-archive-url="/main-admin/members/<%= m.id %>/archive"
-                          aria-label="Archive <%= m.name %>"
-                          title="Archive"
-                        ><svg class="icon"><use href="#icon-archive"/></svg></button>
-                      <% } %>
-                    </div>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+                        class="member-row-menu-item member-row-menu-item-danger"
+                        data-member-delete-url="/main-admin/members/<%= m.id %>/delete"
+                        data-member-delete-name="<%= m.name %>"
+                        data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone."
+                      ><svg class="icon"><use href="#icon-trash"/></svg> Delete</button>
+                    <% } else { %>
+                      <button type="button" class="member-row-menu-item" data-member-archive-url="/main-admin/members/<%= m.id %>/archive">
+                        <svg class="icon"><use href="#icon-archive"/></svg> Archive
+                      </button>
+                    <% } %>
+                  </div>
+                </details>
+                <% if (isFamilyHead && familySize > 1) { %>
+                  <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
+                    <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                  </button>
+                <% } else { %>
+                  <span class="member-row-chevron-spacer"></span>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
         </div>
         <%- include('partials/pagination-controls', { pagination: pagination, baseHref: baseHref }) %>
       <% } %>
@@ -528,7 +505,7 @@
   </main>
   <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/member-name-tag-request.js"></script>
-  <script src="/js/members-family-collapse.js"></script>
+  <script src="/js/members-family-accordion.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>

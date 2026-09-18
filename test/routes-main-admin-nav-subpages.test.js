@@ -76,7 +76,7 @@ test('Members/Communication/Events/Name Tags/Resource Links/Directory/Classified
     { url: '/main-admin/resource-links', tabCount: 2 },
     { url: '/main-admin/directory', tabCount: 3 },
     { url: '/main-admin/classifieds', tabCount: 3 },
-    { url: '/main-admin/forums', tabCount: 3 },
+    { url: '/main-admin/forums', tabCount: 2 },
     { url: '/main-admin/babysitters', tabCount: 3 },
   ];
   for (const { url, tabCount } of pages) {

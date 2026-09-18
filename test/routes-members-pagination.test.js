@@ -51,7 +51,7 @@ test('Members list pagination', async (t) => {
   await t.test('page 1 shows the first 50 on screen but all 65 in the print table', async () => {
     const res = await request(app).get('/admin/members').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.equal(countOccurrences(res.text, 'member-name-link'), 50, 'interactive table shows only the current page');
+    assert.equal(countOccurrences(res.text, 'member-row-name-link'), 50, 'interactive table shows only the current page');
     // The print table's name cell is a plain "<td>Name</td>" with no other
     // markup around it (see admin-members.ejs's .members-print-table), so
     // this count is print-table rows only, independent of the interactive
@@ -68,7 +68,7 @@ test('Members list pagination', async (t) => {
   await t.test('page 2 shows the remaining 15 on screen, still all 65 in the print table', async () => {
     const res = await request(app).get('/admin/members?page=2').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.equal(countOccurrences(res.text, 'member-name-link'), 15);
+    assert.equal(countOccurrences(res.text, 'member-row-name-link'), 15);
     assert.equal(countOccurrences(res.text, '<td>Pagination Kid'), 65, 'print table is unaffected by which page is open');
     assert.match(res.text, /Showing 51&ndash;65 of 65/);
   });
@@ -77,7 +77,7 @@ test('Members list pagination', async (t) => {
     const res = await request(app).get('/admin/members?page=999').set('Cookie', cookie);
     assert.equal(res.status, 200);
     assert.match(res.text, /<option value="2" selected>2<\/option>/);
-    assert.equal(countOccurrences(res.text, 'member-name-link'), 15);
+    assert.equal(countOccurrences(res.text, 'member-row-name-link'), 15);
   });
 
   await t.test('the Next link preserves the active type filter', async () => {
@@ -99,7 +99,7 @@ test('Members list pagination', async (t) => {
   await t.test('?pageSize=all shows every member on one page, with a Show Pages link back instead of Prev\\/Next\\/View All', async () => {
     const res = await request(app).get('/admin/members?pageSize=all').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.equal(countOccurrences(res.text, 'member-name-link'), 65, 'every member renders on one page');
+    assert.equal(countOccurrences(res.text, 'member-row-name-link'), 65, 'every member renders on one page');
     assert.match(res.text, /Showing 1&ndash;65 of 65/);
     assert.match(res.text, /href="\/admin\/members\?page=1">Show Pages<\/a>/);
     assert.doesNotMatch(res.text, /&larr; Prev/);
