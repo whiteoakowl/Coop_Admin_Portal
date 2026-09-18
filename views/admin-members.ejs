@@ -41,14 +41,41 @@
       <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
     </dialog>
 
-    <form method="GET" action="/admin/members" class="members-search-bar no-print">
-      <input type="hidden" name="type" value="<%= typeFilter %>" />
-      <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
-      <input type="hidden" name="day" value="<%= dayFilter %>" />
-      <input type="hidden" name="archived" value="<%= showArchived ? '1' : '' %>" />
-      <svg class="icon"><use href="#icon-search"/></svg>
-      <input type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
-    </form>
+    <div class="members-search-filter-row no-print">
+      <form method="GET" action="/admin/members" class="members-search-bar">
+        <input type="hidden" name="type" value="<%= typeFilter %>" />
+        <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
+        <input type="hidden" name="day" value="<%= dayFilter %>" />
+        <input type="hidden" name="archived" value="<%= showArchived ? '1' : '' %>" />
+        <svg class="icon"><use href="#icon-search"/></svg>
+        <input type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
+      </form>
+
+      <%# A real request: "filter by family should be under the buttons.
+          it should just say filter." Single dropdown, same "one filter
+          dimension at a time" model the type/family split already used -
+          now with a Roster Day group alongside Type/Family. %>
+      <div class="category-filter">
+        <label for="type-select">Filter</label>
+        <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
+          <option value="<%= memberHref({ type: '', family: '', day: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter) ? 'selected' : '' %>>All</option>
+          <option value="<%= memberHref({ type: 'parent', family: '', day: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
+          <option value="<%= memberHref({ type: 'student', family: '', day: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
+          <option value="<%= memberHref({ type: 'admin', family: '', day: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
+          <optgroup label="Roster Day">
+            <option value="<%= memberHref({ type: '', family: '', day: 'monday' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
+            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
+          </optgroup>
+          <% if (families.length > 0) { %>
+            <optgroup label="Family">
+              <% families.forEach(function(f) { %>
+                <option value="<%= memberHref({ type: '', family: f.id, day: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
+              <% }); %>
+            </optgroup>
+          <% } %>
+        </select>
+      </div>
+    </div>
 
     <div class="roster-toolbar no-print" id="members-toolbar">
       <%# Role permissions, Import, and Add/Edit Member all live only on
@@ -102,31 +129,6 @@
           >Archive Selected</button>
         <% } %>
       </div>
-
-      <%# A real request: "filter by family should be under the buttons.
-          it should just say filter." Single dropdown, same "one filter
-          dimension at a time" model the type/family split already used -
-          now with a Roster Day group alongside Type/Family. %>
-      <div class="category-filter" style="margin: 0;">
-        <label for="type-select">Filter</label>
-        <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
-          <option value="<%= memberHref({ type: '', family: '', day: '' }) %>" <%= (!typeFilter && !familyFilter && !dayFilter) ? 'selected' : '' %>>All</option>
-          <option value="<%= memberHref({ type: 'parent', family: '', day: '' }) %>" <%= typeFilter === 'parent' ? 'selected' : '' %>>Parent</option>
-          <option value="<%= memberHref({ type: 'student', family: '', day: '' }) %>" <%= typeFilter === 'student' ? 'selected' : '' %>>Student</option>
-          <option value="<%= memberHref({ type: 'admin', family: '', day: '' }) %>" <%= typeFilter === 'admin' ? 'selected' : '' %>>Admin</option>
-          <optgroup label="Roster Day">
-            <option value="<%= memberHref({ type: '', family: '', day: 'monday' }) %>" <%= dayFilter === 'monday' ? 'selected' : '' %>>Monday</option>
-            <option value="<%= memberHref({ type: '', family: '', day: 'wednesday' }) %>" <%= dayFilter === 'wednesday' ? 'selected' : '' %>>Wednesday</option>
-          </optgroup>
-          <% if (families.length > 0) { %>
-            <optgroup label="Family">
-              <% families.forEach(function(f) { %>
-                <option value="<%= memberHref({ type: '', family: f.id, day: '' }) %>" <%= familyFilter === f.id ? 'selected' : '' %>><%= f.name %></option>
-              <% }); %>
-            </optgroup>
-          <% } %>
-        </select>
-      </div>
     </div>
 
     <form
@@ -135,28 +137,49 @@
       action="/admin/members/bulk-delete"
     ></form>
 
-    <%# A real request, with a reference screenshot: an "Add a Family"
-        card above the member list - opens the same family-name dialog
-        both portals already post to (POST /admin/members/families/new). %>
-    <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('add-family-dialog').showModal()">
+    <%# A real request: "add a family drop down should say manage
+        families and have all the features of the manage families
+        button. Get rid of old manage families button." One entry point
+        now instead of a separate "+ Add a Family" card plus a second
+        "Manage Families" disclosure elsewhere - add, rename, and delete
+        all live in this one dialog. #edit-families-list/data-delete-
+        family are public/js/edit-families.js's own hooks (already
+        loaded below) - it deletes via fetch() and removes just that
+        <li>, so deleting several families in a row doesn't close this
+        dialog out from under whoever's mid-cleanup the way a plain
+        submitting <form> would. %>
+    <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('manage-families-dialog').showModal()">
       <span class="members-add-family-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
       <span class="members-add-family-text">
-        <span class="members-add-family-title">Add a Family</span>
-        <span class="members-add-family-subtitle">Create a family group and invite members</span>
+        <span class="members-add-family-title">Manage Families</span>
+        <span class="members-add-family-subtitle">Add, rename, or delete family groups</span>
       </span>
       <svg class="icon"><use href="#icon-chevron-down"/></svg>
     </button>
-    <dialog id="add-family-dialog" class="notes-dialog">
-      <form method="POST" action="/admin/members/families/new">
-        <h3>Add a Family</h3>
-        <label class="member-form-full">Family Name
+    <dialog id="manage-families-dialog" class="notes-dialog">
+      <h3>Manage Families</h3>
+      <form method="POST" action="/admin/members/families/new" class="manage-families-add-form">
+        <label>New Family Name
           <input type="text" name="name" placeholder="e.g. Smith" required />
         </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Add Family</button>
-        </div>
+        <button type="submit" class="primary-btn">Add</button>
       </form>
+      <p id="edit-families-empty" class="hint" <%= families.length > 0 ? 'hidden' : '' %>>No families yet - add one above.</p>
+      <ul id="edit-families-list" class="edit-families-list" data-base-path="/admin/members" <%= families.length === 0 ? 'hidden' : '' %>>
+        <% families.forEach(function(f) { %>
+          <li class="edit-families-row" data-family-id="<%= f.id %>">
+            <form method="POST" action="/admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
+              <input type="text" name="name" value="<%= f.name %>" aria-label="Rename <%= f.name %>" />
+              <button type="submit" class="icon-btn" aria-label="Save name for <%= f.name %>" title="Save"><svg class="icon"><use href="#icon-save"/></svg></button>
+            </form>
+            <span class="hint"><%= f.memberCount %> member<%= f.memberCount === 1 ? '' : 's' %></span>
+            <button type="button" class="icon-btn icon-btn-danger" data-delete-family="<%= f.id %>" data-family-name="<%= f.name %>" data-member-count="<%= f.memberCount %>" aria-label="Delete <%= f.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+          </li>
+        <% }); %>
+      </ul>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
     </dialog>
 
     <div class="members-section-label-row">
@@ -176,6 +199,16 @@
             data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>"
             data-family-member="<%= isFamilyHead ? '' : '1' %>"
           >
+            <%# A real request: "arrow for dropdown stays on left side" -
+                moved from the end of .member-row-actions to the front of
+                the card, ahead of the avatar. %>
+            <% if (isFamilyHead && familySize > 1) { %>
+              <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
+                <svg class="icon"><use href="#icon-chevron-down"/></svg>
+              </button>
+            <% } else { %>
+              <span class="member-row-chevron-spacer"></span>
+            <% } %>
             <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-bulk-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
             <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>">
               <% if (m.photo_path) { %>
@@ -249,34 +282,32 @@
                   title="Add to Name Tag Request Log"
                 ><svg class="icon"><use href="#icon-send"/></svg></button>
               <% } %>
-              <details class="member-row-menu">
-                <summary class="icon-btn" aria-label="More actions for <%= m.name %>" title="More"><svg class="icon"><use href="#icon-more"/></svg></summary>
-                <div class="member-row-menu-list">
-                  <button type="button" class="member-row-menu-item" onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()">
-                    <svg class="icon"><use href="#icon-edit"/></svg> Notes<%= m.notes ? ' (saved)' : '' %>
-                  </button>
-                  <button type="button" class="member-row-menu-item" data-view-cards="<%= m.id %>">
-                    <svg class="icon"><use href="#icon-badge"/></svg> View Cards
-                  </button>
-                  <button type="button" class="member-row-menu-item" data-view-schedule="<%= m.id %>">
-                    <svg class="icon"><use href="#icon-clock"/></svg> View Schedule
-                  </button>
-                  <button
-                    type="button"
-                    class="member-row-menu-item member-row-menu-item-danger"
-                    data-member-delete-url="/admin/members/<%= m.id %>/delete"
-                    data-member-delete-name="<%= m.name %>"
-                    data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
-                  ><svg class="icon"><use href="#icon-trash"/></svg> Delete</button>
-                </div>
-              </details>
-              <% if (isFamilyHead && familySize > 1) { %>
-                <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
-                  <svg class="icon"><use href="#icon-chevron-down"/></svg>
-                </button>
-              <% } else { %>
-                <span class="member-row-chevron-spacer"></span>
-              <% } %>
+              <%# A real request: "all icons should show, no three dot
+                  option" - Notes/Cards/Schedule/Delete used to live
+                  behind a "More" (⋮) overflow menu; each is now its own
+                  icon button, same .icon-btn treatment as Email/Send
+                  beside them. Their click behavior is unchanged - each
+                  one's own global delegated listener (public/js/members-
+                  dialogs.js, member-row-actions.js) matches by data
+                  attribute, not by living inside any particular menu. %>
+              <button type="button" class="icon-btn" onclick="document.getElementById('notes-dialog-<%= m.id %>').showModal()" aria-label="Notes for <%= m.name %><%= m.notes ? ' (saved)' : '' %>" title="Notes<%= m.notes ? ' (saved)' : '' %>">
+                <svg class="icon"><use href="#icon-edit"/></svg>
+              </button>
+              <button type="button" class="icon-btn" data-view-cards="<%= m.id %>" aria-label="View cards for <%= m.name %>" title="View Cards">
+                <svg class="icon"><use href="#icon-badge"/></svg>
+              </button>
+              <button type="button" class="icon-btn" data-view-schedule="<%= m.id %>" aria-label="View schedule for <%= m.name %>" title="View Schedule">
+                <svg class="icon"><use href="#icon-clock"/></svg>
+              </button>
+              <button
+                type="button"
+                class="icon-btn icon-btn-danger"
+                data-member-delete-url="/admin/members/<%= m.id %>/delete"
+                data-member-delete-name="<%= m.name %>"
+                data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters, volunteer lists, and all attendance history. This cannot be undone."
+                aria-label="Delete <%= m.name %>"
+                title="Delete"
+              ><svg class="icon"><use href="#icon-trash"/></svg></button>
             </div>
             <dialog id="notes-dialog-<%= m.id %>" class="notes-dialog">
               <form method="POST" action="/admin/members/<%= m.id %>/notes">
@@ -356,6 +387,7 @@
   <script src="/js/members-dialogs.js"></script>
   <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-accordion.js"></script>
+  <script src="/js/edit-families.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>

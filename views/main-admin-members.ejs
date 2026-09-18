@@ -91,16 +91,21 @@
         </dialog>
       <% } %>
 
-      <form method="GET" action="/main-admin/members" class="members-search-bar no-print">
-        <input type="hidden" name="tab" value="<%= activeTab %>" />
-        <input type="hidden" name="type" value="<%= typeFilter %>" />
-        <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
-        <svg class="icon"><use href="#icon-search"/></svg>
-        <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
-      </form>
+      <%# A real request: "search members on the left and filter drop
+          down next to it on the right. This should appear on the left
+          side of the screen." Both used to be their own separate rows
+          (search full-width above, filter pushed to the far right of
+          the toolbar below it) - now one row, left-aligned. %>
+      <div class="members-search-filter-row no-print">
+        <form method="GET" action="/main-admin/members" class="members-search-bar">
+          <input type="hidden" name="tab" value="<%= activeTab %>" />
+          <input type="hidden" name="type" value="<%= typeFilter %>" />
+          <input type="hidden" name="family" value="<%= familyFilter || '' %>" />
+          <svg class="icon"><use href="#icon-search"/></svg>
+          <input id="q-input" type="search" name="q" value="<%= q %>" placeholder="Search members&hellip;" aria-label="Search members" />
+        </form>
 
-      <div class="roster-toolbar no-print">
-        <div class="category-filter" style="margin: 0;">
+        <div class="category-filter">
           <label for="type-select">Filter</label>
           <select id="type-select" onchange="window.fullscreenNavigate(this.value)">
             <option value="/main-admin/members?tab=<%= activeTab %>" <%= (!typeFilter && !familyFilter) ? 'selected' : '' %>>All</option>
@@ -116,22 +121,29 @@
             <% } %>
           </select>
         </div>
-        <%# Edit mode's Select All + Actions dropdown - hidden until the
-            "Edit" toggle button above is clicked. A real request: "there
-            should be an edit button on member page that says edit. when
-            you click it it will show check boxes next to every member.
-            you can select individusl, all or none, a dropdown also
-            appears and says actions, delete or archive are the
-            options." Members tab only - Archive already has its own
-            per-row Reactivate button below.
-            A later real request: "remove trash button from each member.
-            you must archive the member and then they can be deleted
-            while archived" - Delete dropped from this Members-tab
-            dropdown for the same reason it was dropped from the per-row
-            actions below; the bulk-delete route (routes/main-admin-
-            members.js's own POST /bulk-delete) is otherwise unreferenced
-            now, kept only so a per-row Archive-tab Delete still works. %>
-        <% if (activeTab === 'members') { %>
+      </div>
+
+      <%# Edit mode's Select All + Actions dropdown - hidden until the
+          "Edit" toggle button above is clicked. A real request: "there
+          should be an edit button on member page that says edit. when
+          you click it it will show check boxes next to every member.
+          you can select individusl, all or none, a dropdown also
+          appears and says actions, delete or archive are the options."
+          Members tab only - Archive already has its own per-row
+          Reactivate button below.
+          A later real request: "remove trash button from each member.
+          you must archive the member and then they can be deleted while
+          archived" - Delete dropped from this Members-tab dropdown for
+          the same reason it was dropped from the per-row actions below;
+          the bulk-delete route (routes/main-admin-members.js's own POST
+          /bulk-delete) is otherwise unreferenced now, kept only so a
+          per-row Archive-tab Delete still works. Only rendered on the
+          Members tab, unlike the shared .roster-toolbar wrapper this
+          used to always sit inside (now removed) - .category-filter
+          moved out into its own .members-search-filter-row above, so
+          there's nothing left needing that wrapper on the Archive tab. %>
+      <% if (activeTab === 'members') { %>
+        <div class="roster-toolbar no-print">
           <div class="class-schedule-archive-controls" data-archive-controls="members-select-form" hidden>
             <label class="checkbox-option class-schedule-select-all">
               <input type="checkbox" data-select-all-for="members-select-form" />
@@ -148,63 +160,51 @@
               >Archive</option>
             </select>
           </div>
-        <% } %>
-      </div>
+        </div>
+      <% } %>
 
       <% if (activeTab === 'members') { %>
-        <%# A real request, with a reference screenshot: an "Add a Family"
-            card above the member list, same shape as Co-op Admin's own
-            (views/admin-members.ejs) - posts to the same route this used
-            to reach via a plain <details> disclosure. The existing
-            rename/delete family-management table moves into its own
-            "Manage Families" disclosure right below, unchanged. %>
-        <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('add-family-dialog').showModal()">
+        <%# A real request: "add a family drop down should say manage
+            families and have all the features of the manage families
+            button. Get rid of old manage families button." One entry
+            point now instead of a separate "+ Add a Family" card plus a
+            second "Manage Families" disclosure - add, rename, and
+            delete all live in this one dialog, same shape as Co-op
+            Admin's own (views/admin-members.ejs, public/js/edit-
+            families.js). %>
+        <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('manage-families-dialog').showModal()">
           <span class="members-add-family-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
           <span class="members-add-family-text">
-            <span class="members-add-family-title">Add a Family</span>
-            <span class="members-add-family-subtitle">Create a family group and invite members</span>
+            <span class="members-add-family-title">Manage Families</span>
+            <span class="members-add-family-subtitle">Add, rename, or delete family groups</span>
           </span>
           <svg class="icon"><use href="#icon-chevron-down"/></svg>
         </button>
-        <dialog id="add-family-dialog" class="notes-dialog">
-          <form method="POST" action="/main-admin/members/families/new">
-            <h3>Add a Family</h3>
-            <label class="member-form-full">Family Name
+        <dialog id="manage-families-dialog" class="notes-dialog">
+          <h3>Manage Families</h3>
+          <form method="POST" action="/main-admin/members/families/new" class="manage-families-add-form">
+            <label>New Family Name
               <input type="text" name="name" placeholder="e.g. Smith" required />
             </label>
-            <div class="notes-dialog-actions">
-              <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-              <button type="submit" class="primary-btn">Add Family</button>
-            </div>
+            <button type="submit" class="primary-btn">Add</button>
           </form>
+          <p id="edit-families-empty" class="hint" <%= families.length > 0 ? 'hidden' : '' %>>No families yet - add one above.</p>
+          <ul id="edit-families-list" class="edit-families-list" data-base-path="/main-admin/members" <%= families.length === 0 ? 'hidden' : '' %>>
+            <% families.forEach(function(f) { %>
+              <li class="edit-families-row" data-family-id="<%= f.id %>">
+                <form method="POST" action="/main-admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
+                  <input type="text" name="name" value="<%= f.name %>" aria-label="Rename <%= f.name %>" />
+                  <button type="submit" class="icon-btn" aria-label="Save name for <%= f.name %>" title="Save"><svg class="icon"><use href="#icon-save"/></svg></button>
+                </form>
+                <span class="hint"><%= f.memberCount %> member<%= f.memberCount === 1 ? '' : 's' %></span>
+                <button type="button" class="icon-btn icon-btn-danger" data-delete-family="<%= f.id %>" data-family-name="<%= f.name %>" data-member-count="<%= f.memberCount %>" aria-label="Delete <%= f.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </li>
+            <% }); %>
+          </ul>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+          </div>
         </dialog>
-
-        <% if (families.length > 0) { %>
-          <details class="manage-section" style="margin-bottom: 1rem;">
-            <summary><svg class="icon"><use href="#icon-users"/></svg> Manage Families</summary>
-            <table class="roster-table condensed-table" style="margin-top: 1rem;">
-              <thead><tr><th>Family</th><th>Active Members</th><th>Actions</th></tr></thead>
-              <tbody>
-                <% families.forEach(function(f) { %>
-                  <tr>
-                    <td>
-                      <form method="POST" action="/main-admin/members/families/<%= f.id %>/rename" class="inline-block-form">
-                        <input type="text" name="name" value="<%= f.name %>" style="width: 12rem;" />
-                        <button type="submit" class="icon-btn" aria-label="Rename family" title="Rename"><svg class="icon"><use href="#icon-save"/></svg></button>
-                      </form>
-                    </td>
-                    <td><%= f.memberCount %></td>
-                    <td>
-                      <form method="POST" action="/main-admin/members/families/<%= f.id %>/delete" class="inline-block-form" data-confirm="Delete the &quot;<%= f.name %>&quot; family? Its members stay in the roster, just ungrouped.">
-                        <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete family" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                      </form>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </details>
-        <% } %>
       <% } %>
 
       <div class="members-section-label-row">
@@ -234,6 +234,16 @@
               data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>"
               data-family-member="<%= isFamilyHead ? '' : '1' %>"
             >
+              <%# A real request: "arrow for dropdown stays on left side" -
+                  moved from the end of .member-row-actions to the front
+                  of the card, ahead of the avatar. %>
+              <% if (isFamilyHead && familySize > 1) { %>
+                <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
+                  <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                </button>
+              <% } else { %>
+                <span class="member-row-chevron-spacer"></span>
+              <% } %>
               <% if (activeTab === 'members') { %>
                 <input type="checkbox" name="memberIds" value="<%= m.id %>" form="members-select-form" class="archive-select-checkbox no-print" aria-label="Select <%= m.name %>" hidden />
               <% } %>
@@ -332,42 +342,41 @@
                   aria-label="Add name tag request for <%= m.name %>"
                   title="Add to Name Tag Request Log"
                 ><svg class="icon"><use href="#icon-send"/></svg></button>
-                <details class="member-row-menu">
-                  <summary class="icon-btn" aria-label="More actions for <%= m.name %>" title="More"><svg class="icon"><use href="#icon-more"/></svg></summary>
-                  <div class="member-row-menu-list">
-                    <% if (showArchived) { %>
-                      <%# A real request: "next to each members name under
-                          archive there should be a button that says
-                          reactivate to make them a member again and
-                          remove them from the archive list." %>
-                      <button type="button" class="member-row-menu-item" data-member-unarchive-url="/main-admin/members/<%= m.id %>/unarchive">
-                        <svg class="icon"><use href="#icon-undo"/></svg> Reactivate
-                      </button>
-                      <%# A real request: "remove trash button from each
-                          member. you must archive the member and then
-                          they can be deleted while archived." - Delete
-                          only exists here, on the Archive tab, never on
-                          the live Members tab. %>
-                      <button
-                        type="button"
-                        class="member-row-menu-item member-row-menu-item-danger"
-                        data-member-delete-url="/main-admin/members/<%= m.id %>/delete"
-                        data-member-delete-name="<%= m.name %>"
-                        data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone."
-                      ><svg class="icon"><use href="#icon-trash"/></svg> Delete</button>
-                    <% } else { %>
-                      <button type="button" class="member-row-menu-item" data-member-archive-url="/main-admin/members/<%= m.id %>/archive">
-                        <svg class="icon"><use href="#icon-archive"/></svg> Archive
-                      </button>
-                    <% } %>
-                  </div>
-                </details>
-                <% if (isFamilyHead && familySize > 1) { %>
-                  <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
-                    <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                <%# A real request: "all icons should show, no three dot
+                    option" - Reactivate/Delete (Archive tab) or Archive
+                    (Members tab) used to live behind a "More" (⋮)
+                    overflow menu; each is now its own icon button, same
+                    .icon-btn treatment as Email/Phone/Send beside them.
+                    Click behavior is unchanged - each one's own global
+                    delegated listener (public/js/member-row-actions.js)
+                    matches by data attribute, not by living inside any
+                    particular menu. %>
+                <% if (showArchived) { %>
+                  <%# A real request: "next to each members name under
+                      archive there should be a button that says
+                      reactivate to make them a member again and remove
+                      them from the archive list." %>
+                  <button type="button" class="icon-btn" data-member-unarchive-url="/main-admin/members/<%= m.id %>/unarchive" aria-label="Reactivate <%= m.name %>" title="Reactivate">
+                    <svg class="icon"><use href="#icon-undo"/></svg>
                   </button>
+                  <%# A real request: "remove trash button from each
+                      member. you must archive the member and then they
+                      can be deleted while archived." - Delete only
+                      exists here, on the Archive tab, never on the live
+                      Members tab. %>
+                  <button
+                    type="button"
+                    class="icon-btn icon-btn-danger"
+                    data-member-delete-url="/main-admin/members/<%= m.id %>/delete"
+                    data-member-delete-name="<%= m.name %>"
+                    data-member-delete-message="Permanently delete <%= m.name %>? This removes them from all rosters and attendance history. This cannot be undone."
+                    aria-label="Delete <%= m.name %>"
+                    title="Delete"
+                  ><svg class="icon"><use href="#icon-trash"/></svg></button>
                 <% } else { %>
-                  <span class="member-row-chevron-spacer"></span>
+                  <button type="button" class="icon-btn" data-member-archive-url="/main-admin/members/<%= m.id %>/archive" aria-label="Archive <%= m.name %>" title="Archive">
+                    <svg class="icon"><use href="#icon-archive"/></svg>
+                  </button>
                 <% } %>
               </div>
             </div>
@@ -510,6 +519,7 @@
   <script src="/js/permissions-edit-toggle.js"></script>
   <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-accordion.js"></script>
+  <script src="/js/edit-families.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>

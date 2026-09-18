@@ -466,10 +466,18 @@ router.post('/families/:id/rename', async (req, res) => {
   res.redirect('/main-admin/members?notice=' + encodeURIComponent('Family renamed.'));
 });
 
+// Same wantsJson branch as Co-op Admin's own /admin/members/families/
+// :id/delete (routes/admin-members.js) - the Manage Families dialog's
+// own Delete button (public/js/edit-families.js) fetches this so the
+// family's row can just disappear from the still-open dialog, instead of
+// a full page navigation closing the whole dialog out from under
+// whoever's mid-cleanup.
 router.post('/families/:id/delete', async (req, res) => {
   const id = parseInt(req.params.id, 10);
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(id);
   await db.prepare('DELETE FROM families WHERE id = ?').run(id);
+  if (wantsJson) return res.json({ ok: true, id, name: family ? family.name : null });
   res.redirect('/main-admin/members?notice=' + encodeURIComponent(family ? `Deleted "${family.name}" family.` : 'Family deleted.'));
 });
 

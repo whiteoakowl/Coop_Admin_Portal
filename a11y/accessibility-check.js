@@ -276,9 +276,11 @@ test('mobile page-tabs popup stays hidden until opened', { timeout: 30000 }, asy
     const page = await context.newPage();
     if (mainAdminCookies && mainAdminCookies.length) await context.addCookies(mainAdminCookies);
     await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
-    // Main Admin's own Members page - has real subpages (Members/
-    // Approvals/Settings/Archive), unlike Co-op Admin's mobile nav (a
-    // flat top-level list with no popup of its own - see admin-nav.ejs).
+    // Main Admin's own Members page has real subpages (Members/
+    // Approvals/Settings/Archive) - Co-op Admin's own equivalent pages
+    // (see admin-nav.ejs) got this same treatment in a later real
+    // request too, so this isn't Main-Admin-specific coverage anymore,
+    // just a convenient page that already has subpages either way.
     await page.goto(base + '/main-admin/members', { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
 
     const closed = await page.evaluate(() => {
@@ -287,12 +289,17 @@ test('mobile page-tabs popup stays hidden until opened', { timeout: 30000 }, asy
     });
     assert.deepEqual(closed, { open: false, display: 'none' }, 'the popup must be fully hidden before its trigger is ever clicked');
 
-    await page.click('.page-tabs-trigger');
+    // A real request: "no blue menu page bar on the pages. Only the pop
+    // up on the orange bar to choose a subpage" - the old visible
+    // .page-tabs-trigger button is gone (permanently display: none);
+    // tapping the bottom orange bar's own current tab is what opens the
+    // popup now (see public/js/page-tabs.js).
+    await page.click('#admin-mobile-tabs a.active');
     const opened = await page.evaluate(() => {
       const d = document.querySelector('.page-tabs-dialog');
       return d && { open: d.open, display: getComputedStyle(d).display, position: getComputedStyle(d).position };
     });
-    assert.deepEqual(opened, { open: true, display: 'flex', position: 'fixed' }, 'clicking the trigger should open it as a real centered modal, not an in-page block');
+    assert.deepEqual(opened, { open: true, display: 'flex', position: 'fixed' }, 'clicking the bottom bar\'s current tab should open the popup, docked to the bar, not an in-page block');
   } finally {
     await context.close();
   }
