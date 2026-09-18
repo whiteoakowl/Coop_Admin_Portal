@@ -506,6 +506,85 @@ async function registrationsForEvent(eventId) {
   });
 }
 
+// A real request: "roster will show primary member name sub categories
+// students and other guests in that family." Groups registrationsForEvent's
+// flat per-member rows (plus this event's own guest registrations, tied
+// back to a family through whichever account registered them) by family -
+// a member/guest with no family at all gets its own singleton group, same
+// "empty means standalone" convention the rest of this app uses. Each
+// group's own members sort primary parent first (then alphabetical), so
+// the admin-events-registrations.ejs roster can render that member as the
+// group's own "primary" row and every other member/guest in the group as
+// an indented line under it; groups themselves sort by that primary row's
+// own last name, same order registrationsForEvent already used.
+async function familyGroupedRegistrationsForEvent(eventId) {
+  const registrations = await db
+    .prepare(
+      `SELECT er.*, m.name AS "memberName", m.member_code AS "memberCode", m.family_id AS "familyId", m.is_primary_parent AS "isPrimaryParent"
+       FROM event_registrations er
+       JOIN members m ON m.id = er.member_id
+       WHERE er.event_id = ?`
+    )
+    .all(eventId);
+  const guestRegistrations = await db
+    .prepare(
+      `SELECT g.*, m.family_id AS "familyId"
+       FROM event_guest_registrations g
+       LEFT JOIN member_accounts ma ON ma.id = g.registered_by_account_id
+       LEFT JOIN members m ON m.id = ma.member_id
+       WHERE g.event_id = ? AND g.status != 'cancelled'`
+    )
+    .all(eventId);
+
+  const groups = new Map();
+  function groupFor(familyId, soloKey) {
+    const key = familyId != null ? `family:${familyId}` : `solo:${soloKey}`;
+    if (!groups.has(key)) groups.set(key, { members: [], guests: [] });
+    return groups.get(key);
+  }
+  registrations.forEach((r) => groupFor(r.familyId, `member:${r.member_id}`).members.push(r));
+  guestRegistrations.forEach((g) => groupFor(g.familyId, `guest:${g.id}`).guests.push(g));
+
+  const groupList = Array.from(groups.values());
+  groupList.forEach((group) => {
+    group.members.sort((a, b) => {
+      const primaryDiff = (b.isPrimaryParent ? 1 : 0) - (a.isPrimaryParent ? 1 : 0);
+      if (primaryDiff) return primaryDiff;
+      return a.memberName.localeCompare(b.memberName, undefined, { sensitivity: 'base' });
+    });
+    group.guests.sort((a, b) => a.guest_name.localeCompare(b.guest_name, undefined, { sensitivity: 'base' }));
+  });
+  groupList.sort((a, b) => {
+    const aName = a.members[0] ? a.members[0].memberName : a.guests[0].guest_name;
+    const bName = b.members[0] ? b.members[0].memberName : b.guests[0].guest_name;
+    return lastNameOf(aName).localeCompare(lastNameOf(bName), undefined, { sensitivity: 'base' }) || aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+  });
+  return groupList;
+}
+
+// Volunteer signup(s) per member for this event, if the event has
+// volunteering enabled at all - a plain memberId -> [roleName, ...] map,
+// for the roster's own "Volunteer Signup" column (a real request: "then a
+// column for volunteer signup"). Reuses the same event_volunteer_signups/
+// event_volunteer_roles tables getEventWithDetails already joins for the
+// member-facing Volunteer section, just shaped for a lookup instead of a
+// per-role list of signups.
+async function volunteerSignupsByMemberForEvent(eventId) {
+  const rows = await db
+    .prepare(
+      `SELECT evs.member_id AS "memberId", evr.role_name AS "roleName" FROM event_volunteer_signups evs
+       JOIN event_volunteer_roles evr ON evr.id = evs.volunteer_role_id
+       WHERE evr.event_id = ?`
+    )
+    .all(eventId);
+  const map = new Map();
+  rows.forEach((r) => {
+    if (!map.has(r.memberId)) map.set(r.memberId, []);
+    map.get(r.memberId).push(r.roleName);
+  });
+  return map;
+}
+
 // --- Registration (member/public, with the full rules engine) ---
 
 // Creates (or, for 'family' pricing, reuses a sibling's already-created)
@@ -1043,6 +1122,8 @@ module.exports = {
   registerForEvent,
   cancelRegistration,
   registrationsForEvent,
+  familyGroupedRegistrationsForEvent,
+  volunteerSignupsByMemberForEvent,
   addGuestRegistration,
   cancelGuestRegistration,
   setRegistrationCheckedIn,

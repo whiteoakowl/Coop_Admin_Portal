@@ -121,6 +121,11 @@ router.get('/:id', async (req, res) => {
         )
         .all(event.id, ...familyIds)
     : [];
+  const myGuestRegistrations = req.portalAccount
+    ? await db
+        .prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND registered_by_account_id = ? AND status != 'cancelled'")
+        .all(event.id, req.portalAccount.id)
+    : [];
 
   res.render('events-detail', {
     title: event.title,
@@ -131,6 +136,7 @@ router.get('/:id', async (req, res) => {
     family,
     registeredMemberIds: myRegistrations.map((r) => r.member_id),
     volunteeredKey: myVolunteerSignups.map((s) => `${s.volunteer_role_id}:${s.member_id}`),
+    myGuestRegistrations,
     isRegistrationWindowOpen: await events.isRegistrationWindowOpen(event),
     priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
     error: req.query.error || null,
@@ -163,6 +169,46 @@ router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
   }
   await events.cancelRegistration(eventId, memberId);
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
+});
+
+// A real request: "guest check in shouldn't be [on the Attendance page].
+// that should be under settings for each individual event only. to
+// allow guest to signup, then they will appear on the event roster." The
+// event's own "Guests can register" setting (allow_guest_register,
+// already a real checkbox on the builder's own registration rules) had
+// nothing that actually let a guest register at all before this - the
+// only way one ever got added to event_guest_registrations was a Main
+// Admin typing them in by hand from the Attendance page (now removed -
+// see routes/admin-events.js's own comment). This is that missing
+// member-facing counterpart: any signed-in account can add a guest to an
+// event that allows them, same event_guest_registrations row/table the
+// admin-side attendance roster and check-in scan already read from.
+router.post('/:id/register-guest', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const back = `/events/${eventId}`;
+  const event = await events.getEvent(eventId);
+  if (!event || !event.allow_guest_register) return res.redirect(back + '?error=' + encodeURIComponent('This event isn\'t accepting guest registrations.'));
+
+  const guestName = (req.body.guestName || '').trim();
+  if (!guestName) return res.redirect(back + '?error=' + encodeURIComponent('Guest name is required.'));
+  await events.addGuestRegistration(
+    eventId,
+    { guestName, guestEmail: (req.body.guestEmail || '').trim(), guestPhone: (req.body.guestPhone || '').trim() },
+    req.portalAccount.id
+  );
+  res.redirect(back + '?notice=' + encodeURIComponent(`${guestName} registered as a guest.`));
+});
+
+router.post('/:id/unregister-guest', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const back = `/events/${eventId}`;
+  const guestId = parseInt(req.body.guestId, 10);
+  const guest = await db.prepare('SELECT * FROM event_guest_registrations WHERE id = ? AND event_id = ?').get(guestId, eventId);
+  if (!guest || guest.registered_by_account_id !== req.portalAccount.id) {
+    return res.redirect(back + '?error=' + encodeURIComponent('You can only manage guests you registered yourself.'));
+  }
+  await events.cancelGuestRegistration(guestId);
+  res.redirect(back + '?notice=' + encodeURIComponent('Guest registration cancelled.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/signup', requirePortalAuth, async (req, res) => {

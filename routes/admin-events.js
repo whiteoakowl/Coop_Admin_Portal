@@ -710,22 +710,43 @@ router.post('/:id/food-items/:itemId/delete', async (req, res) => {
 
 // --- Registrations report, manual check-in/out, and guest registration ---
 
+// A real request: "roster will show primary member name sub categories
+// students and other guests in that family. next column paid amount,
+// date and time registered, signedup/canceled/wait list column ... then
+// a column for volunteer signup." familyGroups is the roster's actual
+// shape now (see utils/events.js's own comment); volunteerSignupsByMember
+// only exists at all when the event has volunteering turned on, same
+// gate the member-facing Volunteer section itself uses.
 router.get('/:id/registrations', async (req, res) => {
   const event = await events.getEvent(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
-  const registrations = await events.registrationsForEvent(req.params.id);
-  const guestRegistrations = events.sortByLastNameField(
-    await db.prepare("SELECT * FROM event_guest_registrations WHERE event_id = ? AND status != 'cancelled'").all(req.params.id),
-    'guest_name'
-  );
+  const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
+  const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
   res.render('admin-events-registrations', {
     title: `Registrations - ${event.title}`,
     event,
-    registrations,
-    guestRegistrations,
+    familyGroups,
+    volunteerSignupsByMember,
     canRegisterGuests: req.portalPermissions.has('register_guests'),
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: "when you click attendance it should show a purple
+// check in and purple check out button. when you click each button it
+// should show the same mobile barcode, barcode or ID check in buttons
+// just like the class check in page." views/admin-events-checkin-
+// scan.ejs is that same method-chooser UI, wired to the /scan endpoint
+// just below.
+router.get('/:id/checkin-scan', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  const mode = req.query.mode === 'checkout' ? 'checkout' : 'checkin';
+  res.render('admin-events-checkin-scan', {
+    title: `${event.title} - ${mode === 'checkout' ? 'Check Out' : 'Check In'}`,
+    event,
+    mode,
   });
 });
 
@@ -786,22 +807,14 @@ router.post('/:id/guests/:guestId/status', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Guest registration ("guest registration for events (admin permission)")
-// - gated by register_guests on top of this whole router's own
-// manage_events requirement, so a Main Admin has to be granted that
-// specific extra permission to add a walk-in guest, even though they can
-// already manage every other part of an event.
-router.post('/:id/guests', requirePortalPermission('register_guests'), async (req, res) => {
-  const guestName = (req.body.guestName || '').trim();
-  if (!guestName) return res.redirect(`/main-admin/events/${req.params.id}/registrations?error=` + encodeURIComponent('Guest name is required.'));
-  await events.addGuestRegistration(
-    req.params.id,
-    { guestName, guestEmail: (req.body.guestEmail || '').trim(), guestPhone: (req.body.guestPhone || '').trim() },
-    req.portalAccount.id
-  );
-  res.redirect(`/main-admin/events/${req.params.id}/registrations?notice=` + encodeURIComponent('Guest registered.'));
-});
-
+// A real request: "guest check in shouldn't be [on the Attendance page].
+// that should be under settings for each individual event only. to allow
+// guest to signup, then they will appear on the event roster." The old
+// admin-only "+ Register Guest" dialog this route backed is gone - guests
+// now self-register from the member-facing event page (routes/events.js's
+// own /:id/register-guest) when the event's "Guests can register" setting
+// allows it. Cancelling one a Main Admin still needs to be able to remove
+// (a no-show, a duplicate, ...) stays available below.
 router.post('/:id/guests/:guestId/cancel', requirePortalPermission('register_guests'), async (req, res) => {
   await events.cancelGuestRegistration(req.params.guestId);
   res.redirect(`/main-admin/events/${req.params.id}/registrations?notice=` + encodeURIComponent('Guest registration cancelled.'));

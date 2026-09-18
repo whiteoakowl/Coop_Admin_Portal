@@ -30,190 +30,142 @@
         <a class="roster-action-btn" href="/main-admin/events?tab=attendance">&larr; Back to Attendance</a>
         <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">Back to Event</a>
       </div>
-    </div>
-
-    <div class="manage-section">
-      <div class="grid-box-header"><h2>Scan to Check In / Out</h2></div>
-      <p class="hint">Scan a member's name tag barcode (or type their member ID) to toggle them Present on the roster below.</p>
-      <div class="class-form-row">
-        <div class="class-form-field">
-          <input type="text" id="event-scan-input" data-event-id="<%= event.id %>" autocomplete="off" placeholder="Scan or type barcode&hellip;" />
-        </div>
-        <div class="class-form-field">
-          <select id="event-scan-mode">
-            <option value="checkin">Check In</option>
-            <option value="checkout">Check Out</option>
-          </select>
-        </div>
+      <%# A real request: "when you click attendance it should show a
+          purple check in and purple check out button. when you click
+          each button it should show the same mobile barcode, barcode or
+          ID check in buttons just like the class check in page." Same
+          .class-checkin-btn look/markup as views/kiosk-class-checkin-
+          attendance.ejs's own pair. %>
+      <div class="class-checkin-actions">
+        <a class="class-checkin-btn" href="/main-admin/events/<%= event.id %>/checkin-scan?mode=checkin">
+          <svg class="icon"><use href="#icon-check"/></svg> Check In
+        </a>
+        <a class="class-checkin-btn" href="/main-admin/events/<%= event.id %>/checkin-scan?mode=checkout">
+          <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
+        </a>
       </div>
-      <p id="event-scan-feedback" class="hint" aria-live="polite"></p>
     </div>
 
-    <% if (registrations.length === 0 && guestRegistrations.length === 0) { %>
+    <% if (familyGroups.length === 0) { %>
       <p class="roster-empty">No one has registered yet.</p>
     <% } else { %>
+      <div class="legend">
+        <span class="legend-item"><span class="cell-tag cell-present">P</span> Present</span>
+        <span class="legend-item"><span class="cell-tag cell-late">L</span> Late</span>
+        <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
+      </div>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
-              <th>Name</th>
+              <%# A real request: "roster will show primary member name
+                  sub categories students and other guests in that
+                  family. next column paid amount, date and time
+                  registered, signedup/canceled/wait list column that
+                  changes as their status changes, then a column for
+                  volunteer signup." "Signup lists" and "questions"
+                  columns aren't included yet - neither one has any real
+                  data behind it in this app yet (signup lists are a
+                  separate, not-yet-built feature; there's no per-event
+                  custom-question feature at all), so there is nothing
+                  "applicable" to show in either one for any event today. %>
+              <th class="roster-name-col">Name</th>
               <th>Status</th>
+              <th>Paid</th>
               <th>Registered</th>
-              <th>Checked In</th>
               <th>P/A/L</th>
-              <th></th>
+              <th>Checked In</th>
+              <th>Checked Out</th>
+              <% if (event.volunteers_enabled) { %><th>Volunteer Signup</th><% } %>
             </tr>
           </thead>
           <tbody>
-            <% registrations.forEach(function(r) { %>
-              <tr data-registration-row="<%= r.id %>">
-                <td class="roster-name-col"><%= r.memberName %></td>
-                <td>
-                  <% if (r.status === 'confirmed') { %>
-                    <span class="badge-pill badge-pill-green">Confirmed</span>
-                  <% } else if (r.status === 'waitlisted') { %>
-                    <span class="badge-pill badge-pill-orange">Waitlisted<% if (r.waitlist_position) { %> (#<%= r.waitlist_position %>)<% } %></span>
-                  <% } else { %>
-                    <span class="badge-pill badge-pill-gray">Cancelled</span>
+            <%
+              // Price display: this event has one flat price (no per-
+              // registration payment tracking exists anywhere in this
+              // schema - Accounting is its own separate, un-integrated
+              // feature), charged once per family for 'family' pricing
+              // (shown only on the group's own primary row) or once per
+              // confirmed person for 'person' pricing (shown on every
+              // confirmed row) - waitlisted/cancelled rows owe nothing
+              // yet either way.
+              function priceFor(status, isFirstInGroup) {
+                if (event.price_cents == null || status !== 'confirmed') return null;
+                if (event.price_per === 'family' && !isFirstInGroup) return null;
+                return '$' + (event.price_cents / 100).toFixed(2);
+              }
+            %>
+            <% familyGroups.forEach(function(group) { %>
+              <% var isFirst = true; %>
+              <% group.members.forEach(function(r) { %>
+                <% var price = priceFor(r.status, isFirst); %>
+                <tr data-registration-row="<%= r.id %>" class="<%= isFirst ? 'roster-group-start' : 'roster-group-member' %>">
+                  <td class="roster-name-col"><%= isFirst ? '' : '↳ ' %><%= r.memberName %></td>
+                  <td>
+                    <% if (r.status === 'confirmed') { %>
+                      <span class="badge-pill badge-pill-green">Signed Up</span>
+                    <% } else if (r.status === 'waitlisted') { %>
+                      <span class="badge-pill badge-pill-orange">Waitlisted<% if (r.waitlist_position) { %> (#<%= r.waitlist_position %>)<% } %></span>
+                    <% } else { %>
+                      <span class="badge-pill badge-pill-gray">Cancelled</span>
+                    <% } %>
+                  </td>
+                  <td><%= price || '—' %></td>
+                  <td><%= r.created_at %></td>
+                  <td>
+                    <select class="roster-cell-select roster-cell-select-<%= r.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/status" aria-label="P/A/L for <%= r.memberName %>">
+                      <option value="" <%= !r.attendance_status ? 'selected' : '' %>>—</option>
+                      <option value="present" <%= r.attendance_status === 'present' ? 'selected' : '' %>>P</option>
+                      <option value="late" <%= r.attendance_status === 'late' ? 'selected' : '' %>>L</option>
+                      <option value="absent" <%= r.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
+                    </select>
+                  </td>
+                  <td><%= r.checked_in_at || '—' %></td>
+                  <td><%= r.checked_out_at || '—' %></td>
+                  <% if (event.volunteers_enabled) { %>
+                    <td><%= (volunteerSignupsByMember.get(r.member_id) || []).join(', ') || '—' %></td>
                   <% } %>
-                </td>
-                <td><%= r.created_at %></td>
-                <td>
-                  <% if (r.checked_in_at && r.checked_out_at) { %>
-                    <span class="badge-pill badge-pill-gray">Checked Out</span>
-                  <% } else if (r.checked_in_at) { %>
-                    <span class="badge-pill badge-pill-green">Present</span>
-                  <% } else { %>
-                    <span class="badge-pill badge-pill-gray">Absent</span>
-                  <% } %>
-                </td>
-                <td>
-                  <select class="roster-cell-select roster-cell-select-<%= r.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/status" aria-label="P/A/L for <%= r.memberName %>">
-                    <option value="" <%= !r.attendance_status ? 'selected' : '' %>>—</option>
-                    <option value="present" <%= r.attendance_status === 'present' ? 'selected' : '' %>>P</option>
-                    <option value="late" <%= r.attendance_status === 'late' ? 'selected' : '' %>>L</option>
-                    <option value="absent" <%= r.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
-                  </select>
-                </td>
-                <td>
-                  <% if (r.status === 'confirmed') { %>
-                    <div class="roster-btn-row">
-                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkin" class="inline-block-form">
-                        <input type="hidden" name="present" value="1" />
-                        <button type="submit" class="roster-action-btn">Check In</button>
-                      </form>
-                      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/<%= r.id %>/checkout" class="inline-block-form">
-                        <button type="submit" class="roster-action-btn">Check Out</button>
-                      </form>
-                    </div>
-                  <% } %>
-                </td>
-              </tr>
-            <% }); %>
-            <% guestRegistrations.forEach(function(g) { %>
-              <tr>
-                <td class="roster-name-col"><%= g.guest_name %> <span class="badge-pill">Guest</span></td>
-                <td><span class="badge-pill badge-pill-green">Confirmed</span></td>
-                <td><%= g.created_at %></td>
-                <td>
-                  <% if (g.checked_in_at && g.checked_out_at) { %>
-                    <span class="badge-pill badge-pill-gray">Checked Out</span>
-                  <% } else if (g.checked_in_at) { %>
-                    <span class="badge-pill badge-pill-green">Present</span>
-                  <% } else { %>
-                    <span class="badge-pill badge-pill-gray">Absent</span>
-                  <% } %>
-                </td>
-                <td>
-                  <select class="roster-cell-select roster-cell-select-<%= g.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/status" aria-label="P/A/L for <%= g.guest_name %>">
-                    <option value="" <%= !g.attendance_status ? 'selected' : '' %>>—</option>
-                    <option value="present" <%= g.attendance_status === 'present' ? 'selected' : '' %>>P</option>
-                    <option value="late" <%= g.attendance_status === 'late' ? 'selected' : '' %>>L</option>
-                    <option value="absent" <%= g.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
-                  </select>
-                </td>
-                <td>
-                  <div class="roster-btn-row">
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/checkin" class="inline-block-form">
-                      <input type="hidden" name="present" value="1" />
-                      <button type="submit" class="roster-action-btn">Check In</button>
-                    </form>
-                    <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/checkout" class="inline-block-form">
-                      <button type="submit" class="roster-action-btn">Check Out</button>
-                    </form>
-                    <% if (canRegisterGuests) { %>
+                </tr>
+                <% isFirst = false; %>
+              <% }); %>
+              <% group.guests.forEach(function(g) { %>
+                <tr data-guest-row="<%= g.id %>" class="<%= isFirst ? 'roster-group-start' : 'roster-group-member' %>">
+                  <td class="roster-name-col"><%= isFirst ? '' : '↳ ' %><%= g.guest_name %> <span class="badge-pill">Guest</span></td>
+                  <td>
+                    <% if (g.status === 'confirmed') { %>
+                      <span class="badge-pill badge-pill-green">Signed Up</span>
+                    <% } else { %>
+                      <span class="badge-pill badge-pill-gray">Cancelled</span>
+                    <% } %>
+                    <% if (canRegisterGuests && g.status === 'confirmed') { %>
                       <form method="POST" action="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/cancel" class="inline-block-form" data-confirm="Cancel guest &quot;<%= g.guest_name %>&quot;?">
                         <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
                       </form>
                     <% } %>
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                  <td><%= priceFor(g.status, isFirst) || '—' %></td>
+                  <td><%= g.created_at %></td>
+                  <td>
+                    <select class="roster-cell-select roster-cell-select-<%= g.attendance_status || 'blank' %>" data-status-endpoint="/main-admin/events/<%= event.id %>/guests/<%= g.id %>/status" aria-label="P/A/L for <%= g.guest_name %>">
+                      <option value="" <%= !g.attendance_status ? 'selected' : '' %>>—</option>
+                      <option value="present" <%= g.attendance_status === 'present' ? 'selected' : '' %>>P</option>
+                      <option value="late" <%= g.attendance_status === 'late' ? 'selected' : '' %>>L</option>
+                      <option value="absent" <%= g.attendance_status === 'absent' ? 'selected' : '' %>>A</option>
+                    </select>
+                  </td>
+                  <td><%= g.checked_in_at || '—' %></td>
+                  <td><%= g.checked_out_at || '—' %></td>
+                  <% if (event.volunteers_enabled) { %><td>—</td><% } %>
+                </tr>
+                <% isFirst = false; %>
+              <% }); %>
             <% }); %>
           </tbody>
         </table>
       </div>
     <% } %>
-
-    <% if (canRegisterGuests) { %>
-      <div class="manage-section">
-        <div class="grid-box-header">
-          <h2>Guest Registration</h2>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-guest-dialog').showModal()">+ Register Guest</button>
-        </div>
-        <p class="hint">A guest has no member record - a lightweight walk-in registration. Check-in for guests is manual only (no name tag barcode exists to scan).</p>
-      </div>
-
-      <dialog id="add-guest-dialog" class="member-picker-dialog">
-        <form method="POST" action="/main-admin/events/<%= event.id %>/guests">
-          <h3>Register a Guest</h3>
-          <label>Name
-            <input type="text" name="guestName" required />
-          </label>
-          <label>Email <span class="hint">(optional)</span>
-            <input type="email" name="guestEmail" />
-          </label>
-          <label>Phone <span class="hint">(optional)</span>
-            <input type="text" name="guestPhone" />
-          </label>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Register</button>
-          </div>
-        </form>
-      </dialog>
-    <% } %>
   </main>
   <script>
-    (function () {
-      var input = document.getElementById('event-scan-input');
-      var mode = document.getElementById('event-scan-mode');
-      var feedback = document.getElementById('event-scan-feedback');
-      var csrf = document.querySelector('meta[name="csrf-token"]');
-      if (!input) return;
-      input.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        var barcode = input.value.trim();
-        input.value = '';
-        if (!barcode) return;
-        fetch('/main-admin/events/' + input.dataset.eventId + '/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf ? csrf.content : '' },
-          body: JSON.stringify({ barcode: barcode, mode: mode.value }),
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            feedback.textContent = data.message || '';
-            feedback.style.color = data.ok ? '' : 'var(--red)';
-            if (data.ok) setTimeout(function () { window.location.reload(); }, 600);
-          })
-          .catch(function () {
-            feedback.textContent = 'Something went wrong - please try again.';
-          });
-      });
-    })();
-
     // P/A/L roster grid (item 11) - each select auto-saves on change, same
     // "no separate Edit/Save step" pattern public/js/attendance-grid.js
     // uses for class attendance, but posting a plain `status` field to

@@ -2436,6 +2436,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-name-col { text-align: left !important; position: sticky; left: 0; background: var(--surface); font-weight: 600; }
 .roster-table thead .roster-name-col { background: var(--brand-soft); }
 
+/* Event Attendance roster - a real request: "roster will show primary
+   member name sub categories students and other guests in that family."
+   Each family's own first row (the primary member, or first alphabetical
+   if none) gets a heavier top border to mark where a new family starts;
+   every other row in that same family sits directly under it with no
+   border and a lighter, non-bold name (the arrow prefix itself, added in
+   the template, already reads as "belongs to the row above"). */
+.roster-group-start td { border-top: 2px solid var(--border); }
+.roster-group-member .roster-name-col { font-weight: 400; color: var(--muted); }
+
 /* Schedules > Settings tab - one row per class, six auto-saving checkbox
    columns (see public/js/class-settings-autosave.js) - centered/wrapped
    headers read better as a checkbox grid than the table's own default
