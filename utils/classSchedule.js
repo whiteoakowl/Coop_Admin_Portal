@@ -645,6 +645,16 @@ async function deleteAllClassArchives() {
 // full day-level rebuild is skipped here for the identical reason (a bulk
 // caller doing this once per row instead of once for the whole import).
 async function setEnrollment(classId, studentIds, { skipSync } = {}) {
+  // A real bug report: "if someone is manually deleted from the roster
+  // they are not automatically added back unless their schedule
+  // changes." Newly enrolling a student here IS that student's own
+  // schedule changing, so it should override any earlier manual removal
+  // from the day's Student roster - captured before the DELETE below
+  // overwrites the previous enrollment, so only students genuinely NEW
+  // to this class (not everyone already on it) count.
+  const previouslyEnrolled = new Set((await db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId)).map((r) => r.student_id));
+  const newlyEnrolled = studentIds.filter((id) => !previouslyEnrolled.has(id));
+
   await db.withTransaction(async (tx) => {
     await tx.prepare('DELETE FROM class_enrollments WHERE class_id = ?').run(classId);
     const link = tx.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?) ON CONFLICT (class_id, student_id) DO NOTHING');
@@ -661,6 +671,10 @@ async function setEnrollment(classId, studentIds, { skipSync } = {}) {
   if (day) {
     for (const studentId of studentIds) {
       for (const position of positions) await removeFromFloaterForHour(day, position, studentId);
+    }
+    if (newlyEnrolled.length > 0) {
+      const studentRosterId = await ensureDayRoster(day, 'student');
+      for (const studentId of newlyEnrolled) await clearRosterManualRemoval(studentRosterId, studentId);
     }
   }
   if (skipSync) return;
@@ -725,8 +739,17 @@ async function addStaff(classId, memberId, role, { skipSync } = {}) {
     .run(classId, memberId, role === 'assistant' ? 'assistant' : 'teacher');
   await removeFromFloaterForOverlappingHours(classId, memberId);
   await syncClassRosterMembers(classId);
-  if (skipSync) return;
   const cls = await db.prepare('SELECT day FROM classes WHERE id = ?').get(classId);
+  // Being picked up as staff here IS this member's own schedule changing -
+  // same reasoning as setEnrollment's own newlyEnrolled handling above,
+  // clearing any earlier manual removal from the day's own roster (see
+  // that bug report there).
+  if (cls) {
+    const staffMember = await db.prepare('SELECT member_type FROM members WHERE id = ?').get(memberId);
+    const dayRosterId = await ensureDayRoster(cls.day, staffMember && staffMember.member_type === 'student' ? 'student' : 'parent');
+    await clearRosterManualRemoval(dayRosterId, memberId);
+  }
+  if (skipSync) return;
   if (cls) await syncDayMemberRosters(cls.day);
 }
 
@@ -969,14 +992,33 @@ async function setRosterMembership(rosterId, memberIdSet) {
   const rows = await db.prepare('SELECT member_id, source FROM roster_members WHERE roster_id = ?').all(rosterId);
   const allExistingIds = new Set(rows.map((r) => r.member_id));
   const autoIds = rows.filter((r) => r.source === 'auto').map((r) => r.member_id);
+  // A real bug report: "if someone is manually deleted from the roster
+  // they are not automatically added back unless their schedule
+  // changes." Without this, a member an admin just removed (routes/
+  // admin-rosters.js's own /remove-member) came right back the next time
+  // ANYTHING on that roster resynced - this member's own schedule didn't
+  // have to change, just anyone else's. removedIds is cleared only by a
+  // genuine schedule change for that specific member (setEnrollment/
+  // addStaff below), so a member skipped here stays off until one of
+  // those actually happens.
+  const removedIds = new Set((await db.prepare('SELECT member_id FROM roster_manual_removals WHERE roster_id = ?').all(rosterId)).map((r) => r.member_id));
   const insert = db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'auto')");
   const remove = db.prepare("DELETE FROM roster_members WHERE roster_id = ? AND member_id = ? AND source = 'auto'");
   for (const memberId of memberIdSet) {
-    if (!allExistingIds.has(memberId)) await insert.run(rosterId, memberId);
+    if (!allExistingIds.has(memberId) && !removedIds.has(memberId)) await insert.run(rosterId, memberId);
   }
   for (const memberId of autoIds) {
     if (!memberIdSet.has(memberId)) await remove.run(rosterId, memberId);
   }
+}
+
+// Forgets a manual removal (routes/admin-rosters.js's own /remove-member)
+// for one member on one roster - called wherever that member's own
+// schedule genuinely changes afterward (setEnrollment/addStaff below,
+// addManualRosterMember itself), so setRosterMembership's own removedIds
+// check above stops skipping them.
+async function clearRosterManualRemoval(rosterId, memberId) {
+  await db.prepare('DELETE FROM roster_manual_removals WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
 }
 
 // Every class across both days, for the Attendance page's Class Rosters
@@ -1015,11 +1057,15 @@ async function allClassesList(day) {
 // Adds someone to a roster by hand (Attendance page's Add Member popup) -
 // tagged source = 'manual' so setRosterMembership's auto-resync never
 // removes them again. INSERT ... ON CONFLICT DO NOTHING so re-adding an
-// existing auto member is a harmless no-op rather than an error.
+// existing auto member is a harmless no-op rather than an error. Also
+// clears any prior manual removal (see clearRosterManualRemoval's own
+// comment) - an admin hand-adding someone obviously supersedes an
+// earlier hand-removal of that same person.
 async function addManualRosterMember(rosterId, memberId) {
   await db
     .prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual') ON CONFLICT (roster_id, member_id) DO NOTHING")
     .run(rosterId, memberId);
+  await clearRosterManualRemoval(rosterId, memberId);
 }
 
 // Creates (once) the students-only roster for a single class, or returns

@@ -601,6 +601,16 @@ router.post('/rosters/:tab/remove-member/:memberId', requireAdmin, async (req, r
   if (!rosterId) return res.status(404).send('Not found');
   const memberId = parseInt(req.params.memberId, 10);
   await db.prepare('DELETE FROM roster_members WHERE roster_id = ? AND member_id = ?').run(rosterId, memberId);
+  // A real bug report: "if someone is manually deleted from the roster
+  // they are not automatically added back unless their schedule
+  // changes." Remembers this was a deliberate removal so utils/
+  // classSchedule.js's setRosterMembership skips re-adding them on the
+  // next routine resync - cleared only when their own schedule actually
+  // changes (setEnrollment/addStaff) or they're manually re-added
+  // (addManualRosterMember).
+  await db
+    .prepare('INSERT INTO roster_manual_removals (roster_id, member_id) VALUES (?, ?) ON CONFLICT (roster_id, member_id) DO UPDATE SET removed_at = now_text()')
+    .run(rosterId, memberId);
   res.redirect(`/admin/rosters?tab=${tab}`);
 });
 
