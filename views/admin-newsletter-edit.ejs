@@ -26,13 +26,11 @@
       <%# A real request: "Add a 'Customize Newsletter' action where
           admin writes their own note/letter that appears before the
           automatic content." Its own form/save action and its own
-          column (custom_note) - see utils/newsletter.js's own comment
-          for why this is kept separate from the auto-assembled
-          body_html below (so "Re-assemble from Live Data" never wipes
-          it out). %>
+          column (custom_note), kept separate from the auto-assembled
+          body_html below - a later request: "customize existing, delete
+          description" dropped this section's own intro sentence. %>
       <div class="manage-section">
         <div class="grid-box-header"><h2>Customize Newsletter</h2></div>
-        <p class="hint">Write a note or letter that appears before the automatically assembled content below.</p>
         <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/customize" class="member-form-grid" data-forum-editor>
           <div class="member-form-full">
             <%- include('partials/forum-editor-toolbar') %>
@@ -45,7 +43,7 @@
         </form>
       </div>
 
-      <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid">
+      <form method="POST" action="/main-admin/newsletter/<%= issue.id %>" class="member-form-grid" id="newsletter-edit-form">
         <label class="member-form-full">Subject
           <input type="text" name="subject" value="<%= issue.subject %>" required />
         </label>
@@ -55,40 +53,57 @@
           <div class="forum-editable" data-forum-editable contenteditable="true"><%- issue.body_html %></div>
           <input type="hidden" name="bodyHtml" data-forum-body-input />
         </div>
-        <div class="member-form-full">
-          <button type="submit" class="primary-btn">Save</button>
-        </div>
       </form>
       <script src="/js/forum-editor.js"></script>
 
+      <%# A real request: "buttons at the bottom. save, schedule, mark
+          sent and delete should all be on the same row, mobile." Save
+          submits the content form above via its own form="" attribute
+          (matching main-admin-members.ejs's own Save Permissions
+          pattern) rather than living inside it, so it can sit in this
+          same row as the other actions instead of on its own line.
+          "Reassemble from live data" is gone entirely - a real request:
+          "not needed feature since the events update automatically" (the
+          content is only ever assembled once, at creation, from
+          whatever's live at that moment - see utils/newsletter.js's own
+          assembleContent). %>
       <div class="manage-section">
         <div class="grid-box-header"><h2>Actions</h2></div>
-        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/regenerate" class="inline-block-form">
-          <button type="submit" class="roster-action-btn" onclick="return confirm('Re-assemble from live data? This overwrites the current content.')">Re-assemble from Live Data</button>
-        </form>
-
-        <% if (issue.status === 'draft') { %>
-          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/schedule" class="inline-block-form">
-            <label>Schedule for
-              <input type="datetime-local" name="scheduledAt" required />
-            </label>
-            <button type="submit" class="roster-action-btn">Schedule</button>
+        <div class="roster-btn-row roster-btn-row-nowrap">
+          <button type="submit" form="newsletter-edit-form" class="roster-action-btn">Save</button>
+          <% if (issue.status === 'draft') { %>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('newsletter-schedule-dialog').showModal()">Schedule</button>
+          <% } else if (issue.status === 'scheduled') { %>
+            <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/unschedule" class="inline-block-form">
+              <button type="submit" class="roster-action-btn">Move Back to Draft</button>
+            </form>
+          <% } %>
+          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/send" class="inline-block-form">
+            <button type="submit" class="roster-action-btn" onclick="return confirm('Mark this issue sent? This records who it reached and can\'t be undone.')">Mark Sent</button>
           </form>
-        <% } else if (issue.status === 'scheduled') { %>
-          <p class="hint">Scheduled for <%= issue.scheduled_at %>.</p>
-          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/unschedule" class="inline-block-form">
-            <button type="submit" class="roster-action-btn">Move Back to Draft</button>
+          <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/delete" class="inline-block-form">
+            <button type="submit" class="roster-action-btn roster-action-btn-danger" onclick="return confirm('Delete this draft?')">Delete</button>
           </form>
-        <% } %>
-
-        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/send" class="inline-block-form">
-          <button type="submit" class="roster-action-btn" onclick="return confirm('Mark this issue sent? This records who it reached and can\'t be undone.')">Mark Sent</button>
-        </form>
-
-        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/delete" class="inline-block-form">
-          <button type="submit" class="roster-action-btn roster-action-btn-danger" onclick="return confirm('Delete this draft?')">Delete</button>
-        </form>
+          <a class="roster-action-btn" href="/main-admin/newsletter/<%= issue.id %>/preview" target="_blank">View Newsletter</a>
+        </div>
+        <% if (issue.status === 'scheduled') { %><p class="hint">Scheduled for <%= issue.scheduled_at %>.</p><% } %>
       </div>
+
+      <%# A real request: "if you click schedule, a pop up window should
+          show to pick the date and time." Replaces the old inline
+          datetime-local input sitting directly in the Actions row. %>
+      <dialog id="newsletter-schedule-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/newsletter/<%= issue.id %>/schedule">
+          <h3>Schedule Newsletter</h3>
+          <label>Date &amp; Time
+            <input type="datetime-local" name="scheduledAt" required />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Schedule</button>
+          </div>
+        </form>
+      </dialog>
     <% } %>
   </main>
 </body>

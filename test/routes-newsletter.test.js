@@ -166,20 +166,79 @@ test('only sent issues appear in the member-facing archive; drafts and scheduled
   assert.match(sentDetail.text, /Already Sent/);
 });
 
-test('re-assembling from live data overwrites hand edits', async () => {
+test('the old "Re-assemble from Live Data" route is gone - not needed since events auto-update at creation time', async () => {
   const admin = await loginAsMainAdmin();
-  const id = await createDraft(admin, 'Regenerate Me');
+  const id = await createDraft(admin, 'No Regenerate Here');
+  const res = await request(app).post(`/main-admin/newsletter/${id}/regenerate`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+  assert.equal(res.status, 404);
 
-  await request(app)
-    .post(`/main-admin/newsletter/${id}`)
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ subject: 'Regenerate Me', bodyHtml: '<p>A hand edit that should be overwritten</p>', _csrf: admin.csrfToken });
+  const editPage = await request(app).get(`/main-admin/newsletter/${id}/edit`).set('Cookie', admin.cookie);
+  assert.doesNotMatch(editPage.text, /Re-assemble from Live Data/);
+});
 
-  await request(app).post(`/main-admin/newsletter/${id}/regenerate`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
+// A real request: "don't show this week's classes. show the next 4 weeks
+// of events from the event calendar." An event 5 weeks out is real, live
+// data, but well outside the newsletter's own lookahead window.
+test('assembled content shows events within the next 4 weeks, omits classes entirely, and always includes Quick Links', async () => {
+  const admin = await loginAsMainAdmin();
+  await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Should Not Appear Class')").run();
+  await db
+    .prepare("INSERT INTO events (title, starts_at, status) VALUES ('Soon Event', to_char(now() + interval '10 days', 'YYYY-MM-DD HH24:MI:SS'), 'published')")
+    .run();
+  await db
+    .prepare("INSERT INTO events (title, starts_at, status) VALUES ('Far Off Event', to_char(now() + interval '40 days', 'YYYY-MM-DD HH24:MI:SS'), 'published')")
+    .run();
 
+  const id = await createDraft(admin, 'Four Week Window');
   const issue = await db.prepare('SELECT * FROM newsletter_issues WHERE id = ?').get(id);
-  assert.doesNotMatch(issue.body_html, /A hand edit that should be overwritten/);
+  assert.match(issue.body_html, /Soon Event/);
+  assert.doesNotMatch(issue.body_html, /Far Off Event/, 'an event over 4 weeks out should not appear');
+  assert.doesNotMatch(issue.body_html, /Should Not Appear Class/);
+  assert.doesNotMatch(issue.body_html, /This Week's Classes/i);
+  assert.match(issue.body_html, /Quick Links/);
+  assert.match(issue.body_html, /href="\/absence"/);
+  assert.match(issue.body_html, /href="\/name-tag"/);
+});
+
+// A real request: "add a button for view newsletter."
+test('View Newsletter previews a draft/scheduled issue through the real member-facing template', async () => {
+  const admin = await loginAsMainAdmin();
+  const id = await createDraft(admin, 'Preview Me');
+
+  const editPage = await request(app).get(`/main-admin/newsletter/${id}/edit`).set('Cookie', admin.cookie);
+  assert.match(editPage.text, new RegExp(`href="/main-admin/newsletter/${id}/preview"`));
+  assert.match(editPage.text, />View Newsletter</);
+
+  const previewRes = await request(app).get(`/main-admin/newsletter/${id}/preview`).set('Cookie', admin.cookie);
+  assert.equal(previewRes.status, 200);
+  assert.match(previewRes.text, /Preview Me/);
+  assert.match(previewRes.text, /not sent yet/);
+});
+
+// A real request: "if you click schedule, a pop up window should show to
+// pick the date and time."
+test('Schedule is a dialog, not an inline datetime input directly in the Actions row', async () => {
+  const admin = await loginAsMainAdmin();
+  const id = await createDraft(admin, 'Schedule Dialog');
+  const editPage = await request(app).get(`/main-admin/newsletter/${id}/edit`).set('Cookie', admin.cookie);
+  assert.match(editPage.text, /<dialog id="newsletter-schedule-dialog"/);
+  assert.match(editPage.text, /onclick="document\.getElementById\('newsletter-schedule-dialog'\)\.showModal\(\)">Schedule</);
+});
+
+// A real request: "buttons at the bottom. save, schedule, mark sent and
+// delete should all be on the same row, mobile."
+test('Save/Schedule/Mark Sent/Delete/View Newsletter all sit in one toolbar row', async () => {
+  const admin = await loginAsMainAdmin();
+  const id = await createDraft(admin, 'One Row');
+  const editPage = await request(app).get(`/main-admin/newsletter/${id}/edit`).set('Cookie', admin.cookie);
+  const rowMatch = /<div class="roster-btn-row roster-btn-row-nowrap">([\s\S]*?)<\/div>/.exec(editPage.text);
+  assert.ok(rowMatch, 'expected the actions toolbar row');
+  const row = rowMatch[1];
+  assert.match(row, /form="newsletter-edit-form" class="roster-action-btn">Save</);
+  assert.match(row, />Schedule</);
+  assert.match(row, />Mark Sent</);
+  assert.match(row, />Delete</);
+  assert.match(row, />View Newsletter</);
 });
 
 test('deleting a draft removes it', async () => {

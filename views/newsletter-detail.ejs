@@ -5,17 +5,28 @@
 </head>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Newsletter',
+    portalTitle: typeof portalTitle !== 'undefined' ? portalTitle : 'Newsletter',
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/newsletter', icon: 'mail', label: 'Newsletter' },
     ],
   }) %>
 
+  <%# backHref/the non-'sent' branch below: a real request: "add a button
+      for view newsletter" - routes/admin-newsletter.js's own GET
+      /:id/preview reuses this exact template (rather than a second,
+      near-duplicate view) so an admin previewing a draft or scheduled
+      issue sees precisely what a member will, once it's actually sent -
+      that route passes backHref back to the editor instead of this
+      page's own default member-facing /newsletter list. %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p><a href="/newsletter">&larr; Back</a></p>
+    <p><a href="<%= typeof backHref !== 'undefined' ? backHref : '/newsletter' %>">&larr; Back</a></p>
     <h1><%= issue.subject %></h1>
-    <p class="hint">Sent <%= issue.sent_at %></p>
+    <% if (issue.status === 'sent') { %>
+      <p class="hint">Sent <%= issue.sent_at %></p>
+    <% } else { %>
+      <p class="hint">Preview &mdash; <%= issue.status === 'scheduled' ? 'scheduled for ' + issue.scheduled_at : 'not sent yet' %>.</p>
+    <% } %>
     <% if (issue.custom_note) { %><div class="forum-editable"><%- issue.custom_note %></div><% } %>
     <div class="forum-editable"><%- issue.body_html %></div>
   </main>

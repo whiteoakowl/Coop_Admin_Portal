@@ -26,11 +26,20 @@ const LAST_30_DAYS_SQL = "to_char(now() at time zone 'utc' - interval '30 days',
 // for "what counts as upcoming/active" as those modules evolve. Any
 // section with nothing to show is simply omitted rather than rendered as
 // an empty placeholder.
+// The 4-week lookahead window "Upcoming Events" below uses - a real
+// request: "don't show this week's classes. show the next 4 weeks of
+// events from the event calendar." A plain date range instead of a fixed
+// row count (the old "next 10 events" cap) so a busy month shows
+// everything actually happening soon and a quiet one doesn't pad itself
+// out with events well past 4 weeks away just to reach 10.
+const FOUR_WEEKS_AHEAD_SQL = "to_char(now() at time zone 'utc' + interval '28 days', 'YYYY-MM-DD HH24:MI:SS')";
+
 async function assembleContent() {
   const parts = [];
 
-  // A real request: "auto-includes next 10 events."
-  const events = await db.prepare("SELECT * FROM events WHERE status = 'published' AND starts_at >= now_text() ORDER BY starts_at LIMIT 10").all();
+  const events = await db
+    .prepare(`SELECT * FROM events WHERE status = 'published' AND starts_at >= now_text() AND starts_at <= ${FOUR_WEEKS_AHEAD_SQL} ORDER BY starts_at`)
+    .all();
   if (events.length) {
     parts.push('<h2>Upcoming Events</h2><ul>' + events.map((e) => `<li><strong>${escapeHtml(e.title)}</strong> - ${escapeHtml(e.starts_at)}${e.location ? ' at ' + escapeHtml(e.location) : ''}</li>`).join('') + '</ul>');
   }
@@ -52,11 +61,6 @@ async function assembleContent() {
     }
   }
   if (reminders.length) parts.push('<h2>Reminders</h2><ul>' + reminders.map((r) => `<li>${r}</li>`).join('') + '</ul>');
-
-  const classes = await db.prepare('SELECT class_name, day, hour_position FROM classes ORDER BY day, hour_position, class_name').all();
-  if (classes.length) {
-    parts.push('<h2>This Week\'s Classes</h2><ul>' + classes.map((c) => `<li>${escapeHtml(c.class_name)} (${c.day === 'monday' ? 'Monday' : 'Wednesday'})</li>`).join('') + '</ul>');
-  }
 
   const announcements = await db.prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 5").all();
   if (announcements.length) {
@@ -90,6 +94,12 @@ async function assembleContent() {
     parts.push('<h2>Publications</h2><ul>' + publications.map((p) => `<li><strong>${escapeHtml(p.title)}</strong></li>`).join('') + '</ul>');
   }
 
+  // A real request: "quick links for absence form and name tag form."
+  // Unlike every section above, always present regardless of live data -
+  // these are standing, evergreen links, not something that ever has
+  // "nothing to show."
+  parts.push('<h2>Quick Links</h2><ul><li><a href="/absence">Absence/Late Form</a></li><li><a href="/name-tag">Name Tag Form</a></li></ul>');
+
   return sanitizePostBody(parts.join('\n') || '<p>Nothing new to share this week.</p>');
 }
 
@@ -114,18 +124,9 @@ async function updateIssue(id, data) {
 // A real request: "Add a 'Customize Newsletter' action where admin
 // writes their own note/letter that appears before the automatic
 // content." Its own column and its own save action, deliberately
-// separate from updateIssue's body_html - see the migration's own
-// comment on why (regenerate() below never touches this).
+// separate from updateIssue's body_html.
 async function setCustomNote(id, note) {
   await db.prepare('UPDATE newsletter_issues SET custom_note = ?, updated_at = now_text() WHERE id = ?').run(sanitizePostBody(note || ''), id);
-}
-
-// Regenerates body_html from live data, overwriting any hand edits - an
-// explicit admin action ("Re-assemble from live data"), never automatic,
-// so an admin's own edits are never silently discarded.
-async function regenerate(id) {
-  const bodyHtml = await assembleContent();
-  await db.prepare('UPDATE newsletter_issues SET body_html = ?, updated_at = now_text() WHERE id = ?').run(bodyHtml, id);
 }
 
 async function scheduleIssue(id, scheduledAt) {
@@ -161,7 +162,6 @@ module.exports = {
   createDraft,
   updateIssue,
   setCustomNote,
-  regenerate,
   scheduleIssue,
   unschedule,
   markSent,

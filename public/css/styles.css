@@ -3153,6 +3153,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .roster-btn-row-centered { justify-content: center; }
 .roster-btn-row-centered .roster-action-btn { flex: 0 0 auto; }
 
+/* A real request: "buttons at the bottom [Save, Schedule, Mark Sent,
+   Delete] should all be on the same row, mobile." Unlike
+   .roster-btn-row-fit-text below (still wraps to a second row once
+   buttons stop fitting), this never wraps at all - overflow-x:auto keeps
+   every button reachable with a horizontal swipe on a narrow phone screen
+   instead of dropping to a second line. */
+.roster-btn-row-nowrap { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.25rem; }
+.roster-btn-row-nowrap > * { flex: 0 0 auto; }
+
 /* View-toggle button (replaces a separate "Archived" tab on pages that
    have one) - stays purple like any other toolbar action when off, and
    switches to a pressed-looking state while the archived view is

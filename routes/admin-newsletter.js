@@ -85,9 +85,21 @@ router.post('/:id/customize', async (req, res) => {
   res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Custom note saved.'));
 });
 
-router.post('/:id/regenerate', async (req, res) => {
-  await newsletter.regenerate(req.params.id);
-  res.redirect(`/main-admin/newsletter/${req.params.id}/edit?notice=` + encodeURIComponent('Re-assembled from live data.'));
+// A real request: "add a button for view newsletter." Reuses the exact
+// same member-facing template (views/newsletter-detail.ejs, normally only
+// reachable once status='sent' - see routes/newsletter.js's own comment)
+// so an admin can see precisely what a draft or scheduled issue will look
+// like before it ever sends, not just the plain contenteditable divs this
+// edit page itself shows.
+router.get('/:id/preview', async (req, res) => {
+  const issue = await newsletter.getIssue(req.params.id);
+  if (!issue) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('newsletter-detail', {
+    title: issue.subject,
+    issue,
+    portalTitle: 'Main Admin',
+    backHref: `/main-admin/newsletter/${issue.id}/edit`,
+  });
 });
 
 router.post('/:id/schedule', async (req, res) => {
