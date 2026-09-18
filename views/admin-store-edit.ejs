@@ -50,6 +50,15 @@
         <label>Price ($)
           <input type="number" name="price" min="0" step="0.01" value="<%= (product.price_cents / 100).toFixed(2) %>" required />
         </label>
+        <label>Category
+          <select name="categoryId">
+            <option value="">Uncategorized</option>
+            <% categories.forEach(function(c) { %><option value="<%= c.id %>" <%= product.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Sizes (comma-separated, blank = no sizes)
+          <input type="text" name="sizes" placeholder="e.g. S, M, L, XL" value="<%= product.sizes || '' %>" />
+        </label>
         <label>Inventory (blank = unlimited)
           <input type="number" name="inventoryCount" min="0" value="<%= product.inventory_count ?? '' %>" />
         </label>

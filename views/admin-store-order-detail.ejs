@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Order #<%= order.id %></h1>
+      <span class="badge-pill badge-pill-<%= order.status === 'fulfilled' || order.status === 'paid' ? 'green' : order.status === 'cancelled' ? 'gray' : 'orange' %>"><%= order.status %></span>
+    </div>
+    <p><a href="/main-admin/store?tab=orders">&larr; Orders</a></p>
+    <p class="hint">For <%= order.memberName %> &middot; <%= order.sale_type === 'online' ? 'Online' : 'In-person' %> &middot; <%= order.created_at %></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Size</th>
+            <th>Quantity</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% order.items.forEach(function(i) { %>
+            <tr>
+              <td><%= i.productName || '(removed item)' %></td>
+              <td><%= i.size || '–' %></td>
+              <td><%= i.quantity %></td>
+              <td>$<%= (i.unit_price_cents / 100).toFixed(2) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Total: $<%= (order.total_cents / 100).toFixed(2) %></strong></p>
+
+    <div class="roster-btn-row">
+      <% if (order.status === 'paid') { %>
+        <form method="POST" action="/main-admin/store/orders/<%= order.id %>/fulfill" class="inline-block-form">
+          <input type="hidden" name="redirectTo" value="/main-admin/store/orders/<%= order.id %>" />
+          <button type="submit" class="roster-action-btn">Fulfill</button>
+        </form>
+      <% } %>
+      <% if (order.status !== 'cancelled' && order.status !== 'fulfilled') { %>
+        <form method="POST" action="/main-admin/store/orders/<%= order.id %>/cancel" class="inline-block-form" data-confirm="Cancel order #<%= order.id %>?">
+          <input type="hidden" name="redirectTo" value="/main-admin/store/orders/<%= order.id %>" />
+          <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

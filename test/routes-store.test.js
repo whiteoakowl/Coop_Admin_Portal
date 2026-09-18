@@ -119,7 +119,7 @@ test('an in-person sale is recorded as paid immediately, distinct from an online
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(parent.memberId), productId, quantity: '1', _csrf: admin.csrfToken });
+    .send({ memberId: String(parent.memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', _csrf: admin.csrfToken });
   assert.equal(saleRes.status, 302);
 
   const order = await db.prepare("SELECT * FROM store_orders WHERE member_id = ? AND sale_type = 'in_person'").get(parent.memberId);

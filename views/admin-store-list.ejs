@@ -11,59 +11,254 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1>Shop</h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
+      <% if (activeTab === 'products') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
+      <% } else if (activeTab === 'orders') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('in-person-dialog').showModal()">+ In-Person Sale</button>
+      <% } else if (activeTab === 'settings') { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+      <% } %>
     </div>
-    <p><a href="/main-admin/store/orders/all">Orders &amp; In-Person Sales</a></p>
 
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'orders' ? 'Orders' : activeTab === 'archived' ? 'Archived' : activeTab === 'settings' ? 'Settings' : 'Products' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
+      <a href="/main-admin/store?tab=products" class="view-tab <%= activeTab === 'products' ? 'active' : '' %>">Products</a>
+      <a href="/main-admin/store?tab=orders" class="view-tab <%= activeTab === 'orders' ? 'active' : '' %>">Orders</a>
+      <a href="/main-admin/store?tab=archived" class="view-tab <%= activeTab === 'archived' ? 'active' : '' %>">Archived</a>
+      <a href="/main-admin/store?tab=settings" class="view-tab <%= activeTab === 'settings' ? 'active' : '' %>">Settings</a>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <% if (products.length === 0) { %>
-      <p class="roster-empty">No products yet &mdash; create one above.</p>
-    <% } %>
-
-    <div class="team-card-grid">
-      <% products.forEach(function(p) { %>
-        <div class="team-col">
-          <div class="team-info-card">
-            <% if (p.imageUrl) { %>
-              <img src="<%= p.imageUrl %>" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
-            <% } %>
-            <h3 class="team-info-title"><a href="/main-admin/store/<%= p.id %>/edit"><%= p.name %></a></h3>
-            <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : p.status === 'archived' ? 'gray' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
-            <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></p>
-            <div class="roster-btn-row">
-              <a class="roster-action-btn" href="/main-admin/store/<%= p.id %>/edit">Edit</a>
-            </div>
-          </div>
-        </div>
-      <% }); %>
-    </div>
-
-    <dialog id="new-product-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/store">
-        <h3>New Product</h3>
-        <label>Name
-          <input type="text" name="name" required />
-        </label>
-        <label>Price ($)
-          <input type="number" name="price" min="0" step="0.01" required />
-        </label>
-        <label>Inventory (blank = unlimited)
-          <input type="number" name="inventoryCount" min="0" />
-        </label>
-        <label>Availability
-          <select name="availability">
-            <option value="both">Online + In-person</option>
-            <option value="online">Online only</option>
-            <option value="in_person">In-person only</option>
+    <% if (activeTab === 'products') { %>
+      <form method="GET" action="/main-admin/store" class="inline-block-form">
+        <input type="hidden" name="tab" value="products" />
+        <label>Filter by category
+          <select name="category" onchange="this.form.submit()">
+            <option value="">All Categories</option>
+            <% categories.forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= selectedCategory === c.id ? 'selected' : '' %>><%= c.name %></option>
+            <% }); %>
           </select>
         </label>
-        <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-          <button type="submit" class="primary-btn">Create</button>
-        </div>
       </form>
-    </dialog>
+
+      <% if (products.length === 0) { %>
+        <p class="roster-empty">No products yet &mdash; create one above.</p>
+      <% } %>
+
+      <div class="team-card-grid">
+        <% products.forEach(function(p) { %>
+          <div class="team-col">
+            <div class="team-info-card">
+              <% if (p.imageUrl) { %>
+                <img src="<%= p.imageUrl %>" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
+              <% } %>
+              <h3 class="team-info-title"><a href="/main-admin/store/<%= p.id %>/edit"><%= p.name %></a></h3>
+              <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
+              <% if (p.categoryName) { %><span class="badge-pill"><%= p.categoryName %></span><% } %>
+              <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %><% if (p.sizeList.length > 0) { %> &middot; Sizes: <%= p.sizeList.join(', ') %><% } %></p>
+              <div class="roster-btn-row">
+                <a class="roster-action-btn" href="/main-admin/store/<%= p.id %>/edit">Edit</a>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+
+      <dialog id="new-product-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/store">
+          <h3>New Product</h3>
+          <label>Name
+            <input type="text" name="name" required />
+          </label>
+          <label>Price ($)
+            <input type="number" name="price" min="0" step="0.01" required />
+          </label>
+          <label>Category
+            <select name="categoryId">
+              <option value="">Uncategorized</option>
+              <% categories.forEach(function(c) { %><option value="<%= c.id %>"><%= c.name %></option><% }); %>
+            </select>
+          </label>
+          <label>Sizes (comma-separated, blank = no sizes)
+            <input type="text" name="sizes" placeholder="e.g. S, M, L, XL" />
+          </label>
+          <label>Inventory (blank = unlimited)
+            <input type="number" name="inventoryCount" min="0" />
+          </label>
+          <label>Availability
+            <select name="availability">
+              <option value="both">Online + In-person</option>
+              <option value="online">Online only</option>
+              <option value="in_person">In-person only</option>
+            </select>
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Create</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
+
+    <% if (activeTab === 'orders') { %>
+      <% if (orders.length === 0) { %>
+        <p class="roster-empty">No orders yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Member</th>
+                <th>Type</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% orders.forEach(function(o) { %>
+                <tr>
+                  <td><a href="/main-admin/store/orders/<%= o.id %>">#<%= o.id %></a></td>
+                  <td><%= o.memberName %></td>
+                  <td><%= o.sale_type === 'online' ? 'Online' : 'In-person' %></td>
+                  <td>$<%= (o.total_cents / 100).toFixed(2) %></td>
+                  <td><span class="badge-pill badge-pill-<%= o.status === 'fulfilled' || o.status === 'paid' ? 'green' : o.status === 'cancelled' ? 'gray' : 'orange' %>"><%= o.status %></span></td>
+                  <td><%= o.created_at %></td>
+                  <td class="roster-btn-row">
+                    <% if (o.status === 'paid') { %>
+                      <form method="POST" action="/main-admin/store/orders/<%= o.id %>/fulfill" class="inline-block-form">
+                        <button type="submit" class="roster-action-btn">Fulfill</button>
+                      </form>
+                    <% } %>
+                    <% if (o.status !== 'cancelled' && o.status !== 'fulfilled') { %>
+                      <form method="POST" action="/main-admin/store/orders/<%= o.id %>/cancel" class="inline-block-form" data-confirm="Cancel order #<%= o.id %>?">
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <dialog id="in-person-dialog" class="class-form-dialog">
+        <form method="POST" action="/main-admin/store/orders/in-person">
+          <div class="class-form-dialog-header">
+            <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-tag"/></svg></span>
+            <h3>Record In-Person Sale</h3>
+            <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+          </div>
+
+          <% if (saleProducts.length === 0) { %>
+            <p class="roster-empty">No products are set up for in-person sale yet.</p>
+          <% } else { %>
+            <p class="hint">Set a quantity for each item being sold. Add several different products (and sizes) to one sale.</p>
+            <div class="sale-cart-list">
+              <% saleProducts.forEach(function(p, idx) { %>
+                <div class="sale-cart-row">
+                  <input type="hidden" name="items[<%= idx %>][productId]" value="<%= p.id %>" />
+                  <input class="sale-cart-qty" type="number" name="items[<%= idx %>][quantity]" min="0" <% if (p.inventory_count != null) { %>max="<%= p.inventory_count %>"<% } %> value="0" aria-label="Quantity of <%= p.name %>" />
+                  <% if (p.sizeList.length > 0) { %>
+                    <select class="sale-cart-size" name="items[<%= idx %>][size]" aria-label="Size of <%= p.name %>">
+                      <% p.sizeList.forEach(function(s) { %><option value="<%= s %>"><%= s %></option><% }); %>
+                    </select>
+                  <% } %>
+                  <span class="sale-cart-info">
+                    <span class="sale-cart-name"><%= p.name %></span>
+                    <span class="sale-cart-meta">$<%= (p.price_cents / 100).toFixed(2) %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></span>
+                  </span>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+
+          <label>Member
+            <select name="memberId" required>
+              <% members.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+            </select>
+          </label>
+          <p class="hint">Recorded as paid immediately - this is for a sale where money already changed hands in person.</p>
+
+          <div class="class-form-dialog-footer">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Order</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
+
+    <% if (activeTab === 'archived') { %>
+      <% if (archived.length === 0) { %>
+        <p class="roster-empty">No archived products.</p>
+      <% } else { %>
+        <div class="team-card-grid">
+          <% archived.forEach(function(p) { %>
+            <div class="team-col">
+              <div class="team-info-card">
+                <h3 class="team-info-title"><%= p.name %></h3>
+                <span class="badge-pill badge-pill-gray">Archived</span>
+                <% if (p.categoryName) { %><span class="badge-pill"><%= p.categoryName %></span><% } %>
+                <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %></p>
+                <div class="roster-btn-row">
+                  <form method="POST" action="/main-admin/store/<%= p.id %>/status" class="inline-block-form">
+                    <input type="hidden" name="status" value="draft" />
+                    <input type="hidden" name="redirectTo" value="/main-admin/store?tab=archived" />
+                    <button type="submit" class="roster-action-btn">Restore</button>
+                  </form>
+                  <form method="POST" action="/main-admin/store/<%= p.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= p.name %>&quot;? This cannot be undone.">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } %>
+
+    <% if (activeTab === 'settings') { %>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Categories</h2></div>
+        <% if (categories.length === 0) { %>
+          <p class="roster-empty">No categories yet &mdash; add one above.</p>
+        <% } else { %>
+          <ul class="store-category-list">
+            <% categories.forEach(function(c) { %>
+              <li class="store-category-row">
+                <form method="POST" action="/main-admin/store/categories/<%= c.id %>" class="store-category-rename-form">
+                  <input type="text" name="name" value="<%= c.name %>" required />
+                  <button type="submit" class="btn-secondary">Save</button>
+                </form>
+                <form method="POST" action="/main-admin/store/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its products become uncategorized.">
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                </form>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <dialog id="add-category-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/store/categories">
+          <h3>Add Category</h3>
+          <label for="add-store-category-name">Category Name
+            <input id="add-store-category-name" type="text" name="name" placeholder="e.g. Apparel" required />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Add</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
   </main>
 </body>
 </html>

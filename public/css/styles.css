@@ -6028,6 +6028,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 }
 .class-form-dialog-footer .primary-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
 .class-form-dialog-footer .primary-btn .icon { width: 0.9rem; height: 0.9rem; }
+
+/* Shop's In-Person Sale cart (.class-form-dialog, reused wide-dialog
+   chrome) - a real request: "list of products with qty and size next to
+   each on the left" - so the quantity/size inputs lead each row, with
+   the product's own name/price reading to their right, not the other
+   way around. Only rows an admin actually sets a quantity on end up as
+   order lines (see routes/admin-store.js's own comment on why). */
+.sale-cart-list { max-height: min(360px, 50vh); overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.75rem; margin-bottom: 1rem; }
+.sale-cart-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.sale-cart-row:last-child { border-bottom: none; }
+.sale-cart-qty { width: 3.5rem; flex: 0 0 auto; }
+.sale-cart-size { width: 5rem; flex: 0 0 auto; }
+.sale-cart-info { flex: 1 1 auto; min-width: 0; }
+.sale-cart-info .sale-cart-name { display: block; font-weight: 600; }
+.sale-cart-info .sale-cart-meta { display: block; font-size: 0.8rem; color: var(--muted); }
+
+/* Shop Settings tab's category list - same inline rename-form + delete
+   button per row as .edit-families-list, kept under its own class names
+   per this app's convention of one feature, one set of class names even
+   when the layout is identical. */
+.store-category-list { list-style: none; margin: 0 0 1rem; padding: 0; max-height: 50vh; overflow-y: auto; }
+.store-category-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.store-category-row:last-child { border-bottom: none; }
+.store-category-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
+.store-category-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
 .import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"],

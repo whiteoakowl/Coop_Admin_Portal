@@ -33,6 +33,13 @@
           <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
         </select>
       </label>
+      <% if (product.sizeList.length > 0) { %>
+        <label>Size
+          <select name="size" required>
+            <% product.sizeList.forEach(function(s) { %><option value="<%= s %>"><%= s %></option><% }); %>
+          </select>
+        </label>
+      <% } %>
       <label>Quantity
         <input type="number" name="quantity" min="1" value="1" <% if (product.inventory_count != null) { %>max="<%= product.inventory_count %>"<% } %> />
       </label>

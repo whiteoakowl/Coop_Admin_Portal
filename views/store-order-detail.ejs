@@ -23,6 +23,7 @@
         <thead>
           <tr>
             <th>Item</th>
+            <th>Size</th>
             <th>Quantity</th>
             <th>Price</th>
           </tr>
@@ -31,6 +32,7 @@
           <% order.items.forEach(function(i) { %>
             <tr>
               <td><%= i.productName || '(removed item)' %></td>
+              <td><%= i.size || '–' %></td>
               <td><%= i.quantity %></td>
               <td>$<%= (i.unit_price_cents / 100).toFixed(2) %></td>
             </tr>
