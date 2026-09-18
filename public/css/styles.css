@@ -3988,18 +3988,28 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    is what "can't resize anything on mobile" turned out to mean in
    practice: the touch just kept missing the tiny handle and landing on
    the badge element underneath (a move, never a resize). Declared after
-   the base rules above so it wins the cascade on a matching device. */
+   the base rules above so it wins the cascade on a matching device.
+   A later real report went the other way - "extremely difficult to
+   resize or move things on mobile... resizing the dots should be
+   smaller" - traced to the 26px size going too far: name tag elements
+   like the logo are only ~30px square to begin with (and start out
+   zoomed to 75% on a phone-width screen - see name-tag-editor.js's own
+   autoFitZoomToViewport), so 8 handles at 26px each sat almost entirely
+   on top of one another around a small element, making it impossible to
+   tell which one a touch would actually grab. 18px keeps handles well
+   above the original mouse-only 12px while leaving enough room between
+   them on a small element to tell them apart. */
 @media (pointer: coarse) {
-  .name-tag-resize-handle { width: 26px; height: 26px; }
-  .name-tag-resize-handle-nw { top: -13px; left: -13px; }
-  .name-tag-resize-handle-n { top: -13px; margin-left: -13px; }
-  .name-tag-resize-handle-ne { top: -13px; right: -13px; }
-  .name-tag-resize-handle-e { margin-top: -13px; right: -13px; }
-  .name-tag-resize-handle-se { bottom: -13px; right: -13px; }
-  .name-tag-resize-handle-s { bottom: -13px; margin-left: -13px; }
-  .name-tag-resize-handle-sw { bottom: -13px; left: -13px; }
-  .name-tag-resize-handle-w { margin-top: -13px; left: -13px; }
-  .name-tag-rotate-handle { top: -40px; width: 26px; height: 26px; margin-left: -13px; }
+  .name-tag-resize-handle { width: 18px; height: 18px; }
+  .name-tag-resize-handle-nw { top: -9px; left: -9px; }
+  .name-tag-resize-handle-n { top: -9px; margin-left: -9px; }
+  .name-tag-resize-handle-ne { top: -9px; right: -9px; }
+  .name-tag-resize-handle-e { margin-top: -9px; right: -9px; }
+  .name-tag-resize-handle-se { bottom: -9px; right: -9px; }
+  .name-tag-resize-handle-s { bottom: -9px; margin-left: -9px; }
+  .name-tag-resize-handle-sw { bottom: -9px; left: -9px; }
+  .name-tag-resize-handle-w { margin-top: -9px; left: -9px; }
+  .name-tag-rotate-handle { top: -34px; width: 18px; height: 18px; margin-left: -9px; }
 }
 
 .name-tag-properties:empty { display: none; }
