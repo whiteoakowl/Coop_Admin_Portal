@@ -48,7 +48,13 @@ test('a single class roster does NOT show the Alerts section', async () => {
 
   const res = await request(app).get(`/admin/rosters?tab=class-${classId}`).set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.doesNotMatch(res.text, /Monday Alerts/);
-  assert.doesNotMatch(res.text, /Substitutes Needed/);
-  assert.doesNotMatch(res.text, /Class Cancellation Risk/);
+  // Scoped to the page's own <main> content, not the whole document -
+  // the shared sidebar (views/partials/admin-nav.ejs) now lists "Class
+  // Cancellation Risk"/"Substitutes Needed" among Logs' own subpage
+  // links on every page, which would otherwise false-positive here even
+  // though this page's own Alerts section is correctly absent.
+  const mainContent = res.text.slice(res.text.indexOf('<main id="main-content"'));
+  assert.doesNotMatch(mainContent, /Monday Alerts/);
+  assert.doesNotMatch(mainContent, /Substitutes Needed/);
+  assert.doesNotMatch(mainContent, /Class Cancellation Risk/);
 });

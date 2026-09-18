@@ -67,11 +67,13 @@
       { key: 'settings', label: 'Settings' },
     ];
     %>
-    <div class="view-tabs">
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= (builderTabDefs.find(function(t) { return t.key === activeTab; }) || builderTabDefs[0]).label %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <% builderTabDefs.forEach(function(t) { %>
         <a href="/main-admin/events/<%= event.id %>/builder?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %></a>
       <% }); %>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <% if (activeTab === 'details') { %>
       <div class="manage-section">

@@ -2417,16 +2417,27 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    that; [open] then re-enables this popup's own layout once it's
    genuinely showing. */
 .page-tabs-dialog:not([open]) { display: none; }
+/* A real request: "the menu of subpages is supposed to be attached to
+   the orange menu bar on the bottom. You click a tab... and a list of
+   pages appears, attached to the orange bar" - anchored as a bottom
+   sheet sitting right on top of .admin-mobile-tabs (same 4.75rem+safe-
+   area clearance .admin-main's own bottom padding reserves for that bar,
+   so this lines up with its top edge exactly) instead of centered on
+   screen like a generic modal. `inset` (not `margin: auto`) overrides
+   the <dialog> UA stylesheet's own `inset: 0` centering. */
 .page-tabs-dialog[open] {
   display: flex;
   flex-direction: column;
   overflow: visible;
   border: none;
-  border-radius: var(--radius);
+  border-radius: var(--radius) var(--radius) 0 0;
   padding: 0.5rem;
-  margin: auto;
-  width: min(320px, calc(100vw - 2.5rem));
-  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+  position: fixed;
+  inset: auto 0.75rem calc(4.75rem + env(safe-area-inset-bottom)) 0.75rem;
+  margin: 0 auto;
+  width: auto;
+  max-width: 420px;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.25);
 }
 .page-tabs-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .page-tabs-dialog .view-tab {

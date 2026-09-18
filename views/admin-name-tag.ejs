@@ -19,11 +19,13 @@
       <div class="alert alert-error"><%= error %></div>
     <% } %>
 
-    <div class="view-tabs no-print">
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'print' ? 'Print' : (tab === 'requests' || tab === 'archived') ? 'Requests' : 'Design' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/name-tag?tab=design">Design</a>
       <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/name-tag?tab=print">Print</a>
       <a class="view-tab<%= tab === 'requests' || tab === 'archived' ? ' active' : '' %>" href="/admin/name-tag?tab=requests">Requests</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
     <div class="view-tab-panel">
       <% if (tab === 'design') { %>
         <div class="name-tag-design-toolbar">

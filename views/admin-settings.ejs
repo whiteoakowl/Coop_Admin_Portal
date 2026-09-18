@@ -11,7 +11,8 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
 
-    <div class="view-tabs">
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'account' ? 'Username/Password' : activeTab === 'classcheckin' ? 'Class Check-In PIN' : activeTab === 'install' ? 'Install App' : activeTab === 'documents' ? 'Documents' : 'Quick Links' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
         <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
@@ -21,7 +22,8 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
       <% } %>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
     <div class="view-tab-panel">
       <% if (activeTab === 'account') { %>
         <div class="settings-account-grid">

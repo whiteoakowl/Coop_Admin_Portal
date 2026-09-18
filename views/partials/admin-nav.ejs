@@ -10,21 +10,93 @@
   <a class="brand" href="/admin">
     <img src="/img/logo-owl.png" alt="Sanford Homeschoolers" />
   </a>
+  <%
+    // A real request: "instead of the tabs on each page, make them
+    // subpages under each menu tab" (desktop) / "when you click the tab
+    // below a menu will pop up" (mobile) - already built for every other
+    // portal (see portal-nav.ejs's own primaryNavLinks/subpages and
+    // public/js/admin-nav-accordion.js, page-tabs.js below), just never
+    // wired in here for Co-op Admin's own separate nav shell. Design/
+    // Print is left a plain link (data-match already covers Name Tag) -
+    // it and Name Tag are two distinct pages with two distinct tab sets
+    // of their own, not one clean list to combine into a single dropdown.
+    const adminNavLinks = [
+      { href: '/admin', icon: 'home', label: 'Home' },
+      // Monday/Wednesday's own Student/Parent roster toggle lives inside
+      // the page itself (?tab=monday-student vs. monday-parent, etc.) -
+      // admin-nav-accordion.js matches the exact ?tab= value, so landing
+      // on the Parent half won't auto-highlight "Monday" here the same
+      // way the page's own tabLabel print header already handles it
+      // (see admin-rosters.ejs); a cosmetic gap in the sidebar's own
+      // active-state only, not a broken link or a broken mobile popup.
+      { href: '/admin/rosters', icon: 'calendar-check', label: 'Attendance', subpages: [
+        { href: '/admin/rosters?tab=monday-student', label: 'Monday' },
+        { href: '/admin/rosters?tab=wednesday-student', label: 'Wednesday' },
+        { href: '/admin/rosters?tab=classes', label: 'Classes' },
+        { href: '/admin/rosters?tab=playground', label: 'Playground' },
+        { href: '/admin/rosters?tab=archive', label: 'Archive' },
+      ] },
+      { href: '/admin/volunteers', icon: 'users', label: 'Floater Assignments' },
+      { href: '/admin/setup', icon: 'broom', label: 'Setup/Cleanup' },
+      { href: '/admin/schedule', icon: 'clock', match: '/admin/class-schedule', label: 'Schedules', subpages: [
+        { href: '/admin/schedule?tab=monday', label: 'Class Schedules' },
+        ...(isFullAdmin ? [
+          { href: '/admin/schedule?tab=members', label: 'Member Schedules' },
+          { href: '/admin/schedule?tab=archive', label: 'Archive' },
+          { href: '/admin/schedule?tab=settings', label: 'Settings' },
+        ] : []),
+      ] },
+      { href: '/admin/logs', icon: 'clipboard-list', label: 'Logs', subpages: [
+        { href: '/admin/logs?tab=absence', label: 'Absence/Late Log' },
+        { href: '/admin/logs?tab=checkinout', label: 'Co-op Check-In/Out Log' },
+        { href: '/admin/logs?tab=classcheckinout', label: 'Class Check-In/Out Log' },
+        { href: '/admin/logs?tab=nametag', label: 'Name Tag Requests' },
+        { href: '/admin/logs?tab=classrisk', label: 'Class Cancellation Risk' },
+        { href: '/admin/logs?tab=substitutes', label: 'Substitutes Needed' },
+        { href: '/admin/logs?tab=allergies', label: 'Allergies/Medical' },
+      ] },
+      { href: '/admin/training', icon: 'graduation-cap', label: 'Training' },
+    ];
+    // Members' own Members/Archived toggle is a ?archived= param, not
+    // ?tab= - public/js/admin-nav-accordion.js's own active-subpage
+    // matching only ever compares ?tab=, so folding this into the
+    // accordion here would just always read "Members" as the active one
+    // even while actually on Archived. Left a plain link; its own page
+    // still gets the mobile tab-popup treatment regardless (see
+    // admin-members.ejs), since that's driven server-side by
+    // showArchived, not by this sidebar's own client-side script.
+    const adminFullAdminNavLinks = [
+      { href: '/admin/members', icon: 'user-check', label: 'Members' },
+      { href: '/admin/library', icon: 'book', label: 'Library', subpages: [
+        { href: '/admin/library?tab=checkin', label: 'Check In' },
+        { href: '/admin/library?tab=checkout', label: 'Check Out' },
+        { href: '/admin/library?tab=members', label: 'Library Log' },
+        { href: '/admin/library?tab=titles', label: 'Catalog' },
+      ] },
+      { href: '/admin/documents', icon: 'file-text', label: 'Documents' },
+      { href: '/admin/design', icon: 'palette', match: '/admin/name-tag', label: 'Design/Print' },
+      { href: '/admin/announcements', icon: 'bell', label: 'Communication', subpages: [
+        { href: '/admin/announcements', label: 'Announcements' },
+        { href: '/admin/announcements/email', label: 'Email' },
+        { href: '/admin/announcements/text', label: 'Text' },
+      ] },
+    ];
+  %>
   <nav id="admin-nav-links">
-    <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg> Home</a>
-    <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg> Attendance</a>
-    <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg> Floater Assignments</a>
-    <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg> Setup/Cleanup</a>
-    <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg> Schedules</a>
-    <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg> Logs</a>
-    <a href="/admin/training"><svg class="icon"><use href="#icon-graduation-cap"/></svg> Training</a>
-    <% if (isFullAdmin) { %>
-      <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg> Members</a>
-      <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg> Library</a>
-      <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg> Documents</a>
-      <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg> Design/Print</a>
-      <a href="/admin/announcements"><svg class="icon"><use href="#icon-bell"/></svg> Communication</a>
-    <% } %>
+    <% adminNavLinks.concat(isFullAdmin ? adminFullAdminNavLinks : []).forEach(function(link) { %>
+      <% if (link.subpages && link.subpages.length) { %>
+        <details class="admin-nav-group">
+          <summary><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %> <svg class="icon admin-nav-group-chevron"><use href="#icon-chevron-down"/></svg></summary>
+          <div class="admin-nav-subpages">
+            <% link.subpages.forEach(function(sp) { %>
+              <a href="<%= sp.href %>"><%= sp.label %></a>
+            <% }); %>
+          </div>
+        </details>
+      <% } else { %>
+        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+      <% } %>
+    <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
     <%# The Co-op Admin Portal runs on its own session (req.session.adminId,
@@ -121,3 +193,12 @@
 <script src="/js/roster-btn-row-grid.js"></script>
 <script src="/js/roster-student-profile.js"></script>
 <script src="/js/skip-link.js"></script>
+<%# A real request: "the new tab system for mobile is only applied to
+    main admin portal. It need to be applied to all portals" - every
+    other portal shares portal-nav.ejs, which already loads this same
+    pair (admin-nav-accordion.js drives the .admin-nav-group <details>
+    above; page-tabs.js drives each converted page's own .page-tabs-
+    trigger/.page-tabs-dialog pair) - Co-op Admin's own separate nav
+    shell just never had them wired in. %>
+<script src="/js/admin-nav-accordion.js"></script>
+<script src="/js/page-tabs.js"></script>

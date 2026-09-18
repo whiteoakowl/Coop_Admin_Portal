@@ -16,7 +16,8 @@
     </p>
     <% if (cls.description) { %><div class="hint forum-editable-display"><%- cls.description %></div><% } %>
 
-    <div class="view-tabs no-print">
+    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'lessons' ? 'Lessons' : tab === 'forum' ? 'Class Forum' : tab === 'resources' ? 'Resources' : tab === 'attendance' ? 'Attendance' : tab === 'assessments' ? 'Assessments' : tab === 'grades' ? 'Grades' : 'Assignments' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab<%= tab === 'assignments' ? ' active' : '' %>" href="?tab=assignments">Assignments</a>
       <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons">Lessons</a>
       <a class="view-tab<%= tab === 'forum' ? ' active' : '' %>" href="?tab=forum">Class Forum</a>
@@ -24,7 +25,8 @@
       <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance">Attendance</a>
       <a class="view-tab<%= tab === 'assessments' ? ' active' : '' %>" href="?tab=assessments">Assessments</a>
       <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades">Grades</a>
-    </div>
+      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
+    </dialog>
 
     <div class="view-tab-panel">
       <% if (tab === 'assignments') { %>
