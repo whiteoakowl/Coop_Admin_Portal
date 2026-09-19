@@ -1883,19 +1883,20 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   margin: 0;
 }
 
-/* Full-width colored day header bar - a real request, with a reference
-   screenshot: solid Co-op Admin orange/blue (same --accent/--brand-dark
-   tokens the sidebar/topbar already use) with white text and an icon in
-   a translucent white circle, replacing the small tinted
-   .family-student-day-pill (still used by partials/dashboard-type-
-   stats.ejs elsewhere) with a bar spanning the whole column. */
+/* Full-width day header bar - originally a real request with its own
+   reference screenshot for a solid Co-op Admin orange/blue fill; a later
+   real request asked for the same soft pastel tint every other card on
+   this page (and the rest of the site) already uses instead - the small
+   icon chip in each row directly below this bar
+   (.family-student-row-icon-orange/-blue) already sets that exact
+   precedent (tint background, dark accent icon/text), just never applied
+   to this larger bar above it. */
 .family-student-day-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
   font-size: 0.95rem;
-  color: #fff;
   padding: 0.55rem 0.8rem;
   border-radius: 10px;
   margin-bottom: 0.7rem;
@@ -1904,20 +1905,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.family-student-day-header-icon .icon { width: 14px; height: 14px; color: #fff; }
-/* var(--accent), this app's usual solid Co-op Admin orange, is too light
-   for white text at this size/weight (2.01:1, axe flags it) - var(--orange)
-   is this app's OTHER established orange (already used as an accessible
-   "text on tint" color, e.g. .badge-pill-absent), and clears 4.5:1 against
-   white here as a solid fill instead. */
-.family-student-day-header-orange { background: var(--orange); }
-.family-student-day-header-blue { background: var(--brand-dark); }
+.family-student-day-header-icon .icon { width: 14px; height: 14px; color: inherit; }
+.family-student-day-header-orange { background: var(--orange-bg); color: var(--accent-dark); }
+.family-student-day-header-blue { background: var(--brand-soft); color: var(--brand-dark); }
 
 @media (max-width: 720px) {
   /* A real request: "on mobile the Monday/Wednesday columns should be
@@ -2173,7 +2169,13 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    (draft/published/archived; not_started/in_progress/passed/failed/
    retry_required/expired) instead of introducing a new color system. */
 .badge-pill-green { background: var(--green-bg); color: var(--green); }
-.badge-pill-orange { background: var(--brand-soft); color: var(--brand-dark); }
+/* This was mistakenly wired to the blue tokens (a real bug this fixes) -
+   "orange" rendered as blue everywhere it's used (Draft event badges,
+   Training statuses), indistinguishable from an actually-blue badge right
+   next to it. --orange/--orange-bg is this same file's own established
+   text-on-tint pair for orange, exactly parallel to the green/red pairs
+   on this same line. */
+.badge-pill-orange { background: var(--orange-bg); color: var(--orange); }
 .badge-pill-red { background: var(--red-bg); color: var(--red); }
 .badge-pill-gray { background: var(--border); color: var(--muted); }
 
@@ -3218,18 +3220,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #fff;
   font-size: 0.9rem;
   font-weight: 700;
   overflow: hidden;
 }
 .member-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.member-avatar-blue { background: var(--brand-dark); }
-.member-avatar-green { background: var(--green); }
-.member-avatar-purple { background: var(--purple); }
-.member-avatar-red { background: var(--red); }
-.member-avatar-orange { background: var(--accent-dark); }
-.member-avatar-gold { background: var(--yellow); }
+/* A real request: "the colors should be the same soft pastel colors used
+   throughout the website" - these used to be solid/saturated fills with
+   white initials, clashing with the soft tinted badge (.badge-pill-*)
+   sitting right next to each one for this exact same color name. Each
+   variant now pairs with its own badge-pill-* counterpart's own tint/text
+   combo instead of inventing a separate solid palette. */
+.member-avatar-blue { background: var(--brand-soft); color: var(--brand-dark); }
+.member-avatar-green { background: var(--green-bg); color: var(--green); }
+.member-avatar-purple { background: var(--purple-soft); color: var(--purple); }
+.member-avatar-red { background: var(--red-bg); color: var(--red); }
+.member-avatar-orange { background: var(--orange-bg); color: var(--accent-dark); }
+.member-avatar-gold { background: var(--yellow-bg); color: var(--yellow); }
 
 .member-row-body { flex: 1; min-width: 0; }
 .member-row-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
