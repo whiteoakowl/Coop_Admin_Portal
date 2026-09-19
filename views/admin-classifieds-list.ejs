@@ -24,13 +24,9 @@
         portal-nav.ejs) / "when you click the tab below a menu will pop
         up" (mobile, see public/js/page-tabs.js) - same tab links either
         way, just moved out of this inline strip. %>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'requests' ? 'Requests' : activeTab === 'archive' ? 'Archive' : 'Categories' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a href="/main-admin/classifieds?tab=categories" class="view-tab <%= activeTab === 'categories' ? 'active' : '' %>">Categories</a>
-      <a href="/main-admin/classifieds?tab=requests" class="view-tab <%= activeTab === 'requests' ? 'active' : '' %>">Requests<% if (requests.length > 0 && activeTab !== 'requests') { %> <span class="badge-pill badge-pill-orange"><%= requests.length %></span><% } %></a>
-      <a href="/main-admin/classifieds?tab=archive" class="view-tab <%= activeTab === 'archive' ? 'active' : '' %>">Archive</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Categories/Requests/Archive now live as subpages under the orange
+        bar's own Classifieds item (views/partials/portal-nav.ejs) instead
+        of a trigger+dialog here. %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

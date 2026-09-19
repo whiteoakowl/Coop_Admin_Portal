@@ -403,12 +403,17 @@ const communityLinks =
 
 <nav class="admin-mobile-tabs" id="admin-mobile-tabs">
   <% primaryNavLinks.forEach(function(link) { %>
-    <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+    <% if (link.subpages && link.subpages.length) { %>
+      <%- include('mobile-subpages-tab', { link: link }) %>
+    <% } else { %>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+    <% } %>
   <% }); %>
   <%# Same classLinks as the desktop sidebar's own #class-nav-links block
       above, appended into this same scrollable bar for the same reason
       communityLinks is below - no room for a second section heading at
-      this width. %>
+      this width. None of these ever have subpages (grep-verified), so
+      no branch needed here the way primaryNavLinks above has. %>
   <% if (classLinks) { %>
     <% classLinks.forEach(function(link) { %>
       <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>

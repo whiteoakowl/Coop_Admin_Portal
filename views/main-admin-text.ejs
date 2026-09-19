@@ -25,14 +25,9 @@
         portal-nav.ejs) / "when you click the tab below a menu will pop
         up" (mobile, see public/js/page-tabs.js) - same tab links either
         way, just moved out of this inline strip. %>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label">Text</span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab" href="/main-admin/announcements">Announcements</a>
-      <a class="view-tab" href="/main-admin/announcements/email">Email</a>
-      <a class="view-tab active" href="/main-admin/announcements/text">Text</a>
-      <a class="view-tab" href="/main-admin/newsletter">Newsletter</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Announcements/Email/Text/Newsletter now live as subpages under the
+        orange bar's own Communication item (views/partials/portal-nav.ejs)
+        instead of a trigger+dialog here. %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

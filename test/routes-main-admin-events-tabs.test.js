@@ -1,11 +1,12 @@
-// Coverage for Main Admin Events tab strip - a real request: "the
-// different tabs should be like the file tabs on other pages at the top
-// of the page." Replaces the old dropdown-select-on-desktop/stacked-
-// expandable-accordion-on-mobile pattern (item 100) with the same
-// `.view-tabs`/`.view-tab` connected-folder-tab strip every other tabbed
-// admin page in this app already uses (see views/admin-classifieds-
-// list.ejs) - one strip, no separate mobile markup, since `.view-tabs`
-// already scrolls horizontally on a narrow screen by itself.
+// Coverage for Main Admin Events tabs - a real request: "the different
+// tabs should be like the file tabs on other pages at the top of the
+// page," later superseded by moving every such tab strip into the shared
+// nav shell (views/partials/portal-nav.ejs's own Events subpages +
+// mobile-subpages-tab.ejs's dialog) instead of any per-page markup - the
+// dialog now renders identically on every Main Admin page regardless of
+// activeTab, so these only check the real, page-specific behavior left on
+// this route (which tab's content renders, that Archive isn't a real
+// tab) rather than markup that's no longer page-specific at all.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -44,32 +45,35 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
-test('Events list: renders the shared .view-tabs strip (not the old dropdown/accordion) with all 5 tabs, active one marked', async () => {
+test('Events list: the nav shell renders all 5 Events subpages, in the shared dialog', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/events?tab=requests').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
 
-  // A later real request moved this strip out of an inline page div: on
-  // desktop these tabs are now subpages under the sidebar's own Events
-  // menu item (views/partials/portal-nav.ejs), and on mobile they
-  // collapse into a popup dialog (public/js/page-tabs.js) - same
-  // .view-tab links either way, just inside a <dialog> instead.
-  assert.match(page.text, /<dialog class="view-tabs page-tabs-dialog no-print">/);
-  assert.doesNotMatch(page.text, /event-tabs-desktop/, 'the old desktop dropdown markup should be gone');
-  assert.doesNotMatch(page.text, /event-mobile-accordion/, 'the old mobile accordion markup should be gone');
-
-  ['Calendar', 'Drafts', 'Event Attendance', 'Settings'].forEach((label) => {
-    assert.match(page.text, new RegExp(`class="view-tab ">${label}<`));
+  // This dialog lives in views/partials/portal-nav.ejs (via mobile-
+  // subpages-tab.ejs) now, rendered the same way regardless of activeTab -
+  // no more per-page dropdown/accordion markup to check for absence, and
+  // no server-rendered "active" class (that's client-side now, see
+  // public/js/admin-nav-accordion.js).
+  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-events">([\s\S]*?)<\/dialog>/.exec(page.text);
+  assert.ok(dialogMatch, 'the Events nav-shell dialog should exist');
+  ['Calendar', 'Drafts', 'Requests', 'Event Attendance', 'Settings'].forEach((label) => {
+    assert.match(dialogMatch[1], new RegExp(`class="view-tab" href="[^"]*">${label}<`));
   });
-  assert.match(page.text, /class="view-tab active">Requests/);
 });
 
-test('Events list: clicking a tab link navigates and marks the new tab active', async () => {
+test('Events list: each ?tab= value renders that tab\'s own page content', async () => {
   const admin = await loginAsMainAdmin();
-  const page = await request(app).get('/main-admin/events?tab=settings').set('Cookie', admin.cookie);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /class="view-tab active">Settings/);
-  assert.match(page.text, /<a href="\/main-admin\/events\?tab=calendar" class="view-tab ">Calendar<\/a>/);
+  const settingsPage = await request(app).get('/main-admin/events?tab=settings').set('Cookie', admin.cookie);
+  assert.equal(settingsPage.status, 200);
+  // Only Calendar/Drafts get the "+ New Event" button (see admin-events-
+  // list.ejs's own activeTab check) - a real, page-specific signal that
+  // ?tab=settings actually changed what rendered, unlike the old test's
+  // now-removed "active" class on a strip that's no longer page-specific.
+  assert.doesNotMatch(settingsPage.text, /\+ New Event/);
+
+  const calendarPage = await request(app).get('/main-admin/events?tab=calendar').set('Cookie', admin.cookie);
+  assert.match(calendarPage.text, /\+ New Event/);
 });
 
 test('Events list: the Archive tab is gone - not a needed feature', async () => {
@@ -77,17 +81,17 @@ test('Events list: the Archive tab is gone - not a needed feature', async () => 
   const page = await request(app).get('/main-admin/events').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   // Other sections (Classifieds, Directory, Chat, Members) keep their own
-  // "Archive" subpage in the shared sidebar rendered on every page, so
-  // this only checks the Events page-tabs dialog/route itself, not the
-  // page as a whole.
-  assert.doesNotMatch(page.text, /main-admin\/events\?tab=archive/);
-  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print">([\s\S]*?)<\/dialog>/.exec(page.text);
-  assert.ok(dialogMatch, 'the Events page-tabs dialog should exist');
+  // "Archive" subpage in the shared nav shell rendered on every page, so
+  // this only checks the Events item's own dialog, not the page as a
+  // whole.
+  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-events">([\s\S]*?)<\/dialog>/.exec(page.text);
+  assert.ok(dialogMatch, 'the Events nav-shell dialog should exist');
   assert.doesNotMatch(dialogMatch[1], />Archive</);
 
   const archiveTab = await request(app).get('/main-admin/events?tab=archive').set('Cookie', admin.cookie);
   assert.equal(archiveTab.status, 200);
-  assert.match(archiveTab.text, /class="view-tab active">Calendar/, 'an unrecognized tab param falls back to Calendar');
+  // An unrecognized tab param falls back to Calendar's own content.
+  assert.match(archiveTab.text, /\+ New Event/);
 });
 
 test('Events builder (per-event edit page): renders its own .view-tabs strip with the 5 real request tabs', async () => {

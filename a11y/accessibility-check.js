@@ -276,30 +276,38 @@ test('mobile page-tabs popup stays hidden until opened', { timeout: 30000 }, asy
     const page = await context.newPage();
     if (mainAdminCookies && mainAdminCookies.length) await context.addCookies(mainAdminCookies);
     await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
-    // Main Admin's own Members page has real subpages (Members/
-    // Approvals/Settings/Archive) - Co-op Admin's own equivalent pages
-    // (see admin-nav.ejs) got this same treatment in a later real
-    // request too, so this isn't Main-Admin-specific coverage anymore,
-    // just a convenient page that already has subpages either way.
+    // Main Admin's own Members item has real subpages (Members/
+    // Approvals/Settings/Archive) - Co-op Admin's own equivalent (see
+    // admin-nav.ejs) got this same treatment in a later real request too,
+    // so this isn't Main-Admin-specific coverage anymore, just a
+    // convenient page that already has subpages either way. Every
+    // subpages-bearing item's own dialog now lives in the shared nav
+    // shell (present on every page, see mobile-subpages-tab.ejs) rather
+    // than just the one matching page, so this targets Members' own
+    // dialog by id specifically instead of the first .page-tabs-dialog on
+    // the page (there are several, one per subpages-bearing nav item).
     await page.goto(base + '/main-admin/members', { waitUntil: 'load', timeout: PAGE_TIMEOUT_MS });
 
     const closed = await page.evaluate(() => {
-      const d = document.querySelector('.page-tabs-dialog');
+      const d = document.getElementById('mobile-subpages-members');
       return d && { open: d.open, display: getComputedStyle(d).display };
     });
     assert.deepEqual(closed, { open: false, display: 'none' }, 'the popup must be fully hidden before its trigger is ever clicked');
 
-    // A real request: "no blue menu page bar on the pages. Only the pop
-    // up on the orange bar to choose a subpage" - the old visible
-    // .page-tabs-trigger button is gone (permanently display: none);
-    // tapping the bottom orange bar's own current tab is what opens the
-    // popup now (see public/js/page-tabs.js).
-    await page.click('#admin-mobile-tabs a.active');
+    // A later real request sharpened this further: "the tab should not
+    // work on mobile until you click the subpage. When you click the
+    // orange menu bar at the bottom it should show the sub pages to
+    // click" - every subpages-bearing item is now a
+    // <button data-subpages-dialog> in the bottom bar (see public/js/
+    // page-tabs.js), always opening its own popup first, from any page in
+    // that section, rather than only from the one page whose own markup
+    // used to carry the dialog.
+    await page.click('#admin-mobile-tabs [data-subpages-dialog="mobile-subpages-members"]');
     const opened = await page.evaluate(() => {
-      const d = document.querySelector('.page-tabs-dialog');
+      const d = document.getElementById('mobile-subpages-members');
       return d && { open: d.open, display: getComputedStyle(d).display, position: getComputedStyle(d).position };
     });
-    assert.deepEqual(opened, { open: true, display: 'flex', position: 'fixed' }, 'clicking the bottom bar\'s current tab should open the popup, docked to the bar, not an in-page block');
+    assert.deepEqual(opened, { open: true, display: 'flex', position: 'fixed' }, 'clicking the bottom bar\'s Members button should open its popup, docked to the bar, not an in-page block');
   } finally {
     await context.close();
   }

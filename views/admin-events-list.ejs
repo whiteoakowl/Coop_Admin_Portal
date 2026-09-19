@@ -23,28 +23,9 @@
       </div>
     </div>
 
-    <%
-      // A real request: "instead of the tabs on each page, make them
-      // subpages under each menu tab" (desktop, see views/partials/
-      // portal-nav.ejs) / "when you click the tab below a menu will pop
-      // up" (mobile, see public/js/page-tabs.js) - same tab links
-      // either way, just moved out of this inline strip.
-      const eventTabDefs = [
-        { key: 'calendar', label: 'Calendar' },
-        { key: 'drafts', label: 'Drafts' },
-        { key: 'requests', label: 'Requests' },
-        { key: 'attendance', label: 'Event Attendance' },
-        { key: 'settings', label: 'Settings' },
-      ];
-      const activeEventTab = eventTabDefs.find((t) => t.key === activeTab) || eventTabDefs[0];
-    %>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeEventTab.label %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <% eventTabDefs.forEach(function(t) { %>
-        <a href="/main-admin/events?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %><% if (t.key === 'requests' && pendingCount > 0) { %> <span class="badge-pill badge-pill-orange"><%= pendingCount %></span><% } %></a>
-      <% }); %>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Calendar/Drafts/Requests/Event Attendance/Settings now live as
+        subpages under the orange bar's own Events item (views/partials/
+        portal-nav.ejs) instead of a trigger+dialog here. %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

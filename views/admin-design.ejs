@@ -11,13 +11,9 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'print' ? 'Print' : tab === 'requests' ? 'Requests' : 'Design' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab<%= tab === 'design' ? ' active' : '' %>" href="/admin/design?tab=design">Design</a>
-      <a class="view-tab<%= tab === 'print' ? ' active' : '' %>" href="/admin/design?tab=print">Print</a>
-      <a class="view-tab<%= tab === 'requests' ? ' active' : '' %>" href="/admin/design?tab=requests">Requests</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Design/Print/Requests now live as subpages under the orange bar's
+        own Design/Print item (views/partials/admin-nav.ejs) instead of a
+        trigger+dialog here. %>
 
     <div class="view-tab-panel">
       <% if (tab === 'requests') { %>

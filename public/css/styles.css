@@ -1593,6 +1593,19 @@ body.public-page .roster-empty {
     padding: 0.4rem 0.6rem calc(0.4rem + env(safe-area-inset-bottom));
     overflow-x: auto;
     scrollbar-width: none;
+    /* Real bug report, recurring even after removing -webkit-overflow-
+       scrolling below (first reported on Chat, then again on
+       Communication): iOS Safari can still drop a `position: fixed`
+       element from its own always-on-top compositing layer mid-scroll,
+       independent of that property, if the element hasn't been promoted
+       to its own layer up front. Forcing one here (a harmless no-op
+       transform, since this bar never actually needs to move) keeps it
+       composited outside the scrolling document layer the whole time
+       instead of only while WebKit happens to decide it's worth one. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
   /* Real bug report: "on mobile, chat page, orange menu bar disappears
      as you scroll." -webkit-overflow-scrolling: touch on a position:
@@ -1605,7 +1618,21 @@ body.public-page .roster-empty {
      actually scroll, which is why Chat (long threads) surfaced it first,
      not something specific to Chat itself. */
   .admin-mobile-tabs::-webkit-scrollbar { display: none; }
-  .admin-mobile-tabs a {
+  /* A real request: "when you click the orange menu bar at the bottom it
+     should show the sub pages to click" from ANY page, not just the one
+     already open - views/partials/*-nav.ejs now renders a section with
+     subpages as a <button data-subpages-dialog> instead of a plain <a>
+     (see public/js/page-tabs.js), so every rule below has to style both
+     the same way - a phone user shouldn't be able to tell which items are
+     links and which pop a dialog open. Each such button's own <dialog>
+     (mobile-subpages-tab.ejs) sits right next to it, still inside this
+     same <nav> - a DIRECT-CHILD selector (>) instead of the plain
+     descendant selector this bar already used for its <a> tabs is what
+     keeps these rules from also reaching into that dialog's own .view-tab
+     links and Close button, which are descendants of this <nav> too but
+     were never meant to look like a bottom-bar icon. */
+  .admin-mobile-tabs > a,
+  .admin-mobile-tabs > button {
     flex: 0 0 auto;
     min-width: 4.25rem;
     display: flex;
@@ -1614,6 +1641,9 @@ body.public-page .roster-empty {
     justify-content: center;
     gap: 0.2rem;
     padding: 0.4rem 0.5rem;
+    border: none;
+    background: none;
+    font-family: inherit;
     border-radius: 8px;
     color: var(--ink);
     font-size: 0.65rem;
@@ -1621,16 +1651,21 @@ body.public-page .roster-empty {
     line-height: 1.15;
     text-align: center;
     white-space: nowrap;
+    cursor: pointer;
     transition: background-color 0.15s ease;
   }
-  .admin-mobile-tabs a .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
-  .admin-mobile-tabs a:hover { background: rgba(255,255,255,0.4); }
-  .admin-mobile-tabs a.active {
+  .admin-mobile-tabs > a .icon,
+  .admin-mobile-tabs > button .icon { width: 1.2em; height: 1.2em; opacity: 0.75; }
+  .admin-mobile-tabs > a:hover,
+  .admin-mobile-tabs > button:hover { background: rgba(255,255,255,0.4); }
+  .admin-mobile-tabs > a.active,
+  .admin-mobile-tabs > button.active {
     background: var(--surface);
     color: var(--brand-darker);
     box-shadow: var(--shadow-sm);
   }
-  .admin-mobile-tabs a.active .icon { opacity: 1; }
+  .admin-mobile-tabs > a.active .icon,
+  .admin-mobile-tabs > button.active .icon { opacity: 1; }
 }
 
 /* Opaque so the page body's blue background (--bg) never shows through
@@ -2397,7 +2432,13 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   gap: 0.5rem;
   margin: 1.25rem 0 0;
   padding: 0.7rem 1rem;
-  background: var(--brand);
+  /* A real, pre-existing contrast bug (white text on --brand's light
+     logo-blue fill, 2.09:1) only just surfaced: this trigger was
+     permanently display: none on every page axe-core ever scanned, until
+     the per-record "standalone" pages above got it back as their only way
+     to reach their own tabs. --brand-darker (its own documented hover
+     shade) keeps the same color family at a contrast ratio that passes. */
+  background: var(--brand-darker);
   color: #fff;
   border: none;
   border-radius: var(--radius);
@@ -2407,6 +2448,18 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   cursor: pointer;
 }
 .page-tabs-trigger .icon { width: 1.1em; height: 1.1em; flex-shrink: 0; }
+/* Per-record sub-tabs (one specific member's own Profile/Class Schedule/
+   Attendance tabs, one specific event's own builder tabs, one specific
+   class's own detail tabs) have no top-level nav entry on the orange bar
+   to attach a popup to at all - they're reached by clicking into a
+   record, not from the nav, so there's no "current tab" on the bar for a
+   tap to repurpose the way public/js/page-tabs.js now does for every
+   other converted page. These keep the original always-visible trigger
+   instead, at every screen width (unlike the base rule above, this one
+   isn't mobile-only - a full-admin desktop view has no other way to
+   reach these tabs either, since there's no sidebar entry for a single
+   record). */
+.page-tabs-trigger.page-tabs-trigger-standalone { display: flex; }
 /* .page-tabs-dialog stays a .view-tabs (reuses its own .view-tab children
    unchanged - see public/js/page-tabs.js) but as a popup list it needs
    its own layout, not .view-tabs's base horizontal-scrolling flex row -

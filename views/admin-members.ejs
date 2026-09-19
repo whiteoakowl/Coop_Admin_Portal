@@ -34,12 +34,10 @@
       <div class="alert alert-success no-print"><%= notice %></div>
     <% } %>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= showArchived ? 'Archived' : 'Members' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab<%= !showArchived ? ' active' : '' %>" href="<%= memberHref({ archived: '' }) %>">Members</a>
-      <a class="view-tab<%= showArchived ? ' active' : '' %>" href="<%= memberHref({ archived: '1' }) %>">Archived</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Members/Archived now lives as subpages under the orange bar's own
+        Members item (views/partials/admin-nav.ejs's own
+        adminFullAdminNavLinks/mobile-subpages-tab.ejs) instead of a
+        trigger+dialog here. %>
 
     <div class="members-search-filter-row no-print">
       <form method="GET" action="/admin/members" class="members-search-bar">

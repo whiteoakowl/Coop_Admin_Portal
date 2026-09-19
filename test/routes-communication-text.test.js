@@ -73,7 +73,6 @@ test('Main Admin Text tab: same candidate list/filter/select-all wiring as Email
 
   const page = await request(app).get('/main-admin/announcements/text').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="view-tab active" href="\/main-admin\/announcements\/text">Text</);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, />Filter</);
   assert.match(page.text, /id="email-select-all"/);

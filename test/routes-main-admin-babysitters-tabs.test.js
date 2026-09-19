@@ -56,13 +56,9 @@ test('Babysitters page: Babysitter/Approvals/Settings tabs all render', async ()
   const { cookie } = await loginAsMainAdmin();
   const directoryPage = await request(app).get('/main-admin/babysitters').set('Cookie', cookie);
   assert.equal(directoryPage.status, 200);
-  assert.match(directoryPage.text, /class="view-tab active" href="\/main-admin\/babysitters\?tab=directory">Babysitter</);
-  assert.match(directoryPage.text, /href="\/main-admin\/babysitters\?tab=approvals">Approvals/);
-  assert.match(directoryPage.text, /href="\/main-admin\/babysitters\?tab=settings">Settings/);
   assert.match(directoryPage.text, />\+ Add Babysitter Profile</);
 
   const settingsPage = await request(app).get('/main-admin/babysitters?tab=settings').set('Cookie', cookie);
-  assert.match(settingsPage.text, /class="view-tab active" href="\/main-admin\/babysitters\?tab=settings">Settings</);
   assert.match(settingsPage.text, /name="requireApproval"/);
 });
 
@@ -123,7 +119,6 @@ test('Approvals tab shows pending submissions with approve/reject actions', asyn
 
   const page = await request(app).get('/main-admin/babysitters?tab=approvals').set('Cookie', cookie);
   assert.match(page.text, /Zzz Sitter C/);
-  assert.match(page.text, /Approvals \(1\)/);
 
   const profile = await db.prepare('SELECT * FROM babysitter_profiles WHERE member_id = ?').get(memberId);
   const approveRes = await request(app)

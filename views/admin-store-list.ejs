@@ -20,14 +20,9 @@
       <% } %>
     </div>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'orders' ? 'Orders' : activeTab === 'archived' ? 'Archived' : activeTab === 'settings' ? 'Settings' : 'Products' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a href="/main-admin/store?tab=products" class="view-tab <%= activeTab === 'products' ? 'active' : '' %>">Products</a>
-      <a href="/main-admin/store?tab=orders" class="view-tab <%= activeTab === 'orders' ? 'active' : '' %>">Orders</a>
-      <a href="/main-admin/store?tab=archived" class="view-tab <%= activeTab === 'archived' ? 'active' : '' %>">Archived</a>
-      <a href="/main-admin/store?tab=settings" class="view-tab <%= activeTab === 'settings' ? 'active' : '' %>">Settings</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Products/Orders/Archived/Settings now live as subpages under the
+        orange bar's own Shop item (views/partials/portal-nav.ejs) instead
+        of a trigger+dialog here. %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

@@ -90,7 +90,6 @@ test('Main Admin Email tab: candidate rows carry role/section/grade/age/registra
 
   const page = await request(app).get('/main-admin/announcements/email').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /class="view-tab active" href="\/main-admin\/announcements\/email">Email</);
   assert.match(page.text, new RegExp(`value="${accountId}" data-email-checkbox`));
   assert.match(page.text, /data-role="student"/);
   assert.match(page.text, /data-grade="5th Grade"/);

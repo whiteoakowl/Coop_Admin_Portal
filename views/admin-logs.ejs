@@ -19,17 +19,10 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'absence' ? 'Absence/Late Log' : tab === 'checkinout' ? 'Co-op Check-In/Out Log' : tab === 'classcheckinout' ? 'Class Check-In/Out Log' : tab === 'classrisk' ? 'Class Cancellation Risk' : tab === 'substitutes' ? 'Substitutes Needed' : tab === 'allergies' ? 'Allergies/Medical' : 'Name Tag Requests' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab<%= tab === 'absence' ? ' active' : '' %>" href="/admin/logs?tab=absence">Absence/Late Log</a>
-      <a class="view-tab<%= tab === 'checkinout' ? ' active' : '' %>" href="/admin/logs?tab=checkinout">Co-op Check-In/Out Log</a>
-      <a class="view-tab<%= tab === 'classcheckinout' ? ' active' : '' %>" href="/admin/logs?tab=classcheckinout">Class Check-In/Out Log</a>
-      <a class="view-tab<%= tab === 'nametag' ? ' active' : '' %>" href="/admin/logs?tab=nametag">Name Tag Requests</a>
-      <a class="view-tab<%= tab === 'classrisk' ? ' active' : '' %>" href="/admin/logs?tab=classrisk">Class Cancellation Risk</a>
-      <a class="view-tab<%= tab === 'substitutes' ? ' active' : '' %>" href="/admin/logs?tab=substitutes">Substitutes Needed</a>
-      <a class="view-tab<%= tab === 'allergies' ? ' active' : '' %>" href="/admin/logs?tab=allergies">Allergies/Medical</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Absence/Check-In-Out/Name Tag Requests/Class Risk/Substitutes/
+        Allergies now live as subpages under the orange bar's own Logs
+        item (views/partials/admin-nav.ejs) instead of a trigger+dialog
+        here. %>
     <div class="view-tab-panel">
       <% if (tab === 'absence') { %>
         <div class="roster-toolbar no-print">

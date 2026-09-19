@@ -7,13 +7,9 @@
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Communication</h1>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label">Announcements</span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab active" href="/admin/announcements">Announcements</a>
-      <a class="view-tab" href="/admin/announcements/email">Email</a>
-      <a class="view-tab" href="/admin/announcements/text">Text</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Announcements/Email/Text now live as subpages under the orange
+        bar's own Communication item (views/partials/admin-nav.ejs)
+        instead of a trigger+dialog here. %>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>

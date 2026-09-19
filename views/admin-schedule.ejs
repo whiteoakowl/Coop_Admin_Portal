@@ -15,16 +15,9 @@
     </div>
     <h1>Schedules</h1>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= topTab === 'members' ? 'Member Schedules' : topTab === 'archive' ? 'Archive' : topTab === 'settings' ? 'Settings' : 'Class Schedules' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab<%= topTab === 'schedules' ? ' active' : '' %>" href="/admin/schedule?tab=monday">Class Schedules</a>
-      <% if (isFullAdmin) { %>
-        <a class="view-tab<%= topTab === 'members' ? ' active' : '' %>" href="/admin/schedule?tab=members">Member Schedules</a>
-        <a class="view-tab<%= topTab === 'archive' ? ' active' : '' %>" href="/admin/schedule?tab=archive">Archive</a>
-        <a class="view-tab<%= topTab === 'settings' ? ' active' : '' %>" href="/admin/schedule?tab=settings">Settings</a>
-      <% } %>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Class Schedules/Member Schedules/Archive/Settings now live as
+        subpages under the orange bar's own Schedules item (views/
+        partials/admin-nav.ejs) instead of a trigger+dialog here. %>
 
     <div class="view-tab-panel">
       <% if (tab === 'monday' || tab === 'wednesday') { %>

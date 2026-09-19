@@ -16,13 +16,9 @@
         portal-nav.ejs) / "when you click the tab below a menu will pop
         up" (mobile, see public/js/page-tabs.js) - same tab links either
         way, just moved out of this inline strip. %>
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'signup-lists' ? 'Sign-Up Lists' : activeTab === 'volunteer-lists' ? 'Volunteer Lists' : 'Committees' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
-      <a class="view-tab<%= activeTab === 'committees' ? ' active' : '' %>" href="/main-admin/volunteers?tab=committees">Committees</a>
-      <a class="view-tab<%= activeTab === 'signup-lists' ? ' active' : '' %>" href="/main-admin/volunteers?tab=signup-lists">Sign-Up Lists</a>
-      <a class="view-tab<%= activeTab === 'volunteer-lists' ? ' active' : '' %>" href="/main-admin/volunteers?tab=volunteer-lists">Volunteer Lists</a>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    <%# Committees/Sign-Up Lists/Volunteer Lists now live as subpages
+        under the orange bar's own Volunteers item (views/partials/
+        portal-nav.ejs) instead of a trigger+dialog here. %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

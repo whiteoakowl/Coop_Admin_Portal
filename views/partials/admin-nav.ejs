@@ -16,10 +16,7 @@
     // below a menu will pop up" (mobile) - already built for every other
     // portal (see portal-nav.ejs's own primaryNavLinks/subpages and
     // public/js/admin-nav-accordion.js, page-tabs.js below), just never
-    // wired in here for Co-op Admin's own separate nav shell. Design/
-    // Print is left a plain link (data-match already covers Name Tag) -
-    // it and Name Tag are two distinct pages with two distinct tab sets
-    // of their own, not one clean list to combine into a single dropdown.
+    // wired in here for Co-op Admin's own separate nav shell.
     const adminNavLinks = [
       { href: '/admin', icon: 'home', label: 'Home' },
       // Monday/Wednesday's own Student/Parent roster toggle lives inside
@@ -57,16 +54,16 @@
       ] },
       { href: '/admin/training', icon: 'graduation-cap', label: 'Training' },
     ];
-    // Members' own Members/Archived toggle is a ?archived= param, not
+    // Members' own Members/Archived toggle is a ?archived=1 param, not
     // ?tab= - public/js/admin-nav-accordion.js's own active-subpage
-    // matching only ever compares ?tab=, so folding this into the
-    // accordion here would just always read "Members" as the active one
-    // even while actually on Archived. Left a plain link; its own page
-    // still gets the mobile tab-popup treatment regardless (see
-    // admin-members.ejs), since that's driven server-side by
-    // showArchived, not by this sidebar's own client-side script.
+    // matcher now compares whatever query param(s) a subpage's own href
+    // declares (not just ?tab=), so this works the same way every ?tab=
+    // group already does.
     const adminFullAdminNavLinks = [
-      { href: '/admin/members', icon: 'user-check', label: 'Members' },
+      { href: '/admin/members', icon: 'user-check', label: 'Members', subpages: [
+        { href: '/admin/members', label: 'Members' },
+        { href: '/admin/members?archived=1', label: 'Archived' },
+      ] },
       { href: '/admin/library', icon: 'book', label: 'Library', subpages: [
         { href: '/admin/library?tab=checkin', label: 'Check In' },
         { href: '/admin/library?tab=checkout', label: 'Check Out' },
@@ -74,7 +71,24 @@
         { href: '/admin/library?tab=titles', label: 'Catalog' },
       ] },
       { href: '/admin/documents', icon: 'file-text', label: 'Documents' },
-      { href: '/admin/design', icon: 'palette', match: '/admin/name-tag', label: 'Design/Print' },
+      // Design/Print and Name Tag used to share one nav slot (Design/
+      // Print's own href, with a data-match covering Name Tag) since
+      // there was no way to give Members-style dropdown treatment to two
+      // distinct pages under one label - now that every subpages-bearing
+      // item gets its own dropdown, they're two separate items instead,
+      // each with its own tab set, and Name Tag finally gets a direct
+      // link of its own (previously unreachable from the nav at all).
+      { href: '/admin/design', icon: 'palette', label: 'Design/Print', subpages: [
+        { href: '/admin/design', label: 'Design' },
+        { href: '/admin/design?tab=print', label: 'Print' },
+        { href: '/admin/design?tab=requests', label: 'Requests' },
+      ] },
+      { href: '/admin/name-tag', icon: 'badge', label: 'Name Tag', subpages: [
+        { href: '/admin/name-tag', label: 'Design' },
+        { href: '/admin/name-tag?tab=print', label: 'Print' },
+        { href: '/admin/name-tag?tab=requests', label: 'Requests' },
+        { href: '/admin/name-tag?tab=archived', label: 'Archived' },
+      ] },
       { href: '/admin/announcements', icon: 'bell', label: 'Communication', subpages: [
         { href: '/admin/announcements', label: 'Announcements' },
         { href: '/admin/announcements/email', label: 'Email' },
@@ -155,20 +169,13 @@
 </div>
 
 <nav class="admin-mobile-tabs" id="admin-mobile-tabs">
-  <a href="/admin"><svg class="icon"><use href="#icon-home"/></svg><span>Home</span></a>
-  <a href="/admin/rosters"><svg class="icon"><use href="#icon-calendar-check"/></svg><span>Attendance</span></a>
-  <a href="/admin/volunteers"><svg class="icon"><use href="#icon-users"/></svg><span>Floaters</span></a>
-  <a href="/admin/setup"><svg class="icon"><use href="#icon-broom"/></svg><span>Setup/Cleanup</span></a>
-  <a href="/admin/schedule" data-match="/admin/class-schedule"><svg class="icon"><use href="#icon-clock"/></svg><span>Schedules</span></a>
-  <a href="/admin/logs"><svg class="icon"><use href="#icon-clipboard-list"/></svg><span>Logs</span></a>
-  <a href="/admin/training"><svg class="icon"><use href="#icon-graduation-cap"/></svg><span>Training</span></a>
-  <% if (isFullAdmin) { %>
-    <a href="/admin/members"><svg class="icon"><use href="#icon-user-check"/></svg><span>Members</span></a>
-    <a href="/admin/library"><svg class="icon"><use href="#icon-book"/></svg><span>Library</span></a>
-    <a href="/admin/documents"><svg class="icon"><use href="#icon-file-text"/></svg><span>Documents</span></a>
-    <a href="/admin/design" data-match="/admin/name-tag"><svg class="icon"><use href="#icon-palette"/></svg><span>Design/Print</span></a>
-    <a href="/admin/announcements"><svg class="icon"><use href="#icon-bell"/></svg><span>Communication</span></a>
-  <% } %>
+  <% adminNavLinks.concat(isFullAdmin ? adminFullAdminNavLinks : []).forEach(function(link) { %>
+    <% if (link.subpages && link.subpages.length) { %>
+      <%- include('mobile-subpages-tab', { link: link }) %>
+    <% } else { %>
+      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+    <% } %>
+  <% }); %>
 </nav>
 
 <%- include('session-timeout-dialog') %>

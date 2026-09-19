@@ -17,7 +17,12 @@
       </div>
     </div>
 
-    <button type="button" class="page-tabs-trigger no-print"><span class="page-tabs-trigger-label"><%= tab === 'schedule' ? 'Class Schedule' : tab === 'attendance' ? 'Attendance' : 'Profile' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
+    <%# One specific member's own Profile/Class Schedule/Attendance tabs -
+        no top-level nav entry to attach a popup to (reached by clicking
+        into a member, not from the nav), so this keeps its own
+        always-visible trigger (see styles.css's own
+        .page-tabs-trigger-standalone). %>
+    <button type="button" class="page-tabs-trigger page-tabs-trigger-standalone no-print"><span class="page-tabs-trigger-label"><%= tab === 'schedule' ? 'Class Schedule' : tab === 'attendance' ? 'Attendance' : 'Profile' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
     <dialog class="view-tabs page-tabs-dialog no-print">
       <a class="view-tab<%= tab === 'profile' ? ' active' : '' %>" href="/admin/members/<%= member.id %>?tab=profile">Profile</a>
       <a class="view-tab<%= tab === 'schedule' ? ' active' : '' %>" href="/admin/members/<%= member.id %>?tab=schedule">Class Schedule</a>

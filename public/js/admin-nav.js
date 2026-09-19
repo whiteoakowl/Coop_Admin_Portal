@@ -8,6 +8,14 @@
     return [primary].concat(extra);
   }
 
+  // A mobile bottom-bar item with subpages is a <button data-subpages-
+  // dialog data-href="..."> (see page-tabs.js), not an <a href="...">, so
+  // it needs its own "what page does this item represent" primary path
+  // instead of .getAttribute('href') (buttons have none).
+  function primaryPathOf(el) {
+    return el.tagName === 'A' ? el.getAttribute('href') : el.dataset.href;
+  }
+
   function bestMatch(candidates, getPrefixes) {
     let best = null;
     let bestLen = -1;
@@ -31,15 +39,18 @@
   // independently.
   function highlightNav(containerSelector) {
     // .admin-nav-subpages links (views/partials/portal-nav.ejs's own
-    // .admin-nav-group subpage lists) carry their own ?tab= query-param
-    // semantics that plain pathname-prefix matching can't tell apart -
-    // e.g. Members' bare href and its own Approvals subpage's href share
-    // the exact same pathname, so this generic matcher would wrongly
-    // mark the bare "default tab" link active even while on Approvals.
-    // public/js/admin-nav-accordion.js already highlights those
-    // correctly on its own; this only needs to leave them alone.
-    const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a')).filter((a) => !a.closest('.admin-nav-subpages'));
-    const activeLink = bestMatch(links, (a) => matchPrefixes(a, a.getAttribute('href')));
+    // .admin-nav-group subpage lists) and .page-tabs-dialog links (the
+    // mobile popup equivalent, mobile-subpages-tab.ejs - nested right
+    // inside #admin-mobile-tabs alongside its own trigger button) both
+    // carry their own ?tab= query-param semantics that plain
+    // pathname-prefix matching can't tell apart - e.g. Members' bare href
+    // and its own Approvals subpage's href share the exact same pathname,
+    // so this generic matcher would wrongly mark the bare "default tab"
+    // link active even while on Approvals. public/js/admin-nav-
+    // accordion.js already highlights those correctly on its own; this
+    // only needs to leave them alone.
+    const links = Array.prototype.slice.call(document.querySelectorAll(containerSelector + ' a, ' + containerSelector + ' button[data-subpages-dialog]')).filter((a) => !a.closest('.admin-nav-subpages') && !a.closest('.page-tabs-dialog'));
+    const activeLink = bestMatch(links, (a) => matchPrefixes(a, primaryPathOf(a)));
     if (activeLink) activeLink.classList.add('active');
   }
 

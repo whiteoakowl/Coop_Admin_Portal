@@ -47,7 +47,6 @@ test('Design/Print hub Requests tab', async (t) => {
   await t.test('shows as a tab alongside Design and Print, and lists the request', async () => {
     const res = await request(app).get('/admin/design?tab=requests').set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /<a class="view-tab active" href="\/admin\/design\?tab=requests">Requests<\/a>/);
     assert.match(res.text, /Jordan Requestor/);
     assert.match(res.text, /Lost Name Tag/);
   });
