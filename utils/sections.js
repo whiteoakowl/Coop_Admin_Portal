@@ -26,6 +26,27 @@ async function classSectionIds(classId) {
   return restrictedSectionIds('class_sections', 'class_id', classId);
 }
 
+// Batch version of classSectionIds for the Student/Parent "Register for a
+// Class" list (routes/student-portal.js) - that page used to call
+// classSectionIds once per open class in a loop, a real N+1 (one query
+// per class shown, on a page members hit often during registration
+// windows). One IN (...) query instead, same shape as utils/
+// adminPositions.js's own adminPositionTitlesForMembers. Returns
+// { [classId]: [sectionId, ...] }; a class with no restriction rows is
+// simply absent from the result (memberSatisfiesRestriction already
+// treats "no entry"/undefined the same as an empty array - unrestricted).
+async function classSectionIdsForClasses(classIds) {
+  if (classIds.length === 0) return {};
+  const placeholders = classIds.map(() => '?').join(',');
+  const rows = await db.prepare(`SELECT class_id AS "classId", section_id AS "sectionId" FROM class_sections WHERE class_id IN (${placeholders})`).all(...classIds);
+  const byClass = {};
+  for (const row of rows) {
+    if (!byClass[row.classId]) byClass[row.classId] = [];
+    byClass[row.classId].push(row.sectionId);
+  }
+  return byClass;
+}
+
 async function eventSectionIds(eventId) {
   return restrictedSectionIds('event_sections', 'event_id', eventId);
 }
@@ -43,4 +64,4 @@ function memberSatisfiesRestriction(memberSectionIds, restrictionIds) {
   return restrictionIds.some((id) => memberSectionIds.has(id));
 }
 
-module.exports = { sectionIdsForMember, classSectionIds, eventSectionIds, forumCategorySectionIds, memberSatisfiesRestriction };
+module.exports = { sectionIdsForMember, classSectionIds, classSectionIdsForClasses, eventSectionIds, forumCategorySectionIds, memberSatisfiesRestriction };

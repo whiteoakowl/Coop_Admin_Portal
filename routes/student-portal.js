@@ -21,7 +21,7 @@ const { formatFriendlyTimestamp, formatTimestamp, formatDateLabel, formatTime } 
 const { assignmentsForStudent, assignmentsForStudentInClass, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
-const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
+const { sectionIdsForMember, classSectionIdsForClasses, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
 const notifications = require('../utils/notifications');
 const resourceLinks = require('../utils/resourceLinks');
@@ -116,9 +116,12 @@ router.get('/classes', async (req, res) => {
   const eligibleClassIds = [];
   if (member) {
     const mySectionIds = await sectionIdsForMember(member.id);
+    // One query for every open class's own restrictions, not one per
+    // class - this page can list dozens of open classes during a
+    // registration window.
+    const restrictionsByClass = await classSectionIdsForClasses(openClasses.map((c) => c.id));
     for (const c of openClasses) {
-      const restriction = await classSectionIds(c.id);
-      if (memberSatisfiesRestriction(mySectionIds, restriction)) eligibleClassIds.push(c.id);
+      if (memberSatisfiesRestriction(mySectionIds, restrictionsByClass[c.id])) eligibleClassIds.push(c.id);
     }
   }
 

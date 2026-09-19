@@ -86,14 +86,33 @@ async function staffCountsForClass(classId) {
   return counts;
 }
 
+// Batch version for the "Sign Up to Teach" browse page below - that page
+// used to call staffCountsForClass once per open class in a loop, a real
+// N+1 (one query per class shown, every time a teacher browses open
+// classes). One GROUP BY query covering every open class instead. Returns
+// { [classId]: { teacher, assistant } }, defaulting a class with no staff
+// rows at all to { teacher: 0, assistant: 0 } same as the single version.
+async function staffCountsForClasses(classIds) {
+  const counts = {};
+  classIds.forEach((id) => {
+    counts[id] = { teacher: 0, assistant: 0 };
+  });
+  if (classIds.length === 0) return counts;
+  const placeholders = classIds.map(() => '?').join(',');
+  const rows = await db.prepare(`SELECT class_id AS "classId", role, COUNT(*) AS c FROM class_staff WHERE class_id IN (${placeholders}) GROUP BY class_id, role`).all(...classIds);
+  rows.forEach((r) => {
+    counts[r.classId][r.role] = Number(r.c);
+  });
+  return counts;
+}
+
 router.get('/browse-classes', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const myClasses = await classesForTeacher(member);
   const myClassIds = new Set(myClasses.map((c) => c.id));
 
   const openClasses = (await allClassesList(null)).filter((c) => c.allow_teacher_register && !myClassIds.has(c.id));
-  const countsByClass = {};
-  for (const c of openClasses) countsByClass[c.id] = await staffCountsForClass(c.id);
+  const countsByClass = await staffCountsForClasses(openClasses.map((c) => c.id));
 
   res.render('teacher-browse-classes', {
     title: 'Sign Up to Teach',

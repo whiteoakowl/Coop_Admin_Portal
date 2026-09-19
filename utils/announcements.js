@@ -11,6 +11,7 @@
 // whole send for the unified "Past Announcements" list.
 const db = require('../db');
 const { notify } = require('./notifications');
+const { mapWithConcurrency } = require('./concurrency');
 
 const ROLE_KEYS = ['parent', 'student', 'teacher', 'coop_admin', 'main_admin'];
 
@@ -58,9 +59,15 @@ async function sendAnnouncement({ title, body, targets, sentByAccountId, sentByP
     }
   }
 
-  for (const accountId of accountIds) {
-    await notify(accountId, 'announcement', { title, body });
-  }
+  // A real performance issue: this used to await notify() one recipient
+  // at a time - each call several DB round trips (and, when the type's
+  // auto-send is on, real email/SMS provider calls) deep - so sending to
+  // "everyone" in an 800-member co-op meant several thousand fully
+  // sequential network round trips on one request. 20 at a time keeps
+  // this fast without opening far more concurrent DB connections/provider
+  // requests than the pool (or the provider's own rate limit) can
+  // actually take at once.
+  await mapWithConcurrency(Array.from(accountIds), 20, (accountId) => notify(accountId, 'announcement', { title, body }));
 
   if (normalizedTargets.includes('public')) {
     await db.prepare('INSERT INTO announcements (title, body, is_public, created_by_account_id) VALUES (?, ?, 1, ?)').run(title, body, sentByAccountId);
