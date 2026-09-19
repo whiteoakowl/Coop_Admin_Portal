@@ -88,34 +88,57 @@ test('Volunteers sidebar: nav group with Committees/Sign-Up Lists/Volunteer List
   assert.match(res.text, /href="\/main-admin\/volunteers\?tab=volunteer-lists">Volunteer Lists</);
 });
 
-test('Committees: create, edit, enable/disable with a checkbox, and delete', async () => {
+test('Committees: create with a leader picked from admin positions, edit, enable/disable with a checkbox, and delete', async () => {
   const admin = await loginAsMainAdmin();
+
+  // A real request: "adding a leader should be a drop down list of admin
+  // positions. Choose an admin and the leaders name and email address
+  // appears below" - the dropdown only ever offers current position
+  // holders, so seed one to pick.
+  const leader1 = await createFamily();
+  await db.prepare("UPDATE members SET email = 'leader1@example.com' WHERE id = ?").run(leader1.parentId);
+  const treasurerId = (await db.prepare("INSERT INTO admin_positions (title, position) VALUES ('Treasurer', 0) RETURNING id").get()).id;
+  await db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?)').run(leader1.parentId, treasurerId);
+
+  const listPageBefore = await request(app).get('/main-admin/volunteers').set('Cookie', admin.cookie);
+  assert.match(listPageBefore.text, /class="committee-leader-select"/);
+  assert.match(listPageBefore.text, new RegExp(`<optgroup label="Treasurer">[\\s\\S]*?data-email="leader1@example.com"[\\s\\S]*?VolParent${leader1.familyId} Jones${leader1.familyId}`));
+
   const createRes = await request(app)
     .post('/main-admin/volunteers/committees')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ name: 'Fundraising', description: 'Raises money', leaderName: 'Jane Doe', contactInfo: 'jane@example.com', _csrf: admin.csrfToken });
-  assert.match(createRes.headers.location, /notice=/);
+    .send({ name: 'Fundraising', description: 'Raises money', leaderMemberId: String(leader1.parentId), _csrf: admin.csrfToken });
+  // Lands on the new committee's own page, not back on the list - a real
+  // request wants adding members to follow right on from creating it.
+  assert.match(createRes.headers.location, /\/main-admin\/volunteers\/committees\/\d+\?notice=/);
+
+  const committee = await db.prepare('SELECT * FROM committees WHERE name = ?').get('Fundraising');
+  assert.equal(committee.leader_member_id, leader1.parentId);
+  assert.equal(committee.enabled, 1, 'a new committee starts enabled');
 
   const listRes = await request(app).get('/main-admin/volunteers').set('Cookie', admin.cookie);
   assert.match(listRes.text, /Fundraising/);
-  assert.match(listRes.text, /Jane Doe/);
-  const committee = await db.prepare('SELECT * FROM committees WHERE name = ?').get('Fundraising');
-  assert.equal(committee.enabled, 1, 'a new committee starts enabled');
+  assert.match(listRes.text, new RegExp(`VolParent${leader1.familyId} Jones${leader1.familyId}`));
 
-  // Edit description/leader/contact from the detail page's own Edit dialog.
+  // Edit description/leader from the detail page's own Edit dialog.
   const detailRes = await request(app).get(`/main-admin/volunteers/committees/${committee.id}`).set('Cookie', admin.cookie);
   assert.equal(detailRes.status, 200);
   assert.match(detailRes.text, /id="edit-committee-dialog"/);
+  assert.match(detailRes.text, new RegExp(`value="${leader1.parentId}" data-email="leader1@example.com" selected`));
+
+  const leader2 = await createFamily();
+  await db.prepare("UPDATE members SET email = 'leader2@example.com' WHERE id = ?").run(leader2.parentId);
+  await db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?)').run(leader2.parentId, treasurerId);
+
   await request(app)
     .post(`/main-admin/volunteers/committees/${committee.id}/update`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ name: 'Fundraising Committee', description: 'Updated', leaderName: 'Jane Smith', contactInfo: 'jane.smith@example.com', _csrf: admin.csrfToken });
+    .send({ name: 'Fundraising Committee', description: 'Updated', leaderMemberId: String(leader2.parentId), _csrf: admin.csrfToken });
   const updated = await db.prepare('SELECT * FROM committees WHERE id = ?').get(committee.id);
   assert.equal(updated.name, 'Fundraising Committee');
-  assert.equal(updated.leader_name, 'Jane Smith');
-  assert.equal(updated.contact_info, 'jane.smith@example.com');
+  assert.equal(updated.leader_member_id, leader2.parentId);
 
   // Disable via the checkbox form on the list page.
   await request(app).post(`/main-admin/volunteers/committees/${committee.id}/enabled`).set('Cookie', admin.cookie).type('form').send({ enabled: '0', _csrf: admin.csrfToken });
@@ -126,6 +149,37 @@ test('Committees: create, edit, enable/disable with a checkbox, and delete', asy
   // Delete via the trash button.
   await request(app).post(`/main-admin/volunteers/committees/${committee.id}/delete`).set('Cookie', admin.cookie).type('form').send({ _csrf: admin.csrfToken });
   assert.equal(await db.prepare('SELECT * FROM committees WHERE id = ?').get(committee.id), undefined);
+});
+
+test('Committee detail: Add Member button adds a plain committee member (separate from Positions/signups), and can be removed', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/committees').set('Cookie', admin.cookie).type('form').send({ name: 'Hospitality Committee', _csrf: admin.csrfToken });
+  const committee = await db.prepare('SELECT * FROM committees WHERE name = ?').get('Hospitality Committee');
+
+  const family = await createFamily();
+  const detailBefore = await request(app).get(`/main-admin/volunteers/committees/${committee.id}`).set('Cookie', admin.cookie);
+  assert.match(detailBefore.text, /id="add-member-dialog"/);
+  assert.match(detailBefore.text, new RegExp(`<option value="${family.parentId}">VolParent${family.familyId} Jones${family.familyId}</option>`));
+  assert.match(detailBefore.text, /No members yet/);
+
+  await request(app)
+    .post(`/main-admin/volunteers/committees/${committee.id}/members`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberId: String(family.parentId), _csrf: admin.csrfToken });
+  const member = await db.prepare('SELECT * FROM committee_members WHERE committee_id = ?').get(committee.id);
+  assert.equal(member.member_id, family.parentId);
+
+  const detailAfter = await request(app).get(`/main-admin/volunteers/committees/${committee.id}`).set('Cookie', admin.cookie);
+  assert.match(detailAfter.text, new RegExp(`VolParent${family.familyId} Jones${family.familyId}`));
+  assert.doesNotMatch(detailAfter.text, /No members yet/);
+
+  await request(app)
+    .post(`/main-admin/volunteers/committees/${committee.id}/members/${family.parentId}/delete`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken });
+  assert.equal(await db.prepare('SELECT * FROM committee_members WHERE committee_id = ?').get(committee.id), undefined);
 });
 
 test('Committee detail: positions, member signups, email links (individual + select-all)', async () => {

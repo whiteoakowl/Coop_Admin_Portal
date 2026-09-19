@@ -17,8 +17,19 @@ function sortByLastName(rows, field) {
 
 // --- Committees ---
 
+// leader_name/leader_email are resolved from leader_member_id here (not
+// stored redundantly on committees itself) so renaming/re-emailing a
+// member in the Members list is instantly reflected wherever they're
+// shown as a committee leader, same "never duplicate a member's own
+// fields elsewhere" reasoning as committee_signups' own memberName/
+// memberEmail join in positionsForCommittee below. Falls back to the old
+// free-text leader_name/contact_info columns for a committee created
+// before the leader-picker existed and never re-saved since.
+const LEADER_JOIN = `LEFT JOIN members lm ON lm.id = c.leader_member_id`;
+const LEADER_SELECT = `COALESCE(lm.name, c.leader_name) AS "leaderName", COALESCE(lm.email, c.contact_info) AS "leaderEmail"`;
+
 async function listCommittees() {
-  const committees = await db.prepare('SELECT * FROM committees ORDER BY name').all();
+  const committees = await db.prepare(`SELECT c.*, ${LEADER_SELECT} FROM committees c ${LEADER_JOIN} ORDER BY c.name`).all();
   for (const c of committees) {
     const counts = await db
       .prepare(
@@ -33,20 +44,20 @@ async function listCommittees() {
 }
 
 async function getCommittee(id) {
-  return db.prepare('SELECT * FROM committees WHERE id = ?').get(id);
+  return db.prepare(`SELECT c.*, ${LEADER_SELECT} FROM committees c ${LEADER_JOIN} WHERE c.id = ?`).get(id);
 }
 
-async function createCommittee({ name, description, leaderName, contactInfo }) {
+async function createCommittee({ name, description, leaderMemberId }) {
   const info = await db
-    .prepare('INSERT INTO committees (name, description, leader_name, contact_info) VALUES (?, ?, ?, ?)')
-    .run(name, description || null, leaderName || null, contactInfo || null);
+    .prepare('INSERT INTO committees (name, description, leader_member_id) VALUES (?, ?, ?)')
+    .run(name, description || null, leaderMemberId || null);
   return info.lastInsertRowid;
 }
 
-async function updateCommittee(id, { name, description, leaderName, contactInfo }) {
+async function updateCommittee(id, { name, description, leaderMemberId }) {
   await db
-    .prepare('UPDATE committees SET name = ?, description = ?, leader_name = ?, contact_info = ? WHERE id = ?')
-    .run(name, description || null, leaderName || null, contactInfo || null, id);
+    .prepare('UPDATE committees SET name = ?, description = ?, leader_member_id = ? WHERE id = ?')
+    .run(name, description || null, leaderMemberId || null, id);
 }
 
 async function setCommitteeEnabled(id, enabled) {
@@ -86,6 +97,35 @@ async function updateCommitteePosition(id, { positionName, slotsNeeded }) {
 
 async function deleteCommitteePosition(id) {
   await db.prepare('DELETE FROM committee_positions WHERE id = ?').run(id);
+}
+
+// A plain roster of people on a committee - a real request: "add a member
+// button," separate from committee_positions/committee_signups above
+// (that pair is a NAMED role with a slot count that a member signs up for
+// themselves, via their own portal account; this is just "this person is
+// on this committee," added directly by Main Admin, no role or
+// self-service involved).
+async function membersForCommittee(committeeId) {
+  return sortByLastName(
+    await db
+      .prepare(
+        `SELECT cm.id, cm.member_id AS "memberId", m.name, m.email FROM committee_members cm
+         JOIN members m ON m.id = cm.member_id
+         WHERE cm.committee_id = ?`
+      )
+      .all(committeeId),
+    'name'
+  );
+}
+
+async function addCommitteeMember(committeeId, memberId) {
+  await db
+    .prepare('INSERT INTO committee_members (committee_id, member_id) VALUES (?, ?) ON CONFLICT (committee_id, member_id) DO NOTHING')
+    .run(committeeId, memberId);
+}
+
+async function removeCommitteeMember(committeeId, memberId) {
+  await db.prepare('DELETE FROM committee_members WHERE committee_id = ? AND member_id = ?').run(committeeId, memberId);
 }
 
 async function signUpForPosition(positionId, memberId, accountId) {
@@ -262,6 +302,9 @@ module.exports = {
   deleteCommitteePosition,
   signUpForPosition,
   cancelCommitteeSignup,
+  membersForCommittee,
+  addCommitteeMember,
+  removeCommitteeMember,
   listSignUpLists,
   getSignUpList,
   signUpListsForEvent,

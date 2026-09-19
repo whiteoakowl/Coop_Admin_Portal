@@ -10,6 +10,8 @@ const router = express.Router();
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const volunteers = require('../utils/committeesAndSignupLists');
 const events = require('../utils/events');
+const { listAdminPositions, membersByAdminPosition } = require('../utils/adminPositions');
+const { activeParentAndAdminOptions } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_volunteers'));
 
@@ -21,6 +23,12 @@ router.get('/', async (req, res) => {
     title: 'Volunteers',
     activeTab: tab,
     committees: tab === 'committees' ? await volunteers.listCommittees() : [],
+    // "Add Committee" dialog's own Leader dropdown, grouped by position -
+    // one option per current holder (see main-admin-volunteers.ejs's own
+    // comment on why this is the whole list, not a list of position
+    // titles).
+    leaderPositions: tab === 'committees' ? await listAdminPositions() : [],
+    leaderPositionMembers: tab === 'committees' ? await membersByAdminPosition() : {},
     signUpLists: tab === 'signup-lists' ? await volunteers.listSignUpLists() : [],
     volunteerLists: tab === 'volunteer-lists' ? await volunteers.listVolunteerLists() : [],
     events: tab === 'signup-lists' || tab === 'volunteer-lists' ? await events.listEvents({}) : [],
@@ -34,13 +42,17 @@ router.get('/', async (req, res) => {
 router.post('/committees', async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect('/main-admin/volunteers?error=' + encodeURIComponent('Committee name is required.'));
-  await volunteers.createCommittee({
+  const committeeId = await volunteers.createCommittee({
     name,
     description: (req.body.description || '').trim(),
-    leaderName: (req.body.leaderName || '').trim(),
-    contactInfo: (req.body.contactInfo || '').trim(),
+    leaderMemberId: parseInt(req.body.leaderMemberId, 10) || null,
   });
-  res.redirect('/main-admin/volunteers?notice=' + encodeURIComponent('Committee created.'));
+  // Straight into the new committee's own page, not back to the list - a
+  // real request ("when adding a new committee... then there should be an
+  // add member button") wants adding members to follow right on from
+  // creating the committee, and that button already lives on this page
+  // (see the Members section below).
+  res.redirect(`/main-admin/volunteers/committees/${committeeId}?notice=` + encodeURIComponent('Committee created.'));
 });
 
 router.post('/committees/:id/update', async (req, res) => {
@@ -49,8 +61,7 @@ router.post('/committees/:id/update', async (req, res) => {
   await volunteers.updateCommittee(req.params.id, {
     name,
     description: (req.body.description || '').trim(),
-    leaderName: (req.body.leaderName || '').trim(),
-    contactInfo: (req.body.contactInfo || '').trim(),
+    leaderMemberId: parseInt(req.body.leaderMemberId, 10) || null,
   });
   res.redirect('/main-admin/volunteers?notice=' + encodeURIComponent('Committee updated.'));
 });
@@ -72,9 +83,25 @@ router.get('/committees/:id', async (req, res) => {
     title: committee.name,
     committee,
     positions: await volunteers.positionsForCommittee(committee.id),
+    members: await volunteers.membersForCommittee(committee.id),
+    leaderPositions: await listAdminPositions(),
+    leaderPositionMembers: await membersByAdminPosition(),
+    memberOptions: await activeParentAndAdminOptions(),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.post('/committees/:id/members', async (req, res) => {
+  const memberId = parseInt(req.body.memberId, 10);
+  if (!memberId) return res.redirect(`/main-admin/volunteers/committees/${req.params.id}?error=` + encodeURIComponent('Select a member to add.'));
+  await volunteers.addCommitteeMember(req.params.id, memberId);
+  res.redirect(`/main-admin/volunteers/committees/${req.params.id}?notice=` + encodeURIComponent('Member added.'));
+});
+
+router.post('/committees/:id/members/:memberId/delete', async (req, res) => {
+  await volunteers.removeCommitteeMember(req.params.id, req.params.memberId);
+  res.redirect(`/main-admin/volunteers/committees/${req.params.id}?notice=` + encodeURIComponent('Member removed.'));
 });
 
 router.post('/committees/:id/positions', async (req, res) => {

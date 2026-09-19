@@ -131,11 +131,14 @@ async function removeAdminPositionForMember(memberId, positionId) {
 // the Admins settings tab's "each admin name next to their position"
 // listing (and its own per-name Remove button) underneath the plain
 // title/delete rows the Add Admin Position form above it manages. Returns
-// { [positionId]: [{ id, name }, ...] }, each list ordered by member name.
+// { [positionId]: [{ id, name, email }, ...] }, each list ordered by
+// member name. email is included for the Committees "pick a leader"
+// dropdown (routes/main-admin-volunteers.js), which needs it to show
+// "the leader's name and email" without a second query per pick.
 async function membersByAdminPosition() {
   const rows = await db
     .prepare(
-      `SELECT map.admin_position_id AS "positionId", m.id, m.name
+      `SELECT map.admin_position_id AS "positionId", m.id, m.name, m.email
        FROM member_admin_positions map JOIN members m ON m.id = map.member_id
        ORDER BY LOWER(m.name)`
     )
@@ -143,7 +146,7 @@ async function membersByAdminPosition() {
   const byPosition = {};
   for (const row of rows) {
     if (!byPosition[row.positionId]) byPosition[row.positionId] = [];
-    byPosition[row.positionId].push({ id: row.id, name: row.name });
+    byPosition[row.positionId].push({ id: row.id, name: row.name, email: row.email });
   }
   return byPosition;
 }

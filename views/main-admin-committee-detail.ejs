@@ -15,15 +15,42 @@
       <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-committee-dialog').showModal()">Edit</button>
     </div>
     <% if (committee.description) { %><p><%= committee.description %></p><% } %>
-    <% if (committee.leader_name || committee.contact_info) { %>
+    <% if (committee.leaderName || committee.leaderEmail) { %>
       <p class="hint">
-        <% if (committee.leader_name) { %>Leader: <%= committee.leader_name %><% } %>
-        <% if (committee.contact_info) { %> &middot; <%= committee.contact_info %><% } %>
+        <% if (committee.leaderName) { %>Leader: <%= committee.leaderName %><% } %>
+        <% if (committee.leaderEmail) { %> &middot; <%= committee.leaderEmail %><% } %>
       </p>
     <% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="grid-box-header">
+      <h2>Members</h2>
+      <button type="button" class="roster-action-btn" onclick="document.getElementById('add-member-dialog').showModal()">+ Add Member</button>
+    </div>
+    <% if (members.length === 0) { %>
+      <p class="roster-empty">No members yet &mdash; add one above.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table condensed-table">
+          <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+              <tr>
+                <td class="roster-name-col"><%= m.name %></td>
+                <td><%= m.email || '—' %></td>
+                <td>
+                  <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/members/<%= m.memberId %>/delete" class="inline-block-form" data-confirm="Remove <%= m.name %> from this committee?">
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
 
     <div class="grid-box-header">
       <h2>Positions</h2>
@@ -95,19 +122,53 @@
         <label>Description
           <textarea name="description" rows="3"><%= committee.description || '' %></textarea>
         </label>
-        <label>Leader Name
-          <input type="text" name="leaderName" value="<%= committee.leader_name || '' %>" />
-        </label>
-        <label>Contact Info
-          <input type="text" name="contactInfo" value="<%= committee.contact_info || '' %>" />
-        </label>
+        <%# Same leader picker as the Add Committee dialog (views/main-
+            admin-volunteers.ejs's own comment explains the one-option-
+            per-holder shape) - pre-selects committee.leader_member_id so
+            re-opening Edit shows who's currently picked. %>
+        <div class="committee-leader-picker">
+          <label>Leader
+            <select name="leaderMemberId" class="committee-leader-select">
+              <option value="">No leader</option>
+              <% leaderPositions.forEach(function(p) { %>
+                <% if (leaderPositionMembers[p.id] && leaderPositionMembers[p.id].length) { %>
+                  <optgroup label="<%= p.title %>">
+                    <% leaderPositionMembers[p.id].forEach(function(m) { %>
+                      <option value="<%= m.id %>" data-email="<%= m.email || '' %>" <%= committee.leader_member_id === m.id ? 'selected' : '' %>><%= m.name %></option>
+                    <% }); %>
+                  </optgroup>
+                <% } %>
+              <% }); %>
+            </select>
+          </label>
+          <p class="hint committee-leader-email"></p>
+        </div>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </form>
     </dialog>
+
+    <dialog id="add-member-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/volunteers/committees/<%= committee.id %>/members">
+        <h3>Add Member</h3>
+        <label for="add-committee-member">Member
+          <select id="add-committee-member" name="memberId" required>
+            <option value="" disabled selected>Select a member&hellip;</option>
+            <% memberOptions.forEach(function(m) { %>
+              <option value="<%= m.id %>"><%= m.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
   </main>
+  <script src="/js/committee-leader-picker.js"></script>
   <script>
     // A real request: "click on each committee and you can view who is
     // signed up for that committee and email button next to each member

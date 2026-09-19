@@ -39,7 +39,7 @@
               <% committees.forEach(function(c) { %>
                 <tr>
                   <td class="roster-name-col"><a href="/main-admin/volunteers/committees/<%= c.id %>"><%= c.name %></a></td>
-                  <td><%= c.leader_name || '—' %></td>
+                  <td><%= c.leaderName || '—' %></td>
                   <td><%= c.signupCount %></td>
                   <td>
                     <form method="POST" action="/main-admin/volunteers/committees/<%= c.id %>/enabled" class="inline-block-form">
@@ -73,18 +73,39 @@
           <label>Description
             <textarea name="description" rows="3"></textarea>
           </label>
-          <label>Leader Name
-            <input type="text" name="leaderName" />
-          </label>
-          <label>Contact Info
-            <input type="text" name="contactInfo" />
-          </label>
+          <%# A real request: "adding a leader should be a drop down list
+              of admin positions. Choose an admin and the leaders name and
+              email address appears below," with a single leader per
+              committee - one <option> per current position holder
+              (grouped under their own position via <optgroup>), not one
+              option per position title, since a position can be held by
+              more than one person and only one of them ends up "the
+              leader" here. public/js/committee-leader-picker.js echoes
+              the picked option's own name/email into the readout below. %>
+          <div class="committee-leader-picker">
+            <label>Leader
+              <select name="leaderMemberId" class="committee-leader-select">
+                <option value="">No leader</option>
+                <% leaderPositions.forEach(function(p) { %>
+                  <% if (leaderPositionMembers[p.id] && leaderPositionMembers[p.id].length) { %>
+                    <optgroup label="<%= p.title %>">
+                      <% leaderPositionMembers[p.id].forEach(function(m) { %>
+                        <option value="<%= m.id %>" data-email="<%= m.email || '' %>"><%= m.name %></option>
+                      <% }); %>
+                    </optgroup>
+                  <% } %>
+                <% }); %>
+              </select>
+            </label>
+            <p class="hint committee-leader-email"></p>
+          </div>
           <div class="notes-dialog-actions">
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
             <button type="submit" class="primary-btn">Create</button>
           </div>
         </form>
       </dialog>
+      <script src="/js/committee-leader-picker.js"></script>
     <% } else if (activeTab === 'signup-lists') { %>
       <div class="grid-box-header">
         <h2>Sign-Up Lists</h2>
