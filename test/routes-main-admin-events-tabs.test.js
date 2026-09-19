@@ -106,11 +106,13 @@ test('Events builder (per-event edit page): renders its own .view-tabs strip wit
 
   const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
-  // Same later real request as the Events list's own tabs above: this
-  // per-event tab strip also moved into a page-tabs-trigger/dialog pair
-  // (public/js/page-tabs.js) instead of a bare inline div, so it gets
-  // the same mobile popup treatment.
-  assert.match(page.text, /<dialog class="view-tabs page-tabs-dialog no-print">/);
+  // Unlike the Events list page above, this per-event tab strip has no
+  // top-level nav entry to attach a popup to (it's reached by clicking
+  // into one specific event, not from the nav) - it keeps the plain
+  // inline .view-tabs strip every tabbed page used before the orange-bar
+  // popup existed, per a later real request to keep that design for
+  // pages with nowhere else to put the tabs.
+  assert.match(page.text, /<div class="view-tabs no-print">/);
   ['Event Details', 'Donations', 'Food', 'Settings'].forEach((label) => {
     assert.match(page.text, new RegExp(`>${label}<`));
   });

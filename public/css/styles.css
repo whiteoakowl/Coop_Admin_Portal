@@ -2417,50 +2417,15 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .view-tab-panel .admin-card-grid:last-child,
 .view-tab-panel .roster-scroll:last-child { margin-bottom: 0; }
 
-/* A real request: "mobile view instead of tabs on all the pages. when
-   you click the tab below a menu will pop up showing the different page
-   choices." Desktop already gets these same tabs as subpages under the
-   matching sidebar menu item instead (see .admin-nav-group above), so
-   the trigger stays hidden there - only .page-tabs-dialog's own <dialog>
-   default (closed unless .showModal() is called, see public/js/page-
-   tabs.js) matters on desktop, which is exactly "not shown at all". */
-.page-tabs-trigger {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 0.5rem;
-  margin: 1.25rem 0 0;
-  padding: 0.7rem 1rem;
-  /* A real, pre-existing contrast bug (white text on --brand's light
-     logo-blue fill, 2.09:1) only just surfaced: this trigger was
-     permanently display: none on every page axe-core ever scanned, until
-     the per-record "standalone" pages above got it back as their only way
-     to reach their own tabs. --brand-darker (its own documented hover
-     shade) keeps the same color family at a contrast ratio that passes. */
-  background: var(--brand-darker);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  font-weight: 700;
-  font-size: 0.95rem;
-  font-family: inherit;
-  cursor: pointer;
-}
-.page-tabs-trigger .icon { width: 1.1em; height: 1.1em; flex-shrink: 0; }
 /* Per-record sub-tabs (one specific member's own Profile/Class Schedule/
    Attendance tabs, one specific event's own builder tabs, one specific
-   class's own detail tabs) have no top-level nav entry on the orange bar
-   to attach a popup to at all - they're reached by clicking into a
-   record, not from the nav, so there's no "current tab" on the bar for a
-   tap to repurpose the way public/js/page-tabs.js now does for every
-   other converted page. These keep the original always-visible trigger
-   instead, at every screen width (unlike the base rule above, this one
-   isn't mobile-only - a full-admin desktop view has no other way to
-   reach these tabs either, since there's no sidebar entry for a single
-   record). */
-.page-tabs-trigger.page-tabs-trigger-standalone { display: flex; }
-/* .page-tabs-dialog stays a .view-tabs (reuses its own .view-tab children
+   class's own detail tabs, and Settings) have no top-level nav entry on
+   the orange bar to attach a popup to at all - they're reached by
+   clicking into a record, not from the nav - so these stay a plain
+   <div class="view-tabs">, the same always-visible connected file-tab
+   strip every tabbed page in this app used before the orange-bar popup
+   (below) existed, rather than a popup with nothing to open it from.
+   .page-tabs-dialog stays a .view-tabs (reuses its own .view-tab children
    unchanged - see public/js/page-tabs.js) but as a popup list it needs
    its own layout, not .view-tabs's base horizontal-scrolling flex row -
    these overrides win the cascade since they're declared after (and are

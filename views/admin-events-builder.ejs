@@ -69,15 +69,14 @@
     %>
     <%# One specific event's own builder tabs - no top-level nav entry to
         attach a popup to (reached by clicking into an event, not from the
-        nav), so this keeps its own always-visible trigger (see
-        styles.css's own .page-tabs-trigger-standalone). %>
-    <button type="button" class="page-tabs-trigger page-tabs-trigger-standalone no-print"><span class="page-tabs-trigger-label"><%= (builderTabDefs.find(function(t) { return t.key === activeTab; }) || builderTabDefs[0]).label %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
+        nav), so this stays the plain connected file-tab strip every other
+        tabbed page used before the orange-bar popup existed, instead of a
+        popup with nothing to open it from. %>
+    <div class="view-tabs no-print">
       <% builderTabDefs.forEach(function(t) { %>
         <a href="/main-admin/events/<%= event.id %>/builder?tab=<%= t.key %>" class="view-tab <%= activeTab === t.key ? 'active' : '' %>"><%= t.label %></a>
       <% }); %>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    </div>
 
     <% if (activeTab === 'details') { %>
       <div class="manage-section">

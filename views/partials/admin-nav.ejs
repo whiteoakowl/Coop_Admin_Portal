@@ -204,8 +204,9 @@
     main admin portal. It need to be applied to all portals" - every
     other portal shares portal-nav.ejs, which already loads this same
     pair (admin-nav-accordion.js drives the .admin-nav-group <details>
-    above; page-tabs.js drives each converted page's own .page-tabs-
-    trigger/.page-tabs-dialog pair) - Co-op Admin's own separate nav
-    shell just never had them wired in. %>
+    above and this same shell's own mobile-subpages-tab.ejs dialogs;
+    page-tabs.js wires each dialog's own [data-subpages-dialog] trigger
+    button) - Co-op Admin's own separate nav shell just never had them
+    wired in. %>
 <script src="/js/admin-nav-accordion.js"></script>
 <script src="/js/page-tabs.js"></script>

@@ -14,17 +14,15 @@
 //
 // A handful of pages have no such nav-shell entry at all - a single
 // member's own Profile/Class Schedule/Attendance tabs, one event's own
-// builder tabs, one class's own detail tabs - because they're reached by
-// clicking into a specific record, not from the nav, so there's no
-// top-level "section" for them to attach to. Those keep their original
-// per-page .page-tabs-trigger/.page-tabs-dialog pair (see styles.css's
-// own .page-tabs-trigger-standalone, which keeps that trigger visible
-// everywhere instead of the base rule's permanent display: none).
+// builder tabs, one class's own detail tabs, and Settings - because
+// they're reached by clicking into a specific record, not from the nav,
+// so there's no top-level "section" for them to attach to. Those keep a
+// plain, always-visible <div class="view-tabs"> instead (see
+// admin-member-profile.ejs and friends), with nothing here to wire up.
 (function () {
   // This script loads from the shared nav partials, included near the
-  // TOP of <body> - well before the rest of <main> (and, on standalone-
-  // trigger pages, that page's own trigger/dialog markup) has even been
-  // parsed yet. A plain immediate run would find nothing to wire up (same
+  // TOP of <body> - well before the rest of <main> has even been parsed
+  // yet. A plain immediate run would find nothing to wire up (same
   // reasoning as public/js/roster-btn-row-grid.js's own 'load' listener).
   function wire() {
     document.querySelectorAll('[data-subpages-dialog]').forEach((trigger) => {
@@ -34,15 +32,6 @@
         e.preventDefault();
         dialog.showModal();
       });
-    });
-
-    document.querySelectorAll('.page-tabs-trigger-standalone').forEach((trigger) => {
-      const dialog = trigger.nextElementSibling;
-      if (!dialog || !dialog.classList.contains('page-tabs-dialog')) return;
-      const activeTab = dialog.querySelector('.view-tab.active');
-      const label = trigger.querySelector('.page-tabs-trigger-label');
-      if (activeTab && label) label.textContent = activeTab.textContent.trim();
-      trigger.addEventListener('click', () => dialog.showModal());
     });
   }
   window.addEventListener('load', wire);

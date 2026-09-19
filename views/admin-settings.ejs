@@ -13,10 +13,10 @@
 
     <%# Settings is reached via the mobile TOP bar's gear icon, not the
         orange bottom bar - no bottom-bar slot to attach a popup to, so
-        this keeps its own always-visible trigger (see styles.css's own
-        .page-tabs-trigger-standalone). %>
-    <button type="button" class="page-tabs-trigger page-tabs-trigger-standalone no-print"><span class="page-tabs-trigger-label"><%= activeTab === 'account' ? 'Username/Password' : activeTab === 'classcheckin' ? 'Class Check-In PIN' : activeTab === 'install' ? 'Install App' : activeTab === 'documents' ? 'Documents' : 'Quick Links' %></span> <svg class="icon"><use href="#icon-chevron-down"/></svg></button>
-    <dialog class="view-tabs page-tabs-dialog no-print">
+        this stays the plain connected file-tab strip every other tabbed
+        page used before the orange-bar popup existed, instead of a popup
+        with nothing to open it from. %>
+    <div class="view-tabs no-print">
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'account' ? ' active' : '' %>" href="/admin/settings?tab=account">Username/Password</a>
         <a class="view-tab<%= activeTab === 'classcheckin' ? ' active' : '' %>" href="/admin/settings?tab=classcheckin">Class Check-In PIN</a>
@@ -26,8 +26,7 @@
       <% if (isFullAdmin) { %>
         <a class="view-tab<%= activeTab === 'documents' ? ' active' : '' %>" href="/admin/settings?tab=documents">Documents</a>
       <% } %>
-      <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-    </dialog>
+    </div>
     <div class="view-tab-panel">
       <% if (activeTab === 'account') { %>
         <div class="settings-account-grid">
