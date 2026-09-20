@@ -410,10 +410,10 @@ async function updateEventSettings(data) {
     .prepare(
       `UPDATE event_settings SET
         default_calendar_view = ?, show_waitlist_position = ?, reminder_days_before = ?,
-        credit_on_family_cancel = ?, credit_on_admin_cancel = ?,
+        credit_on_family_cancel = ?, credit_on_admin_cancel = ?, auto_refund_on_family_cancel = ?,
         subadmin_edit_locations = ?, subadmin_edit_categories = ?,
         family_submit_events = ?, submit_notification_email = ?,
-        family_manage_price_options = ?, family_manage_own_events = ?, family_events_public_default = ?,
+        family_manage_price_options = ?, family_manage_own_events = ?,
         updated_at = now_text()
       WHERE id = 1`
     )
@@ -423,13 +423,13 @@ async function updateEventSettings(data) {
       Number(data.reminderDaysBefore) || 0,
       data.creditOnFamilyCancel ? 1 : 0,
       data.creditOnAdminCancel ? 1 : 0,
+      data.autoRefundOnFamilyCancel ? 1 : 0,
       data.subadminEditLocations ? 1 : 0,
       data.subadminEditCategories ? 1 : 0,
       ['yes', 'auto_approve', 'no'].includes(data.familySubmitEvents) ? data.familySubmitEvents : 'yes',
       (data.submitNotificationEmail || '').trim() || null,
       data.familyManagePriceOptions ? 1 : 0,
-      data.familyManageOwnEvents ? 1 : 0,
-      data.familyEventsPublicDefault ? 1 : 0
+      data.familyManageOwnEvents ? 1 : 0
     );
 }
 
@@ -441,14 +441,15 @@ async function updateEventSettings(data) {
 // up anywhere but the submitter's own "my submissions" and the Main
 // Admin approval queue until it's actually decided. Settings-gated per
 // item 9's "Allow families to submit calendar of events items?" (Yes /
-// Automatically Approve / No) and "Make events submitted by families
-// public by default?".
+// Automatically Approve / No). A later real request removed the
+// "Make events submitted by families public by default?" override that
+// used to live here - a submitted event now always keeps whatever
+// visibility the submitter picked.
 async function submitEvent(data, accountId) {
   const settings = await getEventSettings();
   if (settings.family_submit_events === 'no') return null;
-  const visibility = settings.family_events_public_default ? 'public' : data.visibility;
   return createEvent(
-    { ...data, visibility },
+    data,
     accountId,
     settings.family_submit_events === 'auto_approve'
       ? { submittedByAccountId: accountId, approvalStatus: 'approved' }

@@ -347,13 +347,13 @@ router.post('/settings', async (req, res) => {
     reminderDaysBefore: req.body.reminderDaysBefore,
     creditOnFamilyCancel: req.body.creditOnFamilyCancel === '1',
     creditOnAdminCancel: req.body.creditOnAdminCancel === '1',
+    autoRefundOnFamilyCancel: req.body.autoRefundOnFamilyCancel === '1',
     subadminEditLocations: req.body.subadminEditLocations === '1',
     subadminEditCategories: req.body.subadminEditCategories === '1',
     familySubmitEvents: req.body.familySubmitEvents,
     submitNotificationEmail: req.body.submitNotificationEmail,
     familyManagePriceOptions: req.body.familyManagePriceOptions === '1',
     familyManageOwnEvents: req.body.familyManageOwnEvents === '1',
-    familyEventsPublicDefault: req.body.familyEventsPublicDefault === '1',
   });
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Settings saved.'));
 });

@@ -18,8 +18,13 @@
         <% if (activeTab === 'calendar') { %>
           <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <% } %>
-        <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
-        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
+        <%# A real request: "remove export and import buttons from the
+            event settings page" - still shown on Calendar/Drafts/
+            Requests/Attendance, just not here. %>
+        <% if (activeTab !== 'settings') { %>
+          <a class="roster-action-btn file-action-btn" href="/main-admin/events/export.csv">Export</a>
+          <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-events-dialog').showModal()">Import</button>
+        <% } %>
       </div>
     </div>
 
@@ -199,23 +204,41 @@
         </div>
       <% } %>
     <% } else { %>
+      <%# A real request: "add/edit categories, add/edit locations buttons
+          should be at the top of the page" - moved above General
+          Settings (Item 8's original placement was below the form). %>
+      <div class="roster-btn-row no-print">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
+      </div>
+
       <%# Item 9 - General Settings, same fields/shape as the reference
-          screenshots. show_waitlist_position/credit_on_*/subadmin_edit_*/
+          screenshots. show_waitlist_position/credit_on_*/
+          auto_refund_on_family_cancel/subadmin_edit_*/
           family_manage_price_options/family_manage_own_events don't have a
-          waitlist, per-cancellation credit ledger, or sub-admin role system
-          behind them yet in this app - stored and ready for when they do,
-          same "controls X once a real feature exists" pattern the
+          waitlist, per-cancellation credit ledger/refund, or sub-admin role
+          system behind them yet in this app - stored and ready for when
+          they do, same "controls X once a real feature exists" pattern the
           newsletter's own send-schedule setting already uses. default
-          calendar view, family event submission (gate/auto-approve), the
-          notification email, and public-by-default are wired live (see
-          utils/events.js's submitEvent and routes/events.js). %>
+          calendar view, family event submission (gate/auto-approve), and
+          the notification email are wired live (see utils/events.js's
+          submitEvent and routes/events.js). A later real request removed
+          the "make events public by default" setting that used to live
+          here - a submitted event now always keeps the visibility its
+          submitter picked. Every Allow/Disallow or Yes/No radio pair (and
+          the Calendar/List View pair) sits in its own .checkbox-group so
+          the options land on one row instead of stacking - each
+          .checkbox-option is its own flex box (see styles.css), so plain
+          siblings would otherwise stack one per line. %>
       <form method="POST" action="/main-admin/events/settings" class="stack-form member-form-page-panel">
         <h2>General Settings</h2>
         <div class="member-form-grid">
           <div class="member-form-full">
             <span class="class-form-field-label">Default Calendar User View</span>
-            <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="calendar" <%= eventSettings.default_calendar_view === 'calendar' ? 'checked' : '' %> /> Calendar View</label>
-            <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="list" <%= eventSettings.default_calendar_view === 'list' ? 'checked' : '' %> /> List View</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="calendar" <%= eventSettings.default_calendar_view === 'calendar' ? 'checked' : '' %> /> Calendar View</label>
+              <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="list" <%= eventSettings.default_calendar_view === 'list' ? 'checked' : '' %> /> List View</label>
+            </div>
           </div>
           <label class="checkbox-option member-form-full">
             <input type="checkbox" name="showWaitlistPosition" value="1" <%= eventSettings.show_waitlist_position ? 'checked' : '' %> />
@@ -230,47 +253,65 @@
           </label>
           <div class="member-form-full">
             <span class="class-form-field-label">When registrations are cancelled by a Family, allow an automated credit adjustment to the family's accounting statement?</span>
-            <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Allow</label>
-            <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="0" <%= !eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Do not allow</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Allow</label>
+              <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="0" <%= !eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Do not allow</label>
+            </div>
           </div>
           <div class="member-form-full">
             <span class="class-form-field-label">When registrations are cancelled/deleted by an Admin, or by the System for nonpayment, allow an automated credit adjustment?</span>
-            <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Allow</label>
-            <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="0" <%= !eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Do not allow</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Allow</label>
+              <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="0" <%= !eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Do not allow</label>
+            </div>
+          </div>
+          <%# A real request: "new settings, automatically issue refund if
+              member cancels their registration." %>
+          <div class="member-form-full">
+            <span class="class-form-field-label">Automatically issue a refund if a member cancels their registration?</span>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="autoRefundOnFamilyCancel" value="1" <%= eventSettings.auto_refund_on_family_cancel ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="autoRefundOnFamilyCancel" value="0" <%= !eventSettings.auto_refund_on_family_cancel ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow Sub-Admins the ability to edit Locations?</span>
-            <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="1" <%= eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="0" <%= !eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> No</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="1" <%= eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="0" <%= !eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow Sub-Admins the ability to edit Categories?</span>
-            <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="1" <%= eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="0" <%= !eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> No</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="1" <%= eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="0" <%= !eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow families to submit calendar of events items?</span>
-            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="yes" <%= eventSettings.family_submit_events === 'yes' ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="auto_approve" <%= eventSettings.family_submit_events === 'auto_approve' ? 'checked' : '' %> /> Automatically Approve</label>
-            <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="no" <%= eventSettings.family_submit_events === 'no' ? 'checked' : '' %> /> No</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="yes" <%= eventSettings.family_submit_events === 'yes' ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="auto_approve" <%= eventSettings.family_submit_events === 'auto_approve' ? 'checked' : '' %> /> Automatically Approve</label>
+              <label class="checkbox-option"><input type="radio" name="familySubmitEvents" value="no" <%= eventSettings.family_submit_events === 'no' ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
           <label class="member-form-full">Email Notifications To
             <input type="email" name="submitNotificationEmail" value="<%= eventSettings.submit_notification_email || '' %>" placeholder="admin@example.com" />
           </label>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow families with full administrative rights to manage price options and payment instructions for events they submit?</span>
-            <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="1" <%= eventSettings.family_manage_price_options ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="0" <%= !eventSettings.family_manage_price_options ? 'checked' : '' %> /> No</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="1" <%= eventSettings.family_manage_price_options ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="0" <%= !eventSettings.family_manage_price_options ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow families with full administrative rights to update and manage events they created after approval?</span>
-            <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="1" <%= eventSettings.family_manage_own_events ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="0" <%= !eventSettings.family_manage_own_events ? 'checked' : '' %> /> No</label>
-          </div>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Make events submitted by families public by default?</span>
-            <label class="checkbox-option"><input type="radio" name="familyEventsPublicDefault" value="1" <%= eventSettings.family_events_public_default ? 'checked' : '' %> /> Yes</label>
-            <label class="checkbox-option"><input type="radio" name="familyEventsPublicDefault" value="0" <%= !eventSettings.family_events_public_default ? 'checked' : '' %> /> No</label>
+            <div class="checkbox-group">
+              <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="1" <%= eventSettings.family_manage_own_events ? 'checked' : '' %> /> Yes</label>
+              <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="0" <%= !eventSettings.family_manage_own_events ? 'checked' : '' %> /> No</label>
+            </div>
           </div>
         </div>
         <div class="member-form-footer">
@@ -279,13 +320,6 @@
           </div>
         </div>
       </form>
-
-      <%# Item 8 - "buttons for add/edit category, add/edit location; both
-          create a popup that allows you to add/edit or delete." %>
-      <div class="roster-btn-row">
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
-      </div>
     <% } %>
 
     <dialog id="manage-categories-dialog" class="member-picker-dialog">
