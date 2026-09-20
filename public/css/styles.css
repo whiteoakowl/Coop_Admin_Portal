@@ -2467,6 +2467,41 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    needs its own explicit z-index instead of relying on the browser's
    top-layer promotion a modal gets for free - 50 clears
    .admin-mobile-tabs's own 45 underneath it. */
+/* A real request: "on mobile add a fit to text drop down menu next to
+   each page title with the subpages as a secondary way of accessing the
+   subpages" - public/js/page-tabs.js inserts this right after a page's
+   own <h1> when that page belongs to a subpages-bearing section, opening
+   the exact same dialog the orange bar's own trigger does. Desktop
+   already shows every subpage in the sidebar's own accordion group, so
+   this stays mobile-only, same breakpoint as the orange bar itself.
+   "fit to text" - inline-flex, sized to its own label, never a full-width
+   block button. .page-title-has-menu (added to the <h1> alongside it)
+   keeps the two on the same line regardless of what markup surrounds
+   that heading on any given page - a flex header row's own layout is
+   unaffected (a flex item's outer display doesn't change how its parent
+   places it), and a plain standalone heading now flows inline instead of
+   forcing the trigger onto its own line below. */
+@media (max-width: 860px) {
+  .page-title-has-menu { display: inline-flex; align-items: center; margin-right: 0.5rem; }
+  .page-title-subpages-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: fit-content;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-dark);
+    background: var(--brand-soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .page-title-subpages-trigger .icon { width: 0.8rem; height: 0.8rem; }
+}
+@media (min-width: 861px) {
+  .page-title-subpages-trigger { display: none; }
+}
+
 .page-tabs-dialog[open] {
   display: flex;
   flex-direction: column;
@@ -6133,6 +6168,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .sale-cart-row:last-child { border-bottom: none; }
 .sale-cart-qty { width: 3.5rem; flex: 0 0 auto; }
 .sale-cart-size { width: 5rem; flex: 0 0 auto; }
+/* A real request: "adding options to a product" replaced sizes with a
+   full price/qty/enabled row - this cart's own per-product option picker
+   needs more room than the old plain size dropdown did. */
+.sale-cart-option { width: 11rem; flex: 0 0 auto; }
 .sale-cart-info { flex: 1 1 auto; min-width: 0; }
 .sale-cart-info .sale-cart-name { display: block; font-weight: 600; }
 .sale-cart-info .sale-cart-meta { display: block; font-size: 0.8rem; color: var(--muted); }
@@ -6146,6 +6185,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .store-category-row:last-child { border-bottom: none; }
 .store-category-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
 .store-category-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
+
+/* A real request: "adding options to a product should be a row with a
+   bar for the option title and the individual price next to it, and box
+   for qty and enable/disable button" - the option title input is the
+   widest/flexible one (a "bar"), price/qty are narrow fixed-width boxes
+   next to it, matching the general "flexible name field + narrow number
+   fields" shape .sale-cart-row/.store-category-row already use. */
+.store-options-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+.store-option-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem; border: 1px solid var(--border); border-radius: 10px; }
+.store-option-name { flex: 1 1 12rem; min-width: 0; }
+.store-option-price-label { display: flex; align-items: center; gap: 0.2rem; flex: 0 0 auto; font-weight: 600; }
+.store-option-price-label input { width: 5.5rem; }
+.store-option-qty { width: 4.5rem; flex: 0 0 auto; }
+.store-option-enabled-toggle { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; font-size: 0.85rem; white-space: nowrap; }
+
+/* A real request: "not [no] edit button on the product, clicking the
+   product takes you to the edit page" - .team-info-card is normally a
+   plain <div>; this modifier strips the default <a> underline/color and
+   lets its own .team-info-title wrap onto a second line instead of the
+   base class's single-line ellipsis, since a status pill now sits right
+   next to the name inside it. */
+.store-product-card { text-decoration: none; color: inherit; }
+.store-product-card .team-info-title { white-space: normal; overflow: visible; display: flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap; }
+
+/* Analytics tab (a real request: "graph of total sales... sale totals
+   for each product and product option in a card with three columns") -
+   see the dataviz skill's own mark spec: thin bars, 4px rounded data-end,
+   a small gap between adjacent bars (the x-spacing below already leaves
+   room), recessive axis labels. */
+.store-sales-chart { width: 100%; height: auto; max-height: 220px; }
+.store-sales-bar { fill: var(--brand); }
+.store-sales-bar-label { font-size: 8px; fill: var(--muted); }
+.store-analytics-card { display: grid; grid-template-columns: 1fr auto auto; gap: 0.75rem; align-items: center; text-align: left; }
+.store-analytics-figure { font-weight: 700; text-align: right; }
+
 .import-sample-link { display: inline-block; margin-bottom: 0.75rem; }
 .member-picker-dialog input[type="file"],
 .member-picker-dialog input[type="text"],
@@ -7822,6 +7896,16 @@ tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var
 .training-resource-thumb form { position: absolute; top: -0.35rem; right: -0.35rem; }
 .training-resource-thumb .icon-btn { background: #fff; border: 1px solid var(--border); border-radius: 50%; padding: 0.15rem; }
 .training-resource-upload-form { display: flex; align-items: flex-end; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+/* A real request: "Store, edit product, mobile, upload button for image
+   is drifting off the page" - a store-only modifier (this shared class's
+   other callers - Training/Classifieds/Directory - weren't reported
+   broken, so left untouched) lets the label/input and button wrap onto
+   their own lines instead of overflowing the viewport width. */
+@media (max-width: 480px) {
+  .store-image-upload-form { flex-wrap: wrap; }
+  .store-image-upload-form label,
+  .store-image-upload-form input[type="file"] { width: 100%; }
+}
 
 .training-question-options { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.4rem 0; }
 .training-question-option-row { display: flex; align-items: center; gap: 0.5rem; }

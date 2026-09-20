@@ -56,10 +56,7 @@
             <% categories.forEach(function(c) { %><option value="<%= c.id %>" <%= product.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }); %>
           </select>
         </label>
-        <label>Sizes (comma-separated, blank = no sizes)
-          <input type="text" name="sizes" placeholder="e.g. S, M, L, XL" value="<%= product.sizes || '' %>" />
-        </label>
-        <label>Inventory (blank = unlimited)
+        <label>Inventory (blank = unlimited) <span class="hint">(ignored once this product has any Options below - each option tracks its own stock instead)</span>
           <input type="number" name="inventoryCount" min="0" value="<%= product.inventory_count ?? '' %>" />
         </label>
         <label>Availability
@@ -75,12 +72,53 @@
       </form>
     </div>
 
+    <%
+    // A real request: "adding options to a product should be a row with
+    // a bar for the option title and the individual price next to it,
+    // and box for qty and enable/disable button. Button for add another
+    // option." Each option has its own price (not a delta off the base
+    // price above) and its own stock (qty, blank = unlimited) - see
+    // utils/store.js's own buildOrderLines for how a product WITH any
+    // options requires picking one at checkout instead of using the
+    // plain price/inventory fields above. Whole-list replace on Save
+    // (public/js/store-product-options.js appends/removes rows purely
+    // client-side; nothing here needs a stable per-row id).
+    %>
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Options</h2></div>
+      <% if (legacySizes.length > 0) { %>
+        <p class="hint">This product previously had plain sizes (<%= legacySizes.join(', ') %>) with no price/stock of their own - add them below as real options to keep them.</p>
+      <% } %>
+      <form method="POST" action="/main-admin/store/<%= product.id %>/options" id="product-options-form">
+        <div class="store-options-list" data-options-list data-next-index="<%= options.length %>">
+          <% options.forEach(function(o, idx) { %>
+            <div class="store-option-row" data-option-row>
+              <input type="text" class="store-option-name" name="options[<%= idx %>][name]" value="<%= o.name %>" placeholder="Option title (e.g. Small)" required />
+              <label class="store-option-price-label">$<input type="number" name="options[<%= idx %>][price]" min="0" step="0.01" value="<%= (o.price_cents / 100).toFixed(2) %>" required /></label>
+              <input type="number" class="store-option-qty" name="options[<%= idx %>][qty]" min="0" placeholder="Qty" value="<%= o.quantity ?? '' %>" aria-label="Quantity (blank = unlimited)" />
+              <input type="hidden" name="options[<%= idx %>][enabled]" value="0" />
+              <label class="store-option-enabled-toggle">
+                <input type="checkbox" name="options[<%= idx %>][enabled]" value="1" <%= o.enabled ? 'checked' : '' %> /> Enabled
+              </label>
+              <button type="button" class="icon-btn icon-btn-danger" data-remove-option aria-label="Remove option" title="Remove"><svg class="icon"><use href="#icon-trash"/></svg></button>
+            </div>
+          <% }); %>
+        </div>
+        <div class="roster-btn-row">
+          <button type="button" class="btn-secondary" data-add-option>+ Add Another Option</button>
+        </div>
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save Options</button>
+        </div>
+      </form>
+    </div>
+
     <div class="manage-section">
       <div class="grid-box-header"><h2>Image</h2></div>
       <% if (imageUrl) { %>
         <img src="<%= imageUrl %>" alt="" style="max-width: 320px; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
       <% } %>
-      <form method="POST" action="/main-admin/store/<%= product.id %>/image" enctype="multipart/form-data" class="training-resource-upload-form">
+      <form method="POST" action="/main-admin/store/<%= product.id %>/image" enctype="multipart/form-data" class="training-resource-upload-form store-image-upload-form">
         <label>Choose an Image
           <input type="file" name="image" accept="image/*" required />
         </label>
@@ -88,5 +126,6 @@
       </form>
     </div>
   </main>
+  <script src="/js/store-product-options.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Main Admin's Store management (Community & Commerce track, item 8) -
 // mounted at /main-admin/store (server.js), gated the same way every
 // other Track B admin section is (manage_store, already pre-seeded in
-// db/bootstrapPg.js). Tabs: Products, Orders, Archived, Settings - same
+// db/bootstrapPg.js). Tabs: Products, Orders, Archived, Analytics - same
 // ?tab= convention as Classifieds/Chat/Events. Recording an in-person
 // sale is its own dedicated multi-item action, not a status toggle on an
 // online order - see supabase/migrations/20260825090000_store.sql's own
@@ -38,7 +38,20 @@ function withImage(p) {
   return { ...p, imageUrl: imageUrl(p.image_key), sizeList: store.parseSizes(p.sizes) };
 }
 
-const STORE_TABS = ['products', 'orders', 'archived', 'settings'];
+async function withOptions(p) {
+  return { ...withImage(p), options: await store.availableOptionsForProduct(p.id) };
+}
+
+const STORE_TABS = ['products', 'orders', 'archived', 'analytics'];
+const ANALYTICS_RANGES = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: '3months', label: '3 Months' },
+  { key: '6months', label: '6 Months' },
+  { key: '12months', label: '12 Months' },
+  { key: 'all', label: 'All Time' },
+];
 
 router.get('/', async (req, res) => {
   const activeTab = STORE_TABS.includes(req.query.tab) ? req.query.tab : 'products';
@@ -50,6 +63,9 @@ router.get('/', async (req, res) => {
   let orders = [];
   let saleProducts = [];
   let members = [];
+  let fulfillmentTotals = [];
+  let analytics = null;
+  let analyticsRange = 'month';
 
   if (activeTab === 'products') {
     products = (await store.listProducts({ categoryId: selectedCategory })).filter((p) => p.status !== 'archived').map(withImage);
@@ -57,8 +73,15 @@ router.get('/', async (req, res) => {
     archived = (await store.listProducts({ status: 'archived' })).map(withImage);
   } else if (activeTab === 'orders') {
     orders = await store.allOrders();
-    saleProducts = (await store.listProducts({ status: 'active', availability: 'in_person' })).map(withImage);
+    saleProducts = await Promise.all((await store.listProducts({ status: 'active', availability: 'in_person' })).map(withOptions));
     members = (await db.prepare('SELECT id, name FROM members WHERE active = 1').all()).sort(byLastName);
+    // "button called fulfillment totals. Popup, show counts for all
+    // order that need to be filled" - rendered as a dialog on this same
+    // tab, no separate page needed.
+    fulfillmentTotals = await store.fulfillmentTotals();
+  } else if (activeTab === 'analytics') {
+    analyticsRange = ANALYTICS_RANGES.some((r) => r.key === req.query.range) ? req.query.range : 'month';
+    analytics = await store.salesAnalytics(analyticsRange);
   }
 
   res.render('admin-store-list', {
@@ -71,6 +94,10 @@ router.get('/', async (req, res) => {
     orders,
     saleProducts,
     members,
+    fulfillmentTotals,
+    analytics,
+    analyticsRange,
+    analyticsRanges: ANALYTICS_RANGES,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -102,23 +129,27 @@ router.post('/', async (req, res) => {
 // Express tries routes in registration order, so 'POST /categories'
 // would otherwise be swallowed by 'POST /:id' with id='categories' (same
 // reasoning as routes/admin-classifieds.js's own category routes).
+// A real request: "remove settings subpage. Move add category button to
+// the product page" - Categories management (the only thing Settings
+// ever held, see admin-store-list.ejs) now lives on the Products tab
+// instead, so these three redirect back there.
 router.post('/categories', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/store?tab=settings&error=' + encodeURIComponent('Category name is required.'));
+  if (!name) return res.redirect('/main-admin/store?error=' + encodeURIComponent('Category name is required.'));
   await store.addCategory(name);
-  res.redirect('/main-admin/store?tab=settings&notice=' + encodeURIComponent(`Added "${name}".`));
+  res.redirect('/main-admin/store?notice=' + encodeURIComponent(`Added "${name}".`));
 });
 
 router.post('/categories/:id', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/main-admin/store?tab=settings&error=' + encodeURIComponent('Category name is required.'));
+  if (!name) return res.redirect('/main-admin/store?error=' + encodeURIComponent('Category name is required.'));
   await store.renameCategory(req.params.id, name);
-  res.redirect('/main-admin/store?tab=settings&notice=' + encodeURIComponent('Renamed.'));
+  res.redirect('/main-admin/store?notice=' + encodeURIComponent('Renamed.'));
 });
 
 router.post('/categories/:id/delete', async (req, res) => {
   await store.deleteCategory(req.params.id);
-  res.redirect('/main-admin/store?tab=settings&notice=' + encodeURIComponent('Category removed.'));
+  res.redirect('/main-admin/store?notice=' + encodeURIComponent('Category removed.'));
 });
 
 // Also two-segment paths, same non-collision reasoning as '/categories'
@@ -131,8 +162,8 @@ router.get('/orders/:id', async (req, res) => {
 });
 
 // The In-Person Sale cart: one dialog listing every sellable product with
-// its own quantity + size picker, so an admin can ring up several
-// different items (and sizes) for one member in a single action instead
+// its own quantity + option picker, so an admin can ring up several
+// different items (and options) for one member in a single action instead
 // of repeating this form once per product. The view submits one
 // items[<row index>][...] group per product, each carrying its own
 // productId field - the row index is just a sequential 0, 1, 2... array
@@ -147,7 +178,7 @@ router.post('/orders/in-person', async (req, res) => {
   if (!memberId) return res.redirect('/main-admin/store?tab=orders&error=' + encodeURIComponent('Choose a member.'));
   const itemsInput = Array.isArray(req.body.items) ? req.body.items : Object.values(req.body.items || {});
   const items = itemsInput
-    .map((v) => ({ productId: parseInt((v || {}).productId, 10), quantity: parseInt((v || {}).quantity, 10) || 0, size: ((v || {}).size || '').trim() || null }))
+    .map((v) => ({ productId: parseInt((v || {}).productId, 10), quantity: parseInt((v || {}).quantity, 10) || 0, optionId: (v || {}).optionId ? parseInt((v || {}).optionId, 10) : null }))
     .filter((i) => i.productId && i.quantity > 0);
   if (items.length === 0) {
     return res.redirect('/main-admin/store?tab=orders&error=' + encodeURIComponent('Add a quantity for at least one product.'));
@@ -177,9 +208,41 @@ async function loadEditor(req, res) {
   const product = await store.getProduct(req.params.id);
   if (!product) return res.status(404).render('404', { title: 'Not Found' });
   const categories = await store.listCategories();
-  res.render('admin-store-edit', { title: product.name, product, categories, imageUrl: imageUrl(product.image_key), error: req.query.error || null, notice: req.query.notice || null });
+  const options = await store.optionsForProduct(product.id);
+  res.render('admin-store-edit', {
+    title: product.name,
+    product,
+    categories,
+    options,
+    // "adding options to a product" replaces the old sizes text field -
+    // shown read-only here (only while there's nothing better to show
+    // yet) so a product set up before this change doesn't just silently
+    // lose its old sizes; an admin re-enters them as real options above.
+    legacySizes: options.length === 0 ? store.parseSizes(product.sizes) : [],
+    imageUrl: imageUrl(product.image_key),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 }
 router.get('/:id/edit', loadEditor);
+
+// "add another option" repeater on the edit page (this file's own header
+// comment / utils/store.js's setProductOptions) - one Save button for
+// the whole list, whole-array replace rather than per-row create/update/
+// delete routes.
+router.post('/:id/options', async (req, res) => {
+  const rowsInput = Array.isArray(req.body.options) ? req.body.options : Object.values(req.body.options || {});
+  const options = rowsInput
+    .map((v) => ({
+      name: ((v || {}).name || '').trim(),
+      priceCents: Math.round(Number((v || {}).price || 0) * 100),
+      quantity: (v || {}).qty ? parseInt((v || {}).qty, 10) : null,
+      enabled: (v || {}).enabled === '1',
+    }))
+    .filter((o) => o.name && Number.isFinite(o.priceCents) && o.priceCents >= 0);
+  await store.setProductOptions(req.params.id, options);
+  res.redirect(`/main-admin/store/${req.params.id}/edit?notice=` + encodeURIComponent('Options saved.'));
+});
 
 router.post('/:id', async (req, res) => {
   const id = req.params.id;

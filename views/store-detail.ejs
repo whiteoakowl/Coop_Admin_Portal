@@ -23,8 +23,10 @@
     <% } %>
 
     <h1><%= product.name %></h1>
-    <p class="site-hero-meta">$<%= (product.price_cents / 100).toFixed(2) %></p>
-    <% if (product.inventory_count != null) { %><p class="hint"><%= product.inventory_count %> left in stock</p><% } %>
+    <% if (options.length === 0) { %>
+      <p class="site-hero-meta">$<%= (product.price_cents / 100).toFixed(2) %></p>
+      <% if (product.inventory_count != null) { %><p class="hint"><%= product.inventory_count %> left in stock</p><% } %>
+    <% } %>
     <% if (product.description) { %><p><%= product.description %></p><% } %>
 
     <form method="POST" action="/store/<%= product.id %>/buy" class="member-form-grid">
@@ -33,15 +35,15 @@
           <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
         </select>
       </label>
-      <% if (product.sizeList.length > 0) { %>
-        <label>Size
-          <select name="size" required>
-            <% product.sizeList.forEach(function(s) { %><option value="<%= s %>"><%= s %></option><% }); %>
+      <% if (options.length > 0) { %>
+        <label>Option
+          <select name="optionId" required>
+            <% options.forEach(function(o) { %><option value="<%= o.id %>">$<%= (o.price_cents / 100).toFixed(2) %> - <%= o.name %><% if (o.quantity != null) { %> (<%= o.quantity %> left)<% } %></option><% }); %>
           </select>
         </label>
       <% } %>
       <label>Quantity
-        <input type="number" name="quantity" min="1" value="1" <% if (product.inventory_count != null) { %>max="<%= product.inventory_count %>"<% } %> />
+        <input type="number" name="quantity" min="1" value="1" <% if (options.length === 0 && product.inventory_count != null) { %>max="<%= product.inventory_count %>"<% } %> />
       </label>
       <div class="member-form-full">
         <button type="submit" class="primary-btn">Order</button>

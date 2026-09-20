@@ -54,7 +54,8 @@ router.get('/:id', async (req, res) => {
     return res.status(404).render('404', { title: 'Not Found' });
   }
   const family = await familyForAccount(req.portalAccount.id);
-  res.render('store-detail', { title: product.name, product: { ...withImageUrl(product), sizeList: store.parseSizes(product.sizes) }, family, error: req.query.error || null });
+  const options = await store.availableOptionsForProduct(product.id);
+  res.render('store-detail', { title: product.name, product: withImageUrl(product), options, family, error: req.query.error || null });
 });
 
 router.post('/:id/buy', async (req, res) => {
@@ -64,9 +65,9 @@ router.post('/:id/buy', async (req, res) => {
     return res.redirect(`/store/${req.params.id}?error=` + encodeURIComponent('You can only buy for yourself or your own family.'));
   }
   const quantity = Math.max(1, parseInt(req.body.quantity, 10) || 1);
-  const size = (req.body.size || '').trim() || null;
+  const optionId = req.body.optionId ? parseInt(req.body.optionId, 10) : null;
   try {
-    const orderId = await store.placeOnlineOrder(memberId, req.portalAccount.id, [{ productId: req.params.id, quantity, size }]);
+    const orderId = await store.placeOnlineOrder(memberId, req.portalAccount.id, [{ productId: req.params.id, quantity, optionId }]);
     res.redirect(`/store/orders/${orderId}`);
   } catch (err) {
     res.redirect(`/store/${req.params.id}?error=` + encodeURIComponent(err.message));

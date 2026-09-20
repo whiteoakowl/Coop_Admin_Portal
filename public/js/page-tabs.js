@@ -24,12 +24,83 @@
   // TOP of <body> - well before the rest of <main> has even been parsed
   // yet. A plain immediate run would find nothing to wire up (same
   // reasoning as public/js/roster-btn-row-grid.js's own 'load' listener).
+  // A real request: "on mobile add a fit to text drop down menu next to
+  // each page title with the subpages as a secondary way of accessing
+  // the subpages" - reuses the exact same per-section <dialog> the
+  // orange bar's own trigger already opens (below), so this is purely a
+  // second entry point onto it, not a separate menu/dialog to keep in
+  // sync. Finding "which dialog is this page's own section" duplicates
+  // admin-nav-accordion.js's own findActiveLink matching (query params
+  // included, not just pathname - see that file's own comment on why)
+  // rather than depending on load order between the two scripts.
+  function findCurrentSectionDialog() {
+    const here = new URL(window.location.href);
+    const dialogs = Array.prototype.slice.call(document.querySelectorAll('.page-tabs-dialog[id^="mobile-subpages-"]'));
+    function linksOf(dialog) {
+      return Array.prototype.slice.call(dialog.querySelectorAll('.view-tab'));
+    }
+    let best = null;
+    let bestCount = -1;
+    dialogs.forEach((dialog) => {
+      linksOf(dialog).forEach((a) => {
+        const url = new URL(a.getAttribute('href'), window.location.origin);
+        if (url.pathname !== here.pathname) return;
+        const params = Array.prototype.slice.call(url.searchParams.entries());
+        const isMatch = params.every(([k, v]) => here.searchParams.get(k) === v);
+        if (!isMatch || !params.length) return;
+        if (params.length > bestCount) {
+          best = dialog;
+          bestCount = params.length;
+        }
+      });
+    });
+    if (best) return best;
+    return (
+      dialogs.find((dialog) =>
+        linksOf(dialog).some((a) => {
+          const url = new URL(a.getAttribute('href'), window.location.origin);
+          return url.pathname === here.pathname && !url.search;
+        })
+      ) || null
+    );
+  }
+
+  // "fit to text" - a plain inline trigger, sized to its own label, not a
+  // full-width block - inserted right after the page's own <h1> (styles.css's
+  // own .page-title-has-menu makes that <h1> sit on the same line as it,
+  // whatever the page's own markup around the heading looks like).
+  function insertPageTitleTrigger() {
+    const dialog = findCurrentSectionDialog();
+    if (!dialog) return;
+    const h1 = document.querySelector('#main-content h1, main h1');
+    if (!h1) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'page-title-subpages-trigger';
+    btn.dataset.subpagesDialog = dialog.id;
+    btn.setAttribute('aria-label', 'Page menu');
+    btn.innerHTML = 'Menu <svg class="icon"><use href="#icon-chevron-down"/></svg>';
+    h1.insertAdjacentElement('afterend', btn);
+    h1.classList.add('page-title-has-menu');
+  }
+
   function wire() {
-    const pairs = [];
+    insertPageTitleTrigger();
+    // Keyed by dialog, not a flat trigger/dialog list - the page-title
+    // trigger above and the orange bar's own trigger can now both open
+    // the SAME dialog (a real request: "a secondary way of accessing the
+    // subpages", not a separate one to keep in sync). The outside-click
+    // check below has to recognize a click on EITHER of a dialog's own
+    // triggers as "not outside" - keying by one arbitrary trigger per
+    // dialog would make clicking trigger B look like an outside click to
+    // trigger A's own pair and immediately re-close the dialog B just
+    // opened.
+    const triggersByDialog = new Map();
     document.querySelectorAll('[data-subpages-dialog]').forEach((trigger) => {
       const dialog = document.getElementById(trigger.dataset.subpagesDialog);
       if (!dialog) return;
-      pairs.push({ trigger, dialog });
+      if (!triggersByDialog.has(dialog)) triggersByDialog.set(dialog, []);
+      triggersByDialog.get(dialog).push(trigger);
       // A real request: "clicking on the orange menu tab options does NOT
       // open the page, you still have to click a subpage" - this trigger
       // is a <button>, never an <a>, so it never navigates on its own;
@@ -58,9 +129,10 @@
     // page behind it - reaches its real target normally; this just also
     // closes whichever popup was left open when that happens.
     document.addEventListener('click', (e) => {
-      pairs.forEach(({ trigger, dialog }) => {
+      triggersByDialog.forEach((triggers, dialog) => {
         if (!dialog.open) return;
-        if (dialog.contains(e.target) || trigger.contains(e.target)) return;
+        if (dialog.contains(e.target)) return;
+        if (triggers.some((trigger) => trigger.contains(e.target))) return;
         dialog.close();
       });
     });

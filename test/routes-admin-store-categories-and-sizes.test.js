@@ -1,9 +1,8 @@
-// Coverage for the Shop feature build-out: categories (Settings tab
-// add/rename/delete), per-product sizes, the multi-item In-Person Sale
-// cart (routes/admin-store.js's own POST /orders/in-person), and the
-// Archived tab. See utils/store.js and supabase/migrations/
-// 20260918030000_store_categories_and_sizes.sql for the schema/shape
-// this exercises.
+// Coverage for the Shop feature build-out: categories (add/rename/delete,
+// now on the Products tab), per-product options (replacing the old plain
+// sizes text - see supabase/migrations/20260921010000_store_product_options.sql),
+// the multi-item In-Person Sale cart (routes/admin-store.js's own POST
+// /orders/in-person), and the Archived tab.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -108,35 +107,58 @@ test('Products tab: category filter only shows products in the selected category
   assert.doesNotMatch(page.text, /Filtered Widget/);
 });
 
-test('a product with sizes requires a valid size on both online and in-person checkout', async () => {
+test('a product with options requires choosing one on both online and in-person checkout, at that option\'s own price', async () => {
   const admin = await loginAsMainAdmin();
-  const productId = await createProduct(admin, { name: 'Hoodie', sizes: 'S, M, L' });
+  const productId = await createProduct(admin, { name: 'Hoodie' });
   await activateProduct(admin, productId);
 
-  const product = await db.prepare('SELECT sizes FROM store_products WHERE id = ?').get(productId);
-  assert.equal(product.sizes, 'S, M, L');
+  const csrf = await freshCsrf(admin, 'products');
+  await request(app)
+    .post(`/main-admin/store/${productId}/options`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      'options[0][name]': 'Small',
+      'options[0][price]': '18.00',
+      'options[0][enabled]': '1',
+      'options[1][name]': 'Medium',
+      'options[1][price]': '20.00',
+      'options[1][qty]': '2',
+      'options[1][enabled]': '1',
+      _csrf: csrf,
+    });
 
-  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Sized Buyer', 'sized-buyer', 'parent')").run()).lastInsertRowid;
+  const options = await db.prepare('SELECT * FROM store_product_options WHERE product_id = ? ORDER BY position').all(productId);
+  assert.equal(options.length, 2);
+  const medium = options.find((o) => o.name === 'Medium');
+  assert.equal(medium.price_cents, 2000);
+  assert.equal(medium.quantity, 2);
 
-  let csrf = await freshCsrf(admin, 'orders');
-  const noSizeRes = await request(app)
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Option Buyer', 'option-buyer', 'parent')").run()).lastInsertRowid;
+
+  let orderCsrf = await freshCsrf(admin, 'orders');
+  const noOptionRes = await request(app)
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', _csrf: csrf });
-  assert.match(decodeURIComponent(noSizeRes.headers.location), /Choose a size/);
+    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', _csrf: orderCsrf });
+  assert.match(decodeURIComponent(noOptionRes.headers.location), /Choose an option/);
 
-  csrf = await freshCsrf(admin, 'orders');
-  const withSizeRes = await request(app)
+  orderCsrf = await freshCsrf(admin, 'orders');
+  const withOptionRes = await request(app)
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', 'items[0][size]': 'M', _csrf: csrf });
-  assert.match(withSizeRes.headers.location, /\/main-admin\/store\/orders\/\d+/);
+    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', 'items[0][optionId]': String(medium.id), _csrf: orderCsrf });
+  assert.match(withOptionRes.headers.location, /\/main-admin\/store\/orders\/\d+/);
 
-  const orderId = /\/main-admin\/store\/orders\/(\d+)/.exec(withSizeRes.headers.location)[1];
-  const item = await db.prepare('SELECT size FROM store_order_items WHERE order_id = ?').get(orderId);
-  assert.equal(item.size, 'M');
+  const orderId = /\/main-admin\/store\/orders\/(\d+)/.exec(withOptionRes.headers.location)[1];
+  const item = await db.prepare('SELECT option_name, unit_price_cents FROM store_order_items WHERE order_id = ?').get(orderId);
+  assert.equal(item.option_name, 'Medium');
+  assert.equal(item.unit_price_cents, 2000);
+
+  const updatedMedium = await db.prepare('SELECT quantity FROM store_product_options WHERE id = ?').get(medium.id);
+  assert.equal(updatedMedium.quantity, 1, 'the chosen option\'s own stock should decrement, not the product-level inventory');
 });
 
 test('In-Person Sale cart rings up several different products in one order', async () => {

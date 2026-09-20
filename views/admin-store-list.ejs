@@ -12,15 +12,26 @@
     <div class="grid-box-header">
       <h1>Shop</h1>
       <% if (activeTab === 'products') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
+        <div class="roster-btn-row">
+          <%# A real request: "add button that says view member store.
+              This button shows you the member store view." %>
+          <a class="roster-action-btn" href="/store" target="_blank" rel="noopener">View Member Store</a>
+          <%# A real request: "remove settings subpage. Move add category
+              button to the product page." %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
+        </div>
       <% } else if (activeTab === 'orders') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('in-person-dialog').showModal()">+ In-Person Sale</button>
-      <% } else if (activeTab === 'settings') { %>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+        <div class="roster-btn-row">
+          <%# A real request: "button called fulfillment totals. Popup,
+              show counts for all order that need to be filled." %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('fulfillment-totals-dialog').showModal()">Fulfillment Totals</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('in-person-dialog').showModal()">+ In-Person Sale</button>
+        </div>
       <% } %>
     </div>
 
-    <%# Products/Orders/Archived/Settings now live as subpages under the
+    <%# Products/Orders/Archived/Analytics now live as subpages under the
         orange bar's own Shop item (views/partials/portal-nav.ejs) instead
         of a trigger+dialog here. %>
 
@@ -28,9 +39,10 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (activeTab === 'products') { %>
+      <%# A real request: "filter by category should just say filter." %>
       <form method="GET" action="/main-admin/store" class="inline-block-form">
         <input type="hidden" name="tab" value="products" />
-        <label>Filter by category
+        <label>Filter
           <select name="category" onchange="this.form.submit()">
             <option value="">All Categories</option>
             <% categories.forEach(function(c) { %>
@@ -44,24 +56,63 @@
         <p class="roster-empty">No products yet &mdash; create one above.</p>
       <% } %>
 
+      <%# A real request: "not [no] edit button on the product, clicking
+          the product takes you to the edit page" - the whole card is now
+          the link, nothing left inside it needs its own click target. %>
       <div class="team-card-grid">
         <% products.forEach(function(p) { %>
           <div class="team-col">
-            <div class="team-info-card">
+            <a class="team-info-card store-product-card" href="/main-admin/store/<%= p.id %>/edit">
               <% if (p.imageUrl) { %>
                 <img src="<%= p.imageUrl %>" alt="" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: var(--radius); margin-bottom: 0.5rem;" />
               <% } %>
-              <h3 class="team-info-title"><a href="/main-admin/store/<%= p.id %>/edit"><%= p.name %></a></h3>
-              <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
+              <h3 class="team-info-title">
+                <%= p.name %>
+                <span class="badge-pill badge-pill-<%= p.status === 'active' ? 'green' : 'orange' %>"><%= p.status.charAt(0).toUpperCase() + p.status.slice(1) %></span>
+              </h3>
               <% if (p.categoryName) { %><span class="badge-pill"><%= p.categoryName %></span><% } %>
-              <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %><% if (p.sizeList.length > 0) { %> &middot; Sizes: <%= p.sizeList.join(', ') %><% } %></p>
-              <div class="roster-btn-row">
-                <a class="roster-action-btn" href="/main-admin/store/<%= p.id %>/edit">Edit</a>
-              </div>
-            </div>
+              <p class="hint">$<%= (p.price_cents / 100).toFixed(2) %> &middot; <%= p.availability.replace('_', '-') %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></p>
+            </a>
           </div>
         <% }); %>
       </div>
+
+      <%# A real request: "remove settings subpage. Move add category
+          button to the product page" - Categories management (all
+          Settings ever held) moved here from its own tab. %>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Categories</h2></div>
+        <% if (categories.length === 0) { %>
+          <p class="roster-empty">No categories yet &mdash; add one above.</p>
+        <% } else { %>
+          <ul class="store-category-list">
+            <% categories.forEach(function(c) { %>
+              <li class="store-category-row">
+                <form method="POST" action="/main-admin/store/categories/<%= c.id %>" class="store-category-rename-form">
+                  <input type="text" name="name" value="<%= c.name %>" required />
+                  <button type="submit" class="btn-secondary">Save</button>
+                </form>
+                <form method="POST" action="/main-admin/store/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its products become uncategorized.">
+                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                </form>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <dialog id="add-category-dialog" class="member-picker-dialog">
+        <form method="POST" action="/main-admin/store/categories">
+          <h3>Add Category</h3>
+          <label for="add-store-category-name">Category Name
+            <input id="add-store-category-name" type="text" name="name" placeholder="e.g. Apparel" required />
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Add</button>
+          </div>
+        </form>
+      </dialog>
 
       <dialog id="new-product-dialog" class="member-picker-dialog">
         <form method="POST" action="/main-admin/store">
@@ -78,10 +129,7 @@
               <% categories.forEach(function(c) { %><option value="<%= c.id %>"><%= c.name %></option><% }); %>
             </select>
           </label>
-          <label>Sizes (comma-separated, blank = no sizes)
-            <input type="text" name="sizes" placeholder="e.g. S, M, L, XL" />
-          </label>
-          <label>Inventory (blank = unlimited)
+          <label>Inventory (blank = unlimited) <span class="hint">(ignored once you add Options on the edit page)</span>
             <input type="number" name="inventoryCount" min="0" />
           </label>
           <label>Availability
@@ -155,20 +203,20 @@
           <% if (saleProducts.length === 0) { %>
             <p class="roster-empty">No products are set up for in-person sale yet.</p>
           <% } else { %>
-            <p class="hint">Set a quantity for each item being sold. Add several different products (and sizes) to one sale.</p>
+            <p class="hint">Set a quantity for each item being sold. Add several different products (and options) to one sale.</p>
             <div class="sale-cart-list">
               <% saleProducts.forEach(function(p, idx) { %>
                 <div class="sale-cart-row">
                   <input type="hidden" name="items[<%= idx %>][productId]" value="<%= p.id %>" />
-                  <input class="sale-cart-qty" type="number" name="items[<%= idx %>][quantity]" min="0" <% if (p.inventory_count != null) { %>max="<%= p.inventory_count %>"<% } %> value="0" aria-label="Quantity of <%= p.name %>" />
-                  <% if (p.sizeList.length > 0) { %>
-                    <select class="sale-cart-size" name="items[<%= idx %>][size]" aria-label="Size of <%= p.name %>">
-                      <% p.sizeList.forEach(function(s) { %><option value="<%= s %>"><%= s %></option><% }); %>
+                  <input class="sale-cart-qty" type="number" name="items[<%= idx %>][quantity]" min="0" <% if (p.options.length === 0 && p.inventory_count != null) { %>max="<%= p.inventory_count %>"<% } %> value="0" aria-label="Quantity of <%= p.name %>" />
+                  <% if (p.options.length > 0) { %>
+                    <select class="sale-cart-option" name="items[<%= idx %>][optionId]" aria-label="Option of <%= p.name %>">
+                      <% p.options.forEach(function(o) { %><option value="<%= o.id %>">$<%= (o.price_cents / 100).toFixed(2) %> - <%= o.name %><% if (o.quantity != null) { %> (<%= o.quantity %> left)<% } %></option><% }); %>
                     </select>
                   <% } %>
                   <span class="sale-cart-info">
                     <span class="sale-cart-name"><%= p.name %></span>
-                    <span class="sale-cart-meta">$<%= (p.price_cents / 100).toFixed(2) %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %></span>
+                    <span class="sale-cart-meta"><% if (p.options.length === 0) { %>$<%= (p.price_cents / 100).toFixed(2) %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %><% } %></span>
                   </span>
                 </div>
               <% }); %>
@@ -187,6 +235,38 @@
             <button type="submit" class="primary-btn">Order</button>
           </div>
         </form>
+      </dialog>
+
+      <%# A real request: "button called fulfillment totals. Popup, show
+          counts for all order that need to be filled. Example product
+          title, option, qty. Repeat for each different product title and
+          option that is different. This can be used for bulk product
+          totals." - every 'paid' (not yet fulfilled) order item, summed
+          by product + option (utils/store.js's own fulfillmentTotals). %>
+      <dialog id="fulfillment-totals-dialog" class="member-picker-dialog">
+        <h3>Fulfillment Totals</h3>
+        <p class="hint">Everything still needing to be filled, across every paid order.</p>
+        <% if (fulfillmentTotals.length === 0) { %>
+          <p class="roster-empty">Nothing needs fulfilling right now.</p>
+        <% } else { %>
+          <div class="roster-scroll">
+            <table class="roster-table condensed-table">
+              <thead><tr><th>Product</th><th>Option</th><th>Qty</th></tr></thead>
+              <tbody>
+                <% fulfillmentTotals.forEach(function(row) { %>
+                  <tr>
+                    <td class="roster-name-col"><%= row.productName %></td>
+                    <td><%= row.optionName || '–' %></td>
+                    <td><%= row.qty %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+        </div>
       </dialog>
     <% } %>
 
@@ -219,40 +299,67 @@
       <% } %>
     <% } %>
 
-    <% if (activeTab === 'settings') { %>
-      <div class="manage-section">
-        <div class="grid-box-header"><h2>Categories</h2></div>
-        <% if (categories.length === 0) { %>
-          <p class="roster-empty">No categories yet &mdash; add one above.</p>
-        <% } else { %>
-          <ul class="store-category-list">
-            <% categories.forEach(function(c) { %>
-              <li class="store-category-row">
-                <form method="POST" action="/main-admin/store/categories/<%= c.id %>" class="store-category-rename-form">
-                  <input type="text" name="name" value="<%= c.name %>" required />
-                  <button type="submit" class="btn-secondary">Save</button>
-                </form>
-                <form method="POST" action="/main-admin/store/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its products become uncategorized.">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                </form>
-              </li>
+    <%
+    // A real request: "Store, analytics sub page. Shows graph of total
+    // sales with filter drop down for today, this week, month, 3 months,
+    // 6 month, 12 months, all time. Shows sale totals for each product
+    // and product option in a card with three columns." Single-series
+    // magnitude-over-time -> a plain bar chart, one brand hue, no legend
+    // needed (see the dataviz skill's own form-heuristic for why a
+    // one-series chart skips the legend box).
+    const maxCents = analytics ? Math.max(1, ...analytics.dailyTotals.map(function (d) { return d.totalCents; })) : 1;
+    const CHART_HEIGHT = 160;
+    %>
+    <% if (activeTab === 'analytics') { %>
+      <form method="GET" action="/main-admin/store" class="inline-block-form">
+        <input type="hidden" name="tab" value="analytics" />
+        <label>Date Range
+          <select name="range" onchange="this.form.submit()">
+            <% analyticsRanges.forEach(function(r) { %>
+              <option value="<%= r.key %>" <%= analyticsRange === r.key ? 'selected' : '' %>><%= r.label %></option>
             <% }); %>
-          </ul>
+          </select>
+        </label>
+      </form>
+
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2>Total Sales</h2>
+          <span class="hint"><%= analytics.orderCount %> order<%= analytics.orderCount === 1 ? '' : 's' %> &middot; $<%= (analytics.totalCents / 100).toFixed(2) %></span>
+        </div>
+        <% if (analytics.dailyTotals.length === 0) { %>
+          <p class="roster-empty">No sales in this range.</p>
+        <% } else { %>
+          <svg class="store-sales-chart" viewBox="0 0 <%= analytics.dailyTotals.length * 44 %> <%= CHART_HEIGHT + 26 %>" role="img" aria-label="Total sales over time" preserveAspectRatio="xMinYMin meet">
+            <% analytics.dailyTotals.forEach(function(d, i) { %>
+              <% const barHeight = Math.max(2, Math.round((d.totalCents / maxCents) * CHART_HEIGHT)); %>
+              <rect x="<%= i * 44 + 8 %>" y="<%= CHART_HEIGHT - barHeight %>" width="28" height="<%= barHeight %>" rx="4" class="store-sales-bar">
+                <title><%= d.date %>: $<%= (d.totalCents / 100).toFixed(2) %></title>
+              </rect>
+              <text x="<%= i * 44 + 22 %>" y="<%= CHART_HEIGHT + 16 %>" class="store-sales-bar-label" text-anchor="middle"><%= analytics.bucketedByMonth ? d.date : d.date.slice(5) %></text>
+            <% }); %>
+          </svg>
         <% } %>
       </div>
 
-      <dialog id="add-category-dialog" class="member-picker-dialog">
-        <form method="POST" action="/main-admin/store/categories">
-          <h3>Add Category</h3>
-          <label for="add-store-category-name">Category Name
-            <input id="add-store-category-name" type="text" name="name" placeholder="e.g. Apparel" required />
-          </label>
-          <div class="notes-dialog-actions">
-            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Add</button>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2>Sales By Product</h2></div>
+        <% if (analytics.byProductOption.length === 0) { %>
+          <p class="roster-empty">No sales in this range.</p>
+        <% } else { %>
+          <div class="team-card-grid">
+            <% analytics.byProductOption.forEach(function(row) { %>
+              <div class="team-col">
+                <div class="team-info-card store-analytics-card">
+                  <span class="store-analytics-name"><%= row.productName %><% if (row.optionName) { %><br /><span class="hint"><%= row.optionName %></span><% } %></span>
+                  <span class="store-analytics-figure"><%= row.qty %><br /><span class="hint">sold</span></span>
+                  <span class="store-analytics-figure">$<%= (row.totalCents / 100).toFixed(2) %><br /><span class="hint">total</span></span>
+                </div>
+              </div>
+            <% }); %>
           </div>
-        </form>
-      </dialog>
+        <% } %>
+      </div>
     <% } %>
   </main>
 </body>
