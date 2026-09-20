@@ -17,7 +17,20 @@ const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = 
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const db = require('../db');
 const events = require('../utils/events');
-const { listSignUpLists, getSignUpList, updateSignUpList, listVolunteerLists, getVolunteerList, updateVolunteerList } = require('../utils/committeesAndSignupLists');
+const {
+  listSignUpLists,
+  getSignUpList,
+  updateSignUpList,
+  listVolunteerLists,
+  getVolunteerList,
+  updateVolunteerList,
+  signUpListsForEvent,
+  volunteerListsForEvent,
+  itemsForSignUpList,
+  shiftsForVolunteerList,
+  claimSignUpItem,
+  signUpForShift,
+} = require('../utils/committeesAndSignupLists');
 const { notify } = require('../utils/notifications');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
@@ -770,20 +783,142 @@ router.post('/:id/food-items/:itemId/delete', async (req, res) => {
 // shape now (see utils/events.js's own comment); volunteerSignupsByMember
 // only exists at all when the event has volunteering turned on, same
 // gate the member-facing Volunteer section itself uses.
+// "Top of this page has total families, total parents, total students
+// registered, cancel, checked in and checked out" - counted straight off
+// familyGroupedRegistrationsForEvent's own rows rather than a separate
+// query, since that's already every registration this page renders.
+function registrationTotals(familyGroups) {
+  const totals = { families: familyGroups.length, parents: 0, students: 0, cancelled: 0, checkedIn: 0, checkedOut: 0 };
+  familyGroups.forEach((group) => {
+    group.members.forEach((r) => {
+      if (r.status === 'cancelled') totals.cancelled += 1;
+      else if (r.memberType === 'parent' || r.memberType === 'admin') totals.parents += 1;
+      else totals.students += 1;
+      if (r.checked_in_at) totals.checkedIn += 1;
+      if (r.checked_out_at) totals.checkedOut += 1;
+    });
+    group.guests.forEach((g) => {
+      if (g.status === 'cancelled') totals.cancelled += 1;
+      if (g.checked_in_at) totals.checkedIn += 1;
+      if (g.checked_out_at) totals.checkedOut += 1;
+    });
+  });
+  return totals;
+}
+
+// Attached Volunteer Lists/Sign-Up Lists (utils/committeesAndSignupLists.js -
+// a real request: "if there is a volunteer list or signup list attached
+// to this particular event it will also ask for those selections as
+// specified by the settings" on the Add Registration popup below), each
+// with its own current shifts/items so the popup can offer them.
+async function attachedListsForEvent(eventId) {
+  const [volunteerLists, signUpLists] = await Promise.all([volunteerListsForEvent(eventId), signUpListsForEvent(eventId)]);
+  const volunteerListsWithShifts = await Promise.all(volunteerLists.map(async (l) => ({ ...l, shifts: await shiftsForVolunteerList(l.id) })));
+  const signUpListsWithItems = await Promise.all(signUpLists.map(async (l) => ({ ...l, items: await itemsForSignUpList(l.id) })));
+  return { volunteerLists: volunteerListsWithShifts, signUpLists: signUpListsWithItems };
+}
+
 router.get('/:id/registrations', async (req, res) => {
   const event = await events.getEvent(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
   const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
+  const eligibleMembers = await events.eligibleMembersForRegistration(req.params.id);
+  const { volunteerLists: attachedVolunteerLists, signUpLists: attachedSignUpLists } = await attachedListsForEvent(req.params.id);
   res.render('admin-events-registrations', {
     title: `Registrations - ${event.title}`,
     event,
     familyGroups,
     volunteerSignupsByMember,
+    totals: registrationTotals(familyGroups),
+    eligibleMembers,
+    attachedVolunteerLists,
+    attachedSignUpLists,
     canRegisterGuests: req.portalPermissions.has('register_guests'),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// "Add a button that says add registration. Pop up with menu of
+// members... Able to select multiple boxes and save all at once. If
+// there is a volunteer list or signup list attached to this particular
+// event it will also ask for those selections."
+router.post('/:id/registrations/add', async (req, res) => {
+  const eventId = req.params.id;
+  const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  if (memberIds.length === 0) {
+    return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Choose at least one member.'));
+  }
+  const results = await events.adminAddRegistrations(eventId, memberIds, req.portalAccount.id);
+  const confirmed = results.filter((r) => r.ok).length;
+  const failed = results.filter((r) => !r.ok);
+
+  // The same shared shift/item choice applies to every member just
+  // registered - a real request phrased this as one popup asking for
+  // "those selections" alongside the member checklist, not a separate
+  // choice per person.
+  const shiftId = req.body.volunteerShiftId ? parseInt(req.body.volunteerShiftId, 10) : null;
+  const itemId = req.body.signupItemId ? parseInt(req.body.signupItemId, 10) : null;
+  if (shiftId || itemId) {
+    for (const memberId of memberIds) {
+      if (shiftId) await signUpForShift(shiftId, memberId, req.portalAccount.id);
+      if (itemId) await claimSignUpItem(itemId, memberId, 1, req.portalAccount.id);
+    }
+  }
+
+  const notice = `Registered ${confirmed} member${confirmed === 1 ? '' : 's'}.${failed.length ? ` ${failed.length} skipped (already registered).` : ''}`;
+  res.redirect(`/main-admin/events/${eventId}/registrations?notice=` + encodeURIComponent(notice));
+});
+
+// "Add a print button. Print to fit to page. ABC order according to
+// family name" - familyGroupedRegistrationsForEvent already sorts that
+// way; a dedicated preview page (this app's own print-button convention,
+// see views/admin-rosters-print.ejs) instead of an on-page print media
+// query, so the on-screen roster's own toolbar/pagination never leak
+// into the printed sheet.
+router.get('/:id/registrations/print', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
+  const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
+  res.render('admin-events-registrations-print', {
+    title: `Registrations - ${event.title}`,
+    event,
+    familyGroups,
+    volunteerSignupsByMember,
+  });
+});
+
+// "Add import and export button as well."
+router.get('/:id/registrations/export.csv', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
+  const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
+  sendCsv(res, `registrations-${event.id}.csv`, events.buildRegistrationsExportCsvLines(event, familyGroups, volunteerSignupsByMember));
+});
+
+router.get('/:id/registrations/import-template.xlsx', (req, res) => {
+  const buffer = buildTemplateWorkbook(['Member Code or Name'], [['e.g. 123456 or Jane Smith']]);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="registrations-import-template.xlsx"');
+  res.send(buffer);
+});
+
+const registrationsImportUpload = multer({ storage: multer.memoryStorage() });
+router.post('/:id/registrations/import', registrationsImportUpload.single('file'), async (req, res) => {
+  const eventId = req.params.id;
+  if (!req.file) return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Please choose a file to import.'));
+  let rows;
+  try {
+    rows = await readRowsFromFile(req.file.buffer);
+  } catch (err) {
+    return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent(err.message));
+  }
+  const { imported, errors } = await events.importRegistrationsFromRows(eventId, rows, req.portalAccount.id);
+  const notice = `Registered ${imported} member(s).${errors.length ? ` ${errors.length} row(s) skipped.` : ''}`;
+  res.redirect(`/main-admin/events/${eventId}/registrations?notice=` + encodeURIComponent(notice));
 });
 
 // A real request: "when you click attendance it should show a purple

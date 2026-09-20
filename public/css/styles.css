@@ -2642,20 +2642,26 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   background-position: right 0.45rem center;
   background-size: 0.7rem;
 }
+/* A real request: "purple page buttons at the bottom of long lists like
+   member lists should be solid purple and the same height and balanced
+   row. The buttons should be the same size, well proportioned" - solid
+   fill instead of an outline, same box model (padding/border-radius/
+   font-size) every one of these already shared, so Prev/Next/View All
+   still read as one uniform row. */
 .pagination-btn {
   padding: var(--control-padding-compact);
   border: 1px solid var(--btn-purple);
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-weight: 600;
-  color: var(--purple);
-  background: var(--surface);
+  color: #fff;
+  background: var(--btn-purple);
   text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.pagination-btn:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
-.pagination-btn-disabled { color: var(--muted); border-color: var(--border); cursor: default; pointer-events: none; opacity: 0.6; }
+.pagination-btn:hover { border-color: var(--btn-purple-hover); background: var(--btn-purple-hover); color: #fff; }
+.pagination-btn-disabled { color: var(--muted); background: var(--surface); border-color: var(--border); cursor: default; pointer-events: none; opacity: 0.6; }
 
 .link-btn-danger { color: var(--red); }
 
@@ -2718,18 +2724,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding-right: 2.25rem;
 }
 
-/* Secondary actions (dialog Cancel, small standalone buttons) get a
-   purple outline - present but lower-emphasis next to a solid orange
-   .primary-btn or a solid purple .roster-action-btn. */
-.btn-secondary { color: var(--purple); border-color: var(--btn-purple); cursor: pointer; font-weight: 600; }
-.btn-secondary:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
+/* Secondary actions (dialog Cancel, small standalone buttons) - a real
+   request: "any outlined purple button should be solid purple" - solid
+   fill instead of the outline this used to have, still lower-emphasis
+   next to a solid orange .primary-btn purely by being a different hue,
+   not by being the only unfilled button in the row anymore. */
+.btn-secondary { background: var(--btn-purple); border-color: var(--btn-purple); color: #fff; cursor: pointer; font-weight: 600; }
+.btn-secondary:hover { background: var(--btn-purple-hover); border-color: var(--btn-purple-hover); color: #fff; }
 
 /* A real request: "creating an event save draft button should be the
    same size as publish event button" - event creation's own Save Draft
    sits directly beside .primary-btn's own Publish Event, so the two
    should read as equally-weighted choices rather than one looking like
    an afterthought next to the other. Same box model as .primary-btn,
-   keeping .btn-secondary's own outline/purple color scheme (still the
+   keeping .btn-secondary's own solid purple color scheme (still the
    lower-emphasis of the two actions, just not a smaller target). */
 .btn-secondary-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
 

@@ -24,11 +24,18 @@
         the corner "Full Screen View" toggle every admin page has) can
         land on a stale or failing fetch instead of a real page load in
         that state. A real, explicit link is never at the mercy of
-        browser history or fullscreen interception either way. %>
+        browser history or fullscreen interception either way. A later
+        real request relabeled both: "back to event should say edit
+        event, back to attendance should say all events" - same two
+        links, clearer about what each one actually does. %>
     <div class="roster-toolbar">
       <div class="roster-btn-row">
-        <a class="roster-action-btn" href="/main-admin/events?tab=attendance">&larr; Back to Attendance</a>
-        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">Back to Event</a>
+        <a class="roster-action-btn" href="/main-admin/events?tab=attendance">&larr; All Events</a>
+        <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/builder">Edit Event</a>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('add-registration-dialog').showModal()">+ Add Registration</button>
+        <a class="roster-action-btn print-action-btn" href="/main-admin/events/<%= event.id %>/registrations/print" target="_blank">Print</a>
+        <a class="roster-action-btn file-action-btn" href="/main-admin/events/<%= event.id %>/registrations/export.csv">Export</a>
+        <button type="button" class="roster-action-btn file-action-btn" onclick="document.getElementById('import-registrations-dialog').showModal()">Import</button>
       </div>
       <%# A real request: "when you click attendance it should show a
           purple check in and purple check out button. when you click
@@ -44,6 +51,18 @@
           <svg class="icon"><use href="#icon-log-out"/></svg> Check Out
         </a>
       </div>
+    </div>
+
+    <%# A real request: "top of this page has total families, total
+        parents, total students registered, cancel, checked in and
+        checked out." %>
+    <div class="totals-card">
+      <span class="totals-item"><span class="stat-value"><%= totals.families %></span><span class="stat-label">Families</span></span>
+      <span class="totals-item"><span class="stat-value"><%= totals.parents %></span><span class="stat-label">Parents</span></span>
+      <span class="totals-item"><span class="stat-value"><%= totals.students %></span><span class="stat-label">Students</span></span>
+      <span class="totals-item"><span class="stat-value"><%= totals.cancelled %></span><span class="stat-label">Cancelled</span></span>
+      <span class="totals-item"><span class="stat-value"><%= totals.checkedIn %></span><span class="stat-label">Checked In</span></span>
+      <span class="totals-item"><span class="stat-value"><%= totals.checkedOut %></span><span class="stat-label">Checked Out</span></span>
     </div>
 
     <% if (familyGroups.length === 0) { %>
@@ -164,8 +183,101 @@
         </table>
       </div>
     <% } %>
+
+    <%
+    // "Pop up with menu of members with check boxes and filter for
+    // family name in ABC order. Able to select multiple boxes and save
+    // all at once." eligibleMembers already arrives sorted family-first
+    // A-Z (utils/events.js's own eligibleMembersForRegistration); the
+    // family dropdown below just offers a way to narrow that same list
+    // down to one family, built from its own distinct family names, also
+    // A-Z.
+    var registrationFamilyNames = Array.from(new Set(eligibleMembers.filter(function(m) { return m.familyName; }).map(function(m) { return m.familyName; }))).sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+    %>
+    <dialog id="add-registration-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/add">
+        <h3>Add Registration</h3>
+        <% if (eligibleMembers.length === 0) { %>
+          <p class="hint">Everyone active is already registered for this event.</p>
+        <% } else { %>
+          <label>Filter by Family
+            <select id="add-registration-family-filter">
+              <option value="">All Families</option>
+              <% registrationFamilyNames.forEach(function(name) { %>
+                <option value="<%= name %>"><%= name %></option>
+              <% }); %>
+            </select>
+          </label>
+          <div class="member-picker-list" id="add-registration-member-list">
+            <% eligibleMembers.forEach(function(m) { %>
+              <label class="member-picker-row" data-family="<%= m.familyName || '' %>">
+                <input type="checkbox" name="memberIds" value="<%= m.id %>" />
+                <span><%= m.name %><% if (m.familyName) { %> <span class="hint">(<%= m.familyName %>)</span><% } %></span>
+              </label>
+            <% }); %>
+          </div>
+
+          <% if (attachedVolunteerLists.length) { %>
+            <% attachedVolunteerLists.forEach(function(list) { %>
+              <label><%= list.title %> Shift <span class="hint">(optional - applies to everyone selected above)</span>
+                <select name="volunteerShiftId">
+                  <option value="">None</option>
+                  <% list.shifts.forEach(function(s) { %>
+                    <option value="<%= s.id %>"><%= s.job_name %><% if (s.shift_date) { %> - <%= s.shift_date %><% } %> (<%= s.signups.length %>/<%= s.slots_needed %>)</option>
+                  <% }); %>
+                </select>
+              </label>
+            <% }); %>
+          <% } %>
+          <% if (attachedSignUpLists.length) { %>
+            <% attachedSignUpLists.forEach(function(list) { %>
+              <label><%= list.title %> Item <span class="hint">(optional - one each, applies to everyone selected above)</span>
+                <select name="signupItemId">
+                  <option value="">None</option>
+                  <% list.items.forEach(function(item) { %>
+                    <option value="<%= item.id %>"><%= item.item_name %> (<%= item.quantityClaimed %>/<%= item.quantity_needed %>)</option>
+                  <% }); %>
+                </select>
+              </label>
+            <% }); %>
+          <% } %>
+        <% } %>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <% if (eligibleMembers.length > 0) { %>
+            <button type="submit" class="primary-btn">Save</button>
+          <% } %>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="import-registrations-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events/<%= event.id %>/registrations/import" enctype="multipart/form-data">
+        <h3>Import Registrations</h3>
+        <p class="hint">A spreadsheet with one "Member Code or Name" column. <a href="/main-admin/events/<%= event.id %>/registrations/import-template.xlsx">Download a template</a>.</p>
+        <label>File
+          <input type="file" name="file" accept=".csv,.xlsx,.xls" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Import</button>
+        </div>
+      </form>
+    </dialog>
   </main>
   <script>
+    // "filter for family name in ABC order" - a plain show/hide over the
+    // already-alphabetical checkbox list above, not a server round trip.
+    (function () {
+      var select = document.getElementById('add-registration-family-filter');
+      if (!select) return;
+      select.addEventListener('change', function () {
+        document.querySelectorAll('#add-registration-member-list .member-picker-row').forEach(function (row) {
+          row.hidden = select.value !== '' && row.dataset.family !== select.value;
+        });
+      });
+    })();
+
     // P/A/L roster grid (item 11) - each select auto-saves on change, same
     // "no separate Edit/Save step" pattern public/js/attendance-grid.js
     // uses for class attendance, but posting a plain `status` field to

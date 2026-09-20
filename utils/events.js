@@ -25,6 +25,7 @@ const { GRADE_OPTIONS } = require('./membership');
 const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
+const { findMemberByBarcodeOrName } = require('./memberLookup');
 
 // The Create New Event wizard's own Event Type dropdown - a fixed, short
 // list is plenty for a single co-op (unlike GRADE_OPTIONS/sections,
@@ -521,7 +522,7 @@ async function registrationsForEvent(eventId) {
 async function familyGroupedRegistrationsForEvent(eventId) {
   const registrations = await db
     .prepare(
-      `SELECT er.*, m.name AS "memberName", m.member_code AS "memberCode", m.family_id AS "familyId", m.is_primary_parent AS "isPrimaryParent"
+      `SELECT er.*, m.name AS "memberName", m.member_code AS "memberCode", m.family_id AS "familyId", m.is_primary_parent AS "isPrimaryParent", m.member_type AS "memberType"
        FROM event_registrations er
        JOIN members m ON m.id = er.member_id
        WHERE er.event_id = ?`
@@ -561,6 +562,104 @@ async function familyGroupedRegistrationsForEvent(eventId) {
     return lastNameOf(aName).localeCompare(lastNameOf(bName), undefined, { sensitivity: 'base' }) || aName.localeCompare(bName, undefined, { sensitivity: 'base' });
   });
   return groupList;
+}
+
+// "Add Registration" popup's own member checklist (a real request: "pop
+// up with menu of members with check boxes and filter for family name in
+// ABC order") - every active member not already registered (a cancelled
+// registration doesn't count as "already registered" here, same as
+// createOrReactivateRegistration's own reuse-the-cancelled-row logic),
+// sorted by family surname then name so the family filter/list reads in
+// the same A-Z order either way.
+async function eligibleMembersForRegistration(eventId) {
+  const rows = await db
+    .prepare(
+      `SELECT m.id, m.name, m.member_type AS "memberType", f.name AS "familyName"
+       FROM members m
+       LEFT JOIN families f ON f.id = m.family_id
+       WHERE m.active = 1
+         AND m.id NOT IN (SELECT member_id FROM event_registrations WHERE event_id = ? AND status != 'cancelled')
+       ORDER BY LOWER(COALESCE(f.name, m.name)), LOWER(m.name)`
+    )
+    .all(eventId);
+  return rows;
+}
+
+// A real request: "add import and export button as well" (on the
+// Registrations page). Export flattens familyGroupedRegistrationsForEvent's
+// own shape - already sorted family-first, A-Z by family surname - into
+// one row per member/guest, same order the on-screen roster and the
+// print view use.
+const REGISTRATION_EXPORT_HEADER = ['Family', 'Name', 'Status', 'Paid', 'Registered At', 'P/A/L', 'Checked In', 'Checked Out', 'Volunteer Signup'];
+
+function buildRegistrationsExportCsvLines(event, familyGroups, volunteerSignupsByMember) {
+  const lines = [toCsvRow(REGISTRATION_EXPORT_HEADER)];
+  function priceFor(status, isFirstInGroup) {
+    if (event.price_cents == null || status !== 'confirmed') return '';
+    if (event.price_per === 'family' && !isFirstInGroup) return '';
+    return (event.price_cents / 100).toFixed(2);
+  }
+  familyGroups.forEach((group) => {
+    const familyLabel = group.members[0] ? lastNameOf(group.members[0].memberName) : lastNameOf(group.guests[0].guest_name);
+    let isFirst = true;
+    group.members.forEach((r) => {
+      lines.push(
+        toCsvRow([
+          familyLabel,
+          r.memberName,
+          r.status,
+          priceFor(r.status, isFirst),
+          r.created_at,
+          r.attendance_status || '',
+          r.checked_in_at || '',
+          r.checked_out_at || '',
+          (volunteerSignupsByMember.get(r.member_id) || []).join('; '),
+        ])
+      );
+      isFirst = false;
+    });
+    group.guests.forEach((g) => {
+      lines.push(toCsvRow([familyLabel, `${g.guest_name} (Guest)`, g.status, priceFor(g.status, isFirst), g.created_at, g.attendance_status || '', g.checked_in_at || '', g.checked_out_at || '', '']));
+      isFirst = false;
+    });
+  });
+  return lines;
+}
+
+// Import counterpart - a spreadsheet with a "Member Code or Name" column
+// (barcode also accepted, same lookup the Check-In scan endpoint already
+// uses) is the bulk alternative to the Add Registration popup's own
+// checkbox list, for a family emailed in ahead of time rather than
+// clicked through one at a time.
+async function importRegistrationsFromRows(eventId, rows, accountId) {
+  const errors = [];
+  const found = []; // { rowNum, memberId }
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+    const raw = String(row['Member Code or Name'] || row['Member Code'] || row['Name'] || row['member code or name'] || '').trim();
+    if (!raw) {
+      errors.push(`Row ${rowNum}: needs a Member Code or Name.`);
+      continue;
+    }
+    const { member, ambiguous } = await findMemberByBarcodeOrName(raw);
+    if (ambiguous) {
+      errors.push(`Row ${rowNum}: "${raw}" matches more than one member - use their member code instead.`);
+      continue;
+    }
+    if (!member) {
+      errors.push(`Row ${rowNum}: no active member matches "${raw}".`);
+      continue;
+    }
+    found.push({ rowNum, memberId: member.id });
+  }
+  const results = found.length ? await adminAddRegistrations(eventId, found.map((f) => f.memberId), accountId) : [];
+  let imported = 0;
+  results.forEach((r, i) => {
+    if (r.ok) imported += 1;
+    else errors.push(`Row ${found[i].rowNum}: ${r.error}`);
+  });
+  return { imported, errors };
 }
 
 // Volunteer signup(s) per member for this event, if the event has
@@ -612,6 +711,81 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId) {
   return createCharge(member.id, accountId, 'event_registration', event.id, `${event.title} - event registration`, event.price_cents, tx);
 }
 
+// Shared by registerForEvent (below, member self-service, full eligibility
+// rules) and adminAddRegistrations (a real request: "add a button that
+// says add registration... select multiple boxes and save all at once" -
+// a Main Admin registering someone on purpose overrides age/section/family-
+// ownership eligibility, but still has to respect the same capacity/
+// waitlist/charge bookkeeping every registration goes through, or a
+// capacity event could be oversold by whichever path an admin happened to
+// use). Assumes the caller already confirmed the event exists/is a real
+// target - only "already registered" is re-checked here since it's cheap
+// and both callers need it.
+async function createOrReactivateRegistration(event, member, accountId) {
+  const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(event.id, member.id);
+  if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
+
+  const confirmedCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(event.id)).c);
+  const familyCount = Number(
+    (
+      await db
+        .prepare(
+          `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
+           JOIN members m ON m.id = er.member_id
+           WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) != ?`
+        )
+        .get(event.id, member.family_id ?? -member.id)
+    ).c
+  );
+  const overCapacity = event.capacity != null && confirmedCount >= event.capacity;
+  // A family cap only blocks a *new* family from registering, once
+  // event.family_capacity families already have someone confirmed - a
+  // second (or third) member of a family that's already in doesn't count
+  // as a new family, so they're never blocked by this cap on their own.
+  const alreadyInFamily = await db
+    .prepare(
+      `SELECT 1 FROM event_registrations er JOIN members m ON m.id = er.member_id
+       WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) = ?`
+    )
+    .get(event.id, member.family_id ?? -member.id);
+  const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
+
+  const isFull = overCapacity || overFamilyCapacity;
+  const status = isFull ? 'waitlisted' : 'confirmed';
+  let waitlistPosition = null;
+  let chargeId = null;
+
+  const previouslyCancelled = await db.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(event.id, member.id);
+
+  await db.withTransaction(async (tx) => {
+    if (status === 'confirmed') {
+      chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId);
+    } else {
+      const existingWaitlisted = Number((await tx.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'waitlisted'").get(event.id)).c);
+      waitlistPosition = existingWaitlisted + 1;
+    }
+
+    if (previouslyCancelled) {
+      await tx
+        .prepare(
+          `UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL,
+             waitlist_position = ?, charge_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
+        )
+        .run(status, accountId, waitlistPosition, chargeId, previouslyCancelled.id);
+    } else {
+      await tx
+        .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(event.id, member.id, accountId, status, waitlistPosition, chargeId);
+    }
+  });
+
+  const notice =
+    status === 'confirmed'
+      ? `${member.name} is registered for "${event.title}".`
+      : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
+  return { ok: true, notice, status, waitlistPosition };
+}
+
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
 async function registerForEvent({ eventId, memberId, accountId, family }) {
   const event = await getEvent(eventId);
@@ -630,68 +804,27 @@ async function registerForEvent({ eventId, memberId, accountId, family }) {
     return { ok: false, error: 'That event is limited to specific sections you are not part of.' };
   }
 
-  const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(eventId, memberId);
-  if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
+  return createOrReactivateRegistration(event, member, accountId);
+}
 
-  const confirmedCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'confirmed'").get(eventId)).c);
-  const familyCount = Number(
-    (
-      await db
-        .prepare(
-          `SELECT COUNT(DISTINCT COALESCE(m.family_id, -m.id)) AS c FROM event_registrations er
-           JOIN members m ON m.id = er.member_id
-           WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) != ?`
-        )
-        .get(eventId, member.family_id ?? -member.id)
-    ).c
-  );
-  const overCapacity = event.capacity != null && confirmedCount >= event.capacity;
-  // A family cap only blocks a *new* family from registering, once
-  // event.family_capacity families already have someone confirmed - a
-  // second (or third) member of a family that's already in doesn't count
-  // as a new family, so they're never blocked by this cap on their own.
-  const alreadyInFamily = await db
-    .prepare(
-      `SELECT 1 FROM event_registrations er JOIN members m ON m.id = er.member_id
-       WHERE er.event_id = ? AND er.status = 'confirmed' AND COALESCE(m.family_id, -m.id) = ?`
-    )
-    .get(eventId, member.family_id ?? -member.id);
-  const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
-
-  const isFull = overCapacity || overFamilyCapacity;
-  const status = isFull ? 'waitlisted' : 'confirmed';
-  let waitlistPosition = null;
-  let chargeId = null;
-
-  const previouslyCancelled = await db.prepare("SELECT id FROM event_registrations WHERE event_id = ? AND member_id = ? AND status = 'cancelled'").get(eventId, memberId);
-
-  await db.withTransaction(async (tx) => {
-    if (status === 'confirmed') {
-      chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId);
-    } else {
-      const existingWaitlisted = Number((await tx.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'waitlisted'").get(eventId)).c);
-      waitlistPosition = existingWaitlisted + 1;
+// A real request: "add a button that says add registration. Pop up with
+// menu of members with check boxes... select multiple boxes and save all
+// at once." One result per requested member, in order, so the route can
+// report which (if any) failed (already registered) without losing the
+// ones that succeeded.
+async function adminAddRegistrations(eventId, memberIds, accountId) {
+  const event = await getEvent(eventId);
+  if (!event) return memberIds.map(() => ({ ok: false, error: 'That event no longer exists.' }));
+  const results = [];
+  for (const memberId of memberIds) {
+    const member = await db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
+    if (!member) {
+      results.push({ ok: false, error: 'That member no longer exists.' });
+      continue;
     }
-
-    if (previouslyCancelled) {
-      await tx
-        .prepare(
-          `UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL,
-             waitlist_position = ?, charge_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
-        )
-        .run(status, accountId, waitlistPosition, chargeId, previouslyCancelled.id);
-    } else {
-      await tx
-        .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(eventId, memberId, accountId, status, waitlistPosition, chargeId);
-    }
-  });
-
-  const notice =
-    status === 'confirmed'
-      ? `${member.name} is registered for "${event.title}".`
-      : `${event.title} is full - ${member.name} has been added to the waitlist (#${waitlistPosition}).`;
-  return { ok: true, notice, status, waitlistPosition };
+    results.push(await createOrReactivateRegistration(event, member, accountId));
+  }
+  return results;
 }
 
 // Settles a cancelled registration's own charge - same policy as
@@ -1121,9 +1254,13 @@ module.exports = {
   decideSubmission,
   eventVisibleToFamily,
   registerForEvent,
+  adminAddRegistrations,
+  eligibleMembersForRegistration,
   cancelRegistration,
   registrationsForEvent,
   familyGroupedRegistrationsForEvent,
+  buildRegistrationsExportCsvLines,
+  importRegistrationsFromRows,
   volunteerSignupsByMemberForEvent,
   addGuestRegistration,
   cancelGuestRegistration,

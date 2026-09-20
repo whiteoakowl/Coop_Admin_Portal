@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <%# A real request: "add a print button. Print to fit to page." - same
+      landscape/fit-to-page @page override every other wide roster print
+      view uses (see views/admin-rosters-print.ejs), since this table has
+      more columns than a portrait sheet comfortably holds. %>
+  <style>@page { size: letter landscape; margin: 0.4in; }</style>
+</head>
+<body class="admin-page roster-view-page attendance-print-page">
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>Registrations &mdash; <%= event.title %></h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">Sanford Homeschoolers</p>
+        <p class="print-header-sub">Registrations &mdash; <%= event.title %></p>
+      </div>
+    </div>
+
+    <%
+    function priceFor(status, isFirstInGroup) {
+      if (event.price_cents == null || status !== 'confirmed') return null;
+      if (event.price_per === 'family' && !isFirstInGroup) return null;
+      return '$' + (event.price_cents / 100).toFixed(2);
+    }
+    %>
+    <%# "ABC order according to family name" - familyGroupedRegistrationsForEvent
+        already sorts every group family-first, A-Z. %>
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr>
+          <th class="roster-name-col">Name</th>
+          <th>Status</th>
+          <th>Paid</th>
+          <th>Registered</th>
+          <th>P/A/L</th>
+          <th>Checked In</th>
+          <th>Checked Out</th>
+          <% if (event.volunteers_enabled) { %><th>Volunteer Signup</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% familyGroups.forEach(function(group) { %>
+          <% var isFirst = true; %>
+          <% group.members.forEach(function(r) { %>
+            <tr class="<%= isFirst ? 'roster-group-start' : 'roster-group-member' %>">
+              <td class="roster-name-col"><%= isFirst ? '' : '↳ ' %><%= r.memberName %></td>
+              <td><%= r.status === 'confirmed' ? 'Signed Up' : r.status === 'waitlisted' ? 'Waitlisted' : 'Cancelled' %></td>
+              <td><%= priceFor(r.status, isFirst) || '—' %></td>
+              <td><%= r.created_at %></td>
+              <td><%= (r.attendance_status || '—').charAt(0).toUpperCase() %></td>
+              <td><%= r.checked_in_at || '—' %></td>
+              <td><%= r.checked_out_at || '—' %></td>
+              <% if (event.volunteers_enabled) { %>
+                <td><%= (volunteerSignupsByMember.get(r.member_id) || []).join(', ') || '—' %></td>
+              <% } %>
+            </tr>
+            <% isFirst = false; %>
+          <% }); %>
+          <% group.guests.forEach(function(g) { %>
+            <tr class="<%= isFirst ? 'roster-group-start' : 'roster-group-member' %>">
+              <td class="roster-name-col"><%= isFirst ? '' : '↳ ' %><%= g.guest_name %> (Guest)</td>
+              <td><%= g.status === 'confirmed' ? 'Signed Up' : 'Cancelled' %></td>
+              <td><%= priceFor(g.status, isFirst) || '—' %></td>
+              <td><%= g.created_at %></td>
+              <td><%= (g.attendance_status || '—').charAt(0).toUpperCase() %></td>
+              <td><%= g.checked_in_at || '—' %></td>
+              <td><%= g.checked_out_at || '—' %></td>
+              <% if (event.volunteers_enabled) { %><td>—</td><% } %>
+            </tr>
+            <% isFirst = false; %>
+          <% }); %>
+        <% }); %>
+      </tbody>
+    </table>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>
