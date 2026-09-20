@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Vocabulary Game</h1>
+    <p class="subtitle">Read-only admin view of Spelling Bee scores and word lists.</p>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Top Players</h2></div>
+      <% if (!topPlayers.length) { %>
+        <p class="roster-empty">No rounds played yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Rank</th><th>Name</th><th>Points</th></tr></thead>
+            <tbody>
+              <% topPlayers.forEach(function(p) { %>
+                <tr>
+                  <td><%= p.rank %></td>
+                  <td class="roster-name-col"><%= p.name %></td>
+                  <td><%= p.points %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <%
+    // A real request: "vocabulary game... the (hardcoded, not DB-backed)
+    // word lists" - utils/spellingBee.js's own ELEMENTARY_WORDS/
+    // MIDDLE_WORDS/HIGH_WORDS constants, shown read-only (no add/edit/
+    // delete this round).
+    %>
+    <% wordLists.forEach(function(list) { %>
+      <div class="manage-section">
+        <div class="grid-box-header"><h2><%= list.label %> Word List (<%= list.words.length %>)</h2></div>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Word</th><th>Clue</th></tr></thead>
+            <tbody>
+              <% list.words.forEach(function(w) { %>
+                <tr>
+                  <td class="roster-name-col"><%= w.word %></td>
+                  <td><%= w.clue %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% }); %>
+  </main>
+</body>
+</html>

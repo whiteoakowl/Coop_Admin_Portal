@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Games</h1>
+    <p class="subtitle">Read-only admin view of Student Portal game activity.</p>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Top Score Per Game</h2></div>
+      <% if (!topScores.length) { %>
+        <p class="roster-empty">No scores logged yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Game</th><th>Top Player</th><th>Score</th></tr></thead>
+            <tbody>
+              <% topScores.forEach(function(s) { %>
+                <tr>
+                  <td class="roster-name-col"><%= s.gameTitle %></td>
+                  <td><%= s.name || '—' %></td>
+                  <td><%= s.score ?? '—' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="manage-section">
+      <div class="grid-box-header"><h2>Recent Activity</h2></div>
+      <% if (!recentPlays.length) { %>
+        <p class="roster-empty">No games played yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Player</th><th>Game</th><th>Played At</th></tr></thead>
+            <tbody>
+              <% recentPlays.forEach(function(p) { %>
+                <tr>
+                  <td class="roster-name-col"><%= p.name %></td>
+                  <td><%= p.gameTitle %></td>
+                  <td><%= p.playedAt %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

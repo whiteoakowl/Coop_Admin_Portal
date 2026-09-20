@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Main Admin' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1><%= heading %></h1>
+    <p class="subtitle">Read-only admin view of the Reading Challenge data from the Student/Parent Portal.</p>
+
+    <% if (!students.length) { %>
+      <p class="roster-empty">No reading logs yet.</p>
+    <% } else if (!groupByFamily) { %>
+      <div class="manage-section">
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Name</th><th>Total Hours</th><th>Total Points</th><th>Logs</th><th>Weekly Goal</th></tr></thead>
+            <tbody>
+              <% students.forEach(function(s) { %>
+                <tr>
+                  <td class="roster-name-col"><%= s.name %></td>
+                  <td><%= s.totalHours.toFixed(1) %></td>
+                  <td><%= s.totalPoints %></td>
+                  <td><%= s.logCount %></td>
+                  <td><%= s.weeklyGoalHours %> hrs/wk</td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } else {
+      const families = new Map();
+      students.forEach(function(s) {
+        const key = s.familyName || 'No Family';
+        if (!families.has(key)) families.set(key, []);
+        families.get(key).push(s);
+      });
+    %>
+      <% Array.from(families.entries()).forEach(function(entry) { %>
+        <div class="manage-section">
+          <div class="grid-box-header"><h2><%= entry[0] %></h2></div>
+          <div class="roster-scroll">
+            <table class="roster-table condensed-table">
+              <thead><tr><th>Name</th><th>Total Hours</th><th>Total Points</th><th>Logs</th><th>Weekly Goal</th></tr></thead>
+              <tbody>
+                <% entry[1].forEach(function(s) { %>
+                  <tr>
+                    <td class="roster-name-col"><%= s.name %></td>
+                    <td><%= s.totalHours.toFixed(1) %></td>
+                    <td><%= s.totalPoints %></td>
+                    <td><%= s.logCount %></td>
+                    <td><%= s.weeklyGoalHours %> hrs/wk</td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

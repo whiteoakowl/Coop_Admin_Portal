@@ -134,7 +134,26 @@ const MAIN_ADMIN_NAV_LINKS = [
 // into its own labeled group instead of just renaming its top-level tab,
 // so future student-facing-content admin pages have somewhere to land
 // without crowding the main list.
-const MAIN_ADMIN_STUDENT_PORTAL_LINKS = [{ href: '/main-admin/nature-news', icon: 'sprout', label: 'Nature News' }];
+// A real request: "nature news should be titled fun. Then nature news
+// should be a page under that tab. Also, these subpages, student
+// reading challenge, parent reading challenge, games, vocabulary game.
+// These subpages are the admin side to these pages that are on the
+// parent and student portal already" - same subpages shape
+// primaryNavLinks already supports (a details/summary group on desktop,
+// a mobile-subpages-tab.ejs popup on mobile), reused here since this is
+// this array's first entry to ever need it.
+const MAIN_ADMIN_STUDENT_PORTAL_LINKS = [{
+  href: '/main-admin/nature-news',
+  icon: 'sprout',
+  label: 'Fun',
+  subpages: [
+    { href: '/main-admin/nature-news', label: 'Nature News' },
+    { href: '/main-admin/fun/reading-challenge/students', label: 'Student Reading Challenge' },
+    { href: '/main-admin/fun/reading-challenge/parents', label: 'Parent Reading Challenge' },
+    { href: '/main-admin/fun/games', label: 'Games' },
+    { href: '/main-admin/fun/vocabulary-game', label: 'Vocabulary Game' },
+  ],
+}];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled
 // 2nd section "Activities" (see STUDENT_ACTIVITY_LINKS/classLinksTitle
@@ -321,7 +340,18 @@ const communityLinks =
     <p class="portal-nav-title"><%= classLinksTitle %></p>
     <nav id="class-nav-links">
       <% classLinks.forEach(function(link) { %>
-        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+        <% if (link.subpages && link.subpages.length) { %>
+          <details class="admin-nav-group">
+            <summary><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %> <svg class="icon admin-nav-group-chevron"><use href="#icon-chevron-down"/></svg></summary>
+            <div class="admin-nav-subpages">
+              <% link.subpages.forEach(function(sp) { %>
+                <a href="<%= sp.href %>"><%= sp.label %></a>
+              <% }); %>
+            </div>
+          </details>
+        <% } else { %>
+          <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg> <%= link.label %></a>
+        <% } %>
       <% }); %>
     </nav>
   <% } %>
@@ -417,7 +447,11 @@ const communityLinks =
       no branch needed here the way primaryNavLinks above has. %>
   <% if (classLinks) { %>
     <% classLinks.forEach(function(link) { %>
-      <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+      <% if (link.subpages && link.subpages.length) { %>
+        <%- include('mobile-subpages-tab', { link: link }) %>
+      <% } else { %>
+        <a href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>><svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span></a>
+      <% } %>
     <% }); %>
   <% } %>
   <%# Same COMMUNITY_LINKS as the desktop sidebar's own #community-nav-links
@@ -440,6 +474,13 @@ const communityLinks =
     <%- include('mobile-subpages-dialog', { link: link }) %>
   <% } %>
 <% }); %>
+<% if (classLinks) { %>
+  <% classLinks.forEach(function(link) { %>
+    <% if (link.subpages && link.subpages.length) { %>
+      <%- include('mobile-subpages-dialog', { link: link }) %>
+    <% } %>
+  <% }); %>
+<% } %>
 
 <%- include('confirm-dialog') %>
 
