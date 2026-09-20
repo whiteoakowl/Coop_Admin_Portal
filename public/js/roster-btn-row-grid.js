@@ -38,6 +38,20 @@
     // below - same inline grid-template-columns mechanism, just skipping
     // the "fewest rows at ≤4 columns" calculation for a toolbar that
     // wants a specific shape regardless of button count.
+    //
+    // A real request: "on event the arrow buttons should be half the
+    // size" - the Events calendar's own Prev/Month/Year/Next row
+    // (data-fixed-columns="4") made every column equal width, so the
+    // single-glyph Prev/Next arrow buttons stretched as wide as the
+    // Month/Year dropdowns next to them. data-fixed-column-widths takes
+    // an explicit grid-template-columns value (e.g. "1fr 2fr 2fr 1fr")
+    // instead of repeat(N, 1fr), for a toolbar that wants specific
+    // columns narrower than others rather than all of them equal.
+    const fixedColumnWidths = row.dataset.fixedColumnWidths;
+    if (fixedColumnWidths) {
+      row.style.gridTemplateColumns = fixedColumnWidths;
+      return;
+    }
     const fixedColumns = parseInt(row.dataset.fixedColumns, 10);
     if (fixedColumns > 0) {
       row.style.gridTemplateColumns = `repeat(${fixedColumns}, 1fr)`;

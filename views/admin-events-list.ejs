@@ -49,10 +49,14 @@
             <select>s below at all - so left to its own default it
             miscounted this row as "2 buttons" and produced a 2-column
             grid, splitting these 4 items into two rows (Prev+Month,
-            Year+Next) instead of one. data-fixed-columns is that same
-            script's own existing escape hatch for a toolbar wanting a
-            specific shape regardless of its child count. %>
-        <div class="roster-btn-row event-calendar-nav-row" data-fixed-columns="4">
+            Year+Next) instead of one.
+            A later real request: "the arrow buttons should be half the
+            size" - a plain data-fixed-columns="4" gives Prev/Next the
+            same column width as the Month/Year dropdowns, oversized for
+            a single arrow glyph. data-fixed-column-widths (same script's
+            own newer escape hatch) gives Prev/Next half the column width
+            of Month/Year instead of an equal quarter each. %>
+        <div class="roster-btn-row event-calendar-nav-row" data-fixed-column-widths="1fr 2fr 2fr 1fr">
           <a class="roster-action-btn event-calendar-nav-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
           <select id="event-month-select" class="event-month-select" onchange="window.fullscreenNavigate('/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+document.getElementById('event-year-select').value+'-'+this.value);">
             <% for (let m = 1; m <= 12; m++) { %>

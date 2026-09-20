@@ -66,9 +66,22 @@
   }
 
   // "fit to text" - a plain inline trigger, sized to its own label, not a
-  // full-width block - inserted right after the page's own <h1> (styles.css's
-  // own .page-title-has-menu makes that <h1> sit on the same line as it,
-  // whatever the page's own markup around the heading looks like).
+  // full-width block. A real follow-up request: "the dropdown is in a
+  // different location on every page - it should always be next to the
+  // title, with decent space between, on the same row." Inserting the
+  // trigger as the <h1>'s own SIBLING (the original approach) put its
+  // position at the mercy of whatever container the heading happened to
+  // sit in on that particular page - a .grid-box-header's own
+  // justify-content: space-between, for one, spreads 3 flex children
+  // (title, trigger, the page's own button row) evenly across the whole
+  // row instead of keeping the first two together, landing the trigger
+  // nowhere near the title. Appending the trigger INSIDE the <h1> instead
+  // - as its last child, right after the title's own text - makes the
+  // <h1> the single flex item its own parent's layout has to deal with,
+  // however that parent already positions ONE heading element; the
+  // trigger's position relative to the title text is then governed only
+  // by .page-title-has-menu's own flex/gap rule on this file's own <h1>,
+  // identical on every page regardless of what wraps it.
   function insertPageTitleTrigger() {
     const dialog = findCurrentSectionDialog();
     if (!dialog) return;
@@ -80,7 +93,7 @@
     btn.dataset.subpagesDialog = dialog.id;
     btn.setAttribute('aria-label', 'Page menu');
     btn.innerHTML = 'Menu <svg class="icon"><use href="#icon-chevron-down"/></svg>';
-    h1.insertAdjacentElement('afterend', btn);
+    h1.appendChild(btn);
     h1.classList.add('page-title-has-menu');
   }
 

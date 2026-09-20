@@ -2469,20 +2469,24 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    .admin-mobile-tabs's own 45 underneath it. */
 /* A real request: "on mobile add a fit to text drop down menu next to
    each page title with the subpages as a secondary way of accessing the
-   subpages" - public/js/page-tabs.js inserts this right after a page's
-   own <h1> when that page belongs to a subpages-bearing section, opening
-   the exact same dialog the orange bar's own trigger does. Desktop
-   already shows every subpage in the sidebar's own accordion group, so
-   this stays mobile-only, same breakpoint as the orange bar itself.
-   "fit to text" - inline-flex, sized to its own label, never a full-width
-   block button. .page-title-has-menu (added to the <h1> alongside it)
-   keeps the two on the same line regardless of what markup surrounds
-   that heading on any given page - a flex header row's own layout is
-   unaffected (a flex item's outer display doesn't change how its parent
-   places it), and a plain standalone heading now flows inline instead of
-   forcing the trigger onto its own line below. */
+   subpages" - public/js/page-tabs.js appends this as the page's own
+   <h1>'s LAST CHILD (right after the title's own text) when that page
+   belongs to a subpages-bearing section, opening the exact same dialog
+   the orange bar's own trigger does. Desktop already shows every subpage
+   in the sidebar's own accordion group, so this stays mobile-only, same
+   breakpoint as the orange bar itself.
+   A later real request: "the dropdown is in a different location on
+   every page - it should always be next to the title, with decent space
+   between, lined up on the same row." Living INSIDE the <h1> (that
+   file's own comment has the full reasoning) means .page-title-has-menu
+   here only ever has to place the trigger relative to the title's own
+   text, never fight whatever flex/grid role the <h1> itself plays in
+   its parent's layout on a given page - flex + gap keeps title and
+   trigger on one row with consistent spacing everywhere, and flex-wrap
+   lets a long title drop the trigger to its own line rather than
+   overflowing instead of the two ever landing far apart. */
 @media (max-width: 860px) {
-  .page-title-has-menu { display: inline-flex; align-items: center; margin-right: 0.5rem; }
+  .page-title-has-menu { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; }
   .page-title-subpages-trigger {
     display: inline-flex;
     align-items: center;
@@ -8462,8 +8466,14 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .event-calendar-nav-row { flex-wrap: nowrap; }
 /* A real request: "make the width of the arrow buttons smaller" - less
    horizontal padding than every other .roster-action-btn on the page,
-   since "Prev"/"Next" are the shortest labels in this whole toolbar. */
-.event-calendar-nav-btn { padding: 0.35rem 0.4rem; font-size: 0.75rem; }
+   since "Prev"/"Next" are the shortest labels in this whole toolbar. A
+   later real request: "the arrow buttons should be half the size" -
+   .roster-action-btn's own min-width: 5.5rem/flex: 1 0 auto (styles.css,
+   sized for a real button label) was still forcing an 88px-wide box
+   regardless of this rule's own smaller padding/font-size; flex: 0 0
+   auto/min-width: 0 lets it actually shrink to its own (short) content
+   instead, roughly halving it. */
+.event-calendar-nav-btn { flex: 0 0 auto; min-width: 0; padding: 0.35rem 0.4rem; font-size: 0.75rem; }
 /* A real request: "cancel event button should leave the event on the
    calendar but the title will be marked through with a line" - the
    event stays visible (routes/admin-events.js's own Calendar tab query

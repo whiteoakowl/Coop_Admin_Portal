@@ -76,10 +76,13 @@ test('Calendar tab: toggle row sits above a single Prev/month-select/year-select
   // month drop down, year drop down, small right arrow. all in one row
   // neatly." public/js/roster-btn-row-grid.js's generic mobile column
   // count only counts .roster-action-btn children, missing the two
-  // <select>s here entirely, so without data-fixed-columns it wrongly
+  // <select>s here entirely, so without a fixed column count it wrongly
   // split this row into two (see that script's own comment on this exact
-  // element for the full trace).
-  assert.match(toolbarHtml, /<div class="roster-btn-row event-calendar-nav-row" data-fixed-columns="4">/);
+  // element for the full trace). A later real request: "the arrow
+  // buttons should be half the size" - data-fixed-column-widths gives
+  // Prev/Next half the column width of Month/Year instead of an equal
+  // quarter each.
+  assert.match(toolbarHtml, /<div class="roster-btn-row event-calendar-nav-row" data-fixed-column-widths="1fr 2fr 2fr 1fr">/);
 });
 
 test('Calendar tab: List/Calendar view toggle switches rendering and preserves the month in the URL', async () => {
