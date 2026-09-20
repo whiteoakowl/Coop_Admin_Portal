@@ -19,12 +19,6 @@
         orange bar's own Communication item (views/partials/portal-nav.ejs)
         instead of a trigger+dialog here. %>
 
-    <p class="hint">
-      Sends a notification to signed-in members - it shows up as an Announcement on their portal home page. Check
-      "Public Homepage" to also post to the public homepage, for anyone, signed in or not. Choose as many recipients
-      as you like.
-    </p>
-
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 

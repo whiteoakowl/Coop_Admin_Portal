@@ -218,8 +218,10 @@
             <div class="member-row-body">
               <div class="member-row-topline">
                 <a class="member-row-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
+                <%# A real request: "member rows remove primary column.
+                    it can already be seen when viewing the profile" - the
+                    profile page already shows Primary Parent status. %>
                 <span class="badge-pill badge-pill-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'parent' ? 'Parent' : m.member_type === 'admin' ? 'Admin' : 'Student' %></span>
-                <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
                 <%# A real request: "this will then add their admin title
                     label next to their name on member lists." %>
                 <% if (m.adminTitle) { %><span class="badge-pill" title="Admin Position"><%= m.adminTitle %></span><% } %>

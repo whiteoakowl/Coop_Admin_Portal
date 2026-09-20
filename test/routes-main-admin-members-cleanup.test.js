@@ -63,6 +63,9 @@ test('the Members toolbar carries a single .roster-btn-row with the Edit Permiss
   assert.match(rowHtml, /\+ Add Member/);
   assert.match(rowHtml, />Import</);
   assert.match(rowHtml, />Export</);
-  assert.match(rowHtml, />Create Accounts</);
+  // A later real request: "delete create account button. every member
+  // already automatically has an account. instead there can be an add
+  // member button" - + Add Member (already present above) replaces it.
+  assert.doesNotMatch(rowHtml, />Create Accounts</);
   assert.match(rowHtml, />Add\/Edit Sections</);
 });

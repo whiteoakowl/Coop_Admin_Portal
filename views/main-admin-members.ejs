@@ -51,6 +51,15 @@
             to roster-action-btn so it's sized the same as its neighbors
             here too, matching Setup/Cleanup's own "Edit Dates"
             precedent. %>
+        <%# A real request: "delete create account button. every member
+            already automatically has an account. instead there can be
+            an add member button" - the old "Create Accounts" bulk
+            bootstrap button (routes/main-admin-members.js's own POST
+            /bulk-create-accounts, still there for a direct retrofit of
+            any pre-existing member without one) is dropped from here;
+            + Add Member already opens the full membership form
+            (member-intake-form.ejs) to manually add a family and its
+            members, which is what "instead" asked for. %>
         <div class="roster-btn-row roster-btn-row-fit-text no-print">
           <a class="roster-action-btn" href="/main-admin/members/new">+ Add Member</a>
           <button type="button" class="roster-action-btn" data-permissions-toggle="members-table" aria-pressed="false">Edit Permissions</button>
@@ -58,14 +67,6 @@
           <button type="button" class="roster-action-btn" data-archive-toggle="members-select-form" data-archive-toggle-label="Edit" aria-pressed="false">Edit</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('main-admin-import-dialog').showModal()">Import</button>
           <a class="roster-action-btn file-action-btn" href="/main-admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
-          <%# A real request: "make every member a user... give everyone
-              the password changeme123. all members will have accounts."
-              One-shot bulk bootstrap (routes/main-admin-members.js's own
-              POST /bulk-create-accounts) - skips anyone who already has
-              an account or has no email on file. %>
-          <form method="POST" action="/main-admin/members/bulk-create-accounts" class="inline-block-form" data-confirm="Create a portal account (password: changeme123) for every member who doesn't have one yet? This can't be limited to a smaller group afterward.">
-            <button type="submit" class="roster-action-btn">Create Accounts</button>
-          </form>
           <a class="roster-action-btn" href="/main-admin/sections">Add/Edit Sections</a>
         </div>
 
@@ -254,8 +255,11 @@
                       schedule/rosters/attendance history), which has its
                       own prominent Edit button up top. %>
                   <a class="member-row-name-link" href="/main-admin/members/<%= m.id %>"><%= m.name %></a>
+                  <%# A real request: "member rows remove primary column.
+                      it can already be seen when viewing the profile" -
+                      the profile page (main-admin-member-profile.ejs)
+                      already shows Primary Parent status of its own. %>
                   <span class="badge-pill badge-pill-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %> member-role-badge"><svg class="icon"><use href="#icon-star"/></svg> <%= m.member_type === 'admin' ? 'Admin' : m.member_type === 'parent' ? 'Parent' : 'Student' %></span>
-                  <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
                 </div>
                 <%# A real request: "icons in a row below the name" - grade/
                     age and sections used to be their own stacked rows; a
@@ -305,7 +309,7 @@
                         </label>
                       <% }); %>
                     <% } else { %>
-                      <p class="hint">No portal account &mdash; use the "Create Accounts" button above, or add a password on this member's own <a href="/main-admin/members/<%= m.id %>/edit">Edit</a> page.</p>
+                      <p class="hint">No portal account &mdash; add a password on this member's own <a href="/main-admin/members/<%= m.id %>/edit">Edit</a> page.</p>
                     <% } %>
                   </details>
                 </div>

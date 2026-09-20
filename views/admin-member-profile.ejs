@@ -40,6 +40,10 @@
           </div>
         </div>
         <dl class="member-profile-list">
+          <%# A real request: "member rows remove primary column. it can
+              already be seen when viewing the profile" - shown here so
+              that's still true once the Members list card drops it. %>
+          <% if (member.is_primary_parent) { %><dt>Primary Parent</dt><dd>Yes</dd><% } %>
           <% if (member.member_code) { %><dt>Member ID</dt><dd><%= member.member_code %></dd><% } %>
           <% if (member.address || member.city || member.state || member.zip) { %>
             <dt>Address</dt>

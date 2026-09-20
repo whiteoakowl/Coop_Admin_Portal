@@ -5,10 +5,15 @@
 // moved to a single combined checkbox in the table header (a real earlier
 // request: "select all or none should be checkboxes not buttons") and the
 // Create Email/Create Text button used .primary-btn (a different size/
-// margin than Filter's own .roster-action-btn) - both now sit in the same
+// margin than Filter's own .roster-action-btn) - both now sit in
 // .email-toolbar-row as two plain Select All/Select None checkboxes
 // (checkbox-option, matching every bulk print picker's own pattern under
 // Design/Print) plus Filter and Create Email/Text, all .roster-action-btn.
+//
+// A later real request reordered them: "select all and select none check
+// boxes should be below filter and create email buttons" - Filter/Create
+// Email now lead their own .email-toolbar-row, Select All/Select None
+// follow in a second .email-toolbar-row right under it.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -40,14 +45,17 @@ async function loginAsMainAdmin() {
 }
 
 function checkToolbar(text) {
-  const rowMatch = /<div class="roster-btn-row email-toolbar-row">([\s\S]*?)<\/div>/.exec(text);
-  assert.ok(rowMatch, 'expected the email-toolbar-row');
-  const row = rowMatch[1];
-  assert.match(row, /<label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" \/> Select All<\/label>/);
-  assert.match(row, /<label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" \/> Select None<\/label>/);
-  assert.match(row, /class="roster-action-btn" onclick="document\.getElementById\('email-filter-dialog'\)\.showModal\(\)">Filter</);
+  const rows = [...text.matchAll(/<div class="roster-btn-row email-toolbar-row">([\s\S]*?)<\/div>/g)].map((m) => m[1]);
+  assert.equal(rows.length, 2, 'expected two separate email-toolbar-row divs');
+  const [filterRow, selectRow] = rows;
+  assert.match(filterRow, /class="roster-action-btn" onclick="document\.getElementById\('email-filter-dialog'\)\.showModal\(\)">Filter</);
   // Create Email/Text is a plain roster-action-btn now, same class/size as Filter - not .primary-btn.
-  assert.doesNotMatch(row, /primary-btn/);
+  assert.doesNotMatch(filterRow, /primary-btn/);
+  // "select all and select none check boxes should be below filter and
+  // create email buttons" - their own row, right after Filter/Create's.
+  assert.match(selectRow, /<label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" \/> Select All<\/label>/);
+  assert.match(selectRow, /<label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" \/> Select None<\/label>/);
+  assert.ok(text.indexOf(filterRow) < text.indexOf(selectRow), 'Filter/Create row should come before the Select All/None row');
   // No more combined select-all/none checkbox living in the table's own header cell.
   assert.doesNotMatch(text, /<th><input type="checkbox" id="email-select-all"/);
 }

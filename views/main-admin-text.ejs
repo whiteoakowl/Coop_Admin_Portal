@@ -33,11 +33,16 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <form method="POST" action="/main-admin/announcements/text/compose" id="email-select-form">
+      <%# A real request: "select all and select none check boxes should
+          be below filter and create email buttons" - same reorder as
+          the Email subpage. %>
+      <div class="roster-btn-row email-toolbar-row">
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
+        <button type="submit" class="roster-action-btn">Create Text</button>
+      </div>
       <div class="roster-btn-row email-toolbar-row">
         <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
         <label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" /> Select None</label>
-        <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
-        <button type="submit" class="roster-action-btn">Create Text</button>
       </div>
       <p class="hint" id="email-select-count"></p>
 

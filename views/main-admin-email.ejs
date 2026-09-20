@@ -33,18 +33,28 @@
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
     <form method="POST" action="/main-admin/announcements/email/compose" id="email-select-form">
+      <%# A real request: "select all and select none check boxes should
+          be below filter and create email buttons" - Filter/Create Email
+          lead the toolbar now, Select All/None moved to their own row
+          underneath. %>
       <div class="roster-btn-row email-toolbar-row">
-        <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
-        <label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" /> Select None</label>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('email-filter-dialog').showModal()">Filter</button>
         <button type="submit" class="roster-action-btn">Create Email</button>
       </div>
+      <div class="roster-btn-row email-toolbar-row">
+        <label class="checkbox-option email-select-all"><input type="checkbox" id="email-select-all" /> Select All</label>
+        <label class="checkbox-option email-select-none"><input type="checkbox" id="email-select-none" /> Select None</label>
+      </div>
       <p class="hint" id="email-select-count"></p>
 
+      <%# A real request: "email, columns only name, email, student or
+          parent" - Grade/Section(s)/Registered for Classes dropped from
+          the table itself; the Filter dialog below still filters by all
+          of those, it just no longer needs its own column here to do it. %>
       <div class="roster-scroll">
         <table class="roster-table condensed-table" id="email-candidate-table">
           <thead>
-            <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Grade</th><th>Section(s)</th><th>Registered for Classes</th></tr>
+            <tr><th class="no-print"><span class="sr-only">Select</span></th><th>Name</th><th>Email</th><th>Student or Parent</th></tr>
           </thead>
           <tbody>
             <% candidates.forEach(function(c) { %>
@@ -59,9 +69,7 @@
                 <td><input type="checkbox" name="recipientIds" value="<%= c.accountId %>" data-email-checkbox /></td>
                 <td><%= c.name %></td>
                 <td><%= c.email || '' %></td>
-                <td><%= c.gradeLevel || '' %></td>
-                <td><%= c.sections.join(', ') %></td>
-                <td><%= c.registeredForClasses ? 'Yes' : 'No' %></td>
+                <td><%= c.memberType === 'student' ? 'Student' : 'Parent' %></td>
               </tr>
             <% }); %>
           </tbody>
