@@ -40,7 +40,7 @@ const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
 const forums = require('../utils/forums');
-const { activeMemberOptions } = require('../utils/members');
+const { activeMemberOptions, membersWithDetails, avatarColorFor } = require('../utils/members');
 const { forumCategorySectionIds } = require('../utils/sections');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_forum'));
@@ -74,14 +74,32 @@ router.post('/', async (req, res) => {
   res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group added.'));
 });
 
+// A real request: "lock the chat group should be under edit, not on the
+// front of the chat group card" - these two keep the same underlying
+// setCategoryLocked() they always did, just redirect back to the group's
+// own edit page (where the button now lives) instead of the list.
 router.post('/:id/lock', async (req, res) => {
   await forums.setCategoryLocked(req.params.id, true);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat locked - only moderators can post new threads.'));
+  res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat locked - only moderators can post new threads.'));
 });
 
 router.post('/:id/unlock', async (req, res) => {
   await forums.setCategoryLocked(req.params.id, false);
-  res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat unlocked.'));
+  res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat unlocked.'));
+});
+
+// A real request: "there should also be an archive button" (on the same
+// edit page as Lock) - a status flip, not a delete; archivedThreads()
+// and the member-facing /forums list are unaffected (this is a group-
+// level status, unrelated to individual archived threads).
+router.post('/:id/archive', async (req, res) => {
+  await forums.setCategoryArchived(req.params.id, true);
+  res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group archived.'));
+});
+
+router.post('/:id/unarchive', async (req, res) => {
+  await forums.setCategoryArchived(req.params.id, false);
+  res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group restored from archive.'));
 });
 
 router.post('/:id/delete', async (req, res) => {
@@ -89,13 +107,18 @@ router.post('/:id/delete', async (req, res) => {
   res.redirect('/main-admin/forums?notice=' + encodeURIComponent('Chat group deleted.'));
 });
 
-// The chat group page's own Edit popup - see this file's own header
-// comment (used to be the removed Moderate tab's popup, same fields,
-// just reached from the group's own page now).
+// The chat group's own Edit page - see this file's own header comment
+// (used to be the removed Moderate tab's popup, then a per-page dialog,
+// now its own page: "instead of a popup edit chat to be a page with save
+// button"). Same name/description/allow comments/sections/moderator
+// fields, plus the new Email Notifications checkbox list (a real
+// request: "a column next to each name with checkboxes that is called
+// email notifications").
 router.post('/:id/settings', async (req, res) => {
   const name = (req.body.name || '').trim();
-  if (!name) return res.redirect(`/main-admin/forums/${req.params.id}?error=` + encodeURIComponent('Name is required.'));
+  if (!name) return res.redirect(`/main-admin/forums/${req.params.id}/edit?error=` + encodeURIComponent('Name is required.'));
   const sectionIds = [].concat(req.body.sectionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  const notifyMemberIds = [].concat(req.body.notifyMemberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   await forums.updateCategorySettings(req.params.id, {
     name,
     description: (req.body.description || '').trim(),
@@ -103,7 +126,8 @@ router.post('/:id/settings', async (req, res) => {
     sectionIds,
     moderatorMemberId: req.body.moderatorMemberId ? parseInt(req.body.moderatorMemberId, 10) : null,
   });
-  res.redirect(`/main-admin/forums/${req.params.id}?notice=` + encodeURIComponent('Chat group settings updated.'));
+  await forums.setSubscribers(req.params.id, notifyMemberIds);
+  res.redirect(`/main-admin/forums/${req.params.id}/edit?notice=` + encodeURIComponent('Chat group settings updated.'));
 });
 
 // Archive tab's own "restore" action - see archivedThreads()'s comment in
@@ -137,19 +161,40 @@ router.get('/:id', async (req, res) => {
   const category = await forums.getCategory(req.params.id);
   if (!category) return res.status(404).render('404', { title: 'Not Found' });
   const threads = await forums.listThreads(category.id);
-  // Feeds the page's own Edit popup (this file's own header comment) -
-  // the same name/description/allow comments/sections/moderator fields
-  // the removed Moderate tab used to edit.
-  const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
-  const members = await activeMemberOptions();
-  const sectionIds = await forumCategorySectionIds(category.id);
   res.render('admin-forums-category', {
     title: category.name,
     category,
     threads,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+// The chat group's own settings page (this file's own header comment) -
+// name/description/allow comments/sections/moderator, Lock/Archive, and
+// the full member list with its own Email Notifications checkboxes.
+router.get('/:id/edit', async (req, res) => {
+  const category = await forums.getCategory(req.params.id);
+  if (!category) return res.status(404).render('404', { title: 'Not Found' });
+  const allSections = await db.prepare('SELECT * FROM sections ORDER BY LOWER(name)').all();
+  const members = await activeMemberOptions();
+  const sectionIds = await forumCategorySectionIds(category.id);
+  // "a full list of all members listed just like other member lists with
+  // primary parent first, drop down arrow that will then show other
+  // members of that family" - membersWithDetails() already returns every
+  // member (active and inactive) pre-sorted that exact way; only active
+  // ones make sense to offer a notification checkbox for here.
+  const allMembers = (await membersWithDetails()).filter((m) => m.active);
+  const subscriberIds = await forums.subscriberMemberIds(category.id);
+  res.render('admin-forums-category-edit', {
+    title: `Edit ${category.name}`,
+    category,
     allSections,
     members,
     sectionIds,
+    allMembers,
+    subscriberIds,
+    avatarColorFor,
     notice: req.query.notice || null,
     error: req.query.error || null,
   });

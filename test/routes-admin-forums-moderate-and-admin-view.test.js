@@ -98,11 +98,12 @@ test('the Add Category dialog has no nested <form> - Save is associated via form
   assert.match(res.text, /<button type="submit" form="add-forum-category-form" class="primary-btn">Save<\/button>/);
 });
 
-test('the chat group page (not a Moderate tab) has an Edit button opening the settings popup', async () => {
+test('the chat group page (not a Moderate tab) has an Edit button linking to a settings page', async () => {
   // A later real request dropped the Moderate tab entirely: "edit button
-  // should be on chat group page. no moderation tab/subpage." Same
-  // settings popup (name/description/allow comments/sections/moderator),
-  // now reached from admin-forums-category.ejs instead of a separate tab.
+  // should be on chat group page. no moderation tab/subpage." A further
+  // real request: "instead of a popup edit chat to be a page with save
+  // button" - same settings fields (name/description/allow comments/
+  // sections/moderator), now their own page instead of a dialog.
   const admin = await loginAsMainAdmin();
   await request(app).post('/main-admin/forums').set('Cookie', admin.cookie).type('form').send({ name: 'Moderate Tab Test Chat', scope: 'general', _csrf: admin.csrfToken });
   const category = await db.prepare("SELECT * FROM forum_categories WHERE name = 'Moderate Tab Test Chat'").get();
@@ -112,9 +113,13 @@ test('the chat group page (not a Moderate tab) has an Edit button opening the se
 
   const res = await request(app).get(`/main-admin/forums/${category.id}`).set('Cookie', admin.cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /id="edit-chat-group-dialog"/);
-  assert.match(res.text, new RegExp(`action="/main-admin/forums/${category.id}/settings"`));
-  assert.doesNotMatch(res.text, /<th>Moderator<\/th>/);
+  assert.doesNotMatch(res.text, /id="edit-chat-group-dialog"/);
+  assert.match(res.text, new RegExp(`<a class="roster-action-btn" href="/main-admin/forums/${category.id}/edit">Edit</a>`));
+
+  const editRes = await request(app).get(`/main-admin/forums/${category.id}/edit`).set('Cookie', admin.cookie);
+  assert.equal(editRes.status, 200);
+  assert.match(editRes.text, new RegExp(`action="/main-admin/forums/${category.id}/settings"`));
+  assert.doesNotMatch(editRes.text, /<th>Moderator<\/th>/);
 });
 
 test('updating a category\'s settings sets allow_comments, sections, and a moderator', async () => {

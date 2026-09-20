@@ -43,6 +43,35 @@ async function deleteCategory(id) {
   await db.prepare('DELETE FROM forum_categories WHERE id = ?').run(id);
 }
 
+// A real request: "there should also be an archive button" (on the chat
+// group's own edit page, alongside Lock) - a status flip, same
+// 'active'/'archived' shape forum_threads already uses, not a delete.
+async function setCategoryArchived(id, archived) {
+  await db.prepare("UPDATE forum_categories SET status = ? WHERE id = ?").run(archived ? 'archived' : 'active', id);
+}
+
+// The chat group's own "Email Notifications" checkbox list (a real
+// request: "a column next to each name with checkboxes that is called
+// email notifications") - every member currently checked, for
+// pre-checking the edit page's own list.
+async function subscriberMemberIds(categoryId) {
+  const rows = await db.prepare('SELECT member_id FROM forum_category_subscribers WHERE category_id = ?').all(categoryId);
+  return new Set(rows.map((r) => r.member_id));
+}
+
+// Replaces the whole subscriber list in one go, same "clear and re-
+// insert" shape updateCategorySettings above already uses for
+// forum_category_sections - simpler than diffing against the previous
+// list for what's realistically a short, admin-curated roster.
+async function setSubscribers(categoryId, memberIds) {
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('DELETE FROM forum_category_subscribers WHERE category_id = ?').run(categoryId);
+    for (const memberId of memberIds) {
+      await tx.prepare('INSERT INTO forum_category_subscribers (category_id, member_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(categoryId, memberId);
+    }
+  });
+}
+
 // Main Admin Chat's own Moderate tab - a real request: "Moderate tab
 // should have a list of the chat categories[.] when you click each
 // category it show a pop up of the category's name, description, check
@@ -260,8 +289,11 @@ module.exports = {
   createCategory,
   categoryForClass,
   setCategoryLocked,
+  setCategoryArchived,
   deleteCategory,
   updateCategorySettings,
+  subscriberMemberIds,
+  setSubscribers,
   canAccessCategory,
   isCategoryModerator,
   accessibleCategories,

@@ -16,14 +16,17 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="grid-box-header">
       <h1><%= category.name %></h1>
-      <%# A real request: "edit button should be on chat group page. no
-          moderation tab/subpage." Same name/description/allow comments/
-          sections/moderator settings the old Moderate tab's per-category
-          popup used to edit (routes/admin-forums.js's own POST
-          /:id/settings, unchanged), just reached from here now. %>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-chat-group-dialog').showModal()">Edit</button>
+      <%# A real request: "edit button should be on chat group page... no
+          moderation tab/subpage," later: "instead of a popup edit chat to
+          be a page with save button" - the same name/description/allow
+          comments/sections/moderator settings the old Moderate tab's
+          popup used to edit now live on their own page instead of a
+          dialog here. %>
+      <a class="roster-action-btn" href="/main-admin/forums/<%= category.id %>/edit">Edit</a>
     </div>
     <p><a href="/main-admin/forums">&larr; Chat</a></p>
+    <% if (category.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
+    <% if (category.status === 'archived') { %><span class="badge-pill badge-pill-gray">Archived</span><% } %>
     <% if (category.description) { %><p class="hint"><%= category.description %></p><% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -69,42 +72,5 @@
       </div>
     <% } %>
   </main>
-
-  <dialog id="edit-chat-group-dialog" class="member-picker-dialog">
-    <form method="POST" action="/main-admin/forums/<%= category.id %>/settings">
-      <h3>Edit Chat Group</h3>
-      <label for="edit-chat-group-name">Chat Group Name
-        <input id="edit-chat-group-name" type="text" name="name" value="<%= category.name %>" required />
-      </label>
-      <label for="edit-chat-group-description">Description
-        <textarea id="edit-chat-group-description" name="description" rows="2"><%= category.description || '' %></textarea>
-      </label>
-      <div class="grade-pill-grid">
-        <label class="grade-pill"><input type="checkbox" name="allowComments" <%= category.allow_comments ? 'checked' : '' %> /> Allow comments</label>
-      </div>
-      <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
-      <% if (allSections.length === 0) { %>
-        <p class="hint">No sections defined yet.</p>
-      <% } else { %>
-        <div class="grade-pill-grid">
-          <% allSections.forEach(function(s) { %>
-            <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= sectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
-          <% }); %>
-        </div>
-      <% } %>
-      <label for="edit-chat-group-moderator">Member to Moderate
-        <select id="edit-chat-group-moderator" name="moderatorMemberId">
-          <option value="">None</option>
-          <% members.forEach(function(m) { %>
-            <option value="<%= m.id %>" <%= category.moderator_member_id === m.id ? 'selected' : '' %>><%= m.name %></option>
-          <% }); %>
-        </select>
-      </label>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-        <button type="submit" class="primary-btn">Save</button>
-      </div>
-    </form>
-  </dialog>
 </body>
 </html>

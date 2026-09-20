@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%# A real request: "instead of a popup edit chat to be a page with
+      save button" - the old edit-chat-group-dialog's fields (name/
+      description/allow comments/sections/moderator), Lock (moved off the
+      chat group card per a real request: "Lock the chat group should be
+      under edit, not on the front of the chat group card"), a new
+      Archive button, and a new full member list with an Email
+      Notifications checkbox per member, all on one page instead. %>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="grid-box-header">
+      <h1>Edit <%= category.name %></h1>
+    </div>
+    <p><a href="/main-admin/forums/<%= category.id %>">&larr; <%= category.name %></a></p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <div class="manage-section">
+      <div class="roster-btn-row">
+        <% if (category.is_locked) { %>
+          <form method="POST" action="/main-admin/forums/<%= category.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
+        <% } else { %>
+          <form method="POST" action="/main-admin/forums/<%= category.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
+        <% } %>
+        <% if (category.status === 'archived') { %>
+          <form method="POST" action="/main-admin/forums/<%= category.id %>/unarchive" class="inline-block-form"><button type="submit" class="roster-action-btn">Unarchive</button></form>
+        <% } else { %>
+          <form method="POST" action="/main-admin/forums/<%= category.id %>/archive" class="inline-block-form" data-confirm="Archive &quot;<%= category.name %>&quot;?"><button type="submit" class="roster-action-btn roster-action-btn-danger">Archive</button></form>
+        <% } %>
+      </div>
+    </div>
+
+    <form method="POST" action="/main-admin/forums/<%= category.id %>/settings">
+      <div class="manage-section">
+        <div class="member-form-grid">
+          <label class="member-form-full">Chat Group Name
+            <input type="text" name="name" value="<%= category.name %>" required />
+          </label>
+          <%# A real request: "description should be stacked above the
+              description box. There should be appropriate spacing between
+              each line of text and features" - .member-form-grid's own
+              label already stacks its text above its own input/textarea
+              (block layout, not side-by-side), same as every other field
+              on this page. %>
+          <label class="member-form-full">Description
+            <textarea name="description" rows="2"><%= category.description || '' %></textarea>
+          </label>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Allow comments</span>
+            <div class="grade-pill-grid">
+              <label class="grade-pill"><input type="checkbox" name="allowComments" <%= category.allow_comments ? 'checked' : '' %> /> Allow comments</label>
+            </div>
+          </div>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Sections <span class="hint">(leave all unchecked to allow every section)</span></span>
+            <% if (allSections.length === 0) { %>
+              <p class="hint">No sections defined yet.</p>
+            <% } else { %>
+              <div class="grade-pill-grid">
+                <% allSections.forEach(function(s) { %>
+                  <label class="grade-pill"><input type="checkbox" name="sectionIds" value="<%= s.id %>" <%= sectionIds.includes(s.id) ? 'checked' : '' %> /> <%= s.name %></label>
+                <% }); %>
+              </div>
+            <% } %>
+          </div>
+          <label class="member-form-full">Member to Moderate
+            <select name="moderatorMemberId">
+              <option value="">None</option>
+              <% members.forEach(function(m) { %>
+                <option value="<%= m.id %>" <%= category.moderator_member_id === m.id ? 'selected' : '' %>><%= m.name %></option>
+              <% }); %>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <%
+      // A real request: "should also show a full list of all members
+      // listed just like other member lists with primary parent first,
+      // drop down arrow that will then show other members of that
+      // family. Then there will be a lined up column next to each name
+      // with checkboxes that is called email notifications." Same
+      // family-accordion card shape/behavior as the Members list
+      // (public/js/members-family-accordion.js, shared here), trimmed
+      // down to just a name + one checkbox column - no role badges/
+      // permissions editor, which don't apply to "who gets emailed about
+      // this chat group."
+      %>
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2>Members</h2>
+          <span class="roster-checkbox-label">Email Notifications</span>
+        </div>
+        <% if (allMembers.length === 0) { %>
+          <p class="roster-empty">No members yet.</p>
+        <% } else { %>
+          <div id="chat-group-members-list">
+            <% allMembers.forEach(function(m) { %>
+              <% var familySize = allMembers.filter(function(x) { return x.family_id != null && x.family_id === m.family_id; }).length; %>
+              <% var isFamilyHead = m.is_primary_parent || m.family_id == null || familySize < 2; %>
+              <div class="member-row-card" data-family-key="<%= m.family_id != null ? 'f' + m.family_id : 'solo' + m.id %>" data-family-member="<%= isFamilyHead ? '' : '1' %>">
+                <% if (isFamilyHead && familySize > 1) { %>
+                  <button type="button" class="family-accordion-toggle" aria-expanded="false" aria-label="Show <%= familySize - 1 %> more family member<%= familySize - 1 === 1 ? '' : 's' %>">
+                    <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                  </button>
+                <% } else { %>
+                  <span class="member-row-chevron-spacer"></span>
+                <% } %>
+                <span class="member-avatar member-avatar-<%= avatarColorFor(m.family_id != null ? m.family_id : m.id) %>"><%= m.name.charAt(0).toUpperCase() %></span>
+                <div class="member-row-body">
+                  <div class="member-row-topline">
+                    <span class="member-row-name-link"><%= m.name %></span>
+                    <% if (m.is_primary_parent) { %><span class="primary-parent-badge">Primary</span><% } %>
+                  </div>
+                </div>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="notifyMemberIds" value="<%= m.id %>" <%= subscriberIds.has(m.id) ? 'checked' : '' %> aria-label="Email notifications for <%= m.name %>" />
+                </label>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="event-wizard-footer">
+        <button type="submit" class="primary-btn">Save</button>
+      </div>
+    </form>
+  </main>
+  <script src="/js/members-family-accordion.js"></script>
+</body>
+</html>

@@ -49,13 +49,11 @@
               <h3 class="team-info-title"><a href="/main-admin/forums/<%= c.id %>"><%= c.name %></a></h3>
               <% if (c.scope === 'class') { %><span class="badge-pill">Class: <%= c.class_name %></span><% } else { %><span class="badge-pill badge-pill-green">General</span><% } %>
               <% if (c.is_locked) { %><span class="badge-pill badge-pill-gray">Locked</span><% } %>
-              <div class="roster-btn-row">
-                <% if (c.is_locked) { %>
-                  <form method="POST" action="/main-admin/forums/<%= c.id %>/unlock" class="inline-block-form"><button type="submit" class="roster-action-btn">Unlock</button></form>
-                <% } else { %>
-                  <form method="POST" action="/main-admin/forums/<%= c.id %>/lock" class="inline-block-form"><button type="submit" class="roster-action-btn">Lock</button></form>
-                <% } %>
-              </div>
+              <%# A real request: "Lock the chat group should be under
+                  edit, not on the front of the chat group card" - Lock/
+                  Unlock now lives on the group's own Edit page
+                  (admin-forums-category-edit.ejs) instead of here. %>
+              <% if (c.status === 'archived') { %><span class="badge-pill badge-pill-gray">Archived</span><% } %>
             </div>
           </div>
         <% }); %>
