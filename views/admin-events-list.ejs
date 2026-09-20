@@ -73,7 +73,7 @@
               <tbody>
                 <% calendarList.forEach(function(e) { %>
                   <tr>
-                    <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder"><%= e.title %></a></td>
+                    <td class="roster-name-col"><a href="/main-admin/events/<%= e.id %>/builder" class="<%= e.status === 'cancelled' ? 'event-title-cancelled' : '' %>"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a></td>
                     <td><%= e.startsLabel %></td>
                     <td><%= e.location || '—' %></td>
                     <td><% if (e.categoryColor) { %><span class="badge-pill" style="background:<%= e.categoryColor %>;color:#fff;"><%= e.categoryName || '' %></span><% } else { %>—<% } %></td>
@@ -97,7 +97,7 @@
                     <td class="<%= day.inMonth ? '' : 'hint' %>">
                       <div><%= day.day %></div>
                       <% day.events.forEach(function(e) { %>
-                        <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
+                        <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill<%= e.status === 'cancelled' ? ' event-title-cancelled' : '' %>" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a>
                       <% }); %>
                     </td>
                   <% }); %>

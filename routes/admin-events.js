@@ -17,6 +17,9 @@ const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = 
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const db = require('../db');
 const events = require('../utils/events');
+const { listSignUpLists, getSignUpList, updateSignUpList, listVolunteerLists, getVolunteerList, updateVolunteerList } = require('../utils/committeesAndSignupLists');
+const { notify } = require('../utils/notifications');
+const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
@@ -238,7 +241,11 @@ router.get('/', async (req, res) => {
   const locations = await events.listLocations();
   const eventSettings = await events.getEventSettings();
   if (activeTab === 'calendar') {
-    const published = await events.listEvents({ status: 'published' });
+    // A real request: "cancel event button should leave the event on the
+    // calendar" (with a struck-through title, see admin-events-list.ejs)
+    // rather than the event just disappearing - 'cancelled' joins
+    // 'published' here instead of replacing it.
+    const published = await events.listEvents({ status: ['published', 'cancelled'] });
     calendar = events.monthGrid(req.query.month, published);
     calendarView = req.query.view === 'list' ? 'list' : 'calendar';
     if (calendarView === 'list') {
@@ -354,13 +361,29 @@ router.post('/:id/decide', async (req, res) => {
 // this app's route files keep re-learning - see routes/admin-classifieds.js's
 // own comment on it).
 router.get('/new', async (req, res) => {
+  // A real request: "event slug should say event url. It should show the
+  // web address then finish with the text box to add the custom ending" -
+  // same req.protocol/req.get('host') origin routes/admin-design.js and
+  // routes/main-admin-name-tags.js already compute per-request for a
+  // shareable link, shown as static text in front of the slug input.
+  const origin = `${req.protocol}://${req.get('host')}`;
+  // A real request: "drop down with title, add a volunteer list.
+  // Dropdown with title add a signup list" - only lists not already tied
+  // to a different event are offered, since attaching one here means
+  // giving it this brand-new event's id (utils/committeesAndSignupLists.js's
+  // own event_id column, already nullable/optional everywhere else it's
+  // used).
+  const [allSignUpLists, allVolunteerLists] = await Promise.all([listSignUpLists(), listVolunteerLists()]);
   res.render('admin-events-new', {
     title: 'Create New Event',
+    origin,
     categories: await events.listCategories(),
     locations: await events.listLocations(),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     eventTypes: events.EVENT_TYPES,
+    availableSignUpLists: allSignUpLists.filter((l) => !l.event_id),
+    availableVolunteerLists: allVolunteerLists.filter((l) => !l.event_id),
     error: req.query.error || null,
   });
 });
@@ -399,6 +422,18 @@ router.post('/', upload.single('image'), async (req, res) => {
     { status }
   );
   await events.setEventSections(id, req.body.sectionIds);
+  // A real request: "drop down with title, add a volunteer list.
+  // Dropdown with title add a signup list" - attaches an already-existing
+  // (previously unattached) list to this brand-new event by giving it
+  // the new event's id, preserving its own title/description.
+  if (req.body.volunteerListId) {
+    const list = await getVolunteerList(req.body.volunteerListId);
+    if (list) await updateVolunteerList(list.id, { title: list.title, description: list.description, eventId: id });
+  }
+  if (req.body.signupListId) {
+    const list = await getSignUpList(req.body.signupListId);
+    if (list) await updateSignUpList(list.id, { title: list.title, description: list.description, eventId: id });
+  }
   if (req.file) {
     try {
       await events.setEventImage(id, await saveEventImage(req.file, null));
@@ -592,6 +627,24 @@ router.post('/:id/status', async (req, res) => {
   const status = req.body.status;
   if (!['draft', 'published', 'cancelled'].includes(status)) return res.redirect(`/main-admin/events/${req.params.id}/builder`);
   await events.setEventStatus(req.params.id, status);
+
+  // A real request: "automatic email will be sent to anyone registered
+  // for the event to let them know the event is canceled" - fanned out
+  // the same bounded-concurrency way utils/announcements.js notifies a
+  // whole recipient list, not one fully-sequential notify() per person.
+  if (status === 'cancelled') {
+    const event = await events.getEvent(req.params.id);
+    const registrations = await events.registrationsForEvent(req.params.id);
+    const accountIds = [...new Set(registrations.filter((r) => r.status !== 'cancelled' && r.registered_by_account_id).map((r) => r.registered_by_account_id))];
+    await mapWithConcurrency(accountIds, 20, (accountId) =>
+      notify(accountId, 'event_cancelled', {
+        title: `Event Cancelled: ${event.title}`,
+        body: `"${event.title}" has been cancelled.`,
+        linkUrl: '/events/' + req.params.id,
+      })
+    );
+  }
+
   res.redirect(`/main-admin/events/${req.params.id}/builder?notice=` + encodeURIComponent(`Marked ${status}.`));
 });
 

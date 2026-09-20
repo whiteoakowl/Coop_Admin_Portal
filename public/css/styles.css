@@ -2698,6 +2698,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    lower-emphasis of the two actions, just not a smaller target). */
 .btn-secondary-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
 
+/* A real request: "event slug should say event url. It should show the
+   web address then finish with the text box to add the custom ending" -
+   the base URL reads as plain static text right in front of the input,
+   like a single continuous address, instead of a separate hint line
+   below it. */
+.event-url-field { display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; }
+.event-url-base { color: var(--muted); font-size: 0.9rem; white-space: nowrap; }
+.event-url-field input { flex: 1; min-width: 10rem; }
+
 .legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
 
@@ -8363,6 +8372,12 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    horizontal padding than every other .roster-action-btn on the page,
    since "Prev"/"Next" are the shortest labels in this whole toolbar. */
 .event-calendar-nav-btn { padding: 0.35rem 0.4rem; font-size: 0.75rem; }
+/* A real request: "cancel event button should leave the event on the
+   calendar but the title will be marked through with a line" - the
+   event stays visible (routes/admin-events.js's own Calendar tab query
+   now includes 'cancelled' alongside 'published'), just struck through;
+   the trailing " CANCELED" text is appended in the view itself. */
+.event-title-cancelled { text-decoration: line-through; }
 .event-calendar-nav-row .event-month-select,
 .event-calendar-nav-row .event-year-select {
   padding: 0.3rem 1.5rem 0.3rem 0.4rem;

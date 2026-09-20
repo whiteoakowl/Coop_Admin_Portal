@@ -86,8 +86,9 @@ async function listEvents({ status, visibility, upcomingOnly, approvalStatus, ca
   const clauses = [];
   const params = [];
   if (status) {
-    clauses.push('status = ?');
-    params.push(status);
+    const statuses = Array.isArray(status) ? status : [status];
+    clauses.push(`status IN (${statuses.map(() => '?').join(',')})`);
+    params.push(...statuses);
   }
   if (visibility) {
     clauses.push('visibility = ?');

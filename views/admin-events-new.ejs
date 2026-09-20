@@ -54,9 +54,11 @@
           <label class="member-form-full">Event Title <span class="required-star">*</span>
             <input type="text" name="title" placeholder="e.g., Annual Science Fair 2026" required data-slug-source />
           </label>
-          <label>Event Slug
-            <input type="text" name="slug" placeholder="your-event-slug" data-slug-target />
-            <span class="hint">This will be part of your event's URL.</span>
+          <label>Event URL
+            <div class="event-url-field">
+              <span class="event-url-base"><%= origin %>/events/</span>
+              <input type="text" name="slug" placeholder="your-event-slug" data-slug-target />
+            </div>
           </label>
           <label>Event Category
             <select name="categoryId">
@@ -135,6 +137,33 @@
           </label>
           <label>Organized By
             <input type="text" name="organizedBy" placeholder="e.g., Sanford Homeschoolers" />
+          </label>
+        </div>
+
+        <%
+        // A real request: "drop down with title, add a volunteer list.
+        // Dropdown with title add a signup list" - picks one already-
+        // existing, not-yet-attached list of each kind to give this
+        // event's own id once it's created (routes/main-admin-volunteers.js
+        // is still where a brand new list itself gets built).
+        %>
+        <h3 class="event-wizard-subheading">Volunteers &amp; Sign-Ups</h3>
+        <div class="member-form-grid">
+          <label>Add a Volunteer List
+            <select name="volunteerListId">
+              <option value="">None</option>
+              <% availableVolunteerLists.forEach(function(l) { %>
+                <option value="<%= l.id %>"><%= l.title %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Add a Signup List
+            <select name="signupListId">
+              <option value="">None</option>
+              <% availableSignUpLists.forEach(function(l) { %>
+                <option value="<%= l.id %>"><%= l.title %></option>
+              <% }); %>
+            </select>
           </label>
         </div>
 
