@@ -71,6 +71,28 @@ test('Class Details form has a photo upload field, and the manage page shows not
   assert.doesNotMatch(page.text, /<img src="[^"]*" alt="" style="max-width: 240px/);
 });
 
+test('the Class editor popup (view-fragment) also has the photo upload field, disabled until Edit, and shows an uploaded photo', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Popup Photo Class' });
+
+  const before = await request(app).get(`/admin/class-schedule/classes/${cls.id}/view-fragment`).set('Cookie', admin.cookie);
+  assert.equal(before.status, 200);
+  assert.match(before.text, /enctype="multipart\/form-data"/);
+  assert.match(before.text, /<input type="file" name="image" accept="image\/\*" disabled \/>/);
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${cls.id}?_csrf=${encodeURIComponent(admin.csrfToken)}`)
+    .set('Cookie', admin.cookie)
+    .field('className', 'Popup Photo Class')
+    .field('hourPosition', '1')
+    .field('color', '#EE9A4D')
+    .attach('image', Buffer.from('fake jpeg bytes'), { filename: 'class.jpg', contentType: 'image/jpeg' });
+  const updated = await db.prepare('SELECT * FROM classes WHERE id = ?').get(cls.id);
+
+  const after = await request(app).get(`/admin/class-schedule/classes/${cls.id}/view-fragment`).set('Cookie', admin.cookie);
+  assert.match(after.text, new RegExp(`<img src="/uploads/classes/${updated.image_key}"`));
+});
+
 test('uploading a class photo saves image_key and the manage page then shows it', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Photo Upload Class' });

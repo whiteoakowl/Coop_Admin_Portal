@@ -308,6 +308,7 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
+    classImageUrl: classImageUrl(cls.image_key),
   });
 });
 
