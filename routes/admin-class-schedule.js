@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
@@ -8,7 +10,8 @@ const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
 const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric } = require('../utils/dates');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
-const { spreadsheetFileFilter } = require('../utils/uploads');
+const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
+const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const {
   DAY_LABELS,
@@ -29,6 +32,9 @@ const {
   createClass,
   colorForClassName,
   updateClass,
+  setClassImage,
+  classImageUrl,
+  CLASS_IMAGES_BUCKET,
   updateClassSettings,
   deleteClass,
   archiveClasses,
@@ -44,6 +50,39 @@ const {
 const { classSectionIds } = require('../utils/sections');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 }, fileFilter: spreadsheetFileFilter });
+
+// A real request: "sql editor copy paste should be for event photo,
+// class photo and shop photo" - a class's own optional photo, same
+// public-bucket-or-local-disk shape as routes/admin-events.js's own
+// EVENT_IMAGES_BUCKET (shown to parents browsing classes, not gated
+// behind a login). CLASS_IMAGES_BUCKET/classImageUrl live in utils/
+// classSchedule.js (not local to this file the way events' own are),
+// since every portal's own "view a class" fragment needs to resolve the
+// same photo URL, not just this admin-only save route.
+const CLASS_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'classes');
+if (!createStorageClient() && !fs.existsSync(CLASS_IMAGE_DIR)) fs.mkdirSync(CLASS_IMAGE_DIR, { recursive: true });
+
+const MAX_CLASS_IMAGE_BYTES = 5 * 1024 * 1024;
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_CLASS_IMAGE_BYTES }, fileFilter: imageFileFilter });
+
+async function saveClassImage(file, existingKey) {
+  const client = createStorageClient();
+  let key;
+  if (client) {
+    key = await uploadFile(client, CLASS_IMAGES_BUCKET, file.buffer, file.originalname, file.mimetype);
+  } else {
+    key = generateKey(file.originalname);
+    fs.writeFileSync(path.join(CLASS_IMAGE_DIR, key), file.buffer);
+  }
+  if (existingKey) {
+    if (client) await deleteFile(client, CLASS_IMAGES_BUCKET, existingKey);
+    else {
+      const oldPath = path.join(CLASS_IMAGE_DIR, existingKey);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+  }
+  return key;
+}
 
 // A real request: "on class rosters each student member line should have
 // registration date/time, birthday, grade, allergy symbol, mail icon
@@ -295,12 +334,13 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
+    classImageUrl: classImageUrl(cls.image_key),
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
 });
 
-router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) => {
+router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single('image'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
@@ -338,6 +378,9 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, async (req, res) =>
       autoRefundOnCancel: !!cls.auto_refund_on_cancel,
     });
     await saveClassSections(id, req.body);
+    if (req.file) {
+      await setClassImage(id, await saveClassImage(req.file, cls.image_key));
+    }
   } catch (err) {
     // A real bug report: saving a class (e.g. after setting an assistant
     // slot count) landed on the generic "Something went wrong" error

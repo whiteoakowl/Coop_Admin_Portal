@@ -19,6 +19,7 @@ const {
   ageGroupList,
   getClass,
   formatGradeRange,
+  classImageUrl,
   DAY_LABELS,
   isValidDay,
   defaultDay,
@@ -222,6 +223,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
 
   res.render('parent-class-fragment', {
     cls,
+    classImageUrl: classImageUrl(cls.image_key),
     day: req.query.day || cls.day,
     gradeLabel: formatGradeRange(cls.age_group),
     teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),

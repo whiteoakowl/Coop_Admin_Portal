@@ -11,6 +11,9 @@
 </div>
 
 <div class="parent-class-body">
+  <% if (classImageUrl) { %>
+    <img src="<%= classImageUrl %>" alt="" style="max-width: 100%; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
+  <% } %>
   <p class="hint">
     <%= cls.day === 'monday' ? 'Monday' : 'Wednesday' %>
     <% if (cls.start_time || cls.end_time) { %> &middot; <%= cls.start_time || '?' %>&ndash;<%= cls.end_time || '?' %><% } %>

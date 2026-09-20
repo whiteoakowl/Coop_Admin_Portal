@@ -3,6 +3,20 @@ const { DAYS, DAY_LABELS, isValidDay, defaultDay } = require('./days');
 const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, addMemberToSection, excludedFloaterPairsForList } = require('./volunteers');
 const { byLastName } = require('./members');
 const { amountPaidForCharge, cancelCharge } = require('./payments');
+const { createStorageClient, publicUrl } = require('./storage');
+
+// A real request: "sql editor copy paste should be for event photo,
+// class photo and shop photo" - one shared helper so every portal's own
+// "view a class" fragment (Co-op Admin's manage page, Parent/Student/
+// Teacher's own class-browsing popups) resolves a class's optional photo
+// the same public-bucket-or-local-disk way, instead of each route file
+// re-deriving it (unlike routes/admin-events.js's own EVENT_IMAGES_BUCKET
+// helpers, which only ever needed to live in that one file).
+const CLASS_IMAGES_BUCKET = 'class-images';
+function classImageUrl(key) {
+  if (!key) return null;
+  return createStorageClient() ? publicUrl(CLASS_IMAGES_BUCKET, key) : `/uploads/classes/${key}`;
+}
 
 const HOUR_POSITIONS = [1, 2, 3, 4];
 
@@ -535,6 +549,14 @@ async function updateClass(id, fields) {
   // it) and the new one.
   await syncDayMemberRosters(fields.day);
   if (before && before.day && before.day !== fields.day) await syncDayMemberRosters(before.day);
+}
+
+// A real request: "sql editor copy paste should be for event photo,
+// class photo and shop photo" - a class's own optional photo, same
+// "one file, uploaded separately from the rest of the form's fields"
+// shape as utils/events.js's own setEventImage.
+async function setClassImage(id, imageKey) {
+  await db.prepare('UPDATE classes SET image_key = ? WHERE id = ?').run(imageKey, id);
 }
 
 // The 6 registration/cancellation toggles the Schedules > Settings tab
@@ -1924,6 +1946,9 @@ module.exports = {
   createClass,
   colorForClassName,
   updateClass,
+  setClassImage,
+  classImageUrl,
+  CLASS_IMAGES_BUCKET,
   updateClassSettings,
   deleteClass,
   archiveClasses,

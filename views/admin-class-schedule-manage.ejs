@@ -24,10 +24,17 @@
       <div class="class-manage-form-col">
         <div class="manage-section">
           <h2>Class Details</h2>
-          <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>" class="member-form-grid">
+          <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>" enctype="multipart/form-data" class="member-form-grid">
             <label>Class Name
               <input type="text" name="className" value="<%= cls.class_name %>" required />
             </label>
+            <div class="member-form-full">
+              <span class="roster-checkbox-label">Class Photo</span>
+              <% if (classImageUrl) { %>
+                <img src="<%= classImageUrl %>" alt="" style="max-width: 240px; border-radius: var(--radius); display: block; margin-bottom: 0.5rem;" />
+              <% } %>
+              <input type="file" name="image" accept="image/*" />
+            </div>
             <div>
               <label class="roster-checkbox-label">Color</label>
               <div class="class-color-swatches">
