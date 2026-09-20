@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/welcome">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <a class="primary-btn" href="/portal">My Portals</a>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/portal">&larr; My Portals</a></p>
+        <h1><%= list.title %></h1>
+        <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <% if (items.length === 0) { %>
+          <p class="roster-empty">No items yet.</p>
+        <% } else { %>
+          <div class="training-lesson-list">
+            <% items.forEach(function(item) { %>
+              <% var remaining = item.quantity_needed - item.quantityClaimed; %>
+              <div class="training-lesson-row">
+                <div class="training-lesson-row-main">
+                  <svg class="icon"><use href="#icon-badge"/></svg>
+                  <div class="training-lesson-info">
+                    <strong><%= item.item_name %></strong>
+                    <span class="hint"><%= remaining %> still needed<% if (item.notes) { %> &middot; <%= item.notes %><% } %></span>
+                  </div>
+                  <% if (remaining > 0) { %>
+                    <form method="POST" action="/signup-lists/<%= list.id %>/items/<%= item.id %>/claim" class="training-lesson-actions">
+                      <select name="memberId">
+                        <% family.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
+                      </select>
+                      <input type="number" name="quantity" min="1" value="1" max="<%= remaining %>" style="width: 4rem;" />
+                      <button type="submit" class="roster-action-btn">Sign Up</button>
+                    </form>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

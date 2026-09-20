@@ -151,6 +151,11 @@ router.get('/signup-lists/:id', async (req, res) => {
     list,
     items: await volunteers.itemsForSignUpList(list.id),
     events: await events.listEvents({}),
+    // A real request: "add button that says copy link... you will have
+    // copied the member link to the volunteer or signup list to paste
+    // somewhere else to share" - the new standalone member-facing page
+    // (routes/signup-volunteer-lists.js), not this Main Admin page.
+    memberLink: `${req.protocol}://${req.get('host')}/signup-lists/${list.id}`,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -221,6 +226,7 @@ router.get('/volunteer-lists/:id', async (req, res) => {
     list,
     shifts: await volunteers.shiftsForVolunteerList(list.id),
     events: await events.listEvents({}),
+    memberLink: `${req.protocol}://${req.get('host')}/volunteer-lists/${list.id}`,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

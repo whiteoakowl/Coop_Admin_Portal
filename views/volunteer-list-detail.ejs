@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/icon-sprite') %>
+
+  <header class="site-header">
+    <a class="site-header-brand" href="/welcome">
+      <img src="/img/logo.png" alt="" />
+      <%= settings.org_name %>
+    </a>
+    <div class="site-header-actions">
+      <a class="primary-btn" href="/portal">My Portals</a>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <section class="site-section">
+      <div class="site-section-inner">
+        <p><a href="/portal">&larr; My Portals</a></p>
+        <h1><%= list.title %></h1>
+        <% if (list.description) { %><p class="hint"><%= list.description %></p><% } %>
+
+        <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+        <% if (shifts.length === 0) { %>
+          <p class="roster-empty">No shifts yet.</p>
+        <% } else { %>
+          <div class="training-lesson-list">
+            <% shifts.forEach(function(shift) { %>
+              <% var mySignups = shift.signups.filter(function(s) { return familyIds.indexOf(s.member_id) !== -1; }); %>
+              <div class="training-lesson-row">
+                <div class="training-lesson-row-main">
+                  <svg class="icon"><use href="#icon-badge"/></svg>
+                  <div class="training-lesson-info">
+                    <strong><%= shift.job_name %></strong>
+                    <span class="hint">
+                      <% if (shift.shift_date) { %><%= shift.shift_date %><% } %>
+                      <% if (shift.start_time || shift.end_time) { %> <%= shift.start_time || '' %><% if (shift.end_time) { %> - <%= shift.end_time %><% } %><% } %>
+                      &middot; <%= shift.signups.length %>/<%= shift.slots_needed %> filled
+                    </span>
+                  </div>
+                  <div class="training-lesson-actions">
+                    <% family.forEach(function(m) { %>
+                      <% if (mySignups.some(function(s) { return s.member_id === m.id; })) { %>
+                        <form method="POST" action="/volunteer-lists/<%= list.id %>/shifts/<%= shift.id %>/cancel" class="inline-block-form">
+                          <input type="hidden" name="memberId" value="<%= m.id %>" />
+                          <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                        </form>
+                      <% } else if (shift.signups.length < shift.slots_needed) { %>
+                        <form method="POST" action="/volunteer-lists/<%= list.id %>/shifts/<%= shift.id %>/signup" class="inline-block-form">
+                          <input type="hidden" name="memberId" value="<%= m.id %>" />
+                          <button type="submit" class="roster-action-btn"><%= m.name %>: Sign Up</button>
+                        </form>
+                      <% } %>
+                    <% }); %>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

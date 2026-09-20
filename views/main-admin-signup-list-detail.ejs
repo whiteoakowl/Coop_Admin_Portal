@@ -12,7 +12,10 @@
     <p><a href="/main-admin/volunteers?tab=signup-lists">&larr; Back to Sign-Up Lists</a></p>
     <div class="grid-box-header">
       <h1><%= list.title %></h1>
-      <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-list-dialog').showModal()">Edit</button>
+      <div class="roster-btn-row">
+        <button type="button" class="roster-action-btn" data-copy-link="<%= memberLink %>">Copy Link</button>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-list-dialog').showModal()">Edit</button>
+      </div>
     </div>
     <% if (list.description) { %><p><%= list.description %></p><% } %>
     <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
@@ -105,5 +108,6 @@
       </form>
     </dialog>
   </main>
+  <script src="/js/copy-link.js"></script>
 </body>
 </html>

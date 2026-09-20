@@ -130,6 +130,9 @@ const mainAdminVolunteersRouter = require('./routes/main-admin-volunteers');
 // Member-facing Committees browsing/signup - same sibling-router shape as
 // routes/events.js (mounted at /events).
 const committeesRouter = require('./routes/committees');
+// Standalone /signup-lists/:id and /volunteer-lists/:id pages - see that
+// file's own header comment.
+const signupVolunteerListsRouter = require('./routes/signup-volunteer-lists');
 // Named groups of members (independent of Family) that Events/Classes can
 // optionally restrict registration to - same sibling-router shape.
 const mainAdminSectionsRouter = require('./routes/main-admin-sections');
@@ -412,6 +415,7 @@ app.use('/main-admin/resource-links', mainAdminResourceLinksRouter);
 app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
 app.use('/main-admin/volunteers', mainAdminVolunteersRouter);
 app.use('/committees', committeesRouter);
+app.use('/', signupVolunteerListsRouter);
 app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/main-admin', mainAdminTrainingRouter);
