@@ -94,7 +94,7 @@ test('Events list: the Archive tab is gone - not a needed feature', async () => 
   assert.match(archiveTab.text, /\+ New Event/);
 });
 
-test('Events builder (per-event edit page): renders its own .view-tabs strip with the 5 real request tabs', async () => {
+test('Events builder (per-event edit page): renders its own .view-tabs strip with the real request tabs', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app)
     .post('/main-admin/events')
@@ -113,8 +113,56 @@ test('Events builder (per-event edit page): renders its own .view-tabs strip wit
   // popup existed, per a later real request to keep that design for
   // pages with nowhere else to put the tabs.
   assert.match(page.text, /<div class="view-tabs no-print">/);
-  ['Event Details', 'Donations', 'Food', 'Settings'].forEach((label) => {
+  // A later real request: "editing event should have little tabs at the
+  // top. details, finance, settings, attendance" - "Event Details"
+  // renamed to "Details", Finance added, Volunteers/Donations/Food/
+  // Settings kept, Attendance appended as its own link to the
+  // Registrations page.
+  ['Details', 'Finance', 'Donations', 'Food', 'Settings', 'Attendance'].forEach((label) => {
     assert.match(page.text, new RegExp(`>${label}<`));
   });
-  assert.match(page.text, /class="view-tab active">Volunteers/);
+  assert.doesNotMatch(page.text, />Event Details</);
+  assert.match(page.text, /class="view-tab active" data-builder-nav-link>Volunteers/);
+  assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations" class="view-tab" data-builder-nav-link>Attendance`));
+});
+
+test('Events builder: Finance tab saves Price/Charged Per without touching Details, and the unsaved-changes dialog is present', async () => {
+  const admin = await loginAsMainAdmin();
+  const createRes = await request(app)
+    .post('/main-admin/events')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Finance Tab Test Event', startsAt: '2027-09-01T18:00', _csrf: admin.csrfToken });
+  const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(createRes.headers.location)[1]);
+
+  const detailsPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
+  // Price/Charged Per no longer live on the Details tab.
+  assert.doesNotMatch(detailsPage.text, /name="priceDollars"/);
+  assert.doesNotMatch(detailsPage.text, /name="pricePer"/);
+  // A real request: "warning pop up when clicking to each page/tab that
+  // you must save your changes on that page before going to the next.
+  // cancel and continue buttons."
+  assert.match(detailsPage.text, /id="tab-unsaved-dialog"/);
+  assert.match(detailsPage.text, /you must save your changes on this page before going to the next/i);
+  assert.match(detailsPage.text, /data-tab-guard-continue/);
+  assert.match(detailsPage.text, /<script src="\/js\/event-builder-tab-guard\.js"><\/script>/);
+
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.equal(financePage.status, 200);
+  assert.match(financePage.text, /name="priceDollars"/);
+  assert.match(financePage.text, /name="pricePer"/);
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}/finance`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ priceDollars: '25.00', pricePer: 'family', _csrf: admin.csrfToken });
+
+  const after = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(after.text, /name="priceDollars"[^>]*value="25\.00"/);
+  assert.match(after.text, /value="family" selected/);
+
+  // Saving Finance shouldn't have blanked out the title/description set on Details.
+  const afterDetails = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
+  assert.match(afterDetails.text, /value="Finance Tab Test Event"/);
 });

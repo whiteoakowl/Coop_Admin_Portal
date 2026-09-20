@@ -26,6 +26,7 @@ const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
+const { AGE_GROUPS, ageGroupKeyForBirthday } = require('./emailComposer');
 
 // The Create New Event wizard's own Event Type dropdown - a fixed, short
 // list is plenty for a single co-op (unlike GRADE_OPTIONS/sections,
@@ -55,10 +56,27 @@ function parseAgeGroupList(value) {
     .filter(Boolean);
 }
 
+// A real request: "grade level multiple choice... check boxes next to
+// both that say lock registration to age level or lock registration to
+// grade level" - an explicit on/off switch, rather than "did anyone check
+// a grade box" alone deciding whether the restriction applies.
 function ageGroupAllowsMember(event, member) {
+  if (!event.lock_registration_to_grade) return true;
   const allowed = parseAgeGroupList(event.age_group);
   if (allowed.length === 0) return true;
   return allowed.includes(member.grade_level);
+}
+
+// Same shape as ageGroupAllowsMember, for the new parallel age-bucket
+// restriction - reuses utils/emailComposer.js's own AGE_GROUPS buckets
+// (already how Communication filters by age) instead of inventing a
+// second age vocabulary.
+function ageBucketAllowsMember(event, member) {
+  if (!event.lock_registration_to_age) return true;
+  const allowed = parseAgeGroupList(event.age_group_restriction);
+  if (allowed.length === 0) return true;
+  const key = ageGroupKeyForBirthday(member.birthday);
+  return key != null && allowed.includes(key);
 }
 
 // "adult" = parent/admin member_type, "child" = student - matches
@@ -264,6 +282,21 @@ function eventFields(data) {
     data.volunteerSelectionCount ?? null,
     data.donationSelectionCount ?? null,
     data.foodSelectionCount ?? null,
+    data.isClosed ? 1 : 0,
+    // Same "undefined must not silently override the migration's own
+    // DEFAULT 1" guard volunteersEnabled/donationsEnabled already need
+    // above - the Create wizard never sends this field at all.
+    data.allowRegistrationCancellations === false ? 0 : 1,
+    data.allowRefundOnCancel ? 1 : 0,
+    data.showRegistrantsToMembers ? 1 : 0,
+    data.trackParticipantsOnly ? 1 : 0,
+    data.lockRegistrationToGrade ? 1 : 0,
+    data.lockRegistrationToAge ? 1 : 0,
+    data.ageGroupRestriction || null,
+    data.lockRegistrationToSection ? 1 : 0,
+    data.registrationSectionId ?? null,
+    data.lockVisibilityToSection ? 1 : 0,
+    data.visibilitySectionId ?? null,
   ];
 }
 
@@ -285,8 +318,11 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          slug, event_type, short_description, language, organized_by, tags,
          volunteers_enabled, donations_enabled, food_enabled,
          volunteer_selection_count, donation_selection_count, food_selection_count,
+         is_closed, allow_registration_cancellations, allow_refund_on_cancel, show_registrants_to_members, track_participants_only,
+         lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
+         lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -302,6 +338,9 @@ async function updateEvent(id, data) {
          slug = ?, event_type = ?, short_description = ?, language = ?, organized_by = ?, tags = ?,
          volunteers_enabled = ?, donations_enabled = ?, food_enabled = ?,
          volunteer_selection_count = ?, donation_selection_count = ?, food_selection_count = ?,
+         is_closed = ?, allow_registration_cancellations = ?, allow_refund_on_cancel = ?, show_registrants_to_members = ?, track_participants_only = ?,
+         lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
+         lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -484,12 +523,21 @@ async function decideSubmission(eventId, approve) {
 // means unrestricted" convention.
 async function eventVisibleToFamily(eventId, family) {
   const restriction = await eventSectionIds(eventId);
-  if (restriction.length === 0) return true;
   const union = new Set();
   for (const member of family) {
     for (const id of await sectionIdsForMember(member.id)) union.add(id);
   }
-  return memberSatisfiesRestriction(union, restriction);
+  if (restriction.length > 0 && !memberSatisfiesRestriction(union, restriction)) return false;
+
+  // A real request: "lock registration to only be viewable to one
+  // section check box and dropdown" - a second, narrower single-section
+  // gate alongside the existing multi-section restriction above; a
+  // family must satisfy both when both apply.
+  const event = await getEvent(eventId);
+  if (event && event.lock_visibility_to_section && event.visibility_section_id && !union.has(event.visibility_section_id)) {
+    return false;
+  }
+  return true;
 }
 
 async function registrationsForEvent(eventId) {
@@ -792,6 +840,9 @@ async function registerForEvent({ eventId, memberId, accountId, family }) {
   const event = await getEvent(eventId);
   if (!event) return { ok: false, error: 'That event no longer exists.' };
   if (event.status !== 'published') return { ok: false, error: 'That event is not open for registration.' };
+  // A real request: "close event" checkbox - a manual override
+  // independent of status/capacity/registration window.
+  if (event.is_closed) return { ok: false, error: 'Registration is closed for that event.' };
   if (!(await isRegistrationWindowOpen(event))) return { ok: false, error: 'Registration is not open for that event right now.' };
 
   const member = family.find((m) => m.id === memberId);
@@ -799,10 +850,21 @@ async function registerForEvent({ eventId, memberId, accountId, family }) {
   if (memberIsAdult(member) && !event.allow_adult_register) return { ok: false, error: 'Adults cannot register for that event.' };
   if (!memberIsAdult(member) && !event.allow_child_register) return { ok: false, error: 'Kids cannot register for that event.' };
   if (!ageGroupAllowsMember(event, member)) return { ok: false, error: `That event is limited to specific grades - ${member.name}'s grade isn't included.` };
+  if (!ageBucketAllowsMember(event, member)) return { ok: false, error: `That event is limited to specific ages - ${member.name}'s age isn't included.` };
 
   const restriction = await eventSectionIds(eventId);
   if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(memberId), restriction)) {
     return { ok: false, error: 'That event is limited to specific sections you are not part of.' };
+  }
+  // A real request: "checkbox lock registration to section, drop down of
+  // sections" - a second, narrower single-section gate a member must
+  // also satisfy when it's on, alongside the multi-section restriction
+  // above.
+  if (event.lock_registration_to_section && event.registration_section_id) {
+    const memberSections = await sectionIdsForMember(memberId);
+    if (!memberSections.has(event.registration_section_id)) {
+      return { ok: false, error: 'That event is limited to a specific section you are not part of.' };
+    }
   }
 
   return createOrReactivateRegistration(event, member, accountId);

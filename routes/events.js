@@ -178,6 +178,13 @@ router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
   if (!family.some((m) => m.id === memberId)) {
     return res.redirect(back + '?error=' + encodeURIComponent('You can only manage your own family\'s registrations.'));
   }
+  // A real request: "allow registration cancelations" checkbox - gates a
+  // member's own self-service cancel here only; a Main Admin can always
+  // cancel a registration from the Registrations page regardless.
+  const event = await events.getEvent(eventId);
+  if (event && !event.allow_registration_cancellations) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Cancellations are not allowed for that event - contact an admin.'));
+  }
   await events.cancelRegistration(eventId, memberId);
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
 });

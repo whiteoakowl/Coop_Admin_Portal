@@ -35,6 +35,7 @@ const { notify } = require('../utils/notifications');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
+const { AGE_GROUPS } = require('../utils/emailComposer');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
@@ -164,6 +165,18 @@ function eventDataFromRow(event) {
     volunteerSelectionCount: event.volunteer_selection_count,
     donationSelectionCount: event.donation_selection_count,
     foodSelectionCount: event.food_selection_count,
+    isClosed: !!event.is_closed,
+    allowRegistrationCancellations: !!event.allow_registration_cancellations,
+    allowRefundOnCancel: !!event.allow_refund_on_cancel,
+    showRegistrantsToMembers: !!event.show_registrants_to_members,
+    trackParticipantsOnly: !!event.track_participants_only,
+    lockRegistrationToGrade: !!event.lock_registration_to_grade,
+    lockRegistrationToAge: !!event.lock_registration_to_age,
+    ageGroupRestriction: event.age_group_restriction,
+    lockRegistrationToSection: !!event.lock_registration_to_section,
+    registrationSectionId: event.registration_section_id,
+    lockVisibilityToSection: !!event.lock_visibility_to_section,
+    visibilitySectionId: event.visibility_section_id,
   };
 }
 
@@ -497,7 +510,7 @@ router.post('/import', importUpload.single('file'), async (req, res) => {
 // (this one still handles Event Details' own form; Volunteers/Donations/
 // Food each save through their own settings route below, alongside the
 // existing add-role/add-item routes those tabs already had).
-const BUILDER_TABS = ['details', 'volunteers', 'donations', 'food', 'settings'];
+const BUILDER_TABS = ['details', 'finance', 'volunteers', 'donations', 'food', 'settings'];
 
 async function loadBuilder(req, res) {
   const event = await events.getEventWithDetails(req.params.id);
@@ -513,6 +526,8 @@ async function loadBuilder(req, res) {
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     selectedGrades: events.parseAgeGroupList(event.age_group),
+    ageGroupOptions: AGE_GROUPS,
+    selectedAgeGroups: events.parseAgeGroupList(event.age_group_restriction),
     eventTypes: events.EVENT_TYPES,
     selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
     error: req.query.error || null,
@@ -523,8 +538,9 @@ async function loadBuilder(req, res) {
 router.get('/:id/builder', loadBuilder);
 
 // Event Details tab's own save - everything except Volunteers/Donations/
-// Food's own enable+count fields (saved by their own routes below) and
-// Settings' permissions fields (also saved by its own route below), so
+// Food's own enable+count fields, Settings' permissions fields (including
+// "Is this a public event?", moved there per a later real request), and
+// Finance's own price fields (each saved by its own route below), so
 // saving one tab's form never silently overwrites what another tab has.
 router.post('/:id', upload.single('image'), async (req, res) => {
   const id = req.params.id;
@@ -543,12 +559,9 @@ router.post('/:id', upload.single('image'), async (req, res) => {
     locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
     startsAt,
     endsAt: toSqlTimestamp(req.body.endsAt),
-    visibility: req.body.visibility === 'public' ? 'public' : 'members',
     ...capacityFieldsFromBody(req.body),
     registrationOpensAt: toSqlTimestamp(req.body.registrationOpensAt),
     registrationClosesAt: toSqlTimestamp(req.body.registrationClosesAt),
-    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
-    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
     slug: (req.body.slug || '').trim(),
     eventType: (req.body.eventType || '').trim(),
     shortDescription: (req.body.shortDescription || '').trim(),
@@ -565,6 +578,23 @@ router.post('/:id', upload.single('image'), async (req, res) => {
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Event details saved.'));
 });
 
+// A real request: "editing event should have little tabs at the top.
+// details, finance, settings, attendance" - Price/Charged Per move out of
+// Event Details into their own Finance tab. Same "spread the existing row,
+// override just this tab's own fields" guarantee as every other builder
+// tab's save.
+router.post('/:id/finance', async (req, res) => {
+  const id = req.params.id;
+  const event = await events.getEvent(id);
+  if (!event) return res.status(404).render('404', { title: 'Not Found' });
+  await events.updateEvent(id, {
+    ...eventDataFromRow(event),
+    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
+    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
+  });
+  res.redirect(`/main-admin/events/${id}/builder?tab=finance&notice=` + encodeURIComponent('Finance saved.'));
+});
+
 // Settings tab's own save - "permissions will show up again under
 // settings tab on individual event editing": who can register (adult/
 // child/guest), grade restriction, and sections. Deliberately spreads
@@ -573,17 +603,33 @@ router.post('/:id', upload.single('image'), async (req, res) => {
 // etc.) - the same "don't let one tab's save silently blank another
 // tab's fields" guarantee updateEventQuickFields's own comment already
 // explains, just solved here by reading the row back in instead of a
-// second partial-UPDATE query.
+// second partial-UPDATE query. A later real request redesigned this tab
+// with several new yes/no questions and lock+dropdown pairs (see this
+// file's own comment on the view for the full list) - "is this a public
+// event" moved here too, from Details' own Visibility dropdown.
 router.post('/:id/permissions', async (req, res) => {
   const id = req.params.id;
   const event = await events.getEvent(id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
+    visibility: req.body.isPublicEvent === '1' ? 'public' : 'members',
     ageGroup: [].concat(req.body.ageGroup || []).join(', '),
     allowAdultRegister: req.body.allowAdultRegister !== 'off',
     allowChildRegister: req.body.allowChildRegister !== 'off',
     allowGuestRegister: req.body.allowGuestRegister === '1',
+    isClosed: req.body.isClosed === '1',
+    allowRegistrationCancellations: req.body.allowRegistrationCancellations !== 'off',
+    allowRefundOnCancel: req.body.allowRefundOnCancel === '1',
+    showRegistrantsToMembers: req.body.showRegistrantsToMembers === '1',
+    trackParticipantsOnly: req.body.trackParticipantsOnly === '1',
+    lockRegistrationToGrade: req.body.lockRegistrationToGrade === '1',
+    lockRegistrationToAge: req.body.lockRegistrationToAge === '1',
+    ageGroupRestriction: [].concat(req.body.ageGroupRestriction || []).join(', '),
+    lockRegistrationToSection: req.body.lockRegistrationToSection === '1',
+    registrationSectionId: req.body.registrationSectionId ? parseInt(req.body.registrationSectionId, 10) : null,
+    lockVisibilityToSection: req.body.lockVisibilityToSection === '1',
+    visibilitySectionId: req.body.visibilitySectionId ? parseInt(req.body.visibilitySectionId, 10) : null,
   });
   await events.setEventSections(id, req.body.sectionIds);
   res.redirect(`/main-admin/events/${id}/builder?tab=settings&notice=` + encodeURIComponent('Settings saved.'));
