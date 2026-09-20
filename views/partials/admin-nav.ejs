@@ -28,7 +28,11 @@
       // active-state only, not a broken link or a broken mobile popup.
       { href: '/admin/rosters', icon: 'calendar-check', label: 'Attendance', subpages: [
         { href: '/admin/rosters?tab=monday-student', label: 'Monday' },
-        { href: '/admin/rosters?tab=wednesday-student', label: 'Wednesday' },
+        // A real request: "Wednesday attendance. When clicking on
+        // Wednesday it should automatically show the parent pill toggle
+        // page first" - Monday still defaults to its own Student half,
+        // unchanged; only Wednesday's own link changes.
+        { href: '/admin/rosters?tab=wednesday-parent', label: 'Wednesday' },
         { href: '/admin/rosters?tab=classes', label: 'Classes' },
         { href: '/admin/rosters?tab=playground', label: 'Playground' },
         { href: '/admin/rosters?tab=archive', label: 'Archive' },
@@ -177,6 +181,15 @@
     <% } %>
   <% }); %>
 </nav>
+
+<%# Rendered as siblings of #admin-mobile-tabs, not nested inside it - see
+    mobile-subpages-dialog.ejs for why (that <nav> is position: fixed with
+    its own z-index, which caps any dialog nested inside it). %>
+<% adminNavLinks.concat(isFullAdmin ? adminFullAdminNavLinks : []).forEach(function(link) { %>
+  <% if (link.subpages && link.subpages.length) { %>
+    <%- include('mobile-subpages-dialog', { link: link }) %>
+  <% } %>
+<% }); %>
 
 <%- include('session-timeout-dialog') %>
 <%- include('confirm-dialog') %>

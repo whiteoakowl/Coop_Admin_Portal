@@ -2454,6 +2454,19 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    so this lines up with its top edge exactly) instead of centered on
    screen like a generic modal. `inset` (not `margin: auto`) overrides
    the <dialog> UA stylesheet's own `inset: 0` centering. */
+/* A real request needs the orange bar underneath still clickable while
+   its own popup is open ("clicking on the orange menu tab options...
+   will close the subpage menu" / "you still have to click a subpage" to
+   actually navigate) - public/js/page-tabs.js opens this with .show(),
+   not .showModal(), specifically because a modal <dialog> makes the
+   entire rest of the document inert (not just visually backdropped -
+   genuinely non-interactive, including the trigger button that opened
+   it) for as long as it's open, by spec, with no way to opt out short of
+   not using a real modal. .show() skips that (and skips the ::backdrop
+   pseudo-element modal dialogs get - nothing to style here), so this
+   needs its own explicit z-index instead of relying on the browser's
+   top-layer promotion a modal gets for free - 50 clears
+   .admin-mobile-tabs's own 45 underneath it. */
 .page-tabs-dialog[open] {
   display: flex;
   flex-direction: column;
@@ -2466,9 +2479,9 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   margin: 0 auto;
   width: auto;
   max-width: 420px;
+  z-index: 50;
   box-shadow: 0 -8px 24px rgba(0,0,0,0.25);
 }
-.page-tabs-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
 .page-tabs-dialog .view-tab {
   display: block;
   width: 100%;
@@ -2675,6 +2688,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    .primary-btn or a solid purple .roster-action-btn. */
 .btn-secondary { color: var(--purple); border-color: var(--btn-purple); cursor: pointer; font-weight: 600; }
 .btn-secondary:hover { border-color: var(--btn-purple-hover); background: var(--purple-soft); color: var(--purple-dark); }
+
+/* A real request: "creating an event save draft button should be the
+   same size as publish event button" - event creation's own Save Draft
+   sits directly beside .primary-btn's own Publish Event, so the two
+   should read as equally-weighted choices rather than one looking like
+   an afterthought next to the other. Same box model as .primary-btn,
+   keeping .btn-secondary's own outline/purple color scheme (still the
+   lower-emphasis of the two actions, just not a smaller target). */
+.btn-secondary-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
 
 .legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
 .legend-item { display: flex; align-items: center; gap: 0.4rem; }
@@ -8337,7 +8359,10 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    arrows below 480px so the whole row has room to fit. */
 .event-calendar-toolbar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin: 1.25rem 0; }
 .event-calendar-nav-row { flex-wrap: nowrap; }
-.event-calendar-nav-btn { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+/* A real request: "make the width of the arrow buttons smaller" - less
+   horizontal padding than every other .roster-action-btn on the page,
+   since "Prev"/"Next" are the shortest labels in this whole toolbar. */
+.event-calendar-nav-btn { padding: 0.35rem 0.4rem; font-size: 0.75rem; }
 .event-calendar-nav-row .event-month-select,
 .event-calendar-nav-row .event-year-select {
   padding: 0.3rem 1.5rem 0.3rem 0.4rem;
@@ -8354,7 +8379,7 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   }
   .event-calendar-nav-btn {
     flex: 0 0 auto;
-    padding: 0.35rem 0.55rem;
+    padding: 0.35rem 0.4rem;
     font-size: 0;
   }
   .event-calendar-nav-btn::before {

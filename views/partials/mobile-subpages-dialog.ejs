@@ -1,0 +1,24 @@
+<%
+// Paired with mobile-subpages-tab.ejs's own <button data-subpages-dialog>
+// - split into its own partial and rendered as a direct sibling of
+// #admin-mobile-tabs (right after </nav> closes) rather than nested
+// inside it, so this dialog's own z-index (see styles.css's
+// .page-tabs-dialog[open]) competes at the document's root stacking
+// context instead of being capped by the bar's own `position: fixed;
+// z-index: 45`. See mobile-subpages-tab.ejs for the full explanation.
+//
+// Recomputes the same id from the same link mobile-subpages-tab.ejs used
+// for its trigger button, so the two stay paired.
+const dialogId = 'mobile-subpages-' + link.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+%>
+<%# A real request: "close shouldn't be on the list. Simply clicking a
+    subpage or outside the list or clicking on the orange menu bar tabs
+    will close the subpage menu" - no Close button; public/js/page-
+    tabs.js closes this on an outside click, on re-tapping the bar's own
+    trigger, or (implicitly, since it navigates away) on clicking a
+    subpage link. %>
+<dialog class="view-tabs page-tabs-dialog no-print" id="<%= dialogId %>">
+  <% link.subpages.forEach(function(sp) { %>
+    <a class="view-tab" href="<%= sp.href %>"><%= sp.label %></a>
+  <% }); %>
+</dialog>

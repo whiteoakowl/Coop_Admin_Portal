@@ -4,26 +4,27 @@
 // until you click the subpage. When you click the orange menu bar at the
 // bottom it should show the sub pages to click." A section with
 // subpages renders as a <button data-subpages-dialog="..."> instead of a
-// plain <a href> here, paired with its own <dialog> (the exact same
-// .page-tabs-dialog/.view-tab markup/CSS every per-page popup already
-// used, see styles.css's own comment on .page-tabs-dialog[open] -
-// docking it to the top of the orange bar was already page-agnostic,
-// just never reused at the nav-shell level before) - public/js/page-
-// tabs.js wires the button to open it. Always present in the nav shell
-// (unlike the old per-page dialogs), so it works from anywhere in this
-// portal, not just from the page it's currently on.
+// plain <a href> here - public/js/page-tabs.js wires the button to open
+// its matching dialog.
+//
+// The <dialog> itself is NOT rendered here any more - see mobile-
+// subpages-dialog.ejs, rendered in a second pass AFTER </nav> closes.
+// This bar (#admin-mobile-tabs) is itself `position: fixed; z-index: 45`,
+// which means a dialog nested inside it can only ever compete for
+// stacking order within THIS element's own stacking context, capped at
+// z-index 45 no matter what z-index the dialog itself declares - verified
+// via a real click landing on an unrelated underlying page element
+// instead of the dialog's own (topmost-looking) link. Rendering the
+// dialog as a sibling of this <nav>, directly in <body>, lets its own
+// z-index (see styles.css's .page-tabs-dialog[open]) compete at the
+// document root instead.
 //
 // One id per link, derived from its own label - stable and unique across
 // this one bar's own subpages-bearing items (nothing here has two
-// sections sharing a label).
+// sections sharing a label). mobile-subpages-dialog.ejs recomputes the
+// exact same id from the same link so the two stay paired.
 const dialogId = 'mobile-subpages-' + link.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 %>
 <button type="button" class="mobile-tab-subpages-trigger" data-subpages-dialog="<%= dialogId %>" data-href="<%= link.href %>"<% if (link.match) { %> data-match="<%= link.match %>"<% } %>>
   <svg class="icon"><use href="#icon-<%= link.icon %>"/></svg><span><%= link.label %></span>
 </button>
-<dialog class="view-tabs page-tabs-dialog no-print" id="<%= dialogId %>">
-  <% link.subpages.forEach(function(sp) { %>
-    <a class="view-tab" href="<%= sp.href %>"><%= sp.label %></a>
-  <% }); %>
-  <button type="button" class="page-tabs-dialog-close" onclick="this.closest('dialog').close()">Close</button>
-</dialog>

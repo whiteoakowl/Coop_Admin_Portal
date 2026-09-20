@@ -301,6 +301,46 @@ test('Sign-Up Lists: create multiple lists, attach one to an event, add items, a
   assert.equal(claim.quantity_claimed, 1);
 });
 
+test('Sign-Up List Add Item dialog: a fetch()-style request (Accept: application/json) gets JSON back instead of a redirect, so several items can be added without the page navigating away', async () => {
+  const admin = await loginAsMainAdmin();
+  await request(app).post('/main-admin/volunteers/signup-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Fetch Check List', _csrf: admin.csrfToken });
+  const listId = (await db.prepare("SELECT id FROM sign_up_lists WHERE title = 'Fetch Check List'").get()).id;
+
+  const res1 = await request(app)
+    .post(`/main-admin/volunteers/signup-lists/${listId}/items`)
+    .set('Cookie', admin.cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ itemName: 'Cookies', quantityNeeded: '3', _csrf: admin.csrfToken });
+  assert.equal(res1.status, 200);
+  assert.equal(res1.body.item.item_name, 'Cookies');
+  assert.equal(res1.body.item.quantity_needed, 3);
+  assert.equal(res1.body.item.quantityClaimed, 0);
+  assert.match(res1.body.deleteUrl, new RegExp(`/main-admin/volunteers/signup-lists/${listId}/items/\\d+/delete`));
+
+  const res2 = await request(app)
+    .post(`/main-admin/volunteers/signup-lists/${listId}/items`)
+    .set('Cookie', admin.cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ itemName: 'Juice Boxes', _csrf: admin.csrfToken });
+  assert.equal(res2.status, 200);
+  assert.equal(res2.body.item.item_name, 'Juice Boxes');
+
+  const items = await db.prepare('SELECT item_name FROM sign_up_list_items WHERE list_id = ? ORDER BY id').all(listId);
+  assert.deepEqual(items.map((i) => i.item_name), ['Cookies', 'Juice Boxes'], 'both items landed in the same request cycle, no page reload needed between them');
+
+  // A missing item name is a 400 with a JSON error, not a redirect.
+  const errRes = await request(app)
+    .post(`/main-admin/volunteers/signup-lists/${listId}/items`)
+    .set('Cookie', admin.cookie)
+    .set('Accept', 'application/json')
+    .type('form')
+    .send({ itemName: '', _csrf: admin.csrfToken });
+  assert.equal(errRes.status, 400);
+  assert.match(errRes.body.error, /required/);
+});
+
 test('Volunteer Lists: create a list of shifts by date/hour, attach to an event, and a member signs up/cancels', async () => {
   const admin = await loginAsMainAdmin();
   const eventCreate = await request(app).post('/main-admin/events').set('Cookie', admin.cookie).type('form').send({ title: 'Winter Gala', startsAt: '2027-12-01T18:00', _csrf: admin.csrfToken });

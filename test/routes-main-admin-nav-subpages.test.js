@@ -127,6 +127,10 @@ test('Mobile orange bar: every subpages-bearing item gets its own popup trigger 
     assert.ok(dialogMatch, `${slug} should have its own dialog`);
     const linkMatches = dialogMatch[1].match(/class="view-tab"/g) || [];
     assert.equal(linkMatches.length, tabCount, `${slug} dialog should list ${tabCount} tabs, got ${linkMatches.length}`);
-    assert.match(dialogMatch[1], /<button type="button" class="page-tabs-dialog-close" onclick="this\.closest\('dialog'\)\.close\(\)">Close<\/button>/, `${slug} dialog should have a close button`);
+    // A real request: "close shouldn't be on the list. Simply clicking a
+    // subpage or outside the list or clicking on the orange menu bar tabs
+    // will close the subpage menu" - no Close button any more (see
+    // public/js/page-tabs.js for how it closes now instead).
+    assert.doesNotMatch(dialogMatch[1], /page-tabs-dialog-close/, `${slug} dialog should not have a Close button`);
   });
 });

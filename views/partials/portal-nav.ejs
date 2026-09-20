@@ -432,6 +432,15 @@ const communityLinks =
   <% }); %>
 </nav>
 
+<%# Rendered as siblings of #admin-mobile-tabs, not nested inside it - see
+    mobile-subpages-dialog.ejs for why (that <nav> is position: fixed with
+    its own z-index, which caps any dialog nested inside it). %>
+<% primaryNavLinks.forEach(function(link) { %>
+  <% if (link.subpages && link.subpages.length) { %>
+    <%- include('mobile-subpages-dialog', { link: link }) %>
+  <% } %>
+<% }); %>
+
 <%- include('confirm-dialog') %>
 
 <script src="/js/admin-nav.js"></script>

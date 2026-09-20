@@ -156,10 +156,28 @@ router.get('/signup-lists/:id', async (req, res) => {
   });
 });
 
+// A real request: "signup lists be able to add multiple items to a list
+// in the popup before. Page only refreshes after adding however many
+// needed" - the Add Item dialog (main-admin-signup-list-detail.ejs) now
+// submits this via fetch() so an admin can add several items in a row
+// without the popup closing/the page navigating away after each one;
+// wantsJson mirrors routes/admin-members.js's own family-create branch.
 router.post('/signup-lists/:id/items', async (req, res) => {
+  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
   const itemName = (req.body.itemName || '').trim();
-  if (!itemName) return res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?error=` + encodeURIComponent('Item name is required.'));
-  await volunteers.addSignUpItem(req.params.id, { itemName, quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1, notes: (req.body.notes || '').trim() });
+  if (!itemName) {
+    if (wantsJson) return res.status(400).json({ error: 'Item name is required.' });
+    return res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?error=` + encodeURIComponent('Item name is required.'));
+  }
+  const quantityNeeded = parseInt(req.body.quantityNeeded, 10) || 1;
+  const notes = (req.body.notes || '').trim();
+  const itemId = await volunteers.addSignUpItem(req.params.id, { itemName, quantityNeeded, notes });
+  if (wantsJson) {
+    return res.json({
+      item: { id: itemId, item_name: itemName, quantity_needed: quantityNeeded, notes, quantityClaimed: 0, claims: [] },
+      deleteUrl: `/main-admin/volunteers/signup-lists/${req.params.id}/items/${itemId}/delete`,
+    });
+  }
   res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('Item added.'));
 });
 

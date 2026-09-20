@@ -184,9 +184,10 @@ async function itemsForSignUpList(listId) {
 }
 
 async function addSignUpItem(listId, { itemName, quantityNeeded, notes }) {
-  await db
+  const info = await db
     .prepare('INSERT INTO sign_up_list_items (list_id, item_name, quantity_needed, notes) VALUES (?, ?, ?, ?)')
     .run(listId, itemName, quantityNeeded || 1, notes || null);
+  return info.lastInsertRowid;
 }
 
 async function updateSignUpItem(id, { itemName, quantityNeeded, notes }) {

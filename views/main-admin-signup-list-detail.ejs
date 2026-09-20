@@ -25,34 +25,47 @@
       <button type="button" class="roster-action-btn" onclick="document.getElementById('add-item-dialog').showModal()">+ Add Item</button>
     </div>
 
-    <% if (items.length === 0) { %>
-      <p class="roster-empty">No items yet &mdash; add one above.</p>
-    <% } else { %>
-      <div class="roster-scroll">
-        <table class="roster-table condensed-table">
-          <thead><tr><th>Item</th><th>Needed</th><th>Claimed</th><th>Claimed By</th><th></th></tr></thead>
-          <tbody>
-            <% items.forEach(function(item) { %>
-              <tr>
-                <td class="roster-name-col"><%= item.item_name %><% if (item.notes) { %> <span class="hint"><%= item.notes %></span><% } %></td>
-                <td><%= item.quantity_needed %></td>
-                <td><%= item.quantityClaimed %></td>
-                <td><%= item.claims.map(function(c) { return c.memberName + (c.quantity_claimed > 1 ? ' (' + c.quantity_claimed + ')' : ''); }).join(', ') || '—' %></td>
-                <td>
-                  <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Remove &quot;<%= item.item_name %>&quot;?">
-                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
+    <%# id="signup-items-section" is public/js/signup-list-add-item.js's
+        own target for swapping the empty state out for a real table the
+        first time an item is added without a page reload - see that
+        script's own header comment. %>
+    <div id="signup-items-section">
+      <% if (items.length === 0) { %>
+        <p class="roster-empty">No items yet &mdash; add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Item</th><th>Needed</th><th>Claimed</th><th>Claimed By</th><th></th></tr></thead>
+            <tbody id="signup-items-tbody">
+              <% items.forEach(function(item) { %>
+                <tr>
+                  <td class="roster-name-col"><%= item.item_name %><% if (item.notes) { %> <span class="hint"><%= item.notes %></span><% } %></td>
+                  <td><%= item.quantity_needed %></td>
+                  <td><%= item.quantityClaimed %></td>
+                  <td><%= item.claims.map(function(c) { return c.memberName + (c.quantity_claimed > 1 ? ' (' + c.quantity_claimed + ')' : ''); }).join(', ') || '—' %></td>
+                  <td>
+                    <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items/<%= item.id %>/delete" class="inline-block-form" data-confirm="Remove &quot;<%= item.item_name %>&quot;?">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
 
+    <%# A real request: "signup lists be able to add multiple items to a
+        list in the popup before. Page only refreshes after adding
+        however many needed" - submits via public/js/signup-list-add-
+        item.js instead of a plain form post, appending each new item to
+        the table above and clearing the fields for the next one, so the
+        dialog only ever closes when the admin is actually done. %>
     <dialog id="add-item-dialog" class="member-picker-dialog">
-      <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items">
+      <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/items" id="add-item-form" data-delete-base="/main-admin/volunteers/signup-lists/<%= list.id %>/items">
         <h3>Add Item</h3>
+        <p class="alert alert-error" id="add-item-error" hidden></p>
         <label>Item Name
           <input type="text" name="itemName" required />
         </label>
@@ -63,11 +76,12 @@
           <input type="text" name="notes" />
         </label>
         <div class="notes-dialog-actions">
-          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Done</button>
           <button type="submit" class="primary-btn">Add</button>
         </div>
       </form>
     </dialog>
+    <script src="/js/signup-list-add-item.js"></script>
 
     <dialog id="edit-list-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/volunteers/signup-lists/<%= list.id %>/update">
