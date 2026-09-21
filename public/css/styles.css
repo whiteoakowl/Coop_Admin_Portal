@@ -81,6 +81,13 @@
      same as the homepage card's own label does. */
   --btn-purple: #C38EC7;
   --btn-purple-hover: #ad72b1;
+  /* A real request: "make all other purple buttons blue. Only kiosk
+     purple stays and check in and out purple buttons stay." --btn-purple
+     above is now scoped to just those two callers (.landing-card-purple/
+     .kiosk-method-btn and .class-checkin-btn) - every other former
+     .btn-secondary/.pagination-btn consumer of it points here instead. */
+  --btn-blue: #2e6da4;
+  --btn-blue-hover: #1f4e7a;
   --border: #dbe8f5;
   --radius: 14px;
   --shadow-sm: 0 1px 2px rgba(15,23,42,0.06), 0 1px 1px rgba(15,23,42,0.04);
@@ -2711,11 +2718,11 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .pagination-page-select-label { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 .pagination-page-select {
   padding: 0.2rem 1.6rem 0.2rem 0.4rem;
-  border: 1px solid var(--btn-purple);
+  border: 1px solid var(--btn-blue);
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-weight: 600;
-  color: var(--purple);
+  color: var(--btn-blue);
   background-color: var(--surface);
   background-position: right 0.45rem center;
   background-size: 0.7rem;
@@ -2725,20 +2732,22 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
    row. The buttons should be the same size, well proportioned" - solid
    fill instead of an outline, same box model (padding/border-radius/
    font-size) every one of these already shared, so Prev/Next/View All
-   still read as one uniform row. */
+   still read as one uniform row. A later real request: "make page number
+   pages blue instead of purple" - --btn-blue in place of --btn-purple,
+   same shape. */
 .pagination-btn {
   padding: var(--control-padding-compact);
-  border: 1px solid var(--btn-purple);
+  border: 1px solid var(--btn-blue);
   border-radius: var(--control-radius);
   font-size: var(--control-font-size-compact);
   font-weight: 600;
   color: #fff;
-  background: var(--btn-purple);
+  background: var(--btn-blue);
   text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.pagination-btn:hover { border-color: var(--btn-purple-hover); background: var(--btn-purple-hover); color: #fff; }
+.pagination-btn:hover { border-color: var(--btn-blue-hover); background: var(--btn-blue-hover); color: #fff; }
 .pagination-btn-disabled { color: var(--muted); background: var(--surface); border-color: var(--border); cursor: default; pointer-events: none; opacity: 0.6; }
 
 .link-btn-danger { color: var(--red); }
@@ -2806,16 +2815,39 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    request: "any outlined purple button should be solid purple" - solid
    fill instead of the outline this used to have, still lower-emphasis
    next to a solid orange .primary-btn purely by being a different hue,
-   not by being the only unfilled button in the row anymore. */
-.btn-secondary { background: var(--btn-purple); border-color: var(--btn-purple); color: #fff; cursor: pointer; font-weight: 600; }
-.btn-secondary:hover { background: var(--btn-purple-hover); border-color: var(--btn-purple-hover); color: #fff; }
+   not by being the only unfilled button in the row anymore. A later real
+   request: "make all other purple buttons blue" - --btn-blue in place of
+   --btn-purple (kiosk's own purple buttons don't use this class at all,
+   see --btn-blue's own comment). */
+.btn-secondary { background: var(--btn-blue); border-color: var(--btn-blue); color: #fff; cursor: pointer; font-weight: 600; }
+.btn-secondary:hover { background: var(--btn-blue-hover); border-color: var(--btn-blue-hover); color: #fff; }
+
+/* A later real request: "cancel buttons on all pop-ups should be white
+   and outlined in orange" - every dialog's own dismiss-without-saving
+   button shares this exact literal onclick (confirmed site-wide, 69+
+   buttons across 54 view files: Cancel, plus a handful of Close/Done
+   buttons that dismiss a dialog the identical way) rather than a
+   dedicated class of its own, so that shared fingerprint is the one
+   selector that reaches all of them without a 54-file edit for a class
+   rename. Takes over from the plain solid-blue .btn-secondary above via
+   normal cascade order (same specificity, declared later). */
+.btn-secondary[onclick*="closest('dialog').close()"] {
+  background: #fff;
+  border-color: var(--orange);
+  color: var(--orange);
+}
+.btn-secondary[onclick*="closest('dialog').close()"]:hover {
+  background: var(--orange-bg);
+  border-color: var(--orange);
+  color: var(--orange);
+}
 
 /* A real request: "creating an event save draft button should be the
    same size as publish event button" - event creation's own Save Draft
    sits directly beside .primary-btn's own Publish Event, so the two
    should read as equally-weighted choices rather than one looking like
    an afterthought next to the other. Same box model as .primary-btn,
-   keeping .btn-secondary's own solid purple color scheme (still the
+   keeping .btn-secondary's own solid color scheme (still the
    lower-emphasis of the two actions, just not a smaller target). */
 .btn-secondary-lg { padding: 0.85rem 1.5rem; font-size: 1rem; }
 
