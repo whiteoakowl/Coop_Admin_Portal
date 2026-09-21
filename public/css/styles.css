@@ -7946,12 +7946,52 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   /* Keep a hard, exactly-one-portrait-page box at actual print time too
      (not the generic auto/100vh above) - print-shrink-to-fit.js's
      beforeprint recalculation needs a real page-sized box to measure
-     against, or there'd be nothing to shrink the schedule to fit into. */
+     against, or there'd be nothing to shrink the schedule to fit into.
+     A real bug report: "the right side of the schedule drifts off the
+     page[,] it also prints a blank 2nd page." This box was sized to the
+     full 8.5x11in SHEET, not the actual PRINTABLE area the @page rule
+     (top of admin-class-schedule-print.ejs) leaves once its own 0.4in
+     margin is carved out of that sheet on every side - an 8.5x11in box
+     rendered inside a canvas already reduced to 7.7x10.2in by that
+     margin necessarily overflows by exactly 0.4in top/bottom/left/right,
+     which is also exactly why the numbers matched this box's own
+     padding: two independent 0.4in insets (the real @page margin, plus
+     this box's own padding meant to visually preview that same margin)
+     were stacking instead of the second one substituting for the first.
+     Confirmed live (Playwright's page.pdf({ preferCSSPageSize: true }),
+     the same harness the rest of this file's own print-pagination fixes
+     were verified with) - an 8-room, 4-hour-per-room grid printed with
+     its whole 4th column's text truncated mid-word at the true page
+     edge, the missing content nowhere to be found (not even overflowed
+     onto page 2, which came out completely blank: 0 characters of real
+     content on it, in a genuine page.pdf() page-count/text check, not
+     just visual guesswork). Sizing this box to the actual printABLE
+     area instead - 7.7in x 10.2in, padding: 0 (the @page margin alone
+     already provides the same visual inset around the whole box that
+     this padding used to double up on) - fixed both the truncated last
+     column and the trailing blank page in that same harness. */
   .class-schedule-print-page .print-page {
-    width: 8.5in;
-    height: 11in;
+    width: 7.7in;
+    height: 10.2in;
     min-height: 0;
-    padding: 0.4in;
+    padding: 0;
+  }
+
+  /* Same @page/.print-page margin-stacking bug as .class-schedule-print-
+     page above, on the per-class roster printout instead: this box's
+     unscoped rule near the top of this file sizes it to the full 8.5x11in
+     sheet with its own 0.4in padding meant to preview the @page margin,
+     but class-schedule-roster-print.ejs's @page rule (same 0.4in) already
+     carves that margin out of the physical sheet, leaving only 7.7x10.2in
+     of real printable canvas - stacking the two insets overflows the
+     table's right/bottom edge exactly like the schedule grid did. Same
+     fix: restate the box at the true printable size with no padding of
+     its own, after the generic reset, so it's the one that wins. */
+  .class-roster-print-page .print-page {
+    width: 7.7in;
+    height: 10.2in;
+    min-height: 0;
+    padding: 0;
   }
 
 }
