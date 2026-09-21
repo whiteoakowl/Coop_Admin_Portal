@@ -427,8 +427,10 @@ const communityLinks =
   <%# Same classLinks as the desktop sidebar's own #class-nav-links block
       above, appended into this same scrollable bar for the same reason
       communityLinks is below - no room for a second section heading at
-      this width. None of these ever have subpages (grep-verified), so
-      no branch needed here the way primaryNavLinks above has. %>
+      this width. Parent Portal's own Classes entry has subpages (Class
+      Registration/Manage Classes/Name Tag Request/Absence-Late Form/
+      Policy Handbook - a real request), so this needs the same
+      subpages-or-plain-link branch primaryNavLinks above has. %>
   <% if (classLinks) { %>
     <% classLinks.forEach(function(link) { %>
       <% if (link.subpages && link.subpages.length) { %>

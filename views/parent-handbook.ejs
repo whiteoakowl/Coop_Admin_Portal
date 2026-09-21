@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
+      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
+    ],
+    classLinks: [
+      {
+        icon: 'graduation-cap',
+        label: 'Classes',
+        subpages: [
+          { href: '/parent/classes', label: 'Class Registration' },
+          { href: '/parent/classes/manage', label: 'Manage Classes' },
+          { href: '/name-tag', label: 'Name Tag Request' },
+          { href: '/absence', label: 'Absence/Late Form' },
+          { href: '/parent/handbook', label: 'Policy Handbook' },
+        ],
+      },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Policy Handbook</h1>
+    <% if (handbookHtml) { %>
+      <div class="forum-editable-display"><%- handbookHtml %></div>
+    <% } else { %>
+      <p class="roster-empty">The policy handbook hasn't been published yet.</p>
+    <% } %>
+  </main>
+</body>
+</html>

@@ -16,7 +16,17 @@
       { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
     ],
     classLinks: [
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+      {
+        icon: 'graduation-cap',
+        label: 'Classes',
+        subpages: [
+          { href: '/parent/classes', label: 'Class Registration' },
+          { href: '/parent/classes/manage', label: 'Manage Classes' },
+          { href: '/name-tag', label: 'Name Tag Request' },
+          { href: '/absence', label: 'Absence/Late Form' },
+          { href: '/parent/handbook', label: 'Policy Handbook' },
+        ],
+      },
     ],
   }) %>
 
@@ -55,7 +65,7 @@
             <% }); %>
           </ul>
         <% } %>
-        <a class="roster-action-btn" href="/parent/classes">Manage Class Registration</a>
+        <a class="roster-action-btn" href="/parent/classes/manage">Manage Class Registration</a>
       </section>
 
       <section class="portal-dashboard-card">

@@ -6857,13 +6857,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    .class-view-dialog (1100px, sized for a 3-column edit form + roster
    panels this popup doesn't have) since it's really just one column of
    class info followed by a short list of children. */
+/* A real request: "shrink the width of the class card to be more like
+   the image I sent" - the reference mockup is a narrow, portrait card,
+   not a wide one; 420px reads much closer to it than the original 560px
+   while still comfortably fitting the Teacher/Assistant box and the
+   Register row's name pill + button side by side. */
 .parent-class-dialog {
-  width: min(560px, 92vw);
+  width: min(420px, 92vw);
   max-height: 90vh;
   overflow-y: auto;
   border: none;
   border-radius: var(--radius);
-  padding: 1.75rem;
+  padding: 1.5rem;
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 .parent-class-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
@@ -6875,12 +6880,50 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
-.parent-class-child-name { font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
+.parent-class-child-name {
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+}
+
+/* Redesigned class-registration popup (views/parent-class-fragment.ejs) -
+   a real request: "click on class to register, the class card should
+   look like the image provided" - an icon badge + title header, a Day &
+   Time/Location row, a Teacher/Assistant box, a Grade Level/Enrollment
+   row, and a highlighted (--orange-bg) "Register your children" footer
+   whose own rows now read as a name pill next to a dark-blue Register
+   button rather than the plain bordered row this used to be. */
+.class-view-header-v2 { display: flex; align-items: flex-start; gap: 0.9rem; margin-bottom: 1.1rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--border); position: relative; }
+.class-view-icon-badge { width: 3.2rem; height: 3.2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.class-view-icon-badge .icon { width: 1.6rem; height: 1.6rem; }
+.class-view-header-text { flex: 1; min-width: 0; }
+.class-view-header-text h3 { margin: 0 0 0.15rem; font-size: 1.25rem; line-height: 1.25; }
+.class-view-eyebrow { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+.class-view-info-row { display: flex; align-items: flex-start; gap: 1rem; margin: 0.9rem 0; flex-wrap: wrap; }
+.class-view-info-item { display: flex; align-items: flex-start; gap: 0.55rem; flex: 1; min-width: 140px; }
+.class-view-info-item .icon { width: 1.15rem; height: 1.15rem; color: var(--muted); flex-shrink: 0; margin-top: 0.15rem; }
+.class-view-info-divider { width: 1px; align-self: stretch; background: var(--border); }
+.class-view-info-label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin-bottom: 0.15rem; }
+.class-view-info-value { display: block; font-size: 0.95rem; color: var(--ink); font-weight: 600; }
+
+.class-view-people-box { background: #f8fafc; border-radius: var(--radius); padding: 0.9rem 1rem; margin: 0.9rem 0; }
+.class-view-person { display: flex; align-items: center; gap: 0.75rem; }
+.class-view-people-divider { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
+.class-view-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--brand-soft); color: var(--brand-dark); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.class-view-avatar .icon { width: 1.2rem; height: 1.2rem; }
+.class-view-avatar-alt { background: var(--purple-soft); color: #5b3ea6; }
+
+.class-view-register-box { background: var(--orange-bg); border-radius: var(--radius); padding: 1.1rem 1.25rem; margin-top: 1.1rem; }
+.class-view-register-box h4 { margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; }
+.class-view-register-box h4 .icon { width: 1.1rem; height: 1.1rem; }
+.class-view-register-box .primary-btn-dark,
+.class-view-register-box .roster-action-btn-danger { margin-top: 0; padding: 0.55rem 1.1rem; border-radius: 999px; font-size: 0.85rem; }
 
 /* Allergies/Medical log popup - reuses .class-view-dialog's chrome but
    narrower, since it's just a header + a list, no two-column form. */
@@ -9703,6 +9746,30 @@ button.day-toggle-option { border: 0; background: transparent; cursor: pointer; 
 .class-card-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; }
 .class-card-meta { margin: 0.1rem 0; font-size: 0.82rem; color: var(--muted); }
 .class-card-unregister { padding: 0 1rem 0.85rem; }
+
+/* Parent Portal "Manage Classes" (views/parent-manage-classes.ejs) - a
+   real request for a Classes-tab subpage separate from Class
+   Registration (the browse/register day grid) that just shows every
+   class a child in the family is already registered/waitlisted for.
+   Same card-grid recipe as Student Portal's own "My Classes" above
+   (.classes-grid/.class-card), but under its own class names rather
+   than reusing those directly - .class-card is already defined twice in
+   this file for two different unrelated card shapes (this one and the
+   Class Schedule room-grid's own clickable card), and a family with
+   several children needs each card to also show WHICH child it belongs
+   to, which the single-student version has no need for. */
+.manage-classes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.manage-class-card {
+  display: flex; flex-direction: column; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.manage-class-card-color-bar { height: 0.4rem; }
+.manage-class-card-body { padding: 0.85rem 1rem 0.5rem; }
+.manage-class-card-child { margin: 0 0 0.2rem; font-size: 0.78rem; font-weight: 700; color: var(--brand-dark); text-transform: uppercase; letter-spacing: 0.03em; }
+.manage-class-card-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; }
+.manage-class-card-meta { margin: 0.1rem 0; font-size: 0.82rem; color: var(--muted); }
+.manage-class-card-actions { padding: 0 1rem 0.85rem; }
 
 /* Mini gameplay mockups - small trusted HTML snippets from each catalog
    entry's own `preview` field (utils/gamesCatalog.js), built entirely

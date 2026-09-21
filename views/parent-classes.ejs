@@ -16,7 +16,17 @@
       { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
     ],
     classLinks: [
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+      {
+        icon: 'graduation-cap',
+        label: 'Classes',
+        subpages: [
+          { href: '/parent/classes', label: 'Class Registration' },
+          { href: '/parent/classes/manage', label: 'Manage Classes' },
+          { href: '/name-tag', label: 'Name Tag Request' },
+          { href: '/absence', label: 'Absence/Late Form' },
+          { href: '/parent/handbook', label: 'Policy Handbook' },
+        ],
+      },
     ],
   }) %>
 

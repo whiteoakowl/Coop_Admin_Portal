@@ -23,7 +23,9 @@ const {
   DAY_LABELS,
   isValidDay,
   defaultDay,
+  allClassesList,
 } = require('../utils/classSchedule');
+const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
@@ -108,13 +110,18 @@ router.get('/', async (req, res) => {
   });
 });
 
-// Redirect target for the register/unregister POSTs below - always back
-// to the day grid the dialog was opened from, so cancelling/registering
-// from inside the popup lands the parent right back where they were
-// instead of resetting to Monday. Returns a URL already ending in `?` or
-// `&` so a caller can always just tack `error=`/`notice=` straight on,
-// regardless of whether a `day` param made it in.
-function classesBackUrl(day) {
+// Redirect target for the register/unregister POSTs below - back to the
+// day grid the dialog was opened from, so registering/cancelling from
+// inside the popup lands the parent right back where they were instead
+// of resetting to Monday. A real request: "manage class button on the
+// parent portal homepage should go to the manage classes page" - Manage
+// Classes' own Cancel forms send returnTo=manage so an unregister from
+// THAT page comes back to it instead of the day grid. Returns a URL
+// already ending in `?` or `&` so a caller can always just tack
+// `error=`/`notice=` straight on, regardless of whether a `day` param
+// made it in.
+function classesBackUrl(day, returnTo) {
+  if (returnTo === 'manage') return '/parent/classes/manage?';
   return isValidDay(day) ? `/parent/classes?day=${day}&` : '/parent/classes?';
 }
 
@@ -262,7 +269,7 @@ router.post('/classes/:id/register', async (req, res) => {
 router.post('/classes/:id/unregister', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const studentId = parseInt(req.body.studentId, 10);
-  const back = classesBackUrl(req.body.day);
+  const back = classesBackUrl(req.body.day, req.body.returnTo);
 
   const children = await childrenForAccount(req.portalAccount);
   if (!children.some((c) => c.id === studentId)) {
@@ -272,6 +279,53 @@ router.post('/classes/:id/unregister', async (req, res) => {
   const result = await unregisterFromClass({ classId, studentId, accountId: req.portalAccount.id });
   if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
   res.redirect(back + 'notice=' + encodeURIComponent('Registration cancelled.'));
+});
+
+// A real request: "when parents click on class tab it should have the
+// following subpages. Class registration, Manage Classes, name tag
+// request, absence/late form, Policy Handbook. That manage class button
+// on the parent portal homepage should go to the manage classes page."
+// Distinct from /classes above (browsing/registering for NEW classes,
+// "Class Registration") - this is a read-focused view of every class a
+// child is already enrolled in or waitlisted for, across the WHOLE
+// family (unlike Student Portal's own single-student "My Classes"), with
+// a Cancel action per row.
+router.get('/classes/manage', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const allClasses = await allClassesList(null);
+  const classById = new Map(allClasses.map((c) => [c.id, c]));
+
+  const entries = [];
+  for (const child of children) {
+    const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(child.id);
+    for (const row of enrolledRows) {
+      const cls = classById.get(row.class_id);
+      if (cls) entries.push({ child, cls, waitlistPosition: null });
+    }
+    const waitlistRows = await db.prepare("SELECT class_id, waitlist_position FROM class_registrations WHERE student_id = ? AND status = 'waitlisted'").all(child.id);
+    for (const row of waitlistRows) {
+      const cls = classById.get(row.class_id);
+      if (cls) entries.push({ child, cls, waitlistPosition: row.waitlist_position });
+    }
+  }
+  entries.sort((a, b) => a.child.name.localeCompare(b.child.name) || a.cls.class_name.localeCompare(b.cls.class_name));
+
+  res.render('parent-manage-classes', {
+    title: 'Manage Classes',
+    hasChildren: children.length > 0,
+    entries,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+// A real request: "Policy Handbook" as one of the Classes tab's
+// subpages - reuses the same admin-edited handbook content the pre-
+// account membership application already shows (views/portal-
+// register.ejs), just as a plain read-only page for an already-signed-in
+// parent rather than the scroll-to-agree checkbox flow that page needs.
+router.get('/handbook', async (req, res) => {
+  res.render('parent-handbook', { title: 'Policy Handbook', handbookHtml: await getHandbookHtml() });
 });
 
 // Library - read-only. Reuses the EXISTING library_items/library_checkouts
