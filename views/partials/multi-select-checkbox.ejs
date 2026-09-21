@@ -53,7 +53,20 @@ var msDisabled = (typeof disabled !== 'undefined' && disabled) ? 'disabled' : ''
                 views/class-schedule-view-fragment.ejs, injected into a
                 dialog by fetch() well after this script's own one-time
                 page-load pass already ran. %>
-            <span class="multi-select-chip"><%= o.label %> <button type="button" class="multi-select-chip-remove" data-multi-select-remove-index="<%= idx %>" aria-label="Remove <%= o.label %>">&times;</button></span>
+            <%# A <button> can't legally nest inside .multi-select-trigger,
+                which is itself a <button> - the browser's HTML parser
+                treats a second, inner <button> start tag as an implicit
+                close of the still-open outer one (confirmed live: with 2+
+                chips selected, everything from the first chip's remove
+                control onward gets silently kicked out of the trigger
+                button entirely, landing as unstyled, un-bordered stray
+                siblings right below it - a real bug report, "grade level
+                is not balanced right," screenshotted exactly that). A
+                span with role="button" behaves identically for this
+                control's own click handling (multi-select-checkbox.js
+                only ever matches it by class/data attribute, never by
+                tag name) without ever being a real nested button. %>
+            <span class="multi-select-chip"><%= o.label %> <span class="multi-select-chip-remove" role="button" tabindex="0" data-multi-select-remove-index="<%= idx %>" aria-label="Remove <%= o.label %>">&times;</span></span>
           <% } %>
         <% }); %>
       <% } %>

@@ -53,9 +53,15 @@
       var chip = document.createElement('span');
       chip.className = 'multi-select-chip';
       chip.appendChild(document.createTextNode(text + ' '));
-      var remove = document.createElement('button');
-      remove.type = 'button';
+      // A <span role="button">, not a real <button> - see multi-select-
+      // checkbox.ejs's own comment on why a real one can't nest inside
+      // .multi-select-trigger (itself a <button>) without the browser's
+      // parser silently kicking every chip after the first one out of
+      // the trigger entirely.
+      var remove = document.createElement('span');
       remove.className = 'multi-select-chip-remove';
+      remove.setAttribute('role', 'button');
+      remove.setAttribute('tabindex', '0');
       remove.setAttribute('aria-label', 'Remove ' + text);
       remove.setAttribute('data-multi-select-remove-index', String(allCheckboxes.indexOf(cb)));
       remove.textContent = '×';
@@ -107,8 +113,19 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
-    var open = document.querySelector('[data-multi-select] [data-multi-select-panel]:not([hidden])');
-    if (open) closePanel(open.closest('[data-multi-select]'));
+    if (e.key === 'Escape') {
+      var open = document.querySelector('[data-multi-select] [data-multi-select-panel]:not([hidden])');
+      if (open) closePanel(open.closest('[data-multi-select]'));
+      return;
+    }
+    // The chip remove control is role="button" on a <span>, not a real
+    // <button> (see rebuildChips()'s own comment on why) - a real button
+    // gets Enter/Space-activates-click for free from the browser, this
+    // needs it wired up by hand.
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var removeBtn = e.target.closest('[data-multi-select-remove-index]');
+    if (!removeBtn) return;
+    e.preventDefault();
+    removeBtn.click();
   });
 })();
