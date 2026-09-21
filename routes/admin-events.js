@@ -186,6 +186,8 @@ function eventDataFromRow(event) {
     accountingCategoryId: event.accounting_category_id,
     allowWaitlistSignups: !!event.allow_waitlist_signups,
     allowSignupForOthersInGroup: !!event.allow_signup_for_others_in_group,
+    paymentInstructionsTitle: event.payment_instructions_title,
+    paymentInstructionsText: event.payment_instructions_text,
   };
 }
 
@@ -670,6 +672,8 @@ router.post('/:id/finance', async (req, res) => {
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
     accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
+    paymentInstructionsTitle: (req.body.paymentInstructionsTitle || '').trim(),
+    paymentInstructionsText: (req.body.paymentInstructionsText || '').trim(),
   });
   res.redirect(`/main-admin/events/${id}/builder?tab=finance&notice=` + encodeURIComponent('Finance saved.'));
 });

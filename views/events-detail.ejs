@@ -48,6 +48,12 @@
             <div class="grid-box-header"><h2>Register</h2></div>
             <% if (event.capacity != null) { %><p class="hint"><%= event.registrationCount %>/<%= event.capacity %> registered<% if (event.waitlistCount) { %> &middot; <%= event.waitlistCount %> waitlisted<% } %></p><% } %>
             <% if (event.family_capacity != null) { %><p class="hint"><%= event.familyCount %>/<%= event.family_capacity %> families registered</p><% } %>
+            <% if (event.payment_instructions_title || event.payment_instructions_text) { %>
+              <div class="alert alert-info">
+                <% if (event.payment_instructions_title) { %><strong><%= event.payment_instructions_title %></strong><% } %>
+                <% if (event.payment_instructions_text) { %><p style="margin: 0.35rem 0 0;"><%= event.payment_instructions_text %></p><% } %>
+              </div>
+            <% } %>
             <% if (!isRegistrationWindowOpen) { %>
               <p class="hint">
                 <% if (event.registration_opens_at) { %>Registration opens <%= event.registration_opens_at %>.<% } %>

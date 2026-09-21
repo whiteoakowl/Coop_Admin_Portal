@@ -387,6 +387,15 @@ function eventFields(data) {
     // allow_refund_on_cancel/show_registrants_to_members/
     // track_participants_only above already use.
     data.allowSignupForOthersInGroup ? 1 : 0,
+    // A real request: "adding a the title payment instructions with a
+    // text field below it. This will appear when members are choosing
+    // their tickets." Same title+free-text shape as the existing
+    // membership-application payment info (utils/membershipHandbook.js's
+    // getPaymentInfo/setPaymentInfo) - informational only, no real
+    // checkout - but per-event here, shown on the event's own public
+    // page (views/events-detail.ejs) next to its Price/Ticket Types.
+    data.paymentInstructionsTitle || null,
+    data.paymentInstructionsText || null,
   ];
 }
 
@@ -411,9 +420,9 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          is_closed, allow_registration_cancellations, allow_refund_on_cancel, show_registrants_to_members, track_participants_only,
          lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
          lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id, accounting_category_id,
-         allow_waitlist_signups, allow_signup_for_others_in_group,
+         allow_waitlist_signups, allow_signup_for_others_in_group, payment_instructions_title, payment_instructions_text,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -432,7 +441,7 @@ async function updateEvent(id, data) {
          is_closed = ?, allow_registration_cancellations = ?, allow_refund_on_cancel = ?, show_registrants_to_members = ?, track_participants_only = ?,
          lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
          lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?, accounting_category_id = ?,
-         allow_waitlist_signups = ?, allow_signup_for_others_in_group = ?,
+         allow_waitlist_signups = ?, allow_signup_for_others_in_group = ?, payment_instructions_title = ?, payment_instructions_text = ?,
          updated_at = now_text()
        WHERE id = ?`
     )

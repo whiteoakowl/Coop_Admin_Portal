@@ -26,6 +26,8 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { hashPassword } = require('../utils/portalAuth');
+const { generateMemberCode } = require('../utils/members');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -161,4 +163,75 @@ test('Ticket Types: a ticket with no pricePer submitted defaults to person', asy
 
   const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'Adult'").get(eventId);
   assert.equal(ticket.price_per, 'person');
+});
+
+let paymentInstructionsFamilyCounter = 0;
+async function createParentAccountForPaymentInstructions() {
+  paymentInstructionsFamilyCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Payment Instructions Test Family ${paymentInstructionsFamilyCounter}`)).lastInsertRowid;
+  const parentCode = await generateMemberCode();
+  const parentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1)")
+    .run(`Parent ${paymentInstructionsFamilyCounter}`, parentCode, parentCode, familyId);
+  const email = `paymentinstructionsparent${paymentInstructionsFamilyCounter}@example.com`;
+  const password = 'testpassword123';
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parentInfo.lastInsertRowid, email, hashPassword(password));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password, next: '/events' });
+  return { cookie: loginRes.headers['set-cookie'] };
+}
+
+test('Payment Instructions: Finance tab has a title+text field, saves, and shows on the public event page', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(financePage.text, /name="paymentInstructionsTitle"/);
+  assert.match(financePage.text, /name="paymentInstructionsText"/);
+
+  const csrf = extractCsrf(financePage.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/finance`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ paymentInstructionsTitle: 'How to Pay', paymentInstructionsText: 'Pay by cash, check, or Venmo @coopname at drop-off.', _csrf: csrf });
+
+  const event = await db.prepare('SELECT payment_instructions_title, payment_instructions_text FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.payment_instructions_title, 'How to Pay');
+  assert.equal(event.payment_instructions_text, 'Pay by cash, check, or Venmo @coopname at drop-off.');
+
+  const afterSavePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(afterSavePage.text, /value="How to Pay"/);
+  assert.match(afterSavePage.text, /Pay by cash, check, or Venmo @coopname at drop-off\./);
+
+  await request(app)
+    .post(`/main-admin/events/${eventId}/status`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ status: 'published', _csrf: admin.csrfToken });
+
+  const parent = await createParentAccountForPaymentInstructions();
+  const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.equal(detailPage.status, 200);
+  assert.match(detailPage.text, /How to Pay/);
+  assert.match(detailPage.text, /Pay by cash, check, or Venmo @coopname at drop-off\./);
+});
+
+test('Payment Instructions: blank on the Finance tab shows nothing on the public event page', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/status`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ status: 'published', _csrf: admin.csrfToken });
+
+  const parent = await createParentAccountForPaymentInstructions();
+  const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.equal(detailPage.status, 200);
+  assert.doesNotMatch(detailPage.text, /alert-info/);
 });

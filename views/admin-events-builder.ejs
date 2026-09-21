@@ -242,6 +242,18 @@
               <% }); %>
             </select>
           </label>
+          <%# A real request: "adding a the title payment instructions
+              with a text field below it. This will appear when members
+              are choosing their tickets." Same title+free-text shape as
+              the existing membership-application payment info - shown to
+              a registrant on the event's own public page next to its
+              Price/Ticket Types, not a real checkout. %>
+          <label class="member-form-full">Payment Instructions Title
+            <input type="text" name="paymentInstructionsTitle" value="<%= event.payment_instructions_title || '' %>" placeholder="e.g. How to Pay" />
+          </label>
+          <label class="member-form-full">Payment Instructions
+            <textarea name="paymentInstructionsText" rows="3" placeholder="e.g. Pay by cash, check, or Venmo @coopname at drop-off."><%= event.payment_instructions_text || '' %></textarea>
+          </label>
           <div class="member-form-full">
             <button type="submit" class="primary-btn">Save Finance</button>
           </div>
