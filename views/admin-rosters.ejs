@@ -14,7 +14,14 @@
         <p class="print-header-sub"><%= view === 'classList' ? 'Class Rosters' : view === 'archive' ? 'Attendance Archive' : view === 'playgroundList' ? 'Playground' : view === 'playgroundLog' ? `${pgDayLabel} Playground — ${pgHourLabel}` : tabLabel %> &mdash; Attendance Spreadsheet</p>
       </div>
     </div>
-    <h1>Attendance</h1>
+    <%# A real request: "at the top of the monday attendance page, it
+        should say monday attendance. at the top of the wednesday
+        attendance page it should say wednesday attendance." Only the
+        day-scoped grid view (Parent/Student/class tabs, all of which
+        carry a real `day`) has a single day to name this way - the
+        Classes list, Playground list, and Attendance Archive views span
+        both days at once, so they keep the plain "Attendance" title. %>
+    <h1><%= view === 'grid' ? `${dayLabel} Attendance` : 'Attendance' %></h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>

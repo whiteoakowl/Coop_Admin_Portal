@@ -8,6 +8,16 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Dashboard</h1>
 
+    <%# A real request: "add kiosk button link on co-op admin homepage" -
+        Main Admin already links out to the kiosk from Quick Links/
+        Settings (views/admin-settings.ejs's own admin-card-grid), but
+        this dashboard - the actual Co-op Admin homepage - had no way to
+        jump to it at all. Opens in a new tab like every other kiosk link
+        in the app, so the dashboard itself stays open behind it. %>
+    <div class="roster-btn-row">
+      <a class="roster-action-btn" href="/kiosk" target="_blank"><svg class="icon"><use href="#icon-barcode"/></svg> Kiosk</a>
+    </div>
+
     <%# A real request: match a provided design - "Co-op Member Counts"
         (was "Family & Student Counts"), a date picker in its own header
         (drives Today's Attendance/the Alert Log below - see routes/

@@ -846,6 +846,29 @@ textarea:focus-visible,
    Complete is clicked - see each page's own script). */
 .kiosk-scan-now-text { font-size: 1.6rem; font-weight: 700; margin: 0; }
 
+/* A real request: "kiosk, scan barcode now card and title should be
+   larger on tablet and desktop. thank you, have a great day! should
+   also be larger. asking for setup/cleanup badge should also be much
+   larger. all this on desktop and tablet only." Scoped to the same
+   641px-and-up range this file's own phone breakpoint (max-width: 640px)
+   already draws the mobile/not-mobile line at everywhere else, so a
+   phone keeps today's sizes - a fixed tablet/desktop kiosk screen has
+   plenty of room to spare and is usually read from further away, which
+   is exactly what these larger sizes are for. .kiosk-task-ask-text is a
+   second class alongside .kiosk-instructions on just the Setup/Cleanup
+   badge scan/enter prompts (views/kiosk-checkin.ejs, kiosk-checkout.ejs)
+   - the plain :has(.task-member-name) selector would reach the same
+   elements without it, but this app's own print-pagination fixes exist
+   precisely because an old, unpatchable Chromebook in the field runs a
+   Chromium version this codebase can't assume modern CSS support from,
+   and :has() is newer than plenty of those. */
+@media (min-width: 641px) {
+  .kiosk-panel { max-width: 800px; padding: 4rem 3.5rem; }
+  .kiosk-scan-now-text { font-size: 2.6rem; }
+  .kiosk-instructions { font-size: 1.8rem; }
+  .kiosk-task-ask-text { font-size: 2.4rem; }
+}
+
 /* Mobile Barcode Scan (Find a Parent / Class Check In & Out only) - a
    live rear-camera preview with public/js/kiosk-camera-scanner.js (@zxing/
    library, public/js/vendor/zxing.min.js) decoding CODE128 barcodes
