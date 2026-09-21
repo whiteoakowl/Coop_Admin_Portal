@@ -94,6 +94,28 @@ test('Events list: the Archive tab is gone - not a needed feature', async () => 
   assert.match(archiveTab.text, /\+ New Event/);
 });
 
+// A real request: "make sure the title of all subpages is the same as
+// the title on the subpage menu." This page's own <title>/<h1> used to
+// say "Events" no matter which subpage (?tab=) was active, while the nav
+// menu's own subpages read Calendar/Drafts/Requests/Event Attendance/
+// Settings - now both vary together.
+test('Events list: page title and <h1> match the active subpage\'s own nav label, not a fixed "Events"', async () => {
+  const admin = await loginAsMainAdmin();
+  const cases = [
+    ['/main-admin/events?tab=calendar', 'Calendar'],
+    ['/main-admin/events?tab=drafts', 'Drafts'],
+    ['/main-admin/events?tab=requests', 'Requests'],
+    ['/main-admin/events?tab=attendance', 'Event Attendance'],
+    ['/main-admin/events?tab=settings', 'Settings'],
+  ];
+  for (const [url, label] of cases) {
+    const page = await request(app).get(url).set('Cookie', admin.cookie);
+    assert.equal(page.status, 200);
+    assert.match(page.text, new RegExp(`<title>${label} · Sanford Homeschoolers</title>`));
+    assert.match(page.text, new RegExp(`<h1>${label}</h1>`));
+  }
+});
+
 test('Events builder (per-event edit page): renders its own .view-tabs strip with the real request tabs', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app)

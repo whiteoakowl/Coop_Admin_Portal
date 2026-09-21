@@ -159,7 +159,7 @@ router.get('/classes', async (req, res) => {
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
 
   res.render('parent-classes', {
-    title: 'Classes',
+    title: 'Class Registration',
     day,
     dayLabel: DAY_LABELS[day],
     hours: await hoursForDay(day),

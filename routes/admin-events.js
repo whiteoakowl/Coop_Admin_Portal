@@ -286,6 +286,11 @@ function toSqlTimestamp(datetimeLocal) {
 // from its own builder page (the /:id/status route below is unchanged) -
 // only the dedicated tab for BROWSING every cancelled event is gone.
 const EVENTS_TABS = ['calendar', 'drafts', 'requests', 'attendance', 'settings'];
+// Matches the exact subpage labels the nav sidebar already uses for this
+// tab (views/partials/portal-nav.ejs's own MAIN_ADMIN_NAV_LINKS) - a real
+// request: "make sure the title of all subpages is the same as the title
+// on the subpage menu."
+const EVENTS_TAB_TITLES = { calendar: 'Calendar', drafts: 'Drafts', requests: 'Requests', attendance: 'Event Attendance', settings: 'Settings' };
 
 router.get('/', async (req, res) => {
   const activeTab = EVENTS_TABS.includes(req.query.tab) ? req.query.tab : 'calendar';
@@ -332,7 +337,7 @@ router.get('/', async (req, res) => {
   }
 
   res.render('admin-events-list', {
-    title: 'Events',
+    title: EVENTS_TAB_TITLES[activeTab],
     activeTab,
     pendingCount,
     calendar,

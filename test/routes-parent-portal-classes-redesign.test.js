@@ -113,7 +113,7 @@ test('Parent Portal: the Classes nav tab has all 6 subpages', async () => {
     ['/parent/classes', 'Class Registration'],
     ['/parent/classes/manage', 'View/Cancel Classes'],
     ['/parent/classes/dashboard', 'Class Dashboard'],
-    ['/name-tag', 'Name Tag Request'],
+    ['/name-tag', 'Name Tag Form'],
     ['/absence', 'Absence/Late Form'],
     ['/parent/handbook', 'Policy Handbook'],
   ].forEach(([href, label]) => {
