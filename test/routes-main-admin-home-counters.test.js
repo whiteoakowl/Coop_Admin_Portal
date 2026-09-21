@@ -62,11 +62,16 @@ test('GET /main-admin shows Families/Parents/Students counters and a plain setti
   assert.match(res.text, /<h2>Members<\/h2>/);
   assert.doesNotMatch(res.text, /<h2>People<\/h2>/);
 
-  assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Parents<\/span>/);
-  assert.match(res.text, /<span class="stat-value">2<\/span>\s*<span class="stat-label">Students<\/span>/);
-  assert.match(res.text, /<span class="stat-value">1<\/span>\s*<span class="stat-label">Families<\/span>/);
-  assert.match(res.text, /<span class="stat-label">Teachers<\/span>/);
-  assert.match(res.text, /<span class="stat-label">Admins<\/span>/);
+  // A later request: "main admin, homepage, member count. should look
+  // like the member count on co-op admin portal homepage" - reuses that
+  // page's own .family-student-counts-card/-row markup (views/admin-
+  // dashboard.ejs) instead of the plain .totals-card/stat-value grid this
+  // used to render.
+  assert.match(res.text, /<span class="family-student-row-label">Parents<\/span>\s*<span class="family-student-row-value">1<\/span>/);
+  assert.match(res.text, /<span class="family-student-row-label">Students<\/span>\s*<span class="family-student-row-value">2<\/span>/);
+  assert.match(res.text, /<span class="family-student-row-label">Families<\/span>\s*<span class="family-student-row-value">1<\/span>/);
+  assert.match(res.text, /<span class="family-student-row-label">Teachers<\/span>/);
+  assert.match(res.text, /<span class="family-student-row-label">Admins<\/span>/);
 
   // Pending-requests counters (item 6) each link straight to their own
   // request page. A later request added Membership Requests to this same

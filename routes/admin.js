@@ -72,15 +72,17 @@ router.post('/logout', (req, res) => {
 // and Wednesday, so a date landing on any other weekday has no day-level
 // roster and this is 0.
 //
-// Every query here excludes rosters.category = 'Class Roster' - a member
-// showing up as present, late, absent, or checked out of one specific
-// CLASS (routes/kiosk-class-checkin.js) doesn't mean they showed up at
-// the co-op at all today; only their day-level Parent/Student roster
+// checkedIn/checkedOut below exclude rosters.category = 'Class Roster' -
+// a member showing up as present, or checked out of one specific CLASS
+// (routes/kiosk-class-checkin.js) doesn't mean they showed up at the
+// co-op at all today; only their day-level Parent/Student roster
 // reflects that. Without this filter, checking into or out of a single
 // class would inflate this whole-day dashboard the same as actually
 // checking in/out at the front door - the exact "two independent
 // presence signals" isolation the class check-in flow was built to keep
 // (see routes/kiosk.js's own comment), just extended to this aggregate.
+// late/absent below do NOT exclude it - see that pair's own comment on
+// why.
 async function todayStatsForType(memberType, today) {
   const dow = weekdayOf(today);
   const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
@@ -116,13 +118,30 @@ async function todayStatsForType(memberType, today) {
       )
       .get(today, memberType)
   ).c;
+  // Unlike checkedIn/checkedOut above, late/absent deliberately do NOT
+  // exclude rosters.category = 'Class Roster' - a real bug report:
+  // "today's attendance ... should count absences and late that come
+  // through the form. It's not counting all of them." The Absence/Late
+  // form (routes/absence.js) writes one attendance row per roster
+  // getMemberRostersForDate() finds a student on for that date, which for
+  // a student enrolled in classes but not (for whatever reason) still on
+  // their day-level Student roster themselves means EVERY row it writes
+  // has category = 'Class Roster' - the day-level exclusion above, if
+  // applied here too, silently threw away that student's entire
+  // submission instead of just skipping the noisy duplicate-class-roster
+  // rows it was meant for. Scoping to source = 'absence_form' instead
+  // fixes that undercount and is also a more literal match for what was
+  // asked ("that come through the form") - a manual edit on the
+  // Attendance page's own grid (source = 'manual') no longer counts here
+  // either, and kiosk/class-check-in scans never write status = 'late'/
+  // 'absent' at all (only 'present'), so there was never really a "class
+  // check-in" signal leaking in here in the first place.
   const late = (
     await db
       .prepare(
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
-         JOIN rosters r ON r.id = a.roster_id
-         WHERE a.session_date = ? AND a.status = 'late' AND m.member_type = ? AND r.category != 'Class Roster'`
+         WHERE a.session_date = ? AND a.status = 'late' AND a.source = 'absence_form' AND m.member_type = ?`
       )
       .get(today, memberType)
   ).c;
@@ -131,8 +150,7 @@ async function todayStatsForType(memberType, today) {
       .prepare(
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
-         JOIN rosters r ON r.id = a.roster_id
-         WHERE a.session_date = ? AND a.status = 'absent' AND m.member_type = ? AND r.category != 'Class Roster'`
+         WHERE a.session_date = ? AND a.status = 'absent' AND a.source = 'absence_form' AND m.member_type = ?`
       )
       .get(today, memberType)
   ).c;
