@@ -2,9 +2,13 @@
 // should be an option for adding several types of tickets with a
 // different price and title bar next to it. Add a drop down menu for
 // choosing accounting category." Admin-side only for now (a scoping
-// question confirmed this) - registration still charges the event's own
-// flat price_cents; a real ticket-type CHOICE at registration is a
-// separate follow-up.
+// question confirmed this) - registration doesn't yet let a registrant
+// pick one and be charged accordingly. A later real request: "add ticket
+// types, price, title and permissions person or family... accounting
+// category drop is all that is now needed above ticket types" - each
+// ticket type now carries its own person/family basis, and the Finance
+// tab's own flat Price/Charged Per fields are gone (Accounting Category
+// is the only thing left above the Ticket Types list).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -51,6 +55,20 @@ async function createEvent(admin, overrides = {}) {
   return Number(/\/main-admin\/events\/(\d+)\/builder/.exec(res.headers.location)[1]);
 }
 
+test('Finance tab: only an Accounting Category dropdown, no flat Price/Charged Per fields', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  // Isolate the actual Finance form (not the separate Add Ticket Type
+  // dialog further down the page, which has its own priceDollars/
+  // pricePer fields for the ticket type being added).
+  const financeFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/finance"[^>]*>([\s\S]*?)<\/form>/.exec(financePage.text);
+  assert.ok(financeFormMatch, 'the Finance form should exist');
+  assert.match(financeFormMatch[1], /Accounting Category/);
+  assert.doesNotMatch(financeFormMatch[1], /name="priceDollars"/, 'the top-of-Finance flat Price field should be gone');
+  assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/, 'the top-of-Finance Charged Per dropdown should be gone');
+});
+
 test('Accounting Categories: manage from the Events Settings tab, pick one on the Finance tab, and it persists', async () => {
   const admin = await loginAsMainAdmin();
 
@@ -77,7 +95,7 @@ test('Accounting Categories: manage from the Events Settings tab, pick one on th
     .post(`/main-admin/events/${eventId}/finance`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ priceDollars: '10.00', pricePer: 'person', accountingCategoryId: String(category.id), _csrf: financeCsrf });
+    .send({ accountingCategoryId: String(category.id), _csrf: financeCsrf });
 
   const event = await db.prepare('SELECT accounting_category_id FROM events WHERE id = ?').get(eventId);
   assert.equal(event.accounting_category_id, category.id);
@@ -86,28 +104,18 @@ test('Accounting Categories: manage from the Events Settings tab, pick one on th
   assert.match(afterPage.text, new RegExp(`<option value="${category.id}" selected>Fundraising Revenue</option>`));
 });
 
-test('Ticket Types: only offered when charged per person, not per family', async () => {
+test('Ticket Types: always offered on the Finance tab (not gated on any flat Charged Per)', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
 
-  const perPersonPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(perPersonPage.text, /Ticket Types/);
-  assert.match(perPersonPage.text, /\+ Add Ticket Type/);
-
-  const csrf = extractCsrf(perPersonPage.text);
-  await request(app)
-    .post(`/main-admin/events/${eventId}/finance`)
-    .set('Cookie', admin.cookie)
-    .type('form')
-    .send({ pricePer: 'family', _csrf: csrf });
-
-  const perFamilyPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.doesNotMatch(perFamilyPage.text, /Ticket Types/, 'ticket types should not be offered for a per-family-priced event');
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(financePage.text, /Ticket Types/);
+  assert.match(financePage.text, /\+ Add Ticket Type/);
 });
 
-test('Ticket Types: add and delete, title and price show, and this never touches the flat Price field', async () => {
+test('Ticket Types: add and delete, with a title, price, and its own person/family basis', async () => {
   const admin = await loginAsMainAdmin();
-  const eventId = await createEvent(admin, { priceDollars: '5.00', pricePer: 'person' });
+  const eventId = await createEvent(admin);
 
   let page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   let csrf = extractCsrf(page.text);
@@ -115,15 +123,16 @@ test('Ticket Types: add and delete, title and price show, and this never touches
     .post(`/main-admin/events/${eventId}/ticket-types`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ title: 'VIP', priceDollars: '25.00', _csrf: csrf });
+    .send({ title: 'Family Pass', priceDollars: '25.00', pricePer: 'family', _csrf: csrf });
 
   page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(page.text, /VIP/);
-  assert.match(page.text, /\$25\.00/);
-  assert.match(page.text, /name="priceDollars" min="0" step="0.01" value="5.00"/, 'the flat Price field should be untouched by adding a ticket type');
+  assert.match(page.text, /Family Pass/);
+  assert.match(page.text, /\$25\.00 per family/);
 
-  const ticket = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'VIP'").get(eventId);
+  const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'Family Pass'").get(eventId);
   assert.ok(ticket);
+  assert.equal(ticket.price_per, 'family');
+  assert.equal(ticket.price_cents, 2500);
 
   csrf = extractCsrf(page.text);
   await request(app)
@@ -137,4 +146,19 @@ test('Ticket Types: add and delete, title and price show, and this never touches
 
   page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   assert.match(page.text, /No ticket types yet/);
+});
+
+test('Ticket Types: a ticket with no pricePer submitted defaults to person', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(page.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Adult', priceDollars: '10.00', _csrf: csrf });
+
+  const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'Adult'").get(eventId);
+  assert.equal(ticket.price_per, 'person');
 });

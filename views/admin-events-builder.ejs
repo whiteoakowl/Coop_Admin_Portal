@@ -64,17 +64,18 @@
     // now uses. A later real request: "editing event should have little
     // tabs at the top. details, finance, settings, attendance" - Details
     // (renamed from "Event Details") and a new Finance tab (Price/Charged
-    // Per, split out of Details) join Volunteers/Donations/Food/Settings
-    // rather than replacing them; Attendance is its own link at the end,
-    // straight to the existing Registrations page (views/admin-events-
-    // registrations.ejs already has the full check-in/checkout view this
-    // asked for) rather than a duplicate of that page rebuilt as a tab.
+    // Per, split out of Details) join Volunteers/Settings rather than
+    // replacing them; Attendance is its own link at the end, straight to
+    // the existing Registrations page (views/admin-events-registrations.
+    // ejs already has the full check-in/checkout view this asked for)
+    // rather than a duplicate of that page rebuilt as a tab. A still
+    // later real request folded Donations/Food/Extra Fields into
+    // Volunteers as a pill toggle (see activeSection below) instead of
+    // each keeping its own top-level tab.
     var builderTabDefs = [
       { key: 'details', label: 'Details' },
       { key: 'finance', label: 'Finance' },
-      { key: 'volunteers', label: 'Volunteers' },
-      { key: 'donations', label: 'Donations' },
-      { key: 'food', label: 'Food' },
+      { key: 'volunteers', label: 'Resources/Fields' },
       { key: 'settings', label: 'Settings' },
     ];
     %>
@@ -105,7 +106,7 @@
 
     <% if (activeTab === 'details') { %>
       <div class="manage-section">
-        <form method="POST" action="/main-admin/events/<%= event.id %>" class="member-form-grid">
+        <form method="POST" action="/main-admin/events/<%= event.id %>" class="member-form-grid" id="details-form">
           <label class="member-form-full">Title
             <input type="text" name="title" value="<%= event.title %>" required />
           </label>
@@ -167,9 +168,6 @@
             </div>
           </div>
 
-          <div class="member-form-full">
-            <button type="submit" class="primary-btn">Save Event Details</button>
-          </div>
         </form>
 
         <%# A real request: "uploading image should have an upload button
@@ -188,31 +186,50 @@
             wrapper missing - a too-large file made upload.single() throw
             a MulterError that fell through to the generic error page
             instead of a friendly "too large" redirect (same fix already
-            applied to routes/admin-documents.js and utils/memberIntake.js). %>
+            applied to routes/admin-documents.js and utils/memberIntake.js).
+            A later real request: "upload photo button should be smaller,
+            fit to text and sit clean next to choose file bar" -
+            .roster-action-btn's own flex: 1 0 auto (meant for a ROW of
+            SEVERAL buttons sharing space evenly) stretched this lone
+            button to fill the entire rest of the row next to the file
+            input; .roster-btn-row-fit-text doesn't help here since it's
+            a mobile-only (max-width: 640px) override, so the button gets
+            its own inline flex: 0 0 auto instead, sized to its own text
+            on every screen size. %>
         <div class="member-form-full">
           <span class="roster-checkbox-label">Event Image</span>
           <img src="<%= imageUrl || '' %>" alt="" data-event-image-preview style="max-width: 240px; border-radius: var(--radius); display: <%= imageUrl ? 'block' : 'none' %>; margin-bottom: 0.5rem;" />
           <form method="POST" action="/main-admin/events/<%= event.id %>/image" enctype="multipart/form-data" class="roster-btn-row">
             <input type="file" name="image" accept="image/*" required data-event-image-input />
-            <button type="submit" class="roster-action-btn">Upload</button>
+            <button type="submit" class="roster-action-btn" style="flex: 0 0 auto; min-width: 0;">Upload</button>
           </form>
+        </div>
+
+        <%# A real request: "save event details button should be the very
+            last button on the page and dark blue, like we used on other
+            pages." Linked to the Details form above via form="details-
+            form" (an HTML form can't nest inside another - see the Image
+            form's own comment above - so this can't be a normal
+            descendant of that form and still sit after the Image
+            section), the same standard way a submit button can live
+            outside its own <form> tag; public/js/event-builder-tab-
+            guard.js's own dirty-tracking listens on the <form> element
+            itself, not this button, so it isn't affected by the button
+            no longer being a DOM descendant. %>
+        <div class="member-form-full">
+          <button type="submit" form="details-form" class="primary-btn primary-btn-dark">Save Event Details</button>
         </div>
       </div>
     <% } else if (activeTab === 'finance') { %>
       <%# A real request: "editing event should have little tabs at the
           top. details, finance, settings, attendance" - Price/Charged Per
-          split out of Event Details into their own tab. %>
+          split out of Event Details into their own tab. A later real
+          request: "accounting category drop is all that is now needed
+          above ticket types" - the flat Price/Charged Per fields that
+          used to sit here are gone; each Ticket Type below now carries
+          its own price and person/family basis instead. %>
       <div class="manage-section">
         <form method="POST" action="/main-admin/events/<%= event.id %>/finance" class="member-form-grid">
-          <label>Price ($) <span class="hint">(blank = free)</span>
-            <input type="number" name="priceDollars" min="0" step="0.01" value="<%= event.price_cents != null ? (event.price_cents / 100).toFixed(2) : '' %>" />
-          </label>
-          <label>Charged per
-            <select name="pricePer">
-              <option value="person" <%= event.price_per !== 'family' ? 'selected' : '' %>>Person</option>
-              <option value="family" <%= event.price_per === 'family' ? 'selected' : '' %>>Family</option>
-            </select>
-          </label>
           <%# A real request: "add a drop down menu for choosing
               accounting category" - the list itself is managed from the
               Events list page's own Settings tab (Add/Edit Accounting
@@ -231,22 +248,19 @@
         </form>
       </div>
 
-      <%# A real request: "if charging per person there should be an
-          option for adding several types of tickets with a different
-          price and title bar next to it." Admin-side only for now (a
-          scoping question confirmed this) - registration still charges
-          the flat Price above; this doesn't yet let a registrant pick
-          one. Same +Add/list/delete shape as Volunteer Roles/Donation
-          Items/Food Items below. %>
-      <% if (event.price_per !== 'family') { %>
-        <div class="manage-section">
+      <%# A real request: "add ticket types, price, title and permissions
+          person or family." Admin-side only for now (a scoping question
+          confirmed this) - registration doesn't yet let a registrant pick
+          one and be charged accordingly. Same +Add/list/delete shape as
+          Volunteer Roles/Donation Items/Food Items below. %>
+      <div class="manage-section">
           <div class="grid-box-header">
             <h2>Ticket Types (<%= event.ticketTypes.length %>)</h2>
             <button type="button" class="roster-action-btn" onclick="document.getElementById('add-ticket-type-dialog').showModal()">+ Add Ticket Type</button>
           </div>
 
           <% if (event.ticketTypes.length === 0) { %>
-            <p class="roster-empty">No ticket types yet - registration uses the flat Price above.</p>
+            <p class="roster-empty">No ticket types yet.</p>
           <% } %>
 
           <div class="training-lesson-list">
@@ -256,7 +270,7 @@
                   <svg class="icon"><use href="#icon-badge"/></svg>
                   <div class="training-lesson-info">
                     <strong><%= t.title %></strong>
-                    <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %></span>
+                    <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %> per <%= t.price_per %></span>
                   </div>
                   <div class="training-lesson-actions">
                     <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/delete" class="inline-block-form" data-confirm="Remove ticket type &quot;<%= t.title %>&quot;?">
@@ -268,43 +282,64 @@
             <% }); %>
           </div>
         </div>
-      <% } %>
-    <% } else if (activeTab === 'volunteers' || activeTab === 'donations' || activeTab === 'food') { %>
+    <% } else if (activeTab === 'volunteers') { %>
       <%
-      // A real request: "on the volunteer, donations and food pages.
-      // there will be a check box for, do you want to include this
-      // section? then a dropdown menu of numbers 1-50 that ask, how many
-      // volunteer/donation/food items should each family/individual
-      // registration select in order to sign up for this event?" Same
-      // shape for all three sections, so one shared block renders
-      // whichever one is active instead of writing this out 3 times.
-      var sectionInfo = {
-        volunteers: { enabled: !!event.volunteers_enabled, count: event.volunteer_selection_count, items: event.volunteerRoles, noun: 'volunteer' },
-        donations: { enabled: !!event.donations_enabled, count: event.donation_selection_count, items: event.donationItems, noun: 'donation' },
-        food: { enabled: !!event.food_enabled, count: event.food_selection_count, items: event.foodItems, noun: 'food' },
-      }[activeTab];
+      // A real request: "volunteers, food, donations and extra fields
+      // tabs should be under one tab called, Volunteers. There will then
+      // be a pill toggle on this page for volunteers, food, donations and
+      // extra fields." Same `?section=` pattern as `?tab=`, just one
+      // level down - pillSectionDefs drives both the toggle strip and
+      // which of the four panels below actually renders.
+      var pillSectionDefs = [
+        { key: 'volunteers', label: 'Volunteers' },
+        { key: 'food', label: 'Food' },
+        { key: 'donations', label: 'Donations' },
+        { key: 'extraFields', label: 'Extra Fields' },
+      ];
       %>
-      <div class="manage-section">
-        <form method="POST" action="/main-admin/events/<%= event.id %>/<%= activeTab %>-settings" class="member-form-grid">
-          <label class="checkbox-option member-form-full">
-            <input type="checkbox" name="enabled" value="1" <%= sectionInfo.enabled ? 'checked' : '' %> />
-            Do you want to include this section?
-          </label>
-          <label>How many <%= sectionInfo.noun %> items should each family/individual registration select in order to sign up for this event?
-            <select name="selectionCount">
-              <option value="">No minimum</option>
-              <% for (let n = 1; n <= 50; n++) { %>
-                <option value="<%= n %>" <%= sectionInfo.count === n ? 'selected' : '' %>><%= n %></option>
-              <% } %>
-            </select>
-          </label>
-          <div class="member-form-full">
-            <button type="submit" class="primary-btn">Save</button>
-          </div>
-        </form>
+      <div class="day-toggle no-print" style="margin-bottom: 1rem;">
+        <% pillSectionDefs.forEach(function(s) { %>
+          <a href="/main-admin/events/<%= event.id %>/builder?tab=volunteers&section=<%= s.key %>" class="day-toggle-option <%= activeSection === s.key ? 'active' : '' %>"><%= s.label %></a>
+        <% }); %>
       </div>
 
-      <% if (activeTab === 'volunteers') { %>
+      <% if (activeSection === 'volunteers' || activeSection === 'donations' || activeSection === 'food') { %>
+        <%
+        // A real request: "on the volunteer, donations and food pages.
+        // there will be a check box for, do you want to include this
+        // section? then a dropdown menu of numbers 1-50 that ask, how many
+        // volunteer/donation/food items should each family/individual
+        // registration select in order to sign up for this event?" Same
+        // shape for all three sections, so one shared block renders
+        // whichever one is active instead of writing this out 3 times.
+        var sectionInfo = {
+          volunteers: { enabled: !!event.volunteers_enabled, count: event.volunteer_selection_count, items: event.volunteerRoles, noun: 'volunteer' },
+          donations: { enabled: !!event.donations_enabled, count: event.donation_selection_count, items: event.donationItems, noun: 'donation' },
+          food: { enabled: !!event.food_enabled, count: event.food_selection_count, items: event.foodItems, noun: 'food' },
+        }[activeSection];
+        %>
+        <div class="manage-section">
+          <form method="POST" action="/main-admin/events/<%= event.id %>/<%= activeSection %>-settings" class="member-form-grid">
+            <label class="checkbox-option member-form-full">
+              <input type="checkbox" name="enabled" value="1" <%= sectionInfo.enabled ? 'checked' : '' %> />
+              Do you want to include this section?
+            </label>
+            <label>How many <%= sectionInfo.noun %> items should each family/individual registration select in order to sign up for this event?
+              <select name="selectionCount">
+                <option value="">No minimum</option>
+                <% for (let n = 1; n <= 50; n++) { %>
+                  <option value="<%= n %>" <%= sectionInfo.count === n ? 'selected' : '' %>><%= n %></option>
+                <% } %>
+              </select>
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </form>
+        </div>
+      <% } %>
+
+      <% if (activeSection === 'volunteers') { %>
         <div class="manage-section">
           <div class="grid-box-header">
             <h2>Volunteer Roles (<%= event.volunteerRoles.length %>)</h2>
@@ -341,7 +376,7 @@
             <% }); %>
           </div>
         </div>
-      <% } else if (activeTab === 'donations') { %>
+      <% } else if (activeSection === 'donations') { %>
         <div class="manage-section">
           <div class="grid-box-header">
             <h2>Donation Items (<%= event.donationItems.length %>)</h2>
@@ -377,7 +412,7 @@
             <% }); %>
           </div>
         </div>
-      <% } else { %>
+      <% } else if (activeSection === 'food') { %>
         <div class="manage-section">
           <div class="grid-box-header">
             <h2>Food Items (<%= event.foodItems.length %>)</h2>
@@ -413,6 +448,47 @@
             <% }); %>
           </div>
         </div>
+      <% } else { %>
+        <%
+        // Extra Fields pill - a real request: "extra fields is where you
+        // can add extra form type questions for people signing up for an
+        // event." Answered once per registration on the public event page
+        // (views/events-detail.ejs) and stored in event_registration_
+        // answers - see utils/events.js's own comment on why this is its
+        // own small system rather than reusing Custom Forms.
+        %>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h2>Extra Fields (<%= event.extraFields.length %>)</h2>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-extra-field-dialog').showModal()">+ Add Field</button>
+          </div>
+
+          <% if (event.extraFields.length === 0) { %>
+            <p class="roster-empty">No extra fields yet - registrants only see the standard signup form.</p>
+          <% } %>
+
+          <div class="training-lesson-list">
+            <% event.extraFields.forEach(function(field) { %>
+              <div class="training-lesson-row">
+                <div class="training-lesson-row-main">
+                  <svg class="icon"><use href="#icon-badge"/></svg>
+                  <div class="training-lesson-info">
+                    <strong><%= field.label %></strong>
+                    <span class="hint">
+                      <%= field.field_type %><% if (field.required) { %> &middot; required<% } %>
+                      <% if (field.field_type === 'select' && field.options) { %> &middot; <%= field.options.split('\n').join(', ') %><% } %>
+                    </span>
+                  </div>
+                  <div class="training-lesson-actions">
+                    <form method="POST" action="/main-admin/events/<%= event.id %>/extra-fields/<%= field.id %>/delete" class="inline-block-form" data-confirm="Remove extra field &quot;<%= field.label %>&quot;?">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= field.label %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
       <% } %>
     <% } else { %>
       <%
@@ -424,62 +500,84 @@
       // first, label text after - already this app's standard "checkbox
       // to the left of its own text" shape everywhere else), stacked one
       // per line via .checkbox-group-stack so every row's checkbox lines
-      // up in one column. "Is this a public event?" moves here from
-      // Details' own Visibility dropdown; "allow members to register
-      // guests?" moves out of the old Who Can Register grid below into
-      // this list (same allowGuestRegister field, just relocated).
-      // allow_refund_on_cancel/show_registrants_to_members/
-      // track_participants_only are stored, ready to wire up once a real
-      // refund or "who else is registered" feature exists in this app,
-      // same pattern event_settings' own several fields already use.
+      // up in one column. A still later real request: "make two bold
+      // text titled sections for the check boxes. Registration settings
+      // [...] all go under that section. All other check box questions
+      // go under general settings section. Close signups check box
+      // should be by itself above registration settings. Both capacity
+      // features should move to register settings" - Close Event stands
+      // alone, then Registration Settings (its own reworded question
+      // list, plus Registration Opens/Closes/Capacity/Capacity Counted
+      // By moved in from their own standalone spot below), then General
+      // Settings for the remaining three. .roster-checkbox-label is the
+      // same bold-section-title class the Grade Level/Age/Sections
+      // headings below already use, not a new one. allow_refund_on_cancel
+      // is stored, ready to wire up once a real refund feature exists,
+      // same pattern allow_signup_for_others_in_group below now also
+      // uses (a real "register another family in your group" feature
+      // doesn't exist yet either).
       %>
       <div class="manage-section">
         <form method="POST" action="/main-admin/events/<%= event.id %>/permissions" class="member-form-grid">
           <div class="member-form-full checkbox-group checkbox-group-stack">
-            <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
-            <label class="checkbox-option"><input type="checkbox" name="allowRefundOnCancel" value="1" <%= event.allow_refund_on_cancel ? 'checked' : '' %> /> Allow refunds when a member cancels their registration?</label>
             <label class="checkbox-option"><input type="checkbox" name="isClosed" value="1" <%= event.is_closed ? 'checked' : '' %> /> Close event?</label>
-            <input type="hidden" name="allowRegistrationCancellations" value="off" />
-            <label class="checkbox-option"><input type="checkbox" name="allowRegistrationCancellations" value="1" <%= event.allow_registration_cancellations ? 'checked' : '' %> /> Allow registration cancellations?</label>
-            <label class="checkbox-option"><input type="checkbox" name="allowGuestRegister" value="1" <%= event.allow_guest_register ? 'checked' : '' %> /> Allow members to register guests?</label>
-            <label class="checkbox-option"><input type="checkbox" name="showRegistrantsToMembers" value="1" <%= event.show_registrants_to_members ? 'checked' : '' %> /> Allow other members to see who is registered for this event?</label>
-            <label class="checkbox-option"><input type="checkbox" name="trackParticipantsOnly" value="1" <%= event.track_participants_only ? 'checked' : '' %> /> Only track participants?</label>
-            <%# A real request: "who can register for this event questions
-                should be included in the check box question at the top
-                of the page" - moved in from their own separate "Who Can
-                Register" section below, same fields/hidden-fallback
-                pattern, just relocated into this one shared column. %>
-            <input type="hidden" name="allowAdultRegister" value="off" />
-            <label class="checkbox-option"><input type="checkbox" name="allowAdultRegister" value="1" <%= event.allow_adult_register ? 'checked' : '' %> /> Parents/adults can register?</label>
-            <input type="hidden" name="allowChildRegister" value="off" />
-            <label class="checkbox-option"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Kids can register?</label>
           </div>
 
-          <%# A real request: "registration opens and closes should be
-              moved to event settings tab... capacity counted by moved to
-              event settings" - moved here from Details, along with the
-              Capacity number itself (kept together since routes/admin-
-              events.js's capacityFieldsFromBody needs both from the same
-              submission to compute capacity/family_capacity correctly).
-              Visibility is already covered by "Is this a public event?"
-              above - Details' own separate Visibility dropdown was dead
-              code (this route never read it), so it was just removed
-              rather than duplicated here. %>
-          <label>Registration Opens
-            <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
-          <label>Registration Closes
-            <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
-          <label>Capacity <span class="hint">(blank = no limit)</span>
-            <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
-          </label>
-          <label>Capacity Counted By
-            <select name="capacityType">
-              <option value="person" <%= event.family_capacity == null ? 'selected' : '' %>>Person</option>
-              <option value="family" <%= event.family_capacity != null ? 'selected' : '' %>>Family</option>
-            </select>
-          </label>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Registration Settings</span>
+            <div class="checkbox-group checkbox-group-stack">
+              <%# "who can register for this event" - moved in from its
+                  own separate "Who Can Register" section further down,
+                  same fields/hidden-fallback pattern, just relocated. %>
+              <input type="hidden" name="allowAdultRegister" value="off" />
+              <label class="checkbox-option"><input type="checkbox" name="allowAdultRegister" value="1" <%= event.allow_adult_register ? 'checked' : '' %> /> Include parents in the list of possible registrants when signing up?</label>
+              <label class="checkbox-option"><input type="checkbox" name="trackParticipantsOnly" value="1" <%= event.track_participants_only ? 'checked' : '' %> /> Track "Participants" (only Participants count against Max Allowed)</label>
+              <label class="checkbox-option"><input type="checkbox" name="showRegistrantsToMembers" value="1" <%= event.show_registrants_to_members ? 'checked' : '' %> /> Allow registrants to view a list of others who have signed up</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowSignupForOthersInGroup" value="1" <%= event.allow_signup_for_others_in_group ? 'checked' : '' %> /> Allow registrants to "Sign Up For" on behalf of other families in your group</label>
+              <input type="hidden" name="allowChildRegister" value="off" />
+              <label class="checkbox-option"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Allow children access to the signup page?</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowGuestRegister" value="1" <%= event.allow_guest_register ? 'checked' : '' %> /> Allow registration on behalf of people outside your group</label>
+              <input type="hidden" name="allowWaitlistSignups" value="off" />
+              <label class="checkbox-option"><input type="checkbox" name="allowWaitlistSignups" value="1" <%= event.allow_waitlist_signups ? 'checked' : '' %> /> Allow waiting list signups (only applicable when Max Allowed is reached)</label>
+            </div>
+
+            <%# A real request: "both capacity features should move to
+                register settings under event edit settings tab" -
+                Registration Opens/Closes/Capacity/Capacity Counted By,
+                previously their own standalone spot on this same tab,
+                moved in under this section. Capacity's number and
+                "counted by" type stay paired (routes/admin-events.js's
+                capacityFieldsFromBody needs both from the same
+                submission to compute capacity/family_capacity correctly). %>
+            <label>Registration Opens
+              <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+            </label>
+            <label>Registration Closes
+              <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+            </label>
+            <label>Capacity <span class="hint">(blank = no limit)</span>
+              <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
+            </label>
+            <label>Capacity Counted By
+              <select name="capacityType">
+                <option value="person" <%= event.family_capacity == null ? 'selected' : '' %>>Person</option>
+                <option value="family" <%= event.family_capacity != null ? 'selected' : '' %>>Family</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">General Settings</span>
+            <div class="checkbox-group checkbox-group-stack">
+              <%# "Is this a public event?" moves here from Details' own
+                  Visibility dropdown (dead code - that route never read
+                  it, so it was removed rather than duplicated). %>
+              <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
+              <label class="checkbox-option"><input type="checkbox" name="allowRefundOnCancel" value="1" <%= event.allow_refund_on_cancel ? 'checked' : '' %> /> Allow refunds when a member cancels their registration?</label>
+              <input type="hidden" name="allowRegistrationCancellations" value="off" />
+              <label class="checkbox-option"><input type="checkbox" name="allowRegistrationCancellations" value="1" <%= event.allow_registration_cancellations ? 'checked' : '' %> /> Allow registration cancellations?</label>
+            </div>
+          </div>
 
           <div class="member-form-full">
             <span class="roster-checkbox-label">Grade Level <span class="hint">(leave all unchecked to allow every grade)</span></span>
@@ -556,6 +654,12 @@
         <label>Price ($)
           <input type="number" name="priceDollars" min="0" step="0.01" value="0.00" required />
         </label>
+        <label>Charged per
+          <select name="pricePer">
+            <option value="person">Person</option>
+            <option value="family">Family</option>
+          </select>
+        </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
           <button type="submit" class="primary-btn">Add</button>
@@ -624,6 +728,33 @@
         </label>
         <label>Notes
           <textarea name="notes" rows="2"></textarea>
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="add-extra-field-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events/<%= event.id %>/extra-fields">
+        <h3>Add Extra Field</h3>
+        <label>Question / Label
+          <input type="text" name="label" placeholder="e.g. T-shirt size" required />
+        </label>
+        <label>Field Type
+          <select name="fieldType" onchange="document.getElementById('extra-field-options-row').style.display = this.value === 'select' ? '' : 'none'">
+            <% extraFieldTypes.forEach(function(t) { %>
+              <option value="<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label id="extra-field-options-row" style="display: none;">Choices <span class="hint">(one per line)</span>
+          <textarea name="options" rows="3" placeholder="Small&#10;Medium&#10;Large"></textarea>
+        </label>
+        <label class="checkbox-option">
+          <input type="checkbox" name="required" value="1" />
+          Required to register
         </label>
         <div class="notes-dialog-actions">
           <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

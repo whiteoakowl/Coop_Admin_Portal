@@ -245,6 +245,7 @@ async function getEventWithDetails(id) {
   );
 
   const ticketTypes = await db.prepare('SELECT * FROM event_ticket_types WHERE event_id = ? ORDER BY position, id').all(id);
+  const extraFields = await db.prepare('SELECT * FROM event_extra_fields WHERE event_id = ? ORDER BY position, id').all(id);
 
   return {
     ...event,
@@ -252,6 +253,7 @@ async function getEventWithDetails(id) {
     donationItems,
     foodItems,
     ticketTypes,
+    extraFields,
     registrationCount,
     waitlistCount,
     familyCount,
@@ -267,9 +269,11 @@ async function getEventWithDetails(id) {
 // Donation Items/Food Items above - admin-side only for now (a scoping
 // question confirmed this): registration still charges the event's own
 // flat price_cents, this is just for the admin to define/manage the list.
-async function addTicketType(eventId, title, priceCents) {
+async function addTicketType(eventId, title, priceCents, pricePer) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_ticket_types WHERE event_id = ?').get(eventId)).p) + 1;
-  await db.prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, position) VALUES (?, ?, ?, ?)').run(eventId, title, priceCents, position);
+  await db
+    .prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, price_per, position) VALUES (?, ?, ?, ?, ?)')
+    .run(eventId, title, priceCents, pricePer === 'family' ? 'family' : 'person', position);
 }
 
 async function deleteTicketType(id) {
@@ -296,6 +300,28 @@ async function updateAccountingCategory(id, name) {
 
 async function deleteAccountingCategory(id) {
   await db.prepare('DELETE FROM event_accounting_categories WHERE id = ?').run(id);
+}
+
+// --- Extra Fields (Volunteers tab's pill toggle) - a real request:
+// "extra fields is where you can add extra form type questions for
+// people signing up for an event." Per-event custom questions shown on
+// the public registration form (views/events-detail.ejs) and answered
+// once per registration (event_registration_answers), not a whole
+// separate custom-form system - the existing Custom Forms feature
+// (routes/admin-custom-forms.js) is its own standalone assign-to-
+// roles/members tool, a different shape than "a couple of extra
+// questions tied to this one event's own signup".
+const EXTRA_FIELD_TYPES = ['text', 'textarea', 'select', 'checkbox'];
+
+async function addExtraField(eventId, { label, fieldType, options, required }) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_extra_fields WHERE event_id = ?').get(eventId)).p) + 1;
+  await db
+    .prepare('INSERT INTO event_extra_fields (event_id, label, field_type, options, required, position) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(eventId, label, fieldType, options || null, required ? 1 : 0, position);
+}
+
+async function deleteExtraField(id) {
+  await db.prepare('DELETE FROM event_extra_fields WHERE id = ?').run(id);
 }
 
 function eventFields(data) {
@@ -347,6 +373,20 @@ function eventFields(data) {
     data.lockVisibilityToSection ? 1 : 0,
     data.visibilitySectionId ?? null,
     data.accountingCategoryId ?? null,
+    // A real request: "allow waiting list signups (only applicable when
+    // Max Allowed is reached)" - wired for real (see
+    // createOrReactivateRegistration's allowWaitlist option): when off
+    // and the event is full, registerForEvent rejects instead of
+    // waitlisting. Same undefined-must-not-override-the-migration's-own-
+    // DEFAULT-1 guard as volunteersEnabled/allowRegistrationCancellations
+    // above, since most callers never send this field at all.
+    data.allowWaitlistSignups === false ? 0 : 1,
+    // "Allow registrants to 'Sign Up For' on behalf of other families in
+    // your group" - stored, ready to wire up once a real "register
+    // someone else's family" member-facing feature exists, same pattern
+    // allow_refund_on_cancel/show_registrants_to_members/
+    // track_participants_only above already use.
+    data.allowSignupForOthersInGroup ? 1 : 0,
   ];
 }
 
@@ -371,8 +411,9 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          is_closed, allow_registration_cancellations, allow_refund_on_cancel, show_registrants_to_members, track_participants_only,
          lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
          lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id, accounting_category_id,
+         allow_waitlist_signups, allow_signup_for_others_in_group,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -391,6 +432,7 @@ async function updateEvent(id, data) {
          is_closed = ?, allow_registration_cancellations = ?, allow_refund_on_cancel = ?, show_registrants_to_members = ?, track_participants_only = ?,
          lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
          lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?, accounting_category_id = ?,
+         allow_waitlist_signups = ?, allow_signup_for_others_in_group = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -820,7 +862,7 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId) {
 // use). Assumes the caller already confirmed the event exists/is a real
 // target - only "already registered" is re-checked here since it's cheap
 // and both callers need it.
-async function createOrReactivateRegistration(event, member, accountId) {
+async function createOrReactivateRegistration(event, member, accountId, answers = {}, { allowWaitlist = true } = {}) {
   const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(event.id, member.id);
   if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
 
@@ -850,6 +892,12 @@ async function createOrReactivateRegistration(event, member, accountId) {
   const overFamilyCapacity = event.family_capacity != null && !alreadyInFamily && familyCount >= event.family_capacity;
 
   const isFull = overCapacity || overFamilyCapacity;
+  // A real request: "allow waiting list signups (only applicable when
+  // Max Allowed is reached)" - allowWaitlist is registerForEvent's own
+  // member-facing setting; adminAddRegistrations never passes it, so an
+  // admin's own manual add still always bypasses this, same as every
+  // other member-facing registration rule.
+  if (isFull && !allowWaitlist) return { ok: false, error: `"${event.title}" is full and not accepting waitlist signups.` };
   const status = isFull ? 'waitlisted' : 'confirmed';
   let waitlistPosition = null;
   let chargeId = null;
@@ -864,17 +912,28 @@ async function createOrReactivateRegistration(event, member, accountId) {
       waitlistPosition = existingWaitlisted + 1;
     }
 
+    let registrationId;
     if (previouslyCancelled) {
+      registrationId = previouslyCancelled.id;
       await tx
         .prepare(
           `UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL,
              waitlist_position = ?, charge_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
         )
-        .run(status, accountId, waitlistPosition, chargeId, previouslyCancelled.id);
+        .run(status, accountId, waitlistPosition, chargeId, registrationId);
+      await tx.prepare('DELETE FROM event_registration_answers WHERE registration_id = ?').run(registrationId);
     } else {
-      await tx
+      const info = await tx
         .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id) VALUES (?, ?, ?, ?, ?, ?)')
         .run(event.id, member.id, accountId, status, waitlistPosition, chargeId);
+      registrationId = info.lastInsertRowid;
+    }
+
+    for (const [extraFieldId, value] of Object.entries(answers)) {
+      if (value == null || value === '') continue;
+      await tx
+        .prepare('INSERT INTO event_registration_answers (registration_id, extra_field_id, value) VALUES (?, ?, ?)')
+        .run(registrationId, extraFieldId, value);
     }
   });
 
@@ -886,7 +945,7 @@ async function createOrReactivateRegistration(event, member, accountId) {
 }
 
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
-async function registerForEvent({ eventId, memberId, accountId, family }) {
+async function registerForEvent({ eventId, memberId, accountId, family, answers = {} }) {
   const event = await getEvent(eventId);
   if (!event) return { ok: false, error: 'That event no longer exists.' };
   if (event.status !== 'published') return { ok: false, error: 'That event is not open for registration.' };
@@ -917,7 +976,14 @@ async function registerForEvent({ eventId, memberId, accountId, family }) {
     }
   }
 
-  return createOrReactivateRegistration(event, member, accountId);
+  const extraFields = await db.prepare('SELECT * FROM event_extra_fields WHERE event_id = ?').all(eventId);
+  for (const field of extraFields) {
+    if (field.required && !(answers[field.id] || '').trim()) {
+      return { ok: false, error: `"${field.label}" is required to register.` };
+    }
+  }
+
+  return createOrReactivateRegistration(event, member, accountId, answers, { allowWaitlist: !!event.allow_waitlist_signups });
 }
 
 // A real request: "add a button that says add registration. Pop up with
@@ -1360,6 +1426,9 @@ module.exports = {
   createAccountingCategory,
   updateAccountingCategory,
   deleteAccountingCategory,
+  EXTRA_FIELD_TYPES,
+  addExtraField,
+  deleteExtraField,
   listLocations,
   createLocation,
   updateLocation,

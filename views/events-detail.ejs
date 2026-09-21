@@ -53,7 +53,7 @@
                 <% if (event.registration_opens_at) { %>Registration opens <%= event.registration_opens_at %>.<% } %>
                 <% if (event.registration_closes_at) { %> Registration closed <%= event.registration_closes_at %>.<% } %>
               </p>
-            <% } else { %>
+            <% } else if (!event.extraFields || event.extraFields.length === 0) { %>
               <div class="roster-btn-row">
                 <% family.forEach(function(m) { %>
                   <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
@@ -69,44 +69,90 @@
                   <% } %>
                 <% }); %>
               </div>
-
-              <%# A real request: "guest check in shouldn't be [on the
-                  Main Admin Attendance page]. that should be under
-                  settings for each individual event only. to allow
-                  guest to signup, then they will appear on the event
-                  roster." allow_guest_register is that same existing
-                  per-event "Guests can register" checkbox (views/admin-
-                  events-builder.ejs) - this is its only actual signup
-                  path now that the admin-side manual add is gone. %>
-              <% if (event.allow_guest_register) { %>
-                <div class="manage-section" style="margin-top: 1rem;">
-                  <h3>Bringing a Guest?</h3>
-                  <% if (myGuestRegistrations.length) { %>
-                    <div class="roster-btn-row">
-                      <% myGuestRegistrations.forEach(function(g) { %>
-                        <form method="POST" action="/events/<%= event.id %>/unregister-guest" class="inline-block-form">
-                          <input type="hidden" name="guestId" value="<%= g.id %>" />
-                          <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= g.guest_name %>: Cancel</button>
-                        </form>
-                      <% }); %>
-                    </div>
-                  <% } %>
-                  <form method="POST" action="/events/<%= event.id %>/register-guest" class="member-form-grid">
-                    <label>Guest Name
-                      <input type="text" name="guestName" required />
-                    </label>
-                    <label>Email <span class="hint">(optional)</span>
-                      <input type="email" name="guestEmail" />
-                    </label>
-                    <label>Phone <span class="hint">(optional)</span>
-                      <input type="text" name="guestPhone" />
-                    </label>
+            <% } else { %>
+              <%# A real request: "extra fields is where you can add extra
+                  form type questions for people signing up for an event."
+                  Each not-yet-registered family member gets their own
+                  small form (their answers are their own, per member) with
+                  one input per event.extraFields row, named
+                  answers[<fieldId>] - routes/events.js's own /register
+                  route reads req.body.answers straight through to
+                  registerForEvent. Already-registered members still just
+                  get a plain Cancel button, same as the simple case above. %>
+              <% family.forEach(function(m) { %>
+                <% if (registeredMemberIds.indexOf(m.id) !== -1) { %>
+                  <form method="POST" action="/events/<%= event.id %>/unregister" class="inline-block-form" style="margin-bottom: 0.5rem;">
+                    <input type="hidden" name="memberId" value="<%= m.id %>" />
+                    <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= m.name %>: Cancel</button>
+                  </form>
+                <% } else { %>
+                  <form method="POST" action="/events/<%= event.id %>/register" class="manage-section member-form-grid" style="margin-bottom: 1rem;">
+                    <input type="hidden" name="memberId" value="<%= m.id %>" />
+                    <h3 class="member-form-full"><%= m.name %></h3>
+                    <% event.extraFields.forEach(function(field) { %>
+                      <label class="member-form-full"><%= field.label %><% if (field.required) { %> *<% } %>
+                        <% if (field.field_type === 'textarea') { %>
+                          <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
+                        <% } else if (field.field_type === 'select') { %>
+                          <select name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %>>
+                            <option value="">Select one</option>
+                            <% (field.options || '').split('\n').filter(Boolean).forEach(function(opt) { %>
+                              <option value="<%= opt %>"><%= opt %></option>
+                            <% }); %>
+                          </select>
+                        <% } else if (field.field_type === 'checkbox') { %>
+                          <input type="checkbox" name="answers[f<%= field.id %>]" value="Yes" <%= field.required ? 'required' : '' %> />
+                        <% } else { %>
+                          <input type="text" name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %> />
+                        <% } %>
+                      </label>
+                    <% }); %>
                     <div class="member-form-full">
-                      <button type="submit" class="roster-action-btn">+ Register a Guest</button>
+                      <button type="submit" class="roster-action-btn">Register <%= m.name %></button>
                     </div>
                   </form>
-                </div>
-              <% } %>
+                <% } %>
+              <% }); %>
+            <% } %>
+
+            <%# A real request: "guest check in shouldn't be [on the Main
+                Admin Attendance page]. that should be under settings for
+                each individual event only. to allow guest to signup, then
+                they will appear on the event roster." allow_guest_register
+                is that same existing per-event "Guests can register"
+                checkbox (views/admin-events-builder.ejs) - this is its
+                only actual signup path now that the admin-side manual add
+                is gone. Applies regardless of whether the event has Extra
+                Fields, so it lives outside that if/else rather than nested
+                in one branch of it. %>
+            <% if (isRegistrationWindowOpen && event.allow_guest_register) { %>
+              <div class="manage-section" style="margin-top: 1rem;">
+                <h3>Bringing a Guest?</h3>
+                <% if (myGuestRegistrations.length) { %>
+                  <div class="roster-btn-row">
+                    <% myGuestRegistrations.forEach(function(g) { %>
+                      <form method="POST" action="/events/<%= event.id %>/unregister-guest" class="inline-block-form">
+                        <input type="hidden" name="guestId" value="<%= g.id %>" />
+                        <button type="submit" class="roster-action-btn roster-action-btn-danger"><%= g.guest_name %>: Cancel</button>
+                      </form>
+                    <% }); %>
+                  </div>
+                <% } %>
+                <form method="POST" action="/events/<%= event.id %>/register-guest" class="member-form-grid">
+                  <label>Guest Name
+                    <input type="text" name="guestName" required />
+                  </label>
+                  <label>Email <span class="hint">(optional)</span>
+                    <input type="email" name="guestEmail" />
+                  </label>
+                  <label>Phone <span class="hint">(optional)</span>
+                    <input type="text" name="guestPhone" />
+                  </label>
+                  <div class="member-form-full">
+                    <button type="submit" class="roster-action-btn">+ Register a Guest</button>
+                  </div>
+                </form>
+              </div>
             <% } %>
           </div>
 

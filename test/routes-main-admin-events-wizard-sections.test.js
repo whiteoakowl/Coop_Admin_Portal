@@ -96,8 +96,13 @@ test('unchecking Volunteers/Donations and checking Food in the wizard saves exac
   assert.equal(row.donations_enabled, 0, 'unchecking Donations in the wizard should turn it off');
   assert.equal(row.food_enabled, 1, 'checking Food in the wizard should turn it on');
 
-  const builderPage = await request(app).get(`/main-admin/events/${eventId}/builder`).set('Cookie', admin.cookie);
-  assert.match(builderPage.text, />Food</, 'the Food tab should now appear on the builder');
+  // A later real request folded Donations/Food/Extra Fields into the
+  // Volunteers tab (renamed "Resources/Fields") as a pill toggle, so
+  // Food is no longer its own top-level tab - it's reachable via
+  // ?tab=volunteers&section=food.
+  const builderPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers&section=food`).set('Cookie', admin.cookie);
+  assert.match(builderPage.text, />Food</, 'the Food pill should appear under the Resources/Fields tab');
+  assert.match(builderPage.text, /<input type="checkbox" name="enabled" value="1" checked/, 'Food should be enabled per the wizard checkbox');
 });
 
 test('a plain create with no Event Sections fields at all (a raw caller bypassing the wizard form) keeps the old Volunteers/Donations-on-by-default behavior', async () => {

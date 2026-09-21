@@ -135,3 +135,34 @@ test('saving Event Details (no file attached) never touches the event image', as
   assert.equal(after.title, 'Renamed Event');
   assert.equal(after.image_key, before.image_key, 'the image should be unaffected by a Details save');
 });
+
+// A real request: "upload photo button should be smaller, fit to text
+// and sit clean next to choose file bar" and "save event details button
+// should be the very last button on the page and dark blue, like we
+// used on other pages."
+test('Details tab: Upload button is fit-to-text, Save Event Details is the last button and dark blue', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
+
+  assert.match(page.text, /<form method="POST" action="\/main-admin\/events\/\d+\/image" enctype="multipart\/form-data" class="roster-btn-row">[\s\S]*?<button type="submit" class="roster-action-btn" style="flex: 0 0 auto; min-width: 0;">Upload<\/button>/);
+
+  // The Save button lives outside the Details <form> (an HTML form can't
+  // nest inside another) but is still linked to it via form=, and it's
+  // physically the last button in the Details tab - after the Image
+  // section, not inside the big form above it.
+  const detailsTabHtml = page.text.slice(page.text.indexOf('id="details-form"'));
+  const imageFormIndex = detailsTabHtml.indexOf('/image" enctype="multipart/form-data"');
+  const saveButtonIndex = detailsTabHtml.indexOf('Save Event Details');
+  assert.ok(imageFormIndex > -1 && saveButtonIndex > imageFormIndex, 'Save Event Details should come after the Image upload section');
+  assert.match(detailsTabHtml.slice(saveButtonIndex - 200, saveButtonIndex + 50), /<button type="submit" form="details-form" class="primary-btn primary-btn-dark">Save Event Details<\/button>/);
+
+  // Still submits the Details form correctly despite living outside it.
+  await request(app)
+    .post(`/main-admin/events/${eventId}`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Moved Save Button Event', startsAt: '2027-09-01T18:00', _csrf: admin.csrfToken });
+  const event = await db.prepare('SELECT title FROM events WHERE id = ?').get(eventId);
+  assert.equal(event.title, 'Moved Save Button Event');
+});

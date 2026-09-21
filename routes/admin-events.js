@@ -184,6 +184,8 @@ function eventDataFromRow(event) {
     lockVisibilityToSection: !!event.lock_visibility_to_section,
     visibilitySectionId: event.visibility_section_id,
     accountingCategoryId: event.accounting_category_id,
+    allowWaitlistSignups: !!event.allow_waitlist_signups,
+    allowSignupForOthersInGroup: !!event.allow_signup_for_others_in_group,
   };
 }
 
@@ -564,21 +566,26 @@ router.post('/import', importUpload.single('file'), async (req, res) => {
 // event it show the following tabs at the top, event details, volunteers,
 // donations, food, settings." Same `.view-tabs`/`?tab=` pattern every
 // other tabbed admin page in this app already uses (see admin-events-
-// list.ejs's own tab strip) - the one long single-section page this used
-// to be is now five, each posting to its own already-existing route
-// (this one still handles Event Details' own form; Volunteers/Donations/
-// Food each save through their own settings route below, alongside the
-// existing add-role/add-item routes those tabs already had).
-const BUILDER_TABS = ['details', 'finance', 'volunteers', 'donations', 'food', 'settings'];
+// list.ejs's own tab strip). A later real request folded Donations/Food/
+// Extra Fields into the Volunteers tab itself, as a pill toggle
+// (`?section=`) rather than separate top-level tabs - "volunteers, food,
+// donations and extra fields tabs should be under one tab called,
+// Volunteers." Each section still saves through its own already-existing
+// route below.
+const BUILDER_TABS = ['details', 'finance', 'volunteers', 'settings'];
+const VOLUNTEER_SECTIONS = ['volunteers', 'food', 'donations', 'extraFields'];
 
 async function loadBuilder(req, res) {
   const event = await events.getEventWithDetails(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   const activeTab = BUILDER_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+  const activeSection = VOLUNTEER_SECTIONS.includes(req.query.section) ? req.query.section : 'volunteers';
   res.render('admin-events-builder', {
     title: event.title,
     event,
     activeTab,
+    activeSection,
+    extraFieldTypes: events.EXTRA_FIELD_TYPES,
     imageUrl: imageUrl(event.image_key),
     categories: await events.listCategories(),
     locations: await events.listLocations(),
@@ -649,29 +656,33 @@ router.post('/:id', async (req, res) => {
 // Event Details into their own Finance tab. Same "spread the existing row,
 // override just this tab's own fields" guarantee as every other builder
 // tab's save.
+// A real request: "accounting category drop is all that is now needed
+// above ticket types" - the flat Price/Charged Per fields that used to
+// sit above Ticket Types are gone from this form; each ticket type now
+// carries its own price and person/family basis instead (see the ticket-
+// types route below). event.price_cents/price_per stay in the schema
+// unused rather than dropped, same "retired but not removed column"
+// pattern as e.g. events.language.
 router.post('/:id/finance', async (req, res) => {
   const id = req.params.id;
   const event = await events.getEvent(id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
-    priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
-    pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
     accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
   });
   res.redirect(`/main-admin/events/${id}/builder?tab=finance&notice=` + encodeURIComponent('Finance saved.'));
 });
 
-// Ticket types (Finance tab, per-person events only) - a real request:
-// "if charging per person there should be an option for adding several
-// types of tickets with a different price and title bar next to it."
-// Admin-side only for now (a scoping question confirmed this) -
-// registration still charges the event's own flat price_cents.
+// Ticket types (Finance tab) - a real request: "add ticket types, price,
+// title and permissions person or family." Admin-side only for now (a
+// scoping question confirmed this) - registration doesn't yet let a
+// registrant pick one and be charged accordingly.
 router.post('/:id/ticket-types', async (req, res) => {
   const title = (req.body.title || '').trim();
   const priceCents = req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : 0;
   if (!title) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&error=` + encodeURIComponent('Ticket title is required.'));
-  await events.addTicketType(req.params.id, title, priceCents);
+  await events.addTicketType(req.params.id, title, priceCents, req.body.pricePer);
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type added.'));
 });
 
@@ -722,6 +733,13 @@ router.post('/:id/permissions', async (req, res) => {
     registrationSectionId: req.body.registrationSectionId ? parseInt(req.body.registrationSectionId, 10) : null,
     lockVisibilityToSection: req.body.lockVisibilityToSection === '1',
     visibilitySectionId: req.body.visibilitySectionId ? parseInt(req.body.visibilitySectionId, 10) : null,
+    // A real request: "allow waiting list signups" defaults to checked
+    // (on) - same hidden-fallback-plus-!==-'off' pattern as
+    // allowRegistrationCancellations above, since a checked box only adds
+    // a second element the browser submits, it never removes the hidden
+    // one.
+    allowWaitlistSignups: req.body.allowWaitlistSignups !== 'off',
+    allowSignupForOthersInGroup: req.body.allowSignupForOthersInGroup === '1',
   });
   await events.setEventSections(id, req.body.sectionIds);
   res.redirect(`/main-admin/events/${id}/builder?tab=settings&notice=` + encodeURIComponent('Settings saved.'));
@@ -745,7 +763,7 @@ function sectionToggleRoute(section) {
       [`${section}Enabled`]: req.body.enabled === '1',
       [`${section}SelectionCount`]: selectionCountFromBody(req.body.selectionCount),
     });
-    res.redirect(`/main-admin/events/${id}/builder?tab=${section}&notice=` + encodeURIComponent('Saved.'));
+    res.redirect(`/main-admin/events/${id}/builder?tab=volunteers&section=${section}&notice=` + encodeURIComponent('Saved.'));
   };
 }
 router.post('/:id/volunteers-settings', sectionToggleRoute('volunteers'));
@@ -824,7 +842,7 @@ router.post('/:id/image', uploadEventImage((req) => `/main-admin/events/${req.pa
 
 router.post('/:id/volunteer-roles', async (req, res) => {
   const roleName = (req.body.roleName || '').trim();
-  if (!roleName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&error=` + encodeURIComponent('Role name is required.'));
+  if (!roleName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&error=` + encodeURIComponent('Role name is required.'));
   await events.addVolunteerRole(req.params.id, {
     roleName,
     slotsNeeded: parseInt(req.body.slotsNeeded, 10) || 1,
@@ -832,7 +850,7 @@ router.post('/:id/volunteer-roles', async (req, res) => {
     location: (req.body.location || '').trim(),
     description: (req.body.description || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role added.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&notice=` + encodeURIComponent('Volunteer role added.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/update', async (req, res) => {
@@ -843,26 +861,26 @@ router.post('/:id/volunteer-roles/:roleId/update', async (req, res) => {
     location: (req.body.location || '').trim(),
     description: (req.body.description || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role updated.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&notice=` + encodeURIComponent('Volunteer role updated.'));
 });
 
 router.post('/:id/volunteer-roles/:roleId/delete', async (req, res) => {
   await events.deleteVolunteerRole(req.params.roleId);
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&notice=` + encodeURIComponent('Volunteer role removed.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=volunteers&notice=` + encodeURIComponent('Volunteer role removed.'));
 });
 
 // --- Donation items ---
 
 router.post('/:id/donation-items', async (req, res) => {
   const itemName = (req.body.itemName || '').trim();
-  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&error=` + encodeURIComponent('Item name is required.'));
+  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&error=` + encodeURIComponent('Item name is required.'));
   await events.addDonationItem(req.params.id, {
     itemName,
     quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1,
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item added.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&notice=` + encodeURIComponent('Donation item added.'));
 });
 
 router.post('/:id/donation-items/:itemId/update', async (req, res) => {
@@ -872,12 +890,12 @@ router.post('/:id/donation-items/:itemId/update', async (req, res) => {
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item updated.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&notice=` + encodeURIComponent('Donation item updated.'));
 });
 
 router.post('/:id/donation-items/:itemId/delete', async (req, res) => {
   await events.deleteDonationItem(req.params.itemId);
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=donations&notice=` + encodeURIComponent('Donation item removed.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=donations&notice=` + encodeURIComponent('Donation item removed.'));
 });
 
 // --- Food items - a real request: "on the volunteer, donations and food
@@ -887,14 +905,14 @@ router.post('/:id/donation-items/:itemId/delete', async (req, res) => {
 
 router.post('/:id/food-items', async (req, res) => {
   const itemName = (req.body.itemName || '').trim();
-  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&error=` + encodeURIComponent('Item name is required.'));
+  if (!itemName) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&error=` + encodeURIComponent('Item name is required.'));
   await events.addFoodItem(req.params.id, {
     itemName,
     quantityNeeded: parseInt(req.body.quantityNeeded, 10) || 1,
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item added.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&notice=` + encodeURIComponent('Food item added.'));
 });
 
 router.post('/:id/food-items/:itemId/update', async (req, res) => {
@@ -904,12 +922,36 @@ router.post('/:id/food-items/:itemId/update', async (req, res) => {
     deadline: req.body.deadline || null,
     notes: (req.body.notes || '').trim(),
   });
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item updated.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&notice=` + encodeURIComponent('Food item updated.'));
 });
 
 router.post('/:id/food-items/:itemId/delete', async (req, res) => {
   await events.deleteFoodItem(req.params.itemId);
-  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=food&notice=` + encodeURIComponent('Food item removed.'));
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=food&notice=` + encodeURIComponent('Food item removed.'));
+});
+
+// --- Extra Fields (Volunteers tab's "Extra Fields" pill) - a real
+// request: "extra fields is where you can add extra form type questions
+// for people signing up for an event." ---
+
+router.post('/:id/extra-fields', async (req, res) => {
+  const label = (req.body.label || '').trim();
+  const fieldType = req.body.fieldType;
+  if (!label || !events.EXTRA_FIELD_TYPES.includes(fieldType)) {
+    return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&error=` + encodeURIComponent('Label and a valid field type are required.'));
+  }
+  await events.addExtraField(req.params.id, {
+    label,
+    fieldType,
+    options: fieldType === 'select' ? (req.body.options || '').trim() : null,
+    required: req.body.required === '1',
+  });
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&notice=` + encodeURIComponent('Extra field added.'));
+});
+
+router.post('/:id/extra-fields/:fieldId/delete', async (req, res) => {
+  await events.deleteExtraField(req.params.fieldId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=volunteers&section=extraFields&notice=` + encodeURIComponent('Extra field removed.'));
 });
 
 // --- Registrations report, manual check-in/out, and guest registration ---

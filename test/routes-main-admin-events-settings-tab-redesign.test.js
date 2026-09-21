@@ -89,27 +89,48 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
   const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=settings`).set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
 
-  const groupMatch = /checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(page.text);
-  assert.ok(groupMatch, 'expected the stacked checkbox-group of yes/no questions');
-  const group = groupMatch[1];
+  // A later real request: "make two bold text titled sections for the
+  // check boxes... Close signups check box should be by itself above
+  // registration settings." Close Event is its own lone checkbox-group;
+  // Registration Settings and General Settings are the two bold-titled
+  // (.roster-checkbox-label) sections after it.
+  const closeGroupMatch = /checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>\s*<div class="member-form-full">\s*<span class="roster-checkbox-label">Registration Settings/.exec(page.text);
+  assert.ok(closeGroupMatch, 'expected a standalone checkbox-group ending right before the Registration Settings heading');
+  assert.match(closeGroupMatch[1], /> Close event\?/);
+  assert.doesNotMatch(closeGroupMatch[1], /Is this a public event/, 'Close Event should be alone, not grouped with the others');
+
+  const regGroupMatch = /Registration Settings<\/span>\s*<div class="checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(regGroupMatch, 'expected the Registration Settings checkbox-group');
+  const regGroup = regGroupMatch[1];
   [
-    'Is this a public event?',
-    'Allow refunds when a member cancels their registration?',
-    'Close event?',
-    'Allow registration cancellations?',
-    'Allow members to register guests?',
-    'Allow other members to see who is registered for this event?',
-    'Only track participants?',
-    // A real request: "who can register for this event questions should
-    // be included in the check box question at the top of the page" -
-    // moved in from their own separate "Who Can Register" section.
-    'Parents/adults can register?',
-    'Kids can register?',
+    'Include parents in the list of possible registrants when signing up?',
+    'Track "Participants" (only Participants count against Max Allowed)',
+    'Allow registrants to view a list of others who have signed up',
+    'Allow registrants to "Sign Up For" on behalf of other families in your group',
+    'Allow children access to the signup page?',
+    'Allow registration on behalf of people outside your group',
+    'Allow waiting list signups (only applicable when Max Allowed is reached)',
   ].forEach((question) => {
-    assert.match(group, new RegExp(question.replace(/[?]/g, '\\?')), `expected "${question}" in the checkbox-group`);
+    const pattern = question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(regGroup, new RegExp(pattern), `expected "${question}" in the Registration Settings checkbox-group`);
+  });
+  // Registration Opens/Closes and Capacity/Capacity Counted By moved
+  // under Registration Settings (a real request).
+  const regSectionMatch = /Registration Settings<\/span>([\s\S]*?)<\/div>\s*<div class="member-form-full">\s*<span class="roster-checkbox-label">General Settings/.exec(page.text);
+  assert.ok(regSectionMatch, 'expected the whole Registration Settings section, ending right before General Settings');
+  assert.match(regSectionMatch[1], /name="registrationOpensAt"/);
+  assert.match(regSectionMatch[1], /name="registrationClosesAt"/);
+  assert.match(regSectionMatch[1], /name="capacityValue"/);
+  assert.match(regSectionMatch[1], /name="capacityType"/);
+
+  const generalGroupMatch = /General Settings<\/span>\s*<div class="checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>/.exec(page.text);
+  assert.ok(generalGroupMatch, 'expected the General Settings checkbox-group');
+  const generalGroup = generalGroupMatch[1];
+  ['Is this a public event?', 'Allow refunds when a member cancels their registration?', 'Allow registration cancellations?'].forEach((question) => {
+    assert.match(generalGroup, new RegExp(question.replace(/[?]/g, '\\?')), `expected "${question}" in the General Settings checkbox-group`);
   });
   // Each question is checkbox-first, text after (checkbox on the left).
-  assert.match(group, /<input type="checkbox" name="isPublicEvent" value="1"[^>]*\/> Is this a public event\?/);
+  assert.match(generalGroup, /<input type="checkbox" name="isPublicEvent" value="1"[^>]*\/> Is this a public event\?/);
   assert.doesNotMatch(page.text, /Who Can Register/, 'the old standalone section should be gone');
 
   // A real request: "under individual event settings, there should be a

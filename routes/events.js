@@ -161,7 +161,20 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   const back = `/events/${eventId}`;
 
   const family = await familyForAccount(req.portalAccount.id);
-  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family });
+  // A real request: "extra fields is where you can add extra form type
+  // questions for people signing up for an event" - answers[] here comes
+  // from that per-event event_extra_fields list (views/events-detail.ejs
+  // renders one input per field, named answers[f<fieldId>] - the "f"
+  // prefix keeps qs's body parser from reading a purely-numeric bracket
+  // key as an ARRAY index instead of an object key, which silently
+  // dropped every answer whose field id happened to look like one).
+  const rawAnswers = req.body.answers || {};
+  const answers = {};
+  for (const [key, value] of Object.entries(rawAnswers)) {
+    const match = /^f(\d+)$/.exec(key);
+    if (match) answers[match[1]] = value;
+  }
+  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers });
   if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
 
   const event = await events.getEvent(eventId);

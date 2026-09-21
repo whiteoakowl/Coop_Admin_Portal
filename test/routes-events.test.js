@@ -184,6 +184,36 @@ test('a parent can register themselves and their family, and capacity waitlists 
   );
 });
 
+// A real request: "allow waiting list signups (only applicable when Max
+// Allowed is reached)" - when off, a full event rejects a new
+// registration outright instead of waitlisting it.
+test('capacity full + waitlist signups disabled: registration is rejected, not waitlisted', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin, { title: 'No Waitlist Workshop', visibility: 'public', capacityValue: '1', capacityType: 'person' });
+  await publishEvent(admin, eventId);
+  await db.prepare('UPDATE events SET allow_waitlist_signups = 0 WHERE id = ?').run(eventId);
+
+  const parent = await createParentAccount(1);
+  const child = parent.familyMemberIds[0];
+
+  const first = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+  assert.match(first.headers.location, /notice=/);
+
+  const second = await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(child), _csrf: parent.csrfToken });
+  assert.match(decodeURIComponent(second.headers.location), /error=.*full.*not accepting waitlist/i);
+
+  const rows = await db.prepare('SELECT member_id, status FROM event_registrations WHERE event_id = ?').all(eventId);
+  assert.equal(rows.length, 1, 'the second, over-capacity registration should never have been created');
+});
+
 test('an account cannot register a member outside its own family', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin, { title: 'Family Fun Day', visibility: 'public' });

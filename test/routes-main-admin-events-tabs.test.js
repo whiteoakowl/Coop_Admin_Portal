@@ -115,18 +115,24 @@ test('Events builder (per-event edit page): renders its own .view-tabs strip wit
   assert.match(page.text, /<div class="view-tabs no-print">/);
   // A later real request: "editing event should have little tabs at the
   // top. details, finance, settings, attendance" - "Event Details"
-  // renamed to "Details", Finance added, Volunteers/Donations/Food/
-  // Settings kept, Attendance appended as its own link to the
-  // Registrations page.
-  ['Details', 'Finance', 'Donations', 'Food', 'Settings', 'Attendance'].forEach((label) => {
+  // renamed to "Details", Finance added, Volunteers/Settings kept,
+  // Attendance appended as its own link to the Registrations page. A
+  // still later real request folded Donations/Food/Extra Fields into the
+  // Volunteers tab itself as a pill toggle rather than their own tabs,
+  // and renamed that top-level tab to "Resources/Fields".
+  ['Details', 'Finance', 'Resources/Fields', 'Settings', 'Attendance'].forEach((label) => {
     assert.match(page.text, new RegExp(`>${label}<`));
   });
   assert.doesNotMatch(page.text, />Event Details</);
-  assert.match(page.text, /class="view-tab active" data-builder-nav-link>Volunteers/);
+  assert.match(page.text, /class="view-tab active" data-builder-nav-link>Resources\/Fields/);
   assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations" class="view-tab" data-builder-nav-link>Attendance`));
+  // The Resources/Fields tab's own pill toggle for its four sections.
+  ['Volunteers', 'Food', 'Donations', 'Extra Fields'].forEach((label) => {
+    assert.match(page.text, new RegExp(`class="day-toggle-option[^"]*">${label}<`));
+  });
 });
 
-test('Events builder: Finance tab saves Price/Charged Per without touching Details, and the unsaved-changes dialog is present', async () => {
+test('Events builder: Finance tab saves Accounting Category without touching Details, and the unsaved-changes dialog is present', async () => {
   const admin = await loginAsMainAdmin();
   const createRes = await request(app)
     .post('/main-admin/events')
@@ -136,9 +142,14 @@ test('Events builder: Finance tab saves Price/Charged Per without touching Detai
   const eventId = Number(/\/main-admin\/events\/(\d+)\/builder/.exec(createRes.headers.location)[1]);
 
   const detailsPage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
-  // Price/Charged Per no longer live on the Details tab.
-  assert.doesNotMatch(detailsPage.text, /name="priceDollars"/);
-  assert.doesNotMatch(detailsPage.text, /name="pricePer"/);
+  // Price/Charged Per no longer live on the Details form itself (the
+  // page-wide Add Ticket Type dialog, present on every tab, has its own
+  // same-named fields for the ticket type being added - not what this
+  // checks).
+  const detailsFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+" class="member-form-grid" id="details-form">([\s\S]*?)<\/form>/.exec(detailsPage.text);
+  assert.ok(detailsFormMatch, 'the Details form should exist');
+  assert.doesNotMatch(detailsFormMatch[1], /name="priceDollars"/);
+  assert.doesNotMatch(detailsFormMatch[1], /name="pricePer"/);
   // A real request: "warning pop up when clicking to each page/tab that
   // you must save your changes on that page before going to the next.
   // cancel and continue buttons."
@@ -149,18 +160,21 @@ test('Events builder: Finance tab saves Price/Charged Per without touching Detai
 
   const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
   assert.equal(financePage.status, 200);
-  assert.match(financePage.text, /name="priceDollars"/);
-  assert.match(financePage.text, /name="pricePer"/);
+  // A real request: "accounting category drop is all that is now needed
+  // above ticket types" - the flat Price/Charged Per fields are gone from
+  // the Finance form itself (the separate Add Ticket Type dialog further
+  // down the page still has its own priceDollars/pricePer fields).
+  const financeFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/finance"[^>]*>([\s\S]*?)<\/form>/.exec(financePage.text);
+  assert.ok(financeFormMatch, 'the Finance form should exist');
+  assert.doesNotMatch(financeFormMatch[1], /name="priceDollars"/);
+  assert.doesNotMatch(financeFormMatch[1], /name="pricePer"/);
+  assert.match(financeFormMatch[1], /name="accountingCategoryId"/);
 
   await request(app)
     .post(`/main-admin/events/${eventId}/finance`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ priceDollars: '25.00', pricePer: 'family', _csrf: admin.csrfToken });
-
-  const after = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
-  assert.match(after.text, /name="priceDollars"[^>]*value="25\.00"/);
-  assert.match(after.text, /value="family" selected/);
+    .send({ accountingCategoryId: '', _csrf: admin.csrfToken });
 
   // Saving Finance shouldn't have blanked out the title/description set on Details.
   const afterDetails = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);

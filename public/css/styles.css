@@ -1409,6 +1409,13 @@ body.public-page .roster-empty {
 .primary-btn:hover { background: var(--btn-bg-hover); box-shadow: 0 4px 12px rgba(238,154,77,0.35); }
 .primary-btn:active { transform: translateY(1px); }
 
+/* A real request: "save event details button should be the very last
+   button on the page and dark blue, like we used on other pages" -
+   same size/shape as .primary-btn, just the site's own accessible mid
+   blue (--brand-dark) fill with white text instead of orange-on-dark. */
+.primary-btn-dark { background: var(--brand-dark); color: #fff; }
+.primary-btn-dark:hover { background: #24597f; box-shadow: 0 4px 12px rgba(46,109,164,0.35); }
+
 .alert {
   padding: 0.85rem 1rem;
   border-radius: 10px;
