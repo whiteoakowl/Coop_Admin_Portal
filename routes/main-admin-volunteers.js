@@ -11,7 +11,7 @@ const { requirePortalAuth, requirePortal, requirePortalPermission } = require('.
 const volunteers = require('../utils/committeesAndSignupLists');
 const events = require('../utils/events');
 const { listAdminPositions, membersByAdminPosition } = require('../utils/adminPositions');
-const { activeParentAndAdminOptions } = require('../utils/members');
+const { activeParentAndAdminOptions, activeMemberOptions } = require('../utils/members');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_volunteers'));
 
@@ -32,6 +32,10 @@ router.get('/', async (req, res) => {
     signUpLists: tab === 'signup-lists' ? await volunteers.listSignUpLists() : [],
     volunteerLists: tab === 'volunteer-lists' ? await volunteers.listVolunteerLists() : [],
     events: tab === 'signup-lists' || tab === 'volunteer-lists' ? await events.listEvents({}) : [],
+    // A real request: "below attach to event, there should be a drop
+    // down for attach to member with a choice of members listed abc by
+    // last name" - activeMemberOptions() already sorts that way.
+    memberOptions: tab === 'signup-lists' || tab === 'volunteer-lists' ? await activeMemberOptions() : [],
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
@@ -125,6 +129,7 @@ router.post('/signup-lists', async (req, res) => {
     title,
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
+    memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,
   });
   res.redirect(`/main-admin/volunteers/signup-lists/${id}?notice=` + encodeURIComponent('List created.'));
 });
@@ -134,6 +139,7 @@ router.post('/signup-lists/:id/update', async (req, res) => {
     title: (req.body.title || '').trim(),
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
+    memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,
   });
   res.redirect(`/main-admin/volunteers/signup-lists/${req.params.id}?notice=` + encodeURIComponent('List updated.'));
 });
@@ -151,6 +157,7 @@ router.get('/signup-lists/:id', async (req, res) => {
     list,
     items: await volunteers.itemsForSignUpList(list.id),
     events: await events.listEvents({}),
+    memberOptions: await activeMemberOptions(),
     // A real request: "add button that says copy link... you will have
     // copied the member link to the volunteer or signup list to paste
     // somewhere else to share" - the new standalone member-facing page
@@ -200,6 +207,7 @@ router.post('/volunteer-lists', async (req, res) => {
     title,
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
+    memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,
   });
   res.redirect(`/main-admin/volunteers/volunteer-lists/${id}?notice=` + encodeURIComponent('List created.'));
 });
@@ -209,6 +217,7 @@ router.post('/volunteer-lists/:id/update', async (req, res) => {
     title: (req.body.title || '').trim(),
     description: (req.body.description || '').trim(),
     eventId: req.body.eventId ? parseInt(req.body.eventId, 10) : null,
+    memberId: req.body.memberId ? parseInt(req.body.memberId, 10) : null,
   });
   res.redirect(`/main-admin/volunteers/volunteer-lists/${req.params.id}?notice=` + encodeURIComponent('List updated.'));
 });
@@ -225,6 +234,7 @@ router.get('/volunteer-lists/:id', async (req, res) => {
     title: list.title,
     list,
     shifts: await volunteers.shiftsForVolunteerList(list.id),
+    memberOptions: await activeMemberOptions(),
     events: await events.listEvents({}),
     memberLink: `${req.protocol}://${req.get('host')}/volunteer-lists/${list.id}`,
     error: req.query.error || null,

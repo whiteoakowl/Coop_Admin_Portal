@@ -1212,6 +1212,19 @@ body.public-page .roster-empty {
 .stack-form { display: flex; flex-direction: column; gap: 0.35rem; }
 .stack-form-narrow { max-width: 360px; }
 
+/* A real bug report on the Add Member form (member-intake-form.ejs,
+   shared by every "add a member" entry point): "add another parent
+   should be fit to text button on the left side of the page. Same with
+   add another child button." .stack-form's own flex column above
+   defaults every direct child to align-items:stretch, so a plain <button>
+   with no width of its own stretches to the form's full width instead of
+   sizing to its text - same fix as any other .stack-form child that
+   needs to opt out of that stretch. */
+#add-parent-btn,
+#add-child-btn {
+  align-self: flex-start;
+}
+
 .stack-form label { font-weight: 600; margin-top: 0.75rem; font-size: 0.9rem; }
 
 .stack-form input[type="date"] { width: 192px; }
@@ -3263,7 +3276,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    below it (.roster-toolbar's own justify-content: space-between) - now
    both sit together in one row, hugging the left edge instead of
    spanning/splitting across the page. */
-.members-search-filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+/* A real bug report: "search members, the text and box overlap each
+   other. They are also touching all the orange buttons and should be
+   evenly space row-wise." margin-top puts real space between this row
+   and the .roster-btn-row toolbar directly above it (that row has no
+   margin-bottom of its own - .roster-btn-row is shared by dozens of
+   other toolbars, so the gap is added here instead of changing its
+   shared default). */
+.members-search-filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; margin-bottom: 1rem; }
 .members-search-filter-row .category-filter { margin: 0; }
 
 .members-search-bar {
@@ -3281,12 +3301,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: var(--muted);
   pointer-events: none;
 }
+/* !important: the global base input rule (input:not([type="checkbox"])
+   ...seven :not() clauses..., select, textarea, further up this file)
+   out-specifies this plain class+attribute selector despite looking more
+   targeted - each :not() clause adds its own specificity - and its own
+   small, symmetric padding left no room for the icon above, so the
+   placeholder text rendered right underneath/through it. Same fix as
+   .admin-corner-search input's own identical bug earlier in this file. */
 .members-search-bar input[type="search"] {
   width: 100%;
-  padding: 0.6rem 0.9rem 0.6rem 2.4rem;
+  padding: 0.6rem 0.9rem 0.6rem 2.4rem !important;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-alt, #f3f4f6);
+  background: var(--surface-alt, #f3f4f6) !important;
   font-size: 0.9rem;
 }
 
@@ -6335,6 +6362,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .member-picker-dialog label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
 .member-picker-dialog select { width: 100%; margin-top: 0.25rem; }
 
+/* A real bug report on the Sign-Up/Volunteer List Add/Edit dialogs:
+   "title should be equal spaced from text box. description title should
+   be stacked above the actual description text box" - plain
+   `display: block` above lets a label's own leading text and its control
+   (especially a <textarea>, which unlike <input>/<select> has no
+   width:100% rule forcing it onto its own line) flow as ordinary inline
+   content, so a short label ends up beside its control instead of above
+   it, with inconsistent gaps depending on how the browser happens to
+   wrap that line. This modifier class (not .member-picker-dialog itself
+   - dozens of unrelated dialogs share that class and already render
+   correctly relying on the inline-wrap behavior above) makes every
+   label's text sit above its control with the exact same gap, every
+   time - same fix as .member-form-grid label elsewhere. A label whose
+   leading text has its own inline hint span (e.g. "Attach to Event
+   (optional)") wraps that whole run in its own <span> in the template so
+   flex treats it as the ONE item above the control, not three separate
+   stacked lines (text, hint, control). */
+.dialog-label-stack label { display: flex; flex-direction: column; gap: 0.35rem; }
+.dialog-label-stack select { margin-top: 0; }
+
 /* ---------- Class Schedule (admin grid + print) ---------- */
 
 .class-color-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.5rem; }
@@ -8602,7 +8649,18 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
    the mockup's own purple. */
 .event-wizard-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .event-wizard-header h1 { margin: 0 0 0.2rem; }
-.event-wizard-header-actions { display: flex; gap: 0.6rem; flex-shrink: 0; }
+.event-wizard-header-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+/* A real bug report: "create event save draft button should be the same
+   size as publish event button." .primary-btn's own margin-top:1.5rem
+   (meant for a button sitting alone at the end of a form) pushed Publish
+   Event down out of vertical alignment with Save Draft in this
+   horizontal button pair, and without an explicit white-space, "Save
+   Draft"'s own borderline-tight content width wrapped onto two lines
+   while "Publish Event" (needing more width, so never that tight)
+   stayed on one - taller and narrower than its neighbor instead of a
+   matched pair. */
+.event-wizard-header-actions .primary-btn { margin-top: 0; }
+.event-wizard-header-actions button { white-space: nowrap; }
 
 .event-wizard-steps { display: flex; align-items: flex-start; margin-bottom: 2rem; }
 .event-wizard-step {
@@ -8671,7 +8729,12 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
   padding-top: 1.25rem;
   border-top: 1px solid var(--border);
 }
-.event-wizard-footer-right { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.event-wizard-footer-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+/* Same Save Draft/Publish Event size-mismatch bug as .event-wizard-
+   header-actions above, just this step's own bottom copy of the same
+   button pair. */
+.event-wizard-footer-right .primary-btn { margin-top: 0; }
+.event-wizard-footer-right button { white-space: nowrap; }
 .required-star { color: var(--red); font-weight: 700; }
 
 /* Tags field (Create New Event, Additional step) - type-and-Enter chip

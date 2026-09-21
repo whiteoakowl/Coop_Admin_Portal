@@ -141,24 +141,24 @@ async function cancelCommitteeSignup(positionId, memberId) {
 // --- Sign-Up Lists ("a list of things for people to sign up for") ---
 
 async function listSignUpLists() {
-  return db.prepare('SELECT sl.*, e.title AS "eventTitle" FROM sign_up_lists sl LEFT JOIN events e ON e.id = sl.event_id ORDER BY sl.created_at DESC').all();
+  return db.prepare('SELECT sl.*, e.title AS "eventTitle", m.name AS "memberName" FROM sign_up_lists sl LEFT JOIN events e ON e.id = sl.event_id LEFT JOIN members m ON m.id = sl.member_id ORDER BY sl.created_at DESC').all();
 }
 
 async function getSignUpList(id) {
-  return db.prepare('SELECT sl.*, e.title AS "eventTitle" FROM sign_up_lists sl LEFT JOIN events e ON e.id = sl.event_id WHERE sl.id = ?').get(id);
+  return db.prepare('SELECT sl.*, e.title AS "eventTitle", m.name AS "memberName" FROM sign_up_lists sl LEFT JOIN events e ON e.id = sl.event_id LEFT JOIN members m ON m.id = sl.member_id WHERE sl.id = ?').get(id);
 }
 
 async function signUpListsForEvent(eventId) {
   return db.prepare('SELECT * FROM sign_up_lists WHERE event_id = ? ORDER BY created_at').all(eventId);
 }
 
-async function createSignUpList({ title, description, eventId }) {
-  const info = await db.prepare('INSERT INTO sign_up_lists (title, description, event_id) VALUES (?, ?, ?)').run(title, description || null, eventId || null);
+async function createSignUpList({ title, description, eventId, memberId }) {
+  const info = await db.prepare('INSERT INTO sign_up_lists (title, description, event_id, member_id) VALUES (?, ?, ?, ?)').run(title, description || null, eventId || null, memberId || null);
   return info.lastInsertRowid;
 }
 
-async function updateSignUpList(id, { title, description, eventId }) {
-  await db.prepare('UPDATE sign_up_lists SET title = ?, description = ?, event_id = ? WHERE id = ?').run(title, description || null, eventId || null, id);
+async function updateSignUpList(id, { title, description, eventId, memberId }) {
+  await db.prepare('UPDATE sign_up_lists SET title = ?, description = ?, event_id = ?, member_id = ? WHERE id = ?').run(title, description || null, eventId || null, memberId || null, id);
 }
 
 async function deleteSignUpList(id) {
@@ -223,24 +223,24 @@ async function cancelSignUpClaim(claimId) {
 // sign up for") ---
 
 async function listVolunteerLists() {
-  return db.prepare('SELECT vl.*, e.title AS "eventTitle" FROM volunteer_signup_lists vl LEFT JOIN events e ON e.id = vl.event_id ORDER BY vl.created_at DESC').all();
+  return db.prepare('SELECT vl.*, e.title AS "eventTitle", m.name AS "memberName" FROM volunteer_signup_lists vl LEFT JOIN events e ON e.id = vl.event_id LEFT JOIN members m ON m.id = vl.member_id ORDER BY vl.created_at DESC').all();
 }
 
 async function getVolunteerList(id) {
-  return db.prepare('SELECT vl.*, e.title AS "eventTitle" FROM volunteer_signup_lists vl LEFT JOIN events e ON e.id = vl.event_id WHERE vl.id = ?').get(id);
+  return db.prepare('SELECT vl.*, e.title AS "eventTitle", m.name AS "memberName" FROM volunteer_signup_lists vl LEFT JOIN events e ON e.id = vl.event_id LEFT JOIN members m ON m.id = vl.member_id WHERE vl.id = ?').get(id);
 }
 
 async function volunteerListsForEvent(eventId) {
   return db.prepare('SELECT * FROM volunteer_signup_lists WHERE event_id = ? ORDER BY created_at').all(eventId);
 }
 
-async function createVolunteerList({ title, description, eventId }) {
-  const info = await db.prepare('INSERT INTO volunteer_signup_lists (title, description, event_id) VALUES (?, ?, ?)').run(title, description || null, eventId || null);
+async function createVolunteerList({ title, description, eventId, memberId }) {
+  const info = await db.prepare('INSERT INTO volunteer_signup_lists (title, description, event_id, member_id) VALUES (?, ?, ?, ?)').run(title, description || null, eventId || null, memberId || null);
   return info.lastInsertRowid;
 }
 
-async function updateVolunteerList(id, { title, description, eventId }) {
-  await db.prepare('UPDATE volunteer_signup_lists SET title = ?, description = ?, event_id = ? WHERE id = ?').run(title, description || null, eventId || null, id);
+async function updateVolunteerList(id, { title, description, eventId, memberId }) {
+  await db.prepare('UPDATE volunteer_signup_lists SET title = ?, description = ?, event_id = ?, member_id = ? WHERE id = ?').run(title, description || null, eventId || null, memberId || null, id);
 }
 
 async function deleteVolunteerList(id) {

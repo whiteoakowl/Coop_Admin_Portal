@@ -115,7 +115,7 @@
         </div>
       </div>
 
-      <%# Edit mode's Select All + Actions dropdown - hidden until the
+      <%# Edit mode's Select All/None + Actions dropdown - hidden until the
           "Edit" toggle button above is clicked. A real request: "there
           should be an edit button on member page that says edit. when
           you click it it will show check boxes next to every member.
@@ -123,23 +123,33 @@
           appears and says actions, delete or archive are the options."
           Members tab only - Archive already has its own per-row
           Reactivate button below.
-          A later real request: "remove trash button from each member.
-          you must archive the member and then they can be deleted while
-          archived" - Delete dropped from this Members-tab dropdown for
-          the same reason it was dropped from the per-row actions below;
-          the bulk-delete route (routes/main-admin-members.js's own POST
-          /bulk-delete) is otherwise unreferenced now, kept only so a
-          per-row Archive-tab Delete still works. Only rendered on the
-          Members tab, unlike the shared .roster-toolbar wrapper this
-          used to always sit inside (now removed) - .category-filter
-          moved out into its own .members-search-filter-row above, so
-          there's nothing left needing that wrapper on the Archive tab. %>
+          A later real request removed Delete from here ("remove trash
+          button from each member. you must archive the member and then
+          they can be deleted while archived"), then a later one still
+          asked for it back ("actions drop down should also have
+          delete"), so it's back - same bulk-delete route (routes/main-
+          admin-members.js's own POST /bulk-delete) the per-row Archive-
+          tab Delete button already uses.
+          A real request: "add select none and check box next to select
+          all" - data-select-none-for is public/js/archive-select-
+          toggle.js's own generic mirror of data-select-all-for, a
+          momentary action that clears every checkbox then un-checks
+          itself, same as every other Select None checkbox in this app.
+          Only rendered on the Members tab, unlike the shared
+          .roster-toolbar wrapper this used to always sit inside (now
+          removed) - .category-filter moved out into its own
+          .members-search-filter-row above, so there's nothing left
+          needing that wrapper on the Archive tab. %>
       <% if (activeTab === 'members') { %>
         <div class="roster-toolbar no-print">
           <div class="class-schedule-archive-controls" data-archive-controls="members-select-form" hidden>
             <label class="checkbox-option class-schedule-select-all">
               <input type="checkbox" data-select-all-for="members-select-form" />
               Select All
+            </label>
+            <label class="checkbox-option class-schedule-select-all">
+              <input type="checkbox" data-select-none-for="members-select-form" />
+              Select None
             </label>
             <select data-bulk-action-select form="members-select-form" aria-label="Actions">
               <option value="">Actions</option>
@@ -150,6 +160,12 @@
                 data-bulk-confirm-yes-label="Yes, Archive"
                 data-bulk-confirm-safe="1"
               >Archive</option>
+              <option
+                value="delete"
+                data-bulk-action="/main-admin/members/bulk-delete"
+                data-bulk-confirm="Permanently delete the selected member(s)? This removes them from all rosters and attendance history. This cannot be undone."
+                data-bulk-confirm-yes-label="Yes, Delete"
+              >Delete</option>
             </select>
           </div>
         </div>

@@ -136,7 +136,7 @@
         </div>
       <% } %>
 
-      <dialog id="add-signup-list-dialog" class="member-picker-dialog">
+      <dialog id="add-signup-list-dialog" class="member-picker-dialog dialog-label-stack">
         <form method="POST" action="/main-admin/volunteers/signup-lists">
           <h3>Add Sign-Up List</h3>
           <label>Title
@@ -145,10 +145,16 @@
           <label>Description
             <textarea name="description" rows="3"></textarea>
           </label>
-          <label>Attach to Event <span class="hint">(optional)</span>
+          <label><span>Attach to Event <span class="hint">(optional)</span></span>
             <select name="eventId">
               <option value="">None</option>
               <% events.forEach(function(e) { %><option value="<%= e.id %>"><%= e.title %></option><% }); %>
+            </select>
+          </label>
+          <label><span>Attach to Member <span class="hint">(optional)</span></span>
+            <select name="memberId">
+              <option value="">None</option>
+              <% memberOptions.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
             </select>
           </label>
           <div class="notes-dialog-actions">
@@ -187,7 +193,7 @@
         </div>
       <% } %>
 
-      <dialog id="add-volunteer-list-dialog" class="member-picker-dialog">
+      <dialog id="add-volunteer-list-dialog" class="member-picker-dialog dialog-label-stack">
         <form method="POST" action="/main-admin/volunteers/volunteer-lists">
           <h3>Add Volunteer List</h3>
           <label>Title
@@ -196,10 +202,16 @@
           <label>Description
             <textarea name="description" rows="3"></textarea>
           </label>
-          <label>Attach to Event <span class="hint">(optional)</span>
+          <label><span>Attach to Event <span class="hint">(optional)</span></span>
             <select name="eventId">
               <option value="">None</option>
               <% events.forEach(function(e) { %><option value="<%= e.id %>"><%= e.title %></option><% }); %>
+            </select>
+          </label>
+          <label><span>Attach to Member <span class="hint">(optional)</span></span>
+            <select name="memberId">
+              <option value="">None</option>
+              <% memberOptions.forEach(function(m) { %><option value="<%= m.id %>"><%= m.name %></option><% }); %>
             </select>
           </label>
           <div class="notes-dialog-actions">

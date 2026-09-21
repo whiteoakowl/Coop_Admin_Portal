@@ -301,6 +301,49 @@ test('Sign-Up Lists: create multiple lists, attach one to an event, add items, a
   assert.equal(claim.quantity_claimed, 1);
 });
 
+test('Sign-Up/Volunteer List Add & Edit dialogs: Attach to Member dropdown lists members ABC by last name and persists on create/update', async () => {
+  const admin = await loginAsMainAdmin();
+  const zebraId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Amy Zebra', 'zebra-1', 'parent', 1) RETURNING id").get()).id;
+  const appleId = (await db.prepare("INSERT INTO members (name, barcode, member_type, active) VALUES ('Bob Apple', 'apple-1', 'parent', 1) RETURNING id").get()).id;
+
+  const listPage = await request(app).get('/main-admin/volunteers?tab=signup-lists').set('Cookie', admin.cookie);
+  assert.match(listPage.text, /Attach to Member/);
+  // Apple (last name) sorts before Zebra, regardless of member id/creation order.
+  const appleIndex = listPage.text.indexOf('Bob Apple');
+  const zebraIndex = listPage.text.indexOf('Amy Zebra');
+  assert.ok(appleIndex > -1 && zebraIndex > -1 && appleIndex < zebraIndex, 'members should list ABC by last name');
+
+  const create = await request(app)
+    .post('/main-admin/volunteers/signup-lists')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Member-Attached List', memberId: String(appleId), _csrf: admin.csrfToken });
+  const listId = Number(/\/signup-lists\/(\d+)/.exec(create.headers.location)[1]);
+  let list = await db.prepare('SELECT member_id FROM sign_up_lists WHERE id = ?').get(listId);
+  assert.equal(list.member_id, appleId, 'Attach to Member should be saved on create');
+
+  const detailPage = await request(app).get(`/main-admin/volunteers/signup-lists/${listId}`).set('Cookie', admin.cookie);
+  assert.match(detailPage.text, /Attached member: Bob Apple/);
+  const csrf = extractCsrf(detailPage.text);
+  await request(app)
+    .post(`/main-admin/volunteers/signup-lists/${listId}/update`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Member-Attached List', memberId: String(zebraId), _csrf: csrf });
+  list = await db.prepare('SELECT member_id FROM sign_up_lists WHERE id = ?').get(listId);
+  assert.equal(list.member_id, zebraId, 'Attach to Member should be updatable');
+
+  // Same for Volunteer Lists.
+  const vCreate = await request(app)
+    .post('/main-admin/volunteers/volunteer-lists')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'Member-Attached Volunteer List', memberId: String(appleId), _csrf: admin.csrfToken });
+  const vListId = Number(/\/volunteer-lists\/(\d+)/.exec(vCreate.headers.location)[1]);
+  const vList = await db.prepare('SELECT member_id FROM volunteer_signup_lists WHERE id = ?').get(vListId);
+  assert.equal(vList.member_id, appleId, 'Volunteer Lists should also save Attach to Member');
+});
+
 test('Sign-Up List Add Item dialog: a fetch()-style request (Accept: application/json) gets JSON back instead of a redirect, so several items can be added without the page navigating away', async () => {
   const admin = await loginAsMainAdmin();
   await request(app).post('/main-admin/volunteers/signup-lists').set('Cookie', admin.cookie).type('form').send({ title: 'Fetch Check List', _csrf: admin.csrfToken });

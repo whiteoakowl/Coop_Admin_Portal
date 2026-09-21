@@ -248,6 +248,34 @@
           </div>
         <% } %>
 
+        <%# A real request: "where are the rest of the pages? settings,
+            food, volunteers, etc." Volunteers/Donations are already ON
+            by default for a brand-new event (routes/admin-events.js's
+            own registrationFieldsFromBody), so their tabs already show
+            up after saving without needing anything checked here - only
+            Food defaults off. These three checkboxes are just each
+            section's on/off switch (an existing event column each,
+            volunteers_enabled/donations_enabled/food_enabled); adding
+            actual volunteer roles, donation items, or food items - like
+            the rest of Settings/Finance/Attendance - needs a real event
+            id to attach them to, so that part of each tab only opens up
+            once this event is saved below. %>
+        <h3 class="event-wizard-subheading">Event Sections</h3>
+        <div class="class-form-row">
+          <div class="class-form-field">
+            <input type="hidden" name="volunteersEnabled" value="0" />
+            <label class="grade-pill"><input type="checkbox" name="volunteersEnabled" value="1" checked /> Volunteers</label>
+          </div>
+          <div class="class-form-field">
+            <input type="hidden" name="donationsEnabled" value="0" />
+            <label class="grade-pill"><input type="checkbox" name="donationsEnabled" value="1" checked /> Donations</label>
+          </div>
+          <div class="class-form-field">
+            <label class="grade-pill"><input type="checkbox" name="foodEnabled" value="1" /> Food</label>
+          </div>
+        </div>
+        <p class="hint">Saving below (Draft or Published) takes you to this event's full editor, where Settings, Finance, Attendance, and each enabled section's own items (food, donations, volunteer roles) are ready to fill in.</p>
+
         <div class="event-wizard-footer">
           <button type="button" class="btn-secondary" data-prev-step>&larr; Back</button>
           <div class="event-wizard-footer-right">

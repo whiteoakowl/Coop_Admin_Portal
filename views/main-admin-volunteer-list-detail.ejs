@@ -19,6 +19,7 @@
     </div>
     <% if (list.description) { %><p><%= list.description %></p><% } %>
     <p class="hint">Attached event: <%= list.eventTitle || 'None' %></p>
+    <p class="hint">Attached member: <%= list.memberName || 'None' %></p>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -78,7 +79,7 @@
       </form>
     </dialog>
 
-    <dialog id="edit-list-dialog" class="member-picker-dialog">
+    <dialog id="edit-list-dialog" class="member-picker-dialog dialog-label-stack">
       <form method="POST" action="/main-admin/volunteers/volunteer-lists/<%= list.id %>/update">
         <h3>Edit List</h3>
         <label>Title
@@ -87,10 +88,20 @@
         <label>Description
           <textarea name="description" rows="3"><%= list.description || '' %></textarea>
         </label>
-        <label>Attach to Event <span class="hint">(optional)</span>
+        <label><span>Attach to Event <span class="hint">(optional)</span></span>
           <select name="eventId">
             <option value="">None</option>
             <% events.forEach(function(e) { %><option value="<%= e.id %>" <%= list.event_id === e.id ? 'selected' : '' %>><%= e.title %></option><% }); %>
+          </select>
+        </label>
+        <%# A real request: "below attach to event, there should be a
+            drop down for attach to member with a choice of members
+            listed abc by last name" - memberOptions is already sorted
+            that way (utils/members.js's byLastName). %>
+        <label><span>Attach to Member <span class="hint">(optional)</span></span>
+          <select name="memberId">
+            <option value="">None</option>
+            <% memberOptions.forEach(function(m) { %><option value="<%= m.id %>" <%= list.member_id === m.id ? 'selected' : '' %>><%= m.name %></option><% }); %>
           </select>
         </label>
         <div class="notes-dialog-actions">

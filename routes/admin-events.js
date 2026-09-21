@@ -83,14 +83,21 @@ function registrationFieldsFromBody(body) {
     allowGuestRegister: body.allowGuestRegister === '1',
     priceCents: body.priceDollars ? Math.round(parseFloat(body.priceDollars) * 100) : null,
     pricePer: body.pricePer === 'family' ? 'family' : 'person',
-    // Only the per-event edit page's own Volunteers/Donations/Food tabs
-    // (sectionToggleRoute below) ever submit these fields - the Create
-    // wizard doesn't, so `undefined === '1'` would otherwise always store
-    // false here and silently override the migration's own DEFAULT 1 for
-    // Volunteers/Donations (both already existed live before Food did) on
-    // every new event.
-    volunteersEnabled: body.volunteersEnabled !== undefined ? body.volunteersEnabled === '1' : true,
-    donationsEnabled: body.donationsEnabled !== undefined ? body.donationsEnabled === '1' : true,
+    // A real request: "where are the rest of the pages? settings, food,
+    // volunteers, etc." added an Event Sections checkbox trio to the
+    // wizard's own Permissions step. `!== '0'` (not `=== '1'`) so a
+    // wholly-omitted field (an existing raw POST that doesn't send this
+    // key at all, like some tests still do) keeps the migration's own
+    // DEFAULT 1 for Volunteers/Donations, while the wizard's own hidden-
+    // '0'-fallback + checkbox pair (same field name on both, same
+    // pattern as allowAdultRegister/allowChildRegister above) reliably
+    // reads as false on an explicit uncheck - `!==` rather than `===`
+    // specifically because a CHECKED box submits both elements' values as
+    // an array, which is never strictly equal to either string but is
+    // always !== '0'. Food has no such fallback (or default) since it's
+    // off by default even here, same as it always was.
+    volunteersEnabled: body.volunteersEnabled !== '0',
+    donationsEnabled: body.donationsEnabled !== '0',
     foodEnabled: body.foodEnabled === '1',
     volunteerSelectionCount: selectionCountFromBody(body.volunteerSelectionCount),
     donationSelectionCount: selectionCountFromBody(body.donationSelectionCount),

@@ -119,13 +119,20 @@
     <% } %>
   </main>
 
-  <dialog id="add-category-dialog" class="member-picker-dialog">
+  <%# A real request: "add and close buttons should be next to each
+      other in the same row" - Close (harmless inside the form, it's
+      type="button" so it never submits anything) moved in next to Add,
+      both in the one .notes-dialog-actions row, instead of Add ending
+      the form and Close sitting in its own separate row below the
+      existing-categories list. %>
+  <dialog id="add-category-dialog" class="member-picker-dialog dialog-label-stack">
     <h3>Add/Edit Category</h3>
     <form method="POST" action="/main-admin/resource-links/categories">
       <label for="add-resource-category-title">New Category Name
         <input id="add-resource-category-title" type="text" name="title" placeholder="e.g. Local Field Trips" required />
       </label>
       <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
         <button type="submit" class="primary-btn">Add</button>
       </div>
     </form>
@@ -145,12 +152,9 @@
         <% }); %>
       </div>
     <% } %>
-    <div class="notes-dialog-actions">
-      <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-    </div>
   </dialog>
 
-  <dialog id="add-resource-dialog" class="member-picker-dialog">
+  <dialog id="add-resource-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="/main-admin/resource-links">
       <h3>Add Resource</h3>
       <label for="add-resource-title">Title
@@ -195,7 +199,7 @@
       where you can edit the category and info and save." One shared
       dialog, filled in from the clicked row's own data-* attributes
       (see the script below) rather than one dialog per row. %>
-  <dialog id="edit-resource-dialog" class="member-picker-dialog">
+  <dialog id="edit-resource-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" id="edit-resource-form">
       <h3>Edit Resource</h3>
       <label for="edit-resource-title">Title

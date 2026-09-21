@@ -37,6 +37,24 @@
     });
   });
 
+  // A real request (Main Admin Members' own Edit mode): "add select none
+  // and check box next to select all" - a momentary action, not
+  // persistent state, same as every other Select None checkbox in this
+  // app (see public/js/email-composer-filters.js's own comment): checking
+  // it clears every checkbox tied to this form (and Select All, if it was
+  // checked) then immediately un-checks itself.
+  document.addEventListener('change', (e) => {
+    const none = e.target.closest('[data-select-none-for]');
+    if (!none || !none.checked) return;
+    const formId = none.getAttribute('data-select-none-for');
+    document.querySelectorAll(`input[type="checkbox"][form="${formId}"]`).forEach((cb) => {
+      cb.checked = false;
+    });
+    const selectAll = document.querySelector(`[data-select-all-for="${formId}"]`);
+    if (selectAll) selectAll.checked = false;
+    none.checked = false;
+  });
+
   document.addEventListener('click', (e) => {
     const toggle = e.target.closest('[data-archive-toggle]');
     if (!toggle) return;
