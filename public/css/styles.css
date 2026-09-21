@@ -6837,6 +6837,76 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .training-requirements { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .training-requirements .grade-pill { display: inline-flex; flex-direction: row; align-items: center; }
 
+/* views/partials/multi-select-checkbox.ejs - a real request, with a
+   reference screenshot: "ages and grade choices on event and class forms
+   should be dropdown menus with checkboxes and ability to choose
+   multiple checkboxes... more condensed." Only Grade/Age call sites (see
+   the partial's own comment) - the plain .grade-pill-grid above stays
+   exactly as-is for its other, non-grade/age callers (Sections, Setup
+   Team, training requirements, etc.). */
+.multi-select-checkbox { position: relative; margin: 0.35rem 0 0.75rem; }
+.multi-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--control-font-size-compact);
+  cursor: pointer;
+  text-align: left;
+}
+.multi-select-trigger:hover { border-color: var(--btn-blue); }
+.multi-select-trigger[aria-expanded="true"] { border-color: var(--btn-blue); }
+.multi-select-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 0.3rem; min-width: 0; }
+.multi-select-placeholder { color: var(--muted); }
+.multi-select-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  border-radius: 999px;
+  padding: 0.15rem 0.35rem 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.multi-select-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.multi-select-chip-remove:hover { background: rgba(46,109,164,0.18); }
+.multi-select-chevron { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--muted); }
+.multi-select-trigger[aria-expanded="true"] .multi-select-chevron { transform: rotate(180deg); }
+.multi-select-panel {
+  margin-top: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  padding: 0.6rem 0.75rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 /* Training builder's Passing Score + Video completion threshold - one
    .member-form-grid cell (not .member-form-full) holding both fields side
    by side, so the threshold sits on the same line as Passing Score rather

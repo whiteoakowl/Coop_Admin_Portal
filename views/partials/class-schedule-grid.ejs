@@ -141,11 +141,12 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
     </div>
 
     <span class="class-form-section-label required">Grade Level <span class="optional-tag">(Select all that apply)</span></span>
-    <div class="grade-pill-grid">
-      <% gradeLevels.forEach(function(g) { %>
-        <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
-      <% }); %>
-    </div>
+    <%- include('multi-select-checkbox', {
+      name: 'ageGroup',
+      options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
+      selected: [],
+      placeholder: 'All grades/ages',
+    }) %>
 
     <div class="class-form-row">
       <div class="class-form-field">
@@ -439,6 +440,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
   </table>
 </div>
 <script src="/js/class-schedule-view-toggle.js"></script>
+<script src="/js/multi-select-checkbox.js"></script>
 
 <% if (!gridReadOnly) { %>
 <dialog id="class-view-dialog" class="class-view-dialog"></dialog>

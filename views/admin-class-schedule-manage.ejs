@@ -66,11 +66,12 @@
 
             <div class="member-form-full">
               <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
-              <div class="grade-pill-grid">
-                <% gradeLevels.forEach(function(g) { %>
-                  <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" <%= selectedGrades.includes(g) ? 'checked' : '' %> /> <%= g %></label>
-                <% }); %>
-              </div>
+              <%- include('partials/multi-select-checkbox', {
+                name: 'ageGroup',
+                options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
+                selected: selectedGrades,
+                placeholder: 'All grades/ages',
+              }) %>
             </div>
 
             <div class="member-form-full" data-forum-editor>
@@ -215,5 +216,6 @@
     </dialog>
   </main>
   <script src="/js/forum-editor.js"></script>
+  <script src="/js/multi-select-checkbox.js"></script>
 </body>
 </html>

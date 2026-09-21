@@ -213,11 +213,12 @@
         <h2>Permissions</h2>
         <div class="member-form-full">
           <span class="roster-checkbox-label">Grade Restriction <span class="hint">(leave all unchecked to allow every grade)</span></span>
-          <div class="grade-pill-grid">
-            <% gradeOptions.forEach(function(g) { %>
-              <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" /> <%= g %></label>
-            <% }); %>
-          </div>
+          <%- include('partials/multi-select-checkbox', {
+            name: 'ageGroup',
+            options: gradeOptions.map(function(g) { return { value: g, label: g }; }),
+            selected: [],
+            placeholder: 'All grades',
+          }) %>
         </div>
 
         <%
@@ -289,5 +290,6 @@
   <script src="/js/forum-editor.js"></script>
   <script src="/js/tag-input.js"></script>
   <script src="/js/event-wizard.js"></script>
+  <script src="/js/multi-select-checkbox.js"></script>
 </body>
 </html>

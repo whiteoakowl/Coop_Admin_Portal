@@ -1,0 +1,71 @@
+<%
+/* Generic multi-select-with-chips-and-checkboxes control - a real
+   request, with a reference screenshot: "ages and grade choices on event
+   and class forms should be dropdown menus with checkboxes and ability
+   to choose multiple checkboxes... this will be more condensed." Renders
+   a closed-by-default checkbox list (public/js/multi-select-checkbox.js
+   opens/closes it) behind a text-input-like trigger row that shows one
+   removable chip per currently-checked option, same as the screenshot's
+   states-picker example.
+
+   Params:
+     name        - the checkbox `name` attribute every option shares
+                   (repeated across inputs, same as the plain grid this
+                   replaces - routes reading req.body.<name> via
+                   [].concat(...) need no changes at all)
+     options     - array of { value, label }
+     selected    - array of currently-checked values (strings)
+     placeholder - trigger text shown when nothing is checked
+     disabled    - when true, every checkbox renders `disabled` (view-
+                   only mode - e.g. views/class-schedule-view-fragment.ejs
+                   toggles this the same generic way it always has,
+                   `form.querySelectorAll('input, select, textarea').
+                   forEach(el => el.disabled = false)` on Edit, since
+                   these are still plain <input type="checkbox"> elements
+                   underneath)
+*/
+var msOptions = options || [];
+var msSelected = selected || [];
+// `disabled` is only ever passed by the one read-only caller (see the
+// param doc above) - EJS throws ReferenceError on a bare reference to a
+// local no include() call actually passed, unlike a plain JS object
+// property access, so every other caller needs this typeof guard.
+var msDisabled = (typeof disabled !== 'undefined' && disabled) ? 'disabled' : '';
+%>
+<div class="multi-select-checkbox" data-multi-select data-multi-select-placeholder="<%= placeholder || 'Select…' %>">
+  <button type="button" class="multi-select-trigger" aria-expanded="false">
+    <span class="multi-select-chips" data-multi-select-chips>
+      <% if (msSelected.length === 0) { %>
+        <span class="multi-select-placeholder"><%= placeholder || 'Select…' %></span>
+      <% } else { %>
+        <% msOptions.forEach(function(o, idx) { %>
+          <% if (msSelected.includes(String(o.value))) { %>
+            <%# data-multi-select-remove-index is this option's position among
+                the panel's own checkboxes below (rendered in this same
+                msOptions order, one each) - public/js/multi-select-
+                checkbox.js reads it back to find the right checkbox to
+                uncheck WITHOUT looking it up by value (which would need
+                CSS.escape-style quoting for any value containing a quote
+                or backslash). A plain index-based click handler here,
+                rather than one attached when JS rebuilds these chips
+                itself, also means this initial, server-rendered chip's
+                own remove button works immediately - including inside
+                views/class-schedule-view-fragment.ejs, injected into a
+                dialog by fetch() well after this script's own one-time
+                page-load pass already ran. %>
+            <span class="multi-select-chip"><%= o.label %> <button type="button" class="multi-select-chip-remove" data-multi-select-remove-index="<%= idx %>" aria-label="Remove <%= o.label %>">&times;</button></span>
+          <% } %>
+        <% }); %>
+      <% } %>
+    </span>
+    <svg class="icon multi-select-chevron"><use href="#icon-chevron-down"/></svg>
+  </button>
+  <div class="multi-select-panel" data-multi-select-panel hidden>
+    <% msOptions.forEach(function(o) { %>
+      <label class="checkbox-option">
+        <input type="checkbox" name="<%= name %>" value="<%= o.value %>" <%= msSelected.includes(String(o.value)) ? 'checked' : '' %> <%= msDisabled %> />
+        <%= o.label %>
+      </label>
+    <% }); %>
+  </div>
+</div>

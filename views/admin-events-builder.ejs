@@ -422,21 +422,23 @@
           <div class="member-form-full">
             <span class="roster-checkbox-label">Grade Level <span class="hint">(leave all unchecked to allow every grade)</span></span>
             <label class="checkbox-option"><input type="checkbox" name="lockRegistrationToGrade" value="1" <%= event.lock_registration_to_grade ? 'checked' : '' %> /> Lock registration to grade level</label>
-            <div class="grade-pill-grid">
-              <% gradeOptions.forEach(function(g) { %>
-                <label class="grade-pill"><input type="checkbox" name="ageGroup" value="<%= g %>" <%= selectedGrades.includes(g) ? 'checked' : '' %> /> <%= g %></label>
-              <% }); %>
-            </div>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'ageGroup',
+              options: gradeOptions.map(function(g) { return { value: g, label: g }; }),
+              selected: selectedGrades,
+              placeholder: 'All grades',
+            }) %>
           </div>
 
           <div class="member-form-full">
             <span class="roster-checkbox-label">Age <span class="hint">(leave all unchecked to allow every age)</span></span>
             <label class="checkbox-option"><input type="checkbox" name="lockRegistrationToAge" value="1" <%= event.lock_registration_to_age ? 'checked' : '' %> /> Lock registration to age level</label>
-            <div class="grade-pill-grid">
-              <% ageGroupOptions.forEach(function(g) { %>
-                <label class="grade-pill"><input type="checkbox" name="ageGroupRestriction" value="<%= g.key %>" <%= selectedAgeGroups.includes(g.key) ? 'checked' : '' %> /> <%= g.label %></label>
-              <% }); %>
-            </div>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'ageGroupRestriction',
+              options: ageGroupOptions.map(function(g) { return { value: g.key, label: g.label }; }),
+              selected: selectedAgeGroups,
+              placeholder: 'All ages',
+            }) %>
           </div>
 
           <% if (sections.length) { %>
@@ -556,5 +558,6 @@
   <script src="/js/tag-input.js"></script>
   <script src="/js/event-builder-tab-guard.js"></script>
   <script src="/js/copy-link.js"></script>
+  <script src="/js/multi-select-checkbox.js"></script>
 </body>
 </html>
