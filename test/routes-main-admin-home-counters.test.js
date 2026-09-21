@@ -1,9 +1,13 @@
 // Coverage for the Main Admin homepage's Families/Parents/Students
-// counters and the settings-gear dropdown - real requests: "should show
-// a counter of how many families, how many parents and how many
-// students" and "roles and permissions, website settings, and co-op
-// admin portal links should all be under the main admin settings gear
-// icon."
+// counters and the settings gear - real requests: "should show a counter
+// of how many families, how many parents and how many students," "roles
+// and permissions, website settings, and co-op admin portal links should
+// all be under the main admin settings gear icon," and later "clicking
+// on the settings tab should not show subpages. instead all subpages
+// should be rows of cards for each setting category" (the gear used to
+// open a dropdown of these same destinations right in the sidebar - it's
+// now a plain link to /main-admin/settings, which renders that card grid
+// instead - see test/routes-main-admin-settings-hub.test.js).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -39,7 +43,7 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('GET /main-admin shows Families/Parents/Students counters and the gear dropdown, without the relocated dashboard cards', async () => {
+test('GET /main-admin shows Families/Parents/Students counters and a plain settings-gear link, without the relocated dashboard cards', async () => {
   const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('HomeCounterFamily') RETURNING id").get()).id;
   await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Counter Parent', 'counter-parent-1', 'parent', ?, 1)").run(familyId);
   await db.prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('Counter Kid One', 'counter-kid-1', 'student', ?, 1)").run(familyId);
@@ -88,13 +92,12 @@ test('GET /main-admin shows Families/Parents/Students counters and the gear drop
   assert.doesNotMatch(res.text, /Open Co-op Admin/);
   assert.doesNotMatch(res.text, /Manage Users/);
 
-  // The gear dropdown carries the remaining destinations - the standalone
-  // Users tab itself is gone (see test/routes-main-admin-members-profile-
-  // and-accounts.test.js), so it no longer has an entry here either.
-  assert.doesNotMatch(res.text, /href="\/main-admin\/users">Users</);
-  assert.match(res.text, /href="\/main-admin\/roles">Roles &amp; Permissions</);
-  assert.match(res.text, /href="\/main-admin\/website">Website</);
-  assert.match(res.text, /href="\/admin">Co-op Admin Portal</);
+  // The gear itself is now a plain link straight to the settings hub
+  // (test/routes-main-admin-settings-hub.test.js covers the card grid of
+  // destinations that page renders) - not a dropdown listing them here in
+  // the sidebar.
+  assert.doesNotMatch(res.text, />Settings<\/summary>/);
+  assert.match(res.text, /href="\/main-admin\/settings"><svg class="icon"><use href="#icon-gear"\/><\/svg> Settings<\/a>/);
 });
 
 test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', async () => {

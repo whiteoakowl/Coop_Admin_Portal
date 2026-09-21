@@ -104,12 +104,19 @@ router.get('/', async (req, res) => {
 // under the settings icon at the top as a file tab" - Users and Website
 // (see /website below) both dropped out of the top-level nav (every
 // views/main-admin-*.ejs's own navLinks array) and now live only under
-// the gear icon (views/partials/portal-nav.ejs's settingsHref). This
-// bare redirect gives that gear icon one stable URL to open - Roles &
-// Permissions is first now that the standalone Users tab is gone (see
-// partials/main-admin-settings-tabs.ejs's own comment on why).
-router.get('/settings', requirePortalPermission('manage_users'), (req, res) => {
-  res.redirect('/main-admin/roles');
+// the gear icon (views/partials/portal-nav.ejs's settingsHref).
+// Used to be a bare redirect straight to /main-admin/roles - a later
+// real request: "clicking on the settings tab should not show subpages.
+// instead all subpages should be rows of cards for each setting
+// category" replaced that with a real landing page instead, one card per
+// destination this gear used to either redirect to or list in its own
+// dropdown (views/partials/portal-nav.ejs's old .portal-switcher-details
+// menu, now gone in favor of a plain link straight here). No
+// requirePortalPermission gate here, same as that old dropdown never
+// filtered its own links by permission either - every card is shown,
+// each destination page still enforces its own permission on click.
+router.get('/settings', (req, res) => {
+  res.render('main-admin-settings-hub', { title: 'Settings' });
 });
 
 // A real request: "the co-op admin portal settings quicklinks tab

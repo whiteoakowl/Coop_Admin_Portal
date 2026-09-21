@@ -140,6 +140,26 @@ router.post('/categories', async (req, res) => {
   res.redirect('/main-admin/store?notice=' + encodeURIComponent(`Added "${name}".`));
 });
 
+// A real request: "add/edit category should be a pop up that shows
+// current categories and allows you to add new ones or edit old ones.
+// make multiple changes then click save" - one submit renames every
+// changed row (categoryId[i]/categoryName[i] are parallel arrays, same
+// index) and, if filled in, also creates the new category, instead of
+// each row having its own separate Save button. Registered before the
+// bare 'POST /:id' below, same reasoning as 'POST /categories' above -
+// otherwise it would match id='bulk-save' there instead.
+router.post('/categories/bulk-save', async (req, res) => {
+  const ids = [].concat(req.body.categoryId || []);
+  const names = [].concat(req.body.categoryName || []);
+  for (let i = 0; i < ids.length; i++) {
+    const name = (names[i] || '').trim();
+    if (name) await store.renameCategory(ids[i], name);
+  }
+  const newName = (req.body.newCategoryName || '').trim();
+  if (newName) await store.addCategory(newName);
+  res.redirect('/main-admin/store?notice=' + encodeURIComponent('Categories saved.'));
+});
+
 router.post('/categories/:id', async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect('/main-admin/store?error=' + encodeURIComponent('Category name is required.'));

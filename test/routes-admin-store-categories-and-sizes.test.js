@@ -91,6 +91,40 @@ test('Settings tab: adding, renaming, and deleting a category', async () => {
   assert.equal(product.category_id, null, "the product should survive, now uncategorized");
 });
 
+test('Add/Edit Category popup: bulk-save renames several categories and adds a new one in one submit', async () => {
+  const admin = await loginAsMainAdmin();
+
+  let csrf = await freshCsrf(admin, 'products');
+  await request(app).post('/main-admin/store/categories').set('Cookie', admin.cookie).type('form').send({ name: 'Books', _csrf: csrf });
+  await request(app).post('/main-admin/store/categories').set('Cookie', admin.cookie).type('form').send({ name: 'Toys', _csrf: csrf });
+  const books = await db.prepare("SELECT * FROM store_categories WHERE name = 'Books'").get();
+  const toys = await db.prepare("SELECT * FROM store_categories WHERE name = 'Toys'").get();
+
+  const page = await request(app).get('/main-admin/store?tab=products').set('Cookie', admin.cookie);
+  assert.match(page.text, /Add\/Edit Category/);
+  assert.match(page.text, new RegExp(`name="categoryId" value="${books.id}"`));
+  assert.match(page.text, new RegExp(`name="categoryId" value="${toys.id}"`));
+  csrf = extractCsrf(page.text);
+
+  await request(app)
+    .post('/main-admin/store/categories/bulk-save')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      categoryId: [String(books.id), String(toys.id)],
+      categoryName: ['Books & Media', 'Toys & Games'],
+      newCategoryName: 'Hobbies',
+      _csrf: csrf,
+    });
+
+  const updatedBooks = await db.prepare('SELECT name FROM store_categories WHERE id = ?').get(books.id);
+  const updatedToys = await db.prepare('SELECT name FROM store_categories WHERE id = ?').get(toys.id);
+  const hobbies = await db.prepare("SELECT * FROM store_categories WHERE name = 'Hobbies'").get();
+  assert.equal(updatedBooks.name, 'Books & Media');
+  assert.equal(updatedToys.name, 'Toys & Games');
+  assert.ok(hobbies, 'the new category should also be created in the same submit');
+});
+
 test('Products tab: category filter only shows products in the selected category', async () => {
   const admin = await loginAsMainAdmin();
 

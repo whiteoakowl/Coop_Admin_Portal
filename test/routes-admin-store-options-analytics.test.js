@@ -67,13 +67,16 @@ async function activateProduct(admin, productId) {
   await request(app).post(`/main-admin/store/${productId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'active', _csrf: csrf });
 }
 
-test('Settings tab is gone; Add Category lives on Products', async () => {
+test('Settings tab is gone; Add/Edit Category lives on Products, not a separate list', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/store').set('Cookie', admin.cookie);
   assert.equal(page.status, 200);
   assert.doesNotMatch(page.text, /store\?tab=settings">Settings/);
-  assert.match(page.text, /\+ Add Category/);
-  assert.match(page.text, /<h2>Categories<\/h2>/);
+  assert.match(page.text, />Add\/Edit Category</);
+  // A real request: "categories isn't listed on product page. just the
+  // product cards" - no standalone Categories section/heading outside
+  // the popup.
+  assert.doesNotMatch(page.text, /<h2>Categories<\/h2>/);
 
   const settingsUrl = await request(app).get('/main-admin/store?tab=settings').set('Cookie', admin.cookie);
   // An unrecognized tab value falls back to Products, same as before.

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Main Admin',
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Settings</h1>
+
+    <%# A real request: "clicking on the settings tab should not show
+        subpages. instead all subpages should be rows of cards for each
+        setting category" - the gear used to open a .portal-switcher-
+        details dropdown of 4 links (Roles & Permissions/Website/Audit
+        Log/Co-op Admin Portal, missing Admins/FAQ/Quick Links entirely);
+        this lists every one of them as its own card instead, same
+        .team-card-grid/.team-info-card component every other "pick one
+        of these named things" page in this app already uses (Training,
+        Classifieds categories, Shop products). %>
+    <div class="team-card-grid">
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/roles">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-shield"/></svg></span>
+          <h3 class="team-info-title">Roles &amp; Permissions</h3>
+          <p class="hint">Manage admin roles and what each one can access.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/admins">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-user-check"/></svg></span>
+          <h3 class="team-info-title">Admins</h3>
+          <p class="hint">Admin positions and who currently leads each one.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/website">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-sliders"/></svg></span>
+          <h3 class="team-info-title">Website</h3>
+          <p class="hint">Public site content and settings.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/faq">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-info-circle"/></svg></span>
+          <h3 class="team-info-title">FAQ</h3>
+          <p class="hint">Frequently asked questions shown on the public site.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/quick-links">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-link"/></svg></span>
+          <h3 class="team-info-title">Quick Links</h3>
+          <p class="hint">Shortcut links shown to members.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/main-admin/audit-log">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+          <h3 class="team-info-title">Audit Log</h3>
+          <p class="hint">A record of admin actions taken across the portal.</p>
+        </a>
+      </div>
+      <div class="team-col">
+        <a class="team-info-card" href="/admin">
+          <span class="team-info-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
+          <h3 class="team-info-title">Co-op Admin Portal</h3>
+          <p class="hint">Switch to the separate Co-op Admin Portal.</p>
+        </a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

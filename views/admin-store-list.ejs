@@ -17,8 +17,12 @@
               This button shows you the member store view." %>
           <a class="roster-action-btn" href="/store" target="_blank" rel="noopener">View Member Store</a>
           <%# A real request: "remove settings subpage. Move add category
-              button to the product page." %>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">+ Add Category</button>
+              button to the product page," later renamed and reworked
+              into a combined popup: "add category button should say
+              add/edit category. it should then be a pop up that shows
+              current categories and allows you to add new ones or edit
+              old ones. make multiple changes then click save." %>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-category-dialog').showModal()">Add/Edit Category</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-product-dialog').showModal()">+ New Product</button>
         </div>
       <% } else if (activeTab === 'orders') { %>
@@ -77,41 +81,50 @@
         <% }); %>
       </div>
 
-      <%# A real request: "remove settings subpage. Move add category
-          button to the product page" - Categories management (all
-          Settings ever held) moved here from its own tab. %>
-      <div class="manage-section">
-        <div class="grid-box-header"><h2>Categories</h2></div>
-        <% if (categories.length === 0) { %>
-          <p class="roster-empty">No categories yet &mdash; add one above.</p>
-        <% } else { %>
-          <ul class="store-category-list">
-            <% categories.forEach(function(c) { %>
-              <li class="store-category-row">
-                <form method="POST" action="/main-admin/store/categories/<%= c.id %>" class="store-category-rename-form">
-                  <input type="text" name="name" value="<%= c.name %>" required />
-                  <button type="submit" class="btn-secondary">Save</button>
-                </form>
-                <form method="POST" action="/main-admin/store/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its products become uncategorized.">
-                  <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
-                </form>
-              </li>
-            <% }); %>
-          </ul>
-        <% } %>
-      </div>
+      <%# A real request: "categories isn't listed on product page. just
+          the product cards" - the standalone Categories list/section
+          that used to live here is gone; managing categories now happens
+          entirely in the Add/Edit Category popup below. %>
 
+      <%# A real request: "add category button should say add/edit
+          category. it should then be a pop up that shows current
+          categories and allows you to add new ones or edit old ones.
+          make multiple changes then click save." One form renames every
+          changed row and adds the new one (if filled in) all in one
+          submit - routes/admin-store.js's own POST /categories/bulk-save
+          - instead of each row having its own separate Save button. Each
+          row's own Delete stays its own tiny standalone <form> (the
+          `form=""` attribute on its button submits that form instead of
+          the enclosing one - forms can't nest) so it keeps its own
+          data-confirm and doesn't get swept up by a Save meant only for
+          renames/additions. %>
       <dialog id="add-category-dialog" class="member-picker-dialog">
-        <form method="POST" action="/main-admin/store/categories">
-          <h3>Add Category</h3>
-          <label for="add-store-category-name">Category Name
-            <input id="add-store-category-name" type="text" name="name" placeholder="e.g. Apparel" required />
+        <form method="POST" action="/main-admin/store/categories/bulk-save">
+          <h3>Add/Edit Category</h3>
+          <% if (categories.length === 0) { %>
+            <p class="hint">No categories yet &mdash; add one below.</p>
+          <% } else { %>
+            <div class="store-category-list">
+              <% categories.forEach(function(c) { %>
+                <div class="store-category-row">
+                  <input type="hidden" name="categoryId" value="<%= c.id %>" />
+                  <input type="text" name="categoryName" value="<%= c.name %>" required />
+                  <button type="submit" form="delete-category-<%= c.id %>-form" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+          <label for="add-store-category-name">New Category
+            <input id="add-store-category-name" type="text" name="newCategoryName" placeholder="e.g. Apparel" />
           </label>
           <div class="notes-dialog-actions">
             <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
-            <button type="submit" class="primary-btn">Add</button>
+            <button type="submit" class="primary-btn">Save</button>
           </div>
         </form>
+        <% categories.forEach(function(c) { %>
+          <form method="POST" action="/main-admin/store/categories/<%= c.id %>/delete" id="delete-category-<%= c.id %>-form" data-confirm="Delete category &quot;<%= c.name %>&quot;? Its products become uncategorized."></form>
+        <% }); %>
       </dialog>
 
       <dialog id="new-product-dialog" class="member-picker-dialog">

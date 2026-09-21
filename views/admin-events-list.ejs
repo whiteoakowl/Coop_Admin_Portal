@@ -211,7 +211,7 @@
       <%# A real request: "add/edit categories, add/edit locations buttons
           should be at the top of the page" - moved above General
           Settings (Item 8's original placement was below the form). %>
-      <div class="roster-btn-row no-print">
+      <div class="roster-btn-row events-category-location-row no-print">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
       </div>
@@ -229,11 +229,25 @@
           submitEvent and routes/events.js). A later real request removed
           the "make events public by default" setting that used to live
           here - a submitted event now always keeps the visibility its
-          submitter picked. Every Allow/Disallow or Yes/No radio pair (and
-          the Calendar/List View pair) sits in its own .checkbox-group so
-          the options land on one row instead of stacking - each
-          .checkbox-option is its own flex box (see styles.css), so plain
-          siblings would otherwise stack one per line. %>
+          submitter picked.
+          A later real request: "event settings, all questions should be
+          check boxes. the check boxes should be in a single uniform
+          column on the left and the question begins on the same row as
+          the check box" - replaced every Allow/Disallow or Yes/No RADIO
+          pair (previously its own .checkbox-group row, question text on
+          the line above) with a single checkbox instead, all stacked
+          together in one .checkbox-group-stack column - same
+          .checkbox-option "checkbox first, question text right after, on
+          one row" shape the per-event Settings tab (admin-events-
+          builder.ejs) already established. Checked now means exactly
+          what the old "Allow"/"Yes" radio option meant; unchecked means
+          "Do not allow"/"No" - routes/admin-events.js's own
+          `req.body.X === '1'` already treats a missing (unchecked) field
+          as false, so no backend change was needed. Default Calendar
+          View (Calendar vs. List) and "allow families to submit calendar
+          items" (Yes/Auto-Approve/No) aren't yes/no questions - a
+          checkbox can't represent 3 states or a non-boolean choice - so
+          those two stay as radio groups. %>
       <form method="POST" action="/main-admin/events/settings" class="stack-form member-form-page-panel">
         <h2>General Settings</h2>
         <div class="member-form-grid">
@@ -244,10 +258,6 @@
               <label class="checkbox-option"><input type="radio" name="defaultCalendarView" value="list" <%= eventSettings.default_calendar_view === 'list' ? 'checked' : '' %> /> List View</label>
             </div>
           </div>
-          <label class="checkbox-option member-form-full">
-            <input type="checkbox" name="showWaitlistPosition" value="1" <%= eventSettings.show_waitlist_position ? 'checked' : '' %> />
-            Allow families to see their waiting list position.
-          </label>
           <label>Default Days Before Event to Send Reminder Email
             <select name="reminderDaysBefore">
               <% [0, 1, 2, 3, 5, 7, 10, 14, 21, 30].forEach(function(d) { %>
@@ -255,43 +265,6 @@
               <% }); %>
             </select>
           </label>
-          <div class="member-form-full">
-            <span class="class-form-field-label">When registrations are cancelled by a Family, allow an automated credit adjustment to the family's accounting statement?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Allow</label>
-              <label class="checkbox-option"><input type="radio" name="creditOnFamilyCancel" value="0" <%= !eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> Do not allow</label>
-            </div>
-          </div>
-          <div class="member-form-full">
-            <span class="class-form-field-label">When registrations are cancelled/deleted by an Admin, or by the System for nonpayment, allow an automated credit adjustment?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Allow</label>
-              <label class="checkbox-option"><input type="radio" name="creditOnAdminCancel" value="0" <%= !eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> Do not allow</label>
-            </div>
-          </div>
-          <%# A real request: "new settings, automatically issue refund if
-              member cancels their registration." %>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Automatically issue a refund if a member cancels their registration?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="autoRefundOnFamilyCancel" value="1" <%= eventSettings.auto_refund_on_family_cancel ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="autoRefundOnFamilyCancel" value="0" <%= !eventSettings.auto_refund_on_family_cancel ? 'checked' : '' %> /> No</label>
-            </div>
-          </div>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Allow Sub-Admins the ability to edit Locations?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="1" <%= eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="subadminEditLocations" value="0" <%= !eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> No</label>
-            </div>
-          </div>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Allow Sub-Admins the ability to edit Categories?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="1" <%= eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="subadminEditCategories" value="0" <%= !eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> No</label>
-            </div>
-          </div>
           <div class="member-form-full">
             <span class="class-form-field-label">Allow families to submit calendar of events items?</span>
             <div class="checkbox-group">
@@ -303,19 +276,17 @@
           <label class="member-form-full">Email Notifications To
             <input type="email" name="submitNotificationEmail" value="<%= eventSettings.submit_notification_email || '' %>" placeholder="admin@example.com" />
           </label>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Allow families with full administrative rights to manage price options and payment instructions for events they submit?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="1" <%= eventSettings.family_manage_price_options ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="familyManagePriceOptions" value="0" <%= !eventSettings.family_manage_price_options ? 'checked' : '' %> /> No</label>
-            </div>
-          </div>
-          <div class="member-form-full">
-            <span class="class-form-field-label">Allow families with full administrative rights to update and manage events they created after approval?</span>
-            <div class="checkbox-group">
-              <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="1" <%= eventSettings.family_manage_own_events ? 'checked' : '' %> /> Yes</label>
-              <label class="checkbox-option"><input type="radio" name="familyManageOwnEvents" value="0" <%= !eventSettings.family_manage_own_events ? 'checked' : '' %> /> No</label>
-            </div>
+          <div class="member-form-full checkbox-group checkbox-group-stack">
+            <label class="checkbox-option"><input type="checkbox" name="showWaitlistPosition" value="1" <%= eventSettings.show_waitlist_position ? 'checked' : '' %> /> Allow families to see their waiting list position?</label>
+            <label class="checkbox-option"><input type="checkbox" name="creditOnFamilyCancel" value="1" <%= eventSettings.credit_on_family_cancel ? 'checked' : '' %> /> When registrations are cancelled by a Family, allow an automated credit adjustment to the family's accounting statement?</label>
+            <label class="checkbox-option"><input type="checkbox" name="creditOnAdminCancel" value="1" <%= eventSettings.credit_on_admin_cancel ? 'checked' : '' %> /> When registrations are cancelled/deleted by an Admin, or by the System for nonpayment, allow an automated credit adjustment?</label>
+            <%# A real request: "new settings, automatically issue refund if
+                member cancels their registration." %>
+            <label class="checkbox-option"><input type="checkbox" name="autoRefundOnFamilyCancel" value="1" <%= eventSettings.auto_refund_on_family_cancel ? 'checked' : '' %> /> Automatically issue a refund if a member cancels their registration?</label>
+            <label class="checkbox-option"><input type="checkbox" name="subadminEditLocations" value="1" <%= eventSettings.subadmin_edit_locations ? 'checked' : '' %> /> Allow Sub-Admins the ability to edit Locations?</label>
+            <label class="checkbox-option"><input type="checkbox" name="subadminEditCategories" value="1" <%= eventSettings.subadmin_edit_categories ? 'checked' : '' %> /> Allow Sub-Admins the ability to edit Categories?</label>
+            <label class="checkbox-option"><input type="checkbox" name="familyManagePriceOptions" value="1" <%= eventSettings.family_manage_price_options ? 'checked' : '' %> /> Allow families with full administrative rights to manage price options and payment instructions for events they submit?</label>
+            <label class="checkbox-option"><input type="checkbox" name="familyManageOwnEvents" value="1" <%= eventSettings.family_manage_own_events ? 'checked' : '' %> /> Allow families with full administrative rights to update and manage events they created after approval?</label>
           </div>
         </div>
         <div class="member-form-footer">

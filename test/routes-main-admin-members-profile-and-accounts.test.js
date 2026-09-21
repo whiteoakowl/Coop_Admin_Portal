@@ -67,9 +67,9 @@ test('the Users settings tab is gone: no route, no tab link, no dashboard/nav de
   const usersNew = await request(app).get('/main-admin/users/new').set('Cookie', cookie);
   assert.equal(usersNew.status, 404);
 
-  const settingsRedirect = await request(app).get('/main-admin/settings').set('Cookie', cookie);
-  assert.equal(settingsRedirect.status, 302);
-  assert.match(settingsRedirect.headers.location, /\/main-admin\/roles/);
+  const settingsHub = await request(app).get('/main-admin/settings').set('Cookie', cookie);
+  assert.equal(settingsHub.status, 200);
+  assert.match(settingsHub.text, /href="\/main-admin\/roles"/);
 
   const rolesPage = await request(app).get('/main-admin/roles').set('Cookie', cookie);
   assert.equal(rolesPage.status, 200);

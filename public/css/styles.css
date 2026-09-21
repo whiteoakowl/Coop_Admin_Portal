@@ -1271,16 +1271,25 @@ body.public-page .roster-empty {
 
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.35rem; }
 
-/* Communication > Announcements "Send to" checkboxes: on mobile these wrap
-   into a ragged, hard-to-scan mix of columns since the labels vary a lot in
-   length (role names vs. "Everyone (all active members)"). Stack them in a
-   single left-aligned column instead, matching every other mobile checkbox
-   list in the app; desktop keeps the wrapping row layout above. Scoped to
-   this modifier class rather than .checkbox-group itself so the kiosk
-   Name Tag / Absence forms' own checkbox-group usage is untouched. */
-@media (max-width: 640px) {
-  .checkbox-group-stack { flex-direction: column; align-items: flex-start; }
-}
+/* Communication > Announcements "Send to" checkboxes: these wrap into a
+   ragged, hard-to-scan mix of columns since the labels vary a lot in
+   length (role names vs. "Everyone (all active members)"). Stack them in
+   a single left-aligned column instead, matching every other checkbox
+   list in the app that asks for one. Scoped to this modifier class rather
+   than .checkbox-group itself so the kiosk Name Tag / Absence forms' own
+   checkbox-group usage is untouched.
+   Originally mobile-only (@media max-width: 640px) - Events' own two
+   settings pages (admin-events-list.ejs's General Settings, admin-events-
+   builder.ejs's per-event Settings tab) already used this class on the
+   assumption it meant "always one column" ("stacked one per line...so
+   every row's checkbox lines up in one column" - that file's own
+   comment), which only accidentally held on desktop because their
+   checkbox labels are long enough to wrap onto their own line anyway. A
+   real request - "event settings...check boxes should be in a single
+   uniform column on the left" - made that assumption load-bearing, so
+   the desktop-only gate is gone; every .checkbox-group-stack list is now
+   one column at every width. */
+.checkbox-group-stack { flex-direction: column; align-items: flex-start; }
 
 /* A real request: "at the bottom where there are check boxes for who to
    send the announcement to, it should be in a clean box with check boxes
@@ -2319,6 +2328,24 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--ink);
+}
+/* A real bug this caused: .member-form-grid label's own column-flex
+   layout right above (class+element, specificity 0,1,1) beats plain
+   .checkbox-option's row layout (one class, 0,1,0) for any property
+   .checkbox-option doesn't also set - flex-direction isn't one of them
+   (.checkbox-option relies on flex's own row default), so it lost to the
+   column layout here, stacking the checkbox above its own question text
+   and centering both instead of the intended "checkbox and question on
+   the same row" shape. Two classes plus the element (0,2,1) beats the
+   grid's own rule cleanly. Events' General Settings and per-event
+   Settings tab (admin-events-list.ejs/admin-events-builder.ejs) are the
+   two places this combination is actually used. */
+.member-form-grid label.checkbox-option {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: inherit;
 }
 .member-form-grid input,
 .member-form-grid select,
@@ -3868,6 +3895,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    the only child, just the only .roster-action-btn, so it was still
    stretching to fill the whole row on its own. */
 .email-toolbar-row .roster-action-btn { flex: 0 0 auto; }
+
+/* Events' own Add/Edit Category/Add/Edit Location toolbar - a real
+   request: "events, desktop, add/edit category and add/edit location
+   should be smaller width buttons to fit text more proportional." Same
+   flex:1 0 auto stretching-to-fill-the-row issue as .email-toolbar-row
+   above, just two buttons this time instead of one next to a form. */
+.events-category-location-row .roster-action-btn { flex: 0 0 auto; }
 
 /* Co-op Admin's own Email/Text toolbar row (Filter/Select All/Select
    None/Create) - a real request: "make sure the buttons are well
@@ -6222,15 +6256,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .sale-cart-info .sale-cart-name { display: block; font-weight: 600; }
 .sale-cart-info .sale-cart-meta { display: block; font-size: 0.8rem; color: var(--muted); }
 
-/* Shop Settings tab's category list - same inline rename-form + delete
-   button per row as .edit-families-list, kept under its own class names
-   per this app's convention of one feature, one set of class names even
-   when the layout is identical. */
-.store-category-list { list-style: none; margin: 0 0 1rem; padding: 0; max-height: 50vh; overflow-y: auto; }
+/* Shop's Add/Edit Category popup: a list of existing categories, each an
+   inline rename input + Delete button, same "flexible name field, narrow
+   controls" row shape as .edit-families-list. A real request moved this
+   from its own list on the Products page into the popup itself ("add/
+   edit category...pop up that shows current categories and allows you
+   to add new ones or edit old ones. make multiple changes then click
+   save") - every row's rename input is now a plain field inside the
+   popup's one shared Save form rather than its own per-row form, so
+   Delete (which must stay its own request, not part of a rename/add
+   batch) uses the `form=""` attribute to submit a separate standalone
+   form instead (see admin-store-list.ejs's own comment on this dialog). */
+.store-category-list { margin: 0 0 1rem; max-height: 50vh; overflow-y: auto; }
 .store-category-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
 .store-category-row:last-child { border-bottom: none; }
-.store-category-rename-form { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
-.store-category-rename-form input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.store-category-row input[type="text"] { flex: 1 1 auto; min-width: 0; }
 
 /* A real request: "adding options to a product should be a row with a
    bar for the option title and the individual price next to it, and box

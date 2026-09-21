@@ -40,7 +40,7 @@ async function loginAsMainAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Events Settings tab: Add/Edit Category & Location buttons at the top, Export/Import gone, paired radios share a row', async () => {
+test('Events Settings tab: Add/Edit Category & Location buttons at the top, Export/Import gone, yes/no questions are a single checkbox column', async () => {
   const cookie = await loginAsMainAdmin();
   const res = await request(app).get('/main-admin/events?tab=settings').set('Cookie', cookie);
   assert.equal(res.status, 200);
@@ -63,18 +63,26 @@ test('Events Settings tab: Add/Edit Category & Location buttons at the top, Expo
   assert.match(calendarViewGroup[1], /Calendar View/);
   assert.match(calendarViewGroup[1], /List View/);
 
-  // Every Allow/Do not allow and Yes/No radio pair is wrapped the same way.
-  const groupCount = (res.text.match(/<div class="checkbox-group">/g) || []).length;
-  assert.ok(groupCount >= 8, `expected at least 8 checkbox-group rows, found ${groupCount}`);
+  // A real request: "event settings, all questions should be check
+  // boxes. the check boxes should be in a single uniform column on the
+  // left and the question begins on the same row as the check box." Every
+  // former Allow/Do not allow and Yes/No radio pair (that's genuinely
+  // binary, not the 3-way family-submission or Calendar/List view choice)
+  // is now one checkbox, all sharing a single .checkbox-group-stack column.
+  const stackGroup = /<div class="member-form-full checkbox-group checkbox-group-stack">([\s\S]*?)<\/div>\s*<\/div>/.exec(res.text);
+  assert.ok(stackGroup, 'expected a single stacked checkbox-group column for the yes/no questions');
+  const checkboxCount = (stackGroup[1].match(/type="checkbox"/g) || []).length;
+  assert.ok(checkboxCount >= 8, `expected at least 8 checkboxes in the stacked column, found ${checkboxCount}`);
+  assert.doesNotMatch(stackGroup[1], /type="radio"/, 'the stacked yes/no questions should be checkboxes, not radios');
 
   // "Make events public by default" is gone entirely.
   assert.doesNotMatch(res.text, /Make events submitted by families public by default/);
   assert.doesNotMatch(res.text, /familyEventsPublicDefault/);
 
-  // The new auto-refund setting is present as a Yes/No radio pair.
+  // The new auto-refund setting is present as a single checkbox.
   assert.match(res.text, /Automatically issue a refund if a member cancels their registration\?/);
   assert.match(res.text, /name="autoRefundOnFamilyCancel" value="1"/);
-  assert.match(res.text, /name="autoRefundOnFamilyCancel" value="0"/);
+  assert.doesNotMatch(res.text, /name="autoRefundOnFamilyCancel" value="0"/);
 });
 
 test('saving Settings persists the new auto-refund setting', async () => {
@@ -99,6 +107,7 @@ test('saving Settings persists the new auto-refund setting', async () => {
 
   const after = await request(app).get('/main-admin/events?tab=settings').set('Cookie', cookie);
   assert.match(after.text, /name="autoRefundOnFamilyCancel" value="1" checked/);
+  assert.doesNotMatch(after.text, /name="autoRefundOnFamilyCancel" value="0"/);
 });
 
 test('a family-submitted event keeps its own chosen visibility, even if the legacy public-by-default column is still true in the database', async () => {
