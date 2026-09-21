@@ -27,6 +27,11 @@
       <div class="roster-btn-row roster-btn-row-fit-text">
         <a class="roster-action-btn" href="/main-admin/events">&larr; All Events</a>
         <a class="roster-action-btn" href="/main-admin/events/<%= event.id %>/registrations">Registrations (<%= event.registrationCount %><% if (event.waitlistCount) { %> + <%= event.waitlistCount %> waitlisted<% } %>)</a>
+        <%# A real request: "copy link should be at the top with the rest
+            of the buttons not on the settings page" - moved here from its
+            old home on the Settings tab, same data-copy-link pattern
+            (public/js/copy-link.js). %>
+        <button type="button" class="roster-action-btn" data-copy-link="<%= eventLink %>">Copy Link</button>
         <% if (event.status !== 'published') { %>
           <form method="POST" action="/main-admin/events/<%= event.id %>/status" class="inline-block-form">
             <input type="hidden" name="status" value="published" />
@@ -45,7 +50,7 @@
           </form>
         <% } %>
         <form method="POST" action="/main-admin/events/<%= event.id %>/delete" class="inline-block-form" data-confirm="Delete &quot;<%= event.title %>&quot;? This cannot be undone.">
-          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete Event</button>
+          <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete Event" title="Delete Event"><svg class="icon"><use href="#icon-trash"/></svg></button>
         </form>
       </div>
     </div>
@@ -100,7 +105,7 @@
 
     <% if (activeTab === 'details') { %>
       <div class="manage-section">
-        <form method="POST" action="/main-admin/events/<%= event.id %>" enctype="multipart/form-data" class="member-form-grid">
+        <form method="POST" action="/main-admin/events/<%= event.id %>" class="member-form-grid">
           <label class="member-form-full">Title
             <input type="text" name="title" value="<%= event.title %>" required />
           </label>
@@ -124,9 +129,6 @@
             <div class="forum-editable" data-forum-editable contenteditable="true"><%- event.description || '' %></div>
             <input type="hidden" name="description" data-forum-body-input />
           </div>
-          <label>Category (legacy text - prefer the dropdown below)
-            <input type="text" name="category" value="<%= event.category || '' %>" placeholder="e.g. Social, Fundraiser" />
-          </label>
           <label>Category
             <select name="categoryId">
               <option value="">None</option>
@@ -152,34 +154,6 @@
           <label>Ends
             <input type="datetime-local" name="endsAt" value="<%= event.ends_at ? event.ends_at.replace(' ', 'T').slice(0, 16) : '' %>" />
           </label>
-          <label>Registration Opens
-            <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
-          <label>Registration Closes
-            <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
-          </label>
-          <label>Visibility
-            <select name="visibility">
-              <option value="members" <%= event.visibility === 'members' ? 'selected' : '' %>>Members only</option>
-              <option value="public" <%= event.visibility === 'public' ? 'selected' : '' %>>Public</option>
-            </select>
-          </label>
-          <%
-          // A real request: "capacity totals dropdown choosing family or
-          // person capacity" - one number plus a type picker instead of
-          // two separate numeric fields (routes/admin-events.js's own
-          // capacityFieldsFromBody maps this back onto whichever of
-          // capacity/family_capacity the type actually means).
-          %>
-          <label>Capacity <span class="hint">(blank = no limit)</span>
-            <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
-          </label>
-          <label>Capacity Counted By
-            <select name="capacityType">
-              <option value="person" <%= event.family_capacity == null ? 'selected' : '' %>>Person</option>
-              <option value="family" <%= event.family_capacity != null ? 'selected' : '' %>>Family</option>
-            </select>
-          </label>
           <label>Organized By
             <input type="text" name="organizedBy" value="<%= event.organized_by || '' %>" placeholder="e.g., Sanford Homeschoolers" />
           </label>
@@ -194,17 +168,35 @@
           </div>
 
           <div class="member-form-full">
-            <span class="roster-checkbox-label">Event Image</span>
-            <% if (imageUrl) { %>
-              <img src="<%= imageUrl %>" alt="" style="max-width: 240px; border-radius: var(--radius); display: block; margin-bottom: 0.5rem;" />
-            <% } %>
-            <input type="file" name="image" accept="image/*" />
-          </div>
-
-          <div class="member-form-full">
             <button type="submit" class="primary-btn">Save Event Details</button>
           </div>
         </form>
+
+        <%# A real request: "uploading image should have an upload button
+            to the right of choose file. it still says something went
+            wrong trying to upload a photo. after you hit upload photo
+            button it should show the image before saving." A separate
+            form from Details above (an HTML form can't nest inside
+            another), posting straight to the dedicated POST /:id/image
+            route - the image saves and shows immediately once Upload is
+            clicked, with no need to also click Save Event Details.
+            public/js/event-image-preview.js shows the chosen file
+            instantly (before that round trip even finishes) via a local
+            object URL; the img tag then also carries the real, already-
+            uploaded image on every later page load. The "something went
+            wrong" report was routes/admin-events.js's own uploadEventImage
+            wrapper missing - a too-large file made upload.single() throw
+            a MulterError that fell through to the generic error page
+            instead of a friendly "too large" redirect (same fix already
+            applied to routes/admin-documents.js and utils/memberIntake.js). %>
+        <div class="member-form-full">
+          <span class="roster-checkbox-label">Event Image</span>
+          <img src="<%= imageUrl || '' %>" alt="" data-event-image-preview style="max-width: 240px; border-radius: var(--radius); display: <%= imageUrl ? 'block' : 'none' %>; margin-bottom: 0.5rem;" />
+          <form method="POST" action="/main-admin/events/<%= event.id %>/image" enctype="multipart/form-data" class="roster-btn-row">
+            <input type="file" name="image" accept="image/*" required data-event-image-input />
+            <button type="submit" class="roster-action-btn">Upload</button>
+          </form>
+        </div>
       </div>
     <% } else if (activeTab === 'finance') { %>
       <%# A real request: "editing event should have little tabs at the
@@ -221,11 +213,62 @@
               <option value="family" <%= event.price_per === 'family' ? 'selected' : '' %>>Family</option>
             </select>
           </label>
+          <%# A real request: "add a drop down menu for choosing
+              accounting category" - the list itself is managed from the
+              Events list page's own Settings tab (Add/Edit Accounting
+              Category), same place/pattern as Categories/Locations. %>
+          <label>Accounting Category
+            <select name="accountingCategoryId">
+              <option value="">None</option>
+              <% accountingCategories.forEach(function(c) { %>
+                <option value="<%= c.id %>" <%= event.accounting_category_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+              <% }); %>
+            </select>
+          </label>
           <div class="member-form-full">
             <button type="submit" class="primary-btn">Save Finance</button>
           </div>
         </form>
       </div>
+
+      <%# A real request: "if charging per person there should be an
+          option for adding several types of tickets with a different
+          price and title bar next to it." Admin-side only for now (a
+          scoping question confirmed this) - registration still charges
+          the flat Price above; this doesn't yet let a registrant pick
+          one. Same +Add/list/delete shape as Volunteer Roles/Donation
+          Items/Food Items below. %>
+      <% if (event.price_per !== 'family') { %>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h2>Ticket Types (<%= event.ticketTypes.length %>)</h2>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-ticket-type-dialog').showModal()">+ Add Ticket Type</button>
+          </div>
+
+          <% if (event.ticketTypes.length === 0) { %>
+            <p class="roster-empty">No ticket types yet - registration uses the flat Price above.</p>
+          <% } %>
+
+          <div class="training-lesson-list">
+            <% event.ticketTypes.forEach(function(t) { %>
+              <div class="training-lesson-row">
+                <div class="training-lesson-row-main">
+                  <svg class="icon"><use href="#icon-badge"/></svg>
+                  <div class="training-lesson-info">
+                    <strong><%= t.title %></strong>
+                    <span class="hint">$<%= (t.price_cents / 100).toFixed(2) %></span>
+                  </div>
+                  <div class="training-lesson-actions">
+                    <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types/<%= t.id %>/delete" class="inline-block-form" data-confirm="Remove ticket type &quot;<%= t.title %>&quot;?">
+                      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= t.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
     <% } else if (activeTab === 'volunteers' || activeTab === 'donations' || activeTab === 'food') { %>
       <%
       // A real request: "on the volunteer, donations and food pages.
@@ -391,13 +434,6 @@
       // same pattern event_settings' own several fields already use.
       %>
       <div class="manage-section">
-        <%# A real request: "under individual event settings, there
-            should be a button that says copy link with the public url
-            address for the event" - same data-copy-link pattern Signup/
-            Volunteer Lists already use (public/js/copy-link.js). %>
-        <div class="roster-btn-row no-print">
-          <button type="button" class="roster-action-btn" data-copy-link="<%= eventLink %>">Copy Link</button>
-        </div>
         <form method="POST" action="/main-admin/events/<%= event.id %>/permissions" class="member-form-grid">
           <div class="member-form-full checkbox-group checkbox-group-stack">
             <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
@@ -419,6 +455,32 @@
             <label class="checkbox-option"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Kids can register?</label>
           </div>
 
+          <%# A real request: "registration opens and closes should be
+              moved to event settings tab... capacity counted by moved to
+              event settings" - moved here from Details, along with the
+              Capacity number itself (kept together since routes/admin-
+              events.js's capacityFieldsFromBody needs both from the same
+              submission to compute capacity/family_capacity correctly).
+              Visibility is already covered by "Is this a public event?"
+              above - Details' own separate Visibility dropdown was dead
+              code (this route never read it), so it was just removed
+              rather than duplicated here. %>
+          <label>Registration Opens
+            <input type="datetime-local" name="registrationOpensAt" value="<%= event.registration_opens_at ? event.registration_opens_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+          </label>
+          <label>Registration Closes
+            <input type="datetime-local" name="registrationClosesAt" value="<%= event.registration_closes_at ? event.registration_closes_at.replace(' ', 'T').slice(0, 16) : '' %>" />
+          </label>
+          <label>Capacity <span class="hint">(blank = no limit)</span>
+            <input type="number" name="capacityValue" min="1" value="<%= event.family_capacity ?? event.capacity ?? '' %>" placeholder="No limit" />
+          </label>
+          <label>Capacity Counted By
+            <select name="capacityType">
+              <option value="person" <%= event.family_capacity == null ? 'selected' : '' %>>Person</option>
+              <option value="family" <%= event.family_capacity != null ? 'selected' : '' %>>Family</option>
+            </select>
+          </label>
+
           <div class="member-form-full">
             <span class="roster-checkbox-label">Grade Level <span class="hint">(leave all unchecked to allow every grade)</span></span>
             <label class="checkbox-option"><input type="checkbox" name="lockRegistrationToGrade" value="1" <%= event.lock_registration_to_grade ? 'checked' : '' %> /> Lock registration to grade level</label>
@@ -435,7 +497,7 @@
             <label class="checkbox-option"><input type="checkbox" name="lockRegistrationToAge" value="1" <%= event.lock_registration_to_age ? 'checked' : '' %> /> Lock registration to age level</label>
             <%- include('partials/multi-select-checkbox', {
               name: 'ageGroupRestriction',
-              options: ageGroupOptions.map(function(g) { return { value: g.key, label: g.label }; }),
+              options: ageGroupOptions.map(function(g) { return { value: g, label: g }; }),
               selected: selectedAgeGroups,
               placeholder: 'All ages',
             }) %>
@@ -484,6 +546,22 @@
         </form>
       </div>
     <% } %>
+
+    <dialog id="add-ticket-type-dialog" class="member-picker-dialog">
+      <form method="POST" action="/main-admin/events/<%= event.id %>/ticket-types">
+        <h3>Add Ticket Type</h3>
+        <label>Title
+          <input type="text" name="title" placeholder="e.g. Adult, Child, VIP" required />
+        </label>
+        <label>Price ($)
+          <input type="number" name="priceDollars" min="0" step="0.01" value="0.00" required />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Add</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="add-role-dialog" class="member-picker-dialog">
       <form method="POST" action="/main-admin/events/<%= event.id %>/volunteer-roles">
@@ -559,5 +637,6 @@
   <script src="/js/event-builder-tab-guard.js"></script>
   <script src="/js/copy-link.js"></script>
   <script src="/js/multi-select-checkbox.js"></script>
+  <script src="/js/event-image-preview.js"></script>
 </body>
 </html>

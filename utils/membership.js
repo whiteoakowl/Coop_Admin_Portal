@@ -3,6 +3,9 @@
 // server-side too so submitted values can be validated against a known
 // list rather than trusted as free text.
 const GRADE_OPTIONS = [
+  'Infant',
+  'Toddler',
+  'Preschool',
   'Pre-K',
   'Kindergarten',
   '1st Grade',
@@ -17,6 +20,7 @@ const GRADE_OPTIONS = [
   '10th Grade',
   '11th Grade',
   '12th Grade',
+  'Adult',
 ];
 
 const VOLUNTEER_INTEREST_OPTIONS = [

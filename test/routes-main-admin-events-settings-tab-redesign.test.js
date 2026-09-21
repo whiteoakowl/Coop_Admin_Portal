@@ -120,7 +120,11 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
 
   assert.match(page.text, /> Lock registration to grade level</);
   assert.match(page.text, /> Lock registration to age level</);
-  assert.match(page.text, /name="ageGroupRestriction" value="under5"/);
+  // A real request: "ages should have all ages listed, not just age
+  // groups. 0-100" - every individual age from 0 to 100 is offered now,
+  // not emailComposer.js's 5 coarse AGE_GROUPS buckets.
+  assert.match(page.text, /name="ageGroupRestriction" value="0"/);
+  assert.match(page.text, /name="ageGroupRestriction" value="100"/);
   assert.match(page.text, /> Lock registration to section</);
   assert.match(page.text, /> Lock registration to only be viewable to one section</);
   assert.match(page.text, new RegExp(`<option value="${section.id}"[^>]*>Redesign Section</option>`));
@@ -215,14 +219,18 @@ test('Lock registration to grade level: only enforced when the lock checkbox is 
   assert.match(result.error, /grades/i);
 });
 
-test('Lock registration to age level: uses the AGE_GROUPS buckets, only enforced when locked', async () => {
+test('Lock registration to age level: uses the member\'s exact age, only enforced when locked', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   const parent = await createParentAccount();
   const adultBirthday = '1980-01-01';
   const member = { id: parent.memberId, member_type: 'parent', birthday: adultBirthday, grade_level: null };
 
-  await db.prepare("UPDATE events SET age_group_restriction = 'under5', lock_registration_to_age = 1 WHERE id = ?").run(eventId);
+  // A real request: "ages should have all ages listed, not just age
+  // groups. 0-100" - age_group_restriction now holds individual ages
+  // (e.g. '10'), not one of emailComposer.js's old AGE_GROUPS bucket
+  // keys (e.g. 'under5') - this ~46-year-old parent isn't age 10.
+  await db.prepare("UPDATE events SET age_group_restriction = '10', lock_registration_to_age = 1 WHERE id = ?").run(eventId);
   const result = await events.registerForEvent({ eventId, memberId: parent.memberId, accountId: parent.accountId, family: [member] });
   assert.equal(result.ok, false);
   assert.match(result.error, /ages/i);

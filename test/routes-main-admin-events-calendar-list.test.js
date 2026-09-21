@@ -130,6 +130,11 @@ test('New Event wizard: many more detail fields beyond Title/Starts, and creatin
   const builder = await request(app).get(`/main-admin/events/${eventId}/builder`).set('Cookie', admin.cookie);
   assert.match(builder.text, /North Field/);
   assert.match(builder.text, /Bring a dish to share\./);
-  assert.match(builder.text, /value="50"/);
-  assert.match(builder.text, /<option value="public" selected>Public<\/option>/);
+
+  // Visibility and Capacity/Capacity Counted By moved to the Settings
+  // tab (a real request) - Visibility is the Settings tab's own "Is this
+  // a public event?" checkbox now, not a separate dropdown.
+  const settingsTab = await request(app).get(`/main-admin/events/${eventId}/builder?tab=settings`).set('Cookie', admin.cookie);
+  assert.match(settingsTab.text, /value="50"/);
+  assert.match(settingsTab.text, /<input type="checkbox" name="isPublicEvent" value="1" checked \/> Is this a public event\?/);
 });

@@ -213,6 +213,10 @@
       <div class="roster-btn-row events-category-location-row no-print">
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-categories-dialog').showModal()">Add/Edit Category</button>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-locations-dialog').showModal()">Add/Edit Location</button>
+        <%# A real request: "add a drop down menu for choosing accounting
+            category" (the Finance tab's own dropdown) - the list itself
+            is managed here, same place/pattern as Categories/Locations. %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('manage-accounting-categories-dialog').showModal()">Add/Edit Accounting Category</button>
       </div>
 
       <%# Item 9 - General Settings, same fields/shape as the reference
@@ -348,6 +352,52 @@
                   </td>
                   <td>
                     <form method="POST" action="/main-admin/events/categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this category? Events using it will just show no category.">
+                      <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
+
+    <dialog id="manage-accounting-categories-dialog" class="member-picker-dialog">
+      <h3>Accounting Categories</h3>
+      <p class="hint">A fixed list an event's Finance tab picks one of, for internal bookkeeping - separate from the public-facing Category above.</p>
+      <form method="POST" action="/main-admin/events/accounting-categories" class="stack-form">
+        <div class="member-form-grid">
+          <label>Category Name
+            <input type="text" name="name" placeholder="e.g. Fundraising Revenue" required />
+          </label>
+        </div>
+        <div class="member-form-footer">
+          <div class="member-form-footer-edit">
+            <button type="submit" class="primary-btn">+ Add Accounting Category</button>
+          </div>
+        </div>
+      </form>
+
+      <% if (accountingCategories.length === 0) { %>
+        <p class="roster-empty">No accounting categories yet - add one above.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table condensed-table">
+            <thead><tr><th>Category</th><th></th></tr></thead>
+            <tbody>
+              <% accountingCategories.forEach(function(c) { %>
+                <tr>
+                  <td>
+                    <form method="POST" action="/main-admin/events/accounting-categories/<%= c.id %>/update" class="inline-block-form">
+                      <input type="text" name="name" value="<%= c.name %>" onchange="this.form.submit()" aria-label="Name for <%= c.name %>" />
+                    </form>
+                  </td>
+                  <td>
+                    <form method="POST" action="/main-admin/events/accounting-categories/<%= c.id %>/delete" class="inline-block-form" data-confirm="Delete this accounting category? Events using it will just show no category.">
                       <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
                     </form>
                   </td>

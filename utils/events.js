@@ -26,7 +26,16 @@ const { lastNameOf } = require('./members');
 const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
-const { AGE_GROUPS, ageGroupKeyForBirthday } = require('./emailComposer');
+const { ageFromBirthday } = require('./emailComposer');
+
+// A real request: "ages should have all ages listed, not just age
+// groups. 0-100." Deliberately its own list, not utils/emailComposer.js's
+// AGE_GROUPS (5 coarse buckets like "5 to 8") - that one's built for
+// picking a broad mass-email audience, while locking event registration
+// genuinely cares about someone's exact age (e.g. "must be 8 to ride
+// this"). Values are the ages themselves as strings, same "the option's
+// own value/label" shape GRADE_OPTIONS already uses.
+const AGE_OPTIONS = Array.from({ length: 101 }, (_, age) => String(age));
 
 // The Create New Event wizard's own Event Type dropdown - a fixed, short
 // list is plenty for a single co-op (unlike GRADE_OPTIONS/sections,
@@ -67,16 +76,15 @@ function ageGroupAllowsMember(event, member) {
   return allowed.includes(member.grade_level);
 }
 
-// Same shape as ageGroupAllowsMember, for the new parallel age-bucket
-// restriction - reuses utils/emailComposer.js's own AGE_GROUPS buckets
-// (already how Communication filters by age) instead of inventing a
-// second age vocabulary.
+// Same shape as ageGroupAllowsMember, for the parallel age restriction -
+// checks the member's own exact age (AGE_OPTIONS above), not one of
+// emailComposer.js's coarser AGE_GROUPS buckets.
 function ageBucketAllowsMember(event, member) {
   if (!event.lock_registration_to_age) return true;
   const allowed = parseAgeGroupList(event.age_group_restriction);
   if (allowed.length === 0) return true;
-  const key = ageGroupKeyForBirthday(member.birthday);
-  return key != null && allowed.includes(key);
+  const age = ageFromBirthday(member.birthday);
+  return age != null && allowed.includes(String(age));
 }
 
 // "adult" = parent/admin member_type, "child" = student - matches
@@ -236,17 +244,58 @@ async function getEventWithDetails(id) {
     'guest_name'
   );
 
+  const ticketTypes = await db.prepare('SELECT * FROM event_ticket_types WHERE event_id = ? ORDER BY position, id').all(id);
+
   return {
     ...event,
     volunteerRoles: roles,
     donationItems,
     foodItems,
+    ticketTypes,
     registrationCount,
     waitlistCount,
     familyCount,
     guestRegistrations,
     sectionIds: await eventSectionIds(id),
   };
+}
+
+// --- Ticket types (Finance tab, per-person events only) - a real
+// request: "if charging per person there should be an option for adding
+// several types of tickets with a different price and title bar next to
+// it." Same has-many-rows-owned-by-one-event shape as Volunteer Roles/
+// Donation Items/Food Items above - admin-side only for now (a scoping
+// question confirmed this): registration still charges the event's own
+// flat price_cents, this is just for the admin to define/manage the list.
+async function addTicketType(eventId, title, priceCents) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_ticket_types WHERE event_id = ?').get(eventId)).p) + 1;
+  await db.prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, position) VALUES (?, ?, ?, ?)').run(eventId, title, priceCents, position);
+}
+
+async function deleteTicketType(id) {
+  await db.prepare('DELETE FROM event_ticket_types WHERE id = ?').run(id);
+}
+
+// --- Accounting Categories - same shape as event_categories (see
+// 20260826040000_events_registration_rules.sql), a separate fixed list
+// for internal bookkeeping rather than the public-facing Category
+// dropdown events already have. A real request: "add a drop down menu
+// for choosing accounting category."
+async function listAccountingCategories() {
+  return db.prepare('SELECT * FROM event_accounting_categories ORDER BY position, name').all();
+}
+
+async function createAccountingCategory(name) {
+  const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_accounting_categories').get()).p) + 1;
+  await db.prepare('INSERT INTO event_accounting_categories (name, position) VALUES (?, ?)').run(name, position);
+}
+
+async function updateAccountingCategory(id, name) {
+  await db.prepare('UPDATE event_accounting_categories SET name = ? WHERE id = ?').run(name, id);
+}
+
+async function deleteAccountingCategory(id) {
+  await db.prepare('DELETE FROM event_accounting_categories WHERE id = ?').run(id);
 }
 
 function eventFields(data) {
@@ -297,6 +346,7 @@ function eventFields(data) {
     data.registrationSectionId ?? null,
     data.lockVisibilityToSection ? 1 : 0,
     data.visibilitySectionId ?? null,
+    data.accountingCategoryId ?? null,
   ];
 }
 
@@ -320,9 +370,9 @@ async function createEvent(data, accountId, { submittedByAccountId = null, statu
          volunteer_selection_count, donation_selection_count, food_selection_count,
          is_closed, allow_registration_cancellations, allow_refund_on_cancel, show_registrants_to_members, track_participants_only,
          lock_registration_to_grade, lock_registration_to_age, age_group_restriction,
-         lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id,
+         lock_registration_to_section, registration_section_id, lock_visibility_to_section, visibility_section_id, accounting_category_id,
          created_by_account_id, submitted_by_account_id, approval_status, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(...eventFields(data), accountId, submittedByAccountId, approvalStatus, status);
   return info.lastInsertRowid;
@@ -340,7 +390,7 @@ async function updateEvent(id, data) {
          volunteer_selection_count = ?, donation_selection_count = ?, food_selection_count = ?,
          is_closed = ?, allow_registration_cancellations = ?, allow_refund_on_cancel = ?, show_registrants_to_members = ?, track_participants_only = ?,
          lock_registration_to_grade = ?, lock_registration_to_age = ?, age_group_restriction = ?,
-         lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?,
+         lock_registration_to_section = ?, registration_section_id = ?, lock_visibility_to_section = ?, visibility_section_id = ?, accounting_category_id = ?,
          updated_at = now_text()
        WHERE id = ?`
     )
@@ -1281,6 +1331,7 @@ function monthGrid(monthParam, eventList) {
 
 module.exports = {
   GRADE_OPTIONS,
+  AGE_OPTIONS,
   EVENT_TYPES,
   monthGrid,
   sortByLastNameField,
@@ -1303,6 +1354,12 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
+  addTicketType,
+  deleteTicketType,
+  listAccountingCategories,
+  createAccountingCategory,
+  updateAccountingCategory,
+  deleteAccountingCategory,
   listLocations,
   createLocation,
   updateLocation,

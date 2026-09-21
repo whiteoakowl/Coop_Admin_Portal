@@ -159,6 +159,7 @@ async function listCampaigns(limit = 25) {
 module.exports = {
   AGE_GROUPS,
   ageGroupKeyForBirthday,
+  ageFromBirthday,
   listRoles,
   listSections,
   listGradeLevels,

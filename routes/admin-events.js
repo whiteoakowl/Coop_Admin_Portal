@@ -35,7 +35,6 @@ const { notify } = require('../utils/notifications');
 const { mapWithConcurrency } = require('../utils/concurrency');
 const auditLog = require('../utils/auditLog');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
-const { AGE_GROUPS } = require('../utils/emailComposer');
 const { buildTemplateWorkbook, readRowsFromFile, sendCsv } = require('../utils/spreadsheet');
 
 router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermission('manage_events'));
@@ -184,6 +183,7 @@ function eventDataFromRow(event) {
     registrationSectionId: event.registration_section_id,
     lockVisibilityToSection: !!event.lock_visibility_to_section,
     visibilitySectionId: event.visibility_section_id,
+    accountingCategoryId: event.accounting_category_id,
   };
 }
 
@@ -198,6 +198,31 @@ if (!createStorageClient() && !fs.existsSync(EVENT_IMAGE_DIR)) fs.mkdirSync(EVEN
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });
 
+// A real bug report: "it still says something went wrong trying to
+// upload a photo." A photo over the limit above makes upload.single()
+// itself throw a MulterError (LIMIT_FILE_SIZE) - unlike imageFileFilter
+// rejecting a wrong file TYPE (which just leaves req.file undefined for
+// each route's own "please choose an image" branch to catch), this error
+// was never caught anywhere on any of this file's 3 image-upload routes,
+// so it fell all the way through to server.js's generic catch-all error
+// handler and rendered the generic 500 page - the exact "something went
+// wrong" in the bug report - instead of a friendly, specific redirect.
+// Same fix as routes/admin-documents.js's own uploadDocument wrapper and
+// utils/memberIntake.js's own uploadIntakePhotos wrapper. `back` is the
+// URL (a plain string, or a function of req for a per-event path) to
+// redirect to on that one error case.
+function uploadEventImage(back) {
+  return function (req, res, next) {
+    upload.single('image')(req, res, (err) => {
+      if (err && err.code === 'LIMIT_FILE_SIZE') {
+        const backUrl = typeof back === 'function' ? back(req) : back;
+        return res.redirect(`${backUrl}?error=` + encodeURIComponent(`That image is too large - images are limited to ${MAX_IMAGE_BYTES / (1024 * 1024)}MB.`));
+      }
+      next(err);
+    });
+  };
+}
+
 function imageUrl(key) {
   if (!key) return null;
   return createStorageClient() ? publicUrl(EVENT_IMAGES_BUCKET, key) : `/uploads/events/${key}`;
@@ -205,10 +230,12 @@ function imageUrl(key) {
 
 // Shared by the Create New Event wizard's own page-1 image upload (a real
 // request: "events creation, page one should also have... event image
-// upload") and the existing per-event Image upload on the builder's
-// Settings tab - both just need "store this file, delete whatever image
-// key was there before, return the new key" with the same storage-
-// backend-agnostic (Supabase Storage or local disk) logic either way.
+// upload") and the existing per-event Image upload on the builder's own
+// Details tab (its own dedicated POST /:id/image below, not the big
+// Details form - an HTML form can't nest inside another) - both just
+// need "store this file, delete whatever image key was there before,
+// return the new key" with the same storage-backend-agnostic (Supabase
+// Storage or local disk) logic either way.
 async function saveEventImage(file, existingKey) {
   const client = createStorageClient();
   let key;
@@ -272,6 +299,7 @@ router.get('/', async (req, res) => {
   // Calendar and Drafts tabs too.
   const categories = await events.listCategories();
   const locations = await events.listLocations();
+  const accountingCategories = await events.listAccountingCategories();
   const eventSettings = await events.getEventSettings();
   if (activeTab === 'calendar') {
     // A real request: "cancel event button should leave the event on the
@@ -312,6 +340,7 @@ router.get('/', async (req, res) => {
     attendance,
     categories,
     locations,
+    accountingCategories,
     eventSettings,
     notice: req.query.notice || null,
     error: req.query.error || null,
@@ -335,6 +364,29 @@ router.post('/categories/:id/update', async (req, res) => {
 router.post('/categories/:id/delete', async (req, res) => {
   await events.deleteCategory(req.params.id);
   res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Category removed.'));
+});
+
+// --- Accounting Categories - a real request: "add a drop down menu for
+// choosing accounting category" (Finance tab) - same shape as Categories
+// above, just a plain name list (no color/allow-sync). ---
+
+router.post('/accounting-categories', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Accounting category name is required.'));
+  await events.createAccountingCategory(name);
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category added.'));
+});
+
+router.post('/accounting-categories/:id/update', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.redirect('/main-admin/events?tab=settings&error=' + encodeURIComponent('Accounting category name is required.'));
+  await events.updateAccountingCategory(req.params.id, name);
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category updated.'));
+});
+
+router.post('/accounting-categories/:id/delete', async (req, res) => {
+  await events.deleteAccountingCategory(req.params.id);
+  res.redirect('/main-admin/events?tab=settings&notice=' + encodeURIComponent('Accounting category removed.'));
 });
 
 // --- Locations (item 8) ---
@@ -427,7 +479,7 @@ router.get('/new', async (req, res) => {
 // needs an id-less "existing key" of null, but events.setEventImage needs
 // a real event id) - createEvent runs first, then the file (if any) is
 // uploaded and attached in the same request.
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', uploadEventImage('/main-admin/events/new'), async (req, res) => {
   const title = (req.body.title || '').trim();
   const startsAt = toSqlTimestamp(req.body.startsAt);
   if (!title || !startsAt) {
@@ -530,10 +582,11 @@ async function loadBuilder(req, res) {
     imageUrl: imageUrl(event.image_key),
     categories: await events.listCategories(),
     locations: await events.listLocations(),
+    accountingCategories: await events.listAccountingCategories(),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     gradeOptions: events.GRADE_OPTIONS,
     selectedGrades: events.parseAgeGroupList(event.age_group),
-    ageGroupOptions: AGE_GROUPS,
+    ageGroupOptions: events.AGE_OPTIONS,
     selectedAgeGroups: events.parseAgeGroupList(event.age_group_restriction),
     eventTypes: events.EVENT_TYPES,
     selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
@@ -555,7 +608,7 @@ router.get('/:id/builder', loadBuilder);
 // "Is this a public event?", moved there per a later real request), and
 // Finance's own price fields (each saved by its own route below), so
 // saving one tab's form never silently overwrites what another tab has.
-router.post('/:id', upload.single('image'), async (req, res) => {
+router.post('/:id', async (req, res) => {
   const id = req.params.id;
   const title = (req.body.title || '').trim();
   const startsAt = toSqlTimestamp(req.body.startsAt);
@@ -567,27 +620,27 @@ router.post('/:id', upload.single('image'), async (req, res) => {
     ...eventDataFromRow(event),
     title,
     description: sanitizePostBody(req.body.description || ''),
-    category: (req.body.category || '').trim(),
+    // A real request: "category (legacy text...) and text bar should be
+    // removed, it isn't needed" - views/admin-events-builder.ejs no
+    // longer has this input at all, so there's nothing in req.body to
+    // read here; eventDataFromRow(event)'s own category (spread above)
+    // just passes the existing value through unchanged on every save
+    // instead of blanking it out.
     location: (req.body.location || '').trim(),
     locationId: req.body.locationId ? parseInt(req.body.locationId, 10) : null,
     startsAt,
     endsAt: toSqlTimestamp(req.body.endsAt),
-    ...capacityFieldsFromBody(req.body),
-    registrationOpensAt: toSqlTimestamp(req.body.registrationOpensAt),
-    registrationClosesAt: toSqlTimestamp(req.body.registrationClosesAt),
+    // Registration Opens/Closes, Visibility, and Capacity/Capacity
+    // Counted By all moved to the Settings tab (a real request) - each is
+    // now read/saved by POST /:id/permissions below instead; eventData
+    // FromRow(event)'s own values (spread above) just pass through
+    // unchanged here.
     slug: (req.body.slug || '').trim(),
     eventType: (req.body.eventType || '').trim(),
     shortDescription: (req.body.shortDescription || '').trim(),
     organizedBy: (req.body.organizedBy || '').trim(),
     tags: [].concat(req.body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
   });
-  if (req.file) {
-    try {
-      await events.setEventImage(id, await saveEventImage(req.file, event?.image_key));
-    } catch (err) {
-      return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent(`Saved, but the image upload failed: ${err.message}`));
-    }
-  }
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Event details saved.'));
 });
 
@@ -604,8 +657,27 @@ router.post('/:id/finance', async (req, res) => {
     ...eventDataFromRow(event),
     priceCents: req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : null,
     pricePer: req.body.pricePer === 'family' ? 'family' : 'person',
+    accountingCategoryId: req.body.accountingCategoryId ? parseInt(req.body.accountingCategoryId, 10) : null,
   });
   res.redirect(`/main-admin/events/${id}/builder?tab=finance&notice=` + encodeURIComponent('Finance saved.'));
+});
+
+// Ticket types (Finance tab, per-person events only) - a real request:
+// "if charging per person there should be an option for adding several
+// types of tickets with a different price and title bar next to it."
+// Admin-side only for now (a scoping question confirmed this) -
+// registration still charges the event's own flat price_cents.
+router.post('/:id/ticket-types', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const priceCents = req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : 0;
+  if (!title) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&error=` + encodeURIComponent('Ticket title is required.'));
+  await events.addTicketType(req.params.id, title, priceCents);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type added.'));
+});
+
+router.post('/:id/ticket-types/:ticketId/delete', async (req, res) => {
+  await events.deleteTicketType(req.params.ticketId);
+  res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type removed.'));
 });
 
 // Settings tab's own save - "permissions will show up again under
@@ -627,6 +699,13 @@ router.post('/:id/permissions', async (req, res) => {
   await events.updateEvent(id, {
     ...eventDataFromRow(event),
     visibility: req.body.isPublicEvent === '1' ? 'public' : 'members',
+    // Registration Opens/Closes and Capacity/Capacity Counted By moved
+    // here from the Details tab (a real request) - see this route's own
+    // view template comment for why Capacity's number and "counted by"
+    // type stay paired in the same form.
+    ...capacityFieldsFromBody(req.body),
+    registrationOpensAt: toSqlTimestamp(req.body.registrationOpensAt),
+    registrationClosesAt: toSqlTimestamp(req.body.registrationClosesAt),
     ageGroup: [].concat(req.body.ageGroup || []).join(', '),
     allowAdultRegister: req.body.allowAdultRegister !== 'off',
     allowChildRegister: req.body.allowChildRegister !== 'off',
@@ -727,7 +806,7 @@ router.post('/:id/delete', async (req, res) => {
   res.redirect('/main-admin/events?notice=' + encodeURIComponent('Event deleted.'));
 });
 
-router.post('/:id/image', upload.single('image'), async (req, res) => {
+router.post('/:id/image', uploadEventImage((req) => `/main-admin/events/${req.params.id}/builder`), async (req, res) => {
   const id = req.params.id;
   if (!req.file) return res.redirect(`/main-admin/events/${id}/builder?error=` + encodeURIComponent('Please choose an image file.'));
   const event = await events.getEvent(id);
