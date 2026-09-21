@@ -1587,7 +1587,7 @@ body.public-page .roster-empty {
    the page would otherwise scroll it away. Desktop/tablet only ("This is
    a desktop and tablet view issue only" - a real request) - hidden below
    the mobile-topbar breakpoint, where its own sticky top bar (with the
-   same search + Full Screen controls folded into its icon row) already
+   same search + profile controls folded into its icon row) already
    does this correctly. margin-left clears the fixed sidebar, same offset
    .admin-main itself uses. */
 .admin-page-corner-actions {

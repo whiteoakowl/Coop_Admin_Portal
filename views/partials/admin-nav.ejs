@@ -123,22 +123,14 @@
   </div>
 </aside>
 
-<!-- Top-right corner controls (desktop) - global search, My Portals, and
-     the Full Screen toggle, neither tied to any one page's own content,
-     so all three are reachable no matter which section is open. Search
-     is full-admin only, same as the Members/Library nav links (see
-     routes/admin-search.js for why); My Portals and Full Screen have no
-     such restriction.
-     A real request: "my portals should be at the top orange bar as well,
-     not the side dashboard" - moved here from its old spot in
-     .admin-sidebar-bottom, same /portal destination and icon as before.
-     The Co-op Admin Portal runs on its own session (req.session.adminId,
-     middleware/requireAdmin.js) entirely separate from the member portal
-     system (req.session.portalAccountId, portal-nav.ejs's own "Switch
-     Portal" link) that parent/teacher/student/main-admin share - so this
-     link can't jump straight into another portal the way that one does.
-     It goes to /portal, which sends a signed-out visitor through /login
-     same as any other portal-to-portal jump. -->
+<%# Top-right corner controls (desktop): global search, My Portals
+    (#icon-monitor, a real request: "the portals button should be a
+    computer icon"), and My Profile (#icon-user-circle - a plain
+    placeholder, no member profile-photo field exists yet). Replaces the
+    old Full Screen View toggle, removed here along with its script
+    include and PIN-exit dialog per "remove full screen button and
+    feature from all portal pages" - Kiosk Mode (kiosk-home.ejs) keeps
+    its own separate, untouched copy of that feature. %>
 <header class="admin-page-corner-actions no-print">
   <% if (isFullAdmin) { %>
     <form method="GET" action="/admin/search" class="admin-corner-search">
@@ -148,13 +140,13 @@
     </form>
   <% } %>
   <a class="admin-corner-link" href="/portal">
-    <svg class="icon"><use href="#icon-users"/></svg>
+    <svg class="icon"><use href="#icon-monitor"/></svg>
     My Portals
   </a>
-  <button type="button" class="admin-corner-link" id="fullscreen-toggle-btn" aria-label="Full Screen View">
-    <svg class="icon"><use href="#icon-maximize"/></svg>
-    <span id="fullscreen-toggle-label" class="fullscreen-toggle-label">Full Screen View</span>
-  </button>
+  <a class="admin-corner-link" href="/admin/settings">
+    <svg class="icon"><use href="#icon-user-circle"/></svg>
+    My Profile
+  </a>
 </header>
 
 <div class="admin-mobile-topbar">
@@ -167,8 +159,8 @@
       <% if (isFullAdmin) { %>
         <a class="admin-nav-right-link" href="/admin/search" aria-label="Search"><svg class="icon"><use href="#icon-search"/></svg></a>
       <% } %>
-      <button type="button" class="admin-nav-right-link" id="fullscreen-toggle-btn-mobile" aria-label="Full Screen View"><svg class="icon"><use href="#icon-maximize"/></svg></button>
-      <a class="admin-nav-right-link" href="/portal" aria-label="My Portals"><svg class="icon"><use href="#icon-users"/></svg></a>
+      <a class="admin-nav-right-link" href="/portal" aria-label="My Portals"><svg class="icon"><use href="#icon-monitor"/></svg></a>
+      <a class="admin-nav-right-link" href="/admin/settings" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
       <a class="admin-nav-right-link" href="/admin/settings" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <form method="POST" action="/admin/logout" class="logout-form">
         <button type="submit" class="admin-nav-right-link" aria-label="Log out"><svg class="icon"><use href="#icon-log-out"/></svg></button>
@@ -198,7 +190,6 @@
 
 <%- include('session-timeout-dialog') %>
 <%- include('confirm-dialog') %>
-<%- include('fullscreen-exit-pin-dialog') %>
 
 <script src="/js/admin-nav.js"></script>
 <%# defer, unlike this file's other scripts - both read window.CSRF_TOKEN,
@@ -210,8 +201,6 @@
     ever does, despite appearing later in the HTML. %>
 <script src="/js/session-timeout-warning.js" defer></script>
 <script src="/js/unsaved-changes.js" defer></script>
-<script src="/js/fullscreen-toggle.js"></script>
-<script src="/js/fullscreen-nav.js"></script>
 <script src="/js/confirm-dialog.js"></script>
 <script src="/js/print-blank-target.js"></script>
 <script src="/js/fit-tabs.js"></script>

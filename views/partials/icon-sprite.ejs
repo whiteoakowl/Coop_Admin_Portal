@@ -483,4 +483,21 @@
     <path d="M12 13c0-4 3-6 7-6 0 4-3 6-7 6z"/>
     <path d="M12 11C12 7 9 5 5 5c0 4 3 6 7 6z"/>
   </symbol>
+  <%# A real request: "the portals button should be a computer icon" - a
+      plain monitor/desktop glyph, used for the My Portals/Switch Portal
+      corner link in admin-nav.ejs and portal-nav.ejs instead of the
+      generic #icon-users it borrowed before. %>
+  <symbol id="icon-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+  </symbol>
+  <%# A real request: "there should also be a profile icon with image
+      circle" - a plain person-in-a-circle placeholder, since no member
+      profile-photo field exists yet for this to show an actual photo. %>
+  <symbol id="icon-user-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <circle cx="12" cy="10" r="3"/>
+    <path d="M6.2 18.5a6 6 0 0 1 11.6 0"/>
+  </symbol>
 </svg>
