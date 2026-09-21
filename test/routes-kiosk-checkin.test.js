@@ -110,7 +110,15 @@ test('kiosk check-in scan', async (t) => {
     assert.match(res.body.message, /already checked in/);
 
     // Still exactly one attendance row for this member - not a duplicate.
-    const count = Number((await db.prepare('SELECT COUNT(*) AS n FROM attendance WHERE source = ?').get('kiosk')).n);
+    // Scoped to this member specifically (not just source = 'kiosk') -
+    // the earlier "a member not scheduled on any roster..." subtest above
+    // also writes its own kiosk-sourced row on a real meeting day
+    // (Monday/Wednesday), which an unscoped count would double-count
+    // against, failing this assertion on those days for a reason that has
+    // nothing to do with this test's own member.
+    const count = Number(
+      (await db.prepare("SELECT COUNT(*) AS n FROM attendance WHERE source = 'kiosk' AND member_id = (SELECT id FROM members WHERE barcode = 'Scan Test Kid')").get()).n
+    );
     assert.equal(count, 1);
   });
 

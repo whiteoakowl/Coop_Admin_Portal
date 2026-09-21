@@ -30,7 +30,14 @@
     // "slot" too, same as a plain <button> - styles.css makes that form
     // display: contents on mobile so its button IS the real grid item,
     // so this counts the button, not the (layout-invisible) form itself.
-    const items = row.querySelectorAll(':scope > .roster-action-btn, :scope > form > .roster-action-btn');
+    // A real bug report (Floater Assignments' own Edit Dates/+ Add/Edit
+    // Position row): a .roster-btn-row can also hold .btn-secondary
+    // buttons instead of .roster-action-btn ones - those used to count as
+    // zero items here, so this returned before ever setting a column
+    // count, leaving the row's own `display: grid` (styles.css) with no
+    // explicit columns - one implicit column, stacking every button onto
+    // its own row on mobile instead of laying them out side by side.
+    const items = row.querySelectorAll(':scope > .roster-action-btn, :scope > form > .roster-action-btn, :scope > .btn-secondary');
     if (items.length === 0) return;
     // A toolbar can opt into a fixed column count (e.g. the Members page
     // wanting its 3 buttons to always read as 2 neat rows, not 1 wide

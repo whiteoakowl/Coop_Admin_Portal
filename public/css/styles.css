@@ -4110,6 +4110,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
     width: 100%;
     min-width: 0;
   }
+  /* A real request: "floater assignments mobile, edit dates button and
+     add/edit position button should be side by side on the same row." -
+     that row's own two buttons (views/admin-volunteers.ejs) are
+     .btn-secondary, not .roster-action-btn - public/js/roster-btn-row-
+     grid.js's own item count (the ":scope > .roster-action-btn" query)
+     found zero of them and returned before ever setting a column count,
+     leaving this row as a bare `display: grid` with no explicit columns
+     - one implicit column, so each button landed on its own row instead
+     of side by side. Scoped to `.roster-btn-row >` (a direct child of an
+     actual toolbar row), not `.btn-secondary` alone, so a Cancel/Close
+     button sitting in some unrelated dialog elsewhere on the page is
+     never affected by this. */
+  .roster-btn-row > .btn-secondary {
+    width: 100%;
+    min-width: 0;
+  }
   /* A toolbar action that's really a tiny <form method="POST"> (Resync,
      Archive, ...) around its own .roster-action-btn button, not a plain
      <button>, is still a .roster-btn-row grid item - display: contents
