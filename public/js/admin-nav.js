@@ -16,13 +16,30 @@
     return el.tagName === 'A' ? el.getAttribute('href') : el.dataset.href;
   }
 
+  // A real bug report: "the home button on the dashboard should not stay
+  // highlighted white" - Home's own href is the portal's bare root
+  // (/admin, /main-admin, /student, ...), a single path segment. Prefix
+  // matching (path.indexOf(prefix + '/') === 0) makes that root match
+  // EVERY other page in the portal too (they all start with that same
+  // "/admin/"), so on any page whose real nav item is a <details>
+  // dropdown (Members, Schedules, ...) - which renders no top-level <a>
+  // for bestMatch to even compete with, see this file's own comment
+  // above - Home ends up the only candidate that ever matches, staying
+  // lit even though a completely different section is actually open.
+  // Only a single-segment href (the portal root itself) is restricted to
+  // an exact match here; a deeper href like /admin/volunteers keeps
+  // matching its own sub-paths via the prefix rule exactly as before.
+  function isPortalRoot(prefix) {
+    return prefix.split('/').filter(Boolean).length <= 1;
+  }
+
   function bestMatch(candidates, getPrefixes) {
     let best = null;
     let bestLen = -1;
     candidates.forEach((item) => {
       getPrefixes(item).forEach((prefix) => {
         if (!prefix) return;
-        const matches = path === prefix || path.indexOf(prefix + '/') === 0;
+        const matches = path === prefix || (!isPortalRoot(prefix) && path.indexOf(prefix + '/') === 0);
         if (matches && prefix.length > bestLen) {
           best = item;
           bestLen = prefix.length;

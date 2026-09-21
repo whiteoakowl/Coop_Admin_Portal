@@ -466,6 +466,19 @@ textarea:focus-visible,
 }
 .admin-corner-search:focus-within { border-color: var(--brand); }
 .admin-corner-search .icon { width: 0.95rem; height: 0.95rem; color: var(--muted); flex-shrink: 0; }
+/* A real request: "search bar at the top of all of the pages should be
+   smaller in height to match the full screen button" - the global
+   input/select/textarea base rule (this file's own "every control by
+   default" comment above) sets padding: var(--control-padding-compact)
+   on every <input>, this one included; .admin-corner-search input
+   already overrode border/background but never padding, so the input's
+   own box kept growing taller than .admin-corner-link's plain text+icon
+   (no padded input inside it at all), nearly doubling the whole pill's
+   height. padding: 0 !important here (needed - that base rule's long
+   :not() chain out-specifies a plain .admin-corner-search input
+   selector) and a matched line-height let the OUTER .admin-corner-search
+   pill's own 0.35rem 0.9rem padding be the only thing sizing this
+   control, same as the button beside it. */
 .admin-corner-search input {
   border: none;
   outline: none;
@@ -473,8 +486,10 @@ textarea:focus-visible,
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.3;
   color: var(--ink);
   width: 9rem;
+  padding: 0 !important;
 }
 
 @media (max-width: 720px) {
@@ -1435,7 +1450,26 @@ body.public-page .roster-empty {
 .admin-nav-group.has-active-subpage summary .icon { opacity: 1; }
 .admin-nav-group-chevron { width: 0.9em; height: 0.9em; margin-left: auto; transition: transform 0.15s ease; }
 .admin-nav-group[open] .admin-nav-group-chevron { transform: rotate(180deg); }
-.admin-nav-subpages { display: flex; flex-direction: column; padding-left: 1.9rem; margin: 0.1rem 0 0.3rem; }
+/* A real request: "when you click on a dashboard tab the subpages expand
+   and they are a lighter orange and the tab title is more outlined." This
+   is about the plain open/click state (any group you click open), not
+   just .has-active-subpage above (which only applies once a subpage is
+   actually the current page) - so both rules key off [open] alone. The
+   subpages list has no background at all today, sitting flush on the
+   sidebar's own solid --accent orange; a white-tint overlay reads as a
+   lighter orange against that same backdrop without needing a second
+   named color. */
+.admin-nav-group[open] summary { border: 1.5px solid rgba(0,0,0,0.16); }
+.admin-nav-subpages {
+  display: flex;
+  flex-direction: column;
+  padding-left: 1.9rem;
+  margin: 0.1rem 0 0.3rem;
+  background: rgba(255,255,255,0.3);
+  border-radius: 8px;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
 .admin-nav-subpages a {
   display: block;
   color: var(--ink);

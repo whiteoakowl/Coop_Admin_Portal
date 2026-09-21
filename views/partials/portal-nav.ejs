@@ -125,35 +125,22 @@ const MAIN_ADMIN_NAV_LINKS = [
   // needed - public/js/admin-nav.js already prefix-matches every sub-page
   // under /main-admin/training/... against this link's own href.
   { href: '/main-admin/training', icon: 'graduation-cap', label: 'Training' },
-];
-// Main Admin's own labeled 2nd section, same #class-nav-links mechanism
-// Parent/Student Portal already use for their own "Co-op Classes"/
-// "Activities" grouping (see classLinks/classLinksTitle below) - a real
-// request: "nature news should be under a tab called student portal."
-// Nature News moved out of the flat MAIN_ADMIN_NAV_LINKS list above and
-// into its own labeled group instead of just renaming its top-level tab,
-// so future student-facing-content admin pages have somewhere to land
-// without crowding the main list.
-// A real request: "nature news should be titled fun. Then nature news
-// should be a page under that tab. Also, these subpages, student
-// reading challenge, parent reading challenge, games, vocabulary game.
-// These subpages are the admin side to these pages that are on the
-// parent and student portal already" - same subpages shape
-// primaryNavLinks already supports (a details/summary group on desktop,
-// a mobile-subpages-tab.ejs popup on mobile), reused here since this is
-// this array's first entry to ever need it.
-const MAIN_ADMIN_STUDENT_PORTAL_LINKS = [{
-  href: '/main-admin/nature-news',
-  icon: 'sprout',
-  label: 'Fun',
-  subpages: [
+  // A real request: "there should not be a student portal section. the
+  // fun tab should be part of the rest of the dashboard." This used to be
+  // its own labeled 2nd section (a separate #class-nav-links group titled
+  // "Student Portal", the exact same mechanism Parent/Student Portal use
+  // for their own "Co-op Classes"/"Activities" groupings - see
+  // classLinks/classLinksTitle below) - now just a normal entry in the
+  // flat list like every other tab, same subpages shape (a details/
+  // summary group on desktop, a mobile-subpages-tab.ejs popup on mobile).
+  { href: '/main-admin/nature-news', icon: 'sprout', label: 'Fun', subpages: [
     { href: '/main-admin/nature-news', label: 'Nature News' },
     { href: '/main-admin/fun/reading-challenge/students', label: 'Student Reading Challenge' },
     { href: '/main-admin/fun/reading-challenge/parents', label: 'Parent Reading Challenge' },
     { href: '/main-admin/fun/games', label: 'Games' },
     { href: '/main-admin/fun/vocabulary-game', label: 'Vocabulary Game' },
-  ],
-}];
+  ] },
+];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled
 // 2nd section "Activities" (see STUDENT_ACTIVITY_LINKS/classLinksTitle
@@ -206,8 +193,12 @@ const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : po
 // pattern as MAIN_ADMIN_NAV_LINKS above) - its own heading text is
 // "Activities" rather than "Co-op Classes" (classLinksTitle, used by
 // the template further down), the only other caller of this section.
-const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : portalTitle === 'Main Admin' ? MAIN_ADMIN_STUDENT_PORTAL_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
-const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : portalTitle === 'Main Admin' ? 'Student Portal' : 'Co-op Classes';
+// Main Admin no longer has a 2nd section at all - its old "Student
+// Portal" group (just the Fun tab) folded back into MAIN_ADMIN_NAV_LINKS
+// above, so it falls through to the general locals.classLinks case here,
+// which Main Admin's own pages never pass (null, no 2nd section rendered).
+const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
+const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : 'Co-op Classes';
 
 // The Community & Commerce feature set (Events, Forums, Store, Business
 // Directory, Classifieds, Member Directory, Newsletter, Photos,
