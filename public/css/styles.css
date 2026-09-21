@@ -603,6 +603,7 @@ textarea:focus-visible,
 .kiosk-wrap { width: 100%; max-width: 900px; display: flex; flex-direction: column; align-items: center; }
 
 .kiosk-panel {
+  position: relative;
   background: var(--surface);
   border-radius: 24px;
   padding: 3rem 2rem;
@@ -617,6 +618,15 @@ textarea:focus-visible,
 .kiosk-message { font-size: 1.5rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
 
 .kiosk-instructions { font-size: 1.4rem; font-weight: 600; margin: 0 0 1.5rem; }
+
+/* A real request: "there text have a great day should be bigger." That
+   message (and every other run-time status - "Checking in...", "Have a
+   great day!", any error) renders into this one #kiosk-instructions
+   element (public/js/kiosk-checkin.js/kiosk-checkout.js's setState()) -
+   sized up beyond the shared .kiosk-instructions base without touching
+   the plain static prompts (the "How would you like to check in?"
+   chooser text, etc.) that also carry that class. */
+#kiosk-instructions { font-size: 1.7rem; }
 
 .kiosk-status {
   width: 160px;
@@ -718,9 +728,17 @@ textarea:focus-visible,
    .kiosk-cancel-btn above (that one abandons a single in-progress task
    scan; this one closes out a whole run of completed scans), so it reads
    as a positive "wrap up" action rather than a muted escape hatch. */
+/* A real request: "kiosk, change method should be top right of the card.
+   done button should be bottom right of the card." Both anchor to
+   .kiosk-panel itself (position: relative, above) rather than to
+   whichever intermediate [data-method-panel] div they happen to sit
+   inside, so they land in the same corner of the card regardless of
+   which method/step is currently showing. */
 .kiosk-done-btn {
-  display: block;
-  margin: 1.5rem auto 0;
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  margin: 0;
   background: none;
   border: 1px solid var(--btn-bg);
   border-radius: 10px;
@@ -729,6 +747,13 @@ textarea:focus-visible,
   font-size: 1rem;
   font-weight: 600;
 }
+/* #step-scan is short enough (just the method chooser or a single line of
+   scan-now text) that taking Done out of the flow to corner it left no
+   in-flow room reserved for it at all, so it landed right on top of that
+   text instead of below it - this reserves that room back, on top of
+   .kiosk-panel's own bottom padding (id beats class, so this wins at
+   every width without having to touch .kiosk-panel's other 3 sides). */
+#step-scan { padding-bottom: 5rem; }
 .kiosk-done-btn:hover { background: var(--btn-bg); color: var(--ink); }
 
 /* Scan-or-keypad layout shared by every kiosk scan screen (Check In, Check
@@ -828,10 +853,12 @@ textarea:focus-visible,
    plain-text style so it doesn't compete with the method buttons or
    panel's own primary action for attention. */
 .kiosk-method-back {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 1.5rem;
   color: var(--muted);
   font-weight: 600;
   background: none;
@@ -866,6 +893,7 @@ textarea:focus-visible,
   .kiosk-panel { max-width: 800px; padding: 4rem 3.5rem; }
   .kiosk-scan-now-text { font-size: 2.6rem; }
   .kiosk-instructions { font-size: 1.8rem; }
+  #kiosk-instructions { font-size: 2.2rem; }
   .kiosk-task-ask-text { font-size: 2.4rem; }
 }
 
@@ -5855,8 +5883,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   border-bottom: 2px solid #000;
 }
 .team-print-preview-page .print-header img { height: 48px; width: 48px; border-radius: 50%; }
-.team-print-preview-page .team-print-page-inner .print-header-title { font-size: 18pt; font-weight: 800; margin: 0; color: #000; }
-.team-print-preview-page .team-print-page-inner .print-header-sub { font-size: 14pt; margin: 0.1rem 0 0; color: #333; }
+.team-print-preview-page .team-print-page-inner .print-header-title { font-size: 21pt; font-weight: 800; margin: 0; color: #000; }
+.team-print-preview-page .team-print-page-inner .print-header-sub { font-size: 17pt; margin: 0.1rem 0 0; color: #333; }
 .team-print-preview-page .setup-team-card-grid .team-info-title,
 .team-print-preview-page .setup-team-card-grid .team-info-desc-print,
 .team-print-preview-page .setup-team-card-grid .team-print-meta,
@@ -5865,8 +5893,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-print-preview-page .setup-team-card-grid .team-member-flag,
 .team-print-preview-page .setup-team-card-grid .team-tasks-card h4,
 .team-print-preview-page .setup-team-card-grid .team-tasks-list {
-  font-size: 14pt;
+  font-size: 17pt;
 }
+/* Mirrors the @media print .team-member-row-absent reset below, same
+   reasoning as the rest of this block: this preview page should show
+   exactly what actually prints, including no leftover red shading. */
+.team-print-preview-page .team-member-row-absent {
+  background: none;
+  color: inherit;
+  margin: 0;
+  padding: 0.4rem 0;
+  border-radius: 0;
+}
+.team-print-preview-page .team-member-row-absent .team-member-avatar { background: var(--brand-soft); color: var(--brand-dark); }
 
 /* The "looks like an actual page" chrome (width/shadow/border) IS
    screen-only, unlike the three rules above - real print already gets
@@ -7644,6 +7683,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .team-info-title-input { font-weight: 700; }
   .team-col { box-shadow: none; border: 1px solid #999; break-inside: avoid; }
 
+  /* A real request: "when printing setup/cleanup teams it should not
+     show the ... shading" - .team-member-row-absent's red highlight
+     (styles.css, above) is a screen-only "who needs a sub" flag; a
+     printed roster is handed out ahead of time and isn't updated live as
+     people check in, so by the time it's on paper that highlight is
+     stale at best. Print-only reset back to a plain row, same as anyone
+     else on the team. */
+  .team-member-row-absent {
+    background: none;
+    color: inherit;
+    margin: 0;
+    padding: 0.4rem 0;
+    border-radius: 0;
+  }
+  .team-member-row-absent .team-member-avatar { background: var(--brand-soft); color: var(--brand-dark); }
+
   /* Setup/Cleanup Teams print header reorganization (see .team-print-meta
      itself for the full comment) - the screen's editable Leader/Meeting
      time/Meeting location row (.team-info-meta-row, styles.css) swaps
@@ -7686,7 +7741,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      traced to the shrink math, not the starting size: "start at 14 point
      font and shrink it from there if needed to fit the whole team on a
      page." Nothing else about the mechanism changes - this is still just
-     the starting point fitOne() measures against before shrinking. */
+     the starting point fitOne() measures against before shrinking.
+
+     Raised again to 17pt/21pt/17pt - a further request ("font should be
+     larger") once the red/green shading above was dropped and there was
+     room to spare. Still just the starting point, not a fixed size - a
+     team busy enough to need shrinking still shrinks proportionally down
+     from here exactly as before, so this can't break the one-team-per-
+     page fit. */
   .setup-team-card-grid .team-info-title,
   .setup-team-card-grid .team-info-desc-print,
   .setup-team-card-grid .team-print-meta,
@@ -7695,13 +7757,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .setup-team-card-grid .team-member-flag,
   .setup-team-card-grid .team-tasks-card h4,
   .setup-team-card-grid .team-tasks-list {
-    font-size: 14pt;
+    font-size: 17pt;
   }
   .team-print-page-inner .print-header-title {
-    font-size: 18pt;
+    font-size: 21pt;
   }
   .team-print-page-inner .print-header-sub {
-    font-size: 14pt;
+    font-size: 17pt;
   }
 
   /* Floater Teams: always a clean 2-per-row grid on paper (portrait, see
