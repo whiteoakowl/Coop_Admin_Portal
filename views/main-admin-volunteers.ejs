@@ -111,8 +111,6 @@
         <h2>Sign-Up Lists</h2>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-signup-list-dialog').showModal()">+ Add List</button>
       </div>
-      <p class="hint">Create a list of things for people to sign up for (e.g. potluck dishes or supplies), optionally attached to one event.</p>
-
       <% if (signUpLists.length === 0) { %>
         <p class="roster-empty">No sign-up lists yet &mdash; add one above.</p>
       <% } else { %>
@@ -168,8 +166,6 @@
         <h2>Volunteer Lists</h2>
         <button type="button" class="roster-action-btn" onclick="document.getElementById('add-volunteer-list-dialog').showModal()">+ Add List</button>
       </div>
-      <p class="hint">Create a list of jobs by date or hour that members can sign up for, optionally attached to one event.</p>
-
       <% if (volunteerLists.length === 0) { %>
         <p class="roster-empty">No volunteer lists yet &mdash; add one above.</p>
       <% } else { %>

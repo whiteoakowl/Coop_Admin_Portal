@@ -3368,6 +3368,31 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   margin-bottom: 0.65rem;
 }
 .member-row-card.member-row-collapsed { display: none; }
+/* A real request: "add a print button to member list. make sure the
+   printing is clean and fits nicely on pages with borders." The family
+   accordion (public/js/members-family-accordion.js) only shows a
+   collapsed family's non-head members once its own chevron is clicked -
+   left alone, a printout would silently drop every member whose family
+   happened to still be collapsed on screen, same as any other
+   interaction-gated visibility. A full roster printout should always
+   include every member regardless of what's expanded on screen, so
+   print forces every card open and drops the now-meaningless chevron/
+   spacer column (nothing left to expand on paper) so avatars line up in
+   one flush left column instead of a half-column of blank space. Each
+   card also gets a firm, printer-visible border (var(--border) alone can
+   render nearly invisible on some printers/toner levels) and page-break-
+   inside: avoid so one member's card is never split across a page
+   boundary - shadows are print-only clutter, dropped alongside. */
+@media print {
+  .member-row-card.member-row-collapsed { display: flex !important; }
+  .member-row-card {
+    border: 1px solid #999;
+    box-shadow: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .family-accordion-toggle, .member-row-chevron-spacer { display: none; }
+}
 /* A member row nested under a family's head gets a slight indent so it
    visually reads as belonging to that family once expanded. */
 .member-row-card[data-family-member="1"] { margin-left: 1.5rem; }
@@ -3912,6 +3937,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .grid-box-header .roster-action-btn,
 .roster-btn-row > .roster-action-btn:only-child,
 .roster-btn-row > form:only-child .roster-action-btn {
+  flex: 0 0 auto;
+}
+
+/* A real request (Main Admin Members' "Edit Member List" toggle): "all
+   other buttons disappear and you only see cancel button and save
+   button" - public/js/archive-select-toggle.js hides every sibling
+   [data-archive-hide-while] button via the `hidden` attribute rather than
+   removing it, so the :only-child rule above never matches (the hidden
+   siblings are still DOM children, just display:none) and the toggle -
+   now the row's one visible .roster-action-btn - was left alone to
+   absorb the whole row's flex-grow and stretch edge to edge. Keying off
+   aria-pressed="true" (the same toggle already sets it) targets exactly
+   that moment without needing a "count only visible siblings" selector
+   CSS doesn't have. */
+.roster-btn-row > [data-archive-toggle][aria-pressed="true"] {
   flex: 0 0 auto;
 }
 

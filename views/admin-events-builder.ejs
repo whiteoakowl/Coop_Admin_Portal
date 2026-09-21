@@ -391,6 +391,13 @@
       // same pattern event_settings' own several fields already use.
       %>
       <div class="manage-section">
+        <%# A real request: "under individual event settings, there
+            should be a button that says copy link with the public url
+            address for the event" - same data-copy-link pattern Signup/
+            Volunteer Lists already use (public/js/copy-link.js). %>
+        <div class="roster-btn-row no-print">
+          <button type="button" class="roster-action-btn" data-copy-link="<%= eventLink %>">Copy Link</button>
+        </div>
         <form method="POST" action="/main-admin/events/<%= event.id %>/permissions" class="member-form-grid">
           <div class="member-form-full checkbox-group checkbox-group-stack">
             <label class="checkbox-option"><input type="checkbox" name="isPublicEvent" value="1" <%= event.visibility === 'public' ? 'checked' : '' %> /> Is this a public event?</label>
@@ -401,6 +408,15 @@
             <label class="checkbox-option"><input type="checkbox" name="allowGuestRegister" value="1" <%= event.allow_guest_register ? 'checked' : '' %> /> Allow members to register guests?</label>
             <label class="checkbox-option"><input type="checkbox" name="showRegistrantsToMembers" value="1" <%= event.show_registrants_to_members ? 'checked' : '' %> /> Allow other members to see who is registered for this event?</label>
             <label class="checkbox-option"><input type="checkbox" name="trackParticipantsOnly" value="1" <%= event.track_participants_only ? 'checked' : '' %> /> Only track participants?</label>
+            <%# A real request: "who can register for this event questions
+                should be included in the check box question at the top
+                of the page" - moved in from their own separate "Who Can
+                Register" section below, same fields/hidden-fallback
+                pattern, just relocated into this one shared column. %>
+            <input type="hidden" name="allowAdultRegister" value="off" />
+            <label class="checkbox-option"><input type="checkbox" name="allowAdultRegister" value="1" <%= event.allow_adult_register ? 'checked' : '' %> /> Parents/adults can register?</label>
+            <input type="hidden" name="allowChildRegister" value="off" />
+            <label class="checkbox-option"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Kids can register?</label>
           </div>
 
           <div class="member-form-full">
@@ -420,20 +436,6 @@
               <% ageGroupOptions.forEach(function(g) { %>
                 <label class="grade-pill"><input type="checkbox" name="ageGroupRestriction" value="<%= g.key %>" <%= selectedAgeGroups.includes(g.key) ? 'checked' : '' %> /> <%= g.label %></label>
               <% }); %>
-            </div>
-          </div>
-
-          <div class="member-form-full">
-            <span class="roster-checkbox-label">Who Can Register</span>
-            <div class="class-form-row">
-              <div class="class-form-field">
-                <input type="hidden" name="allowAdultRegister" value="off" />
-                <label class="grade-pill"><input type="checkbox" name="allowAdultRegister" value="1" <%= event.allow_adult_register ? 'checked' : '' %> /> Parents/adults can register</label>
-              </div>
-              <div class="class-form-field">
-                <input type="hidden" name="allowChildRegister" value="off" />
-                <label class="grade-pill"><input type="checkbox" name="allowChildRegister" value="1" <%= event.allow_child_register ? 'checked' : '' %> /> Kids can register</label>
-              </div>
             </div>
           </div>
 
@@ -553,5 +555,6 @@
   <script src="/js/forum-editor.js"></script>
   <script src="/js/tag-input.js"></script>
   <script src="/js/event-builder-tab-guard.js"></script>
+  <script src="/js/copy-link.js"></script>
 </body>
 </html>

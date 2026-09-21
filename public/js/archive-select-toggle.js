@@ -77,7 +77,23 @@
       // "leaving selection mode never leaves a stray selection behind"
       // guarantee the visible, per-card ones already got above.
       document.querySelectorAll(`input[type="checkbox"].archive-offpage-checkbox[form="${formId}"]`).forEach((cb) => { cb.checked = false; });
+      // Same reset for the Actions dropdown/Save button pair (public/js/
+      // members-bulk-actions.js) - closing edit mode shouldn't leave a
+      // stale chosen action armed for next time either.
+      const actionSelect = controls.querySelector('[data-bulk-action-select]');
+      if (actionSelect) actionSelect.value = '';
+      const saveBtn = document.querySelector(`[data-bulk-action-save][form="${formId}"]`);
+      if (saveBtn) saveBtn.disabled = true;
     }
+    // A real request (Main Admin Members' own "Edit Member List" toggle):
+    // "all other buttons disappear and you only see cancel button and
+    // save button" - any element flagged data-archive-hide-while="<formId>"
+    // (the rest of the page's own toolbar) hides for as long as this
+    // form's edit mode is active, same generic per-form scoping every
+    // other data-archive-* attribute here already uses.
+    document.querySelectorAll(`[data-archive-hide-while="${formId}"]`).forEach((el) => {
+      el.hidden = activating;
+    });
     // A real request (Main Admin Members' own "Edit" toggle + Actions
     // dropdown): the off label isn't always "Archive" - data-archive-
     // toggle-label overrides it per caller, defaulting to 'Archive' so

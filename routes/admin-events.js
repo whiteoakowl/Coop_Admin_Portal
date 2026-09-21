@@ -537,6 +537,12 @@ async function loadBuilder(req, res) {
     selectedAgeGroups: events.parseAgeGroupList(event.age_group_restriction),
     eventTypes: events.EVENT_TYPES,
     selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
+    // A real request: "under individual event settings, there should be
+    // a button that says copy link with the public url address for the
+    // event" - same data-copy-link pattern Signup/Volunteer Lists
+    // already use. /events/:id (not the "Event URL" slug field, which
+    // isn't actually wired into routing) is this event's real public URL.
+    eventLink: `${req.protocol}://${req.get('host')}/events/${event.id}`,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });

@@ -100,11 +100,23 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
     'Allow members to register guests?',
     'Allow other members to see who is registered for this event?',
     'Only track participants?',
+    // A real request: "who can register for this event questions should
+    // be included in the check box question at the top of the page" -
+    // moved in from their own separate "Who Can Register" section.
+    'Parents/adults can register?',
+    'Kids can register?',
   ].forEach((question) => {
     assert.match(group, new RegExp(question.replace(/[?]/g, '\\?')), `expected "${question}" in the checkbox-group`);
   });
   // Each question is checkbox-first, text after (checkbox on the left).
   assert.match(group, /<input type="checkbox" name="isPublicEvent" value="1"[^>]*\/> Is this a public event\?/);
+  assert.doesNotMatch(page.text, /Who Can Register/, 'the old standalone section should be gone');
+
+  // A real request: "under individual event settings, there should be a
+  // button that says copy link with the public url address for the
+  // event."
+  assert.match(page.text, new RegExp(`data-copy-link="https?://[^"]*/events/${eventId}"`));
+  assert.match(page.text, />Copy Link</);
 
   assert.match(page.text, /> Lock registration to grade level</);
   assert.match(page.text, /> Lock registration to age level</);

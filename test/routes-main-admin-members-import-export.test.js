@@ -45,7 +45,7 @@ async function loginAsMainAdmin() {
   return { cookie, csrfToken };
 }
 
-test('Members page toolbar: Add Member/Edit Permissions/Edit/Import/Export sit above a "Filter" (not "type or family") control', async () => {
+test('Members page toolbar: Add Member/Edit Permissions/Edit Member List/Import/Export sit above a "Filter" (not "type or family") control', async () => {
   const { cookie } = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
   assert.equal(page.status, 200);
@@ -55,11 +55,22 @@ test('Members page toolbar: Add Member/Edit Permissions/Edit/Import/Export sit a
   assert.ok(buttonRowIndex > -1 && filterIndex > -1 && buttonRowIndex < filterIndex, 'the button row must come before the filter control');
 
   assert.match(page.text, />Edit Permissions</);
-  assert.match(page.text, />Edit</);
+  assert.match(page.text, />Edit Member List</);
   assert.match(page.text, />Import</);
   assert.match(page.text, />Export</);
   assert.match(page.text, /<label for="type-select">Filter<\/label>/);
   assert.doesNotMatch(page.text, /Filter by type or family/);
+});
+
+// Coverage for a real request: "add a print button to member list. make
+// sure the printing is clean and fits nicely on pages with borders."
+test('Members page toolbar has a Print button and a branded print-only header', async () => {
+  const { cookie } = await loginAsMainAdmin();
+  const page = await request(app).get('/main-admin/members').set('Cookie', cookie);
+  assert.equal(page.status, 200);
+
+  assert.match(page.text, /onclick="window\.print\(\)"[^>]*>Print</);
+  assert.match(page.text, /<div class="print-header">[\s\S]*?<p class="print-header-sub">Members<\/p>/);
 });
 
 test('GET /main-admin/members/export.csv exports the roster as CSV', async () => {

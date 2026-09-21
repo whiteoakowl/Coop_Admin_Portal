@@ -109,7 +109,7 @@
                 <div class="store-category-row">
                   <input type="hidden" name="categoryId" value="<%= c.id %>" />
                   <input type="text" name="categoryName" value="<%= c.name %>" required />
-                  <button type="submit" form="delete-category-<%= c.id %>-form" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                  <button type="submit" form="delete-category-<%= c.id %>-form" class="icon-btn icon-btn-danger" aria-label="Delete <%= c.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
                 </div>
               <% }); %>
             </div>

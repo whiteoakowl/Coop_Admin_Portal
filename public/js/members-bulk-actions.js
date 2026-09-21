@@ -49,24 +49,32 @@
   // wiring above, just read off the SELECTED <option> of a
   // <select data-bulk-action-select form="..."> instead of a clicked
   // button, since there's no single element to read data- attributes
-  // from otherwise. Submits immediately on change (there's no separate
-  // "go" button - picking an action from a placeholder-first dropdown IS
-  // the action), then resets back to the placeholder so the dropdown
-  // never keeps showing whichever action was last picked.
+  // from otherwise.
+  //
+  // A later real request: "all other buttons disappear and you only see
+  // cancel button and save button" - picking an action from the dropdown
+  // no longer submits by itself; it just arms the form (same data-*
+  // wiring) and enables the page's own explicit Save button
+  // (data-bulk-action-save, form="..." - a plain submit button, so
+  // confirm-dialog.js's usual click-to-confirm flow applies to it exactly
+  // like any other submit button already wired to a data-confirm form).
   document.addEventListener('change', (e) => {
     const select = e.target.closest('[data-bulk-action-select]');
     if (!select) return;
     const option = select.selectedOptions[0];
-    if (!option || !option.dataset.bulkAction) return;
     const formId = select.getAttribute('form');
     const form = formId && document.getElementById(formId);
+    const saveBtn = formId && document.querySelector(`[data-bulk-action-save][form="${formId}"]`);
     if (!form) return;
+    if (!option || !option.dataset.bulkAction) {
+      if (saveBtn) saveBtn.disabled = true;
+      return;
+    }
     form.action = option.dataset.bulkAction;
     form.dataset.confirm = option.dataset.bulkConfirm;
     form.dataset.confirmYesLabel = option.dataset.bulkConfirmYesLabel || 'Yes';
     if (option.dataset.bulkConfirmSafe) form.dataset.confirmSafe = '1';
     else delete form.dataset.confirmSafe;
-    form.requestSubmit();
-    select.value = '';
+    if (saveBtn) saveBtn.disabled = false;
   });
 })();
