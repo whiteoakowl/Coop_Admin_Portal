@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
+      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
+    ],
+    classLinks: [
+      {
+        icon: 'graduation-cap',
+        label: 'Classes',
+        subpages: [
+          { href: '/parent/classes', label: 'Class Registration' },
+          { href: '/parent/classes/manage', label: 'View/Cancel Classes' },
+          { href: '/parent/classes/dashboard', label: 'Class Dashboard' },
+          { href: '/name-tag', label: 'Name Tag Request' },
+          { href: '/absence', label: 'Absence/Late Form' },
+          { href: '/parent/handbook', label: 'Policy Handbook' },
+        ],
+      },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Class Dashboard</h1>
+
+    <% if (children.length === 0) { %>
+      <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
+    <% } else { %>
+      <form method="GET" action="/parent/classes/dashboard" class="class-dash-picker-form">
+        <label class="member-form-full">Viewing classes for
+          <select name="studentId" onchange="this.form.submit()">
+            <% children.forEach(function(c) { %>
+              <option value="<%= c.id %>" <%= selectedChild && selectedChild.id === c.id ? 'selected' : '' %>><%= c.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <noscript><button type="submit" class="roster-action-btn">Go</button></noscript>
+      </form>
+
+      <% if (mondayClasses.length === 0 && wednesdayClasses.length === 0) { %>
+        <p class="roster-empty"><%= selectedChild.name %> isn't enrolled in any classes yet.</p>
+      <% } else { %>
+        <h2>Monday</h2>
+        <% if (mondayClasses.length === 0) { %>
+          <p class="roster-empty">No Monday classes.</p>
+        <% } else { %>
+          <div class="class-dash-grid">
+            <% mondayClasses.forEach(function(c) { %>
+              <a class="class-dash-card" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">
+                <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+                <div class="class-dash-card-body">
+                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                </div>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <h2>Wednesday</h2>
+        <% if (wednesdayClasses.length === 0) { %>
+          <p class="roster-empty">No Wednesday classes.</p>
+        <% } else { %>
+          <div class="class-dash-grid">
+            <% wednesdayClasses.forEach(function(c) { %>
+              <a class="class-dash-card" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">
+                <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+                <div class="class-dash-card-body">
+                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                </div>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+      <% } %>
+    <% } %>
+  </main>
+</body>
+</html>

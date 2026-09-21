@@ -16,8 +16,8 @@ const fs = require('fs');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList } = require('../utils/classSchedule');
-const { formatFriendlyTimestamp, formatTimestamp, formatDateLabel, formatTime } = require('../utils/dates');
+const { allClassesList, attendanceHistoryForRoster } = require('../utils/classSchedule');
+const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
 const { assignmentsForStudent, assignmentsForStudentInClass, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
@@ -177,31 +177,6 @@ router.post('/classes/:id/unregister', async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
-// This student's own attendance history for one class, via the class's
-// own auto-roster (classes.roster_id, see ensureClassRoster/
-// syncClassRosterMembers in utils/classSchedule.js) - same shape as
-// attendanceHistoryForMember in routes/admin-members.js, just narrowed to
-// one roster_id instead of every roster the member ever appears on.
-async function classAttendanceHistory(memberId, rosterId) {
-  if (!rosterId) return [];
-  const rows = await db
-    .prepare(
-      `SELECT a.session_date AS date, a.status, a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime"
-       FROM attendance a
-       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
-       WHERE a.member_id = ? AND a.roster_id = ?
-       ORDER BY a.session_date DESC`
-    )
-    .all(memberId, rosterId);
-  return rows.map((r) => ({
-    dateLabel: formatDateLabel(r.date),
-    status: r.status,
-    statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
-    checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
-    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
-  }));
-}
-
 const CLASS_DETAIL_TABS = ['assignments', 'lessons', 'forum', 'resources', 'attendance', 'assessments', 'grades'];
 
 // One class's own detail page - card-clicked from /student/classes. Read-
@@ -227,7 +202,7 @@ router.get('/classes/:id', async (req, res) => {
 
   const tab = CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'assignments';
   const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(member.id, classId) : [];
-  const attendance = tab === 'attendance' ? await classAttendanceHistory(member.id, cls.roster_id) : [];
+  const attendance = tab === 'attendance' ? await attendanceHistoryForRoster(member.id, cls.roster_id) : [];
   const forumCategory = tab === 'forum' ? await forums.categoryForClass(classId) : null;
 
   res.render('student-class-detail', { title: cls.class_name, cls, tab, assignments, attendance, forumCategory });

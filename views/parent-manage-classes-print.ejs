@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+  <style>@page { size: letter; margin: 0.4in; }</style>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+    ],
+  }) %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <div class="print-preview-header no-print">
+      <h1>View/Cancel Classes</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="print-header">
+      <img src="/img/logo.png" alt="" />
+      <div>
+        <p class="print-header-title">My Family's Classes</p>
+      </div>
+    </div>
+    <% if (!hasChildren || entries.length === 0) { %>
+      <p class="roster-empty">No one in your family is registered for a class yet.</p>
+    <% } else { %>
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Family Member</th><th>Class</th><th>Day &amp; Time</th><th>Teacher</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <% entries.forEach(function(entry) { %>
+            <tr>
+              <td><%= entry.child.name %></td>
+              <td><%= entry.cls.class_name %></td>
+              <td><%= entry.cls.dayLabel %> &middot; <%= entry.cls.timeLabel %></td>
+              <td><%= entry.cls.teacherNames.length ? entry.cls.teacherNames.join(', ') : '—' %></td>
+              <td><%= entry.waitlistPosition != null ? `Waitlisted (#${entry.waitlistPosition})` : 'Registered' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </main>
+  <script src="/js/print-auto.js"></script>
+</body>
+</html>

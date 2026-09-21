@@ -21,7 +21,8 @@
         label: 'Classes',
         subpages: [
           { href: '/parent/classes', label: 'Class Registration' },
-          { href: '/parent/classes/manage', label: 'Manage Classes' },
+          { href: '/parent/classes/manage', label: 'View/Cancel Classes' },
+          { href: '/parent/classes/dashboard', label: 'Class Dashboard' },
           { href: '/name-tag', label: 'Name Tag Request' },
           { href: '/absence', label: 'Absence/Late Form' },
           { href: '/parent/handbook', label: 'Policy Handbook' },
@@ -31,45 +32,66 @@
   }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Manage Classes</h1>
+    <h1>View/Cancel Classes</h1>
     <p class="hint">Your family's current class registrations. To register for a new class, use <a href="/parent/classes">Class Registration</a>.</p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
+    <% if (hasChildren && entries.length > 0) { %>
+      <div class="roster-toolbar">
+        <div class="roster-btn-row">
+          <a class="roster-action-btn print-action-btn" href="/parent/classes/manage/print" target="_blank">Print</a>
+          <a class="roster-action-btn file-action-btn" href="/parent/classes/manage/export.csv">Export</a>
+          <a class="roster-action-btn" href="/parent/name-tags">Print Name Tag</a>
+        </div>
+      </div>
+    <% } %>
+
     <% if (!hasChildren) { %>
       <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
     <% } else if (entries.length === 0) { %>
       <p class="roster-empty">No one in your family is registered for a class yet.</p>
-    <% } else { %>
-      <div class="manage-classes-grid">
+    <% } else {
+      let lastChildId = null;
+    %>
+      <div class="manage-classes-list">
         <% entries.forEach(function(entry) { %>
-          <div class="manage-class-card">
-            <div class="manage-class-card-color-bar" style="background: <%= entry.cls.color %>;"></div>
-            <div class="manage-class-card-body">
-              <p class="manage-class-card-child"><%= entry.child.name %></p>
-              <h3 class="manage-class-card-title"><%= entry.cls.class_name %></h3>
-              <p class="manage-class-card-meta"><%= entry.cls.dayLabel %> &middot; <%= entry.cls.timeLabel %></p>
-              <p class="manage-class-card-meta"><%= entry.cls.room || 'No room set' %></p>
-              <p class="manage-class-card-meta"><%= entry.cls.teacherNames.length ? entry.cls.teacherNames.join(', ') : 'No teacher assigned' %></p>
-              <% if (entry.waitlistPosition != null) { %>
-                <span class="badge-pill">Waitlisted (#<%= entry.waitlistPosition %>)</span>
+          <% if (entry.child.id !== lastChildId) { lastChildId = entry.child.id; %>
+            <p class="manage-classes-group-header"><%= entry.child.name %></p>
+          <% } %>
+          <div class="manage-classes-row" data-class-row data-class-id="<%= entry.cls.id %>">
+            <span class="manage-classes-row-color-bar" style="background: <%= entry.cls.color %>;"></span>
+            <div class="manage-classes-row-info">
+              <% if (entry.waitlistPosition == null) { %>
+                <a class="manage-classes-row-title" href="/parent/classes/dashboard/<%= entry.cls.id %>?studentId=<%= entry.child.id %>"><%= entry.cls.class_name %></a>
               <% } else { %>
-                <span class="badge-pill badge-pill-present">Registered</span>
+                <span class="manage-classes-row-title"><%= entry.cls.class_name %></span>
               <% } %>
+              <span class="manage-classes-row-meta"><%= entry.cls.dayLabel %> &middot; <%= entry.cls.timeLabel %> &middot; <%= entry.cls.room || 'No room set' %> &middot; <%= entry.cls.teacherNames.length ? entry.cls.teacherNames.join(', ') : 'No teacher assigned' %></span>
             </div>
+            <% if (entry.waitlistPosition != null) { %>
+              <span class="badge-pill">Waitlisted (#<%= entry.waitlistPosition %>)</span>
+            <% } else { %>
+              <span class="badge-pill badge-pill-present">Registered</span>
+            <% } %>
             <% if (entry.cls.allow_cancel) { %>
-              <form method="POST" action="/parent/classes/<%= entry.cls.id %>/unregister" class="manage-class-card-actions">
-                <input type="hidden" name="studentId" value="<%= entry.child.id %>" />
-                <input type="hidden" name="day" value="<%= entry.cls.day %>" />
-                <input type="hidden" name="returnTo" value="manage" />
-                <button type="submit" class="roster-action-btn roster-action-btn-danger">Cancel</button>
-              </form>
+              <button
+                type="button"
+                class="icon-btn icon-btn-danger"
+                data-cancel-class-btn
+                data-cancel-class-url="/parent/classes/<%= entry.cls.id %>/unregister"
+                data-cancel-student-id="<%= entry.child.id %>"
+                data-cancel-day="<%= entry.cls.day %>"
+                aria-label="Cancel <%= entry.child.name %>'s registration in <%= entry.cls.class_name %>"
+                title="Cancel"
+              ><svg class="icon"><use href="#icon-trash"/></svg></button>
             <% } %>
           </div>
         <% }); %>
       </div>
     <% } %>
   </main>
+  <script src="/js/parent-manage-classes.js"></script>
 </body>
 </html>

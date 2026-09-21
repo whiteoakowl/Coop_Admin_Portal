@@ -4,6 +4,7 @@ const { getListByDay, sectionsForList, membersForList, removeMemberFromSection, 
 const { byLastName } = require('./members');
 const { amountPaidForCharge, cancelCharge } = require('./payments');
 const { createStorageClient, publicUrl } = require('./storage');
+const { formatDateLabel, formatTime } = require('./dates');
 
 // A real request: "sql editor copy paste should be for event photo,
 // class photo and shop photo" - one shared helper so every portal's own
@@ -1076,6 +1077,33 @@ async function allClassesList(day) {
   return list;
 }
 
+// One member's own attendance history for one class, via the class's own
+// auto-roster (classes.roster_id, see ensureClassRoster/
+// syncClassRosterMembers above) - same shape as attendanceHistoryForMember
+// in routes/admin-members.js, just narrowed to one roster_id instead of
+// every roster the member ever appears on. Shared by Student Portal's own
+// class detail page and Parent Portal's read-only Class Dashboard, since
+// both show the same per-class attendance for a single student.
+async function attendanceHistoryForRoster(memberId, rosterId) {
+  if (!rosterId) return [];
+  const rows = await db
+    .prepare(
+      `SELECT a.session_date AS date, a.status, a.check_in_time AS "checkInTime", c.check_out_time AS "checkOutTime"
+       FROM attendance a
+       LEFT JOIN checkouts c ON c.member_id = a.member_id AND c.roster_id = a.roster_id AND c.session_date = a.session_date
+       WHERE a.member_id = ? AND a.roster_id = ?
+       ORDER BY a.session_date DESC`
+    )
+    .all(memberId, rosterId);
+  return rows.map((r) => ({
+    dateLabel: formatDateLabel(r.date),
+    status: r.status,
+    statusLabel: r.status === 'present' ? 'Present' : r.status === 'late' ? 'Late' : 'Absent',
+    checkInTime: r.checkInTime ? formatTime(r.checkInTime) : null,
+    checkOutTime: r.checkOutTime ? formatTime(r.checkOutTime) : null,
+  }));
+}
+
 // Adds someone to a roster by hand (Attendance page's Add Member popup) -
 // tagged source = 'manual' so setRosterMembership's auto-resync never
 // removes them again. INSERT ... ON CONFLICT DO NOTHING so re-adding an
@@ -1987,4 +2015,5 @@ module.exports = {
   liveMemberScheduleRowsForDay,
   addManualRosterMember,
   allClassesList,
+  attendanceHistoryForRoster,
 };

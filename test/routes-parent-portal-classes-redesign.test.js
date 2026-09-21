@@ -103,7 +103,7 @@ test('Parent Portal homepage: "Manage Class Registration" links to /parent/class
   assert.match(home.text, /<a class="roster-action-btn" href="\/parent\/classes\/manage">Manage Class Registration<\/a>/);
 });
 
-test('Parent Portal: the Classes nav tab has all 5 subpages', async () => {
+test('Parent Portal: the Classes nav tab has all 6 subpages', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
   const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-classes">([\s\S]*?)<\/dialog>/.exec(home.text);
@@ -111,7 +111,8 @@ test('Parent Portal: the Classes nav tab has all 5 subpages', async () => {
   const dialog = dialogMatch[1];
   [
     ['/parent/classes', 'Class Registration'],
-    ['/parent/classes/manage', 'Manage Classes'],
+    ['/parent/classes/manage', 'View/Cancel Classes'],
+    ['/parent/classes/dashboard', 'Class Dashboard'],
     ['/name-tag', 'Name Tag Request'],
     ['/absence', 'Absence/Late Form'],
     ['/parent/handbook', 'Policy Handbook'],
@@ -120,7 +121,7 @@ test('Parent Portal: the Classes nav tab has all 5 subpages', async () => {
   });
 });
 
-test('Manage Classes page: shows an enrolled child\'s class with a Cancel button, and cancelling returns to Manage Classes', async () => {
+test('View/Cancel Classes page: shows an enrolled child\'s class with a Cancel button, and cancelling (non-fetch) redirects back to it', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Manage Page Class' });
   const parent = await createParentWithChild();
@@ -135,8 +136,7 @@ test('Manage Classes page: shows an enrolled child\'s class with a Cancel button
   assert.equal(manage.status, 200);
   assert.match(manage.text, /Manage Page Class/);
   assert.match(manage.text, /Registered/);
-  assert.match(manage.text, new RegExp(`action="/parent/classes/${cls.id}/unregister"`));
-  assert.match(manage.text, /name="returnTo" value="manage"/);
+  assert.match(manage.text, new RegExp(`data-cancel-class-url="/parent/classes/${cls.id}/unregister"`));
 
   const csrf2 = extractCsrf(manage.text);
   const cancelRes = await request(app)
