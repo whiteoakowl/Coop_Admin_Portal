@@ -7,7 +7,8 @@ const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
-const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric } = require('../utils/dates');
+const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel } = require('../utils/dates');
+const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
@@ -312,19 +313,42 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
   });
 });
 
+const CLASS_MANAGE_TABS = ['details', 'staffRoster', 'assignments', 'grades'];
+
 // Kept as a standalone page too (direct-link/bookmark friendly), even
-// though the grid's "View" button now opens the same content as a popup.
+// though the grid's own class card now links straight here instead of
+// opening the popup fragment. A real request: "when you click a classes
+// it should take you to the classes full settings page with tabs for all
+// of that classes features. Admin and teachers can change classes
+// information or upload assignments, grades etc." - Teacher Portal
+// already lets a teacher manage their own classes' assignments/grades
+// (routes/teacher-portal.js's own /classes/:id, /assignments/:id); this
+// adds the equivalent Assignments/Grades tabs here so an admin has the
+// same reach over EVERY class, not just Class Details/Staff/Roster.
 router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const cls = await getClass(id);
   if (!cls) return res.status(404).send('Not found');
 
+  const activeTab = CLASS_MANAGE_TABS.includes(req.query.tab) ? req.query.tab : 'details';
   const enrolledIds = cls.students.map((s) => s.id);
   const staffIds = cls.staff.map((s) => s.id);
+
+  let assignments = [];
+  if (activeTab === 'assignments' || activeTab === 'grades') {
+    const rawAssignments = await assignmentsForClass(id);
+    assignments = await Promise.all(
+      rawAssignments.map(async (a) => {
+        const { rows } = await gradebookForAssignment(a.id);
+        return { ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null, gradedCount: rows.filter((r) => r.points_earned != null).length, studentCount: rows.length };
+      })
+    );
+  }
 
   res.render('admin-class-schedule-manage', {
     title: `Manage - ${cls.class_name}`,
     cls,
+    activeTab,
     dayLabel: DAY_LABELS[cls.day],
     hours: await hoursForDay(cls.day),
     gradeLevels: GRADE_LEVELS,
@@ -336,9 +360,58 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
     classImageUrl: classImageUrl(cls.image_key),
+    assignments,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+router.post('/class-schedule/classes/:id/assignments', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const cls = await getClass(id);
+  if (!cls) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/classes/${id}/manage?tab=assignments`;
+
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(back + '&error=' + encodeURIComponent('An assignment title is required.'));
+  await createAssignment({
+    classId: id,
+    className: cls.class_name,
+    title,
+    description: (req.body.description || '').trim(),
+    dueDate: req.body.dueDate || null,
+    pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
+    createdByAccountId: null,
+  });
+  res.redirect(back + '&notice=' + encodeURIComponent(`"${title}" added.`));
+});
+
+// Grading one assignment - own page rather than a third thing crammed
+// into the class's own Grades tab, same shape as Teacher Portal's own
+// /assignments/:id (routes/teacher-portal.js) so an admin grading a
+// class works exactly like a teacher grading their own.
+router.get('/class-schedule/assignments/:id', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  if (!assignment) return res.status(404).send('Not found');
+  const cls = await getClass(assignment.class_id);
+  const { rows } = await gradebookForAssignment(assignmentId);
+  res.render('admin-class-assignment-gradebook', { title: assignment.title, cls, assignment, rows, notice: req.query.notice || null });
+});
+
+router.post('/class-schedule/assignments/:id/grades', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  if (!assignment) return res.status(404).send('Not found');
+
+  const { rows } = await gradebookForAssignment(assignmentId);
+  for (const row of rows) {
+    const rawPoints = req.body[`points_${row.student_id}`];
+    const pointsEarned = rawPoints === '' || rawPoints == null ? null : Number(rawPoints);
+    const feedback = (req.body[`feedback_${row.student_id}`] || '').trim();
+    await saveGrade({ assignmentId, studentId: row.student_id, pointsEarned, feedback, gradedByAccountId: null });
+  }
+  res.redirect(`/admin/class-schedule/assignments/${assignmentId}?notice=` + encodeURIComponent('Grades saved.'));
 });
 
 router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single('image'), async (req, res) => {

@@ -331,25 +331,22 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                   <%#
                     A real request: "remove the edit button and attendance
                     link button from the schedule cards to view the titles
-                    easier. the attendance link should be on the edit
-                    class form." Both icon buttons are gone - the
-                    attendance quicklink already lived on the class view/
-                    edit dialog too (class-schedule-view-fragment.ejs's own
-                    "Class Check-In Link" in .class-view-roster-actions),
-                    so nothing needed to move there. The card itself is
-                    now the click target that opens that same dialog
-                    (data-view-class, handled by public/js/class-schedule-
-                    view.js's existing delegated click listener - it never
-                    cared whether that attribute lived on a small button
-                    or the whole card), matching the exact same pattern
-                    Parent Portal's own read-only class cards already use
-                    (views/parent-classes.ejs). Can't reuse THAT page's
-                    <button class="class-card-clickable"> wrapper here
-                    though - a <button> can't legally contain the archive
-                    checkbox below, so this stays a <div> with role=button/
-                    tabindex for the same keyboard behavior (class-
-                    schedule-view.js's own keydown handler, added
-                    alongside this). %>
+                    easier." Both icon buttons are gone - the card itself
+                    is the click target (data-view-class, handled by
+                    public/js/class-schedule-view.js's delegated click
+                    listener). A later real request: "when you click a
+                    classes it should take you to the classes full
+                    settings page with tabs for all of that classes
+                    features" - that listener now navigates straight to
+                    the class's own tabbed Manage page (admin-class-
+                    schedule-manage.ejs) instead of opening a quick-view
+                    popup. Can't use a <button class="class-card-clickable">
+                    wrapper here the way Parent Portal's own read-only
+                    class cards do (views/parent-classes.ejs) - a <button>
+                    can't legally contain the archive checkbox below, so
+                    this stays a <div> with role=button/tabindex for the
+                    same keyboard behavior (class-schedule-view.js's own
+                    keydown handler). %>
                   <div
                     class="class-card<% if (!gridReadOnly) { %> class-card-clickable<% } %>"
                     style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"

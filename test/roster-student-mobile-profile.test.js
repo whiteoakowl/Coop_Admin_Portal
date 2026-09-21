@@ -107,7 +107,7 @@ test('the standalone Manage page (admin-class-schedule-manage.ejs) carries the s
   const classId = await createClass({ day: 'monday', hourPosition: 3, className: 'Manage Page Roster Class' });
   await setEnrollment(classId, [studentId]);
 
-  const res = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', cookie);
+  const res = await request(app).get(`/admin/class-schedule/classes/${classId}/manage?tab=staffRoster`).set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /data-roster-student-card/);
   assert.match(res.text, /data-name="Manage Page Student"/);
