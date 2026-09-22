@@ -60,6 +60,26 @@ router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
+// TEMPORARY diagnostic for the "photo uploads still fail after redeploy"
+// investigation - confirms what this specific running Netlify Function
+// instance actually sees for the two Storage env vars, without ever
+// printing their real values, since the Netlify dashboard's own UI can't
+// answer "did this deploy actually pick up my env var change." Remove
+// once Storage uploads are confirmed working again.
+router.get('/storage-env-check', requireFullAdmin, (req, res) => {
+  const { createStorageClient } = require('../utils/storage');
+  const url = process.env.SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  res.json({
+    supabaseUrlSet: !!url,
+    supabaseUrlLength: url.length,
+    serviceRoleKeySet: !!key,
+    serviceRoleKeyLength: key.length,
+    serviceRoleKeyPrefix: key.slice(0, 6),
+    storageClientConfigured: !!createStorageClient(),
+  });
+});
+
 // --- Dashboard ---
 
 // Today's checked-in/out/late/absent counts for one member type, each as
