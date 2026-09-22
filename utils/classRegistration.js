@@ -43,9 +43,11 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, al
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.registration_open) return { ok: false, error: 'Registration is not open for that class.' };
   if (!cls[allowField]) return { ok: false, error: 'Registration is not open for that class yet.' };
-  if (!(await isRegistrationOpenForAccount(portalRoles))) return { ok: false, error: 'Registration is not open for your account yet.' };
 
   const restriction = await classSectionIds(classId);
+  if (!(await isRegistrationOpenForAccount(portalRoles, { day: cls.day, sectionIds: restriction }))) {
+    return { ok: false, error: 'Registration is not open for your account yet.' };
+  }
   if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(studentId), restriction)) {
     return { ok: false, error: 'This class is limited to specific sections you are not part of.' };
   }

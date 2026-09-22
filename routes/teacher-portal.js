@@ -15,6 +15,8 @@ const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssign
 const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
 const { byLastName } = require('../utils/members');
 const { buildRosterGridData } = require('../utils/rosterGrid');
+const { classSectionIds } = require('../utils/sections');
+const { isRegistrationOpenForAccount } = require('../utils/registrationWindows');
 const notifications = require('../utils/notifications');
 
 router.use(requirePortalAuth, requirePortal('teacher'));
@@ -134,6 +136,13 @@ router.post('/classes/:id/join', async (req, res) => {
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   if (!cls || !cls.allow_teacher_register) {
     return res.redirect(back + '?error=' + encodeURIComponent('Self-signup is not open for that class.'));
+  }
+  // No date/time enforcement existed here at all before Registration
+  // Schedule (a real request) - Parent/Student Portal registration
+  // already gated on this same isRegistrationOpenForAccount check.
+  const restriction = await classSectionIds(classId);
+  if (!(await isRegistrationOpenForAccount(req.portalRoles, { day: cls.day, sectionIds: restriction }))) {
+    return res.redirect(back + '?error=' + encodeURIComponent('Registration is not open for your account yet.'));
   }
   const already = await db.prepare('SELECT 1 FROM class_staff WHERE class_id = ? AND member_id = ?').get(classId, member.id);
   if (already) return res.redirect(back + '?error=' + encodeURIComponent('You are already staffed on that class.'));

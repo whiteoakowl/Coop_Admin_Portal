@@ -229,6 +229,13 @@ router.get('/classes/:id/fragment', async (req, res) => {
 
   const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
   const staff = cls.staff || [];
+  const assistantCount = staff.filter((s) => s.role === 'assistant').length;
+  // A real request: the class card should show how many students/
+  // assistants can sign up and how many of each already have, plus the
+  // class's own waitlist total - not just "Full"/"X seats left" for
+  // students alone, and not scoped to the signed-in family the way
+  // waitlistPositionByStudentId below already is.
+  const waitlistCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM class_registrations WHERE class_id = ? AND status = 'waitlisted'").get(classId)).c);
 
   res.render('parent-class-fragment', {
     cls,
@@ -237,13 +244,16 @@ router.get('/classes/:id/fragment', async (req, res) => {
     gradeLabel: formatGradeRange(cls.age_group),
     teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
     assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+    enrolledCount,
+    assistantCount,
+    waitlistCount,
     seatsLeft: cls.capacity == null ? null : Math.max(0, cls.capacity - enrolledCount),
     isFull: cls.capacity != null && enrolledCount >= cls.capacity,
     children: eligibleChildren,
     hasChildren: children.length > 0,
     enrolledIds: [...enrolledIds],
     waitlistPositionByStudentId,
-    windowOpen: await isRegistrationOpenForAccount(req.portalRoles),
+    windowOpen: await isRegistrationOpenForAccount(req.portalRoles, { day: cls.day, sectionIds: restriction }),
   });
 });
 

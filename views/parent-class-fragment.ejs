@@ -110,6 +110,39 @@
     <% } %>
   </div>
 
+  <%# A real request: "show how many students can sign up, how many
+      assistants can sign up and how many of each have already signed
+      up. It should also show wait list amount." A slot count of null
+      means "no limit set" for that role, same convention cls.capacity
+      already uses. %>
+  <div class="class-view-info-row">
+    <div class="class-view-info-item">
+      <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+      <div>
+        <span class="class-view-info-label">Students</span>
+        <strong class="class-view-info-value"><%= enrolledCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %> signed up</strong>
+      </div>
+    </div>
+    <div class="class-view-info-divider"></div>
+    <div class="class-view-info-item">
+      <svg class="icon"><use href="#icon-user"/></svg>
+      <div>
+        <span class="class-view-info-label">Assistants</span>
+        <strong class="class-view-info-value"><%= assistantCount %><% if (cls.assistant_slots != null) { %> / <%= cls.assistant_slots %><% } %> signed up</strong>
+      </div>
+    </div>
+    <% if (waitlistCount > 0) { %>
+      <div class="class-view-info-divider"></div>
+      <div class="class-view-info-item">
+        <svg class="icon"><use href="#icon-clock"/></svg>
+        <div>
+          <span class="class-view-info-label">Waitlist</span>
+          <strong class="class-view-info-value"><%= waitlistCount %> waiting</strong>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
   <% if (cls.description) { %>
     <div class="hint forum-editable-display parent-class-description"><%- cls.description %></div>
   <% } %>

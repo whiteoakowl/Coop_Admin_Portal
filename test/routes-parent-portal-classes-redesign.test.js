@@ -188,3 +188,29 @@ test('Class registration popup: redesigned card shows icon header, Day & Time/Lo
   assert.match(fragment.text, /Register your children/);
   assert.match(fragment.text, /<button type="submit" class="primary-btn primary-btn-dark">Register<\/button>/);
 });
+
+test('Class registration popup: shows student/assistant signup counts (with slot totals) and a waitlist count', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Counts Class', capacity: '2' });
+  await db.prepare('UPDATE classes SET assistant_slots = 1 WHERE id = ?').run(cls.id);
+
+  const assistantCode = await generateMemberCode();
+  const assistantInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, active) VALUES (?, ?, ?, 'parent', 1)")
+    .run('Nadia Ferris', assistantCode, assistantCode);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'assistant')").run(cls.id, assistantInfo.lastInsertRowid);
+
+  const parentA = await createParentWithChild();
+  const parentB = await createParentWithChild();
+  const parentC = await createParentWithChild();
+  await request(app).post(`/parent/classes/${cls.id}/register`).set('Cookie', parentA.cookie).type('form').send({ studentId: String(parentA.childId), day: 'monday', _csrf: parentA.csrfToken });
+  await request(app).post(`/parent/classes/${cls.id}/register`).set('Cookie', parentB.cookie).type('form').send({ studentId: String(parentB.childId), day: 'monday', _csrf: parentB.csrfToken });
+  // Class is now full (capacity 2) - this third registration waitlists.
+  await request(app).post(`/parent/classes/${cls.id}/register`).set('Cookie', parentC.cookie).type('form').send({ studentId: String(parentC.childId), day: 'monday', _csrf: parentC.csrfToken });
+
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parentA.cookie);
+  assert.equal(fragment.status, 200);
+  assert.match(fragment.text, /Students<\/span>\s*<strong class="class-view-info-value">2 \/ 2 signed up<\/strong>/);
+  assert.match(fragment.text, /Assistants<\/span>\s*<strong class="class-view-info-value">1 \/ 1 signed up<\/strong>/);
+  assert.match(fragment.text, /Waitlist<\/span>\s*<strong class="class-view-info-value">1 waiting<\/strong>/);
+});

@@ -6,7 +6,8 @@ const fs = require('fs');
 const db = require('../db');
 const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
-const { isValidISODate } = require('../utils/dates');
+const { isValidISODate, easternInputToUtcText, formatTimestamp } = require('../utils/dates');
+const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
 const { defaultDateFor, parseDayValue } = require('../utils/days');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const {
@@ -143,12 +144,16 @@ router.get('/schedule', requireAdmin, async (req, res) => {
   // own /settings route + public/js/class-settings-autosave.js) rather
   // than needing the class's own Edit popup opened just to flip one flag.
   if (tab === 'settings') {
+    const windowRows = await listWindows();
     return res.render('admin-schedule', {
       title: 'Schedules',
       tab,
       topTab: 'settings',
       classes: await allClassesList(null),
       dayLabels: CLASS_DAY_LABELS,
+      windows: windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) })),
+      roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
+      sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -235,6 +240,40 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// --- Classes > Settings: Registration Schedule (staged, day/section/
+// role-targeted class registration windows - see
+// utils/registrationWindows.js's own header comment). A real request:
+// "main admin, classes, settings. Add registration schedule. Be able to
+// control who can signup on each schedule grid monday/Wednesday. Date,
+// time and section and open for teacher or assistant registration" - a
+// follow-up confirmed this should live under Co-op Admin's own Classes >
+// Settings tab (class settings always live here), not a separate Main
+// Admin page, and should gate everyone who registers for a class
+// (parents/students/teachers), not just teacher/assistant.
+router.post('/schedule/registration-windows', requireFullAdmin, async (req, res) => {
+  const label = (req.body.label || '').trim();
+  const opensAt = easternInputToUtcText(req.body.opensAt);
+  const closesAt = easternInputToUtcText(req.body.closesAt);
+  const back = '/admin/schedule?tab=settings';
+  if (!label || !opensAt) {
+    return res.redirect(back + '&error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
+  }
+  await createWindow({
+    label,
+    roleKey: req.body.roleKey || null,
+    opensAt,
+    closesAt,
+    day: req.body.day || null,
+    sectionId: req.body.sectionId ? Number(req.body.sectionId) : null,
+  });
+  res.redirect(back + '&notice=' + encodeURIComponent('Registration window added.'));
+});
+
+router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async (req, res) => {
+  await deleteWindow(req.params.id);
+  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Registration window removed.'));
 });
 
 // --- Member Schedules: bulk import ---

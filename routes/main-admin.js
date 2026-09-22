@@ -10,8 +10,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requirePortalAuth, requirePortal, requirePortalPermission } = require('../middleware/portalAuth');
-const { listWindows, createWindow, deleteWindow } = require('../utils/registrationWindows');
-const { easternInputToUtcText, formatTimestamp, isValidISODate } = require('../utils/dates');
+const { isValidISODate } = require('../utils/dates');
 const { allDiplomas, issueDiploma, allTranscriptEntries, addTranscriptEntry } = require('../utils/academics');
 const { DAY_LABELS } = require('../utils/days');
 const { GRADE_OPTIONS } = require('../utils/membership');
@@ -251,33 +250,6 @@ router.post('/faq/add', requirePortalPermission('manage_website'), async (req, r
 router.post('/faq/:id/delete', requirePortalPermission('manage_website'), async (req, res) => {
   await db.prepare('DELETE FROM faqs WHERE id = ?').run(req.params.id);
   res.redirect('/main-admin/faq?notice=' + encodeURIComponent('FAQ removed.'));
-});
-
-// --- Registration Windows (staged, group-targeted class registration -
-// see utils/registrationWindows.js's own header comment) ---
-
-router.get('/registration-windows', requirePortalPermission('manage_classes'), async (req, res) => {
-  const windowRows = await listWindows();
-  const windows = windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) }));
-  const roles = await db.prepare('SELECT key, label FROM roles ORDER BY label').all();
-  res.render('main-admin-registration-windows', { title: 'Registration Windows', windows, roles, error: req.query.error || null, notice: req.query.notice || null });
-});
-
-router.post('/registration-windows', requirePortalPermission('manage_classes'), async (req, res) => {
-  const label = (req.body.label || '').trim();
-  const opensAt = easternInputToUtcText(req.body.opensAt);
-  const closesAt = easternInputToUtcText(req.body.closesAt);
-  const back = '/main-admin/registration-windows';
-  if (!label || !opensAt) {
-    return res.redirect(back + '?error=' + encodeURIComponent('A label and an opens-at date/time are required.'));
-  }
-  await createWindow({ label, roleKey: req.body.roleKey || null, opensAt, closesAt });
-  res.redirect(back + '?notice=' + encodeURIComponent('Registration window added.'));
-});
-
-router.post('/registration-windows/:id/delete', requirePortalPermission('manage_classes'), async (req, res) => {
-  await deleteWindow(req.params.id);
-  res.redirect('/main-admin/registration-windows?notice=' + encodeURIComponent('Registration window removed.'));
 });
 
 // --- Academics: diplomas + transcripts (utils/academics.js) ---

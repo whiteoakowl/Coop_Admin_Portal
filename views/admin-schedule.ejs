@@ -178,6 +178,104 @@
           </div>
           <p class="hint no-print" id="class-settings-save-status" role="status"></p>
         <% } %>
+
+        <%# A real request: "add registration schedule. Be able to
+            control who can signup on each schedule grid monday/
+            Wednesday. Date, time and section and open for teacher or
+            assistant registration." A follow-up confirmed this gates
+            everyone (parents/students/teachers), and "section" means the
+            existing Sections feature - class settings always live here
+            under Co-op Admin, not a separate Main Admin page. %>
+        <h2>Registration Schedule</h2>
+        <p class="hint">
+          Stage class registration in rounds (e.g. teachers first, then everyone else), scoped to one day's
+          schedule grid and/or a Sections group if you like. A class only accepts registrations once it's
+          individually marked "Open for Registration" above <em>and</em>, if any windows exist below, the
+          registering member qualifies for one that's currently open. With no windows at all, a class's own Open
+          toggle is the only gate.
+        </p>
+
+        <section class="portal-dashboard-card portal-dashboard-card-wide">
+          <h2>Add a Window</h2>
+          <form method="POST" action="/admin/schedule/registration-windows" class="member-form-grid">
+            <label class="member-form-full">Label
+              <input type="text" name="label" placeholder="e.g. Teacher Priority Registration" required />
+            </label>
+            <label>Open For
+              <select name="roleKey">
+                <option value="">Everyone</option>
+                <% roles.forEach(function(r) { %>
+                  <option value="<%= r.key %>"><%= r.label %></option>
+                <% }); %>
+              </select>
+            </label>
+            <label>Schedule Grid
+              <select name="day">
+                <option value="">Both days</option>
+                <% Object.keys(dayLabels).forEach(function(key) { %>
+                  <option value="<%= key %>"><%= dayLabels[key] %></option>
+                <% }); %>
+              </select>
+            </label>
+            <label>Section
+              <select name="sectionId">
+                <option value="">All sections</option>
+                <% sections.forEach(function(s) { %>
+                  <option value="<%= s.id %>"><%= s.name %></option>
+                <% }); %>
+              </select>
+            </label>
+            <label>Opens At
+              <input type="datetime-local" name="opensAt" required />
+            </label>
+            <label>Closes At <span class="hint">(optional - blank means it stays open)</span>
+              <input type="datetime-local" name="closesAt" />
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Add Window</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="portal-dashboard-section">
+          <h2>Current Windows</h2>
+          <% if (windows.length === 0) { %>
+            <p class="roster-empty">No registration windows yet - every open class is available to every family immediately.</p>
+          <% } else { %>
+            <div class="roster-scroll">
+              <table class="roster-table members-table condensed-table">
+                <thead>
+                  <tr>
+                    <th>Label</th>
+                    <th>Open For</th>
+                    <th>Schedule Grid</th>
+                    <th>Section</th>
+                    <th>Opens At</th>
+                    <th>Closes At</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% windows.forEach(function(w) { %>
+                    <tr>
+                      <td class="roster-name-col"><%= w.label %></td>
+                      <td><%= w.roleLabel || 'Everyone' %></td>
+                      <td><%= w.day ? (dayLabels[w.day] || w.day) : 'Both days' %></td>
+                      <td><%= w.sectionName || 'All sections' %></td>
+                      <td><%= w.opensLabel %></td>
+                      <td><%= w.closesLabel || 'Stays open' %></td>
+                      <td>
+                        <form method="POST" action="/admin/schedule/registration-windows/<%= w.id %>/delete" data-confirm="Delete the &quot;<%= w.label %>&quot; window?">
+                          <button type="submit" class="roster-action-btn roster-action-btn-danger">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </section>
       <% } else { %>
         <%
           function buildQuery(overrides) {
