@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Orientation</h1>
+    <p class="hint">Every family with a student registered for classes on either day, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Orientation Meet Up are usually set from their own Check-In subpage instead.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <% if (rows.length === 0) { %>
+      <p class="roster-empty">No one is registered for classes on either day yet.</p>
+    <% } else { %>
+      <div class="roster-scroll">
+        <table class="roster-table members-table condensed-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Day</th>
+              <th>Orientation Video</th>
+              <th>Orientation Meet Up</th>
+              <th>Teacher Training</th>
+              <th>Tour</th>
+              <th>% Complete</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+              <tr>
+                <td class="roster-name-col"><%= r.memberName %></td>
+                <td><%= r.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                <% ['video', 'meetup', 'teacherTraining', 'tour'].forEach(function(field) { %>
+                  <td>
+                    <button
+                      type="button"
+                      class="orientation-dot<%= r[field] ? ' orientation-dot-complete' : '' %>"
+                      data-orientation-toggle
+                      data-member-id="<%= r.memberId %>"
+                      data-day="<%= r.day %>"
+                      data-field="<%= field %>"
+                      data-complete="<%= r[field] ? '1' : '0' %>"
+                      aria-pressed="<%= r[field] ? 'true' : 'false' %>"
+                      aria-label="<%= field %> for <%= r.memberName %>, <%= r.day %> - <%= r[field] ? 'complete' : 'incomplete' %>"
+                    ></button>
+                  </td>
+                <% }); %>
+                <td><%= r.percentComplete %>%</td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  <script src="/js/orientation-toggle.js"></script>
+</body>
+</html>

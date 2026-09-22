@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation</a></p>
+    <h1><%= title %></h1>
+    <p class="hint">Everyone registered for classes on either day, in one list - check a name (or Select All), then Check In.</p>
+
+    <div class="roster-toolbar no-print">
+      <div class="roster-btn-row">
+        <%# .class-checkin-btn - the one deliberately-still-purple button
+            class in this app (see public/css/styles.css's own comment:
+            "make all other purple buttons blue. Only kiosk purple stays
+            and check in and out purple buttons stay"), same one the
+            actual Class Check-In kiosk uses. %>
+        <button type="submit" form="orientation-checkin-form" class="class-checkin-btn">Check In</button>
+        <button type="button" class="roster-action-btn" data-copy-link="<%= linkUrl %>">Copy Link</button>
+      </div>
+    </div>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form id="orientation-checkin-form" method="POST" action="<%= postUrl %>">
+      <% if (rows.length === 0) { %>
+        <p class="roster-empty">No one is registered for classes on either day yet.</p>
+      <% } else { %>
+        <div class="roster-scroll">
+          <table class="roster-table members-table condensed-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" data-select-all-for="orientation-checkin-form" aria-label="Select all" /></th>
+                <th>Member</th>
+                <th>Day</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(function(r) { %>
+                <tr>
+                  <td>
+                    <% if (!r[field]) { %>
+                      <input type="checkbox" name="members" value="<%= r.memberId %>:<%= r.day %>" form="orientation-checkin-form" aria-label="Select <%= r.memberName %>, <%= r.day %>" />
+                    <% } %>
+                  </td>
+                  <td class="roster-name-col"><%= r.memberName %></td>
+                  <td><%= r.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td>
+                    <% if (r[field]) { %>
+                      <span class="status-badge status-badge-present">Checked In</span>
+                    <% } else { %>
+                      <span class="hint">Not yet</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </form>
+  </main>
+  <script src="/js/archive-select-toggle.js"></script>
+  <script src="/js/copy-link.js"></script>
+</body>
+</html>

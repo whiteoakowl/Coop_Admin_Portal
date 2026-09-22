@@ -96,6 +96,15 @@
         { href: '/admin/announcements/email', label: 'Email' },
         { href: '/admin/announcements/text', label: 'Text' },
       ] },
+      // A real request: "Add an orientation tab. List of members
+      // registered for classes on either day... Subpages, tour check in,
+      // orientation check in." See routes/admin-orientation.js/utils/
+      // orientation.js.
+      { href: '/admin/orientation', icon: 'check-circle', label: 'Orientation', subpages: [
+        { href: '/admin/orientation', label: 'Orientation' },
+        { href: '/admin/orientation/tour-checkin', label: 'Tour Check-In' },
+        { href: '/admin/orientation/orientation-checkin', label: 'Orientation Check-In' },
+      ] },
     ];
   %>
   <nav id="admin-nav-links">

@@ -7476,6 +7476,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .status-badge-partial { background: var(--yellow-bg); color: var(--yellow); }
 .status-badge-complete { background: var(--green-bg); color: var(--green); }
 
+/* Orientation tab's own circles (a real request: "circle check boxes
+   that show green when complete") - public/js/orientation-toggle.js
+   flips both the fill and data-complete on click. */
+.orientation-dot {
+  width: 1.5rem; height: 1.5rem; border-radius: 50%; padding: 0;
+  border: 2px solid var(--border); background: var(--surface); cursor: pointer;
+}
+.orientation-dot:hover { border-color: var(--muted); }
+.orientation-dot-complete { background: var(--green); border-color: var(--green); }
+.orientation-dot-complete:hover { background: var(--green); border-color: var(--green); }
+
 /* Member Schedules tab - every person's actual Schedule Card (same design
    as the printable one), side by side in alphabetical-by-last-name order
    instead of a table row per person. Students and parents/admins are
