@@ -1,0 +1,64 @@
+<%
+// Shared event month-grid, with month/year dropdowns and narrower Prev/
+// Next arrows - a real request: "Parent portal events, events page
+// should show the same event calendar that is on main admin portal."
+// Main Admin (views/admin-events-list.ejs) and every member-facing
+// portal (views/events-list.ejs, via routes/events.js) already build
+// their calendar DATA from the exact same utils/events.js monthGrid() -
+// this partial is the rendering they now share too, replacing the
+// member-facing page's own older, simpler markup (plain Prev/Next text
+// links, no month/year dropdowns) so the two never drift apart again.
+//
+// locals: calendar (monthGrid()'s own shape), monthLinkBase (a URL up
+// through its own `view=X` query param, no `&month=` yet - e.g. Main
+// Admin's "/main-admin/events?tab=calendar&view=calendar" vs. the
+// shared "/events?view=calendar" - each caller's own routing, appended
+// to below), eventHref(e) - one event pill's own link target (Main
+// Admin's own builder page vs. the shared public event detail page).
+%>
+<div class="event-calendar-toolbar no-print">
+  <%# A real request: "mobile view. the row should be small left arrow,
+      month drop down, year drop down, small right arrow. all in one row
+      neatly," later: "the arrow buttons should be half the size" - see
+      public/js/roster-btn-row-grid.js's own data-fixed-column-widths
+      escape hatch (its default grid only counts .roster-action-btn
+      children, never the two <select>s below, so left to its own
+      default it split these 4 controls into two rows instead of one). %>
+  <div class="roster-btn-row event-calendar-nav-row" data-fixed-column-widths="1fr 2fr 2fr 1fr">
+    <a class="roster-action-btn event-calendar-nav-btn" href="<%= monthLinkBase %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
+    <select id="event-month-select" class="event-month-select" onchange="window.location.href='<%- monthLinkBase %>&month='+document.getElementById('event-year-select').value+'-'+this.value;">
+      <% for (let m = 1; m <= 12; m++) { %>
+        <option value="<%= String(m).padStart(2, '0') %>" <%= calendar.month === m ? 'selected' : '' %>><%= new Date(Date.UTC(2000, m - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' }) %></option>
+      <% } %>
+    </select>
+    <select id="event-year-select" class="event-year-select" onchange="window.location.href='<%- monthLinkBase %>&month='+this.value+'-'+document.getElementById('event-month-select').value;">
+      <% for (let y = calendar.year - 3; y <= calendar.year + 3; y++) { %>
+        <option value="<%= y %>" <%= calendar.year === y ? 'selected' : '' %>><%= y %></option>
+      <% } %>
+    </select>
+    <a class="roster-action-btn event-calendar-nav-btn" href="<%= monthLinkBase %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
+  </div>
+</div>
+
+<% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
+  <p class="roster-empty">No published events this month.</p>
+<% } %>
+<div class="roster-scroll">
+  <table class="roster-table condensed-table event-calendar-table">
+    <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+    <tbody>
+      <% calendar.weeks.forEach(function(week) { %>
+        <tr>
+          <% week.forEach(function(day) { %>
+            <td class="<%= day.inMonth ? '' : 'hint' %>">
+              <div><%= day.day %></div>
+              <% day.events.forEach(function(e) { %>
+                <a href="<%= eventHref(e) %>" class="badge-pill<%= e.status === 'cancelled' ? ' event-title-cancelled' : '' %>" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a>
+              <% }); %>
+            </td>
+          <% }); %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>

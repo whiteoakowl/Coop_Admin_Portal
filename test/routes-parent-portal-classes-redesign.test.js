@@ -106,8 +106,13 @@ test('Parent Portal homepage: "Manage Class Registration" links to /parent/class
 test('Parent Portal: the Classes nav tab has all 6 subpages', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
-  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-classes">([\s\S]*?)<\/dialog>/.exec(home.text);
-  assert.ok(dialogMatch, 'expected a Classes subpages dialog');
+  // A later real request ("Parent portal is not divided into sections.
+  // Tabs are in this order... co-op classes...") renamed the nav label
+  // from "Classes" to "Co-op Classes" (views/partials/portal-nav.ejs's
+  // own PARENT_NAV_LINKS), which changes this dialog's auto-derived id
+  // too (mobile-subpages-dialog.ejs slugifies the link's own label).
+  const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-co-op-classes">([\s\S]*?)<\/dialog>/.exec(home.text);
+  assert.ok(dialogMatch, 'expected a Co-op Classes subpages dialog');
   const dialog = dialogMatch[1];
   [
     ['/parent/classes', 'Class Registration'],

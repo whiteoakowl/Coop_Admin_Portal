@@ -41,35 +41,6 @@
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'calendar' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=calendar&month=<%= monthParam %>" aria-label="Calendar View" title="Calendar View"><svg class="icon"><use href="#icon-grid"/></svg></a>
           <a class="roster-action-btn archived-toggle-btn icon-toggle-btn<%= calendarView === 'list' ? ' active' : '' %>" href="/main-admin/events?tab=calendar&view=list&month=<%= monthParam %>" aria-label="List View" title="List View"><svg class="icon"><use href="#icon-menu"/></svg></a>
         </div>
-        <%# A real request: "mobile view. the row should be small left
-            arrow, month drop down, year drop down, small right arrow.
-            all in one row neatly." public/js/roster-btn-row-grid.js's
-            generic mobile layout only counts .roster-action-btn children
-            when computing a grid's column count - it never sees the two
-            <select>s below at all - so left to its own default it
-            miscounted this row as "2 buttons" and produced a 2-column
-            grid, splitting these 4 items into two rows (Prev+Month,
-            Year+Next) instead of one.
-            A later real request: "the arrow buttons should be half the
-            size" - a plain data-fixed-columns="4" gives Prev/Next the
-            same column width as the Month/Year dropdowns, oversized for
-            a single arrow glyph. data-fixed-column-widths (same script's
-            own newer escape hatch) gives Prev/Next half the column width
-            of Month/Year instead of an equal quarter each. %>
-        <div class="roster-btn-row event-calendar-nav-row" data-fixed-column-widths="1fr 2fr 2fr 1fr">
-          <a class="roster-action-btn event-calendar-nav-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.prevParam %>">&larr; Prev</a>
-          <select id="event-month-select" class="event-month-select" onchange="window.fullscreenNavigate('/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+document.getElementById('event-year-select').value+'-'+this.value);">
-            <% for (let m = 1; m <= 12; m++) { %>
-              <option value="<%= String(m).padStart(2, '0') %>" <%= calendar.month === m ? 'selected' : '' %>><%= new Date(Date.UTC(2000, m - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' }) %></option>
-            <% } %>
-          </select>
-          <select id="event-year-select" class="event-year-select" onchange="window.fullscreenNavigate('/main-admin/events?tab=calendar&view=<%= calendarView %>&month='+this.value+'-'+document.getElementById('event-month-select').value);">
-            <% for (let y = calendar.year - 3; y <= calendar.year + 3; y++) { %>
-              <option value="<%= y %>" <%= calendar.year === y ? 'selected' : '' %>><%= y %></option>
-            <% } %>
-          </select>
-          <a class="roster-action-btn event-calendar-nav-btn" href="/main-admin/events?tab=calendar&view=<%= calendarView %>&month=<%= calendar.nextParam %>">Next &rarr;</a>
-        </div>
       </div>
 
       <% if (calendarView === 'list') { %>
@@ -93,28 +64,11 @@
           </div>
         <% } %>
       <% } else { %>
-        <% if (calendar.weeks.every(function(w) { return w.every(function(d) { return d.events.length === 0; }); })) { %>
-          <p class="roster-empty">No published events this month.</p>
-        <% } %>
-        <div class="roster-scroll">
-          <table class="roster-table condensed-table event-calendar-table">
-            <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
-            <tbody>
-              <% calendar.weeks.forEach(function(week) { %>
-                <tr>
-                  <% week.forEach(function(day) { %>
-                    <td class="<%= day.inMonth ? '' : 'hint' %>">
-                      <div><%= day.day %></div>
-                      <% day.events.forEach(function(e) { %>
-                        <a href="/main-admin/events/<%= e.id %>/builder" class="badge-pill<%= e.status === 'cancelled' ? ' event-title-cancelled' : '' %>" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %><% if (e.status === 'cancelled') { %> CANCELED<% } %></a>
-                      <% }); %>
-                    </td>
-                  <% }); %>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+        <%- include('partials/event-calendar-grid', {
+          calendar: calendar,
+          monthLinkBase: `/main-admin/events?tab=calendar&view=${calendarView}`,
+          eventHref: function (e) { return `/main-admin/events/${e.id}/builder`; },
+        }) %>
       <% } %>
     <% } else if (activeTab === 'drafts') { %>
       <% if (drafts.length === 0) { %>

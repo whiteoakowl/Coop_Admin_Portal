@@ -15,17 +15,37 @@
     <% if (rows.length === 0) { %>
       <p class="roster-empty">No one is registered for classes on either day yet.</p>
     <% } else { %>
+      <%
+        // A real request: "If the column title has two words stack them
+        // one on top of the other to save room" - applied generically so
+        // any header here (this list, or a later one added to it) gets
+        // the same treatment without a special case per column.
+        var stackedHeader = function (text) {
+          var words = text.split(' ');
+          return words.length === 2 ? words.join('<br>') : text;
+        };
+        // A real request: "Orientation video column should say parent
+        // orientation, teacher training should say teacher orientation,
+        // add a column for open house" - labels only; the underlying
+        // field keys (utils/orientation.js's own FIELDS) are unchanged.
+        var columns = [
+          { field: 'video', label: 'Parent Orientation' },
+          { field: 'meetup', label: 'Orientation Meet Up' },
+          { field: 'teacherTraining', label: 'Teacher Orientation' },
+          { field: 'tour', label: 'Tour' },
+          { field: 'openHouse', label: 'Open House' },
+        ];
+      %>
       <div class="roster-scroll">
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
               <th>Member</th>
               <th>Day</th>
-              <th>Orientation Video</th>
-              <th>Orientation Meet Up</th>
-              <th>Teacher Training</th>
-              <th>Tour</th>
-              <th>% Complete</th>
+              <% columns.forEach(function(col) { %>
+                <th class="orientation-col-center"><%- stackedHeader(col.label) %></th>
+              <% }); %>
+              <th class="orientation-col-center"><%- stackedHeader('% Complete') %></th>
             </tr>
           </thead>
           <tbody>
@@ -33,8 +53,8 @@
               <tr>
                 <td class="roster-name-col"><%= r.memberName %></td>
                 <td><%= r.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
-                <% ['video', 'meetup', 'teacherTraining', 'tour'].forEach(function(field) { %>
-                  <td>
+                <% columns.map(function(col) { return col.field; }).forEach(function(field) { %>
+                  <td class="orientation-col-center">
                     <button
                       type="button"
                       class="orientation-dot<%= r[field] ? ' orientation-dot-complete' : '' %>"

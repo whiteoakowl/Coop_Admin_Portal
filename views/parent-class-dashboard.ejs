@@ -9,22 +9,50 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Class Dashboard</h1>
 
-    <% if (children.length === 0) { %>
-      <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
+    <% if (children.length === 0 && parents.length === 0) { %>
+      <p class="roster-empty">No family members are linked to your account yet. Contact an admin if this looks wrong.</p>
     <% } else { %>
+      <%
+        var selectedPerson = selectedChild || selectedParent;
+        var selectedValue = selectedChild ? ('student-' + selectedChild.id) : selectedParent ? ('parent-' + selectedParent.id) : '';
+      %>
+      <%# A real request: "Classroom dashboard on parent portal should
+          have Parent names in drop down menu to show what classes the
+          parent is teaching or assisting in" - the dashboard's original
+          request ("a dropdown menu... with each family member to choose
+          view") already called for every family member, so this one
+          picker now covers both children (viewing their enrolled
+          classes) and parents (viewing the classes they teach/assist). %>
       <form method="GET" action="/parent/classes/dashboard" class="class-dash-picker-form">
         <label class="member-form-full">Viewing classes for
-          <select name="studentId" onchange="this.form.submit()">
-            <% children.forEach(function(c) { %>
-              <option value="<%= c.id %>" <%= selectedChild && selectedChild.id === c.id ? 'selected' : '' %>><%= c.name %></option>
-            <% }); %>
+          <select name="viewer" onchange="this.form.submit()">
+            <% if (children.length) { %>
+              <optgroup label="Children">
+                <% children.forEach(function(c) { %>
+                  <option value="student-<%= c.id %>" <%= selectedValue === ('student-' + c.id) ? 'selected' : '' %>><%= c.name %></option>
+                <% }); %>
+              </optgroup>
+            <% } %>
+            <% if (parents.length) { %>
+              <optgroup label="Parents">
+                <% parents.forEach(function(p) { %>
+                  <option value="parent-<%= p.id %>" <%= selectedValue === ('parent-' + p.id) ? 'selected' : '' %>><%= p.name %></option>
+                <% }); %>
+              </optgroup>
+            <% } %>
           </select>
         </label>
         <noscript><button type="submit" class="roster-action-btn">Go</button></noscript>
       </form>
 
       <% if (mondayClasses.length === 0 && wednesdayClasses.length === 0) { %>
-        <p class="roster-empty"><%= selectedChild.name %> isn't enrolled in any classes yet.</p>
+        <p class="roster-empty">
+          <% if (selectedParent) { %>
+            <%= selectedParent.name %> isn't teaching or assisting in any classes yet.
+          <% } else { %>
+            <%= selectedPerson.name %> isn't enrolled in any classes yet.
+          <% } %>
+        </p>
       <% } else { %>
         <h2>Monday</h2>
         <% if (mondayClasses.length === 0) { %>
@@ -32,15 +60,7 @@
         <% } else { %>
           <div class="class-dash-grid">
             <% mondayClasses.forEach(function(c) { %>
-              <a class="class-dash-card" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">
-                <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
-                <div class="class-dash-card-body">
-                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
-                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
-                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
-                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
-                </div>
-              </a>
+              <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild }) %>
             <% }); %>
           </div>
         <% } %>
@@ -51,15 +71,7 @@
         <% } else { %>
           <div class="class-dash-grid">
             <% wednesdayClasses.forEach(function(c) { %>
-              <a class="class-dash-card" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">
-                <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
-                <div class="class-dash-card-body">
-                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
-                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
-                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
-                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
-                </div>
-              </a>
+              <%- include('partials/class-dash-card', { c: c, selectedChild: selectedChild }) %>
             <% }); %>
           </div>
         <% } %>

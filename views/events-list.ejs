@@ -11,21 +11,29 @@
   // routes/events.js), so it can't assume a signed-in visitor belongs to
   // any one portal the way every other page in a specific portal can -
   // hence the plain public site-header below, not partials/portal-nav,
-  // for a logged-out visitor or one signed in without a student role. A
-  // signed-in student specifically gets their own portal-nav shell
-  // instead (portalTitle: 'Student Portal' - the one title portal-nav.ejs
-  // itself special-cases to STUDENT_NAV_LINKS/COMMUNITY_LINKS_STUDENT,
-  // same as every native /student/* page), so their own bottom tab bar
-  // (Home/Calendar/Chat/Classes/...) stays put here exactly like it does
-  // everywhere else in their portal, instead of vanishing onto this one
-  // shared page. Scoped to student accounts only - broadening this to
-  // Parent/Teacher too would need their own (currently still per-page,
-  // not centralized) navLinks arrays repeated here, a larger change than
-  // this bug report asked for.
-  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  // for a logged-out visitor or one signed in without a student/parent
+  // role. A signed-in student or parent specifically gets their own
+  // portal-nav shell instead (portalTitle 'Student Portal'/'Parent
+  // Portal' - the two titles portal-nav.ejs itself special-cases to
+  // STUDENT_NAV_LINKS/PARENT_NAV_LINKS, same as every native /student/*
+  // or /parent/* page), so their own bottom tab bar stays put here
+  // exactly like it does everywhere else in their portal, instead of
+  // vanishing onto this one shared page. Parent joined Student here once
+  // a later real request ("Parent portal events, events page should show
+  // the same event calendar that is on main admin portal") made Parent
+  // Portal's own navLinks centralized too (PARENT_NAV_LINKS) - the exact
+  // blocker this comment used to cite for not doing so ("would need
+  // their own... navLinks arrays repeated here"). Teacher Portal's own
+  // navLinks are still per-page, not centralized, so it's left out here
+  // same as before.
+  const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+  const usesPortalNavShell = hasStudentRole || hasParentRole;
   %>
-  <% if (isStudentPortalAccount) { %>
+  <% if (hasStudentRole) { %>
     <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+  <% } else if (hasParentRole) { %>
+    <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 
@@ -45,7 +53,7 @@
   </header>
   <% } %>
 
-  <main id="main-content" tabindex="-1"<% if (isStudentPortalAccount) { %> class="admin-main"<% } %>>
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
         <h1>Events</h1>
@@ -67,30 +75,11 @@
         <% if (events.length === 0) { %>
           <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
         <% } else if (view === 'calendar') { %>
-          <div class="roster-toolbar no-print">
-            <div class="roster-btn-row">
-              <a class="roster-action-btn" href="/events?view=calendar&month=<%= calendar.prevParam %>">&larr; Prev</a>
-              <strong><%= calendar.label %></strong>
-              <a class="roster-action-btn" href="/events?view=calendar&month=<%= calendar.nextParam %>">Next &rarr;</a>
-            </div>
-          </div>
-          <table class="roster-table condensed-table event-calendar-table">
-            <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
-            <tbody>
-              <% calendar.weeks.forEach(function(week) { %>
-                <tr>
-                  <% week.forEach(function(day) { %>
-                    <td class="<%= day.inMonth ? '' : 'hint' %>">
-                      <div><%= day.day %></div>
-                      <% day.events.forEach(function(e) { %>
-                        <a href="/events/<%= e.id %>" class="badge-pill" style="<%= e.categoryColor ? `background:${e.categoryColor};color:#fff;` : '' %> display:block; margin-top:2px;"><%= e.title %></a>
-                      <% }); %>
-                    </td>
-                  <% }); %>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+          <%- include('partials/event-calendar-grid', {
+            calendar: calendar,
+            monthLinkBase: '/events?view=calendar',
+            eventHref: function (e) { return `/events/${e.id}`; },
+          }) %>
         <% } else { %>
           <div class="event-card-grid">
             <% events.forEach(function(e) { %>

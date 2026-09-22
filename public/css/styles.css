@@ -7555,6 +7555,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 /* Orientation tab's own circles (a real request: "circle check boxes
    that show green when complete") - public/js/orientation-toggle.js
    flips both the fill and data-complete on click. */
+/* A real request: "If the column title has two words stack them one on
+   top of the other to save room" - views/admin-orientation.ejs's own
+   stackedHeader() only inserts the <br>; this just keeps the resulting
+   2-line headers (and the circle/percent cells below them) compact and
+   centered instead of left-aligned like Member/Day. */
+.orientation-col-center { text-align: center; line-height: 1.2; }
 .orientation-dot {
   width: 1.5rem; height: 1.5rem; border-radius: 50%; padding: 0;
   border: 2px solid var(--border); background: var(--surface); cursor: pointer;
@@ -9983,7 +9989,16 @@ a.manage-classes-row-title:hover { text-decoration: underline; }
 }
 .class-dash-card:hover, .class-dash-card:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .class-dash-card-color-bar { height: 0.4rem; }
-.class-dash-card-body { padding: 0.85rem 1rem 0.5rem; }
+/* A real request: "Class card should show Class image on left of card." */
+.class-dash-card-body { padding: 0.85rem 1rem 0.5rem; display: flex; gap: 0.75rem; align-items: flex-start; }
+.class-dash-card-image {
+  width: 3.25rem; height: 3.25rem; border-radius: var(--radius); object-fit: cover; flex-shrink: 0;
+}
+.class-dash-card-image-placeholder {
+  display: flex; align-items: center; justify-content: center; background: var(--surface-alt, #eef1f4); color: var(--muted);
+}
+.class-dash-card-image-placeholder .icon { width: 1.4rem; height: 1.4rem; }
+.class-dash-card-text { min-width: 0; }
 .class-dash-card-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; }
 .class-dash-card-meta { margin: 0.1rem 0; font-size: 0.82rem; color: var(--muted); }
 .class-dash-picker-form { margin: 0.5rem 0 1.25rem; }

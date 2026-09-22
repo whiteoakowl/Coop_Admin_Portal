@@ -15,8 +15,11 @@
 const db = require('../db');
 const { primaryParentsFor } = require('./scheduleCardData');
 
-const FIELDS = ['video', 'meetup', 'teacherTraining', 'tour'];
-const COLUMN_PREFIX = { video: 'video', meetup: 'meetup', teacherTraining: 'teacher_training', tour: 'tour' };
+// A real request: "add a column for open house" - same shape as the 4
+// original circle columns (openHouse -> open_house_complete/
+// open_house_completed_at, see the orientation_open_house migration).
+const FIELDS = ['video', 'meetup', 'teacherTraining', 'tour', 'openHouse'];
+const COLUMN_PREFIX = { video: 'video', meetup: 'meetup', teacherTraining: 'teacher_training', tour: 'tour', openHouse: 'open_house' };
 
 // Every (primary parent, day) pair that has at least one enrolled,
 // active student in a class on that day, joined to whatever progress
@@ -61,6 +64,7 @@ async function orientationRows() {
         meetup: Number(progress.meetup_complete) === 1,
         teacherTraining: Number(progress.teacher_training_complete) === 1,
         tour: Number(progress.tour_complete) === 1,
+        openHouse: Number(progress.open_house_complete) === 1,
       };
       const doneCount = Object.values(flags).filter(Boolean).length;
       return {

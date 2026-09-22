@@ -307,3 +307,59 @@ test('Class Dashboard detail: a class not enrolled in, or a child not in the fam
   const res = await request(app).get(`/parent/classes/dashboard/${cls.id}?studentId=${parent.childId}`).set('Cookie', parent.cookie);
   assert.equal(res.status, 404);
 });
+
+// A real request: "Classroom dashboard on parent portal should have
+// Parent names in drop down menu to show what classes the parent is
+// teaching or assisting in. Class card should show Class image on left
+// of card." The dashboard's original request ("a dropdown menu... with
+// each family member to choose view") already called for every family
+// member; only students ever got wired up until now.
+test('Class Dashboard: dropdown includes parent names, and selecting one shows the classes they teach/assist', async () => {
+  const admin = await loginAsAdmin();
+  const taughtClass = await createClass(admin, { className: 'Taught By Parent Class', day: 'monday' });
+  const assistedClass = await createClass(admin, { className: 'Assisted By Parent Class', day: 'wednesday', hourPosition: '2' });
+  const parent = await createParentWithChild();
+
+  const parentMember = await db.prepare("SELECT * FROM members WHERE name = ?").get(`Dashboard Parent ${familyCounter}`);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(taughtClass.id, parentMember.id);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'assistant')").run(assistedClass.id, parentMember.id);
+
+  const dashboard = await request(app).get('/parent/classes/dashboard').set('Cookie', parent.cookie);
+  assert.equal(dashboard.status, 200);
+  assert.match(dashboard.text, new RegExp(`<optgroup label="Parents">[\\s\\S]*?<option value="parent-${parentMember.id}"[^>]*>Dashboard Parent`));
+
+  const teaching = await request(app).get(`/parent/classes/dashboard?viewer=parent-${parentMember.id}`).set('Cookie', parent.cookie);
+  assert.equal(teaching.status, 200);
+  assert.match(teaching.text, /Taught By Parent Class/);
+  assert.match(teaching.text, /Assisted By Parent Class/);
+  // A teaching parent's card has nowhere to click through to yet (the
+  // detail route below is student-enrollment-only), so it renders as a
+  // plain, non-linking card.
+  assert.doesNotMatch(teaching.text, new RegExp(`href="/parent/classes/dashboard/${taughtClass.id}`));
+});
+
+test('Class Dashboard: a parent teaching/assisting in no classes yet sees an empty state, not their child\'s classes', async () => {
+  const admin = await loginAsAdmin();
+  await createClass(admin, { className: 'Unrelated Class' });
+  const parent = await createParentWithChild();
+  const parentMember = await db.prepare("SELECT * FROM members WHERE name = ?").get(`Dashboard Parent ${familyCounter}`);
+
+  const res = await request(app).get(`/parent/classes/dashboard?viewer=parent-${parentMember.id}`).set('Cookie', parent.cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, new RegExp(`${parentMember.name} isn't teaching or assisting in any classes yet\\.`));
+});
+
+test('Class Dashboard: class cards show the class image on the left', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Image Card Class' });
+  await db.prepare('UPDATE classes SET image_key = ? WHERE id = ?').run('classes/test-image.jpg', cls.id);
+  const parent = await createParentWithChild();
+  await request(app)
+    .post(`/parent/classes/${cls.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+
+  const dashboard = await request(app).get('/parent/classes/dashboard').set('Cookie', parent.cookie);
+  assert.match(dashboard.text, /<img class="class-dash-card-image" src="\/uploads\/classes\/classes\/test-image\.jpg" alt="" \/>/);
+});

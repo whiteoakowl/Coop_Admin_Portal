@@ -110,7 +110,9 @@ test('Orientation list: one row per family per day, deduped across siblings, wit
     .send({ _csrf: admin.csrfToken, field: 'video', value: '1' });
   assert.equal(toggleOn.status, 200);
   const afterOn = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
-  assert.match(afterOn.text, />25%</);
+  // 1 of 5 fields complete now that Open House is a 5th column (a real
+  // request: "add a column for open house").
+  assert.match(afterOn.text, />20%</);
 
   const toggleOff = await request(app)
     .post(`/admin/orientation/${parentId}/monday/toggle`)
@@ -169,6 +171,40 @@ test('Tour Check-In subpage: purple Check In button, Copy Link, shows every regi
 
   const afterPage = await request(app).get('/admin/orientation/tour-checkin').set('Cookie', admin.cookie);
   assert.match(afterPage.text, /Checked In/);
+});
+
+// A real request: "Orientation video column should say parent
+// orientation, teacher training should say teacher orientation, add a
+// column for open house. If the column title has two words stack them
+// one on top of the other to save room."
+test('Orientation list: relabeled columns, a new Open House toggle, and two-word headers stacked with <br>', async () => {
+  const admin = await loginAsAdmin();
+  const { parentId } = await createFamilyWithEnrolledStudent('monday', { parentName: 'Relabel Test Parent' });
+
+  const page = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<th class="orientation-col-center">Parent<br>Orientation<\/th>/);
+  assert.match(page.text, /<th class="orientation-col-center">Teacher<br>Orientation<\/th>/);
+  assert.match(page.text, /<th class="orientation-col-center">Open<br>House<\/th>/);
+  assert.match(page.text, /<th class="orientation-col-center">%<br>Complete<\/th>/);
+  // "Orientation Meet Up" is 3 words, so it must NOT be stacked.
+  assert.match(page.text, /<th class="orientation-col-center">Orientation Meet Up<\/th>/);
+  assert.doesNotMatch(page.text, />Orientation Video</);
+  assert.doesNotMatch(page.text, />Teacher Training</);
+
+  const toggleOn = await request(app)
+    .post(`/admin/orientation/${parentId}/monday/toggle`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ _csrf: admin.csrfToken, field: 'openHouse', value: '1' });
+  assert.equal(toggleOn.status, 200);
+
+  const row = await db.prepare('SELECT open_house_complete FROM orientation_progress WHERE member_id = ? AND day = ?').get(parentId, 'monday');
+  assert.equal(Number(row.open_house_complete), 1);
+
+  const afterOn = await request(app).get('/admin/orientation').set('Cookie', admin.cookie);
+  assert.match(afterOn.text, />20%</);
+  assert.match(afterOn.text, /data-field="openHouse"\s+data-complete="1"/);
 });
 
 test('Orientation Check-In subpage marks meetup_complete, independently of the Tour Check-In page', async () => {

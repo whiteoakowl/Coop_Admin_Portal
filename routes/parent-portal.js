@@ -85,6 +85,24 @@ async function childrenForAccount(account) {
   ).sort(byLastName);
 }
 
+// Every adult in this account's own family - a real request: "Classroom
+// dashboard on parent portal should have Parent names in drop down menu
+// to show what classes the parent is teaching or assisting in," which
+// the dashboard's own original request ("a dropdown menu... with each
+// family member to choose view") already called for but only ever
+// implemented for students (childrenForAccount above). Same re-derive-
+// from-the-account rule as childrenForAccount - never trusts a member id
+// from the request.
+async function parentsForAccount(account) {
+  const member = await memberForAccount(account.id);
+  if (!member || !member.family_id) return [];
+  return (
+    await db
+      .prepare("SELECT * FROM members WHERE family_id = ? AND member_type = 'parent' AND active = 1")
+      .all(member.family_id)
+  ).sort(byLastName);
+}
+
 router.get('/', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
 
@@ -428,6 +446,18 @@ async function classesForChild(childId) {
   return all.filter((c) => classIds.has(c.id));
 }
 
+// Every class one specific parent is staffing (teacher or assistant role)
+// - the parent-facing twin of classesForChild above, same class_staff
+// table Teacher Portal's own classesForTeacher (routes/teacher-portal.js)
+// already reads.
+async function classesStaffedByMember(memberId) {
+  const staffRows = await db.prepare('SELECT class_id FROM class_staff WHERE member_id = ?').all(memberId);
+  const classIds = new Set(staffRows.map((r) => r.class_id));
+  if (classIds.size === 0) return [];
+  const all = await allClassesList(null);
+  return all.filter((c) => classIds.has(c.id));
+}
+
 // A real request: "Add subpage class dashboard... Its already created on
 // admin portal i think. Find all those features. They should look like
 // real online classes. Parent portal there is a dropdown menu at the top
@@ -441,9 +471,34 @@ async function classesForChild(childId) {
 // route below.
 router.get('/classes/dashboard', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
-  const selectedId = parseInt(req.query.studentId, 10);
-  const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
-  const classes = selectedChild ? await classesForChild(selectedChild.id) : [];
+  const parents = await parentsForAccount(req.portalAccount);
+
+  // `viewer` is the new unified picker value ("student-<id>"/"parent-<id>")
+  // a real request added: "Classroom dashboard on parent portal should
+  // have Parent names in drop down menu to show what classes the parent
+  // is teaching or assisting in" - the dashboard's original request ("a
+  // dropdown menu... with each family member to choose view") already
+  // called for every family member, but only students ever got wired up.
+  // `studentId` alone still works unqualified - the one other page that
+  // links here (views/parent-class-dashboard-detail.ejs's own back link)
+  // still uses it, and that page only ever shows a child's own view.
+  const viewerMatch = /^(student|parent)-(\d+)$/.exec(req.query.viewer || '');
+  let viewerKind = viewerMatch ? viewerMatch[1] : 'student';
+  const viewerId = viewerMatch ? parseInt(viewerMatch[2], 10) : parseInt(req.query.studentId, 10);
+
+  let selectedChild = viewerKind === 'student' ? children.find((c) => c.id === viewerId) || null : null;
+  let selectedParent = viewerKind === 'parent' ? parents.find((p) => p.id === viewerId) || null : null;
+  if (!selectedChild && !selectedParent) {
+    selectedChild = children[0] || null;
+    selectedParent = selectedChild ? null : parents[0] || null;
+    viewerKind = selectedChild ? 'student' : 'parent';
+  }
+
+  const classes = selectedChild
+    ? await classesForChild(selectedChild.id)
+    : selectedParent
+      ? await classesStaffedByMember(selectedParent.id)
+      : [];
 
   // A real request: "classes should be categorized as Monday or
   // Wednesday and in time order" - allClassesList's own default order is
@@ -455,7 +510,10 @@ router.get('/classes/dashboard', async (req, res) => {
   res.render('parent-class-dashboard', {
     title: 'Class Dashboard',
     children,
+    parents,
     selectedChild,
+    selectedParent,
+    viewerKind,
     mondayClasses: classes.filter((c) => c.day === 'monday').sort(byHourPosition),
     wednesdayClasses: classes.filter((c) => c.day === 'wednesday').sort(byHourPosition),
   });

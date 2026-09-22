@@ -1,0 +1,29 @@
+<%
+// locals: c (one allClassesList row - see utils/classSchedule.js's own
+// classImageUrl field), selectedChild (null when the dashboard is
+// showing a parent's own teaching/assisting classes instead of a
+// child's enrolled ones - see views/parent-class-dashboard.ejs). A real
+// request: "Class card should show Class image on left of card." A
+// child's card still links into the shared read-only class detail page
+// (routes/parent-portal.js's own /classes/dashboard/:id, which requires
+// a child's own enrollment); a parent's teaching card has nowhere to
+// click through to yet (that route is student-enrollment-only), so it
+// renders as a plain, non-linking card instead.
+var cardTag = selectedChild ? 'a' : 'div';
+%>
+<<%= cardTag %> class="class-dash-card"<% if (selectedChild) { %> href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>"<% } %>>
+  <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+  <div class="class-dash-card-body">
+    <% if (c.classImageUrl) { %>
+      <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
+    <% } else { %>
+      <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+    <% } %>
+    <div class="class-dash-card-text">
+      <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+      <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+      <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+      <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+    </div>
+  </div>
+</<%= cardTag %>>
