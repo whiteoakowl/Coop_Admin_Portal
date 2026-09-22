@@ -6,6 +6,8 @@
 // rather than re-deriving day/time formatting a second time.
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
@@ -24,6 +26,7 @@ const {
   createContentItem,
   deleteContentItem,
   reorderContentItems,
+  saveLessonAttachment,
   createQuizQuestion,
   deleteQuizQuestion,
   pendingReviewAnswers,
@@ -305,22 +308,67 @@ async function contentItemForTeacher(req, contentItemId) {
   return found ? { contentItem, ...found } : null;
 }
 
-router.post('/assignments/:id/content', async (req, res) => {
+// Same mimetype-plus-extension pairing routes/admin-class-schedule.js's
+// own lessonAttachmentFileFilter uses - kept in sync since both routes
+// post to the exact same shared form (views/partials/lesson-content-
+// manage.ejs's own "Add Assignments" panel).
+const LESSON_ATTACHMENT_MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+function lessonAttachmentFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const expectedType = LESSON_ATTACHMENT_MIME_BY_EXT[ext];
+  cb(null, Boolean(expectedType) && file.mimetype === expectedType);
+}
+const MAX_LESSON_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const lessonAttachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_LESSON_ATTACHMENT_BYTES }, fileFilter: lessonAttachmentFileFilter });
+function uploadLessonAttachment(req, res, next) {
+  lessonAttachmentUpload.single('attachment')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(
+        `/teacher/assignments/${req.params.id}?error=` +
+          encodeURIComponent(`That file is too large - assignment attachments are limited to ${MAX_LESSON_ATTACHMENT_BYTES / (1024 * 1024)}MB.`)
+      );
+    }
+    next(err);
+  });
+}
+const LESSON_CONTENT_TYPES = ['video', 'text', 'file', 'quiz', 'assignment_upload'];
+
+router.post('/assignments/:id/content', uploadLessonAttachment, async (req, res) => {
   const assignmentId = parseInt(req.params.id, 10);
   const found = await assignmentForTeacher(req, assignmentId);
   if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
   const back = `/teacher/assignments/${assignmentId}`;
   const type = req.body.type;
-  if (!['video', 'text', 'file', 'quiz'].includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+  if (!LESSON_CONTENT_TYPES.includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+
+  let attachmentUrl = null;
+  let attachmentName = null;
+  if (type === 'assignment_upload' && req.file) {
+    attachmentUrl = await saveLessonAttachment(req.file);
+    attachmentName = req.file.originalname;
+  }
+
   await createContentItem({
     assignmentId,
     type,
     title: (req.body.title || '').trim(),
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
-    body: type === 'text' ? sanitizePostBody(req.body.body || '') : null,
+    body: type === 'text' || type === 'assignment_upload' ? sanitizePostBody(req.body.body || '') : null,
     fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
+    description: type === 'video' || type === 'file' ? (req.body.description || '').trim() : null,
+    attachmentUrl,
+    attachmentName,
   });
-  res.redirect(back + '?notice=' + encodeURIComponent('Content added.'));
+  res.redirect(back + '?notice=' + encodeURIComponent('Assignment added.'));
 });
 
 router.post('/content/:id/delete', async (req, res) => {

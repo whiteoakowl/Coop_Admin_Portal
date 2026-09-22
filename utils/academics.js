@@ -4,8 +4,11 @@
 // header comment for the schema rationale, especially
 // student_academic_history's "only written going forward" limitation.
 const db = require('../db');
+const fs = require('fs');
+const path = require('path');
 const { formatDateLabel, formatFriendlyTimestamp, todayISO } = require('./dates');
 const { lastNameOf } = require('./members');
+const { createStorageClient, uploadFile, deleteFile, generateKey, publicUrl } = require('./storage');
 
 // Ordered by each lesson's own drag-reordered position (see the lesson
 // content/quizzes migration's own backfill) rather than due date now that
@@ -192,12 +195,54 @@ async function addTranscriptEntry({ studentId, className, day, ageGroup, teacher
   return info.lastInsertRowid;
 }
 
-// --- Lesson content items (video/text/file/quiz) ---
+// --- Lesson content items (video/text/file/quiz/assignment_upload) ---
 // A real request: "Classes, lessons. Button to add lessons. Could be link
 // to video, text description, file link, quiz with scoring... drop down
 // of the different links and activities." One lesson (class_assignments)
 // can carry several content blocks, each its own row (see the migration's
 // own header comment for why - a lesson isn't limited to one of each).
+
+// A later real request: "add a description area [to Link to Video/Link
+// to File], an option for assignment upload, text box with word count
+// and full editing features, also be able to upload a file such as doc,
+// pdf, jpg etc." - assignment_upload's own attachment, shared between
+// Co-op Admin's and Teacher Portal's identical Add Assignments form
+// (views/partials/lesson-content-manage.ejs), same public-bucket-or-
+// local-disk shape utils/classSchedule.js's own CLASS_IMAGES_BUCKET/
+// classImageUrl already use for a class's own photo.
+const LESSON_ATTACHMENTS_BUCKET = 'lesson-attachments';
+const LESSON_ATTACHMENT_DIR = path.join(__dirname, '..', 'public', 'uploads', 'lesson-attachments');
+if (!createStorageClient() && !fs.existsSync(LESSON_ATTACHMENT_DIR)) {
+  try {
+    fs.mkdirSync(LESSON_ATTACHMENT_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${LESSON_ATTACHMENT_DIR}:`, err.message);
+  }
+}
+
+function lessonAttachmentUrl(key) {
+  if (!key) return null;
+  return createStorageClient() ? publicUrl(LESSON_ATTACHMENTS_BUCKET, key) : `/uploads/lesson-attachments/${key}`;
+}
+
+async function saveLessonAttachment(file, existingKey) {
+  const client = createStorageClient();
+  let key;
+  if (client) {
+    key = await uploadFile(client, LESSON_ATTACHMENTS_BUCKET, file.buffer, file.originalname, file.mimetype);
+  } else {
+    key = generateKey(file.originalname);
+    fs.writeFileSync(path.join(LESSON_ATTACHMENT_DIR, key), file.buffer);
+  }
+  if (existingKey) {
+    if (client) await deleteFile(client, LESSON_ATTACHMENTS_BUCKET, existingKey);
+    else {
+      const oldPath = path.join(LESSON_ATTACHMENT_DIR, existingKey);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+  }
+  return key;
+}
 
 async function getContentItem(id) {
   return db.prepare('SELECT * FROM lesson_content_items WHERE id = ?').get(id);
@@ -211,26 +256,29 @@ async function contentItemsForAssignment(assignmentId, { includeAnswerKey = fals
   const items = await db.prepare('SELECT * FROM lesson_content_items WHERE assignment_id = ? ORDER BY position, id').all(assignmentId);
   return Promise.all(
     items.map(async (item) => {
-      if (item.type !== 'quiz') return item;
-      return { ...item, questions: await questionsForContentItem(item.id, { includeAnswerKey }) };
+      const withAttachment = { ...item, attachmentUrl: lessonAttachmentUrl(item.attachment_url) };
+      if (withAttachment.type !== 'quiz') return withAttachment;
+      return { ...withAttachment, questions: await questionsForContentItem(item.id, { includeAnswerKey }) };
     })
   );
 }
 
-async function createContentItem({ assignmentId, type, title, videoUrl, body, fileUrl }) {
+async function createContentItem({ assignmentId, type, title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName }) {
   const { next_position: nextPosition } = await db
     .prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM lesson_content_items WHERE assignment_id = ?')
     .get(assignmentId);
   const info = await db
-    .prepare('INSERT INTO lesson_content_items (assignment_id, type, position, title, video_url, body, file_url) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(assignmentId, type, nextPosition, title || null, videoUrl || null, body || null, fileUrl || null);
+    .prepare(
+      'INSERT INTO lesson_content_items (assignment_id, type, position, title, video_url, body, file_url, description, attachment_url, attachment_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(assignmentId, type, nextPosition, title || null, videoUrl || null, body || null, fileUrl || null, description || null, attachmentUrl || null, attachmentName || null);
   return info.lastInsertRowid;
 }
 
-async function updateContentItem(id, { title, videoUrl, body, fileUrl }) {
+async function updateContentItem(id, { title, videoUrl, body, fileUrl, description, attachmentUrl, attachmentName }) {
   await db
-    .prepare('UPDATE lesson_content_items SET title = ?, video_url = ?, body = ?, file_url = ? WHERE id = ?')
-    .run(title || null, videoUrl || null, body || null, fileUrl || null, id);
+    .prepare('UPDATE lesson_content_items SET title = ?, video_url = ?, body = ?, file_url = ?, description = ?, attachment_url = ?, attachment_name = ? WHERE id = ?')
+    .run(title || null, videoUrl || null, body || null, fileUrl || null, description || null, attachmentUrl || null, attachmentName || null, id);
 }
 
 async function deleteContentItem(id) {
@@ -413,6 +461,49 @@ async function lessonsForStudentView(classId, studentId) {
   );
 }
 
+// A real request: "On lesson list show percentage of how many people in
+// the class completed the assignments." The only defined "complete a
+// lesson" action in this data model is submitting its quiz(zes) (see
+// lessonsForStudentView/views/partials/lessons-view.ejs's own "Take
+// Quiz" flow - a lesson with only video/text/file/assignment_upload
+// content has no submission of its own, nothing to be "complete" or not)
+// - a lesson counts as complete for one student once EVERY quiz content
+// item in it has that student's own quiz_attempts row. Returns
+// { [assignmentId]: percent|null } - null for a lesson with no quiz
+// content at all, or a class with no enrolled students, rather than a
+// misleading 0%/100%.
+async function completionStatsForAssignments(classId) {
+  const enrolled = await db
+    .prepare(
+      `SELECT ce.student_id FROM class_enrollments ce JOIN members m ON m.id = ce.student_id WHERE ce.class_id = ? AND m.active = 1`
+    )
+    .all(classId);
+  const studentIds = enrolled.map((r) => r.student_id);
+  const assignments = await assignmentsForClass(classId);
+  const stats = {};
+  for (const a of assignments) {
+    if (studentIds.length === 0) {
+      stats[a.id] = null;
+      continue;
+    }
+    const quizItems = await db.prepare("SELECT id FROM lesson_content_items WHERE assignment_id = ? AND type = 'quiz'").all(a.id);
+    if (quizItems.length === 0) {
+      stats[a.id] = null;
+      continue;
+    }
+    const quizIds = quizItems.map((q) => q.id);
+    let completedCount = 0;
+    for (const studentId of studentIds) {
+      const { c } = await db
+        .prepare(`SELECT COUNT(*) AS c FROM quiz_attempts WHERE student_id = ? AND content_item_id IN (${quizIds.map(() => '?').join(',')})`)
+        .get(studentId, ...quizIds);
+      if (Number(c) === quizIds.length) completedCount++;
+    }
+    stats[a.id] = Math.round((completedCount / studentIds.length) * 100);
+  }
+  return stats;
+}
+
 module.exports = {
   assignmentsForClass,
   getAssignment,
@@ -435,6 +526,9 @@ module.exports = {
   updateContentItem,
   deleteContentItem,
   reorderContentItems,
+  lessonAttachmentUrl,
+  saveLessonAttachment,
+  completionStatsForAssignments,
   questionsForContentItem,
   createQuizQuestion,
   deleteQuizQuestion,

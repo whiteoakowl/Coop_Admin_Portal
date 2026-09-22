@@ -22,6 +22,8 @@ const {
   updateContentItem,
   deleteContentItem,
   reorderContentItems,
+  saveLessonAttachment,
+  completionStatsForAssignments,
   createQuizQuestion,
   deleteQuizQuestion,
   pendingReviewAnswers,
@@ -374,10 +376,23 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
   let assignments = [];
   if (activeTab === 'assignments' || activeTab === 'grades') {
     const rawAssignments = await assignmentsForClass(id);
+    // A real request: "On lesson list show percentage of how many people
+    // in the class completed the assignments" - see
+    // completionStatsForAssignments' own comment for what "completed"
+    // means here (every quiz in the lesson has that student's own
+    // attempt); null (rendered as "—") for a lesson with no quiz content
+    // to complete at all.
+    const completionStats = activeTab === 'assignments' ? await completionStatsForAssignments(id) : {};
     assignments = await Promise.all(
       rawAssignments.map(async (a) => {
         const { rows } = await gradebookForAssignment(a.id);
-        return { ...a, dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null, gradedCount: rows.filter((r) => r.points_earned != null).length, studentCount: rows.length };
+        return {
+          ...a,
+          dueDateLabel: a.due_date ? formatDateLabel(a.due_date) : null,
+          gradedCount: rows.filter((r) => r.points_earned != null).length,
+          studentCount: rows.length,
+          completionPercent: completionStats[a.id] != null ? completionStats[a.id] : null,
+        };
       })
     );
   }
@@ -503,24 +518,80 @@ router.post('/class-schedule/assignments/:id/edit', requireFullAdmin, async (req
 });
 
 // --- Lesson content items (the "drop down of the different links and
-// activities" - video/text/file/quiz) ---
+// activities" - video/text/file/quiz/assignment_upload) ---
 
-router.post('/class-schedule/assignments/:id/content', requireFullAdmin, async (req, res) => {
+// A real request: "assignment upload... also be able to upload a file
+// such as doc, pdf, jpg etc." - same mimetype-plus-extension pairing
+// utils/uploads.js's own imageFileFilter/documentFileFilter each use,
+// just accepting either set for this one field instead of splitting it
+// across two (there's no second "image" field here the way Document
+// upload has).
+const LESSON_ATTACHMENT_MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+function lessonAttachmentFileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const expectedType = LESSON_ATTACHMENT_MIME_BY_EXT[ext];
+  cb(null, Boolean(expectedType) && file.mimetype === expectedType);
+}
+const MAX_LESSON_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const lessonAttachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_LESSON_ATTACHMENT_BYTES }, fileFilter: lessonAttachmentFileFilter });
+
+// A file over the limit above makes multer.single() itself throw a
+// MulterError (LIMIT_FILE_SIZE) rather than just leaving req.file unset
+// the way a wrong file TYPE does (lessonAttachmentFileFilter) - same bug
+// shape routes/admin-documents.js's own uploadDocument wrapper already
+// fixed for Documents (a real bug report: an oversized upload fell
+// through to the generic "Something went wrong" page instead of a
+// friendly redirect).
+function uploadLessonAttachment(req, res, next) {
+  lessonAttachmentUpload.single('attachment')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.redirect(
+        `/admin/class-schedule/assignments/${req.params.id}?error=` +
+          encodeURIComponent(`That file is too large - assignment attachments are limited to ${MAX_LESSON_ATTACHMENT_BYTES / (1024 * 1024)}MB.`)
+      );
+    }
+    next(err);
+  });
+}
+
+const LESSON_CONTENT_TYPES = ['video', 'text', 'file', 'quiz', 'assignment_upload'];
+
+router.post('/class-schedule/assignments/:id/content', requireFullAdmin, uploadLessonAttachment, async (req, res) => {
   const assignmentId = parseInt(req.params.id, 10);
   const assignment = await getAssignment(assignmentId);
   if (!assignment) return res.status(404).send('Not found');
   const back = `/admin/class-schedule/assignments/${assignmentId}`;
   const type = req.body.type;
-  if (!['video', 'text', 'file', 'quiz'].includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+  if (!LESSON_CONTENT_TYPES.includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+
+  let attachmentUrl = null;
+  let attachmentName = null;
+  if (type === 'assignment_upload' && req.file) {
+    attachmentUrl = await saveLessonAttachment(req.file);
+    attachmentName = req.file.originalname;
+  }
+
   await createContentItem({
     assignmentId,
     type,
     title: (req.body.title || '').trim(),
     videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
-    body: type === 'text' ? sanitizePostBody(req.body.body || '') : null,
+    body: type === 'text' || type === 'assignment_upload' ? sanitizePostBody(req.body.body || '') : null,
     fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
+    description: type === 'video' || type === 'file' ? (req.body.description || '').trim() : null,
+    attachmentUrl,
+    attachmentName,
   });
-  res.redirect(back + '?notice=' + encodeURIComponent('Content added.'));
+  res.redirect(back + '?notice=' + encodeURIComponent('Assignment added.'));
 });
 
 router.post('/class-schedule/content/:id/delete', requireFullAdmin, async (req, res) => {

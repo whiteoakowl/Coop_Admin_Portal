@@ -30,11 +30,16 @@
 </div>
 
 <div class="manage-section">
+  <%# A real request: "lesson content says assignments" - renamed from
+      "Lesson Content" (the underlying data model - class_assignments/
+      lesson_content_items - keeps its own internal names; this is a
+      label-only change, same as "Add Content" -> "Add Assignments"
+      below). %>
   <div class="grid-box-header">
-    <h2>Lesson Content (<%= contentItems.length %>)</h2>
+    <h2>Assignments (<%= contentItems.length %>)</h2>
   </div>
   <% if (contentItems.length === 0) { %>
-    <p class="roster-empty">No content added yet.</p>
+    <p class="roster-empty">No assignments added yet.</p>
   <% } else { %>
     <div class="roster-scroll">
       <table class="roster-table members-table condensed-table">
@@ -49,9 +54,15 @@
               <td class="roster-name-col">
                 <%= item.title || '(untitled)' %>
                 <% if (item.type === 'video' && item.video_url) { %><div class="hint"><a href="<%= item.video_url %>" target="_blank" rel="noopener">Video link</a></div><% } %>
+                <% if (item.type === 'video' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
+                <% if (item.type === 'file' && item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.type === 'text' && item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
                 <% if (item.type === 'quiz') { %><div class="hint"><%= item.questions.length %> question<%= item.questions.length === 1 ? '' : 's' %></div><% } %>
+                <% if (item.type === 'assignment_upload') { %>
+                  <% if (item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                  <% if (item.attachmentUrl) { %><div class="hint"><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Attachment' %></a></div><% } %>
+                <% } %>
               </td>
               <td>
                 <% if (item.type === 'quiz') { %>
@@ -59,7 +70,7 @@
                 <% } %>
               </td>
               <td>
-                <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this content item?');">
+                <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this assignment?');">
                   <button type="submit" class="btn-secondary">Delete</button>
                 </form>
               </td>
@@ -71,14 +82,15 @@
   <% } %>
 
   <div class="portal-dashboard-card portal-dashboard-card-wide">
-    <h3>Add Content</h3>
-    <form method="POST" action="<%= basePath %>/assignments/<%= assignment.id %>/content" class="member-form-grid" data-toggle-form>
+    <h3>Add Assignments</h3>
+    <form method="POST" action="<%= basePath %>/assignments/<%= assignment.id %>/content" enctype="multipart/form-data" class="member-form-grid" data-toggle-form>
       <label class="member-form-full">Type
         <select name="type" data-toggle-select>
           <option value="video">Link to Video</option>
           <option value="text">Text Description</option>
           <option value="file">Link to File</option>
           <option value="quiz">Quiz (with scoring)</option>
+          <option value="assignment_upload">Assignment Upload</option>
         </select>
       </label>
       <label class="member-form-full">Title
@@ -87,18 +99,41 @@
       <label class="member-form-full" data-toggle-field="video">Video URL
         <input type="url" name="videoUrl" placeholder="https://..." />
       </label>
+      <label class="member-form-full" data-toggle-field="video" style="display: none;">Description
+        <textarea name="description" rows="2"></textarea>
+      </label>
       <label class="member-form-full" data-toggle-field="text" style="display: none;">Description
         <textarea name="body" rows="3"></textarea>
       </label>
       <label class="member-form-full" data-toggle-field="file" style="display: none;">File URL
         <input type="url" name="fileUrl" placeholder="https://..." />
       </label>
+      <label class="member-form-full" data-toggle-field="file" style="display: none;">Description
+        <textarea name="description" rows="2"></textarea>
+      </label>
       <p class="hint member-form-full" data-toggle-field="quiz" style="display: none;">A blank quiz will be added - add its questions afterward from the "Manage Questions" link.</p>
+      <%# A real request: "assignment upload, text box with word count and
+          full editing features, also be able to upload a file such as
+          doc, pdf, jpg etc." - the exact same rich-text editor ("full
+          editing features") the Class Description field above already
+          uses, plus a live word count (public/js/assignment-upload-word-
+          count.js) and its own file attachment. %>
+      <div class="member-form-full" data-toggle-field="assignment_upload" style="display: none;" data-forum-editor>
+        <label>Assignment Text</label>
+        <%- include('forum-editor-toolbar') %>
+        <div class="forum-editable" data-forum-editable data-word-count-source contenteditable="true"></div>
+        <input type="hidden" name="body" data-forum-body-input />
+        <p class="hint"><span data-word-count>0</span> words</p>
+      </div>
+      <label class="member-form-full" data-toggle-field="assignment_upload" style="display: none;">Attach a File <span class="hint">(doc, pdf, or image)</span>
+        <input type="file" name="attachment" accept=".doc,.docx,.pdf,.jpg,.jpeg,.png,.gif,.webp" />
+      </label>
       <div class="member-form-full">
-        <button type="submit" class="primary-btn">Add Content</button>
+        <button type="submit" class="primary-btn">Add Assignments</button>
       </div>
     </form>
   </div>
 </div>
 <script src="/js/lesson-drag-reorder.js"></script>
 <script src="/js/lesson-content-form.js"></script>
+<script src="/js/assignment-upload-word-count.js"></script>

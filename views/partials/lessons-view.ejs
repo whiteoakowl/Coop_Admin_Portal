@@ -30,13 +30,19 @@
             <li style="padding: 0.6rem 0; border-top: 1px solid var(--border);">
               <% if (item.type === 'video') { %>
                 <strong><%= item.title || 'Video' %></strong>
+                <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.video_url) { %><div><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></div><% } %>
               <% } else if (item.type === 'text') { %>
                 <strong><%= item.title || 'Description' %></strong>
                 <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
               <% } else if (item.type === 'file') { %>
                 <strong><%= item.title || 'File' %></strong>
+                <% if (item.description) { %><div class="hint"><%= item.description %></div><% } %>
                 <% if (item.file_url) { %><div><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></div><% } %>
+              <% } else if (item.type === 'assignment_upload') { %>
+                <strong><%= item.title || 'Assignment' %></strong>
+                <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+                <% if (item.attachmentUrl) { %><div><a href="<%= item.attachmentUrl %>" target="_blank" rel="noopener"><%= item.attachment_name || 'Download Attachment' %></a></div><% } %>
               <% } else if (item.type === 'quiz') { %>
                 <strong><%= item.title || 'Quiz' %></strong>
                 <div>

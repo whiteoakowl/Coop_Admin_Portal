@@ -208,7 +208,14 @@
       <div class="manage-section">
         <div class="grid-box-header">
           <h2>Lessons (<%= assignments.length %>)</h2>
-          <a class="btn-secondary" href="/admin/class-schedule/quiz-review">Quiz Review</a>
+          <div class="roster-btn-row">
+            <%# A real request: "Add a new lesson should be a button, when
+                you click it there is a popup to add information" -
+                replaces the old always-visible inline "New Lesson" card
+                at the bottom of this tab. %>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-lesson-dialog').showModal()">+ New Lesson</button>
+            <a class="btn-secondary" href="/admin/class-schedule/quiz-review">Quiz Review</a>
+          </div>
         </div>
         <% if (assignments.length === 0) { %>
           <p class="roster-empty">No lessons yet.</p>
@@ -216,7 +223,7 @@
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
               <thead>
-                <tr><th></th><th>Title</th><th>Open</th><th>Due</th><th>Points</th><th></th></tr>
+                <tr><th></th><th>Title</th><th>Open</th><th>Due</th><th>Points</th><th>Completed</th><th></th></tr>
               </thead>
               <tbody data-lesson-reorder-tbody data-class-id="<%= cls.id %>">
                 <% assignments.forEach(function(a) { %>
@@ -226,6 +233,13 @@
                     <td><%= a.open_date ? a.open_date : '—' %></td>
                     <td><%= a.dueDateLabel || '—' %></td>
                     <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
+                    <%# A real request: "On lesson list show percentage of
+                        how many people in the class completed the
+                        assignments" - see completionStatsForAssignments'
+                        own comment (utils/academics.js) for what
+                        "completed" means here; "—" for a lesson with no
+                        quiz content to complete at all. %>
+                    <td><%= a.completionPercent != null ? a.completionPercent + '%' : '—' %></td>
                     <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Manage</a></td>
                   </tr>
                 <% }); %>
@@ -233,10 +247,16 @@
             </table>
           </div>
         <% } %>
+      </div>
 
-        <div class="portal-dashboard-card portal-dashboard-card-wide">
-          <h3>New Lesson</h3>
-          <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/assignments" class="member-form-grid">
+      <dialog id="add-lesson-dialog" class="class-form-dialog">
+        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/assignments">
+          <div class="class-form-dialog-header">
+            <span class="class-form-dialog-icon"><svg class="icon"><use href="#icon-book"/></svg></span>
+            <h3>New Lesson</h3>
+            <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+          </div>
+          <div class="member-form-grid">
             <label class="member-form-full">Title
               <input type="text" name="title" required />
             </label>
@@ -255,9 +275,9 @@
             <div class="member-form-full">
               <button type="submit" class="primary-btn">Add Lesson</button>
             </div>
-          </form>
-        </div>
-      </div>
+          </div>
+        </form>
+      </dialog>
       <script src="/js/lesson-drag-reorder.js"></script>
     <% } else if (activeTab === 'grades') { %>
       <div class="manage-section">
