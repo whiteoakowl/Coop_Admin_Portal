@@ -643,8 +643,11 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       color: req.body.color || cls.color,
       startTime: (req.body.startTime || '').trim(),
       endTime: (req.body.endTime || '').trim(),
+      startDate: (req.body.startDate || '').trim(),
+      endDate: (req.body.endDate || '').trim(),
       capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
       description: sanitizePostBody(req.body.description || ''),
+      supplyList: (req.body.supplyList || '').trim(),
       ...registrationFieldsFromBody(req.body),
       // Registration Open, Who Can Register, and Cancellation now live on
       // the Settings tab's own auto-saving form (see the /settings route

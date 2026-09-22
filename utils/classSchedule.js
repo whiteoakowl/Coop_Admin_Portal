@@ -488,9 +488,9 @@ async function renameRoom(day, oldName, newName) {
 async function createClass(fields) {
   const info = await db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, capacity, registration_open, description,
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, start_date, end_date, capacity, registration_open, description, supply_list,
          allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -502,9 +502,12 @@ async function createClass(fields) {
       fields.color || (await nextPaletteColor()),
       fields.startTime || null,
       fields.endTime || null,
+      fields.startDate || null,
+      fields.endDate || null,
       fields.capacity || null,
       fields.registrationOpen ? 1 : 0,
       fields.description || null,
+      fields.supplyList || null,
       fields.allowParentRegister === false ? 0 : 1,
       fields.allowTeacherRegister === false ? 0 : 1,
       fields.allowStudentRegister ? 1 : 0,
@@ -524,7 +527,7 @@ async function createClass(fields) {
 async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, numeric_ages = ?, color = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, numeric_ages = ?, color = ?, start_time = ?, end_time = ?, start_date = ?, end_date = ?, capacity = ?, registration_open = ?, description = ?, supply_list = ?,
        allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?
      WHERE id = ?`
   ).run(
@@ -537,9 +540,12 @@ async function updateClass(id, fields) {
     fields.color || '#EE9A4D',
     fields.startTime || null,
     fields.endTime || null,
+    fields.startDate || null,
+    fields.endDate || null,
     fields.capacity || null,
     fields.registrationOpen ? 1 : 0,
     fields.description || null,
+    fields.supplyList || null,
     fields.allowParentRegister === false ? 0 : 1,
     fields.allowTeacherRegister === false ? 0 : 1,
     fields.allowStudentRegister ? 1 : 0,

@@ -199,7 +199,14 @@ router.post('/classes/:id/unregister', async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
-const CLASS_DETAIL_TABS = ['assignments', 'lessons', 'forum', 'resources', 'attendance', 'assessments', 'grades'];
+// A real request: "Parent and student portal. On classroom dashboard
+// when you click on a Class card it take you to that class. Details
+// should have teachers, assistants, room number, start and end dates,
+// start and end time, day of the week, class description, supply
+// list." - Details is now the default landing tab here, matching Parent
+// Portal's own class detail page (routes/parent-portal.js's own
+// CLASS_DASHBOARD_TABS, which already defaults to 'details').
+const CLASS_DETAIL_TABS = ['details', 'assignments', 'lessons', 'forum', 'resources', 'attendance', 'assessments', 'grades'];
 
 // One class's own detail page - card-clicked from /student/classes. Read-
 // only for this first pass: Assignments/Grades reuse the real academics
@@ -222,7 +229,7 @@ router.get('/classes/:id', async (req, res) => {
   const cls = classes.find((c) => c.id === classId);
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
 
-  const tab = CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'assignments';
+  const tab = CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'details';
   const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(member.id, classId) : [];
   const lessons = tab === 'lessons' ? await lessonsForStudentView(classId, member.id) : [];
   const attendance = tab === 'attendance' ? await attendanceHistoryForRoster(member.id, cls.roster_id) : [];

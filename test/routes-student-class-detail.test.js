@@ -85,7 +85,24 @@ test('a class detail page 404s for a class this student is not enrolled in', asy
   assert.equal(res.status, 404);
 });
 
-test('class detail page defaults to Assignments and shows only this class\'s own assignments', async () => {
+// A later real request ("Parent and student portal. On classroom
+// dashboard when you click on a Class card it take you to that class.
+// Details should have teachers, assistants, room number, start and end
+// dates, start and end time, day of the week, class description, supply
+// list") made Details the new default landing tab here, matching Parent
+// Portal's own class detail page - Assignments is now reached via its
+// own ?tab=assignments, same as every other tab.
+test('class detail page defaults to Details', async () => {
+  const { memberId, cookie } = await createStudent('Details Default Student');
+  const classAId = await createClassWithTeacher('monday', 'Class A', 'Teacher A');
+  await classSchedule.setEnrollment(classAId, [memberId]);
+
+  const res = await request(app).get(`/student/classes/${classAId}`).set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /class="view-tab active" href="\?tab=details">Details/);
+});
+
+test('Assignments tab shows only this class\'s own assignments', async () => {
   const { memberId, cookie } = await createStudent('Assignments Student');
   const classAId = await createClassWithTeacher('monday', 'Class A', 'Teacher A');
   const classBId = await createClassWithTeacher('wednesday', 'Class B', 'Teacher B');
@@ -94,7 +111,7 @@ test('class detail page defaults to Assignments and shows only this class\'s own
   await academics.createAssignment({ classId: classAId, className: 'Class A', title: 'Class A Homework', dueDate: '2026-09-05', pointsPossible: 10 });
   await academics.createAssignment({ classId: classBId, className: 'Class B', title: 'Class B Homework', dueDate: '2026-09-06', pointsPossible: 10 });
 
-  const res = await request(app).get(`/student/classes/${classAId}`).set('Cookie', cookie);
+  const res = await request(app).get(`/student/classes/${classAId}?tab=assignments`).set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.match(res.text, /Class A Homework/);
   assert.doesNotMatch(res.text, /Class B Homework/);

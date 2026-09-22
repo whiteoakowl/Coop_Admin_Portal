@@ -30,9 +30,20 @@
 
     <div class="view-tab-panel">
       <% if (tab === 'details') { %>
+        <%# A real request: "Details should have teachers, assistants,
+            room number, start and end dates, start and end time, day of
+            the week, class description, supply list." Teacher(s), room,
+            day, time, and description already show in the page header
+            above these tabs - the rest lives here. %>
         <p><strong>Assistant(s):</strong> <%= cls.assistantNames && cls.assistantNames.length ? cls.assistantNames.join(', ') : 'None assigned' %></p>
+        <p><strong>Start Date:</strong> <%= cls.start_date || 'Not set' %></p>
+        <p><strong>End Date:</strong> <%= cls.end_date || 'Not set' %></p>
         <p><strong>Grade/Age:</strong> <%= cls.gradeLabel || 'Not set' %></p>
         <p><strong>Enrolled:</strong> <%= cls.studentCount %><% if (cls.capacity != null) { %> / <%= cls.capacity %><% } %></p>
+        <% if (cls.supply_list) { %>
+          <p><strong>Supply List:</strong></p>
+          <p class="hint" style="white-space: pre-wrap;"><%= cls.supply_list %></p>
+        <% } %>
       <% } else if (tab === 'assignments') { %>
         <% if (assignments.length === 0) { %>
           <p class="roster-empty">No assignments yet.</p>

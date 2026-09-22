@@ -81,6 +81,15 @@
             <label>End Time
               <input type="text" name="endTime" value="<%= cls.end_time || '' %>" placeholder="10:00 AM" />
             </label>
+            <%# A real request: "Details should have... start and end
+                dates" - the class's own overall term/session date range,
+                separate from Start/End Time above (its daily time slot). %>
+            <label>Start Date
+              <input type="date" name="startDate" value="<%= cls.start_date || '' %>" />
+            </label>
+            <label>End Date
+              <input type="date" name="endDate" value="<%= cls.end_date || '' %>" />
+            </label>
 
             <div class="member-form-full">
               <label class="roster-checkbox-label">Grade <span class="hint">(select all that apply)</span></label>
@@ -110,6 +119,10 @@
               <div class="forum-editable" data-forum-editable contenteditable="true"><%- cls.description || '' %></div>
               <input type="hidden" name="description" data-forum-body-input />
             </div>
+
+            <label class="member-form-full">Supply List <span class="hint">(shown on the class's own Details page)</span>
+              <textarea name="supplyList" rows="3"><%= cls.supply_list || '' %></textarea>
+            </label>
 
             <div class="member-form-full class-edit-slots-row">
               <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
