@@ -608,6 +608,35 @@ async function updateClassSettings(id, field, value) {
   await db.prepare(`UPDATE classes SET ${column} = ? WHERE id = ?`).run(value ? 1 : 0, id);
 }
 
+// A real request: "Overall class settings. Add a place to create and add
+// new semester titles. On individual class settings add dropdown for
+// choosing semester." A generic, ordered list of semester titles (e.g.
+// "Fall 2026") that classes get tagged with - same shape as Sections
+// (utils/members.js's own sections table), but its own concept since a
+// class only ever belongs to one semester at a time (a dropdown, not a
+// multi-select). Task #181's orientation rebuild groups members by this
+// same semester.
+async function listSemesters() {
+  return db.prepare('SELECT * FROM semesters ORDER BY id DESC').all();
+}
+
+async function createSemester(title) {
+  const trimmed = (title || '').trim();
+  if (!trimmed) throw new Error('A semester title is required.');
+  return db.prepare('INSERT INTO semesters (title) VALUES (?) RETURNING *').get(trimmed);
+}
+
+async function deleteSemester(id) {
+  await db.prepare('DELETE FROM semesters WHERE id = ?').run(id);
+}
+
+// Separate from updateClassSettings above since the value here is a
+// nullable semester id, not a boolean - '' from the dropdown's own "No
+// Semester" option means clear it.
+async function setClassSemester(id, semesterId) {
+  await db.prepare('UPDATE classes SET semester_id = ? WHERE id = ?').run(semesterId || null, id);
+}
+
 // Deactivates (never hard-deletes) the class's auto-roster before removing
 // the class - a hard delete would cascade-wipe its attendance history
 // (attendance.roster_id references rosters ON DELETE CASCADE). Deactivating
@@ -2005,6 +2034,10 @@ module.exports = {
   classImageUrl,
   CLASS_IMAGES_BUCKET,
   updateClassSettings,
+  listSemesters,
+  createSemester,
+  deleteSemester,
+  setClassSemester,
   deleteClass,
   archiveClasses,
   listClassArchives,

@@ -58,6 +58,7 @@ const {
   classImageUrl,
   CLASS_IMAGES_BUCKET,
   updateClassSettings,
+  setClassSemester,
   deleteClass,
   archiveClasses,
   listClassArchives,
@@ -760,7 +761,14 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
 router.post('/class-schedule/classes/:id/settings', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   try {
-    await updateClassSettings(id, req.body.field, req.body.value === '1');
+    // The Semester dropdown saves through this same route/JS as the
+    // checkboxes above, but carries a nullable semester id rather than a
+    // boolean - see setClassSemester's own comment.
+    if (req.body.field === 'semesterId') {
+      await setClassSemester(id, req.body.value ? parseInt(req.body.value, 10) : null);
+    } else {
+      await updateClassSettings(id, req.body.field, req.body.value === '1');
+    }
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }

@@ -36,6 +36,9 @@ const {
   syncDayMemberRosters,
   listClassArchives,
   allClassesList,
+  listSemesters,
+  createSemester,
+  deleteSemester,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -162,6 +165,7 @@ router.get('/schedule', requireAdmin, async (req, res) => {
       windows: windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) })),
       roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
+      semesters: await listSemesters(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -282,6 +286,28 @@ router.post('/schedule/registration-windows', requireFullAdmin, async (req, res)
 router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteWindow(req.params.id);
   res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Registration window removed.'));
+});
+
+// --- Classes > Settings: Semesters - a real request: "Overall class
+// settings. Add a place to create and add new semester titles. On
+// individual class settings add dropdown for choosing semester." Just a
+// title list; each class's own semester assignment is a per-row dropdown
+// on this same page, saved via the existing auto-save route (routes/
+// admin-class-schedule.js's /class-schedule/classes/:id/settings, field
+// 'semesterId').
+router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
+  const back = '/admin/schedule?tab=settings';
+  try {
+    await createSemester(req.body.title);
+  } catch (err) {
+    return res.redirect(back + '&error=' + encodeURIComponent(err.message));
+  }
+  res.redirect(back + '&notice=' + encodeURIComponent('Semester added.'));
+});
+
+router.post('/schedule/semesters/:id/delete', requireFullAdmin, async (req, res) => {
+  await deleteSemester(req.params.id);
+  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Semester removed.'));
 });
 
 // --- Member Schedules: bulk import ---
