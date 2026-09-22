@@ -8,7 +8,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation</a></p>
     <h1><%= title %></h1>
-    <p class="hint">Everyone registered for classes on either day, in one list - check a name (or Select All), then Check In.</p>
+    <p class="hint">Everyone registered for classes this semester, in one list - check a name (or Select All), then Check In.</p>
 
     <div class="roster-toolbar no-print">
       <div class="roster-btn-row">
@@ -25,8 +25,9 @@
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <form id="orientation-checkin-form" method="POST" action="<%= postUrl %>">
+      <input type="hidden" name="semesterId" value="<%= semesterId != null ? semesterId : '' %>" />
       <% if (rows.length === 0) { %>
-        <p class="roster-empty">No one is registered for classes on either day yet.</p>
+        <p class="roster-empty">No one is registered for classes this semester yet.</p>
       <% } else { %>
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table">
@@ -43,11 +44,11 @@
                 <tr>
                   <td>
                     <% if (!r[field]) { %>
-                      <input type="checkbox" name="members" value="<%= r.memberId %>:<%= r.day %>" form="orientation-checkin-form" aria-label="Select <%= r.memberName %>, <%= r.day %>" />
+                      <input type="checkbox" name="members" value="<%= r.memberId %>" form="orientation-checkin-form" aria-label="Select <%= r.memberName %>" />
                     <% } %>
                   </td>
                   <td class="roster-name-col"><%= r.memberName %></td>
-                  <td><%= r.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                  <td><%= r.dayLabel %></td>
                   <td>
                     <% if (r[field]) { %>
                       <span class="status-badge status-badge-present">Checked In</span>

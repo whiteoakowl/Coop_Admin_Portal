@@ -6,14 +6,35 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Orientation</h1>
-    <p class="hint">Every family with a student registered for classes on either day, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Orientation Meet Up are usually set from their own Check-In subpage instead.</p>
+    <div class="roster-toolbar">
+      <div><h1>Orientation</h1></div>
+      <div class="roster-btn-row no-print">
+        <a class="btn-secondary" href="/admin/orientation/settings">Orientation Settings</a>
+      </div>
+    </div>
+    <p class="hint">Every family with a student registered for classes this semester, and their orientation progress. Click a circle to mark it complete/incomplete by hand - Tour and Orientation Meet Up are usually set from their own Check-In subpage instead.</p>
+
+    <%# A real request: "Orientation gets a dropdown to pick which
+        semester to view" - defaults to the newest semester (see
+        resolveSemesterId in routes/admin-orientation.js); only shown
+        once at least one semester exists. %>
+    <% if (semesters.length > 0) { %>
+      <div class="category-filter no-print" style="margin-bottom: 1rem;">
+        <label for="orientation-semester-select">Semester</label>
+        <select id="orientation-semester-select" onchange="window.location.href = '/admin/orientation?semesterId=' + this.value">
+          <option value="none" <%= semesterId == null ? 'selected' : '' %>>All Semesters</option>
+          <% semesters.forEach(function(s) { %>
+            <option value="<%= s.id %>" <%= semesterId === s.id ? 'selected' : '' %>><%= s.title %></option>
+          <% }); %>
+        </select>
+      </div>
+    <% } %>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (rows.length === 0) { %>
-      <p class="roster-empty">No one is registered for classes on either day yet.</p>
+      <p class="roster-empty">No one is registered for classes this semester yet.</p>
     <% } else { %>
       <%
         // A real request: "If the column title has two words stack them
@@ -40,19 +61,38 @@
         <table class="roster-table members-table condensed-table">
           <thead>
             <tr>
+              <th></th>
               <th>Member</th>
               <th>Day</th>
               <% columns.forEach(function(col) { %>
-                <th class="orientation-col-center"><%- stackedHeader(col.label) %></th>
+                <th class="orientation-col-center">
+                  <% if (links[col.field]) { %>
+                    <a href="<%= links[col.field] %>" target="_blank" rel="noopener"><%- stackedHeader(col.label) %></a>
+                  <% } else { %>
+                    <%- stackedHeader(col.label) %>
+                  <% } %>
+                </th>
               <% }); %>
               <th class="orientation-col-center"><%- stackedHeader('% Complete') %></th>
+              <th class="orientation-col-center"><%- stackedHeader('Date Completed') %></th>
             </tr>
           </thead>
           <tbody>
             <% rows.forEach(function(r) { %>
               <tr>
+                <%# A real request: "Members are only listed once with
+                    arrow dropdown for children to expand and close" -
+                    the children row directly below stays hidden until
+                    this arrow is clicked (public/js/orientation-toggle.js). %>
+                <td class="roster-drag-col">
+                  <% if (r.children.length > 0) { %>
+                    <button type="button" class="icon-btn" data-orientation-expand aria-expanded="false" aria-label="Show <%= r.children.length %> child<%= r.children.length === 1 ? '' : 'ren' %> for <%= r.memberName %>">
+                      <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                    </button>
+                  <% } %>
+                </td>
                 <td class="roster-name-col"><%= r.memberName %></td>
-                <td><%= r.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                <td><%= r.dayLabel %></td>
                 <% columns.map(function(col) { return col.field; }).forEach(function(field) { %>
                   <td class="orientation-col-center">
                     <button
@@ -60,16 +100,29 @@
                       class="orientation-dot<%= r[field] ? ' orientation-dot-complete' : '' %>"
                       data-orientation-toggle
                       data-member-id="<%= r.memberId %>"
-                      data-day="<%= r.day %>"
+                      data-semester-id="<%= semesterId != null ? semesterId : '' %>"
                       data-field="<%= field %>"
                       data-complete="<%= r[field] ? '1' : '0' %>"
                       aria-pressed="<%= r[field] ? 'true' : 'false' %>"
-                      aria-label="<%= field %> for <%= r.memberName %>, <%= r.day %> - <%= r[field] ? 'complete' : 'incomplete' %>"
+                      aria-label="<%= field %> for <%= r.memberName %> - <%= r[field] ? 'complete' : 'incomplete' %>"
                     ></button>
                   </td>
                 <% }); %>
                 <td><%= r.percentComplete %>%</td>
+                <td><%= r.dateCompleted || '—' %></td>
               </tr>
+              <% if (r.children.length > 0) { %>
+                <tr class="orientation-children-row" hidden>
+                  <td></td>
+                  <td colspan="<%= 4 + columns.length %>">
+                    <ul class="orientation-children-list">
+                      <% r.children.forEach(function(c) { %>
+                        <li><%= c.name %> <span class="hint">(<%= c.dayLabel %>)</span></li>
+                      <% }); %>
+                    </ul>
+                  </td>
+                </tr>
+              <% } %>
             <% }); %>
           </tbody>
         </table>

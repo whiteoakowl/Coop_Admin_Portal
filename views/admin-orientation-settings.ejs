@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/orientation">&larr; Orientation</a></p>
+    <h1>Orientation Settings</h1>
+    <%# A real request: "Add button for orientation settings to Link
+        training or check in with each circle check mark column so the
+        information can be linked" - one optional URL per column; when
+        set, that column's header on the main Orientation list links out
+        to it (a training video, an external check-in event, etc.)
+        instead of being a plain label. %>
+    <p class="hint">Attach a link to each orientation column - a training video, a sign-up page, or a check-in event. Leave a field blank to remove its link.</p>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <form method="POST" action="/admin/orientation/settings" class="member-form-grid">
+      <label class="member-form-full">Parent Orientation Link
+        <input type="url" name="video" placeholder="https://..." value="<%= links.video || '' %>" />
+      </label>
+      <label class="member-form-full">Orientation Meet Up Link
+        <input type="url" name="meetup" placeholder="https://..." value="<%= links.meetup || '' %>" />
+      </label>
+      <label class="member-form-full">Teacher Orientation Link
+        <input type="url" name="teacherTraining" placeholder="https://..." value="<%= links.teacherTraining || '' %>" />
+      </label>
+      <label class="member-form-full">Tour Link
+        <input type="url" name="tour" placeholder="https://..." value="<%= links.tour || '' %>" />
+      </label>
+      <label class="member-form-full">Open House Link
+        <input type="url" name="openHouse" placeholder="https://..." value="<%= links.openHouse || '' %>" />
+      </label>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Save Orientation Settings</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

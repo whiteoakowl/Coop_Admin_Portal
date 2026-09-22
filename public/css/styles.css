@@ -7569,6 +7569,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .orientation-dot-complete { background: var(--green); border-color: var(--green); }
 .orientation-dot-complete:hover { background: var(--green); border-color: var(--green); }
 
+/* A real request: "Members are only listed once with arrow dropdown for
+   children to expand and close" - public/js/orientation-toggle.js
+   toggles the chevron rotation and the hidden attribute on the very next
+   row (the child list). */
+.orientation-expand-open .icon { transform: rotate(180deg); }
+.orientation-children-list { list-style: none; margin: 0; padding: 0 0 0 2rem; }
+.orientation-children-list li { padding: 0.2rem 0; }
+
 /* Member Schedules tab - every person's actual Schedule Card (same design
    as the printable one), side by side in alphabetical-by-last-name order
    instead of a table row per person. Students and parents/admins are
