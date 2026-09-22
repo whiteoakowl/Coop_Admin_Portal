@@ -36,6 +36,7 @@ const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday, todayISO } = 
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
+const resourceLinks = require('../utils/resourceLinks');
 const {
   assignmentsForStudent,
   assignmentsForStudentInClass,
@@ -608,6 +609,52 @@ router.get('/library', async (req, res) => {
   const memberIds = family.map((m) => m.id);
   const { active, recentReturns } = await libraryActivityForMemberIds(memberIds);
   res.render('parent-library', { title: 'Library', active, recentReturns });
+});
+
+// Resources - a real request added this as a standing Parent Portal nav
+// tab ("Parent portal is not divided into sections. Tabs are in this
+// order... resources..."). Read-only, reuses the exact same role-scoped
+// utils/resourceLinks.js list Student Portal already reads (routes/
+// student-portal.js's own /resources) - just for the 'parent' role.
+router.get('/resources', async (req, res) => {
+  const links = await resourceLinks.listResourceLinksForRole('parent');
+  res.render('parent-resources', {
+    title: 'Resource Links',
+    links,
+    categories: await resourceLinks.listCategories(),
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/resources/submit', async (req, res) => {
+  const title = (req.body.title || '').trim();
+  const url = (req.body.url || '').trim();
+  if (!title || !url) return res.redirect('/parent/resources?error=' + encodeURIComponent('Title and website are required.'));
+
+  const member = await memberForAccount(req.portalAccount.id);
+  await resourceLinks.submitResourceLink({
+    title,
+    url,
+    description: (req.body.description || '').trim(),
+    city: (req.body.city || '').trim(),
+    state: (req.body.state || '').trim(),
+    categoryId: parseInt(req.body.categoryId, 10) || null,
+    submittedByMemberId: member ? member.id : null,
+  });
+  res.redirect('/parent/resources?notice=' + encodeURIComponent('Thanks! Your resource was submitted for admin approval.'));
+});
+
+// Documents - another new standing nav tab from that same request. Every
+// document Co-op Admin manages (routes/admin-documents.js) is already
+// meant to be shareable (each one has its own genuinely-public Copy Link
+// - see routes/documents.js), so this is just a read-only card grid of
+// the same `documents` table, no separate parent-facing storage/serving
+// code - each card link goes straight to the existing public
+// /documents/<token> page rather than duplicating its file-streaming.
+router.get('/documents', async (req, res) => {
+  const documents = await db.prepare('SELECT id, title, image_path, public_token FROM documents ORDER BY LOWER(title)').all();
+  res.render('parent-documents', { title: 'Documents', documents });
 });
 
 // Academics - assignments/grades, transcript, and diploma status for each

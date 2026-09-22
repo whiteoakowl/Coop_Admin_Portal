@@ -124,7 +124,6 @@
     <% }); %>
   </nav>
   <div class="admin-sidebar-bottom">
-    <a href="/admin/settings"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
     <form method="POST" action="/admin/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
     </form>
@@ -133,12 +132,18 @@
 
 <%# Top-right corner controls (desktop): global search, My Portals
     (#icon-monitor, a real request: "the portals button should be a
-    computer icon"), and My Profile (#icon-user-circle - a plain
-    placeholder, no member profile-photo field exists yet). Replaces the
+    computer icon"), My Profile (#icon-user-circle - a plain placeholder,
+    no member profile-photo field exists yet), and Settings. Replaces the
     old Full Screen View toggle, removed here along with its script
     include and PIN-exit dialog per "remove full screen button and
     feature from all portal pages" - Kiosk Mode (kiosk-home.ejs) keeps
-    its own separate, untouched copy of that feature. %>
+    its own separate, untouched copy of that feature. A later real
+    request ("Switch portal, profile icon, settings icon should all be
+    top right of screen") moved Settings up here from
+    .admin-sidebar-bottom (still Log Out's home) - Co-op Admin has no
+    separate settings page from its own profile/account page, so both
+    links point at /admin/settings, same as they already did in the
+    mobile topbar below. %>
 <header class="admin-page-corner-actions no-print">
   <% if (isFullAdmin) { %>
     <form method="GET" action="/admin/search" class="admin-corner-search">
@@ -154,6 +159,10 @@
   <a class="admin-corner-link" href="/admin/settings">
     <svg class="icon"><use href="#icon-user-circle"/></svg>
     My Profile
+  </a>
+  <a class="admin-corner-link" href="/admin/settings">
+    <svg class="icon"><use href="#icon-gear"/></svg>
+    Settings
   </a>
 </header>
 

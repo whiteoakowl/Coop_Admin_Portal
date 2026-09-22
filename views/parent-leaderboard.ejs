@@ -4,21 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', {
-    portalTitle: 'Parent Portal',
-    navLinks: [
-      { href: '/parent', icon: 'home', label: 'Home' },
-      { href: '/parent/library', icon: 'book', label: 'Library' },
-      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
-      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
-      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
-      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
-    ],
-    classLinks: [
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
-    ],
-  }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <h1>Leaderboard</h1>

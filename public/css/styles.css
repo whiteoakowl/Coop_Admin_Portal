@@ -1632,9 +1632,38 @@ body.public-page .roster-empty {
 }
 .admin-page-corner-actions .admin-corner-link:hover { background: #fff; }
 
-/* Settings + Log out live at the bottom of the sidebar on desktop, pinned
-   there via margin-top:auto; folded into the mobile topbar's right side
-   (a separate compact box) on small screens where there's no sidebar. */
+/* Switch Portal's <details>/<summary> (.portal-switcher-details below)
+   defaults to white text for the dark sidebar it used to live in - a
+   real request ("Switch portal, profile icon, settings icon should all
+   be top right of screen") moved it up into this orange corner header
+   alongside My Profile/Settings, so it needs the same white-pill look as
+   .admin-corner-link right above, not the sidebar's transparent-on-dark
+   style. */
+.admin-page-corner-actions .portal-switcher-details summary {
+  background: rgba(255,255,255,0.95);
+  color: var(--muted);
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.admin-page-corner-actions .portal-switcher-details summary:hover,
+.admin-page-corner-actions .portal-switcher-details[open] summary { background: #fff; }
+.admin-page-corner-actions .portal-switcher-menu {
+  position: absolute;
+  right: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+}
+.admin-page-corner-actions .portal-switcher-menu a { color: var(--ink); }
+.admin-page-corner-actions .portal-switcher-menu a:hover { background: rgba(0,0,0,0.05); }
+
+/* Log out is the only control still pinned to the bottom of the sidebar
+   on desktop, via margin-top:auto; folded into the mobile topbar's right
+   side (a separate compact box) on small screens where there's no
+   sidebar. */
 .admin-sidebar-bottom {
   margin-top: auto;
   padding-top: 0.4rem;

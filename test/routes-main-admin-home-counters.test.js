@@ -100,9 +100,11 @@ test('GET /main-admin shows Families/Parents/Students counters and a plain setti
   // The gear itself is now a plain link straight to the settings hub
   // (test/routes-main-admin-settings-hub.test.js covers the card grid of
   // destinations that page renders) - not a dropdown listing them here in
-  // the sidebar.
+  // the sidebar. A later request ("Switch portal, profile icon, settings
+  // icon should all be top right of screen") moved this link out of the
+  // sidebar and into the top-right .admin-page-corner-actions header.
   assert.doesNotMatch(res.text, />Settings<\/summary>/);
-  assert.match(res.text, /href="\/main-admin\/settings"><svg class="icon"><use href="#icon-gear"\/><\/svg> Settings<\/a>/);
+  assert.match(res.text, /class="admin-corner-link" href="\/main-admin\/settings">\s*<svg class="icon"><use href="#icon-gear"\/><\/svg>\s*Settings/);
 });
 
 test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', async () => {

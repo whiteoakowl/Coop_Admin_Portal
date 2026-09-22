@@ -4,21 +4,7 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
-  <%- include('partials/portal-nav', {
-    portalTitle: 'Parent Portal',
-    navLinks: [
-      { href: '/parent', icon: 'home', label: 'Home' },
-      { href: '/parent/library', icon: 'book', label: 'Library' },
-      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
-      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
-      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
-      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
-      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
-    ],
-    classLinks: [
-      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
-    ],
-  }) %>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
     <div class="reading-header">
@@ -26,9 +12,18 @@
         <h1>Reading Challenge</h1>
         <p class="subtitle">Track your reading. Grow your mind. Earn rewards!</p>
       </div>
-      <% if (dashboard) { %>
-        <span class="reading-points-pill"><svg class="icon"><use href="#icon-star"/></svg> <%= dashboard.totalPoints.toLocaleString() %> Points</span>
-      <% } %>
+      <div class="roster-btn-row">
+        <% if (dashboard) { %>
+          <span class="reading-points-pill"><svg class="icon"><use href="#icon-star"/></svg> <%= dashboard.totalPoints.toLocaleString() %> Points</span>
+        <% } %>
+        <%# A real request: "achievements and leaderboard are buttons in
+            reading challenge page" - dropped from the standing Parent
+            Portal nav (views/partials/portal-nav.ejs's own PARENT_NAV_LINKS)
+            in favor of these two buttons; both pages still exist at their
+            own /parent/achievements and /parent/leaderboard URLs. %>
+        <a class="roster-action-btn" href="/parent/achievements"><svg class="icon"><use href="#icon-star"/></svg> Achievements</a>
+        <a class="roster-action-btn" href="/parent/leaderboard"><svg class="icon"><use href="#icon-trophy"/></svg> Leaderboard</a>
+      </div>
     </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -169,7 +164,6 @@
               <span class="hint">You earned <%= Math.round(dashboard.weeklyGoalHours * dashboard.pointsPerHour) %> points this week!</span>
             </div>
           <% } %>
-          <p class="hint reading-goal-cross-link"><a href="/parent/achievements">View Achievements &rarr;</a></p>
         </div>
       </div>
 
@@ -189,8 +183,6 @@
           </div>
         </div>
       </div>
-
-      <p class="hint reading-goal-cross-link"><a href="/parent/leaderboard">View Leaderboard &rarr;</a></p>
 
       <dialog id="edit-goal-dialog" class="member-picker-dialog">
         <form method="POST" action="/parent/reading/goal">

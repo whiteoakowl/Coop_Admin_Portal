@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Documents</h1>
+
+    <% if (documents.length === 0) { %>
+      <p class="roster-empty">No documents have been shared yet.</p>
+    <% } else { %>
+      <%
+        var docColors = ['landing-card-orange', 'landing-card-purple', 'landing-card-green'];
+      %>
+      <div class="landing-grid documents-grid">
+        <% documents.forEach(function(d, i) { %>
+          <a class="landing-card <%= docColors[i % docColors.length] %>" href="/documents/<%= d.public_token %>">
+            <% if (d.image_path) { %>
+              <img class="landing-card-image" src="/documents/<%= d.public_token %>/image" alt="" />
+            <% } else { %>
+              <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+            <% } %>
+            <span class="landing-label"><%= d.title %></span>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

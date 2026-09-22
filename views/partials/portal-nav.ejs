@@ -141,6 +141,54 @@ const MAIN_ADMIN_NAV_LINKS = [
     { href: '/main-admin/fun/vocabulary-game', label: 'Vocabulary Game' },
   ] },
 ];
+// Parent Portal's own primary nav - a real request: "Parent portal is not
+// divided into sections. Tabs are in this order" (the exact 15-tab list
+// below), which also killed off Parent Portal's own classLinks "Co-op
+// Classes" 2nd section and communityLinks "Community" 3rd section (see
+// classLinks/communityLinks further down - both forced to nothing for
+// Parent Portal now, same override pattern as Main Admin/Student Portal
+// below) - everything folds into this one flat list instead. Same anti-
+// drift reasoning as MAIN_ADMIN_NAV_LINKS below - this used to be a
+// copy-pasted navLinks+classLinks pair in all 15 views/parent-*.ejs files
+// that pass this partial anything (drifting the moment one got edited
+// and the others didn't - parent-name-tags.ejs's own copy had already
+// drifted, with an extra Name Tags entry none of the others had),
+// centralized here the same way once a real restructure request made
+// that drift risk concrete. Achievements/Leaderboard dropped from the
+// list entirely per that same request ("Achievements and leaderboard are
+// buttons in reading challenge page") - they're still reachable at their
+// own /parent/achievements and /parent/leaderboard URLs, just as buttons
+// on views/parent-reading.ejs now instead of standing nav tabs. Resources
+// and Documents are new routes (routes/parent-portal.js's own
+// /parent/resources - the same role-scoped utils/resourceLinks.js list
+// Student Portal already reads, just for the 'parent' role - and
+// /parent/documents, a read-only card grid of the same `documents` table
+// Co-op Admin manages, each card linking out to the existing public
+// /documents/<token> view rather than duplicating its file-serving code).
+const PARENT_NAV_LINKS = [
+  { href: '/parent', icon: 'home', label: 'Home' },
+  { href: '/events', icon: 'calendar-check', label: 'Events' },
+  { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
+    { href: '/parent/classes', label: 'Class Registration' },
+    { href: '/parent/classes/manage', label: 'View/Cancel Classes' },
+    { href: '/parent/classes/dashboard', label: 'Class Dashboard' },
+    { href: '/name-tag', label: 'Name Tag Form' },
+    { href: '/absence', label: 'Absence/Late Form' },
+    { href: '/parent/handbook', label: 'Policy Handbook' },
+  ] },
+  { href: '/forums', icon: 'users', label: 'Chat' },
+  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
+  { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
+  { href: '/parent/resources', icon: 'book', label: 'Resources' },
+  { href: '/parent/documents', icon: 'file-text', label: 'Documents' },
+  { href: '/store', icon: 'grid', label: 'Store' },
+  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+  { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
+  { href: '/parent/library', icon: 'book', label: 'Library' },
+  { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+  { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
+];
 // Student Portal's own primary nav - a real request: "dashboard panel
 // tabs. They should be these titles and in this order," plus a labeled
 // 2nd section "Activities" (see STUDENT_ACTIVITY_LINKS/classLinksTitle
@@ -178,26 +226,23 @@ const STUDENT_ACTIVITY_LINKS = [
   { href: '/student/nature-news', icon: 'sprout', label: 'Nature News' },
   { href: '/student/spelling-bee', icon: 'type', label: 'Spelling Bee' },
 ];
-const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : portalTitle === 'Student Portal' ? STUDENT_NAV_LINKS : navLinks;
+const primaryNavLinks = portalTitle === 'Main Admin' ? MAIN_ADMIN_NAV_LINKS : portalTitle === 'Student Portal' ? STUDENT_NAV_LINKS : portalTitle === 'Parent Portal' ? PARENT_NAV_LINKS : navLinks;
 
-// Optional - only views/parent-*.ejs pass this (see their own comment).
-// A real request: "parent portal should be divided between all the
-// general tabs and a co-op class section with all the tabs for
-// classes" - everywhere else's navLinks stays one flat list.
-// locals.classLinks, not `typeof classLinks !== 'undefined'` - that would
-// reference this very declaration's own not-yet-initialized `const`
-// binding (a genuine ReferenceError from `const`'s temporal dead zone,
-// unlike a bare undeclared identifier), not the value the caller passed.
-// Student Portal forces its own STUDENT_ACTIVITY_LINKS above regardless
-// of whatever a page's own call site still passes (same override
-// pattern as MAIN_ADMIN_NAV_LINKS above) - its own heading text is
-// "Activities" rather than "Co-op Classes" (classLinksTitle, used by
-// the template further down), the only other caller of this section.
-// Main Admin no longer has a 2nd section at all - its old "Student
-// Portal" group (just the Fun tab) folded back into MAIN_ADMIN_NAV_LINKS
-// above, so it falls through to the general locals.classLinks case here,
-// which Main Admin's own pages never pass (null, no 2nd section rendered).
-const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
+// Optional - only a caller with no forced primaryNavLinks override above
+// still gets to pass this (see their own comment). locals.classLinks, not
+// `typeof classLinks !== 'undefined'` - that would reference this very
+// declaration's own not-yet-initialized `const` binding (a genuine
+// ReferenceError from `const`'s temporal dead zone), not the value the
+// caller passed. Student Portal forces its own STUDENT_ACTIVITY_LINKS
+// above regardless of whatever a page's own call site still passes (same
+// override pattern as MAIN_ADMIN_NAV_LINKS above) - its own heading text
+// is "Activities" (classLinksTitle, used by the template further down).
+// Main Admin and Parent Portal both force null (no 2nd section at all) -
+// Main Admin's old "Student Portal" group (just the Fun tab) folded back
+// into MAIN_ADMIN_NAV_LINKS above; Parent Portal's old "Co-op Classes"
+// group folded into PARENT_NAV_LINKS above per a later real request
+// ("Parent portal is not divided into sections").
+const classLinks = portalTitle === 'Student Portal' ? STUDENT_ACTIVITY_LINKS : (portalTitle === 'Main Admin' || portalTitle === 'Parent Portal') ? null : (typeof locals.classLinks !== 'undefined' ? locals.classLinks : null);
 const classLinksTitle = portalTitle === 'Student Portal' ? 'Activities' : 'Co-op Classes';
 
 // The Community & Commerce feature set (Events, Forums, Store, Business
@@ -237,25 +282,17 @@ const COMMUNITY_LINKS = [
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
   { href: '/notifications', icon: 'bell', label: 'Notifications' },
 ];
-// Parent gets a trimmed version - a real request: "parent portal
-// dashboard should not have tabs for member directory, newsletter,
-// publication, forms or notifications. these will be managed by the
-// main admin side only." Notifications specifically becomes its own
-// Announcements section on the Parent home page (see routes/parent-
-// portal.js), not a link to the generic /notifications page; Newsletter
-// stays main-admin-authored content mailed out, not something a parent
-// browses; Member Directory/Publications/Forms stay reachable to a
-// parent only if Main Admin links to them from elsewhere (e.g. an
-// announcement or the newsletter itself), not as a standing nav tab.
-const COMMUNITY_LINKS_PARENT = [
-  { href: '/events', icon: 'calendar-check', label: 'Events' },
-  { href: '/forums', icon: 'users', label: 'Chat' },
-  { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
-  { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
-  { href: '/store', icon: 'grid', label: 'Store' },
-  { href: '/photos', icon: 'camera', label: 'Photos' },
-  { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
-];
+// Parent Portal gets no separate Community section at all (empty array,
+// same as Main Admin/Student Portal) - a later real request ("Parent
+// portal is not divided into sections. Tabs are in this order") gave an
+// exact, exhaustive single flat nav (PARENT_NAV_LINKS above, which is
+// where Events/Chat/Business Directory/Classifieds/Store/Photos/
+// Accounting - this section's old trimmed COMMUNITY_LINKS_PARENT set -
+// all moved to). Member Directory/Newsletter/Publications/Forms/
+// Notifications still aren't in that list - same reasoning as before,
+// reachable to a parent only if Main Admin links to them from elsewhere
+// (e.g. an announcement or the newsletter itself), not as a standing tab.
+const COMMUNITY_LINKS_PARENT = [];
 // Teacher gets a further-trimmed version - a real request: "teacher
 // portal, remove the following tabs. newsletter, forms, store,
 // publications, accounting, notifications, member directory, business
@@ -355,49 +392,45 @@ const communityLinks =
     </nav>
   <% } %>
   <div class="admin-sidebar-bottom">
-    <%# A real request: "roles and permissions, website settings, and
-        co-op admin portal links should all be under the main admin
-        settings gear icon" - Main Admin's gear used to open a dropdown of
-        its own admin-configuration destinations (same expand/collapse
-        pattern as Switch Portal below) instead of linking straight to
-        Users the way it used to. A later real request: "clicking on the
-        settings tab should not show subpages. instead all subpages
-        should be rows of cards for each setting category" replaced that
-        dropdown with a plain link - same as every other portal's gear
-        already was - straight to settingsHref
-        (routes/main-admin.js's own /settings), which now renders that
-        card grid instead of redirecting. %>
-    <a href="<%= settingsHref %>"><svg class="icon"><use href="#icon-gear"/></svg> Settings</a>
-    <% if (showSwitcher) { %>
-      <details class="portal-switcher-details">
-        <summary><svg class="icon"><use href="#icon-monitor"/></svg> Switch Portal</summary>
-        <div class="portal-switcher-menu">
-          <a href="/portal">All My Portals</a>
-        </div>
-      </details>
-    <% } %>
     <form method="POST" action="/logout" class="logout-form">
       <button type="submit"><svg class="icon"><use href="#icon-log-out"/></svg> Log out</button>
     </form>
   </div>
 </aside>
 
-<%# Corner header: My Profile (#icon-user-circle, a plain placeholder -
-    no member profile-photo field exists yet). A real request: "Clicking
-    on the profile icon at the top on every portal should be the member's
-    full profile membership form so that they can edit it" - distinct
-    from settingsHref (the gear icon, account-level settings like My
-    Privacy) since this request. Replaces the old Full Screen View
-    toggle, removed here along with its script include per "remove full
-    screen button and feature from all portal pages" - Kiosk Mode
-    (kiosk-home.ejs) keeps its own separate, untouched copy. No search
-    form here (unlike admin-nav.ejs's own corner) - that's a
-    Co-op-Admin-only feature. %>
+<%# Corner header: My Profile, Settings, Switch Portal - a real request:
+    "Switch portal, profile icon, settings icon should all be top right
+    of screen." Settings and Switch Portal used to live at the bottom of
+    the left sidebar (.admin-sidebar-bottom, still Log Out's home) -
+    moved up here, alongside My Profile, on desktop; the mobile topbar
+    below already showed all four together and needs no change.
+    My Profile (#icon-user-circle, a plain placeholder - no member
+    profile-photo field exists yet) - a real request: "Clicking on the
+    profile icon at the top on every portal should be the member's full
+    profile membership form so that they can edit it" - distinct from
+    settingsHref (the gear icon, account-level settings like My Privacy)
+    since this request. Replaces the old Full Screen View toggle, removed
+    here along with its script include per "remove full screen button and
+    feature from all portal pages" - Kiosk Mode (kiosk-home.ejs) keeps its
+    own separate, untouched copy. No search form here (unlike
+    admin-nav.ejs's own corner) - that's a Co-op-Admin-only feature. %>
 <header class="admin-page-corner-actions no-print">
   <a class="admin-corner-link" href="/portal/profile">
     <svg class="icon"><use href="#icon-user-circle"/></svg>
     My Profile
   </a>
+  <a class="admin-corner-link" href="<%= settingsHref %>">
+    <svg class="icon"><use href="#icon-gear"/></svg>
+    Settings
+  </a>
+  <% if (showSwitcher) { %>
+    <details class="portal-switcher-details">
+      <summary><svg class="icon"><use href="#icon-monitor"/></svg> Switch Portal</summary>
+      <div class="portal-switcher-menu">
+        <a href="/portal">All My Portals</a>
+      </div>
+    </details>
+  <% } %>
 </header>
 
 <div class="admin-mobile-topbar">
