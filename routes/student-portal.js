@@ -54,14 +54,26 @@ router.use(requirePortalAuth, requirePortal('student'));
 const BABYSITTER_PHOTOS_BUCKET = 'private-babysitter-photos';
 const BABYSITTER_PHOTOS_DIR = path.join(__dirname, '..', 'private-uploads', 'babysitter-photos');
 const babysitterStorageClient = createStorageClient();
-if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
+if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) {
+  try {
+    fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${BABYSITTER_PHOTOS_DIR}:`, err.message);
+  }
+}
 const MAX_BABYSITTER_PHOTO_BYTES = 4 * 1024 * 1024;
 const uploadBabysitterPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BABYSITTER_PHOTO_BYTES }, fileFilter: imageFileFilter });
 
 const NATURE_NEWS_BUCKET = 'private-nature-news';
 const NATURE_NEWS_DIR = path.join(__dirname, '..', 'private-uploads', 'nature-news');
 const natureNewsStorageClient = createStorageClient();
-if (!natureNewsStorageClient && !fs.existsSync(NATURE_NEWS_DIR)) fs.mkdirSync(NATURE_NEWS_DIR, { recursive: true });
+if (!natureNewsStorageClient && !fs.existsSync(NATURE_NEWS_DIR)) {
+  try {
+    fs.mkdirSync(NATURE_NEWS_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${NATURE_NEWS_DIR}:`, err.message);
+  }
+}
 const MAX_NATURE_NEWS_PHOTO_BYTES = 6 * 1024 * 1024;
 const uploadNatureNewsPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_NATURE_NEWS_PHOTO_BYTES }, fileFilter: imageFileFilter });
 

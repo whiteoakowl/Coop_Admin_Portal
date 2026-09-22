@@ -23,9 +23,20 @@ const DOCUMENTS_BUCKET = 'documents';
 // Only needed as a local-disk fallback - a serverless deployment's
 // filesystem is read-only outside /tmp, so this must not run when
 // Storage is actually configured (createStorageClient() below is cheap,
-// no network call of its own - safe to call here just to check).
+// no network call of its own - safe to call here just to check). Wrapped
+// in try/catch: Storage being unconfigured (env vars missing/misscoped)
+// used to mean this threw at require time and crashed the *entire* app
+// (every route lives in one bundled function) before a single request
+// could be served - now it only means local uploads fail on their own
+// first write instead of taking every other route down with them.
 const DOCUMENT_DIR = path.join(__dirname, '..', 'public', 'uploads', 'documents');
-if (!createStorageClient() && !fs.existsSync(DOCUMENT_DIR)) fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
+if (!createStorageClient() && !fs.existsSync(DOCUMENT_DIR)) {
+  try {
+    fs.mkdirSync(DOCUMENT_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${DOCUMENT_DIR}:`, err.message);
+  }
+}
 
 // 5MB, not the 20MB this used to allow - a real bug report: "When
 // uploading documents on the admin side. It times out and says something

@@ -24,7 +24,13 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 
 const STORE_IMAGES_BUCKET = 'store-images';
 const STORE_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'store');
-if (!createStorageClient() && !fs.existsSync(STORE_IMAGE_DIR)) fs.mkdirSync(STORE_IMAGE_DIR, { recursive: true });
+if (!createStorageClient() && !fs.existsSync(STORE_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(STORE_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${STORE_IMAGE_DIR}:`, err.message);
+  }
+}
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });

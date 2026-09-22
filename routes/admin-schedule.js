@@ -54,7 +54,13 @@ const storageClient = createStorageClient();
 // Only needed as a local-disk fallback - a serverless deployment's
 // filesystem is read-only outside /tmp, so this must not run when
 // Storage is actually configured.
-if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${DESIGN_IMAGE_DIR}:`, err.message);
+  }
+}
 
 const uploadDesignImage = multer({
   storage: multer.memoryStorage(),

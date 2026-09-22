@@ -19,7 +19,13 @@ const T = require('../utils/training');
 const RESOURCE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'training');
 const RESOURCE_BUCKET = 'training-resources';
 const storageClient = createStorageClient();
-if (!storageClient && !fs.existsSync(RESOURCE_DIR)) fs.mkdirSync(RESOURCE_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(RESOURCE_DIR)) {
+  try {
+    fs.mkdirSync(RESOURCE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${RESOURCE_DIR}:`, err.message);
+  }
+}
 const uploadResource = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: imageFileFilter });
 
 function backToBuilder(res, trainingId, extra) {

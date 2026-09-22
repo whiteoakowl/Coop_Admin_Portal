@@ -27,7 +27,13 @@ const { ensurePortalAccountForMember } = require('./portalAuth');
 const PHOTO_DIR = path.join(__dirname, '..', 'public', 'uploads', 'members');
 const MEMBER_PHOTOS_BUCKET = 'member-photos';
 const storageClient = createStorageClient();
-if (!storageClient && !fs.existsSync(PHOTO_DIR)) fs.mkdirSync(PHOTO_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(PHOTO_DIR)) {
+  try {
+    fs.mkdirSync(PHOTO_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${PHOTO_DIR}:`, err.message);
+  }
+}
 
 const MAX_CHILD_PHOTO_BYTES = 5 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_CHILD_PHOTO_BYTES }, fileFilter: imageFileFilter });

@@ -197,7 +197,13 @@ function eventDataFromRow(event) {
 // schedule.js already use for their own public-facing images.
 const EVENT_IMAGES_BUCKET = 'event-images';
 const EVENT_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'events');
-if (!createStorageClient() && !fs.existsSync(EVENT_IMAGE_DIR)) fs.mkdirSync(EVENT_IMAGE_DIR, { recursive: true });
+if (!createStorageClient() && !fs.existsSync(EVENT_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(EVENT_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${EVENT_IMAGE_DIR}:`, err.message);
+  }
+}
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });

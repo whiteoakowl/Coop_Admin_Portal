@@ -98,7 +98,13 @@ const NAME_TAG_DAY_LABELS = { monday: 'Monday', wednesday: 'Wednesday', both: 'B
 const DESIGN_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'name-tags');
 const NAME_TAG_IMAGES_BUCKET = 'name-tag-images';
 const storageClient = createStorageClient();
-if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(DESIGN_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${DESIGN_IMAGE_DIR}:`, err.message);
+  }
+}
 
 // Schedule Card design images get their own bucket/dir (same split as
 // Co-op Admin's own admin-schedule.js vs admin-name-tag.js), but since
@@ -109,7 +115,13 @@ if (!storageClient && !fs.existsSync(DESIGN_IMAGE_DIR)) fs.mkdirSync(DESIGN_IMAG
 // second router file.
 const SCHEDULE_CARD_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'schedule-cards');
 const SCHEDULE_CARD_IMAGES_BUCKET = 'schedule-card-images';
-if (!storageClient && !fs.existsSync(SCHEDULE_CARD_IMAGE_DIR)) fs.mkdirSync(SCHEDULE_CARD_IMAGE_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(SCHEDULE_CARD_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(SCHEDULE_CARD_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${SCHEDULE_CARD_IMAGE_DIR}:`, err.message);
+  }
+}
 
 const uploadDesignImage = multer({
   storage: multer.memoryStorage(),

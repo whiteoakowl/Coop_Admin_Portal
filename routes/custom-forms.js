@@ -33,7 +33,13 @@ const FORM_FILES_BUCKET = 'custom-form-files';
 // it directly fetchable by URL.
 const FORM_FILES_DIR = path.join(__dirname, '..', 'private-uploads', 'custom-form-files');
 const storageClient = createStorageClient();
-if (!storageClient && !fs.existsSync(FORM_FILES_DIR)) fs.mkdirSync(FORM_FILES_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(FORM_FILES_DIR)) {
+  try {
+    fs.mkdirSync(FORM_FILES_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${FORM_FILES_DIR}:`, err.message);
+  }
+}
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES } });

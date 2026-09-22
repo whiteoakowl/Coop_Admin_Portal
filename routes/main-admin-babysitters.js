@@ -19,7 +19,13 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 const BABYSITTER_PHOTOS_BUCKET = 'private-babysitter-photos';
 const BABYSITTER_PHOTOS_DIR = path.join(__dirname, '..', 'private-uploads', 'babysitter-photos');
 const babysitterStorageClient = createStorageClient();
-if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
+if (!babysitterStorageClient && !fs.existsSync(BABYSITTER_PHOTOS_DIR)) {
+  try {
+    fs.mkdirSync(BABYSITTER_PHOTOS_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${BABYSITTER_PHOTOS_DIR}:`, err.message);
+  }
+}
 const MAX_BABYSITTER_PHOTO_BYTES = 4 * 1024 * 1024;
 const uploadBabysitterPhoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BABYSITTER_PHOTO_BYTES }, fileFilter: imageFileFilter });
 

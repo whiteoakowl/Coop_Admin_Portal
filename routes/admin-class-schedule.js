@@ -80,7 +80,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 102
 // since every portal's own "view a class" fragment needs to resolve the
 // same photo URL, not just this admin-only save route.
 const CLASS_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'classes');
-if (!createStorageClient() && !fs.existsSync(CLASS_IMAGE_DIR)) fs.mkdirSync(CLASS_IMAGE_DIR, { recursive: true });
+if (!createStorageClient() && !fs.existsSync(CLASS_IMAGE_DIR)) {
+  try {
+    fs.mkdirSync(CLASS_IMAGE_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${CLASS_IMAGE_DIR}:`, err.message);
+  }
+}
 
 const MAX_CLASS_IMAGE_BYTES = 5 * 1024 * 1024;
 const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_CLASS_IMAGE_BYTES }, fileFilter: imageFileFilter });

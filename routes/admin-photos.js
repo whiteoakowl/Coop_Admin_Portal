@@ -25,7 +25,13 @@ router.use(requirePortalAuth, requirePortal('main_admin'), requirePortalPermissi
 const PHOTOS_BUCKET = 'private-photos';
 const PHOTOS_DIR = path.join(__dirname, '..', 'private-uploads', 'photos');
 const storageClient = createStorageClient();
-if (!storageClient && !fs.existsSync(PHOTOS_DIR)) fs.mkdirSync(PHOTOS_DIR, { recursive: true });
+if (!storageClient && !fs.existsSync(PHOTOS_DIR)) {
+  try {
+    fs.mkdirSync(PHOTOS_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create local upload directory ${PHOTOS_DIR}:`, err.message);
+  }
+}
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES }, fileFilter: imageFileFilter });
