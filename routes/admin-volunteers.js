@@ -15,6 +15,7 @@ const {
   saveHourLabel,
   classesAtRiskForDay,
   removeNonPrimaryParentsFromFloaterTeams,
+  checkedInMemberIdsForDate,
 } = require('../utils/classSchedule');
 const {
   DAY_LABELS,
@@ -91,6 +92,13 @@ async function buildHourSections(day, selectedDate) {
   });
   const infantByMemberId = {};
   for (const id of candidateIds) infantByMemberId[id] = await hasInfantChild(id);
+  // A real request: "in the dropdown of members to choose for a
+  // position, highlight them green if they have checked in" - same
+  // "compute on read from the attendance table" shape (and same green
+  // already used for this exact signal elsewhere - see utils/setup.js's
+  // own assignmentCardsForDate comment) as checkedInMemberIdsForDate's
+  // other caller.
+  const checkedInIds = await checkedInMemberIdsForDate(selectedDate);
 
   hourSections.forEach((hour) => {
     hour.slots.forEach((slot) => {
@@ -100,6 +108,7 @@ async function buildHourSections(day, selectedDate) {
         rankLabel: RANK_LABELS[p.rank] || null,
         infant: !!infantByMemberId[p.id],
         assignedHourCount: assignedHourCounts[p.id] || 0,
+        checkedIn: checkedInIds.has(p.id),
       }));
       if (slot.assigned && !candidates.some((c) => c.id === slot.assigned.id)) {
         candidates.unshift({
@@ -108,6 +117,7 @@ async function buildHourSections(day, selectedDate) {
           rankLabel: RANK_LABELS[slot.assigned.rank] || null,
           infant: slot.assigned.infant,
           assignedHourCount: assignedHourCounts[slot.assigned.id] || 0,
+          checkedIn: checkedInIds.has(slot.assigned.id),
         });
       }
       slot.candidates = candidates;

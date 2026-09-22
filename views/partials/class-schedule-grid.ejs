@@ -140,12 +140,25 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
       </div>
     </div>
 
-    <span class="class-form-section-label required">Grade Level <span class="optional-tag">(Select all that apply)</span></span>
+    <span class="class-form-section-label">Grade <span class="optional-tag">(Select all that apply)</span></span>
     <%- include('multi-select-checkbox', {
       name: 'ageGroup',
       options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
       selected: [],
-      placeholder: 'All grades/ages',
+      placeholder: 'All grades',
+    }) %>
+
+    <%# A real request: "grade selection and age selection should be
+        separate menus of choices" - a second, independent multi-select of
+        exact numeric ages, same shape utils/events.js's own age
+        restriction already uses (see utils/classSchedule.js's own
+        AGE_OPTIONS comment). %>
+    <span class="class-form-section-label">Age <span class="optional-tag">(Select all that apply)</span></span>
+    <%- include('multi-select-checkbox', {
+      name: 'numericAges',
+      options: ageOptions.map(function(a) { return { value: a, label: a }; }),
+      selected: [],
+      placeholder: 'All ages',
     }) %>
 
     <div class="class-form-row">

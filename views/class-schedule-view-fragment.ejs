@@ -78,12 +78,23 @@
         </label>
 
         <div class="member-form-full">
-          <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
+          <label class="roster-checkbox-label">Grade <span class="hint">(select all that apply)</span></label>
           <%- include('partials/multi-select-checkbox', {
             name: 'ageGroup',
             options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
             selected: selectedGrades,
-            placeholder: 'All grades/ages',
+            placeholder: 'All grades',
+            disabled: true,
+          }) %>
+        </div>
+
+        <div class="member-form-full">
+          <label class="roster-checkbox-label">Age <span class="hint">(select all that apply)</span></label>
+          <%- include('partials/multi-select-checkbox', {
+            name: 'numericAges',
+            options: ageOptions.map(function(a) { return { value: a, label: a }; }),
+            selected: selectedAges,
+            placeholder: 'All ages',
             disabled: true,
           }) %>
         </div>

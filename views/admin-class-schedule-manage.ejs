@@ -29,8 +29,9 @@
     <div class="view-tabs no-print">
       <a class="view-tab<%= activeTab === 'details' ? ' active' : '' %>" href="?tab=details">Details</a>
       <a class="view-tab<%= activeTab === 'staffRoster' ? ' active' : '' %>" href="?tab=staffRoster">Staff &amp; Roster</a>
-      <a class="view-tab<%= activeTab === 'assignments' ? ' active' : '' %>" href="?tab=assignments">Assignments</a>
+      <a class="view-tab<%= activeTab === 'assignments' ? ' active' : '' %>" href="?tab=assignments">Lessons</a>
       <a class="view-tab<%= activeTab === 'grades' ? ' active' : '' %>" href="?tab=grades">Grades</a>
+      <a class="view-tab<%= activeTab === 'chat' ? ' active' : '' %>" href="?tab=chat">Chat</a>
     </div>
 
     <% if (activeTab === 'details') { %>
@@ -77,12 +78,24 @@
             </label>
 
             <div class="member-form-full">
-              <label class="roster-checkbox-label">Grade/Age Group <span class="hint">(select all that apply)</span></label>
+              <label class="roster-checkbox-label">Grade <span class="hint">(select all that apply)</span></label>
               <%- include('partials/multi-select-checkbox', {
                 name: 'ageGroup',
                 options: gradeLevels.map(function(g) { return { value: g, label: g }; }),
                 selected: selectedGrades,
-                placeholder: 'All grades/ages',
+                placeholder: 'All grades',
+              }) %>
+            </div>
+
+            <%# A real request: "grade selection and age selection should
+                be separate menus of choices" %>
+            <div class="member-form-full">
+              <label class="roster-checkbox-label">Age <span class="hint">(select all that apply)</span></label>
+              <%- include('partials/multi-select-checkbox', {
+                name: 'numericAges',
+                options: ageOptions.map(function(a) { return { value: a, label: a }; }),
+                selected: selectedAges,
+                placeholder: 'All ages',
               }) %>
             </div>
 
@@ -176,10 +189,10 @@
     <% } else if (activeTab === 'assignments') { %>
       <div class="manage-section">
         <div class="grid-box-header">
-          <h2>Assignments (<%= assignments.length %>)</h2>
+          <h2>Lessons (<%= assignments.length %>)</h2>
         </div>
         <% if (assignments.length === 0) { %>
-          <p class="roster-empty">No assignments yet.</p>
+          <p class="roster-empty">No lessons yet.</p>
         <% } else { %>
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
@@ -201,7 +214,7 @@
         <% } %>
 
         <div class="portal-dashboard-card portal-dashboard-card-wide">
-          <h3>New Assignment</h3>
+          <h3>New Lesson</h3>
           <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/assignments" class="member-form-grid">
             <label class="member-form-full">Title
               <input type="text" name="title" required />
@@ -216,7 +229,7 @@
               <input type="number" name="pointsPossible" min="0" />
             </label>
             <div class="member-form-full">
-              <button type="submit" class="primary-btn">Add Assignment</button>
+              <button type="submit" class="primary-btn">Add Lesson</button>
             </div>
           </form>
         </div>
@@ -227,12 +240,12 @@
           <h2>Grades</h2>
         </div>
         <% if (assignments.length === 0) { %>
-          <p class="roster-empty">No assignments to grade yet - add one from the Assignments tab.</p>
+          <p class="roster-empty">No lessons to grade yet - add one from the Lessons tab.</p>
         <% } else { %>
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
               <thead>
-                <tr><th>Assignment</th><th>Due</th><th>Graded</th><th></th></tr>
+                <tr><th>Lesson</th><th>Due</th><th>Graded</th><th></th></tr>
               </thead>
               <tbody>
                 <% assignments.forEach(function(a) { %>
@@ -247,6 +260,30 @@
             </table>
           </div>
         <% } %>
+      </div>
+    <% } else if (activeTab === 'chat') { %>
+      <div class="manage-section">
+        <div class="grid-box-header">
+          <h2>Chat</h2>
+        </div>
+        <div class="roster-log-list">
+          <% if (chatMessages.length === 0) { %>
+            <p class="roster-log-empty">No messages yet.</p>
+          <% } %>
+          <% chatMessages.forEach(function(m) { %>
+            <div class="roster-log-row">
+              <span class="roster-log-name"><%= m.admin_username %></span>
+              <span class="roster-log-meta"><%= m.createdAtLabel %></span>
+              <p class="hint" style="flex-basis: 100%; margin: 0.25rem 0 0;"><%= m.body %></p>
+            </div>
+          <% }); %>
+        </div>
+        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/chat" class="stack-form">
+          <label class="member-form-full">Message
+            <textarea name="body" rows="2" required></textarea>
+          </label>
+          <button type="submit" class="primary-btn">Send</button>
+        </form>
       </div>
     <% } %>
 

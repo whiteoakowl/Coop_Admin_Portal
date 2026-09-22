@@ -52,6 +52,14 @@ function ageGroupList(ageGroup) {
     .filter(Boolean);
 }
 
+// A real request: "grade selection and age selection should be separate
+// menus of choices" - exact numeric ages (0-100), same shape utils/
+// events.js's own AGE_OPTIONS restriction already uses ("deliberately
+// its own list," not GRADE_LEVELS' grade vocabulary). Stored in
+// classes.numeric_ages, parsed with the same generic comma-split
+// ageGroupList above.
+const AGE_OPTIONS = Array.from({ length: 101 }, (_, age) => String(age));
+
 // "1st" -> "1", "3rd" -> "3" - the non-numeric grade labels (Infant,
 // Toddler, Preschool, PreK, Kindergarten) have no suffix to strip and
 // pass through unchanged.
@@ -479,9 +487,9 @@ async function renameRoom(day, oldName, newName) {
 async function createClass(fields) {
   const info = await db
     .prepare(
-      `INSERT INTO classes (day, hour_position, class_name, room, age_group, color, start_time, end_time, capacity, registration_open, description,
+      `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, capacity, registration_open, description,
          allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -489,6 +497,7 @@ async function createClass(fields) {
       fields.className,
       fields.room || null,
       fields.ageGroup || null,
+      fields.numericAges || null,
       fields.color || (await nextPaletteColor()),
       fields.startTime || null,
       fields.endTime || null,
@@ -514,7 +523,7 @@ async function createClass(fields) {
 async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
-    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, color = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
+    `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, numeric_ages = ?, color = ?, start_time = ?, end_time = ?, capacity = ?, registration_open = ?, description = ?,
        allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?
      WHERE id = ?`
   ).run(
@@ -523,6 +532,7 @@ async function updateClass(id, fields) {
     fields.className,
     fields.room || null,
     fields.ageGroup || null,
+    fields.numericAges || null,
     fields.color || '#EE9A4D',
     fields.startTime || null,
     fields.endTime || null,
@@ -1959,6 +1969,7 @@ module.exports = {
   UNASSIGNED_ROOM,
   COLOR_PALETTE,
   GRADE_LEVELS,
+  AGE_OPTIONS,
   ageGroupList,
   formatGradeRange,
   hoursForDay,

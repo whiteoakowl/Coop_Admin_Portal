@@ -79,10 +79,12 @@
       <%# Role permissions, Import, and Add/Edit Member all live only on
           the Main Admin Portal's own Members page now - a real request:
           "the buttons on the members page will read Export, Print,
-          Edit." data-fixed-columns keeps these 3 reading as two neat
-          rows on mobile instead of one wide row (see roster-btn-row-
-          grid.js's own comment on the attribute). %>
-      <div class="roster-btn-row" data-fixed-columns="2">
+          Edit." A later real request: "export, print and edit buttons
+          should be similar size and on the same row, for mobile" - no
+          data-fixed-columns here means roster-btn-row-grid.js's own
+          adaptive layout takes over, and 3 buttons already fits in one
+          row at its own "≤4 columns" cap. %>
+      <div class="roster-btn-row">
         <a class="roster-action-btn file-action-btn" href="/admin/members/export.csv<%= (typeFilter || familyFilter) ? '?' : '' %><%= typeFilter ? 'type=' + typeFilter : '' %><%= (typeFilter && familyFilter) ? '&' : '' %><%= familyFilter ? 'family=' + familyFilter : '' %>">Export</a>
         <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
         <button type="button" class="roster-action-btn" data-archive-toggle="members-bulk-form" aria-pressed="false">Edit</button>
@@ -135,50 +137,13 @@
       action="/admin/members/bulk-delete"
     ></form>
 
-    <%# A real request: "add a family drop down should say manage
-        families and have all the features of the manage families
-        button. Get rid of old manage families button." One entry point
-        now instead of a separate "+ Add a Family" card plus a second
-        "Manage Families" disclosure elsewhere - add, rename, and delete
-        all live in this one dialog. #edit-families-list/data-delete-
-        family are public/js/edit-families.js's own hooks (already
-        loaded below) - it deletes via fetch() and removes just that
-        <li>, so deleting several families in a row doesn't close this
-        dialog out from under whoever's mid-cleanup the way a plain
-        submitting <form> would. %>
-    <button type="button" class="members-add-family-card no-print" onclick="document.getElementById('manage-families-dialog').showModal()">
-      <span class="members-add-family-icon"><svg class="icon"><use href="#icon-users"/></svg></span>
-      <span class="members-add-family-text">
-        <span class="members-add-family-title">Manage Families</span>
-        <span class="members-add-family-subtitle">Add, rename, or delete family groups</span>
-      </span>
-      <svg class="icon"><use href="#icon-chevron-down"/></svg>
-    </button>
-    <dialog id="manage-families-dialog" class="notes-dialog">
-      <h3>Manage Families</h3>
-      <form method="POST" action="/admin/members/families/new" class="manage-families-add-form">
-        <label>New Family Name
-          <input type="text" name="name" placeholder="e.g. Smith" required />
-        </label>
-        <button type="submit" class="primary-btn">Add</button>
-      </form>
-      <p id="edit-families-empty" class="hint" <%= families.length > 0 ? 'hidden' : '' %>>No families yet - add one above.</p>
-      <ul id="edit-families-list" class="edit-families-list" data-base-path="/admin/members" <%= families.length === 0 ? 'hidden' : '' %>>
-        <% families.forEach(function(f) { %>
-          <li class="edit-families-row" data-family-id="<%= f.id %>">
-            <form method="POST" action="/admin/members/families/<%= f.id %>/rename" class="edit-families-rename-form">
-              <input type="text" name="name" value="<%= f.name %>" aria-label="Rename <%= f.name %>" />
-              <button type="submit" class="icon-btn" aria-label="Save name for <%= f.name %>" title="Save"><svg class="icon"><use href="#icon-save"/></svg></button>
-            </form>
-            <span class="hint"><%= f.memberCount %> member<%= f.memberCount === 1 ? '' : 's' %></span>
-            <button type="button" class="icon-btn icon-btn-danger" data-delete-family="<%= f.id %>" data-family-name="<%= f.name %>" data-member-count="<%= f.memberCount %>" aria-label="Delete <%= f.name %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
-          </li>
-        <% }); %>
-      </ul>
-      <div class="notes-dialog-actions">
-        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
-      </div>
-    </dialog>
+    <%# A real request: "Co-op admin portal, members, remove manage
+        families button and features. This is only done on main admin
+        portal." Family creation from the Add/Edit Member form's own "+
+        Add New Family" inline dialog is unaffected (POST /admin/members/
+        families/new still exists for that) - only this page's own
+        standalone add/rename/delete-families dialog is gone; that whole
+        feature now lives exclusively on Main Admin's own Members page. %>
 
     <div class="members-section-label-row">
       <span class="members-section-label"><%= showArchived ? 'ARCHIVED' : 'MEMBERS' %></span>
@@ -387,7 +352,6 @@
   <script src="/js/members-dialogs.js"></script>
   <script src="/js/member-name-tag-request.js"></script>
   <script src="/js/members-family-accordion.js"></script>
-  <script src="/js/edit-families.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/members-bulk-actions.js"></script>
   <script src="/js/member-row-actions.js"></script>

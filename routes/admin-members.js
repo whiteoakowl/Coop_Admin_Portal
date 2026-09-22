@@ -784,36 +784,12 @@ router.post('/members/bulk-unarchive', async (req, res) => {
   res.redirect(membersRedirectUrl(req, 'archived=1', { notice: `Restored ${memberIds.length} member(s).` }));
 });
 
-// --- Edit Families dialog (rename or delete a family "name" itself,
-// distinct from adding/removing individual members from one - see
-// families.name's own uniqueness constraint and members.family_id's ON
-// DELETE SET NULL, so deleting a family here only ungroups its members,
-// it never deletes the members themselves). ---
-
-router.post('/members/families/:id/rename', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const name = (req.body.name || '').trim();
-  if (!name) return res.redirect('/admin/members?error=' + encodeURIComponent('Family name is required.'));
-  const clash = await db.prepare('SELECT id FROM families WHERE LOWER(name) = LOWER(?) AND id != ?').get(name, id);
-  if (clash) return res.redirect('/admin/members?error=' + encodeURIComponent(`"${name}" family already exists.`));
-  await db.prepare('UPDATE families SET name = ? WHERE id = ?').run(name, id);
-  res.redirect('/admin/members?notice=' + encodeURIComponent('Family renamed.'));
-});
-
-// Same wantsJson branch as /members/families/new above - the Edit
-// Families dialog's own Delete button (public/js/edit-families.js) fetches
-// this so the family's row can just disappear from the still-open dialog,
-// instead of a full page navigation closing the whole dialog out from
-// under an admin who's part-way through deleting several in a row.
-router.post('/members/families/:id/delete', async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const wantsJson = req.headers.accept && req.headers.accept.includes('application/json');
-  const family = await db.prepare('SELECT * FROM families WHERE id = ?').get(id);
-  await db.prepare('DELETE FROM families WHERE id = ?').run(id);
-  if (wantsJson) return res.json({ ok: true, id, name: family ? family.name : null });
-  res.redirect(
-    '/admin/members?notice=' + encodeURIComponent(family ? `Deleted "${family.name}" family.` : 'Family deleted.')
-  );
-});
+// A real request: "Co-op admin portal, members, remove manage families
+// button and features. This is only done on main admin portal." Renaming
+// and deleting a family's own "name" (distinct from adding/removing
+// individual members from one) now lives exclusively on Main Admin's own
+// Members page (routes/main-admin-members.js) - Co-op Admin's own
+// /members/families/new above stays, since the Add/Edit Member form's
+// own "+ Add New Family" inline dialog still needs it.
 
 module.exports = router;

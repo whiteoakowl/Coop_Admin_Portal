@@ -89,8 +89,9 @@ test('Class Manage page: renders Details/Staff & Roster/Assignments/Grades tabs,
   assert.equal(page.status, 200);
   assert.match(page.text, /<a class="view-tab active" href="\?tab=details">Details<\/a>/);
   assert.match(page.text, /<a class="view-tab" href="\?tab=staffRoster">Staff &amp; Roster<\/a>/);
-  assert.match(page.text, /<a class="view-tab" href="\?tab=assignments">Assignments<\/a>/);
+  assert.match(page.text, /<a class="view-tab" href="\?tab=assignments">Lessons<\/a>/);
   assert.match(page.text, /<a class="view-tab" href="\?tab=grades">Grades<\/a>/);
+  assert.match(page.text, /<a class="view-tab" href="\?tab=chat">Chat<\/a>/);
   assert.match(page.text, /Class Details/);
   assert.doesNotMatch(page.text, /Teachers &amp; Assistants/);
 });
@@ -104,11 +105,30 @@ test('Class Manage page: Staff & Roster tab shows the roster content, Assignment
   assert.match(staffRoster.text, /Student Roster/);
 
   const assignmentsTab = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
-  assert.match(assignmentsTab.text, /No assignments yet/);
-  assert.match(assignmentsTab.text, /New Assignment/);
+  assert.match(assignmentsTab.text, /No lessons yet/);
+  assert.match(assignmentsTab.text, /New Lesson/);
 
   const gradesTab = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=grades`).set('Cookie', admin.cookie);
-  assert.match(gradesTab.text, /No assignments to grade yet/);
+  assert.match(gradesTab.text, /No lessons to grade yet/);
+});
+
+test('Class Manage page: Chat tab shows a message log; posting a message from the admin session shows it with the admin\'s username', async () => {
+  const admin = await loginAsAdmin();
+  const cls = await createClass(admin, { className: 'Chat Tab Class' });
+
+  const emptyChat = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=chat`).set('Cookie', admin.cookie);
+  assert.match(emptyChat.text, /No messages yet/);
+  const csrf = extractCsrf(emptyChat.text);
+
+  await request(app)
+    .post(`/admin/class-schedule/classes/${cls.id}/chat`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ body: 'Reminder: field trip permission slips due Friday.', _csrf: csrf });
+
+  const afterPost = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=chat`).set('Cookie', admin.cookie);
+  assert.match(afterPost.text, /Reminder: field trip permission slips due Friday\./);
+  assert.match(afterPost.text, /testadmin/);
 });
 
 test('Class Manage page: create an assignment from the Assignments tab, then grade it from the Grades tab', async () => {

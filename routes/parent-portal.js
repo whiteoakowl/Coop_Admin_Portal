@@ -31,7 +31,7 @@ const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
@@ -215,6 +215,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
   });
 
   const allowedGrades = ageGroupList(cls.age_group);
+  const allowedAges = ageGroupList(cls.numeric_ages);
   const restriction = await classSectionIds(classId);
   const eligibleChildren = [];
   for (const child of children) {
@@ -223,6 +224,7 @@ router.get('/classes/:id/fragment', async (req, res) => {
       continue;
     }
     if (allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
+    if (allowedAges.length && !allowedAges.includes(String(ageFromBirthday(child.birthday)))) continue;
     if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(child.id), restriction)) continue;
     eligibleChildren.push(child);
   }
@@ -308,6 +310,8 @@ router.post('/classes/:id/unregister', async (req, res) => {
   res.redirect(back + 'notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
+const DAY_SORT_ORDER = { monday: 0, wednesday: 1 };
+
 // Every class a child in the family is enrolled in or waitlisted for -
 // shared by the list-view page below and its Print/Export toolbar buttons
 // so all three always agree on exactly the same rows.
@@ -329,7 +333,17 @@ async function manageClassesEntriesForAccount(account) {
       if (cls) entries.push({ child, cls, waitlistPosition: row.waitlist_position });
     }
   }
-  entries.sort((a, b) => a.child.name.localeCompare(b.child.name) || a.cls.class_name.localeCompare(b.cls.class_name));
+  // A real request: "viewing class schedule for family or person student,
+  // classes should be categorized as Monday or Wednesday and in time
+  // order" - grouped by family member first (unchanged), then by day
+  // (Monday before Wednesday), then by the class's own hour_position
+  // (its actual time slot) rather than alphabetically by class name.
+  entries.sort(
+    (a, b) =>
+      a.child.name.localeCompare(b.child.name) ||
+      DAY_SORT_ORDER[a.cls.day] - DAY_SORT_ORDER[b.cls.day] ||
+      a.cls.hour_position - b.cls.hour_position
+  );
   return { children, entries };
 }
 
@@ -411,12 +425,19 @@ router.get('/classes/dashboard', async (req, res) => {
   const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
   const classes = selectedChild ? await classesForChild(selectedChild.id) : [];
 
+  // A real request: "classes should be categorized as Monday or
+  // Wednesday and in time order" - allClassesList's own default order is
+  // alphabetical by class name (used elsewhere for a plain lookup list),
+  // so each day's own cards are re-sorted by hour_position (the class's
+  // actual time slot) here instead.
+  const byHourPosition = (a, b) => a.hour_position - b.hour_position;
+
   res.render('parent-class-dashboard', {
     title: 'Class Dashboard',
     children,
     selectedChild,
-    mondayClasses: classes.filter((c) => c.day === 'monday'),
-    wednesdayClasses: classes.filter((c) => c.day === 'wednesday'),
+    mondayClasses: classes.filter((c) => c.day === 'monday').sort(byHourPosition),
+    wednesdayClasses: classes.filter((c) => c.day === 'wednesday').sort(byHourPosition),
   });
 });
 

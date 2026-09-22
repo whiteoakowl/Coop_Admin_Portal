@@ -127,72 +127,33 @@ test('bulk-delete/bulk-archive/bulk-unarchive with no memberIds redirects back w
   assert.equal(Number(row.active), 1, 'the member must not have been archived');
 });
 
-test('POST /admin/members/families/:id/rename changes the family name', async () => {
+// Family rename/delete (POST /admin/members/families/:id/rename,
+// /admin/members/families/:id/delete) used to live here too, but a real
+// request removed the whole Manage Families dialog from Co-op Admin's
+// own Members page ("this is only done on main admin portal") - that
+// coverage belongs with Main Admin's own equivalent routes now
+// (routes/main-admin-members.js), not here. POST /admin/members/
+// families/new stays (and is still covered elsewhere): the Add/Edit
+// Member form's own "+ Add New Family" inline dialog still needs it.
+test('Co-op Admin Members: the Manage Families dialog/button is gone, and its rename/delete routes no longer exist', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
-  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Original Family Name') RETURNING id").get()).id;
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Removed Feature Family') RETURNING id").get()).id;
 
-  const res = await request(app)
+  const page = await request(app).get('/admin/members').set('Cookie', cookie);
+  assert.doesNotMatch(page.text, /Manage Families/);
+  assert.doesNotMatch(page.text, /manage-families-dialog/);
+  assert.doesNotMatch(page.text, /edit-families\.js/);
+
+  const renameRes = await request(app)
     .post(`/admin/members/families/${familyId}/rename`)
     .set('Cookie', cookie)
     .type('form')
-    .send({ _csrf: csrfToken, name: 'Renamed Family Name' });
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /notice=Family%20renamed/);
+    .send({ _csrf: csrfToken, name: 'Should Not Work' });
+  assert.equal(renameRes.status, 404);
+
+  const deleteRes = await request(app).post(`/admin/members/families/${familyId}/delete`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+  assert.equal(deleteRes.status, 404);
 
   const row = await db.prepare('SELECT name FROM families WHERE id = ?').get(familyId);
-  assert.equal(row.name, 'Renamed Family Name');
-});
-
-test('POST /admin/members/families/:id/rename rejects a name clashing with another family', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
-  await db.prepare("INSERT INTO families (name) VALUES ('Existing Family')").run();
-  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Clash Target Family') RETURNING id").get()).id;
-
-  const res = await request(app)
-    .post(`/admin/members/families/${familyId}/rename`)
-    .set('Cookie', cookie)
-    .type('form')
-    .send({ _csrf: csrfToken, name: 'Existing Family' });
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /error=/);
-
-  const row = await db.prepare('SELECT name FROM families WHERE id = ?').get(familyId);
-  assert.equal(row.name, 'Clash Target Family', 'the name must be unchanged after a clash');
-});
-
-test('POST /admin/members/families/:id/delete removes the family but leaves its members intact, just ungrouped', async () => {
-  const { cookie, csrfToken } = await loginAsAdmin();
-  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('Family To Delete') RETURNING id").get()).id;
-  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type, family_id) VALUES ('Family Delete Member', 'family-delete-member', 'student', ?) RETURNING id").get(familyId)).id;
-
-  const res = await request(app).post(`/admin/members/families/${familyId}/delete`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
-  assert.equal(res.status, 302);
-  assert.match(res.headers.location, /notice=Deleted%20/);
-
-  assert.equal(await db.prepare('SELECT id FROM families WHERE id = ?').get(familyId), undefined, 'the family row itself should be gone');
-  const member = await db.prepare('SELECT id, family_id FROM members WHERE id = ?').get(memberId);
-  assert.ok(member, 'the member must not have been deleted');
-  assert.equal(member.family_id, null, 'the member should just be ungrouped, not removed');
-});
-
-test('POST /admin/members/families/:id/delete returns JSON instead of redirecting when Accept: application/json is sent', async () => {
-  // The Edit Families dialog's own Delete button (public/js/edit-families.js)
-  // fetches this with Accept: application/json specifically so a real page
-  // navigation never closes the dialog mid-cleanup - see routes/admin-
-  // members.js's own comment.
-  const { cookie, csrfToken } = await loginAsAdmin();
-  const familyId = (await db.prepare("INSERT INTO families (name) VALUES ('JSON Delete Family') RETURNING id").get()).id;
-
-  const res = await request(app)
-    .post(`/admin/members/families/${familyId}/delete`)
-    .set('Cookie', cookie)
-    .set('Accept', 'application/json')
-    .type('form')
-    .send({ _csrf: csrfToken });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.id, familyId);
-  assert.equal(res.body.name, 'JSON Delete Family');
-
-  assert.equal(await db.prepare('SELECT id FROM families WHERE id = ?').get(familyId), undefined);
+  assert.equal(row.name, 'Removed Feature Family', 'the family should be untouched since neither route exists anymore');
 });

@@ -93,3 +93,25 @@ test('todayStatsForType "of Y" denominator', async (t) => {
     assert.equal(totalAfter, totalBefore + 1, "a student scheduled on today's roster should count toward today's denominator");
   });
 });
+
+// A later real request: "admins should still count as parents for
+// features such as attendance and absence forms... if an admin submits
+// an absence form they should still be counted as an absent parent on
+// today's count on the homepage." routes/admin.js's own Home dashboard
+// route now calls todayStatsForType(['parent', 'admin'], today) for the
+// Parent card - todayStatsForType itself accepts either a single type or
+// an array, IN-ing every type given.
+test('todayStatsForType accepts an array of member types, so an admin\'s absence form counts toward the Parent card\'s "Absent" total', async () => {
+  const today = todayISO();
+  const roster = await db.prepare("SELECT id FROM rosters WHERE name = 'Monday Parents'").get();
+  const adminId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Dashboard Absent Admin', 'dashboard-absent-admin', 'admin')").run()
+  ).lastInsertRowid;
+  await db
+    .prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, source) VALUES (?, ?, ?, 'absent', 'absence_form')")
+    .run(adminId, roster.id, today);
+
+  const parentOnly = (await adminRouter.todayStatsForType('parent', today)).absent;
+  const parentAndAdmin = (await adminRouter.todayStatsForType(['parent', 'admin'], today)).absent;
+  assert.equal(parentAndAdmin, parentOnly + 1, "the admin's absence form should count toward the combined Parent card total, not the parent-only one");
+});

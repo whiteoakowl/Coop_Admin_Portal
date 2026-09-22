@@ -4227,15 +4227,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 
   /* A real request: "filter by family should be under the buttons," now
      "search members on the left and filter drop down next to it on the
-     right" - .members-search-filter-row's flex-wrap only drops the
-     filter to its own line once the row actually runs out of width; on
-     a narrow phone the search box alone is wide enough that the filter
-     needs to be forced onto its own line below it instead. Scoped to
-     just this row (not every .category-filter site-wide) so other
-     .roster-toolbar + .category-filter pages keep their existing side-
-     by-side layout. */
+     right" - later reversed by another real request: "members search
+     members and filter should be on the same line, mobile." Rather than
+     force the filter onto its own line (the old fix, now removed), the
+     search box itself shrinks below its desktop min-width and the
+     Filter dropdown's own label collapses to just the icon, so both fit
+     side by side even on a narrow phone. Scoped to just this row (not
+     every .category-filter/.members-search-bar site-wide) so other
+     .roster-toolbar + .category-filter pages keep their own layout. */
+  .members-search-filter-row {
+    flex-wrap: nowrap;
+  }
+  .members-search-filter-row .members-search-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .members-search-filter-row .category-filter {
-    flex-basis: 100%;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+  .members-search-filter-row .category-filter label {
+    /* Visually hidden, not display:none - the label stays in the
+       accessible name for the <select> right after it. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .members-search-filter-row .category-filter select {
+    width: auto;
+    max-width: 6.5rem;
   }
 }
 
@@ -5436,6 +5462,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   color: var(--ink);
 }
 .floater-assign-form select:disabled { background-color: #f8fafc; color: var(--muted); }
+/* A real request: "in the dropdown of members to choose for a position,
+   highlight them green if they have checked in" - same green already
+   used for this exact signal on the Setup/Cleanup Assignments roster
+   (.setup-assignment-row-checked-in above). Support for styling <option>
+   varies by browser, so the option's own text also says "checked in"
+   (see floater-chart-cards.ejs) as a non-visual fallback. */
+.floater-assign-form select option.floater-option-checked-in { background: var(--green-bg); color: var(--green); }
 .floater-assign-btn {
   flex-shrink: 0;
   border: none;

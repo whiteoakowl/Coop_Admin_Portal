@@ -14,6 +14,7 @@
 const db = require('../db');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('./sections');
 const { ageGroupList } = require('./classSchedule');
+const { ageFromBirthday } = require('./dates');
 const { createCharge, amountPaidForCharge, cancelCharge, recordPayment } = require('./payments');
 const { isRegistrationOpenForAccount } = require('./registrationWindows');
 const notifications = require('./notifications');
@@ -70,6 +71,18 @@ async function registerForClass({ classId, studentId, accountId, portalRoles, al
   const allowedGrades = ageGroupList(cls.age_group);
   if (allowedGrades.length && !allowedGrades.includes(student.grade_level)) {
     return { ok: false, error: `${student.name} isn't in an eligible grade level for this class.` };
+  }
+  // A real request: "grade selection and age selection should be
+  // separate menus of choices" - an independent numeric-age restriction
+  // alongside the grade one above, same "only restricts if non-empty,
+  // both gates must pass" shape utils/events.js's own ageGroupAllowsMember/
+  // ageBucketAllowsMember pair already uses.
+  const allowedAges = ageGroupList(cls.numeric_ages);
+  if (allowedAges.length) {
+    const age = ageFromBirthday(student.birthday);
+    if (age == null || !allowedAges.includes(String(age))) {
+      return { ok: false, error: `${student.name} isn't an eligible age for this class.` };
+    }
   }
   const enrolledCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?').get(classId)).c);
   const isFull = cls.capacity != null && enrolledCount >= cls.capacity;

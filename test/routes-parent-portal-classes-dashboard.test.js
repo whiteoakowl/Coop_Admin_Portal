@@ -119,6 +119,35 @@ test('View/Cancel Classes: list view groups by family member, and toolbar has Pr
   assert.match(manage.text, /href="\/parent\/name-tags">Print Name Tag/);
 });
 
+// A real request: "viewing class schedule for family or person student,
+// classes should be categorized as Monday or Wednesday and in time
+// order" - within one child's own block, entries used to sort
+// alphabetically by class name; now Monday sorts before Wednesday, and
+// within a day by hour_position (actual time slot).
+test('View/Cancel Classes: within one child\'s block, entries sort Monday-then-Wednesday and by time, not alphabetically', async () => {
+  const admin = await loginAsAdmin();
+  const wednesdayClass = await createClass(admin, { className: 'A Wednesday Entry', day: 'wednesday', hourPosition: '1' });
+  const mondayLater = await createClass(admin, { className: 'B Monday Later', day: 'monday', hourPosition: '2' });
+  const mondayEarlier = await createClass(admin, { className: 'C Monday Earlier', day: 'monday', hourPosition: '1' });
+  const parent = await createParentWithChild();
+
+  for (const cls of [wednesdayClass, mondayLater, mondayEarlier]) {
+    await request(app)
+      .post(`/parent/classes/${cls.id}/register`)
+      .set('Cookie', parent.cookie)
+      .type('form')
+      .send({ studentId: String(parent.childId), day: cls.day, _csrf: parent.csrfToken });
+  }
+
+  const manage = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
+  const iEarlier = manage.text.indexOf('C Monday Earlier');
+  const iLater = manage.text.indexOf('B Monday Later');
+  const iWed = manage.text.indexOf('A Wednesday Entry');
+  assert.ok(iEarlier > 0 && iLater > 0 && iWed > 0, 'all three classes should render');
+  assert.ok(iEarlier < iLater, 'the earlier Monday hour_position should render before the later one, despite its name sorting after alphabetically');
+  assert.ok(iLater < iWed, 'Monday entries should render before Wednesday entries, despite the Wednesday class name sorting first alphabetically');
+});
+
 test('View/Cancel Classes: fetch-style cancel (X-Requested-With) returns JSON instead of redirecting, and actually cancels', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Instant Delete Class' });
@@ -218,6 +247,33 @@ test('Class Dashboard: family-member dropdown, and classes grouped Monday-first 
   const wednesdayIndex = dashboard.text.indexOf('Wednesday Dash Class');
   assert.ok(mondayIndex > 0 && wednesdayIndex > 0 && mondayIndex < wednesdayIndex, 'Monday class should render before the Wednesday class');
   assert.match(dashboard.text, new RegExp(`href="/parent/classes/dashboard/${mondayClass.id}\\?studentId=${parent.childId}"`));
+});
+
+// A real request: "classes should be categorized as Monday or Wednesday
+// and in time order" - within a day, allClassesList's own default order
+// is alphabetical by class name, so two classes on the same day used to
+// render in name order, not their actual time-slot order.
+test('Class Dashboard: within a day, classes render in time (hour_position) order, not alphabetically', async () => {
+  const admin = await loginAsAdmin();
+  const laterClass = await createClass(admin, { className: 'A Later Class', day: 'monday', hourPosition: '3' });
+  const earlierClass = await createClass(admin, { className: 'Z Earlier Class', day: 'monday', hourPosition: '1' });
+  const parent = await createParentWithChild();
+
+  await request(app)
+    .post(`/parent/classes/${laterClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  await request(app)
+    .post(`/parent/classes/${earlierClass.id}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+
+  const dashboard = await request(app).get('/parent/classes/dashboard').set('Cookie', parent.cookie);
+  const earlierIndex = dashboard.text.indexOf('Z Earlier Class');
+  const laterIndex = dashboard.text.indexOf('A Later Class');
+  assert.ok(earlierIndex > 0 && laterIndex > 0 && earlierIndex < laterIndex, 'the earlier hour_position class should render first, even though its name sorts later alphabetically');
 });
 
 test('Class Dashboard detail: shows assignments/grades for the selected child, scoped to only that class', async () => {

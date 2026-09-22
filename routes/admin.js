@@ -83,7 +83,16 @@ router.post('/logout', (req, res) => {
 // (see routes/kiosk.js's own comment), just extended to this aggregate.
 // late/absent below do NOT exclude it - see that pair's own comment on
 // why.
+// memberType is a single type ('student') or an array of types
+// (['parent', 'admin']) - a real request: "admins should still count as
+// parents for features such as attendance and absence forms... they
+// should still be counted as an absent parent on today's count on the
+// homepage" - admins already share the Parent day-roster itself (see
+// utils/rosters.js's own ensureMemberOnTodayRoster comment), this just
+// extends the Parent card's own counts to match.
 async function todayStatsForType(memberType, today) {
+  const types = [].concat(memberType);
+  const placeholders = types.map(() => '?').join(',');
   const dow = weekdayOf(today);
   const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
   const total = day
@@ -93,9 +102,9 @@ async function todayStatsForType(memberType, today) {
             `SELECT COUNT(DISTINCT m.id) AS c FROM members m
              JOIN roster_members rm ON rm.member_id = m.id
              JOIN rosters r ON r.id = rm.roster_id
-             WHERE m.active = 1 AND m.member_type = ? AND r.category = 'Class Schedule' AND r.schedule_day = ?`
+             WHERE m.active = 1 AND m.member_type IN (${placeholders}) AND r.category = 'Class Schedule' AND r.schedule_day = ?`
           )
-          .get(memberType, day)
+          .get(...types, day)
       ).c
     : 0;
   const checkedIn = (
@@ -104,9 +113,9 @@ async function todayStatsForType(memberType, today) {
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
          JOIN rosters r ON r.id = a.roster_id
-         WHERE a.session_date = ? AND a.status = 'present' AND m.member_type = ? AND r.category != 'Class Roster'`
+         WHERE a.session_date = ? AND a.status = 'present' AND m.member_type IN (${placeholders}) AND r.category != 'Class Roster'`
       )
-      .get(today, memberType)
+      .get(today, ...types)
   ).c;
   const checkedOut = (
     await db
@@ -114,9 +123,9 @@ async function todayStatsForType(memberType, today) {
         `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
          JOIN members m ON m.id = c.member_id
          JOIN rosters r ON r.id = c.roster_id
-         WHERE c.session_date = ? AND m.member_type = ? AND r.category != 'Class Roster'`
+         WHERE c.session_date = ? AND m.member_type IN (${placeholders}) AND r.category != 'Class Roster'`
       )
-      .get(today, memberType)
+      .get(today, ...types)
   ).c;
   // Unlike checkedIn/checkedOut above, late/absent deliberately do NOT
   // exclude rosters.category = 'Class Roster' - a real bug report:
@@ -141,18 +150,18 @@ async function todayStatsForType(memberType, today) {
       .prepare(
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
-         WHERE a.session_date = ? AND a.status = 'late' AND a.source = 'absence_form' AND m.member_type = ?`
+         WHERE a.session_date = ? AND a.status = 'late' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
       )
-      .get(today, memberType)
+      .get(today, ...types)
   ).c;
   const absent = (
     await db
       .prepare(
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
-         WHERE a.session_date = ? AND a.status = 'absent' AND a.source = 'absence_form' AND m.member_type = ?`
+         WHERE a.session_date = ? AND a.status = 'absent' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
       )
-      .get(today, memberType)
+      .get(today, ...types)
   ).c;
 
   return { total, checkedIn, checkedOut, late, absent };
@@ -292,7 +301,7 @@ router.get('/', requireAdmin, async (req, res) => {
     wednesdayParentCount,
     wednesdayFamilyCount,
     studentStats: await statsWithTrends('student', today, previousDate),
-    parentStats: await statsWithTrends('parent', today, previousDate),
+    parentStats: await statsWithTrends(['parent', 'admin'], today, previousDate),
     alertDayLabel: alertDay ? DAY_LABELS[alertDay] : null,
     absenceAlerts,
     classesAtRisk,

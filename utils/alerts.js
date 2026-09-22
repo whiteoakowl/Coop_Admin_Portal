@@ -20,20 +20,24 @@ function todaysSessionDays(date) {
   return DAYS.filter((day) => weekdayOf(date) === DAY_WEEKDAY[day]);
 }
 
-// Every PARENT who submitted an Absence/Late form for today, one row per
-// person (a parent submitting for two of their own kids' classes writes
-// two attendance rows, one per roster, but that's still one alert per
-// person) - the Alert Log's own signal that a form came in today, same
-// as the dedicated Absence/Late Log tab an admin would otherwise have to
-// go check manually. A real request: "absence alerts on the attendance
-// page should only show parents names that are absent" - a student's own
-// absence doesn't affect staffing/floater coverage the way a parent's
-// does, so it's just noise here (a student marked absent on the very
-// same form still shows up fine on the grid itself and in the Logs >
-// Absence tab - this only trims the alert). Kept consistent with
-// routes/admin-rosters.js's own absenceFormSubmissionsForRoster (the
-// Attendance page's inline Alerts box), which applies the identical
-// filter for the identical reason.
+// Every PARENT (or admin, who counts as a parent for this - a real
+// request: "admins should still count as parents for features such as
+// attendance and absence forms... if an admin submits an absence form
+// they should still be counted as an absent parent... on the daily
+// alerts at the bottom of the attendance page") who submitted an
+// Absence/Late form for today, one row per person (a parent submitting
+// for two of their own kids' classes writes two attendance rows, one per
+// roster, but that's still one alert per person) - the Alert Log's own
+// signal that a form came in today, same as the dedicated Absence/Late
+// Log tab an admin would otherwise have to go check manually. A real
+// request: "absence alerts on the attendance page should only show
+// parents names that are absent" - a student's own absence doesn't
+// affect staffing/floater coverage the way a parent's does, so it's just
+// noise here (a student marked absent on the very same form still shows
+// up fine on the grid itself and in the Logs > Absence tab - this only
+// trims the alert). Kept consistent with routes/admin-rosters.js's own
+// absenceFormSubmissionsForRoster (the Attendance page's inline Alerts
+// box), which applies the identical filter for the identical reason.
 async function absenceFormAlertsForDay(day, date) {
   return db
     .prepare(
@@ -41,7 +45,7 @@ async function absenceFormAlertsForDay(day, date) {
        FROM attendance a
        JOIN members m ON m.id = a.member_id
        JOIN rosters r ON r.id = a.roster_id
-       WHERE a.session_date = ? AND a.source = 'absence_form' AND r.schedule_day = ? AND m.member_type = 'parent'
+       WHERE a.session_date = ? AND a.source = 'absence_form' AND r.schedule_day = ? AND m.member_type IN ('parent', 'admin')
        ORDER BY "sortName"`
     )
     .all(date, day);
@@ -54,7 +58,8 @@ async function absenceFormAlertsForDay(day, date) {
 // different query. A real request: "absence alerts on the attendance
 // page should only show parents names that are absent" - a student's own
 // absence doesn't affect staffing/floater coverage the way a parent's
-// does, so it's just noise here (member_type = 'parent' only; students
+// does, so it's just noise here (member_type IN ('parent', 'admin') only
+// - admins count as parents for this, a later real request; students
 // marked absent on the very same form still show up fine on the grid
 // itself and in the Logs > Absence tab - this only trims the Alerts box).
 async function absenceFormSubmissionsForRoster(rosterId, date) {
@@ -64,7 +69,7 @@ async function absenceFormSubmissionsForRoster(rosterId, date) {
       `SELECT m.name AS name, a.status, a.reason_category AS "reasonCategory", a.reason_text AS "reasonText"
        FROM attendance a
        JOIN members m ON m.id = a.member_id
-       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form' AND m.member_type = 'parent'`
+       WHERE a.roster_id = ? AND a.session_date = ? AND a.source = 'absence_form' AND m.member_type IN ('parent', 'admin')`
     )
     .all(rosterId, date))
     .sort(byLastName)

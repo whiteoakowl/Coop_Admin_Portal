@@ -27,11 +27,10 @@
       // (see admin-rosters.ejs); a cosmetic gap in the sidebar's own
       // active-state only, not a broken link or a broken mobile popup.
       { href: '/admin/rosters', icon: 'calendar-check', label: 'Attendance', subpages: [
-        { href: '/admin/rosters?tab=monday-student', label: 'Monday' },
-        // A real request: "Wednesday attendance. When clicking on
-        // Wednesday it should automatically show the parent pill toggle
-        // page first" - Monday still defaults to its own Student half,
-        // unchanged; only Wednesday's own link changes.
+        // A real request: "attendance, Monday, it should always land on
+        // parents first" - matches Wednesday's own link (see below), so
+        // both days now land on their Parent half first.
+        { href: '/admin/rosters?tab=monday-parent', label: 'Monday' },
         { href: '/admin/rosters?tab=wednesday-parent', label: 'Wednesday' },
         { href: '/admin/rosters?tab=classes', label: 'Classes' },
         { href: '/admin/rosters?tab=playground', label: 'Playground' },

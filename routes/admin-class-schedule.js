@@ -19,6 +19,7 @@ const {
   HOUR_POSITIONS,
   COLOR_PALETTE,
   GRADE_LEVELS,
+  AGE_OPTIONS,
   ageGroupList,
   defaultDay,
   hoursForDay,
@@ -263,6 +264,7 @@ router.post('/class-schedule/classes/new', requireFullAdmin, async (req, res) =>
     className,
     room: (req.body.room || '').trim(),
     ageGroup: [].concat(req.body.ageGroup || []).join(', '),
+    numericAges: [].concat(req.body.numericAges || []).join(', '),
     color: req.body.color || null,
     startTime: (req.body.startTime || '').trim(),
     endTime: (req.body.endTime || '').trim(),
@@ -302,8 +304,10 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
     cls,
     hours: await hoursForDay(cls.day),
     gradeLevels: GRADE_LEVELS,
+    ageOptions: AGE_OPTIONS,
     colorPalette: COLOR_PALETTE,
     selectedGrades: ageGroupList(cls.age_group),
+    selectedAges: ageGroupList(cls.numeric_ages),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
@@ -313,7 +317,7 @@ router.get('/class-schedule/classes/:id/view-fragment', requireFullAdmin, async 
   });
 });
 
-const CLASS_MANAGE_TABS = ['details', 'staffRoster', 'assignments', 'grades'];
+const CLASS_MANAGE_TABS = ['details', 'staffRoster', 'assignments', 'grades', 'chat'];
 
 // Kept as a standalone page too (direct-link/bookmark friendly), even
 // though the grid's own class card now links straight here instead of
@@ -345,6 +349,14 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     );
   }
 
+  let chatMessages = [];
+  if (activeTab === 'chat') {
+    chatMessages = (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(id)).map((m) => ({
+      ...m,
+      createdAtLabel: formatFriendlyTimestamp(m.created_at),
+    }));
+  }
+
   res.render('admin-class-schedule-manage', {
     title: `Manage - ${cls.class_name}`,
     cls,
@@ -352,8 +364,10 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     dayLabel: DAY_LABELS[cls.day],
     hours: await hoursForDay(cls.day),
     gradeLevels: GRADE_LEVELS,
+    ageOptions: AGE_OPTIONS,
     colorPalette: COLOR_PALETTE,
     selectedGrades: ageGroupList(cls.age_group),
+    selectedAges: ageGroupList(cls.numeric_ages),
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
@@ -361,9 +375,26 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     selectedSectionIds: await classSectionIds(id),
     classImageUrl: classImageUrl(cls.image_key),
     assignments,
+    chatMessages,
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
+});
+
+// A real request: "classes tabs, add class chat" - a simple, flat
+// message log scoped to this one class, for Co-op Admin's own legacy
+// admin session (a follow-up question confirmed: a separate, simple
+// board here rather than reusing the existing Main Admin/portal forums
+// feature, which lives entirely under a different login this page's own
+// admin session doesn't carry).
+router.post('/class-schedule/classes/:id/chat', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const back = `/admin/class-schedule/classes/${id}/manage?tab=chat`;
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect(back + '&error=' + encodeURIComponent('A message is required.'));
+  const admin = await db.prepare('SELECT username FROM admins WHERE id = ?').get(req.session.adminId);
+  await db.prepare('INSERT INTO class_chat_messages (class_id, admin_username, body) VALUES (?, ?, ?)').run(id, admin.username, body);
+  res.redirect(back);
 });
 
 router.post('/class-schedule/classes/:id/assignments', requireFullAdmin, async (req, res) => {
@@ -373,7 +404,7 @@ router.post('/class-schedule/classes/:id/assignments', requireFullAdmin, async (
   const back = `/admin/class-schedule/classes/${id}/manage?tab=assignments`;
 
   const title = (req.body.title || '').trim();
-  if (!title) return res.redirect(back + '&error=' + encodeURIComponent('An assignment title is required.'));
+  if (!title) return res.redirect(back + '&error=' + encodeURIComponent('A lesson title is required.'));
   await createAssignment({
     classId: id,
     className: cls.class_name,
@@ -432,6 +463,7 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       className,
       room: (req.body.room || '').trim(),
       ageGroup: [].concat(req.body.ageGroup || []).join(', '),
+      numericAges: [].concat(req.body.numericAges || []).join(', '),
       color: req.body.color || cls.color,
       startTime: (req.body.startTime || '').trim(),
       endTime: (req.body.endTime || '').trim(),
