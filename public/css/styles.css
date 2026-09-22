@@ -356,6 +356,20 @@ textarea:focus-visible,
 }
 .landing-label { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--ink); text-align: center; }
 
+/* A real request: "on the document click card with title below it, all
+   one card" - a document's own image replaces the generic file icon
+   above, title stays below it either way. */
+.landing-card-image { width: 3.25rem; height: 3.25rem; border-radius: 50%; object-fit: cover; }
+
+/* Document management list (views/admin-documents.ejs's own Add/Edit
+   Documents popup) - image thumb on the left, title+filename, then the
+   Copy Link/Delete row - same "optional photo on the left" shape
+   .class-card-thumb-row already uses. */
+.document-manage-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 10px; flex-wrap: wrap; }
+.document-manage-row-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.document-manage-row-info { display: flex; flex-direction: column; flex: 1; min-width: 8rem; }
+.document-manage-row-title { font-weight: 700; }
+
 /* Check In / Check Out are the two most-used buttons, so they stand out in brand orange. */
 .landing-card-orange { background: var(--btn-bg); border-color: var(--btn-bg); }
 .landing-card-orange:hover { border-color: var(--btn-bg-hover); }
@@ -440,6 +454,8 @@ textarea:focus-visible,
 }
 
 .document-view-frame { width: 100%; height: 100%; border: none; }
+
+.document-view-image { max-width: 320px; width: 100%; border-radius: var(--radius); display: block; margin-bottom: 0.75rem; }
 
 .admin-corner-link {
   display: inline-flex;
@@ -3548,6 +3564,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    top to bottom), never the name splitting across two lines. */
 .member-row-name-link { font-weight: 700; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .member-row-name-link:hover { text-decoration: underline; }
+
+/* A real request: "Admins will simply get a star next to their member
+   name" - member_type === 'admin' is fully derived (holding an Admin
+   Position), never a manually-chosen form checkbox anymore. */
+.member-admin-star { display: inline-flex; color: #d4a017; }
+.member-admin-star .icon { width: 1rem; height: 1rem; }
 .member-role-badge { display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .member-role-badge .icon { width: 11px; height: 11px; }
 
@@ -6523,6 +6545,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .store-option-qty { width: 4.5rem; flex: 0 0 auto; }
 .store-option-enabled-toggle { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; font-size: 0.85rem; white-space: nowrap; }
 
+/* A real request: "when you add an option there will be sub categories
+   to add variables, each with their own price. This setup is like
+   shopify." - each option GROUP (e.g. "Size") is its own bordered block
+   holding a name field and its own list of VALUE rows (the existing
+   .store-option-row above, now nested a level deeper). */
+.store-option-groups-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem; }
+.store-option-group { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; }
+.store-option-group-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.store-group-name { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.store-option-group .store-options-list { margin-bottom: 0.5rem; }
+
 /* A real request: "not [no] edit button on the product, clicking the
    product takes you to the edit page" - .team-info-card is normally a
    plain <div>; this modifier strips the default <a> underline/color and
@@ -6702,6 +6735,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .class-card .badge-pill { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
 .badge-pill-absent { background: var(--red-bg); color: var(--red); }
 
+/* A real request: "the class image should show on the left side of the
+   class card on the parent and student portal." Shared by both the Class
+   Schedule room grid (views/parent-classes.ejs) and the Student Portal's
+   own classes-grid cards (views/student-classes.ejs) - a class with no
+   photo just renders class-card-thumb-content alone, no reserved image
+   slot, so nothing shifts for the common case. min-width: 0 on the content
+   column is what lets its own title/lines keep wrapping at their normal
+   width instead of being pushed wider by the flex row. */
+.class-card-thumb-row { display: flex; align-items: flex-start; gap: 0.5rem; }
+.class-card-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.class-card-thumb-content { flex: 1; min-width: 0; }
+
 /* Class Schedule room grid on a phone - the 800px desktop min-width (see
    the grid's own comment above) forces a lot of horizontal scroll to see
    the rest of the table on a ~375-430px screen. Shrinking the floor, plus
@@ -6719,6 +6764,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid .class-card-line { font-size: 0.66rem; }
   .class-schedule-room-grid .class-card-pill-label,
   .class-schedule-room-grid .class-card .badge-pill { font-size: 0.62rem; }
+  .class-schedule-room-grid .class-card-thumb { width: 32px; height: 32px; }
 }
 
 /* A real request: "shrink the calendar grid on mobile view so you can see
@@ -6748,6 +6794,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .class-schedule-room-grid .class-card-line { font-size: 0.56rem; }
   .class-schedule-room-grid .class-card-pill-label,
   .class-schedule-room-grid .class-card .badge-pill { font-size: 0.52rem; padding: 0.1rem 0.3rem; }
+  .class-schedule-room-grid .class-card-thumb { width: 26px; height: 26px; border-radius: 4px; }
 }
 
 /* Create/Edit Class form - the form itself takes 1/3 of the page, the
@@ -8639,6 +8686,56 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .event-card-body h3 { margin: 0; font-size: 1.05rem; color: var(--ink); }
 .event-card-date { font-size: 0.82rem; color: var(--brand-dark, var(--brand)); font-weight: 700; display: flex; align-items: center; gap: 0.35rem; }
 .event-card-location { margin: 0; font-size: 0.88rem; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; }
+
+/* Member Store (views/store-list.ejs) - a real request: "change shop
+   product card to look similar [to a reference design]": photo on the
+   left instead of on top, an In Stock/Out of Stock badge, price and
+   stock count on one row, and a prominent order button. A product with
+   no photo just gives store-product-card-body the full row (no reserved
+   image slot), same "only render the thumb when there's one" convention
+   the class-card-thumb-row cards use. */
+.store-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.1rem; margin-top: 1.5rem; }
+.store-product-card {
+  display: flex;
+  gap: 0.9rem;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.9rem;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.store-product-card:hover, .store-product-card:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.store-product-card-image { width: 96px; height: 96px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.store-product-card-body { display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; flex: 1; }
+.store-product-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.store-product-card-header h3 { margin: 0; font-size: 1.05rem; line-height: 1.3; color: var(--ink); }
+.store-product-card-price-row { display: flex; align-items: center; gap: 0.6rem; }
+.store-product-card-price { font-size: 1.2rem; font-weight: 700; color: var(--brand-dark); font-variant-numeric: tabular-nums; }
+.store-product-card-divider { width: 1px; align-self: stretch; background: var(--border); }
+.store-product-card-stock { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.store-product-card-cta {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--brand);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.store-product-card-cta .icon { width: 15px; height: 15px; }
+@media (max-width: 480px) {
+  .store-product-card-image { width: 72px; height: 72px; border-radius: 10px; }
+  .store-product-card-header h3 { font-size: 0.95rem; }
+  .store-product-card-price { font-size: 1.05rem; }
+}
 
 /* Forums (Community & Commerce track) - category/thread cards reuse
    .team-card-grid/.team-info-card and .training-lesson-list already

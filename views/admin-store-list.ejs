@@ -221,15 +221,15 @@
               <% saleProducts.forEach(function(p, idx) { %>
                 <div class="sale-cart-row">
                   <input type="hidden" name="items[<%= idx %>][productId]" value="<%= p.id %>" />
-                  <input class="sale-cart-qty" type="number" name="items[<%= idx %>][quantity]" min="0" <% if (p.options.length === 0 && p.inventory_count != null) { %>max="<%= p.inventory_count %>"<% } %> value="0" aria-label="Quantity of <%= p.name %>" />
-                  <% if (p.options.length > 0) { %>
-                    <select class="sale-cart-option" name="items[<%= idx %>][optionId]" aria-label="Option of <%= p.name %>">
-                      <% p.options.forEach(function(o) { %><option value="<%= o.id %>">$<%= (o.price_cents / 100).toFixed(2) %> - <%= o.name %><% if (o.quantity != null) { %> (<%= o.quantity %> left)<% } %></option><% }); %>
+                  <input class="sale-cart-qty" type="number" name="items[<%= idx %>][quantity]" min="0" <% if (p.optionGroups.length === 0 && p.inventory_count != null) { %>max="<%= p.inventory_count %>"<% } %> value="0" aria-label="Quantity of <%= p.name %>" />
+                  <% p.optionGroups.forEach(function(group) { %>
+                    <select class="sale-cart-option" name="items[<%= idx %>][optionValues][<%= group.id %>]" aria-label="<%= group.name %> of <%= p.name %>">
+                      <% group.values.forEach(function(v) { %><option value="<%= v.id %>"><%= group.name %>: <%= v.name %><% if (v.price_cents != null) { %> (+$<%= (v.price_cents / 100).toFixed(2) %>)<% } %><% if (v.quantity != null) { %> (<%= v.quantity %> left)<% } %></option><% }); %>
                     </select>
-                  <% } %>
+                  <% }); %>
                   <span class="sale-cart-info">
                     <span class="sale-cart-name"><%= p.name %></span>
-                    <span class="sale-cart-meta"><% if (p.options.length === 0) { %>$<%= (p.price_cents / 100).toFixed(2) %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %><% } %></span>
+                    <span class="sale-cart-meta"><% if (p.optionGroups.length === 0) { %>$<%= (p.price_cents / 100).toFixed(2) %><% if (p.inventory_count != null) { %> &middot; <%= p.inventory_count %> in stock<% } %><% } %></span>
                   </span>
                 </div>
               <% }); %>

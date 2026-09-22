@@ -114,16 +114,30 @@
                         data-view-class-day="<%= day %>"
                         data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
                       >
-                        <div class="class-card-header">
-                          <h3><%= cls.class_name %></h3>
-                          <% if (enrolledClassIds.indexOf(cls.id) !== -1) { %>
-                            <span class="badge-pill badge-pill-present" title="One of your children is enrolled">Registered</span>
+                        <%# A real request: "the class image should show on
+                            the left side of the class card on the parent
+                            and student portal" - .class-card-thumb-row
+                            wraps the card's existing content so the photo
+                            (when this class has one) sits to its left; a
+                            class with no photo just renders the content
+                            div alone, same as before this change. %>
+                        <div class="class-card-thumb-row">
+                          <% if (cls.classImageUrl) { %>
+                            <img class="class-card-thumb" src="<%= cls.classImageUrl %>" alt="" />
                           <% } %>
-                        </div>
-                        <div class="class-card-info">
-                          <% if (cls.gradeLabel) { %><p class="class-card-line"><%= cls.gradeLabel %></p><% } %>
-                          <p class="class-card-line"><span class="class-card-line-label">Teacher:</span> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></p>
-                          <% if (cls.room) { %><p class="class-card-line"><span class="class-card-line-label">Room:</span> <%= cls.room %></p><% } %>
+                          <div class="class-card-thumb-content">
+                            <div class="class-card-header">
+                              <h3><%= cls.class_name %></h3>
+                              <% if (enrolledClassIds.indexOf(cls.id) !== -1) { %>
+                                <span class="badge-pill badge-pill-present" title="One of your children is enrolled">Registered</span>
+                              <% } %>
+                            </div>
+                            <div class="class-card-info">
+                              <% if (cls.gradeLabel) { %><p class="class-card-line"><%= cls.gradeLabel %></p><% } %>
+                              <p class="class-card-line"><span class="class-card-line-label">Teacher:</span> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : '—' %></p>
+                              <% if (cls.room) { %><p class="class-card-line"><span class="class-card-line-label">Room:</span> <%= cls.room %></p><% } %>
+                            </div>
+                          </div>
                         </div>
                       </button>
                     <% }); %>

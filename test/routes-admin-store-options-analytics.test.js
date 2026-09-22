@@ -1,6 +1,7 @@
 // Coverage for a real request batch on Main Admin Shop:
-// - product Options as rows (title/price/qty/enable-disable), replacing
-//   plain sizes - see supabase/migrations/20260921010000_store_product_options.sql
+// - product Options as Group -> Values rows (title/price/qty/
+//   enable-disable), replacing plain sizes - see
+//   supabase/migrations/20261005010000_store_option_groups.sql
 // - Orders tab "Fulfillment Totals" popup (utils/store.js's own
 //   fulfillmentTotals())
 // - a new Analytics subpage (date-range filter + per-product/option
@@ -27,6 +28,8 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { hashPassword } = require('../utils/portalAuth');
+const { generateMemberCode } = require('../utils/members');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -67,6 +70,28 @@ async function activateProduct(admin, productId) {
   await request(app).post(`/main-admin/store/${productId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'active', _csrf: csrf });
 }
 
+let familyCounter = 0;
+async function createParentAccount() {
+  familyCounter += 1;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Test Family ${familyCounter}`)).lastInsertRowid;
+  const code = await generateMemberCode();
+  const parentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1)")
+    .run(`Parent ${familyCounter}`, code, code, familyId);
+  const email = `parent${familyCounter}@example.com`;
+  const password = 'testpassword123';
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parentInfo.lastInsertRowid, email, hashPassword(password));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password, next: '/store' });
+  const cookie = loginRes.headers['set-cookie'];
+  const page = await request(app).get('/store').set('Cookie', cookie);
+  return { cookie, csrfToken: extractCsrf(page.text), memberId: parentInfo.lastInsertRowid };
+}
+
 test('Settings tab is gone; Add/Edit Category lives on Products, not a separate list', async () => {
   const admin = await loginAsMainAdmin();
   const page = await request(app).get('/main-admin/store').set('Cookie', admin.cookie);
@@ -83,32 +108,41 @@ test('Settings tab is gone; Add/Edit Category lives on Products, not a separate 
   assert.match(settingsUrl.text, /\+ New Product/);
 });
 
-test('Product Options: add rows with title/price/qty/enabled, save, and see them pre-filled on reload', async () => {
+test('Product Options: add a group of value rows with title/price/qty/enabled, save, and see them pre-filled on reload', async () => {
   const admin = await loginAsMainAdmin();
   const productId = await createProduct(admin, { name: 'Mug' });
 
   const editPage = await request(app).get(`/main-admin/store/${productId}/edit`).set('Cookie', admin.cookie);
   assert.match(editPage.text, /<h2>Options<\/h2>/);
-  assert.match(editPage.text, /\+ Add Another Option/);
-  assert.match(editPage.text, /data-options-list data-next-index="0"/, 'a brand-new product starts with an empty, JS-appendable options list');
+  assert.match(editPage.text, /\+ Add Option Group/);
+  assert.match(editPage.text, /data-groups-list data-next-index="0"/, 'a brand-new product starts with an empty, JS-appendable groups list');
 
+  // A real request: "only one save button at the bottom" merged the
+  // Details and Options forms into one - options now save through the
+  // same POST /:id the product's own name/price already go through, so
+  // this includes both (matching whatever the product was created with).
   const csrf = await freshCsrf(admin);
   await request(app)
-    .post(`/main-admin/store/${productId}/options`)
+    .post(`/main-admin/store/${productId}`)
     .set('Cookie', admin.cookie)
     .type('form')
     .send({
-      'options[0][name]': 'Blue',
-      'options[0][price]': '9.50',
-      'options[0][qty]': '5',
-      'options[0][enabled]': '1',
-      'options[1][name]': 'Red',
-      'options[1][price]': '11.00',
-      'options[1][enabled]': '0',
+      name: 'Mug',
+      price: '10.00',
+      'groups[0][name]': 'Color',
+      'groups[0][values][0][name]': 'Blue',
+      'groups[0][values][0][price]': '9.50',
+      'groups[0][values][0][qty]': '5',
+      'groups[0][values][0][enabled]': '1',
+      'groups[0][values][1][name]': 'Red',
+      'groups[0][values][1][price]': '11.00',
+      'groups[0][values][1][enabled]': '0',
       _csrf: csrf,
     });
 
-  const rows = await db.prepare('SELECT * FROM store_product_options WHERE product_id = ? ORDER BY position').all(productId);
+  const group = await db.prepare('SELECT * FROM store_product_option_groups WHERE product_id = ?').get(productId);
+  assert.equal(group.name, 'Color');
+  const rows = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ? ORDER BY position').all(group.id);
   assert.equal(rows.length, 2);
   assert.equal(rows[0].name, 'Blue');
   assert.equal(rows[0].price_cents, 950);
@@ -118,6 +152,7 @@ test('Product Options: add rows with title/price/qty/enabled, save, and see them
   assert.equal(rows[1].enabled, 0);
 
   const reloaded = await request(app).get(`/main-admin/store/${productId}/edit`).set('Cookie', admin.cookie);
+  assert.match(reloaded.text, /value="Color"/);
   assert.match(reloaded.text, /value="Blue"/);
   assert.match(reloaded.text, /value="9.50"/);
   assert.match(reloaded.text, /value="Red"/);
@@ -128,17 +163,148 @@ test('Product Options: add rows with title/price/qty/enabled, save, and see them
   assert.equal(detail.status, 200);
 });
 
+test('a real request: "add option will be a drop down menu... sub categories to add variables, each with their own price" - multiple groups, summed pricing', async () => {
+  const admin = await loginAsMainAdmin();
+  const productId = await createProduct(admin, { name: 'Shopify Style Shirt', price: '15.00' });
+  await activateProduct(admin, productId);
+  const csrf = await freshCsrf(admin);
+  await request(app)
+    .post(`/main-admin/store/${productId}`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      name: 'Shopify Style Shirt',
+      price: '15.00',
+      'groups[0][name]': 'Size',
+      'groups[0][values][0][name]': 'Small',
+      'groups[0][values][0][enabled]': '1',
+      'groups[0][values][1][name]': 'Large',
+      'groups[0][values][1][price]': '3.00',
+      'groups[0][values][1][enabled]': '1',
+      'groups[1][name]': 'Color',
+      'groups[1][values][0][name]': 'Blue',
+      'groups[1][values][0][price]': '2.00',
+      'groups[1][values][0][enabled]': '1',
+      _csrf: csrf,
+    });
+
+  const groups = await db.prepare('SELECT * FROM store_product_option_groups WHERE product_id = ? ORDER BY position').all(productId);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].name, 'Size');
+  assert.equal(groups[1].name, 'Color');
+  const small = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ? AND name = ?').get(groups[0].id, 'Small');
+  const large = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ? AND name = ?').get(groups[0].id, 'Large');
+  const blue = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ? AND name = ?').get(groups[1].id, 'Blue');
+  assert.equal(small.price_cents, null, 'a value with no price entered stays unset, not $0');
+  assert.equal(large.price_cents, 300);
+  assert.equal(blue.price_cents, 200);
+
+  const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Multi Group Buyer', 'multi-group-buyer', 'parent')").run()).lastInsertRowid;
+
+  // Neither group's value has a price ("Small" + no color group picked
+  // -> not possible, Color is required too) - picking Small + Blue should
+  // total just Blue's $2.00 (Small contributes $0), never fall back to
+  // the base $15.00 price, since "total the value from both if both have
+  // prices" - one has a price, so that one wins.
+  let orderCsrf = await freshCsrf(admin, 'orders');
+  const smallBlueRes = await request(app)
+    .post('/main-admin/store/orders/in-person')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      memberId: String(memberId),
+      'items[0][productId]': productId,
+      'items[0][quantity]': '1',
+      [`items[0][optionValues][${groups[0].id}]`]: String(small.id),
+      [`items[0][optionValues][${groups[1].id}]`]: String(blue.id),
+      _csrf: orderCsrf,
+    });
+  const smallBlueOrderId = /\/main-admin\/store\/orders\/(\d+)/.exec(smallBlueRes.headers.location)[1];
+  const smallBlueItem = await db.prepare('SELECT option_name, unit_price_cents FROM store_order_items WHERE order_id = ?').get(smallBlueOrderId);
+  assert.equal(smallBlueItem.option_name, 'Small, Blue');
+  assert.equal(smallBlueItem.unit_price_cents, 200);
+
+  // Picking Large + Blue should total both: $3.00 + $2.00 = $5.00.
+  orderCsrf = await freshCsrf(admin, 'orders');
+  const largeBlueRes = await request(app)
+    .post('/main-admin/store/orders/in-person')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      memberId: String(memberId),
+      'items[0][productId]': productId,
+      'items[0][quantity]': '1',
+      [`items[0][optionValues][${groups[0].id}]`]: String(large.id),
+      [`items[0][optionValues][${groups[1].id}]`]: String(blue.id),
+      _csrf: orderCsrf,
+    });
+  const largeBlueOrderId = /\/main-admin\/store\/orders\/(\d+)/.exec(largeBlueRes.headers.location)[1];
+  const largeBlueItem = await db.prepare('SELECT option_name, unit_price_cents FROM store_order_items WHERE order_id = ?').get(largeBlueOrderId);
+  assert.equal(largeBlueItem.option_name, 'Large, Blue');
+  assert.equal(largeBlueItem.unit_price_cents, 500);
+
+  // Both groups still each require a selection - not just the priced one.
+  orderCsrf = await freshCsrf(admin, 'orders');
+  const missingGroupRes = await request(app)
+    .post('/main-admin/store/orders/in-person')
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({
+      memberId: String(memberId),
+      'items[0][productId]': productId,
+      'items[0][quantity]': '1',
+      [`items[0][optionValues][${groups[0].id}]`]: String(small.id),
+      _csrf: orderCsrf,
+    });
+  assert.match(decodeURIComponent(missingGroupRes.headers.location), /Choose a Color/);
+
+  // Parent/student portal checkout renders one dropdown per group.
+  const parentAccount = await createParentAccount();
+  const productPage = await request(app).get(`/store/${productId}`).set('Cookie', parentAccount.cookie);
+  assert.match(productPage.text, new RegExp(`optionValues\\[${groups[0].id}\\]`));
+  assert.match(productPage.text, new RegExp(`optionValues\\[${groups[1].id}\\]`));
+  assert.match(productPage.text, /<label>Size\s*<select/);
+  assert.match(productPage.text, /<label>Color\s*<select/);
+  assert.match(productPage.text, /Large \(\+\$3\.00\)/);
+});
+
+test('a real request: "only one save button at the bottom. Upload button should be on the same row as choose file."', async () => {
+  const admin = await loginAsMainAdmin();
+  const productId = await createProduct(admin, { name: 'One Save Button Product' });
+
+  const page = await request(app).get(`/main-admin/store/${productId}/edit`).set('Cookie', admin.cookie);
+  assert.equal(page.status, 200);
+
+  // Exactly one Save button on the whole page, tied to the Details form
+  // via form="details-form" (an HTML form can't nest inside another, so
+  // it can't be a normal descendant and still sit after Options/Image).
+  const saveButtonMatches = page.text.match(/<button type="submit"[^>]*>Save<\/button>/g) || [];
+  assert.equal(saveButtonMatches.length, 1, 'expected exactly one "Save" button');
+  assert.match(saveButtonMatches[0], /form="details-form"/);
+  assert.doesNotMatch(page.text, />Save Options</);
+
+  // The Image section's Choose File input and Upload button share one
+  // row (same .roster-btn-row <form> - see admin-events-builder.ejs's
+  // own Event Image row, the same pattern applied here).
+  const imageForm = /<form method="POST" action="\/main-admin\/store\/\d+\/image"[^]*?<\/form>/.exec(page.text);
+  assert.ok(imageForm, 'expected to find the Image upload form');
+  assert.match(imageForm[0], /class="roster-btn-row"/);
+  assert.match(imageForm[0], /<input type="file" name="image"/);
+  assert.match(imageForm[0], />Upload<\/button>/);
+});
+
 test('Fulfillment Totals: sums quantity across every paid order, grouped by product + option', async () => {
   const admin = await loginAsMainAdmin();
   const productId = await createProduct(admin, { name: 'Fulfillment Widget' });
   await activateProduct(admin, productId);
   let csrf = await freshCsrf(admin);
   await request(app)
-    .post(`/main-admin/store/${productId}/options`)
+    .post(`/main-admin/store/${productId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ 'options[0][name]': 'Standard', 'options[0][price]': '5.00', 'options[0][enabled]': '1', _csrf: csrf });
-  const option = await db.prepare('SELECT id FROM store_product_options WHERE product_id = ?').get(productId);
+    .send({ name: 'Fulfillment Widget', price: '10.00', 'groups[0][name]': 'Options', 'groups[0][values][0][name]': 'Standard', 'groups[0][values][0][price]': '5.00', 'groups[0][values][0][enabled]': '1', _csrf: csrf });
+  const group = await db.prepare('SELECT id FROM store_product_option_groups WHERE product_id = ?').get(productId);
+  const option = await db.prepare('SELECT id FROM store_product_options WHERE group_id = ?').get(group.id);
 
   const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Fulfillment Buyer', 'fulfillment-buyer', 'parent')").run()).lastInsertRowid;
 
@@ -147,13 +313,13 @@ test('Fulfillment Totals: sums quantity across every paid order, grouped by prod
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '3', 'items[0][optionId]': String(option.id), _csrf: csrf });
+    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '3', [`items[0][optionValues][${group.id}]`]: String(option.id), _csrf: csrf });
   csrf = await freshCsrf(admin, '?tab=orders');
   await request(app)
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '2', 'items[0][optionId]': String(option.id), _csrf: csrf });
+    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '2', [`items[0][optionValues][${group.id}]`]: String(option.id), _csrf: csrf });
 
   const ordersPage = await request(app).get('/main-admin/store?tab=orders').set('Cookie', admin.cookie);
   assert.match(ordersPage.text, /Fulfillment Totals/);
@@ -171,11 +337,12 @@ test('Analytics tab: date-range dropdown, a sales chart, and per-product/option 
   await activateProduct(admin, productId);
   const csrf = await freshCsrf(admin);
   await request(app)
-    .post(`/main-admin/store/${productId}/options`)
+    .post(`/main-admin/store/${productId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ 'options[0][name]': 'Only Option', 'options[0][price]': '7.00', 'options[0][enabled]': '1', _csrf: csrf });
-  const option = await db.prepare('SELECT id FROM store_product_options WHERE product_id = ?').get(productId);
+    .send({ name: 'Analytics Gadget', price: '10.00', 'groups[0][name]': 'Options', 'groups[0][values][0][name]': 'Only Option', 'groups[0][values][0][price]': '7.00', 'groups[0][values][0][enabled]': '1', _csrf: csrf });
+  const group = await db.prepare('SELECT id FROM store_product_option_groups WHERE product_id = ?').get(productId);
+  const option = await db.prepare('SELECT id FROM store_product_options WHERE group_id = ?').get(group.id);
 
   const memberId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Analytics Buyer', 'analytics-buyer', 'parent')").run()).lastInsertRowid;
   const saleCsrf = await freshCsrf(admin, '?tab=orders');
@@ -183,7 +350,7 @@ test('Analytics tab: date-range dropdown, a sales chart, and per-product/option 
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '4', 'items[0][optionId]': String(option.id), _csrf: saleCsrf });
+    .send({ memberId: String(memberId), 'items[0][productId]': String(productId), 'items[0][quantity]': '4', [`items[0][optionValues][${group.id}]`]: String(option.id), _csrf: saleCsrf });
 
   const nav = await request(app).get('/main-admin').set('Cookie', admin.cookie);
   assert.match(nav.text, /href="\/main-admin\/store\?tab=analytics">Analytics</);

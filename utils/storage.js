@@ -58,6 +58,24 @@ async function uploadFile(client, bucket, buffer, originalName, contentType) {
   return key;
 }
 
+// A signed, time-limited URL the BROWSER can PUT a file straight to,
+// bypassing this app's own server entirely for the file's bytes. Exists
+// specifically for uploads too large for a single Netlify Function
+// invocation to proxy (see routes/admin-documents.js's own comment on
+// why documents were capped at 5MB) - the function itself only ever
+// handles this tiny request (a filename) and, once Storage confirms the
+// PUT landed, a second tiny request with the resulting key. Uses the
+// underlying signed-upload-url REST endpoint's own documented plain-PUT
+// contract (no @supabase/supabase-js needed on the browser side) - the
+// client does `fetch(uploadUrl, { method: 'PUT', body: file, headers: {
+// 'content-type': file.type } })`.
+async function createSignedUploadUrl(client, bucket, originalName) {
+  const key = generateKey(originalName);
+  const { data, error } = await client.storage.from(bucket).createSignedUploadUrl(key);
+  if (error) throw new Error(`Supabase Storage signed upload URL failed (${bucket}/${key}): ${error.message}`);
+  return { key, uploadUrl: data.signedUrl };
+}
+
 function deleteFile(client, bucket, key) {
   if (!key) return Promise.resolve();
   return client.storage.from(bucket).remove([key]);
@@ -92,4 +110,4 @@ async function downloadFile(client, bucket, key) {
   return Buffer.from(await data.arrayBuffer());
 }
 
-module.exports = { createStorageClient, uploadFile, deleteFile, publicUrl, downloadFile, generateKey };
+module.exports = { createStorageClient, uploadFile, deleteFile, publicUrl, downloadFile, generateKey, createSignedUploadUrl };

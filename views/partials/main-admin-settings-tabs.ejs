@@ -1,12 +1,12 @@
 <%
 // Sub-tab bar for Main Admin's Settings area (reached via the gear icon
 // - views/partials/portal-nav.ejs's settingsHref, routes/main-admin.js's
-// /settings redirect). Roles & Permissions, Admins, Website, and Quick
-// Links are real separate pages/routes under the hood (unchanged), not
-// panels of one shared template - this is just the tab strip every one
-// of them includes at the top of <main> so switching between them still
-// reads as one settings area. `activeSettingsTab` local: 'roles' |
-// 'admins' | 'website' | 'faq' | 'quicklinks'.
+// /settings redirect). Admins, Website, FAQ, and Quick Links are real
+// separate pages/routes under the hood (unchanged), not panels of one
+// shared template - this is just the tab strip every one of them
+// includes at the top of <main> so switching between them still reads as
+// one settings area. `activeSettingsTab` local: 'admins' | 'website' |
+// 'faq' | 'quicklinks'.
 //
 // A real request: "make every member a user... take away user settings.
 // all members will have accounts." The standalone Users tab (account
@@ -14,9 +14,18 @@
 // managed from their own profile (routes/main-admin-members.js), and
 // membership/account approval already has its own home at Members >
 // Approvals (utils/membershipApprovals.js).
+//
+// A later real request folded admin-position permission editing into
+// this same Admins page: "you can click on each admin position... the
+// roles and permissions are listed below... we won't need a separate
+// roles/permissions tab under settings." /main-admin/roles itself is
+// unchanged and still reachable directly - it still owns the
+// permissions granted to every OTHER role (teacher, parent, coop_admin),
+// unrelated to admin positions - it's just no longer linked from this
+// tab strip, since managing an admin position's own permissions never
+// needs it anymore.
 %>
 <div class="view-tabs">
-  <a class="view-tab<%= activeSettingsTab === 'roles' ? ' active' : '' %>" href="/main-admin/roles">Roles &amp; Permissions</a>
   <%# A real request: "co-op admin portal. settings gear, admins tab.
       this tab should be located under the main admin portal settings
       gear as a tab. it should not be on co-op admin portal." Moved from

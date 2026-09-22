@@ -60,26 +60,6 @@ router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
-// TEMPORARY diagnostic for the "photo uploads still fail after redeploy"
-// investigation - confirms what this specific running Netlify Function
-// instance actually sees for the two Storage env vars, without ever
-// printing their real values, since the Netlify dashboard's own UI can't
-// answer "did this deploy actually pick up my env var change." Remove
-// once Storage uploads are confirmed working again.
-router.get('/storage-env-check', requireFullAdmin, (req, res) => {
-  const { createStorageClient } = require('../utils/storage');
-  const url = process.env.SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  res.json({
-    supabaseUrlSet: !!url,
-    supabaseUrlLength: url.length,
-    serviceRoleKeySet: !!key,
-    serviceRoleKeyLength: key.length,
-    serviceRoleKeyPrefix: key.slice(0, 6),
-    storageClientConfigured: !!createStorageClient(),
-  });
-});
-
 // --- Dashboard ---
 
 // Today's checked-in/out/late/absent counts for one member type, each as
@@ -346,16 +326,20 @@ router.get('/import-template/names.xlsx', requireAdmin, (req, res) => {
 // tab. it should not be on co-op admin portal." The Admin Positions/
 // Leaders manager (Add Admin Position, Add Leaders) moved to
 // /main-admin/admins (routes/main-admin.js) - 'leaders' is no longer a
-// tab here at all, so this stays 'documents' as the last full-admin-only
-// tab.
-const SETTINGS_TABS = ['account', 'classcheckin', 'quicklinks', 'install', 'documents'];
-const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin', 'documents'];
+// tab here at all.
+//
+// A later real request: "document upload is currently under settings.
+// It should move to the documents page." - 'documents' is gone from here
+// too; that upload form and management list now live entirely on
+// /admin/documents itself (routes/admin-documents.js).
+const SETTINGS_TABS = ['account', 'classcheckin', 'quicklinks', 'install'];
+const FULL_ADMIN_ONLY_TABS = ['account', 'classcheckin'];
 
 async function renderSettings(req, res, error, success, activeTab) {
   const isFullAdmin = !!req.session.adminId;
   // A Co-op Admin (a member, not the master admin account) only ever gets
   // Quick Links and Install App here - Username/Password manages the
-  // single master admin account, and Documents is full-Admin-only.
+  // single master admin account.
   let tab = SETTINGS_TABS.includes(activeTab) ? activeTab : 'account';
   if (FULL_ADMIN_ONLY_TABS.includes(tab) && !isFullAdmin) tab = 'quicklinks';
   res.render('admin-settings', {
@@ -363,7 +347,6 @@ async function renderSettings(req, res, error, success, activeTab) {
     username: req.session.username,
     isFullAdmin,
     activeTab: tab,
-    documents: await db.prepare('SELECT * FROM documents ORDER BY LOWER(title)').all(),
     error,
     success,
   });

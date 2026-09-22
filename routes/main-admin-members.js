@@ -509,10 +509,17 @@ function memberFormFields(req) {
       memberType === 'parent'
         ? [].concat(req.body.cleanupTeamIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
         : null,
+    // req.body.adminPositionsFormPresent (a hidden marker, always
+    // submitted alongside these checkboxes - see partials/member-form-
+    // fields.ejs's own comment) distinguishes a real form save (resync to
+    // exactly what's checked, however many that is) from a raw/partial
+    // request that skips the form entirely (undefined here means "leave
+    // existing positions untouched," never "clear them" - see
+    // utils/adminPositions.js's own syncMemberAdminPositions).
     adminPositionIds:
-      memberType === 'admin'
+      req.body.adminPositionsFormPresent === '1'
         ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
-        : null,
+        : undefined,
   };
 }
 
@@ -789,7 +796,18 @@ router.post('/:id/edit', uploadMemberPhoto((req) => `/main-admin/members/${req.p
   if (!f.name) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent('Name is required.'));
   const clash = await db.prepare('SELECT id FROM members WHERE LOWER(name) = LOWER(?) AND id != ?').get(f.name, id);
   if (clash) return res.redirect(`/main-admin/members/${id}/edit?error=` + encodeURIComponent(`"${f.name}" is already in the member list.`));
-  const existing = await db.prepare('SELECT photo_path FROM members WHERE id = ?').get(id);
+  const existing = await db.prepare('SELECT photo_path, member_type FROM members WHERE id = ?').get(id);
+  // A real request: "There should not be admin check box on any of the
+  // membership form or profiles... Admins will simply get a star."
+  // member_type === 'admin' is derived purely from holding an Admin
+  // Position (utils/adminPositions.js's own syncMemberAdminStatus) -
+  // this form can no longer grant OR revoke it directly (same boundary
+  // routes/admin-members.js's own POST /members/:id/edit already
+  // enforces), for a raw request that skips the form entirely.
+  if (existing && (f.memberType === 'admin') !== (existing.member_type === 'admin')) {
+    f.memberType = existing.member_type;
+    if (f.memberType !== 'admin') f.adminPositionIds = null;
+  }
   const photoPath = req.file ? await savePhotoFile(req.file) : existing ? existing.photo_path : null;
   // A newly uploaded photo replaces the old one in photo_path below - see
   // routes/admin-members.js's own identical POST /members/:id/edit.

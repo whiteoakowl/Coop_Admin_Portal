@@ -42,8 +42,15 @@ async function rolesForAccount(accountId) {
     .all(accountId);
 }
 
-// Every permission key granted by ANY role this account holds - a plain
-// Set of strings (e.g. 'manage_classes') so a route only ever needs
+// Every permission key granted by ANY role this account holds, UNIONED
+// with every permission granted by any Admin Position the underlying
+// member holds - a real request: "the roles and permissions are listed
+// below [on each admin position's own edit window]... we won't need a
+// separate roles/permissions tab under settings." Confirmed a position's
+// permissions belong to the position itself (utils/adminPositions.js's
+// own setPositionPermissions), so anyone currently holding it shares the
+// same grant, same as a role. A plain Set of strings (e.g.
+// 'manage_classes') so a route only ever needs
 // `permissions.has('manage_classes')`, never a role-name comparison.
 async function permissionsForAccount(accountId) {
   const rows = await db
@@ -52,9 +59,16 @@ async function permissionsForAccount(accountId) {
        FROM permissions p
        JOIN role_permissions rp ON rp.permission_id = p.id
        JOIN member_account_roles mar ON mar.role_id = rp.role_id
-       WHERE mar.member_account_id = ?`
+       WHERE mar.member_account_id = ?
+       UNION
+       SELECT DISTINCT p.key
+       FROM permissions p
+       JOIN admin_position_permissions app ON app.permission_id = p.id
+       JOIN member_admin_positions map ON map.admin_position_id = app.admin_position_id
+       JOIN member_accounts ma ON ma.member_id = map.member_id
+       WHERE ma.id = ?`
     )
-    .all(accountId);
+    .all(accountId, accountId);
   return new Set(rows.map((r) => r.key));
 }
 

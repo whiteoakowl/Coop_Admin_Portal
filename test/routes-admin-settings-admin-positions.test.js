@@ -62,10 +62,10 @@ test('Main Admin Settings: Admins tab', async (t) => {
 
   await t.test('adding a position lists it', async () => {
     const res = await request(app)
-      .post('/main-admin/admins/positions')
+      .post('/main-admin/admins/positions/bulk-save')
       .set('Cookie', cookie)
       .type('form')
-      .send({ title: 'President', _csrf: csrfToken });
+      .send({ newPositionTitle: 'President', _csrf: csrfToken });
     assert.equal(res.status, 200);
     assert.match(res.text, /President/);
     assert.doesNotMatch(res.text, /No admin positions added yet\./);
@@ -115,10 +115,10 @@ test('Main Admin Settings: Admins tab', async (t) => {
 
   await t.test('adding a duplicate title is a no-op, not an error', async () => {
     const res = await request(app)
-      .post('/main-admin/admins/positions')
+      .post('/main-admin/admins/positions/bulk-save')
       .set('Cookie', cookie)
       .type('form')
-      .send({ title: 'President', _csrf: csrfToken });
+      .send({ newPositionTitle: 'President', _csrf: csrfToken });
     assert.equal(res.status, 200);
     const rows = await db.prepare('SELECT id FROM admin_positions WHERE title = ?').all('President');
     assert.equal(rows.length, 1, 'still exactly one "President" row, not duplicated');

@@ -45,7 +45,7 @@ function withImage(p) {
 }
 
 async function withOptions(p) {
-  return { ...withImage(p), options: await store.availableOptionsForProduct(p.id) };
+  return { ...withImage(p), optionGroups: await store.availableOptionGroupsForProduct(p.id) };
 }
 
 const STORE_TABS = ['products', 'orders', 'archived', 'analytics'];
@@ -204,7 +204,20 @@ router.post('/orders/in-person', async (req, res) => {
   if (!memberId) return res.redirect('/main-admin/store?tab=orders&error=' + encodeURIComponent('Choose a member.'));
   const itemsInput = Array.isArray(req.body.items) ? req.body.items : Object.values(req.body.items || {});
   const items = itemsInput
-    .map((v) => ({ productId: parseInt((v || {}).productId, 10), quantity: parseInt((v || {}).quantity, 10) || 0, optionId: (v || {}).optionId ? parseInt((v || {}).optionId, 10) : null }))
+    .map((v) => ({
+      productId: parseInt((v || {}).productId, 10),
+      quantity: parseInt((v || {}).quantity, 10) || 0,
+      // One <select> per option group (see admin-store-list.ejs's own
+      // in-person sale cart) - optionValues is keyed by group id, but
+      // since a group id is itself numeric, express's qs parser may
+      // reinterpret those brackets as array indices instead of object
+      // keys (same trap this route's own header comment already flags
+      // for productId/quantity); Object.values() reads correctly either
+      // way, skipping any resulting sparse-array holes.
+      optionValueIds: Object.values((v || {}).optionValues || {})
+        .map((id) => parseInt(id, 10))
+        .filter(Boolean),
+    }))
     .filter((i) => i.productId && i.quantity > 0);
   if (items.length === 0) {
     return res.redirect('/main-admin/store?tab=orders&error=' + encodeURIComponent('Add a quantity for at least one product.'));
@@ -234,17 +247,18 @@ async function loadEditor(req, res) {
   const product = await store.getProduct(req.params.id);
   if (!product) return res.status(404).render('404', { title: 'Not Found' });
   const categories = await store.listCategories();
-  const options = await store.optionsForProduct(product.id);
+  const optionGroups = await store.optionGroupsForProduct(product.id);
   res.render('admin-store-edit', {
     title: product.name,
     product,
     categories,
-    options,
+    optionGroups,
     // "adding options to a product" replaces the old sizes text field -
     // shown read-only here (only while there's nothing better to show
     // yet) so a product set up before this change doesn't just silently
-    // lose its old sizes; an admin re-enters them as real options above.
-    legacySizes: options.length === 0 ? store.parseSizes(product.sizes) : [],
+    // lose its old sizes; an admin re-enters them as real option groups
+    // above.
+    legacySizes: optionGroups.length === 0 ? store.parseSizes(product.sizes) : [],
     imageUrl: imageUrl(product.image_key),
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -252,24 +266,12 @@ async function loadEditor(req, res) {
 }
 router.get('/:id/edit', loadEditor);
 
-// "add another option" repeater on the edit page (this file's own header
-// comment / utils/store.js's setProductOptions) - one Save button for
-// the whole list, whole-array replace rather than per-row create/update/
-// delete routes.
-router.post('/:id/options', async (req, res) => {
-  const rowsInput = Array.isArray(req.body.options) ? req.body.options : Object.values(req.body.options || {});
-  const options = rowsInput
-    .map((v) => ({
-      name: ((v || {}).name || '').trim(),
-      priceCents: Math.round(Number((v || {}).price || 0) * 100),
-      quantity: (v || {}).qty ? parseInt((v || {}).qty, 10) : null,
-      enabled: (v || {}).enabled === '1',
-    }))
-    .filter((o) => o.name && Number.isFinite(o.priceCents) && o.priceCents >= 0);
-  await store.setProductOptions(req.params.id, options);
-  res.redirect(`/main-admin/store/${req.params.id}/edit?notice=` + encodeURIComponent('Options saved.'));
-});
-
+// A real request: "only one save button at the bottom" - Details and
+// Options used to be two separate forms, each with its own Save button.
+// Both now live in the same <form> (views/admin-store-edit.ejs), so one
+// POST here saves both in a single request; the whole-tree-replace
+// behavior for options (utils/store.js's setProductOptionGroups) is
+// unchanged from when it had its own dedicated route.
 router.post('/:id', async (req, res) => {
   const id = req.params.id;
   const name = (req.body.name || '').trim();
@@ -286,6 +288,35 @@ router.post('/:id', async (req, res) => {
     categoryId: req.body.categoryId ? parseInt(req.body.categoryId, 10) : null,
     sizes: (req.body.sizes || '').trim(),
   });
+
+  // Shopify-style Group -> Values: groups[g][name] plus groups[g][values][v][...]
+  // - a value's own price is optional (blank = "no added price", not $0
+  // charged twice - see utils/store.js's own buildOrderLines for how an
+  // unset price is summed as $0 across every selected group).
+  const groupsInput = Array.isArray(req.body.groups) ? req.body.groups : Object.values(req.body.groups || {});
+  const optionGroups = groupsInput
+    .map((g) => ({
+      name: ((g || {}).name || '').trim(),
+      values: (Array.isArray((g || {}).values) ? (g || {}).values : Object.values((g || {}).values || {}))
+        .map((v) => {
+          const rawPrice = (v || {}).price;
+          let priceCents = null;
+          if (rawPrice !== undefined && String(rawPrice).trim() !== '') {
+            const cents = Math.round(Number(rawPrice) * 100);
+            if (Number.isFinite(cents) && cents >= 0) priceCents = cents;
+          }
+          return {
+            name: ((v || {}).name || '').trim(),
+            priceCents,
+            quantity: (v || {}).qty ? parseInt((v || {}).qty, 10) : null,
+            enabled: (v || {}).enabled === '1',
+          };
+        })
+        .filter((v) => v.name),
+    }))
+    .filter((g) => g.name && g.values.length > 0);
+  await store.setProductOptionGroups(id, optionGroups);
+
   res.redirect(`/main-admin/store/${id}/edit?notice=` + encodeURIComponent('Saved.'));
 });
 

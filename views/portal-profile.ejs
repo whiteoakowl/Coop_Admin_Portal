@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'My Profile',
+    navLinks: [
+      { href: '/portal', icon: 'home', label: 'My Portals' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>My Profile</h1>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%# A real request: "Clicking on the profile icon at the top on every
+        portal should be the member's full profile membership form so
+        that they can edit it. It will also have a tab for schedules,
+        event signups." %>
+    <div class="view-tabs no-print">
+      <a class="view-tab<%= activeTab === 'profile' ? ' active' : '' %>" href="/portal/profile?tab=profile">Profile</a>
+      <a class="view-tab<%= activeTab === 'schedules' ? ' active' : '' %>" href="/portal/profile?tab=schedules">Schedules</a>
+      <a class="view-tab<%= activeTab === 'signups' ? ' active' : '' %>" href="/portal/profile?tab=signups">Event Signups</a>
+    </div>
+
+    <% if (activeTab === 'profile') { %>
+      <form method="POST" action="/portal/profile" class="member-form-grid">
+        <label class="member-form-full">Name
+          <input type="text" name="name" value="<%= member.name %>" required />
+        </label>
+        <label>Address
+          <input type="text" name="address" value="<%= member.address || '' %>" />
+        </label>
+        <label>City
+          <input type="text" name="city" value="<%= member.city || '' %>" />
+        </label>
+        <label>State
+          <input type="text" name="state" value="<%= member.state || '' %>" />
+        </label>
+        <label>Zip
+          <input type="text" name="zip" value="<%= member.zip || '' %>" />
+        </label>
+        <label>Phone
+          <input type="text" name="phone" value="<%= member.phone || '' %>" />
+        </label>
+        <label>Email
+          <input type="email" name="email" value="<%= member.email || '' %>" />
+        </label>
+
+        <%# A real request: "They still can't edit the birthday and grade
+            level after joining though. They can see it but it's locked.
+            Only admin can change that on their form." Rendered disabled
+            (so nothing here ever posts a value at all - see
+            routes/portal-auth.js's own POST /portal/profile, which never
+            even reads a birthday/gradeLevel field). %>
+        <label>Birthday <span class="hint">(contact an admin to change)</span>
+          <input type="text" value="<%= member.birthday || 'Not set' %>" disabled />
+        </label>
+        <label>Grade Level <span class="hint">(contact an admin to change)</span>
+          <input type="text" value="<%= member.grade_level || 'Not set' %>" disabled />
+        </label>
+
+        <label class="member-form-full">Medical/Allergy Notes
+          <textarea name="medicalNotes" rows="3"><%= member.medical_notes || '' %></textarea>
+        </label>
+
+        <div class="member-form-full">
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    <% } else if (activeTab === 'schedules') { %>
+      <% if (schedule.length === 0) { %>
+        <p class="hint">No class schedule on file yet.</p>
+      <% } else { %>
+        <table class="roster-table">
+          <thead><tr><th>Name</th><th>Role</th><th>Day</th><th>Time</th><th>Class</th><th>Room</th></tr></thead>
+          <tbody>
+            <% schedule.forEach(function(row) { %>
+              <tr>
+                <td><%= row.memberName %></td>
+                <td><%= row.role %></td>
+                <td><%= row.day === 'monday' ? 'Monday' : 'Wednesday' %></td>
+                <td><%= row.start_time || '' %><% if (row.end_time) { %>&ndash;<%= row.end_time %><% } %></td>
+                <td><%= row.class_name %></td>
+                <td><%= row.room || '' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    <% } else { %>
+      <% if (signups.length === 0) { %>
+        <p class="hint">No event sign-ups on file yet.</p>
+      <% } else { %>
+        <table class="roster-table">
+          <thead><tr><th>Name</th><th>Event</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody>
+            <% signups.forEach(function(row) { %>
+              <tr>
+                <td><%= row.memberName %></td>
+                <td><%= row.title %></td>
+                <td><%= (row.starts_at || '').slice(0, 10) %></td>
+                <td><span class="badge-pill <%= row.status === 'confirmed' ? 'badge-pill-green' : 'badge-pill-orange' %>"><%= row.status.charAt(0).toUpperCase() + row.status.slice(1) %></span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    <% } %>
+  </main>
+</body>
+</html>

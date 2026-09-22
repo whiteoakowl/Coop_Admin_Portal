@@ -1,7 +1,8 @@
 // Coverage for the Shop feature build-out: categories (add/rename/delete,
-// now on the Products tab), per-product options (replacing the old plain
-// sizes text - see supabase/migrations/20260921010000_store_product_options.sql),
-// the multi-item In-Person Sale cart (routes/admin-store.js's own POST
+// now on the Products tab), per-product option groups/values (replacing
+// the old plain sizes text - see
+// supabase/migrations/20261005010000_store_option_groups.sql), the
+// multi-item In-Person Sale cart (routes/admin-store.js's own POST
 // /orders/in-person), and the Archived tab.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -146,23 +147,31 @@ test('a product with options requires choosing one on both online and in-person 
   const productId = await createProduct(admin, { name: 'Hoodie' });
   await activateProduct(admin, productId);
 
+  // Options save through the same POST /:id the product's own name/price
+  // already go through - see routes/admin-store.js's own comment ("only
+  // one save button at the bottom" merged the two forms into one).
   const csrf = await freshCsrf(admin, 'products');
   await request(app)
-    .post(`/main-admin/store/${productId}/options`)
+    .post(`/main-admin/store/${productId}`)
     .set('Cookie', admin.cookie)
     .type('form')
     .send({
-      'options[0][name]': 'Small',
-      'options[0][price]': '18.00',
-      'options[0][enabled]': '1',
-      'options[1][name]': 'Medium',
-      'options[1][price]': '20.00',
-      'options[1][qty]': '2',
-      'options[1][enabled]': '1',
+      name: 'Hoodie',
+      price: '10.00',
+      'groups[0][name]': 'Size',
+      'groups[0][values][0][name]': 'Small',
+      'groups[0][values][0][price]': '18.00',
+      'groups[0][values][0][enabled]': '1',
+      'groups[0][values][1][name]': 'Medium',
+      'groups[0][values][1][price]': '20.00',
+      'groups[0][values][1][qty]': '2',
+      'groups[0][values][1][enabled]': '1',
       _csrf: csrf,
     });
 
-  const options = await db.prepare('SELECT * FROM store_product_options WHERE product_id = ? ORDER BY position').all(productId);
+  const options = await db
+    .prepare('SELECT o.* FROM store_product_options o JOIN store_product_option_groups g ON g.id = o.group_id WHERE g.product_id = ? ORDER BY o.position')
+    .all(productId);
   assert.equal(options.length, 2);
   const medium = options.find((o) => o.name === 'Medium');
   assert.equal(medium.price_cents, 2000);
@@ -176,14 +185,14 @@ test('a product with options requires choosing one on both online and in-person 
     .set('Cookie', admin.cookie)
     .type('form')
     .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', _csrf: orderCsrf });
-  assert.match(decodeURIComponent(noOptionRes.headers.location), /Choose an option/);
+  assert.match(decodeURIComponent(noOptionRes.headers.location), /Choose a Size/);
 
   orderCsrf = await freshCsrf(admin, 'orders');
   const withOptionRes = await request(app)
     .post('/main-admin/store/orders/in-person')
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', 'items[0][optionId]': String(medium.id), _csrf: orderCsrf });
+    .send({ memberId: String(memberId), 'items[0][productId]': productId, 'items[0][quantity]': '1', [`items[0][optionValues][${medium.group_id}]`]: String(medium.id), _csrf: orderCsrf });
   assert.match(withOptionRes.headers.location, /\/main-admin\/store\/orders\/\d+/);
 
   const orderId = /\/main-admin\/store\/orders\/(\d+)/.exec(withOptionRes.headers.location)[1];

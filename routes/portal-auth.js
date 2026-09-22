@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { findAccountByEmail, verifyPassword, hashPassword } = require('../utils/portalAuth');
+const { findAccountByEmail, verifyPassword, hashPassword, memberForAccount, familyForAccount } = require('../utils/portalAuth');
 const { generateMemberCode } = require('../utils/members');
 const { createFailureRateLimiter } = require('../utils/loginRateLimit');
 const { GRADE_OPTIONS } = require('../utils/membership');
@@ -311,6 +311,110 @@ router.get('/portal', async (req, res) => {
 router.get('/portal/settings', (req, res) => {
   if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fsettings');
   res.render('portal-settings', { title: 'Settings' });
+});
+
+// A real request: "Clicking on the profile icon at the top on every
+// portal should be the member's full profile membership form so that
+// they can edit it. They still can't edit the birthday and grade level
+// after joining though. They can see it but it's locked. Only admin can
+// change that on their form. It will also have a tab for schedules,
+// event signups." Distinct from the gear icon above (account-level
+// settings, unchanged) - this is the member's OWN record, same fields
+// the admin-side membership form edits (partials/member-form-fields.ejs),
+// but self-service: no member type, family, admin position, or portal
+// role controls here - those stay admin-only. Shared across every
+// member-backed portal (parent/student/teacher/main_admin) since they
+// all resolve to one members row via memberForAccount; the single shared
+// Co-op Admin login (routes/admin.js) isn't tied to any one member, so
+// it keeps its own separate /admin/settings instead.
+const PROFILE_TABS = ['profile', 'schedules', 'signups'];
+
+async function renderProfile(req, res, error, notice, activeTab) {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/portal');
+  const family = await familyForAccount(req.portalAccount.id);
+  const familyIds = family.map((m) => m.id);
+  const placeholders = familyIds.map(() => '?').join(',');
+
+  let schedule = [];
+  let signups = [];
+  const tab = PROFILE_TABS.includes(activeTab) ? activeTab : 'profile';
+
+  if (tab === 'schedules') {
+    schedule = await db
+      .prepare(
+        `SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.name AS "memberName", 'Student' AS "role"
+         FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id JOIN members m ON m.id = ce.student_id
+         WHERE ce.student_id IN (${placeholders})
+         UNION ALL
+         SELECT c.day, c.hour_position, c.class_name, c.room, c.start_time, c.end_time, m.name AS "memberName",
+           CASE cs.role WHEN 'teacher' THEN 'Teacher' ELSE 'Assistant' END AS "role"
+         FROM class_staff cs JOIN classes c ON c.id = cs.class_id JOIN members m ON m.id = cs.member_id
+         WHERE cs.member_id IN (${placeholders})
+         ORDER BY day, hour_position`
+      )
+      .all(...familyIds, ...familyIds);
+  } else if (tab === 'signups') {
+    signups = await db
+      .prepare(
+        `SELECT e.id, e.title, e.starts_at, er.status, m.name AS "memberName"
+         FROM event_registrations er JOIN events e ON e.id = er.event_id JOIN members m ON m.id = er.member_id
+         WHERE er.member_id IN (${placeholders}) AND er.status != 'cancelled'
+         ORDER BY e.starts_at DESC`
+      )
+      .all(...familyIds);
+  }
+
+  res.render('portal-profile', {
+    title: 'My Profile',
+    member,
+    activeTab: tab,
+    schedule,
+    signups,
+    gradeOptions: GRADE_OPTIONS,
+    error,
+    notice,
+  });
+}
+
+router.get('/portal/profile', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  await renderProfile(req, res, req.query.error || null, req.query.notice || null, req.query.tab);
+});
+
+// Deliberately narrow - only the fields the admin-side membership form
+// also treats as "just contact info" (see partials/member-form-fields.ejs)
+// are writable here. member_type, birthday, grade_level, family_id, and
+// admin positions never appear in this request at all, so there's
+// nothing for a raw/spoofed submission to even attempt to change - not a
+// value that gets silently discarded, a field that was simply never read.
+router.post('/portal/profile', async (req, res) => {
+  if (!req.portalAccount) return res.redirect('/login?next=%2Fportal%2Fprofile');
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.redirect('/portal');
+
+  const name = (req.body.name || '').trim();
+  if (!name) {
+    return res.redirect('/portal/profile?error=' + encodeURIComponent('Name is required.'));
+  }
+
+  await db
+    .prepare(
+      `UPDATE members SET name = ?, address = ?, city = ?, state = ?, zip = ?, phone = ?, email = ?, medical_notes = ? WHERE id = ?`
+    )
+    .run(
+      name,
+      (req.body.address || '').trim() || null,
+      (req.body.city || '').trim() || null,
+      (req.body.state || '').trim() || null,
+      (req.body.zip || '').trim() || null,
+      (req.body.phone || '').trim() || null,
+      (req.body.email || '').trim() || null,
+      (req.body.medicalNotes || '').trim() || null,
+      member.id
+    );
+
+  res.redirect('/portal/profile?notice=' + encodeURIComponent('Profile updated.'));
 });
 
 module.exports = router;

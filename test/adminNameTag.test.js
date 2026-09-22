@@ -126,11 +126,13 @@ test('Member form: creating an Admin member with positions, and the position pic
   // has no place on the family-intake form at /admin/members/new -
   // "there shouldn't be any lone admins/leaders, or single members," so
   // that form only ever creates parent/student rows. Turning an existing
-  // member INTO an admin is now Main-Admin-only ("Admin roles is only
-  // chosen under settings in main admin portal" / "Choosing admins
-  // should not be on the membership profile, co-op admin portal") - so
-  // create a plain family member first, then promote them via
-  // /main-admin/members/:id/edit, not Co-op Admin's own edit route.
+  // member INTO an admin is no longer a membership-form choice at all
+  // ("There should not be admin check box on any of the membership form
+  // or profiles... Admins will simply get a star") - it's derived purely
+  // from being assigned to an Admin Position via Main Admin > Settings >
+  // Admins (utils/adminPositions.js's own syncMemberAdminStatus) - so
+  // create a plain family member first, then assign them a position
+  // there, not through either portal's own member edit form.
   await request(app)
     .post('/admin/members/new')
     .set('Cookie', cookie)
@@ -149,11 +151,11 @@ test('Member form: creating an Admin member with positions, and the position pic
 
   const { cookie: mainCookie, csrfToken: mainCsrf } = await loginAsMainAdmin();
   const promoteRes = await request(app)
-    .post(`/main-admin/members/${created.id}/edit`)
+    .post(`/main-admin/admins/positions/${presidentId}/update`)
     .set('Cookie', mainCookie)
     .type('form')
-    .send({ name: 'Pat President', memberType: 'admin', _csrf: mainCsrf });
-  assert.equal(promoteRes.status, 302);
+    .send({ memberId: String(created.id), _csrf: mainCsrf });
+  assert.equal(promoteRes.status, 200);
 
   let member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();
   assert.equal(member.member_type, 'admin');
@@ -168,14 +170,15 @@ test('Member form: creating an Admin member with positions, and the position pic
   // <select name="adminPositionId">.
   const adminEditPage = await request(app).get(`/admin/members/${created.id}/edit`).set('Cookie', cookie);
   assert.equal(adminEditPage.status, 200);
-  assert.match(adminEditPage.text, /<input type="radio" name="memberType" value="admin" checked disabled/, 'now Admin, shown as a fixed indicator');
+  assert.match(adminEditPage.text, /<input type="hidden" name="memberType" value="admin"/, 'now Admin, shown as a fixed indicator');
+  assert.doesNotMatch(adminEditPage.text, /<input type="radio" name="memberType"/);
   assert.match(adminEditPage.text, /President/, 'expected the Settings-managed position in the picker');
 
   const createRes = await request(app)
     .post(`/admin/members/${created.id}/edit`)
     .set('Cookie', cookie)
     .type('form')
-    .send({ name: 'Pat President', memberType: 'admin', adminPositionIds: [String(presidentId), String(treasurerId)], _csrf: csrfToken });
+    .send({ name: 'Pat President', adminPositionsFormPresent: '1', adminPositionIds: [String(presidentId), String(treasurerId)], _csrf: csrfToken });
   assert.equal(createRes.status, 302);
 
   member = await db.prepare("SELECT * FROM members WHERE name = 'Pat President'").get();

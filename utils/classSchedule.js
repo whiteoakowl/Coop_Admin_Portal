@@ -359,6 +359,7 @@ async function roomGridForDay(day) {
       teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
       assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
       endTimeSpan: spanFromEndTime(cls),
+      classImageUrl: classImageUrl(cls.image_key),
     });
   }
 
@@ -1090,6 +1091,7 @@ async function allClassesList(day) {
       timeLabel: await timeRangeForClass(r),
       teacherNames: staff.filter((s) => s.role === 'teacher').map((s) => s.name),
       assistantNames: staff.filter((s) => s.role === 'assistant').map((s) => s.name),
+      classImageUrl: classImageUrl(r.image_key),
     });
   }
   return list;

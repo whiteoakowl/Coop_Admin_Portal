@@ -11,7 +11,7 @@
   <main id="main-content" tabindex="-1" class="admin-main">
     <p class="subtitle no-print"><a href="/main-admin/members">&larr; Members</a></p>
     <div class="roster-toolbar">
-      <h1><%= member.name %></h1>
+      <h1><%= member.name %><% if (member.member_type === 'admin') { %> <span class="member-admin-star" title="Admin"><svg class="icon"><use href="#icon-star"/></svg></span><% } %></h1>
       <a class="primary-btn no-print" href="/main-admin/members/<%= member.id %>/edit"><svg class="icon"><use href="#icon-edit"/></svg> Edit</a>
     </div>
 

@@ -83,89 +83,133 @@ async function deleteProduct(id) {
   await db.prepare('DELETE FROM store_products WHERE id = ?').run(id);
 }
 
-// --- Product Options ("adding options to a product... a row for the
-// option title and the individual price next to it, and box for qty and
-// enable/disable button") - replaces the old plain sizes text with a
-// real per-option price/stock/enabled row. See this migration's own
-// header comment: 20260921010000_store_product_options.sql.
+// --- Product Options: a Shopify-style Group -> Values hierarchy ("On
+// main admin shop, product, when you add an option there will be sub
+// categories to add variables, each with their own price"). A product
+// can have several groups at once (e.g. "Size" AND "Color"), each shown
+// as its own dropdown at checkout; not every group's values need their
+// own price - the final price defaults to whichever one value has a set
+// price, or sums every priced value's price if more than one group has
+// one (see buildOrderLines below). See this migration's own header
+// comment: 20261005010000_store_option_groups.sql.
 
-async function optionsForProduct(productId) {
-  return db.prepare('SELECT * FROM store_product_options WHERE product_id = ? ORDER BY position, id').all(productId);
+async function optionGroupsForProduct(productId) {
+  const groups = await db.prepare('SELECT * FROM store_product_option_groups WHERE product_id = ? ORDER BY position, id').all(productId);
+  for (const group of groups) {
+    group.values = await db.prepare('SELECT * FROM store_product_options WHERE group_id = ? ORDER BY position, id').all(group.id);
+  }
+  return groups;
 }
 
-// Every option this product's own checkout should currently offer - only
-// enabled ones, and only ones still in stock (an enabled option with
-// quantity 0 is still "on" but has nothing left to sell).
-async function availableOptionsForProduct(productId) {
-  return (await optionsForProduct(productId)).filter((o) => o.enabled && (o.quantity == null || o.quantity > 0));
+// Every group/value this product's own checkout should currently offer -
+// only enabled values still in stock (an enabled value with quantity 0
+// is still "on" but has nothing left to sell), and only groups that still
+// have at least one such value.
+async function availableOptionGroupsForProduct(productId) {
+  const groups = await optionGroupsForProduct(productId);
+  return groups
+    .map((group) => ({ ...group, values: group.values.filter((v) => v.enabled && (v.quantity == null || v.quantity > 0)) }))
+    .filter((group) => group.values.length > 0);
 }
 
-// Whole-list replace, same "clear and re-insert" shape utils/forums.js's
+// Whole-tree replace, same "clear and re-insert" shape utils/forums.js's
 // own setSubscribers/updateCategorySettings already use for a short,
-// admin-curated list - simpler than diffing which rows changed, and a
-// past order already snapshotted its own option_name/unit_price_cents,
+// admin-curated list - simpler than diffing which groups/values changed,
+// and a past order already snapshotted its own option_name/
+// unit_price_cents (plus the per-value detail in store_order_item_options),
 // so replacing the live rows underneath it changes nothing about what
-// that order shows (option_id there is nullable and only ever used to
-// link back to a STILL-current option, e.g. for stock decrementing).
-async function setProductOptions(productId, options) {
+// that order shows. groups: [{ name, values: [{ name, priceCents,
+// quantity, enabled }] }].
+async function setProductOptionGroups(productId, groups) {
   await db.withTransaction(async (tx) => {
-    await tx.prepare('DELETE FROM store_product_options WHERE product_id = ?').run(productId);
-    let position = 0;
-    for (const opt of options) {
-      await tx
-        .prepare('INSERT INTO store_product_options (product_id, name, price_cents, quantity, enabled, position) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(productId, opt.name, opt.priceCents, opt.quantity ?? null, opt.enabled ? 1 : 0, position);
-      position += 1;
+    await tx.prepare('DELETE FROM store_product_option_groups WHERE product_id = ?').run(productId);
+    let groupPosition = 0;
+    for (const group of groups) {
+      const groupInfo = await tx.prepare('INSERT INTO store_product_option_groups (product_id, name, position) VALUES (?, ?, ?)').run(productId, group.name, groupPosition);
+      const groupId = groupInfo.lastInsertRowid;
+      let valuePosition = 0;
+      for (const value of group.values) {
+        await tx
+          .prepare('INSERT INTO store_product_options (group_id, name, price_cents, quantity, enabled, position) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(groupId, value.name, value.priceCents, value.quantity ?? null, value.enabled ? 1 : 0, valuePosition);
+        valuePosition += 1;
+      }
+      groupPosition += 1;
     }
   });
 }
 
 // Shared by both checkout paths: validates every item against live
-// product/option rows (never trusting a client-sent price, availability,
-// or option), decrements stock, and returns { totalCents, lineItems } or
-// throws a plain Error with a message safe to show the buyer directly.
+// product/group/value rows (never trusting a client-sent price,
+// availability, or option), decrements stock, and returns { totalCents,
+// lineItems } or throws a plain Error with a message safe to show the
+// buyer directly. items: [{ productId, quantity, optionValueIds }] -
+// optionValueIds is the id of the chosen value in each group the buyer
+// picked from (order doesn't matter, and it's fine to include ids that
+// don't apply - each group only looks for its own).
 async function buildOrderLines(items, saleType) {
   let totalCents = 0;
   const lineItems = [];
-  for (const { productId, quantity, optionId } of items) {
+  for (const { productId, quantity, optionValueIds } of items) {
     const product = await getProduct(productId);
     if (!product || product.status !== 'active') throw new Error('That item is no longer available.');
     if (product.availability !== 'both' && product.availability !== saleType) {
       throw new Error(`"${product.name}" isn't available for ${saleType === 'online' ? 'online purchase' : 'in-person sale'}.`);
     }
-    const options = await optionsForProduct(product.id);
+    const wantedIds = new Set((optionValueIds || []).map(Number));
+    const groups = await availableOptionGroupsForProduct(product.id);
+    const chosenValues = [];
+    for (const group of groups) {
+      const chosen = group.values.find((v) => wantedIds.has(v.id));
+      if (!chosen) throw new Error(`Choose a ${group.name} for "${product.name}".`);
+      if (chosen.quantity != null && quantity > chosen.quantity) {
+        throw new Error(`Only ${chosen.quantity} of "${product.name} - ${chosen.name}" left in stock.`);
+      }
+      chosenValues.push({ ...chosen, groupName: group.name });
+    }
     let unitPriceCents = product.price_cents;
-    let chosenOptionId = null;
-    let chosenOptionName = null;
-    if (options.length > 0) {
-      const option = optionId ? options.find((o) => o.id === Number(optionId) && o.enabled) : null;
-      if (!option) throw new Error(`Choose an option for "${product.name}".`);
-      if (option.quantity != null && quantity > option.quantity) {
-        throw new Error(`Only ${option.quantity} of "${product.name} - ${option.name}" left in stock.`);
+    if (chosenValues.length > 0) {
+      let sum = 0;
+      let anyPriced = false;
+      for (const value of chosenValues) {
+        if (value.quantity != null) {
+          await db.prepare('UPDATE store_product_options SET quantity = quantity - ? WHERE id = ?').run(quantity, value.id);
+        }
+        if (value.price_cents != null) {
+          sum += value.price_cents;
+          anyPriced = true;
+        }
       }
-      if (option.quantity != null) {
-        await db.prepare('UPDATE store_product_options SET quantity = quantity - ? WHERE id = ?').run(quantity, option.id);
-      }
-      unitPriceCents = option.price_cents;
-      chosenOptionId = option.id;
-      chosenOptionName = option.name;
+      unitPriceCents = anyPriced ? sum : product.price_cents;
     } else if (product.inventory_count != null && quantity > product.inventory_count) {
       throw new Error(`Only ${product.inventory_count} of "${product.name}" left in stock.`);
     }
-    if (options.length === 0 && product.inventory_count != null) {
+    if (chosenValues.length === 0 && product.inventory_count != null) {
       await db.prepare('UPDATE store_products SET inventory_count = inventory_count - ? WHERE id = ?').run(quantity, product.id);
     }
     totalCents += unitPriceCents * quantity;
-    lineItems.push({ productId: product.id, quantity, unitPriceCents, optionId: chosenOptionId, optionName: chosenOptionName });
+    lineItems.push({
+      productId: product.id,
+      quantity,
+      unitPriceCents,
+      optionId: chosenValues.length === 1 ? chosenValues[0].id : null,
+      optionName: chosenValues.length > 0 ? chosenValues.map((v) => v.name).join(', ') : null,
+      optionValues: chosenValues.map((v) => ({ id: v.id, groupName: v.groupName, name: v.name, priceCents: v.price_cents })),
+    });
   }
   return { totalCents, lineItems };
 }
 
 async function insertOrderItems(orderId, lineItems) {
   for (const li of lineItems) {
-    await db
+    const itemInfo = await db
       .prepare('INSERT INTO store_order_items (order_id, product_id, quantity, unit_price_cents, option_id, option_name) VALUES (?, ?, ?, ?, ?, ?)')
       .run(orderId, li.productId, li.quantity, li.unitPriceCents, li.optionId || null, li.optionName || null);
+    for (const value of li.optionValues || []) {
+      await db
+        .prepare('INSERT INTO store_order_item_options (order_item_id, option_id, group_name, option_name, price_cents) VALUES (?, ?, ?, ?, ?)')
+        .run(itemInfo.lastInsertRowid, value.id, value.groupName, value.name, value.priceCents);
+    }
   }
 }
 
@@ -324,9 +368,9 @@ module.exports = {
   setProductStatus,
   setProductImage,
   deleteProduct,
-  optionsForProduct,
-  availableOptionsForProduct,
-  setProductOptions,
+  optionGroupsForProduct,
+  availableOptionGroupsForProduct,
+  setProductOptionGroups,
   placeOnlineOrder,
   recordInPersonSale,
   fulfillOrder,

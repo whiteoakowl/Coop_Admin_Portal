@@ -82,12 +82,11 @@ test('an existing Admin member keeps their type when other fields are edited via
     .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Existing Admin Member', 'Existing Admin Member', 'admin')")
     .run();
 
-  await t.test('the edit form shows Admin as a fixed, disabled indicator (not a pickable Parent/Student toggle)', async () => {
+  await t.test('the edit form shows Admin as a fixed, locked indicator (not a pickable Parent/Student toggle)', async () => {
     const res = await request(app).get(`/admin/members/${adminId}/edit`).set('Cookie', cookie);
     assert.equal(res.status, 200);
-    assert.match(res.text, /<input type="radio" name="memberType" value="admin" checked disabled/);
-    assert.doesNotMatch(res.text, /<input type="radio" name="memberType" value="parent"/);
-    assert.doesNotMatch(res.text, /<input type="radio" name="memberType" value="student"/);
+    assert.match(res.text, /<input type="hidden" name="memberType" value="admin"/);
+    assert.doesNotMatch(res.text, /<input type="radio" name="memberType"/, 'Admin status is never a pickable radio, on any portal, anymore');
   });
 
   await t.test('editing the phone number keeps member_type as admin', async () => {

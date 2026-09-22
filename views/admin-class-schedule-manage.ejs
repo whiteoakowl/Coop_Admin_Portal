@@ -43,10 +43,15 @@
             </label>
             <div class="member-form-full">
               <span class="roster-checkbox-label">Class Photo</span>
-              <% if (classImageUrl) { %>
-                <img src="<%= classImageUrl %>" alt="" style="max-width: 240px; border-radius: var(--radius); display: block; margin-bottom: 0.5rem;" />
-              <% } %>
-              <input type="file" name="image" accept="image/*" />
+              <%# A real request: "the class photo should automatically show
+                  the image under class settings before saving" - same
+                  data-class-image-input/data-class-image-preview + always-
+                  rendered (display toggled, not conditionally rendered) img
+                  pattern public/js/class-image-preview.js and the Event
+                  Image upload already use, so the just-chosen file shows
+                  immediately without waiting for the form to actually save. %>
+              <img src="<%= classImageUrl || '' %>" alt="" data-class-image-preview style="max-width: 240px; border-radius: var(--radius); display: <%= classImageUrl ? 'block' : 'none' %>; margin-bottom: 0.5rem;" />
+              <input type="file" name="image" accept="image/*" data-class-image-input />
             </div>
             <div>
               <label class="roster-checkbox-label">Color</label>
@@ -330,5 +335,6 @@
   </main>
   <script src="/js/forum-editor.js"></script>
   <script src="/js/multi-select-checkbox.js"></script>
+  <script src="/js/class-image-preview.js"></script>
 </body>
 </html>

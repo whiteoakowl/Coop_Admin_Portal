@@ -238,10 +238,16 @@ function memberFormFields(req) {
     // plain <select>) with a checkbox multi-select, same "array of ids,
     // gated to the one member type that actually shows the field" shape
     // as cleanupTeamIds just above.
+    // req.body.adminPositionsFormPresent (a hidden marker, always
+    // submitted alongside these checkboxes - see partials/member-form-
+    // fields.ejs's own comment) distinguishes a real form save (resync to
+    // exactly what's checked, however many that is) from a raw/partial
+    // request that skips the form entirely (undefined here means "leave
+    // existing positions untouched," never "clear them").
     adminPositionIds:
-      memberType === 'admin'
+      req.body.adminPositionsFormPresent === '1'
         ? [].concat(req.body.adminPositionIds || []).map((id) => parseInt(id, 10)).filter(Boolean)
-        : null,
+        : undefined,
   };
 }
 

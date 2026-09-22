@@ -23,7 +23,7 @@
         class="member-edit-form member-edit-form-page"
         data-add-family-url="/main-admin/members/families/new"
       >
-        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels, adminPositions, memberAdminPositionIds, allowAdminType: true }) %>
+        <%- include('partials/member-form-fields', { member, mode, families, memberFamilyId, setupTeams, memberCleanupTeamIds, gradeLevels, adminPositions, memberAdminPositionIds }) %>
 
         <%# A real request: "when editing a member profile, there is a
             button that says add parent/student. when you click this

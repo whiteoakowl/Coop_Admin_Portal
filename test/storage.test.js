@@ -9,13 +9,13 @@
 // expects, and handle its documented { error } result shape correctly.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { uploadFile, deleteFile, publicUrl, downloadFile, generateKey, createStorageClient } = require('../utils/storage');
+const { uploadFile, deleteFile, publicUrl, downloadFile, generateKey, createStorageClient, createSignedUploadUrl } = require('../utils/storage');
 
 // Mirrors @supabase/supabase-js's client.storage.from(bucket).upload/remove/
 // download shape closely enough to prove utils/storage.js calls it
 // correctly, without needing the real package's network behavior.
-function fakeClient({ uploadError = null, removeError = null, downloadError = null, downloadBytes = null } = {}) {
-  const calls = { uploads: [], removes: [], downloads: [] };
+function fakeClient({ uploadError = null, removeError = null, downloadError = null, downloadBytes = null, signedUploadError = null } = {}) {
+  const calls = { uploads: [], removes: [], downloads: [], signedUploads: [] };
   return {
     calls,
     storage: {
@@ -34,6 +34,11 @@ function fakeClient({ uploadError = null, removeError = null, downloadError = nu
             if (downloadError) return { data: null, error: downloadError };
             const bytes = downloadBytes || Buffer.from('fake file bytes');
             return { data: { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) }, error: null };
+          },
+          async createSignedUploadUrl(key) {
+            calls.signedUploads.push({ bucket, key });
+            if (signedUploadError) return { data: null, error: signedUploadError };
+            return { data: { signedUrl: `https://example.supabase.co/storage/v1/object/upload/sign/${bucket}/${key}?token=fake-token`, path: key, token: 'fake-token' }, error: null };
           },
         };
       },
@@ -98,6 +103,26 @@ test('downloadFile', async (t) => {
     await assert.rejects(
       downloadFile(client, 'documents', 'missing.pdf'),
       /Supabase Storage download failed \(documents\/missing\.pdf\): object not found/
+    );
+  });
+});
+
+test('createSignedUploadUrl', async (t) => {
+  await t.test('generates a key, asks Storage to sign it, and returns both', async () => {
+    const client = fakeClient();
+    const { key, uploadUrl } = await createSignedUploadUrl(client, 'documents', 'Handbook.pdf');
+    assert.equal(client.calls.signedUploads.length, 1);
+    assert.equal(client.calls.signedUploads[0].bucket, 'documents');
+    assert.equal(client.calls.signedUploads[0].key, key);
+    assert.match(key, /\.pdf$/);
+    assert.equal(uploadUrl, `https://example.supabase.co/storage/v1/object/upload/sign/documents/${key}?token=fake-token`);
+  });
+
+  await t.test('throws with a clear message when Supabase reports an error', async () => {
+    const client = fakeClient({ signedUploadError: { message: 'bucket not found' } });
+    await assert.rejects(
+      createSignedUploadUrl(client, 'documents', 'Handbook.pdf'),
+      /Supabase Storage signed upload URL failed \(documents\/.*\): bucket not found/
     );
   });
 });

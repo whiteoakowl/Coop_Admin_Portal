@@ -199,3 +199,26 @@ test('an account cannot buy for a member outside its own family, and cannot view
   const view = await request(app).get(`/store/orders/${orderId}`).set('Cookie', parentA.cookie);
   assert.equal(view.status, 403);
 });
+
+test('a real request: "change shop product card to look similar" - image left, In Stock/Out of Stock badge, price + stock count row, and an order CTA', async () => {
+  const admin = await loginAsMainAdmin();
+  const inStockId = await createActiveProduct(admin, { name: 'Card In Stock Widget', inventoryCount: '3' });
+  const outOfStockId = await createActiveProduct(admin, { name: 'Card Out Of Stock Widget', inventoryCount: '0' });
+  const parent = await createParentAccount();
+
+  const page = await request(app).get('/store').set('Cookie', parent.cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.text, /class="store-product-grid"/);
+
+  const inStockStart = page.text.indexOf('Card In Stock Widget');
+  const inStockCard = page.text.slice(page.text.lastIndexOf('<a class="store-product-card"', inStockStart), page.text.indexOf('</a>', inStockStart));
+  assert.match(inStockCard, /badge-pill-green">In Stock</);
+  assert.match(inStockCard, /\$15\.00/);
+  assert.match(inStockCard, /3 in stock/);
+  assert.match(inStockCard, /View &amp; Order/);
+
+  const outOfStockStart = page.text.indexOf('Card Out Of Stock Widget');
+  const outOfStockCard = page.text.slice(page.text.lastIndexOf('<a class="store-product-card"', outOfStockStart), page.text.indexOf('</a>', outOfStockStart));
+  assert.match(outOfStockCard, /badge-pill-gray">Out of Stock</);
+  assert.match(outOfStockCard, /0 in stock/);
+});

@@ -23,6 +23,9 @@ const {
   listAdminPositions,
   addAdminPosition,
   deleteAdminPosition,
+  renameAdminPosition,
+  permissionIdsForPosition,
+  setPositionPermissions,
   addAdminPositionForMember,
   removeAdminPositionForMember,
   membersByAdminPosition,
@@ -132,11 +135,42 @@ router.get('/quick-links', (req, res) => {
 // tab should be located under the main admin portal settings gear as a
 // tab. it should not be on co-op admin portal.") ---
 
+// A real request: "one blue button that says add/edit admin position and
+// one for printing the admin roster list... you can click on each admin
+// position in the list and it will open an edit window. Here you can add
+// a member from the drop down list. Add email address, add phone number.
+// Then the roles and permissions are listed below... Admin list grid
+// show admin position, admin name, phone, email, trash can." rows is one
+// entry per (position, member) pair - a position with several leaders
+// (the old "Add Leaders" dialog was additive, several people can share
+// one title) gets one row per leader; a position with no one assigned
+// yet still gets its own single row (member: null) so it stays visible
+// and manageable. permissions/positionPermissionIds power each
+// position's own "roles and permissions" checkbox grid - confirmed with
+// the requester that a permission belongs to the POSITION itself (every
+// current and future holder shares it), same shape
+// routes/main-admin.js's own POST /roles/:id/permissions already uses
+// for role_permissions, just scoped to an admin_position instead.
 async function renderAdmins(req, res, error, notice) {
+  const adminPositions = await listAdminPositions();
+  const leadersByPosition = await membersByAdminPosition();
+  const permissions = await db.prepare('SELECT * FROM permissions ORDER BY label').all();
+  const positionPermissionIds = {};
+  for (const p of adminPositions) positionPermissionIds[p.id] = await permissionIdsForPosition(p.id);
+
+  const rows = [];
+  for (const p of adminPositions) {
+    const leaders = leadersByPosition[p.id] || [];
+    if (leaders.length === 0) rows.push({ position: p, member: null });
+    else for (const leader of leaders) rows.push({ position: p, member: leader });
+  }
+
   res.render('main-admin-admins', {
     title: 'Admins',
-    adminPositions: await listAdminPositions(),
-    leadersByPosition: await membersByAdminPosition(),
+    adminPositions,
+    rows,
+    permissions,
+    positionPermissionIds,
     memberOptions: await activeMemberOptions(),
     error,
     notice,
@@ -147,11 +181,21 @@ router.get('/admins', requirePortalPermission('manage_users'), async (req, res) 
   await renderAdmins(req, res, req.query.error || null, req.query.notice || null);
 });
 
-router.post('/admins/positions', requirePortalPermission('manage_users'), async (req, res) => {
-  const title = (req.body.title || '').trim();
-  if (!title) return renderAdmins(req, res, 'Position title is required.', null);
-  await addAdminPosition(title);
-  await renderAdmins(req, res, null, `Added "${title}".`);
+// "Add/Edit Admin Position" button - one popup listing every existing
+// position with its own rename input + delete, plus a "new position"
+// field at the bottom, one Save for all of it - same shape Shop's own
+// Add/Edit Category popup already uses (routes/admin-store.js's own
+// POST /categories/bulk-save).
+router.post('/admins/positions/bulk-save', requirePortalPermission('manage_users'), async (req, res) => {
+  const ids = [].concat(req.body.positionId || []);
+  const titles = [].concat(req.body.positionTitle || []);
+  for (let i = 0; i < ids.length; i++) {
+    const renamedTitle = (titles[i] || '').trim();
+    if (renamedTitle) await renameAdminPosition(parseInt(ids[i], 10), renamedTitle);
+  }
+  const newTitle = (req.body.newPositionTitle || '').trim();
+  if (newTitle) await addAdminPosition(newTitle);
+  await renderAdmins(req, res, null, 'Positions saved.');
 });
 
 router.post('/admins/positions/:id/delete', requirePortalPermission('manage_users'), async (req, res) => {
@@ -159,14 +203,26 @@ router.post('/admins/positions/:id/delete', requirePortalPermission('manage_user
   await renderAdmins(req, res, null, 'Position removed.');
 });
 
-router.post('/admins/positions/assign', requirePortalPermission('manage_users'), async (req, res) => {
-  const memberId = parseInt(req.body.memberId, 10);
-  const positionId = parseInt(req.body.positionId, 10);
-  if (!memberId || !positionId) {
-    return renderAdmins(req, res, 'Choose both a member and a position.', null);
+// Each admin position's own edit window. A chosen member is ADDED (same
+// additive "never replaces whoever else already holds this position"
+// behavior the old Add Leaders dialog had) - re-selecting someone who
+// already holds it is a harmless no-op, letting this same dropdown also
+// double as "update this existing leader's contact info" without a
+// separate control. Permissions replace the position's whole set.
+router.post('/admins/positions/:id/update', requirePortalPermission('manage_users'), async (req, res) => {
+  const positionId = parseInt(req.params.id, 10);
+  const permissionIds = [].concat(req.body.permissionIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
+  await setPositionPermissions(positionId, permissionIds);
+
+  const memberId = req.body.memberId ? parseInt(req.body.memberId, 10) : null;
+  if (memberId) {
+    await addAdminPositionForMember(memberId, positionId);
+    const email = (req.body.email || '').trim();
+    const phone = (req.body.phone || '').trim();
+    await db.prepare('UPDATE members SET email = ?, phone = ? WHERE id = ?').run(email || null, phone || null, memberId);
   }
-  await addAdminPositionForMember(memberId, positionId);
-  await renderAdmins(req, res, null, 'Leader added.');
+
+  await renderAdmins(req, res, null, 'Saved.');
 });
 
 router.post('/admins/positions/:positionId/members/:memberId/remove', requirePortalPermission('manage_users'), async (req, res) => {

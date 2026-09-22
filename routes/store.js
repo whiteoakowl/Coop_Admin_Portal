@@ -25,9 +25,30 @@ function withImageUrl(product) {
 
 router.use(requirePortalAuth);
 
+// A real request: "change shop product card to look similar [to a
+// reference design: image left, In Stock/Out of Stock badge, price and
+// stock count on one row, a prominent order button]." A product WITH
+// options is in stock as long as at least one of its enabled options
+// still has room (or is unlimited - quantity null); a stock COUNT is
+// only shown for the simple no-options case, where inventory_count is a
+// single real number rather than one per option.
+async function withStockInfo(product) {
+  const groups = await store.optionGroupsForProduct(product.id);
+  const hasOptions = groups.length > 0;
+  // In stock only if every group still has at least one enabled, in-stock
+  // value to pick from - a group with nothing left to choose makes the
+  // whole product unbuyable, same as buildOrderLines' own "Choose a
+  // {group} for..." requirement.
+  const inStock = hasOptions
+    ? groups.every((g) => g.values.some((v) => v.enabled && (v.quantity == null || v.quantity > 0)))
+    : product.inventory_count == null || product.inventory_count > 0;
+  const stockCount = !hasOptions && product.inventory_count != null ? product.inventory_count : null;
+  return { ...withImageUrl(product), inStock, stockCount };
+}
+
 router.get('/', async (req, res) => {
   const products = await store.listProducts({ status: 'active', availability: 'online' });
-  res.render('store-list', { title: 'Store', products: products.map(withImageUrl) });
+  res.render('store-list', { title: 'Store', products: await Promise.all(products.map(withStockInfo)) });
 });
 
 router.get('/orders', async (req, res) => {
@@ -54,8 +75,8 @@ router.get('/:id', async (req, res) => {
     return res.status(404).render('404', { title: 'Not Found' });
   }
   const family = await familyForAccount(req.portalAccount.id);
-  const options = await store.availableOptionsForProduct(product.id);
-  res.render('store-detail', { title: product.name, product: withImageUrl(product), options, family, error: req.query.error || null });
+  const optionGroups = await store.availableOptionGroupsForProduct(product.id);
+  res.render('store-detail', { title: product.name, product: withImageUrl(product), optionGroups, family, error: req.query.error || null });
 });
 
 router.post('/:id/buy', async (req, res) => {
@@ -65,9 +86,16 @@ router.post('/:id/buy', async (req, res) => {
     return res.redirect(`/store/${req.params.id}?error=` + encodeURIComponent('You can only buy for yourself or your own family.'));
   }
   const quantity = Math.max(1, parseInt(req.body.quantity, 10) || 1);
-  const optionId = req.body.optionId ? parseInt(req.body.optionId, 10) : null;
+  // One <select> per option group (views/store-detail.ejs) - see
+  // routes/admin-store.js's own in-person sale route for why
+  // Object.values() (not assuming an array) is the safe way to read this
+  // regardless of whether express's qs parser treated the group-id keys
+  // as object keys or array indices.
+  const optionValueIds = Object.values(req.body.optionValues || {})
+    .map((id) => parseInt(id, 10))
+    .filter(Boolean);
   try {
-    const orderId = await store.placeOnlineOrder(memberId, req.portalAccount.id, [{ productId: req.params.id, quantity, optionId }]);
+    const orderId = await store.placeOnlineOrder(memberId, req.portalAccount.id, [{ productId: req.params.id, quantity, optionValueIds }]);
     res.redirect(`/store/orders/${orderId}`);
   } catch (err) {
     res.redirect(`/store/${req.params.id}?error=` + encodeURIComponent(err.message));

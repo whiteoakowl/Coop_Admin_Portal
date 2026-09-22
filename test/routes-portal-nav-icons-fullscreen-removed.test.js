@@ -83,7 +83,12 @@ test('Parent Portal (portal-nav.ejs): no Full Screen View button/script, My Prof
   assert.doesNotMatch(page.text, /Full Screen View/);
   assert.doesNotMatch(page.text, /fullscreen-toggle\.js/);
 
-  assert.match(page.text, /<a class="admin-corner-link" href="\/portal\/settings">\s*<svg class="icon"><use href="#icon-user-circle"\/><\/svg>\s*My Profile/);
+  // A later real request: "Clicking on the profile icon at the top on
+  // every portal should be the member's full profile membership form so
+  // that they can edit it" - My Profile now points at /portal/profile
+  // (views/portal-profile.ejs), not the generic account-settings page
+  // settingsHref still resolves to for the gear icon.
+  assert.match(page.text, /<a class="admin-corner-link" href="\/portal\/profile">\s*<svg class="icon"><use href="#icon-user-circle"\/><\/svg>\s*My Profile/);
   assert.match(page.text, /aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"\/>/);
 });
 

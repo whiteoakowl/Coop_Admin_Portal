@@ -27,10 +27,21 @@
             <a class="class-card-link" href="/student/classes/<%= c.id %>">
               <div class="class-card-color-bar" style="background:<%= c.color %>"></div>
               <div class="class-card-body">
-                <h3 class="class-card-title"><%= c.class_name %></h3>
-                <p class="class-card-meta"><%= c.dayLabel %> &middot; <%= c.timeLabel %></p>
-                <p class="class-card-meta"><%= c.room || 'No room set' %></p>
-                <p class="class-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                <%# Same class-card-thumb-row pattern as the Parent Portal's
+                    own class cards (views/parent-classes.ejs) - a real
+                    request: "the class image should show on the left side
+                    of the class card." %>
+                <div class="class-card-thumb-row">
+                  <% if (c.classImageUrl) { %>
+                    <img class="class-card-thumb" src="<%= c.classImageUrl %>" alt="" />
+                  <% } %>
+                  <div class="class-card-thumb-content">
+                    <h3 class="class-card-title"><%= c.class_name %></h3>
+                    <p class="class-card-meta"><%= c.dayLabel %> &middot; <%= c.timeLabel %></p>
+                    <p class="class-card-meta"><%= c.room || 'No room set' %></p>
+                    <p class="class-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                  </div>
+                </div>
               </div>
             </a>
             <% if (c.allow_student_register && c.allow_cancel) { %>

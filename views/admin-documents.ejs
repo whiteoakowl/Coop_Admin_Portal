@@ -6,13 +6,21 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Documents</h1>
+    <div class="grid-box-header">
+      <h1>Documents</h1>
+      <%# A real request: "document upload is currently under settings.
+          It should move to the documents page and be a button called
+          add/edit documents." Replaces the old Settings > Documents tab
+          (views/admin-settings.ejs) entirely - upload, the existing
+          list, Copy Link, and delete all live in this one popup now. %>
+      <button type="button" class="primary-btn" onclick="document.getElementById('manage-documents-dialog').showModal()">Add/Edit Documents</button>
+    </div>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <% if (documents.length === 0) { %>
-      <p class="hint">No documents uploaded yet. Add one from <a href="/admin/settings?tab=documents">Settings &rarr; Documents</a>.</p>
+      <p class="hint">No documents uploaded yet. Add one with Add/Edit Documents above.</p>
     <% } else { %>
       <%
         var docColors = ['landing-card-orange', 'landing-card-purple', 'landing-card-green'];
@@ -20,12 +28,89 @@
       <div class="landing-grid documents-grid">
         <% documents.forEach(function(d, i) { %>
           <a class="landing-card <%= docColors[i % docColors.length] %>" href="/admin/documents/<%= d.id %>/view">
-            <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+            <%# A real request: "on the document click card with title
+                below it, all one card" - the image (when set) replaces
+                the generic file icon, title stays below it either way. %>
+            <% if (d.image_path) { %>
+              <img class="landing-card-image" src="/admin/documents/<%= d.id %>/image" alt="" />
+            <% } else { %>
+              <span class="landing-icon"><svg class="icon"><use href="#icon-file-text"/></svg></span>
+            <% } %>
             <span class="landing-label"><%= d.title %></span>
           </a>
         <% }); %>
       </div>
     <% } %>
+
+    <dialog id="manage-documents-dialog" class="member-picker-dialog">
+      <h3>Add/Edit Documents</h3>
+
+      <div class="manage-section">
+        <h4>Upload Document</h4>
+        <p class="hint">Add a PDF or Word document to show as a card on this page. An optional image shows on its line below and on its own card.</p>
+        <% if (storageConfigured) { %>
+          <form id="document-upload-form" data-direct-upload="true" class="stack-form stack-form-narrow">
+            <label for="docTitle">Title</label>
+            <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
+
+            <label for="docFile">File (PDF or Word)</label>
+            <input id="docFile" name="file" type="file" accept=".pdf,.doc,.docx" required />
+
+            <label for="docImage">Image (optional)</label>
+            <input id="docImage" name="image" type="file" accept="image/*" />
+
+            <button type="submit" class="primary-btn">Upload</button>
+            <p class="hint" data-upload-status></p>
+          </form>
+        <% } else { %>
+          <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data" class="stack-form stack-form-narrow">
+            <label for="docTitle">Title</label>
+            <input id="docTitle" name="title" type="text" placeholder="e.g. Parent Handbook" />
+
+            <label for="docFile">File (PDF or Word)</label>
+            <input id="docFile" name="file" type="file" accept=".pdf,.doc,.docx" required />
+
+            <label for="docImage">Image (optional)</label>
+            <input id="docImage" name="image" type="file" accept="image/*" />
+
+            <button type="submit" class="primary-btn">Upload</button>
+          </form>
+        <% } %>
+      </div>
+
+      <div class="manage-section">
+        <h4>Uploaded Documents</h4>
+        <% if (documents.length === 0) { %>
+          <p class="hint">No documents uploaded yet.</p>
+        <% } else { %>
+          <div class="store-options-list">
+            <% documents.forEach(function(d) { %>
+              <div class="document-manage-row">
+                <% if (d.image_path) { %>
+                  <img class="document-manage-row-thumb" src="/admin/documents/<%= d.id %>/image" alt="" />
+                <% } %>
+                <div class="document-manage-row-info">
+                  <span class="document-manage-row-title"><%= d.title %></span>
+                  <span class="hint"><%= d.original_name %></span>
+                </div>
+                <div class="roster-btn-row">
+                  <button type="button" class="roster-action-btn" data-copy-link="<%= publicOrigin %>/documents/<%= d.public_token %>">Copy Link</button>
+                  <form method="POST" action="/admin/documents/<%= d.id %>/delete" data-confirm="Delete &quot;<%= d.title %>&quot;?">
+                    <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete <%= d.title %>" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>
+                  </form>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="notes-dialog-actions">
+        <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Close</button>
+      </div>
+    </dialog>
   </main>
+  <script src="/js/document-upload.js"></script>
+  <script src="/js/copy-link.js"></script>
 </body>
 </html>

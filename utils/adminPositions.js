@@ -13,6 +13,10 @@ async function listAdminPositions() {
   return db.prepare('SELECT * FROM admin_positions ORDER BY position, LOWER(title)').all();
 }
 
+async function getAdminPosition(id) {
+  return db.prepare('SELECT * FROM admin_positions WHERE id = ?').get(id);
+}
+
 async function nextPosition() {
   const row = await db.prepare('SELECT MAX(position) AS "maxPos" FROM admin_positions').get();
   return (row && row.maxPos != null ? row.maxPos : -1) + 1;
@@ -38,6 +42,65 @@ async function addAdminPosition(title) {
 // setup_teams' own leader_id/members relationship.
 async function deleteAdminPosition(id) {
   await db.prepare('DELETE FROM admin_positions WHERE id = ?').run(id);
+}
+
+async function renameAdminPosition(id, title) {
+  await db.prepare('UPDATE admin_positions SET title = ? WHERE id = ?').run(title, id);
+}
+
+async function permissionIdsForPosition(positionId) {
+  return (await db.prepare('SELECT permission_id AS "id" FROM admin_position_permissions WHERE admin_position_id = ?').all(positionId)).map((r) => r.id);
+}
+
+// Whole-list replace, same "clear and re-insert" shape
+// routes/main-admin.js's own POST /roles/:id/permissions already uses for
+// role_permissions - confirmed with the requester that permissions belong
+// to the POSITION itself (every current and future holder shares the
+// same set), not configured per individual person.
+async function setPositionPermissions(positionId, permissionIds) {
+  await db.withTransaction(async (tx) => {
+    await tx.prepare('DELETE FROM admin_position_permissions WHERE admin_position_id = ?').run(positionId);
+    for (const permissionId of permissionIds) {
+      await tx.prepare('INSERT INTO admin_position_permissions (admin_position_id, permission_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(positionId, permissionId);
+    }
+  });
+}
+
+// A real request: "There should not be admin check box on any of the
+// membership form or profiles... Admins will simply get a star next to
+// their member name." member_type's own 'admin' value (see
+// partials/member-form-fields.ejs) is no longer settable from the form -
+// it's derived instead, purely from whether a member holds any admin
+// position at all. Holding a position also grants the Main Admin portal
+// role itself (member_account_roles), same reasoning: a position with
+// checked permissions is meaningless if the person still can't log into
+// the portal those permissions apply to - that's the whole point of "we
+// won't need a separate roles/permissions tab," an admin position now
+// fully replaces both the old manual role grant AND the old manual
+// Admin-type toggle.
+async function syncMemberAdminStatus(memberId) {
+  const countRow = await db.prepare('SELECT COUNT(*) AS "count" FROM member_admin_positions WHERE member_id = ?').get(memberId);
+  const holdsAny = Number(countRow.count) > 0;
+
+  const member = await db.prepare('SELECT member_type FROM members WHERE id = ?').get(memberId);
+  if (member) {
+    if (holdsAny && member.member_type !== 'admin') {
+      await db.prepare("UPDATE members SET member_type = 'admin' WHERE id = ?").run(memberId);
+    } else if (!holdsAny && member.member_type === 'admin') {
+      await db.prepare("UPDATE members SET member_type = 'parent' WHERE id = ?").run(memberId);
+    }
+  }
+
+  const account = await db.prepare('SELECT id FROM member_accounts WHERE member_id = ?').get(memberId);
+  if (!account) return;
+  const mainAdminRole = await db.prepare("SELECT id FROM roles WHERE key = 'main_admin'").get();
+  if (!mainAdminRole) return;
+  const hasRole = await db.prepare('SELECT 1 AS "x" FROM member_account_roles WHERE member_account_id = ? AND role_id = ?').get(account.id, mainAdminRole.id);
+  if (holdsAny && !hasRole) {
+    await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?) ON CONFLICT DO NOTHING').run(account.id, mainAdminRole.id);
+  } else if (!holdsAny && hasRole) {
+    await db.prepare('DELETE FROM member_account_roles WHERE member_account_id = ? AND role_id = ?').run(account.id, mainAdminRole.id);
+  }
 }
 
 // A real request: "ability to add unlimited admin positions to a member
@@ -102,11 +165,23 @@ async function adminPositionTitlesForMembers(memberIds) {
 // syncCleanupTeams, so saving the member form with every checkbox
 // unchecked correctly clears a member who's no longer holding any
 // position (e.g. converted away from admin), not just a no-op.
+//
+// positionIds === undefined is a distinct case from null/[] - "the
+// admin-positions form section wasn't actually submitted at all" (a raw
+// request that skips the form, per routes/admin-members.js's own
+// memberFormFields and its adminPositionsFormPresent marker), not "clear
+// every position." Treating the two the same would let an incomplete
+// request silently strip an existing Admin of every position - and, now
+// that syncMemberAdminStatus below derives member_type/the Main Admin
+// role from position count, silently demote them too.
 async function syncMemberAdminPositions(memberId, positionIds) {
+  if (positionIds === undefined) return;
   await db.prepare('DELETE FROM member_admin_positions WHERE member_id = ?').run(memberId);
-  if (!positionIds) return;
-  const link = db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?) ON CONFLICT (member_id, admin_position_id) DO NOTHING');
-  for (const positionId of positionIds) await link.run(memberId, positionId);
+  if (positionIds) {
+    const link = db.prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?) ON CONFLICT (member_id, admin_position_id) DO NOTHING');
+    for (const positionId of positionIds) await link.run(memberId, positionId);
+  }
+  await syncMemberAdminStatus(memberId);
 }
 
 // A real request: "there should also be a button that says add leaders.
@@ -121,24 +196,25 @@ async function addAdminPositionForMember(memberId, positionId) {
   await db
     .prepare('INSERT INTO member_admin_positions (member_id, admin_position_id) VALUES (?, ?) ON CONFLICT (member_id, admin_position_id) DO NOTHING')
     .run(memberId, positionId);
+  await syncMemberAdminStatus(memberId);
 }
 
 async function removeAdminPositionForMember(memberId, positionId) {
   await db.prepare('DELETE FROM member_admin_positions WHERE member_id = ? AND admin_position_id = ?').run(memberId, positionId);
+  await syncMemberAdminStatus(memberId);
 }
 
 // Every current member<->position assignment, grouped by position - powers
-// the Admins settings tab's "each admin name next to their position"
-// listing (and its own per-name Remove button) underneath the plain
-// title/delete rows the Add Admin Position form above it manages. Returns
-// { [positionId]: [{ id, name, email }, ...] }, each list ordered by
-// member name. email is included for the Committees "pick a leader"
-// dropdown (routes/main-admin-volunteers.js), which needs it to show
-// "the leader's name and email" without a second query per pick.
+// the Admins page's "each admin name next to their position" listing
+// (and its own per-name Remove button). Returns { [positionId]: [{ id,
+// name, email, phone }, ...] }, each list ordered by member name. email/
+// phone are included for the Committees "pick a leader" dropdown
+// (routes/main-admin-volunteers.js) and for the Admins grid's own Phone/
+// Email columns, without a second query per row.
 async function membersByAdminPosition() {
   const rows = await db
     .prepare(
-      `SELECT map.admin_position_id AS "positionId", m.id, m.name, m.email
+      `SELECT map.admin_position_id AS "positionId", m.id, m.name, m.email, m.phone
        FROM member_admin_positions map JOIN members m ON m.id = map.member_id
        ORDER BY LOWER(m.name)`
     )
@@ -146,15 +222,20 @@ async function membersByAdminPosition() {
   const byPosition = {};
   for (const row of rows) {
     if (!byPosition[row.positionId]) byPosition[row.positionId] = [];
-    byPosition[row.positionId].push({ id: row.id, name: row.name, email: row.email });
+    byPosition[row.positionId].push({ id: row.id, name: row.name, email: row.email, phone: row.phone });
   }
   return byPosition;
 }
 
 module.exports = {
   listAdminPositions,
+  getAdminPosition,
   addAdminPosition,
   deleteAdminPosition,
+  renameAdminPosition,
+  permissionIdsForPosition,
+  setPositionPermissions,
+  syncMemberAdminStatus,
   adminPositionIdsForMember,
   adminPositionTitlesForMember,
   adminPositionTitlesForMembers,

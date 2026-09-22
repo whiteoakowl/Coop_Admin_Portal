@@ -89,6 +89,10 @@ const adminRouter = require('./routes/admin');
 const adminRostersRouter = require('./routes/admin-rosters');
 const adminLogsRouter = require('./routes/admin-logs');
 const adminDocumentsRouter = require('./routes/admin-documents');
+// Public, unauthenticated document pages (share link) - see that file's
+// own header comment for why this is a separate router from admin-
+// documents.js's requireFullAdmin-gated management routes.
+const documentsRouter = require('./routes/documents');
 const adminLibraryRouter = require('./routes/admin-library');
 const adminDesignRouter = require('./routes/admin-design');
 const adminMiscBadgesRouter = require('./routes/admin-misc-badges');
@@ -417,6 +421,7 @@ app.use('/main-admin/babysitters', mainAdminBabysittersRouter);
 app.use('/main-admin/volunteers', mainAdminVolunteersRouter);
 app.use('/committees', committeesRouter);
 app.use('/', signupVolunteerListsRouter);
+app.use('/documents', documentsRouter);
 app.use('/main-admin/sections', mainAdminSectionsRouter);
 app.use('/main-admin/name-tags', mainAdminNameTagsRouter);
 app.use('/main-admin', mainAdminTrainingRouter);

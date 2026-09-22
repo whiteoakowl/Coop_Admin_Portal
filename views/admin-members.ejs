@@ -183,6 +183,14 @@
             <div class="member-row-body">
               <div class="member-row-topline">
                 <a class="member-row-name-link" href="/admin/members/<%= m.id %>"><%= m.name %></a><%- include('partials/medical-flag', { member: m }) %>
+                <%# A real request: "Admins will simply get a star next to
+                    their member name" - member_type === 'admin' is now
+                    fully derived from holding an Admin Position (utils/
+                    adminPositions.js's own syncMemberAdminStatus), never
+                    a manually-chosen checkbox on this form. %>
+                <% if (m.member_type === 'admin') { %>
+                  <span class="member-admin-star" title="Admin"><svg class="icon"><use href="#icon-star"/></svg></span>
+                <% } %>
                 <%# A real request: "member rows remove primary column.
                     it can already be seen when viewing the profile" - the
                     profile page already shows Primary Parent status. %>

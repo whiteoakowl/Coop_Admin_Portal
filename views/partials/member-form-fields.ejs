@@ -6,19 +6,22 @@
 //
 // locals: member, mode ('create'|'edit'), families (with memberCount),
 // memberFamilyId, setupTeams (with memberCount), memberCleanupTeamIds,
-// gradeLevels, adminPositions, memberAdminPositionIds, allowAdminType
+// gradeLevels, adminPositions, memberAdminPositionIds
 //
-// allowAdminType: "Choosing admins should not be on the membership
-// profile, co-op admin portal. It should be on main admin member list
-// edit only." Co-op Admin's own Add/Edit Member form (views/
-// admin-member-edit.ejs) omits this local entirely, so it defaults to
-// false below and this partial keeps its original Co-op-Admin-only
-// restricted behavior (no way to pick Admin, see the toggle markup
-// further down). Main Admin's own edit form (views/
-// main-admin-member-edit.ejs) is the one place admin promotion/
-// demotion should happen, so it passes allowAdminType: true to get the
-// full 3-way Parent/Student/Admin toggle instead.
-const allowAdminType = typeof locals.allowAdminType !== 'undefined' && locals.allowAdminType;
+// A real request: "There should not be admin check box on any of the
+// membership form or profiles. Just parent/student and primary parent.
+// Admins will simply get a star next to their member name." Admin status
+// (member_type === 'admin') is no longer choosable from ANY form on
+// either portal - it's fully derived from holding at least one Admin
+// Position, assigned from Main Admin > Settings > Admins instead (see
+// utils/adminPositions.js's own syncMemberAdminStatus, which also grants
+// the Main Admin portal role itself the moment someone holds any
+// position - the same reason a separate Roles & Permissions tab isn't
+// needed anymore either). The toggle below is only ever a 2-way Parent/
+// Student choice now; an already-Admin member gets a locked, hidden
+// "admin" value instead (see further down) so saving this form for
+// something unrelated - name, phone, whatever - can never silently
+// demote them.
 const isParent = member.member_type === 'parent';
 // 'admin' - co-op staff/leaders who mainly just need a printable badge
 // (see members.member_type's own schema comment) - a real request added
@@ -48,42 +51,22 @@ const US_STATES = [
     <h3><%= typeLabel %> Membership Form</h3>
     <p>Create or update a <%= isAdmin ? 'co-op admin/leader' : isParent ? 'parent/guardian' : 'student' %> membership profile.</p>
   </div>
-  <%# A real request: "Choosing admins should not be on the membership
-      profile, co-op admin portal. It should be on main admin member
-      list edit only." When allowAdminType is false (Co-op Admin's own
-      Add/Edit Member form), this never offers a way to PICK Admin: a
-      new/Parent/Student member only ever gets the 2-way Parent/Student
-      toggle below. The one edge case is editing a member who's already
-      Admin (assigned from Main Admin) - shown as a disabled, still-
-      checked radio (not simply omitted) so the header/theme stays
-      correctly "Admin" (public/js/member-form.js reads whichever radio
-      is :checked) and a hidden input carries the same value through on
-      submit, since a disabled input never posts - Co-op Admin can still
-      edit that member's other fields without silently demoting them to
-      Student the moment this form saves. Main Admin's own edit form
-      passes allowAdminType: true and gets the full interactive 3-way
-      toggle instead, since that's the one place promotion/demotion
-      should happen. %>
+  <%# A real request: "There should not be admin check box on any of the
+      membership form or profiles. Just parent/student and primary
+      parent." Neither portal's form can pick Admin anymore - the only
+      choice here is Parent/Student. An existing Admin (assigned from
+      Main Admin > Settings > Admins) gets a locked, hidden "admin" value
+      instead (not simply omitted) so the header/theme stays correctly
+      "Admin" (public/js/member-form.js reads whichever radio is
+      :checked, so a plain hidden input works just as well with nothing
+      to check) and saving this form for something unrelated - name,
+      phone, whatever - never silently demotes them back to Student. %>
   <div class="member-type-toggle" role="group" aria-label="Member type">
-    <% if (allowAdminType) { %>
-      <label class="member-type-toggle-btn member-type-toggle-parent">
-        <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
-        <svg class="icon"><use href="#icon-user"/></svg> Parent
-      </label>
-      <label class="member-type-toggle-btn member-type-toggle-student">
-        <input type="radio" name="memberType" value="student" <%= (!isParent && !isAdmin) ? 'checked' : '' %> />
-        <svg class="icon"><use href="#icon-graduation-cap"/></svg> Student
-      </label>
-      <label class="member-type-toggle-btn member-type-toggle-admin">
-        <input type="radio" name="memberType" value="admin" <%= isAdmin ? 'checked' : '' %> />
-        <svg class="icon"><use href="#icon-badge"/></svg> Admin
-      </label>
-    <% } else if (isAdmin) { %>
-      <label class="member-type-toggle-btn member-type-toggle-admin">
-        <input type="radio" name="memberType" value="admin" checked disabled />
+    <% if (isAdmin) { %>
+      <span class="member-type-toggle-btn member-type-toggle-admin" aria-hidden="true">
         <input type="hidden" name="memberType" value="admin" />
         <svg class="icon"><use href="#icon-badge"/></svg> Admin
-      </label>
+      </span>
     <% } else { %>
       <label class="member-type-toggle-btn member-type-toggle-parent">
         <input type="radio" name="memberType" value="parent" <%= isParent ? 'checked' : '' %> />
@@ -239,6 +222,18 @@ const US_STATES = [
       shape as the Setup/Cleanup Team box above (public/js/member-form.js's
       initPickerChecklist wires both the same way). %>
   <div class="manage-section member-form-section-box member-form-section-purple" id="admin-only-fields" data-admin-only style="<%= isAdmin ? '' : 'display:none;' %>">
+    <%# A real request coupled Admin status/permissions to holding a
+        position (utils/adminPositions.js's own syncMemberAdminStatus) -
+        this section is always present in the DOM (just hidden when not
+        Admin, see data-admin-only above), so a real save always submits
+        its current checkbox state either way. This marker distinguishes
+        that real submission from a raw/partial request that skips the
+        form entirely (adminPositionIds simply wouldn't be a key at all) -
+        without it, such a request would read as "clear every position,"
+        silently demoting an existing Admin and revoking the Main Admin
+        role that comes with it. See routes/admin-members.js's and
+        routes/main-admin-members.js's own memberFormFields. %>
+    <input type="hidden" name="adminPositionsFormPresent" value="1" />
     <h2><svg class="icon"><use href="#icon-badge"/></svg> Admin Positions</h2>
     <% if (adminPositions.length === 0) { %>
       <p class="hint">No positions added yet - add some under <a href="/main-admin/admins">Main Admin &gt; Admins</a>.</p>

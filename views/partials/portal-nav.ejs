@@ -383,14 +383,18 @@ const communityLinks =
 </aside>
 
 <%# Corner header: My Profile (#icon-user-circle, a plain placeholder -
-    no member profile-photo field exists yet). Replaces the old Full
-    Screen View toggle, removed here along with its script include per
-    "remove full screen button and feature from all portal pages" -
-    Kiosk Mode (kiosk-home.ejs) keeps its own separate, untouched copy.
-    No search form here (unlike admin-nav.ejs's own corner) - that's a
+    no member profile-photo field exists yet). A real request: "Clicking
+    on the profile icon at the top on every portal should be the member's
+    full profile membership form so that they can edit it" - distinct
+    from settingsHref (the gear icon, account-level settings like My
+    Privacy) since this request. Replaces the old Full Screen View
+    toggle, removed here along with its script include per "remove full
+    screen button and feature from all portal pages" - Kiosk Mode
+    (kiosk-home.ejs) keeps its own separate, untouched copy. No search
+    form here (unlike admin-nav.ejs's own corner) - that's a
     Co-op-Admin-only feature. %>
 <header class="admin-page-corner-actions no-print">
-  <a class="admin-corner-link" href="<%= settingsHref %>">
+  <a class="admin-corner-link" href="/portal/profile">
     <svg class="icon"><use href="#icon-user-circle"/></svg>
     My Profile
   </a>
@@ -403,7 +407,7 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
-      <a class="admin-nav-right-link" href="<%= settingsHref %>" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
+      <a class="admin-nav-right-link" href="/portal/profile" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
       <a class="admin-nav-right-link" href="<%= settingsHref %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>
         <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-monitor"/></svg></a>

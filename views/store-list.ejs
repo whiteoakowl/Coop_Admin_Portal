@@ -19,16 +19,30 @@
     <% if (products.length === 0) { %>
       <p class="roster-empty">Nothing for sale online right now.</p>
     <% } else { %>
-      <div class="event-card-grid">
+      <%# A real request: "change shop product card to look similar [to a
+          reference design]" - photo on the left, an In Stock/Out of
+          Stock badge, price and stock count on one row, and a prominent
+          order button, replacing the old top-image/plain-text
+          .event-card layout this page borrowed before. %>
+      <div class="store-product-grid">
         <% products.forEach(function(p) { %>
-          <a class="event-card" href="/store/<%= p.id %>">
+          <a class="store-product-card" href="/store/<%= p.id %>">
             <% if (p.imageUrl) { %>
-              <div class="event-card-image"><img src="<%= p.imageUrl %>" alt="" /></div>
+              <img class="store-product-card-image" src="<%= p.imageUrl %>" alt="" />
             <% } %>
-            <div class="event-card-body">
-              <span class="event-card-date">$<%= (p.price_cents / 100).toFixed(2) %></span>
-              <h3><%= p.name %></h3>
-              <% if (p.inventory_count != null) { %><p class="event-card-location"><%= p.inventory_count %> left</p><% } %>
+            <div class="store-product-card-body">
+              <div class="store-product-card-header">
+                <h3><%= p.name %></h3>
+                <span class="badge-pill <%= p.inStock ? 'badge-pill-green' : 'badge-pill-gray' %>"><%= p.inStock ? 'In Stock' : 'Out of Stock' %></span>
+              </div>
+              <div class="store-product-card-price-row">
+                <span class="store-product-card-price">$<%= (p.price_cents / 100).toFixed(2) %></span>
+                <% if (p.stockCount != null) { %>
+                  <span class="store-product-card-divider"></span>
+                  <span class="store-product-card-stock"><%= p.stockCount %> in stock</span>
+                <% } %>
+              </div>
+              <span class="store-product-card-cta">View &amp; Order <svg class="icon"><use href="#icon-arrow-right"/></svg></span>
             </div>
           </a>
         <% }); %>
