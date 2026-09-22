@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Parent Portal',
+    navLinks: [
+      { href: '/parent', icon: 'home', label: 'Home' },
+      { href: '/parent/library', icon: 'book', label: 'Library' },
+      { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics' },
+      { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
+      { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
+      { href: '/parent/achievements', icon: 'star', label: 'Achievements' },
+      { href: '/parent/leaderboard', icon: 'trophy', label: 'Leaderboard' },
+    ],
+    classLinks: [
+      { href: '/parent/classes', icon: 'graduation-cap', label: 'Classes' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle"><a href="/parent/classes/dashboard/<%= cls.id %>?tab=lessons&studentId=<%= selectedChild.id %>">&larr; <%= cls.class_name %> Lessons</a></p>
+    <h1><%= contentItem.title || 'Quiz' %></h1>
+    <p class="hint">Completing for <strong><%= selectedChild.name %></strong></p>
+
+    <%- include('partials/quiz-take-form', { contentItem, questions, attempt, postUrl: `/parent/content/${contentItem.id}/quiz?studentId=${selectedChild.id}` }) %>
+  </main>
+</body>
+</html>

@@ -8,7 +8,25 @@ const requireAdmin = require('../middleware/requireAdmin');
 const requireFullAdmin = require('../middleware/requireFullAdmin');
 const { requireDay, isValidDay, parseDayValue } = require('../utils/days');
 const { ageFromBirthday, formatFriendlyTimestamp, formatDateNumeric, formatDateLabel } = require('../utils/dates');
-const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
+const {
+  assignmentsForClass,
+  getAssignment,
+  createAssignment,
+  updateAssignment,
+  reorderAssignments,
+  gradebookForAssignment,
+  saveGrade,
+  contentItemsForAssignment,
+  getContentItem,
+  createContentItem,
+  updateContentItem,
+  deleteContentItem,
+  reorderContentItems,
+  createQuizQuestion,
+  deleteQuizQuestion,
+  pendingReviewAnswers,
+  scoreAnswer,
+} = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
@@ -178,6 +196,15 @@ router.get('/class-schedule/import-template.xlsx', requireFullAdmin, (req, res) 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="class-schedule-import-template.xlsx"');
   res.send(buffer);
+});
+
+// Same reason as import-template.xlsx above - registered before the
+// /:day route so "quiz-review" isn't swallowed as a day value. Every
+// short_answer quiz answer, across every class, still waiting on a
+// teacher/admin's score.
+router.get('/class-schedule/quiz-review', requireFullAdmin, async (req, res) => {
+  const pending = await pendingReviewAnswers();
+  res.render('admin-quiz-review', { title: 'Quiz Review', pending, notice: req.query.notice || null });
 });
 
 // This used to be its own standalone page (views/admin-class-schedule.ejs,
@@ -393,7 +420,7 @@ router.post('/class-schedule/classes/:id/chat', requireFullAdmin, async (req, re
   const body = (req.body.body || '').trim();
   if (!body) return res.redirect(back + '&error=' + encodeURIComponent('A message is required.'));
   const admin = await db.prepare('SELECT username FROM admins WHERE id = ?').get(req.session.adminId);
-  await db.prepare('INSERT INTO class_chat_messages (class_id, admin_username, body) VALUES (?, ?, ?)').run(id, admin.username, body);
+  await db.prepare('INSERT INTO class_chat_messages (class_id, author_name, body) VALUES (?, ?, ?)').run(id, admin.username, body);
   res.redirect(back);
 });
 
@@ -411,23 +438,166 @@ router.post('/class-schedule/classes/:id/assignments', requireFullAdmin, async (
     title,
     description: (req.body.description || '').trim(),
     dueDate: req.body.dueDate || null,
+    openDate: req.body.openDate || null,
     pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
     createdByAccountId: null,
   });
   res.redirect(back + '&notice=' + encodeURIComponent(`"${title}" added.`));
 });
 
-// Grading one assignment - own page rather than a third thing crammed
-// into the class's own Grades tab, same shape as Teacher Portal's own
-// /assignments/:id (routes/teacher-portal.js) so an admin grading a
-// class works exactly like a teacher grading their own.
+// Drag-and-drop reorder for the Lessons tab's own list, mirroring
+// public/js/task-list-drag-reorder.js's own fetch-on-pointerup shape.
+router.post('/class-schedule/classes/:id/assignments/reorder', requireFullAdmin, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const assignmentIds = [].concat(req.body.assignmentIds || []).map((v) => parseInt(v, 10));
+  await reorderAssignments(id, assignmentIds);
+  res.json({ ok: true });
+});
+
+// Grading/managing one assignment - own page rather than a third thing
+// crammed into the class's own Grades tab, same shape as Teacher Portal's
+// own /assignments/:id (routes/teacher-portal.js) so an admin grading a
+// class works exactly like a teacher grading their own. Also the lesson's
+// own content-item management surface (video/text/file/quiz blocks) and
+// its Details edit form, since a lesson doesn't have anywhere else to
+// carry those.
 router.get('/class-schedule/assignments/:id', requireFullAdmin, async (req, res) => {
   const assignmentId = parseInt(req.params.id, 10);
   const assignment = await getAssignment(assignmentId);
   if (!assignment) return res.status(404).send('Not found');
   const cls = await getClass(assignment.class_id);
   const { rows } = await gradebookForAssignment(assignmentId);
-  res.render('admin-class-assignment-gradebook', { title: assignment.title, cls, assignment, rows, notice: req.query.notice || null });
+  const contentItems = await contentItemsForAssignment(assignmentId, { includeAnswerKey: true });
+  res.render('admin-class-assignment-gradebook', {
+    title: assignment.title,
+    cls,
+    assignment,
+    rows,
+    contentItems,
+    notice: req.query.notice || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/class-schedule/assignments/:id/edit', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  if (!assignment) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/assignments/${assignmentId}`;
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(back + '?error=' + encodeURIComponent('A lesson title is required.'));
+  await updateAssignment(assignmentId, {
+    title,
+    description: (req.body.description || '').trim(),
+    dueDate: req.body.dueDate || null,
+    openDate: req.body.openDate || null,
+    pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Lesson details saved.'));
+});
+
+// --- Lesson content items (the "drop down of the different links and
+// activities" - video/text/file/quiz) ---
+
+router.post('/class-schedule/assignments/:id/content', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  if (!assignment) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/assignments/${assignmentId}`;
+  const type = req.body.type;
+  if (!['video', 'text', 'file', 'quiz'].includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+  await createContentItem({
+    assignmentId,
+    type,
+    title: (req.body.title || '').trim(),
+    videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
+    body: type === 'text' ? sanitizePostBody(req.body.body || '') : null,
+    fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Content added.'));
+});
+
+router.post('/class-schedule/content/:id/delete', requireFullAdmin, async (req, res) => {
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem) return res.status(404).send('Not found');
+  await deleteContentItem(contentItem.id);
+  res.redirect(`/admin/class-schedule/assignments/${contentItem.assignment_id}?notice=` + encodeURIComponent('Content removed.'));
+});
+
+router.post('/class-schedule/assignments/:id/content/reorder', requireFullAdmin, async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const contentItemIds = [].concat(req.body.contentItemIds || []).map((v) => parseInt(v, 10));
+  await reorderContentItems(assignmentId, contentItemIds);
+  res.json({ ok: true });
+});
+
+// --- Quiz questions (one 'quiz' content item's own multiple_choice/
+// short_answer questions - added one at a time, a fixed 4 choice slots
+// for multiple_choice, matching this app's own "round-trip POST form, no
+// dynamic client-side row cloning" convention for everywhere but the
+// member intake form's unlimited children list). ---
+
+router.get('/class-schedule/content/:id/questions', requireFullAdmin, async (req, res) => {
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem || contentItem.type !== 'quiz') return res.status(404).send('Not found');
+  const assignment = await getAssignment(contentItem.assignment_id);
+  const cls = await getClass(assignment.class_id);
+  const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: true });
+  const questions = items.find((i) => i.id === contentItem.id).questions;
+  res.render('admin-quiz-questions', {
+    title: `Questions - ${contentItem.title || 'Quiz'}`,
+    basePath: '/admin/class-schedule',
+    cls,
+    assignment,
+    contentItem,
+    questions,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/class-schedule/content/:id/questions', requireFullAdmin, async (req, res) => {
+  const contentItem = await getContentItem(parseInt(req.params.id, 10));
+  if (!contentItem) return res.status(404).send('Not found');
+  const back = `/admin/class-schedule/assignments/${contentItem.assignment_id}`;
+  const type = req.body.type === 'short_answer' ? 'short_answer' : 'multiple_choice';
+  const prompt = (req.body.prompt || '').trim();
+  if (!prompt) return res.redirect(back + '?error=' + encodeURIComponent('A question prompt is required.'));
+  const correctIndex = req.body.correctChoice;
+  const choices = [1, 2, 3, 4].map((n) => ({
+    label: (req.body[`choice${n}`] || '').trim(),
+    isCorrect: String(correctIndex) === String(n),
+  }));
+  await createQuizQuestion({
+    contentItemId: contentItem.id,
+    type,
+    prompt,
+    pointsPossible: req.body.pointsPossible ? Number(req.body.pointsPossible) : 1,
+    choices: type === 'multiple_choice' ? choices : [],
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Question added.'));
+});
+
+router.post('/class-schedule/questions/:id/delete', requireFullAdmin, async (req, res) => {
+  const questionId = parseInt(req.params.id, 10);
+  const question = await db.prepare('SELECT q.*, lci.assignment_id FROM quiz_questions q JOIN lesson_content_items lci ON lci.id = q.content_item_id WHERE q.id = ?').get(questionId);
+  if (!question) return res.status(404).send('Not found');
+  await deleteQuizQuestion(questionId);
+  res.redirect(`/admin/class-schedule/assignments/${question.assignment_id}?notice=` + encodeURIComponent('Question removed.'));
+});
+
+// --- Quiz review queue - every short_answer answer, across every class,
+// still waiting on a teacher/admin's score (see the confirmed access
+// model: multiple_choice auto-scores, short_answer needs a human). Note:
+// the GET route itself lives up near /class-schedule/import-template.xlsx
+// (before /class-schedule/:day) - a single-segment path here would
+// otherwise be swallowed by that :day route first. ---
+
+router.post('/class-schedule/quiz-answers/:id/score', requireFullAdmin, async (req, res) => {
+  const answerId = parseInt(req.params.id, 10);
+  const pointsEarned = req.body.pointsEarned === '' || req.body.pointsEarned == null ? 0 : Number(req.body.pointsEarned);
+  await scoreAnswer({ answerId, isCorrect: pointsEarned > 0, pointsEarned, gradedByAccountId: null });
+  res.redirect('/admin/class-schedule/quiz-review?notice=' + encodeURIComponent('Answer scored.'));
 });
 
 router.post('/class-schedule/assignments/:id/grades', requireFullAdmin, async (req, res) => {

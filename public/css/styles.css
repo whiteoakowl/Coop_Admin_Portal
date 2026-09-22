@@ -2723,6 +2723,26 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .filter-row { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
 .filter-row .category-filter { margin: 0; }
 
+/* A single "Filter" button that opens a small dropdown panel of fields
+   (a real request: "Class page filter drop down. Filter button, grade
+   level, hour, day, full") - a native <details>/<summary>, same
+   affordance the nav's own accordions already use, styled as a popover
+   instead of an inline expand. public/js/class-schedule-filters.js closes
+   it on an outside click; the ::marker is hidden so <summary> reads as a
+   plain button, not a disclosure triangle. */
+.filter-details { position: relative; }
+.filter-details > summary { list-style: none; cursor: pointer; }
+.filter-details > summary::-webkit-details-marker { display: none; }
+.filter-details .filter-panel {
+  position: absolute; top: calc(100% + 0.4rem); left: 0; z-index: 20;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--control-radius);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); padding: 0.9rem; min-width: 14rem;
+}
+.filter-details .filter-panel .category-filter { flex-direction: column; align-items: stretch; gap: 0.25rem; margin: 0; }
+.filter-details .filter-panel select,
+.filter-details .filter-panel input[type="date"] { width: 100%; }
+
 /* Class Schedule grid's "Archive" toggle reveals this row (Select All +
    Archive Selected) - flex-basis: 100% forces it onto its own line below
    "Highlight Absences For" inside .filter-row's flex-wrap, rather than
@@ -8296,6 +8316,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .task-list-drag-handle .icon { width: 1.1rem; height: 1.1rem; }
 .task-list-card.task-list-card-dragging { opacity: 0.55; }
 tr[data-task-list-item].task-list-item-dragging { opacity: 0.55; background: var(--brand-soft); }
+
+/* Lessons/lesson-content drag-and-drop reorder (a real request: "be able
+   to reorder, assignments or lessons, drag and drop") - same Pointer
+   Events shape as public/js/task-list-drag-reorder.js, see
+   public/js/lesson-drag-reorder.js. */
+.roster-drag-col { width: 1.5rem; }
+.lesson-drag-handle { display: inline-flex; cursor: grab; touch-action: none; color: var(--muted); }
+.lesson-drag-handle:active { cursor: grabbing; }
+tr[data-lesson-reorder-row].lesson-row-dragging,
+tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: var(--brand-soft); }
 
 /* ---------- Sitewide delete confirmation popup (partials/confirm-dialog.ejs) ---------- */
 .confirm-dialog {

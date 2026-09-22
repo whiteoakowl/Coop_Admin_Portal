@@ -13,22 +13,51 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
 
 <div class="roster-toolbar no-print">
   <div class="filter-row">
-    <div class="category-filter">
-      <label for="date-select-<%= day %>">Highlight Absences For</label>
-      <input
-        type="date"
-        id="date-select-<%= day %>"
-        value="<%= selectedDate %>"
-        onchange="window.fullscreenNavigate('<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : ''))"
-      />
-    </div>
-    <div class="category-filter">
-      <label for="class-schedule-hour-select-<%= day %>">Hour</label>
-      <select id="class-schedule-hour-select-<%= day %>" data-class-schedule-hour-filter="<%= day %>">
-        <option value="">All Hours</option>
-        <% hours.forEach(function(h) { %><option value="<%= h.position %>"><%= h.label %></option><% }); %>
-      </select>
-    </div>
+    <%# A real request: "Class page filter drop down. Filter button, grade
+        level, hour, day, full, for co-op admin" - a follow-up confirmed
+        Date/Hour (already standalone dropdowns here) move into this same
+        button too, and Day is dropped entirely (Monday/Wednesday are
+        already their own separate tabs, so a Day field here would just be
+        a confusing second way to do the same thing). Grade Level and Full
+        filter BOTH Grid and List views (public/js/class-schedule-filters.js);
+        Hour still only really does anything in List view, same as before -
+        see that file's own comment on why. %>
+    <details class="filter-details" data-filter-details>
+      <summary class="roster-action-btn">Filter</summary>
+      <div class="filter-panel">
+        <div class="category-filter">
+          <label for="date-select-<%= day %>">Highlight Absences For</label>
+          <input
+            type="date"
+            id="date-select-<%= day %>"
+            value="<%= selectedDate %>"
+            onchange="window.fullscreenNavigate('<%= gridBasePath %>' + (this.value ? '<%= dateParamSep %>date=' + this.value : ''))"
+          />
+        </div>
+        <div class="category-filter">
+          <label for="class-schedule-hour-select-<%= day %>">Hour</label>
+          <select id="class-schedule-hour-select-<%= day %>" data-class-schedule-hour-filter="<%= day %>">
+            <option value="">All Hours</option>
+            <% hours.forEach(function(h) { %><option value="<%= h.position %>"><%= h.label %></option><% }); %>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="class-schedule-grade-select-<%= day %>">Grade Level</label>
+          <select id="class-schedule-grade-select-<%= day %>" data-class-schedule-grade-filter="<%= day %>">
+            <option value="">All Grades</option>
+            <% (typeof gradeLevels !== 'undefined' ? gradeLevels : []).forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+          </select>
+        </div>
+        <div class="category-filter">
+          <label for="class-schedule-full-select-<%= day %>">Full</label>
+          <select id="class-schedule-full-select-<%= day %>" data-class-schedule-full-filter="<%= day %>">
+            <option value="">All Classes</option>
+            <option value="full">Full Only</option>
+            <option value="open">Open Only</option>
+          </select>
+        </div>
+      </div>
+    </details>
     <%# Grid view already lays every hour out as its own column, so this
         filter's only real effect is on List view's flat row-per-class
         table below - kept visible in both views (a real request) rather
@@ -363,6 +392,8 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
                   <div
                     class="class-card<% if (!gridReadOnly) { %> class-card-clickable<% } %>"
                     style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
+                    data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
+                    data-class-full="<%= (cls.capacity != null && cls.students.length >= cls.capacity) ? '1' : '0' %>"
                     <% if (!gridReadOnly) { %>
                       data-view-class="<%= cls.id %>" role="button" tabindex="0" aria-label="View/edit <%= cls.class_name %>"
                     <% } %>
@@ -434,7 +465,11 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
         <tr><td colspan="6" class="roster-empty">No classes yet.</td></tr>
       <% } %>
       <% allClasses.forEach(function(cls) { %>
-        <tr data-class-schedule-hour="<%= cls.hour_position %>">
+        <tr
+          data-class-schedule-hour="<%= cls.hour_position %>"
+          data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
+          data-class-full="<%= (cls.capacity != null && cls.students.length >= cls.capacity) ? '1' : '0' %>"
+        >
           <td class="class-schedule-list-name-col">
             <span class="class-schedule-list-swatch" style="background: <%= cls.color %>;"></span>
             <%= cls.class_name %>
@@ -450,6 +485,7 @@ const gridReadOnly = typeof readOnly !== 'undefined' && readOnly;
   </table>
 </div>
 <script src="/js/class-schedule-view-toggle.js"></script>
+<script src="/js/class-schedule-filters.js"></script>
 <script src="/js/multi-select-checkbox.js"></script>
 
 <% if (!gridReadOnly) { %>

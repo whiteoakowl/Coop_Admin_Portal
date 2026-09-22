@@ -26,6 +26,14 @@
     </p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%- include('partials/lesson-content-manage', { basePath: '/teacher', assignment, contentItems }) %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Grades</h2>
+      </div>
 
     <% if (rows.length === 0) { %>
       <p class="roster-empty">No students enrolled in this class yet.</p>
@@ -60,6 +68,7 @@
         </div>
       </form>
     <% } %>
+    </div>
   </main>
 </body>
 </html>

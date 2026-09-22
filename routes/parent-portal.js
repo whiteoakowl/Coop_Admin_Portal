@@ -25,17 +25,28 @@ const {
   defaultDay,
   allClassesList,
   attendanceHistoryForRoster,
+  GRADE_LEVELS,
 } = require('../utils/classSchedule');
 const { sendCsv, toCsvRow } = require('../utils/spreadsheet');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
-const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday } = require('../utils/dates');
+const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday, todayISO } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf, byLastName } = require('../utils/members');
 const { libraryActivityForMemberIds } = require('../utils/library');
-const { assignmentsForStudent, assignmentsForStudentInClass, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
+const {
+  assignmentsForStudent,
+  assignmentsForStudentInClass,
+  diplomaForStudent,
+  transcriptForStudent,
+  lessonsForStudentView,
+  getContentItem,
+  getQuizAttempt,
+  submitQuizAttempt,
+  contentItemsForAssignment,
+} = require('../utils/academics');
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
@@ -165,6 +176,8 @@ router.get('/classes', async (req, res) => {
     hours: await hoursForDay(day),
     roomGrid: await roomGridForDay(day),
     hasChildren: children.length > 0,
+    children,
+    gradeLevels: GRADE_LEVELS,
     enrolledClassIds,
     windowOpen,
     nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
@@ -441,16 +454,23 @@ router.get('/classes/dashboard', async (req, res) => {
   });
 });
 
-const CLASS_DASHBOARD_TABS = ['details', 'assignments', 'grades', 'lessons', 'attendance'];
+const CLASS_DASHBOARD_TABS = ['details', 'assignments', 'grades', 'lessons', 'attendance', 'chat'];
 
 // One class's own read-only info page for one child - details/
 // assignments/grades/lessons/attendance, the same academics data (and,
-// for Attendance, the same class roster) Student Portal's own class
+// for Attendance, the same class roster; for Lessons, the same
+// lessonsForStudentView content-item view) Student Portal's own class
 // detail page already shows that student, just viewed by a parent on the
-// child's behalf instead of the student themselves. Lessons has no real
-// content model yet (same "coming soon" stub Student Portal shows).
-// Only ever shows a class + child pairing this account's own family
-// actually has (never trusts either id from the request).
+// child's behalf instead of the student themselves. Lessons started out
+// READ-ONLY here (quiz-taking was student-only, full stop) - a follow-up
+// request made that a per-class choice instead: "allow parents to
+// complete lessons for student... turned on or off for different
+// classes." views/partials/lessons-view.ejs now gets canTakeQuiz: !!cls.
+// allow_parent_complete_lessons, so the "Take Quiz" link (and the actual
+// GET/POST /content/:id/quiz routes below) only ever appear/work for a
+// class that's deliberately opted in. Only ever shows a class + child
+// pairing this account's own family actually has (never trusts either id
+// from the request).
 router.get('/classes/dashboard/:id', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const children = await childrenForAccount(req.portalAccount);
@@ -462,9 +482,18 @@ router.get('/classes/dashboard/:id', async (req, res) => {
   const cls = classes.find((c) => c.id === classId);
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
 
-  const tab = CLASS_DASHBOARD_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+  let tab = CLASS_DASHBOARD_TABS.includes(req.query.tab) ? req.query.tab : 'details';
+  if (tab === 'chat' && !cls.allow_parent_chat) tab = 'details';
   const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(selectedChild.id, classId) : [];
+  const lessons = tab === 'lessons' ? await lessonsForStudentView(classId, selectedChild.id) : [];
   const attendance = tab === 'attendance' ? await attendanceHistoryForRoster(selectedChild.id, cls.roster_id) : [];
+  const chatMessages =
+    tab === 'chat'
+      ? (await db.prepare('SELECT * FROM class_chat_messages WHERE class_id = ? ORDER BY id ASC').all(classId)).map((m) => ({
+          ...m,
+          createdAtLabel: formatFriendlyTimestamp(m.created_at),
+        }))
+      : [];
 
   res.render('parent-class-dashboard-detail', {
     title: cls.class_name,
@@ -473,8 +502,85 @@ router.get('/classes/dashboard/:id', async (req, res) => {
     selectedChild,
     tab,
     assignments,
+    lessons,
     attendance,
+    chatMessages,
   });
+});
+
+// A real request: "allow parent to interact in the class chat... turned
+// on or off for different classes" - posts into the exact same
+// class_chat_messages log Co-op Admin's own Chat tab already reads/writes
+// (views/partials/class-chat.ejs, shared by both), gated by the class's
+// own allow_parent_chat setting the same way the GET route above hides
+// the tab entirely when it's off.
+router.post('/classes/dashboard/:id/chat', async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
+  const children = await childrenForAccount(req.portalAccount);
+  const selectedId = parseInt(req.query.studentId, 10);
+  const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
+  if (!selectedChild) return res.status(404).render('404', { title: 'Not Found' });
+
+  const classes = await classesForChild(selectedChild.id);
+  const cls = classes.find((c) => c.id === classId);
+  if (!cls || !cls.allow_parent_chat) return res.status(404).render('404', { title: 'Not Found' });
+
+  const back = `/parent/classes/dashboard/${classId}?tab=chat&studentId=${selectedChild.id}`;
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect(back + '&error=' + encodeURIComponent('A message is required.'));
+  const member = await memberForAccount(req.portalAccount.id);
+  await db.prepare('INSERT INTO class_chat_messages (class_id, author_name, body) VALUES (?, ?, ?)').run(classId, member.name, body);
+  res.redirect(back);
+});
+
+// A real request: "allow parents to complete lessons for student...
+// turned on or off for different classes" - the parent-side counterpart
+// to routes/student-portal.js's own quiz-taking routes, submitting on
+// behalf of whichever child ?studentId= names (defaulting to the first,
+// same convention as the class dashboard route above). Re-derives
+// everything from scratch rather than trusting the content item id alone:
+// the quiz has to actually belong to a class one of this account's own
+// children is enrolled in, AND that class has to have allow_parent_
+// complete_lessons on - either failing gets the same 404 a nonexistent
+// quiz would, so this route can't be used to probe which classes exist.
+async function contentItemForParent(req, contentItemId) {
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem || contentItem.type !== 'quiz') return null;
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  if (!assignment) return null;
+  const children = await childrenForAccount(req.portalAccount);
+  const selectedId = parseInt(req.query.studentId, 10);
+  const selectedChild = children.find((c) => c.id === selectedId) || children[0] || null;
+  if (!selectedChild) return null;
+  const classes = await classesForChild(selectedChild.id);
+  const cls = classes.find((c) => c.id === assignment.class_id);
+  if (!cls || !cls.allow_parent_complete_lessons) return null;
+  return { contentItem, assignment, cls, selectedChild };
+}
+
+router.get('/content/:id/quiz', async (req, res) => {
+  const found = await contentItemForParent(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(404).render('404', { title: 'Not Found' });
+  const { contentItem, assignment, cls, selectedChild } = found;
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  const attempt = await getQuizAttempt(contentItem.id, selectedChild.id);
+  const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
+  const questions = items.find((i) => i.id === contentItem.id).questions;
+  res.render('parent-quiz-take', { title: contentItem.title || 'Quiz', cls, assignment, contentItem, questions, attempt: attempt || null, selectedChild });
+});
+
+router.post('/content/:id/quiz', async (req, res) => {
+  const found = await contentItemForParent(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(404).render('404', { title: 'Not Found' });
+  const { contentItem, assignment, selectedChild } = found;
+  const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
+  const questions = items.find((i) => i.id === contentItem.id).questions;
+  const answers = questions.map((q) => {
+    if (q.type === 'multiple_choice') return { questionId: q.id, choiceId: req.body[`choice_${q.id}`] ? parseInt(req.body[`choice_${q.id}`], 10) : null };
+    return { questionId: q.id, answerText: req.body[`answer_${q.id}`] || '' };
+  });
+  await submitQuizAttempt({ contentItemId: contentItem.id, studentId: selectedChild.id, answers });
+  res.redirect(`/parent/classes/dashboard/${assignment.class_id}?tab=lessons&studentId=${selectedChild.id}&notice=` + encodeURIComponent('Quiz submitted.'));
 });
 
 // A real request: "Policy Handbook" as one of the Classes tab's

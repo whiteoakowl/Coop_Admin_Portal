@@ -47,9 +47,40 @@
       </div>
     <% } %>
 
-    <div class="day-toggle no-print schedule-day-toggle">
-      <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/parent/classes?day=monday">Monday</a>
-      <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/parent/classes?day=wednesday">Wednesday</a>
+    <div class="filter-row no-print">
+      <div class="day-toggle schedule-day-toggle">
+        <a class="day-toggle-option<%= day === 'monday' ? ' active' : '' %>" href="/parent/classes?day=monday">Monday</a>
+        <a class="day-toggle-option<%= day === 'wednesday' ? ' active' : '' %>" href="/parent/classes?day=wednesday">Wednesday</a>
+      </div>
+      <%# A real request: "Parents can filter classes by grade level and
+          by their own students, drop down menu. If filtering by their
+          student it will only show classes that matching their grade
+          level." Picking a student locks the Grade Level select to that
+          student's own grade_level (public/js/parent-class-filters.js) -
+          "All Students" hands control back to Grade Level on its own. %>
+      <% if (hasChildren) { %>
+        <details class="filter-details" data-filter-details>
+          <summary class="roster-action-btn">Filter</summary>
+          <div class="filter-panel">
+            <div class="category-filter">
+              <label for="parent-class-student-select">My Student</label>
+              <select id="parent-class-student-select" data-parent-class-student-filter>
+                <option value="">All Students</option>
+                <% children.forEach(function(child) { %>
+                  <option value="<%= child.id %>" data-grade="<%= child.grade_level || '' %>"><%= child.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="category-filter">
+              <label for="parent-class-grade-select">Grade Level</label>
+              <select id="parent-class-grade-select" data-parent-class-grade-filter>
+                <option value="">All Grades</option>
+                <% gradeLevels.forEach(function(g) { %><option value="<%= g %>"><%= g %></option><% }); %>
+              </select>
+            </div>
+          </div>
+        </details>
+      <% } %>
     </div>
 
     <div class="roster-scroll">
@@ -81,6 +112,7 @@
                         style="border-left-color: <%= cls.color %>; background: color-mix(in srgb, <%= cls.color %> 42%, white);"
                         data-view-class="<%= cls.id %>"
                         data-view-class-day="<%= day %>"
+                        data-class-grade-list="<%= (cls.age_group || '').split(',').map(function(g) { return g.trim(); }).filter(Boolean).join(',') %>"
                       >
                         <div class="class-card-header">
                           <h3><%= cls.class_name %></h3>
@@ -108,5 +140,6 @@
   <dialog id="parent-class-dialog" class="parent-class-dialog"></dialog>
   <script src="/js/fragment-dialog.js"></script>
   <script src="/js/parent-class-view.js"></script>
+  <script src="/js/parent-class-filters.js"></script>
 </body>
 </html>

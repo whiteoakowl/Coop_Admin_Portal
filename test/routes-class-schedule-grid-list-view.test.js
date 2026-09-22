@@ -69,9 +69,10 @@ test('the list view lists every class alphabetically, and the day pill/hour drop
   const listNames = [...res.text.matchAll(nameCol)].map((m) => m[0].replace(/<[^>]+>/g, '').trim());
   assert.deepEqual(listNames, ['Art Basics', 'Math Explorers', 'Zebra Studies']);
 
-  // Each list row carries its own hour position for the client-side hour filter.
-  assert.match(res.text, /<tr data-class-schedule-hour="1">/);
-  assert.match(res.text, /<tr data-class-schedule-hour="2">/);
+  // Each list row carries its own hour position for the client-side hour filter
+  // (alongside the Grade Level/Full filters' own data attributes on the same row).
+  assert.match(res.text, /<tr[^>]*data-class-schedule-hour="1"/);
+  assert.match(res.text, /<tr[^>]*data-class-schedule-hour="2"/);
 });
 
 test('an empty day shows "No classes yet." in the list view too, not just the grid', async () => {

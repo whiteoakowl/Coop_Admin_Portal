@@ -190,6 +190,7 @@
       <div class="manage-section">
         <div class="grid-box-header">
           <h2>Lessons (<%= assignments.length %>)</h2>
+          <a class="btn-secondary" href="/admin/class-schedule/quiz-review">Quiz Review</a>
         </div>
         <% if (assignments.length === 0) { %>
           <p class="roster-empty">No lessons yet.</p>
@@ -197,15 +198,17 @@
           <div class="roster-scroll">
             <table class="roster-table members-table condensed-table">
               <thead>
-                <tr><th>Title</th><th>Due</th><th>Points</th><th></th></tr>
+                <tr><th></th><th>Title</th><th>Open</th><th>Due</th><th>Points</th><th></th></tr>
               </thead>
-              <tbody>
+              <tbody data-lesson-reorder-tbody data-class-id="<%= cls.id %>">
                 <% assignments.forEach(function(a) { %>
-                  <tr>
+                  <tr data-lesson-reorder-row="<%= a.id %>">
+                    <td class="roster-drag-col"><span data-lesson-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
                     <td class="roster-name-col"><%= a.title %></td>
+                    <td><%= a.open_date ? a.open_date : '—' %></td>
                     <td><%= a.dueDateLabel || '—' %></td>
                     <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
-                    <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Grade</a></td>
+                    <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Manage</a></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -222,6 +225,9 @@
             <label class="member-form-full">Description
               <textarea name="description" rows="2"></textarea>
             </label>
+            <label>Open Date
+              <input type="date" name="openDate" />
+            </label>
             <label>Due Date
               <input type="date" name="dueDate" />
             </label>
@@ -234,6 +240,7 @@
           </form>
         </div>
       </div>
+      <script src="/js/lesson-drag-reorder.js"></script>
     <% } else if (activeTab === 'grades') { %>
       <div class="manage-section">
         <div class="grid-box-header">
@@ -253,7 +260,7 @@
                     <td class="roster-name-col"><%= a.title %></td>
                     <td><%= a.dueDateLabel || '—' %></td>
                     <td><%= a.gradedCount %> / <%= a.studentCount %></td>
-                    <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Grade</a></td>
+                    <td><a class="roster-action-btn" href="/admin/class-schedule/assignments/<%= a.id %>">Manage</a></td>
                   </tr>
                 <% }); %>
               </tbody>
@@ -266,24 +273,7 @@
         <div class="grid-box-header">
           <h2>Chat</h2>
         </div>
-        <div class="roster-log-list">
-          <% if (chatMessages.length === 0) { %>
-            <p class="roster-log-empty">No messages yet.</p>
-          <% } %>
-          <% chatMessages.forEach(function(m) { %>
-            <div class="roster-log-row">
-              <span class="roster-log-name"><%= m.admin_username %></span>
-              <span class="roster-log-meta"><%= m.createdAtLabel %></span>
-              <p class="hint" style="flex-basis: 100%; margin: 0.25rem 0 0;"><%= m.body %></p>
-            </div>
-          <% }); %>
-        </div>
-        <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/chat" class="stack-form">
-          <label class="member-form-full">Message
-            <textarea name="body" rows="2" required></textarea>
-          </label>
-          <button type="submit" class="primary-btn">Send</button>
-        </form>
+        <%- include('partials/class-chat', { chatMessages, postUrl: `/admin/class-schedule/classes/${cls.id}/chat` }) %>
       </div>
     <% } %>
 

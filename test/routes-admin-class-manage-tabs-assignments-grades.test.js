@@ -152,7 +152,7 @@ test('Class Manage page: create an assignment from the Assignments tab, then gra
 
   const afterCreate = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=assignments`).set('Cookie', admin.cookie);
   assert.match(afterCreate.text, /Fractions Worksheet/);
-  assert.match(afterCreate.text, new RegExp(`href="/admin/class-schedule/assignments/${assignment.id}">Grade<`));
+  assert.match(afterCreate.text, new RegExp(`href="/admin/class-schedule/assignments/${assignment.id}">Manage<`));
 
   const gradesTab = await request(app).get(`/admin/class-schedule/classes/${cls.id}/manage?tab=grades`).set('Cookie', admin.cookie);
   assert.match(gradesTab.text, /Fractions Worksheet/);

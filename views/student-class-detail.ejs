@@ -15,6 +15,7 @@
       <% if (cls.teacherNames.length) { %> &middot; <%= cls.teacherNames.join(', ') %><% } %>
     </p>
     <% if (cls.description) { %><div class="hint forum-editable-display"><%- cls.description %></div><% } %>
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
     <%# One specific class's own tabs - no top-level nav entry to attach a
         popup to (reached by clicking into a class, not from the nav), so
@@ -106,6 +107,8 @@
             </table>
           </div>
         <% } %>
+      <% } else if (tab === 'lessons') { %>
+        <%- include('partials/lessons-view', { lessons, canTakeQuiz: true }) %>
       <% } else if (tab === 'forum') { %>
         <% if (forumCategory) { %>
           <p class="hint">This class has its own chat space.</p>

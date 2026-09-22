@@ -1,0 +1,24 @@
+<%# One class's own flat chat log (class_chat_messages) - shared between
+    Co-op Admin's own Chat tab (always visible) and Parent Portal's own
+    Chat tab (only rendered at all when the class's allow_parent_chat
+    setting is on - see routes/parent-portal.js's own comment). `body`
+    is plain text (no rich-text editor here, unlike a forum post), so it's
+    rendered escaped, not raw. locals: chatMessages, postUrl. %>
+<div class="roster-log-list">
+  <% if (chatMessages.length === 0) { %>
+    <p class="roster-log-empty">No messages yet.</p>
+  <% } %>
+  <% chatMessages.forEach(function(m) { %>
+    <div class="roster-log-row">
+      <span class="roster-log-name"><%= m.author_name %></span>
+      <span class="roster-log-meta"><%= m.createdAtLabel %></span>
+      <p class="hint" style="flex-basis: 100%; margin: 0.25rem 0 0;"><%= m.body %></p>
+    </div>
+  <% }); %>
+</div>
+<form method="POST" action="<%= postUrl %>" class="stack-form">
+  <label class="member-form-full">Message
+    <textarea name="body" rows="2" required></textarea>
+  </label>
+  <button type="submit" class="primary-btn">Send</button>
+</form>

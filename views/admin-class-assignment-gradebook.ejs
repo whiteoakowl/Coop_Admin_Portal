@@ -6,7 +6,7 @@
 <body class="admin-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle no-print"><a href="/admin/class-schedule/classes/<%= cls.id %>/manage?tab=grades">&larr; <%= cls.class_name %> Grades</a></p>
+    <p class="subtitle no-print"><a href="/admin/class-schedule/classes/<%= cls.id %>/manage?tab=assignments">&larr; <%= cls.class_name %> Lessons</a></p>
     <h1><%= assignment.title %></h1>
     <% if (assignment.description) { %><p class="hint"><%= assignment.description %></p><% } %>
     <p class="hint">
@@ -14,6 +14,14 @@
     </p>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%- include('partials/lesson-content-manage', { basePath: '/admin/class-schedule', assignment, contentItems }) %>
+
+    <div class="manage-section">
+      <div class="grid-box-header">
+        <h2>Grades</h2>
+      </div>
 
     <% if (rows.length === 0) { %>
       <p class="roster-empty">No students enrolled in this class yet.</p>
@@ -48,6 +56,7 @@
         </div>
       </form>
     <% } %>
+    </div>
   </main>
 </body>
 </html>

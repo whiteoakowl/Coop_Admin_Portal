@@ -1,0 +1,78 @@
+<%# One quiz content item's own questions - added one at a time (round-
+    trip POST, matching this app's own convention for everywhere but the
+    member intake form's unlimited children list), with a fixed 4 choice
+    slots for a multiple_choice question so no dynamic add/remove-choice
+    JS is needed; a blank slot is simply never persisted (see
+    utils/academics.js's createQuizQuestion). Shared between Co-op Admin
+    and Teacher Portal - basePath/contentItem/questions come from the
+    including page. %>
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2>Questions (<%= questions.length %>)</h2>
+  </div>
+  <% if (questions.length === 0) { %>
+    <p class="roster-empty">No questions yet.</p>
+  <% } else { %>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th>Prompt</th><th>Type</th><th>Points</th><th>Choices</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% questions.forEach(function(q) { %>
+            <tr>
+              <td class="roster-name-col"><%= q.prompt %></td>
+              <td><%= q.type === 'multiple_choice' ? 'Multiple Choice' : 'Short Answer' %></td>
+              <td><%= q.points_possible %></td>
+              <td>
+                <% if (q.type === 'multiple_choice') { %>
+                  <% q.choices.forEach(function(c) { %>
+                    <div<% if (Number(c.is_correct) === 1) { %> class="hint" style="color: var(--green); font-weight: 600;"<% } %>><%= c.label %><% if (Number(c.is_correct) === 1) { %> &#10003;<% } %></div>
+                  <% }); %>
+                <% } else { %>
+                  <span class="hint">Teacher/admin reviews each answer</span>
+                <% } %>
+              </td>
+              <td>
+                <form method="POST" action="<%= basePath %>/questions/<%= q.id %>/delete" onsubmit="return confirm('Remove this question?');">
+                  <button type="submit" class="btn-secondary">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="portal-dashboard-card portal-dashboard-card-wide">
+    <h3>Add Question</h3>
+    <form method="POST" action="<%= basePath %>/content/<%= contentItem.id %>/questions" class="member-form-grid" data-toggle-form>
+      <label class="member-form-full">Question Type
+        <select name="type" data-toggle-select>
+          <option value="multiple_choice">Multiple Choice (auto-scored)</option>
+          <option value="short_answer">Short Answer (teacher reviews)</option>
+        </select>
+      </label>
+      <label class="member-form-full">Prompt
+        <textarea name="prompt" rows="2" required></textarea>
+      </label>
+      <label>Points Possible
+        <input type="number" name="pointsPossible" min="1" step="0.5" value="1" />
+      </label>
+      <div class="member-form-full" data-toggle-field="multiple_choice">
+        <p class="hint">Fill in each answer choice and mark the correct one.</p>
+        <% [1, 2, 3, 4].forEach(function(n) { %>
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="radio" name="correctChoice" value="<%= n %>" <% if (n === 1) { %>checked<% } %> />
+            <input type="text" name="choice<%= n %>" placeholder="Choice <%= n %>" style="flex: 1;" />
+          </label>
+        <% }); %>
+      </div>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Add Question</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script src="/js/lesson-content-form.js"></script>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="hint"><a href="/teacher/assignments/<%= assignment.id %>">&larr; <%= assignment.title %></a></p>
+    <h1><%= contentItem.title || 'Quiz' %></h1>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <%- include('partials/quiz-questions-manage', { basePath, contentItem, questions }) %>
+  </main>
+</body>
+</html>

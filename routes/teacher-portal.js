@@ -11,8 +11,26 @@ const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth')
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList, removeStaff } = require('../utils/classSchedule');
 const { createCharge } = require('../utils/payments');
-const { assignmentsForClass, getAssignment, createAssignment, gradebookForAssignment, saveGrade } = require('../utils/academics');
+const {
+  assignmentsForClass,
+  getAssignment,
+  createAssignment,
+  updateAssignment,
+  reorderAssignments,
+  gradebookForAssignment,
+  saveGrade,
+  contentItemsForAssignment,
+  getContentItem,
+  createContentItem,
+  deleteContentItem,
+  reorderContentItems,
+  createQuizQuestion,
+  deleteQuizQuestion,
+  pendingReviewAnswers,
+  scoreAnswer,
+} = require('../utils/academics');
 const { formatDateLabel, formatFriendlyTimestamp, todayISO, formatDateLong } = require('../utils/dates');
+const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { byLastName } = require('../utils/members');
 const { buildRosterGridData } = require('../utils/rosterGrid');
 const { classSectionIds } = require('../utils/sections');
@@ -215,10 +233,21 @@ router.post('/classes/:id/assignments', async (req, res) => {
     title,
     description: (req.body.description || '').trim(),
     dueDate: req.body.dueDate || null,
+    openDate: req.body.openDate || null,
     pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
     createdByAccountId: req.portalAccount.id,
   });
   res.redirect(back + '?notice=' + encodeURIComponent(`"${title}" added.`));
+});
+
+router.post('/classes/:id/assignments/reorder', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const classId = parseInt(req.params.id, 10);
+  if (!classes.find((c) => c.id === classId)) return res.status(403).json({ error: 'not your class' });
+  const assignmentIds = [].concat(req.body.assignmentIds || []).map((v) => parseInt(v, 10));
+  await reorderAssignments(classId, assignmentIds);
+  res.json({ ok: true });
 });
 
 router.get('/assignments/:id', async (req, res) => {
@@ -230,7 +259,157 @@ router.get('/assignments/:id', async (req, res) => {
     return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
   }
   const { rows } = await gradebookForAssignment(assignment.id);
-  res.render('teacher-gradebook', { title: assignment.title, cls, assignment, rows, notice: req.query.notice || null });
+  const contentItems = await contentItemsForAssignment(assignment.id, { includeAnswerKey: true });
+  res.render('teacher-gradebook', { title: assignment.title, cls, assignment, rows, contentItems, notice: req.query.notice || null, error: req.query.error || null });
+});
+
+router.post('/assignments/:id/edit', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const assignmentId = parseInt(req.params.id, 10);
+  const assignment = await getAssignment(assignmentId);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) {
+    return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  }
+  const back = `/teacher/assignments/${assignmentId}`;
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(back + '?error=' + encodeURIComponent('A lesson title is required.'));
+  await updateAssignment(assignmentId, {
+    title,
+    description: (req.body.description || '').trim(),
+    dueDate: req.body.dueDate || null,
+    openDate: req.body.openDate || null,
+    pointsPossible: req.body.pointsPossible ? parseInt(req.body.pointsPossible, 10) : null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Lesson details saved.'));
+});
+
+// --- Lesson content items + quiz questions (same "video/text/file/quiz,
+// drop down of the different links and activities" model Co-op Admin's
+// own routes/admin-class-schedule.js uses, scoped here to classes this
+// teacher actually teaches). ---
+
+async function assignmentForTeacher(req, assignmentId) {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const assignment = await getAssignment(assignmentId);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  return cls ? { assignment, cls } : null;
+}
+
+async function contentItemForTeacher(req, contentItemId) {
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem) return null;
+  const found = await assignmentForTeacher(req, contentItem.assignment_id);
+  return found ? { contentItem, ...found } : null;
+}
+
+router.post('/assignments/:id/content', async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const found = await assignmentForTeacher(req, assignmentId);
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  const back = `/teacher/assignments/${assignmentId}`;
+  const type = req.body.type;
+  if (!['video', 'text', 'file', 'quiz'].includes(type)) return res.redirect(back + '?error=' + encodeURIComponent('Choose a content type.'));
+  await createContentItem({
+    assignmentId,
+    type,
+    title: (req.body.title || '').trim(),
+    videoUrl: type === 'video' ? (req.body.videoUrl || '').trim() : null,
+    body: type === 'text' ? sanitizePostBody(req.body.body || '') : null,
+    fileUrl: type === 'file' ? (req.body.fileUrl || '').trim() : null,
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Content added.'));
+});
+
+router.post('/content/:id/delete', async (req, res) => {
+  const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  await deleteContentItem(found.contentItem.id);
+  res.redirect(`/teacher/assignments/${found.assignment.id}?notice=` + encodeURIComponent('Content removed.'));
+});
+
+router.post('/assignments/:id/content/reorder', async (req, res) => {
+  const assignmentId = parseInt(req.params.id, 10);
+  const found = await assignmentForTeacher(req, assignmentId);
+  if (!found) return res.status(403).json({ error: 'not your class' });
+  const contentItemIds = [].concat(req.body.contentItemIds || []).map((v) => parseInt(v, 10));
+  await reorderContentItems(assignmentId, contentItemIds);
+  res.json({ ok: true });
+});
+
+router.get('/content/:id/questions', async (req, res) => {
+  const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
+  if (!found || found.contentItem.type !== 'quiz') return res.status(404).send('Not found');
+  const items = await contentItemsForAssignment(found.assignment.id, { includeAnswerKey: true });
+  const questions = items.find((i) => i.id === found.contentItem.id).questions;
+  res.render('teacher-quiz-questions', {
+    title: `Questions - ${found.contentItem.title || 'Quiz'}`,
+    basePath: '/teacher',
+    assignment: found.assignment,
+    contentItem: found.contentItem,
+    questions,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
+});
+
+router.post('/content/:id/questions', async (req, res) => {
+  const found = await contentItemForTeacher(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  const back = `/teacher/assignments/${found.assignment.id}`;
+  const type = req.body.type === 'short_answer' ? 'short_answer' : 'multiple_choice';
+  const prompt = (req.body.prompt || '').trim();
+  if (!prompt) return res.redirect(back + '?error=' + encodeURIComponent('A question prompt is required.'));
+  const correctIndex = req.body.correctChoice;
+  const choices = [1, 2, 3, 4].map((n) => ({
+    label: (req.body[`choice${n}`] || '').trim(),
+    isCorrect: String(correctIndex) === String(n),
+  }));
+  await createQuizQuestion({
+    contentItemId: found.contentItem.id,
+    type,
+    prompt,
+    pointsPossible: req.body.pointsPossible ? Number(req.body.pointsPossible) : 1,
+    choices: type === 'multiple_choice' ? choices : [],
+  });
+  res.redirect(back + '?notice=' + encodeURIComponent('Question added.'));
+});
+
+router.post('/questions/:id/delete', async (req, res) => {
+  const questionId = parseInt(req.params.id, 10);
+  const question = await db.prepare('SELECT q.*, lci.assignment_id FROM quiz_questions q JOIN lesson_content_items lci ON lci.id = q.content_item_id WHERE q.id = ?').get(questionId);
+  if (!question) return res.status(404).send('Not found');
+  const found = await assignmentForTeacher(req, question.assignment_id);
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  await deleteQuizQuestion(questionId);
+  res.redirect(`/teacher/assignments/${found.assignment.id}?notice=` + encodeURIComponent('Question removed.'));
+});
+
+router.get('/quiz-review', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForTeacher(member);
+  const pending = await pendingReviewAnswers(classes.map((c) => c.id));
+  res.render('teacher-quiz-review', { title: 'Quiz Review', pending, notice: req.query.notice || null });
+});
+
+router.post('/quiz-answers/:id/score', async (req, res) => {
+  const answerId = parseInt(req.params.id, 10);
+  const answer = await db
+    .prepare(
+      `SELECT lci.assignment_id FROM quiz_answers qa
+       JOIN quiz_attempts qat ON qat.id = qa.attempt_id
+       JOIN lesson_content_items lci ON lci.id = qat.content_item_id
+       WHERE qa.id = ?`
+    )
+    .get(answerId);
+  if (!answer) return res.status(404).send('Not found');
+  const found = await assignmentForTeacher(req, answer.assignment_id);
+  if (!found) return res.status(403).render('403', { title: 'Not Authorized', message: "You don't teach that class.", backHref: '/teacher', backLabel: 'Back to Teacher Portal' });
+  const pointsEarned = req.body.pointsEarned === '' || req.body.pointsEarned == null ? 0 : Number(req.body.pointsEarned);
+  await scoreAnswer({ answerId, isCorrect: pointsEarned > 0, pointsEarned, gradedByAccountId: req.portalAccount.id });
+  res.redirect('/teacher/quiz-review?notice=' + encodeURIComponent('Answer scored.'));
 });
 
 router.post('/assignments/:id/grades', async (req, res) => {

@@ -158,6 +158,8 @@
                   <th>Students Can Self-Register</th>
                   <th>Members Can Cancel</th>
                   <th>Auto-Refund on Cancel</th>
+                  <th>Parents Can Complete Lessons</th>
+                  <th>Parents Can Use Class Chat</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,6 +173,8 @@
                     <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowStudentRegister" <%= c.allow_student_register ? 'checked' : '' %> aria-label="Students can self-register - <%= c.class_name %>" /></td>
                     <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowCancel" <%= c.allow_cancel ? 'checked' : '' %> aria-label="Members can cancel their registration - <%= c.class_name %>" /></td>
                     <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="autoRefundOnCancel" <%= c.auto_refund_on_cancel ? 'checked' : '' %> aria-label="Auto-refund a paid charge on cancel - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentCompleteLessons" <%= c.allow_parent_complete_lessons ? 'checked' : '' %> aria-label="Parents can complete lessons for their student - <%= c.class_name %>" /></td>
+                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentChat" <%= c.allow_parent_chat ? 'checked' : '' %> aria-label="Parents can use this class's chat - <%= c.class_name %>" /></td>
                   </tr>
                 <% }); %>
               </tbody>

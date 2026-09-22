@@ -1,0 +1,34 @@
+<%# Every short_answer quiz answer still waiting on a teacher/admin's
+    score (see utils/academics.js's pendingReviewAnswers) - the confirmed
+    access model: multiple_choice auto-scores at submission, short_answer
+    needs a human before that student's attempt is 'graded'. Shared
+    between Co-op Admin (every class) and Teacher Portal (their own
+    classes only, via the classIds passed to pendingReviewAnswers).
+    basePath/pending come from the including page. %>
+<% if (pending.length === 0) { %>
+  <p class="roster-empty">Nothing waiting on a review right now.</p>
+<% } else { %>
+  <div class="roster-scroll">
+    <table class="roster-table members-table condensed-table">
+      <thead>
+        <tr><th>Student</th><th>Class / Lesson / Quiz</th><th>Question</th><th>Answer</th><th>Score</th></tr>
+      </thead>
+      <tbody>
+        <% pending.forEach(function(p) { %>
+          <tr>
+            <td class="roster-name-col"><%= p.student_name %></td>
+            <td><%= p.class_name %> &middot; <%= p.assignment_title %> &middot; <%= p.content_item_title || 'Quiz' %></td>
+            <td><%= p.prompt %></td>
+            <td><%= p.answer_text || '(blank)' %></td>
+            <td>
+              <form method="POST" action="<%= basePath %>/quiz-answers/<%= p.answer_id %>/score" style="display: flex; align-items: center; gap: 0.4rem;">
+                <input type="number" name="pointsEarned" min="0" max="<%= p.points_possible %>" step="0.5" style="width: 4.5rem;" placeholder="0-<%= p.points_possible %>" />
+                <button type="submit" class="roster-action-btn">Score</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>

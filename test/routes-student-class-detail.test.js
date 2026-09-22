@@ -149,14 +149,14 @@ test('Class Forum tab links to the class\'s own forum category when one exists, 
   assert.match(withForumRes.text, new RegExp(`/forums/${categoryId}`));
 });
 
-test('Lessons and Assessments tabs render a stub without crashing', async () => {
+test('Lessons tab renders the real lesson-content view (no lessons yet); Assessments still renders a stub without crashing', async () => {
   const { memberId, cookie } = await createStudent('Stub Tabs Student');
   const classId = await createClassWithTeacher('monday', 'Stub Class', 'Teacher S');
   await classSchedule.setEnrollment(classId, [memberId]);
 
   const lessonsRes = await request(app).get(`/student/classes/${classId}?tab=lessons`).set('Cookie', cookie);
   assert.equal(lessonsRes.status, 200);
-  assert.match(lessonsRes.text, /Coming soon/);
+  assert.match(lessonsRes.text, /No lessons yet/);
 
   const assessmentsRes = await request(app).get(`/student/classes/${classId}?tab=assessments`).set('Cookie', cookie);
   assert.equal(assessmentsRes.status, 200);

@@ -55,7 +55,10 @@
     </section>
 
     <section class="portal-dashboard-section">
-      <h2>Assignments</h2>
+      <div class="grid-box-header">
+        <h2>Assignments</h2>
+        <a class="btn-secondary" href="/teacher/quiz-review">Quiz Review</a>
+      </div>
       <% if (assignments.length === 0) { %>
         <p class="roster-empty">No assignments yet.</p>
       <% } else { %>
@@ -63,19 +66,23 @@
           <table class="roster-table members-table condensed-table">
             <thead>
               <tr>
+                <th></th>
                 <th>Title</th>
+                <th>Open</th>
                 <th>Due</th>
                 <th>Points</th>
                 <th></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-lesson-reorder-tbody data-class-id="<%= cls.id %>" data-reorder-url="/teacher/classes/<%= cls.id %>/assignments/reorder">
               <% assignments.forEach(function(a) { %>
-                <tr>
+                <tr data-lesson-reorder-row="<%= a.id %>">
+                  <td class="roster-drag-col"><span data-lesson-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
                   <td class="roster-name-col"><%= a.title %></td>
+                  <td><%= a.open_date ? a.open_date : '—' %></td>
                   <td><%= a.dueDateLabel || '—' %></td>
                   <td><%= a.points_possible != null ? a.points_possible : '—' %></td>
-                  <td><a class="roster-action-btn" href="/teacher/assignments/<%= a.id %>">Grade</a></td>
+                  <td><a class="roster-action-btn" href="/teacher/assignments/<%= a.id %>">Manage</a></td>
                 </tr>
               <% }); %>
             </tbody>
@@ -92,6 +99,9 @@
           <label class="member-form-full">Description
             <textarea name="description" rows="2"></textarea>
           </label>
+          <label>Open Date
+            <input type="date" name="openDate" />
+          </label>
           <label>Due Date
             <input type="date" name="dueDate" />
           </label>
@@ -104,6 +114,7 @@
         </form>
       </div>
     </section>
+    <script src="/js/lesson-drag-reorder.js"></script>
   </main>
 </body>
 </html>

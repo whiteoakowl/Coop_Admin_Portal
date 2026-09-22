@@ -585,6 +585,14 @@ const CLASS_SETTINGS_FIELDS = {
   allowStudentRegister: 'allow_student_register',
   allowCancel: 'allow_cancel',
   autoRefundOnCancel: 'auto_refund_on_cancel',
+  // A real request: "allow parents to complete lessons for student and
+  // allow parent to interact in the class chat... turned on or off for
+  // different classes." Both default off (see the migration's own
+  // comment) - see utils/academics.js's lessonsForStudentView/
+  // submitQuizAttempt callers and routes/parent-portal.js's own Chat tab
+  // for where each is actually enforced.
+  allowParentCompleteLessons: 'allow_parent_complete_lessons',
+  allowParentChat: 'allow_parent_chat',
 };
 
 async function updateClassSettings(id, field, value) {

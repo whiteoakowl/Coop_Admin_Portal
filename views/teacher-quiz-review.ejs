@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', {
+    portalTitle: 'Teacher Portal',
+    navLinks: [
+      { href: '/teacher', icon: 'home', label: 'Home' },
+      { href: '/teacher/attendance', icon: 'calendar-check', label: 'Attendance' },
+      { href: '/teacher/classes', icon: 'graduation-cap', label: 'Classes' },
+      { href: '/forums', icon: 'users', label: 'Chat' },
+      { href: '/training', icon: 'graduation-cap', label: 'Training' },
+      { href: '/teacher/assignments', icon: 'clipboard-list', label: 'Assignments' },
+      { href: '/forums', icon: 'mail', label: 'Messages' },
+    ],
+  }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Quiz Review</h1>
+    <p class="hint">Short-answer questions need your review and a score before that student's quiz is final.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%- include('partials/quiz-review-list', { basePath: '/teacher', pending }) %>
+  </main>
+</body>
+</html>

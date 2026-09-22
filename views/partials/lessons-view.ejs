@@ -1,0 +1,62 @@
+<%# Lessons view - video/text/file/quiz content per lesson, shared
+    between Student Portal (canTakeQuiz: true, quizBasePath: '/student',
+    always allowed) and Parent Portal (canTakeQuiz: !!cls.
+    allow_parent_complete_lessons, quizBasePath: '/parent' - a real
+    request: "allow parents to complete lessons for student... turned on
+    or off for different classes"). `lessons` comes from utils/
+    academics.js's lessonsForStudentView. quizBasePath defaults to
+    '/student' so existing callers that only ever passed canTakeQuiz
+    don't need to change. %>
+<% var quizBasePathLocal = typeof quizBasePath !== 'undefined' ? quizBasePath : '/student'; %>
+<% var quizQueryLocal = typeof quizQuery !== 'undefined' ? quizQuery : ''; %>
+<% if (lessons.length === 0) { %>
+  <p class="roster-empty">No lessons yet.</p>
+<% } else { %>
+  <% lessons.forEach(function(lesson) { %>
+    <div class="portal-dashboard-card portal-dashboard-card-wide" style="margin-bottom: 1rem;">
+      <h3><%= lesson.title %></h3>
+      <p class="hint">
+        <% if (lesson.open_date) { %>Opens <%= lesson.open_date %><% } %>
+        <% if (lesson.dueDateLabel) { %> &middot; Due <%= lesson.dueDateLabel %><% } %>
+      </p>
+      <% if (lesson.description) { %><p class="hint"><%= lesson.description %></p><% } %>
+      <% if (!lesson.isOpen) { %>
+        <p class="roster-empty">This lesson opens <%= lesson.open_date %>.</p>
+      <% } else if (lesson.contentItems.length === 0) { %>
+        <p class="roster-empty">No content added yet.</p>
+      <% } else { %>
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          <% lesson.contentItems.forEach(function(item) { %>
+            <li style="padding: 0.6rem 0; border-top: 1px solid var(--border);">
+              <% if (item.type === 'video') { %>
+                <strong><%= item.title || 'Video' %></strong>
+                <% if (item.video_url) { %><div><a href="<%= item.video_url %>" target="_blank" rel="noopener">Watch Video</a></div><% } %>
+              <% } else if (item.type === 'text') { %>
+                <strong><%= item.title || 'Description' %></strong>
+                <% if (item.body) { %><div class="forum-editable-display"><%- item.body %></div><% } %>
+              <% } else if (item.type === 'file') { %>
+                <strong><%= item.title || 'File' %></strong>
+                <% if (item.file_url) { %><div><a href="<%= item.file_url %>" target="_blank" rel="noopener">Open File</a></div><% } %>
+              <% } else if (item.type === 'quiz') { %>
+                <strong><%= item.title || 'Quiz' %></strong>
+                <div>
+                  <% if (item.attempt) { %>
+                    <% if (item.attempt.status === 'graded') { %>
+                      <span class="hint">Score: <strong><%= item.attempt.score_points %> / <%= item.attempt.points_possible %></strong></span>
+                    <% } else { %>
+                      <span class="hint">Submitted - awaiting teacher review</span>
+                    <% } %>
+                  <% } else if (canTakeQuiz) { %>
+                    <a class="roster-action-btn" href="<%= quizBasePathLocal %>/content/<%= item.id %>/quiz<%= quizQueryLocal %>">Take Quiz</a>
+                  <% } else { %>
+                    <span class="hint">Not taken yet</span>
+                  <% } %>
+                </div>
+              <% } %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+  <% }); %>
+<% } %>

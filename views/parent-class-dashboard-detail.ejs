@@ -37,6 +37,9 @@
       <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades&studentId=<%= selectedChild.id %>">Grades</a>
       <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons&studentId=<%= selectedChild.id %>">Lessons</a>
       <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance&studentId=<%= selectedChild.id %>">Attendance</a>
+      <% if (cls.allow_parent_chat) { %>
+        <a class="view-tab<%= tab === 'chat' ? ' active' : '' %>" href="?tab=chat&studentId=<%= selectedChild.id %>">Chat</a>
+      <% } %>
     </div>
 
     <div class="view-tab-panel">
@@ -96,6 +99,10 @@
             </table>
           </div>
         <% } %>
+      <% } else if (tab === 'lessons') { %>
+        <%- include('partials/lessons-view', { lessons, canTakeQuiz: !!cls.allow_parent_complete_lessons, quizBasePath: '/parent', quizQuery: `?studentId=${selectedChild.id}` }) %>
+      <% } else if (tab === 'chat') { %>
+        <%- include('partials/class-chat', { chatMessages, postUrl: `/parent/classes/dashboard/${cls.id}/chat?studentId=${selectedChild.id}` }) %>
       <% } else if (tab === 'attendance') { %>
         <% if (attendance.length === 0) { %>
           <p class="roster-empty">No attendance recorded yet.</p>

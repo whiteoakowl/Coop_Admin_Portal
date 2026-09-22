@@ -1,0 +1,104 @@
+<%# Lesson content items (video/text/file/quiz) - the "drop down of the
+    different links and activities" from a real request, shared between
+    Co-op Admin's own lesson page and Teacher Portal's own lesson page so
+    the two don't drift. basePath is '/admin/class-schedule' or
+    '/teacher'; assignment/contentItems come from the including page. %>
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2>Lesson Details</h2>
+  </div>
+  <form method="POST" action="<%= basePath %>/assignments/<%= assignment.id %>/edit" class="member-form-grid">
+    <label class="member-form-full">Title
+      <input type="text" name="title" value="<%= assignment.title %>" required />
+    </label>
+    <label class="member-form-full">Description
+      <textarea name="description" rows="2"><%= assignment.description || '' %></textarea>
+    </label>
+    <label>Open Date
+      <input type="date" name="openDate" value="<%= assignment.open_date || '' %>" />
+    </label>
+    <label>Due Date
+      <input type="date" name="dueDate" value="<%= assignment.due_date || '' %>" />
+    </label>
+    <label>Points Possible
+      <input type="number" name="pointsPossible" min="0" value="<%= assignment.points_possible != null ? assignment.points_possible : '' %>" />
+    </label>
+    <div class="member-form-full">
+      <button type="submit" class="primary-btn">Save Lesson Details</button>
+    </div>
+  </form>
+</div>
+
+<div class="manage-section">
+  <div class="grid-box-header">
+    <h2>Lesson Content (<%= contentItems.length %>)</h2>
+  </div>
+  <% if (contentItems.length === 0) { %>
+    <p class="roster-empty">No content added yet.</p>
+  <% } else { %>
+    <div class="roster-scroll">
+      <table class="roster-table members-table condensed-table">
+        <thead>
+          <tr><th></th><th>Type</th><th>Content</th><th></th><th></th></tr>
+        </thead>
+        <tbody data-content-reorder-tbody data-assignment-id="<%= assignment.id %>" data-reorder-url="<%= basePath %>/assignments/<%= assignment.id %>/content/reorder">
+          <% contentItems.forEach(function(item) { %>
+            <tr data-content-reorder-row="<%= item.id %>">
+              <td class="roster-drag-col"><span data-content-reorder-handle class="lesson-drag-handle" title="Drag to reorder">&#9776;</span></td>
+              <td><span class="status-badge status-badge-active"><%= item.type %></span></td>
+              <td class="roster-name-col">
+                <%= item.title || '(untitled)' %>
+                <% if (item.type === 'video' && item.video_url) { %><div class="hint"><a href="<%= item.video_url %>" target="_blank" rel="noopener">Video link</a></div><% } %>
+                <% if (item.type === 'file' && item.file_url) { %><div class="hint"><a href="<%= item.file_url %>" target="_blank" rel="noopener">File link</a></div><% } %>
+                <% if (item.type === 'text' && item.body) { %><div class="hint forum-editable-display"><%- item.body %></div><% } %>
+                <% if (item.type === 'quiz') { %><div class="hint"><%= item.questions.length %> question<%= item.questions.length === 1 ? '' : 's' %></div><% } %>
+              </td>
+              <td>
+                <% if (item.type === 'quiz') { %>
+                  <a class="roster-action-btn" href="<%= basePath %>/content/<%= item.id %>/questions">Manage Questions</a>
+                <% } %>
+              </td>
+              <td>
+                <form method="POST" action="<%= basePath %>/content/<%= item.id %>/delete" onsubmit="return confirm('Remove this content item?');">
+                  <button type="submit" class="btn-secondary">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="portal-dashboard-card portal-dashboard-card-wide">
+    <h3>Add Content</h3>
+    <form method="POST" action="<%= basePath %>/assignments/<%= assignment.id %>/content" class="member-form-grid" data-toggle-form>
+      <label class="member-form-full">Type
+        <select name="type" data-toggle-select>
+          <option value="video">Link to Video</option>
+          <option value="text">Text Description</option>
+          <option value="file">Link to File</option>
+          <option value="quiz">Quiz (with scoring)</option>
+        </select>
+      </label>
+      <label class="member-form-full">Title
+        <input type="text" name="title" />
+      </label>
+      <label class="member-form-full" data-toggle-field="video">Video URL
+        <input type="url" name="videoUrl" placeholder="https://..." />
+      </label>
+      <label class="member-form-full" data-toggle-field="text" style="display: none;">Description
+        <textarea name="body" rows="3"></textarea>
+      </label>
+      <label class="member-form-full" data-toggle-field="file" style="display: none;">File URL
+        <input type="url" name="fileUrl" placeholder="https://..." />
+      </label>
+      <p class="hint member-form-full" data-toggle-field="quiz" style="display: none;">A blank quiz will be added - add its questions afterward from the "Manage Questions" link.</p>
+      <div class="member-form-full">
+        <button type="submit" class="primary-btn">Add Content</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script src="/js/lesson-drag-reorder.js"></script>
+<script src="/js/lesson-content-form.js"></script>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body class="admin-page">
+  <%- include('partials/admin-nav') %>
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <p class="subtitle no-print"><a href="/admin/class-schedule">&larr; Classes</a></p>
+    <h1>Quiz Review</h1>
+    <p class="hint">Short-answer questions need a teacher/admin to review and score them before that student's quiz is final.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+
+    <%- include('partials/quiz-review-list', { basePath: '/admin/class-schedule', pending }) %>
+  </main>
+</body>
+</html>

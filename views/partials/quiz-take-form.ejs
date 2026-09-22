@@ -1,0 +1,36 @@
+<%# One quiz's own submission form (or, once an attempt exists, its own
+    read-only result) - shared between Student Portal (always allowed)
+    and Parent Portal (only reachable at all when the class's own
+    allow_parent_complete_lessons setting is on - see routes/parent-
+    portal.js's own comment). locals: contentItem, questions, attempt,
+    postUrl. %>
+<% if (attempt) { %>
+  <div class="alert alert-success">
+    This quiz was already submitted.
+    <% if (attempt.status === 'graded') { %>
+      Score: <strong><%= attempt.score_points %> / <%= attempt.points_possible %></strong>
+    <% } else { %>
+      A teacher/admin is still reviewing part of it.
+    <% } %>
+  </div>
+<% } else { %>
+  <form method="POST" action="<%= postUrl %>">
+    <% questions.forEach(function(q, i) { %>
+      <div class="portal-dashboard-card portal-dashboard-card-wide" style="margin-bottom: 1rem;">
+        <h3><%= i + 1 %>. <%= q.prompt %> <span class="hint">(<%= q.points_possible %> pt<%= Number(q.points_possible) === 1 ? '' : 's' %>)</span></h3>
+        <% if (q.type === 'multiple_choice') { %>
+          <% q.choices.forEach(function(c) { %>
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+              <input type="radio" name="choice_<%= q.id %>" value="<%= c.id %>" required />
+              <%= c.label %>
+            </label>
+          <% }); %>
+        <% } else { %>
+          <textarea name="answer_<%= q.id %>" rows="3" style="width: 100%;"></textarea>
+          <p class="hint">A teacher/admin will review this answer.</p>
+        <% } %>
+      </div>
+    <% }); %>
+    <button type="submit" class="primary-btn">Submit Quiz</button>
+  </form>
+<% } %>

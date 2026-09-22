@@ -17,8 +17,18 @@ const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
 const { allClassesList, attendanceHistoryForRoster } = require('../utils/classSchedule');
-const { formatFriendlyTimestamp, formatTimestamp } = require('../utils/dates');
-const { assignmentsForStudent, assignmentsForStudentInClass, diplomaForStudent, transcriptForStudent } = require('../utils/academics');
+const { formatFriendlyTimestamp, formatTimestamp, todayISO } = require('../utils/dates');
+const {
+  assignmentsForStudent,
+  assignmentsForStudentInClass,
+  diplomaForStudent,
+  transcriptForStudent,
+  lessonsForStudentView,
+  getContentItem,
+  getQuizAttempt,
+  submitQuizAttempt,
+  contentItemsForAssignment,
+} = require('../utils/academics');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const forums = require('../utils/forums');
 const { sectionIdsForMember, classSectionIdsForClasses, memberSatisfiesRestriction } = require('../utils/sections');
@@ -202,10 +212,53 @@ router.get('/classes/:id', async (req, res) => {
 
   const tab = CLASS_DETAIL_TABS.includes(req.query.tab) ? req.query.tab : 'assignments';
   const assignments = ['assignments', 'grades'].includes(tab) ? await assignmentsForStudentInClass(member.id, classId) : [];
+  const lessons = tab === 'lessons' ? await lessonsForStudentView(classId, member.id) : [];
   const attendance = tab === 'attendance' ? await attendanceHistoryForRoster(member.id, cls.roster_id) : [];
   const forumCategory = tab === 'forum' ? await forums.categoryForClass(classId) : null;
 
-  res.render('student-class-detail', { title: cls.class_name, cls, tab, assignments, attendance, forumCategory });
+  res.render('student-class-detail', { title: cls.class_name, cls, tab, assignments, lessons, attendance, forumCategory, notice: req.query.notice || null });
+});
+
+// Quiz-taking - student-only, per the confirmed access model (a parent
+// can view a child's own attempt on the same Lessons tab, but never
+// submit one - see routes/parent-portal.js's own Lessons tab, which has
+// no equivalent POST route at all). Re-derives the student's own classes
+// from scratch (never trusts the content item id alone) so a student
+// can't take a quiz that isn't even in one of their own classes.
+async function contentItemForStudent(req, contentItemId) {
+  const member = await memberForAccount(req.portalAccount.id);
+  const contentItem = await getContentItem(contentItemId);
+  if (!contentItem || contentItem.type !== 'quiz') return null;
+  const assignment = await db.prepare('SELECT * FROM class_assignments WHERE id = ?').get(contentItem.assignment_id);
+  const classes = await classesForStudent(member);
+  const cls = assignment ? classes.find((c) => c.id === assignment.class_id) : null;
+  if (!cls) return null;
+  return { member, contentItem, assignment, cls };
+}
+
+router.get('/content/:id/quiz', async (req, res) => {
+  const found = await contentItemForStudent(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(404).render('404', { title: 'Not Found' });
+  const { member, contentItem, assignment, cls } = found;
+  if (assignment.open_date && assignment.open_date > todayISO()) return res.status(404).render('404', { title: 'Not Found' });
+  const attempt = await getQuizAttempt(contentItem.id, member.id);
+  const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
+  const questions = items.find((i) => i.id === contentItem.id).questions;
+  res.render('student-quiz-take', { title: contentItem.title || 'Quiz', cls, assignment, contentItem, questions, attempt: attempt || null });
+});
+
+router.post('/content/:id/quiz', async (req, res) => {
+  const found = await contentItemForStudent(req, parseInt(req.params.id, 10));
+  if (!found) return res.status(404).render('404', { title: 'Not Found' });
+  const { member, contentItem, assignment } = found;
+  const items = await contentItemsForAssignment(assignment.id, { includeAnswerKey: false });
+  const questions = items.find((i) => i.id === contentItem.id).questions;
+  const answers = questions.map((q) => {
+    if (q.type === 'multiple_choice') return { questionId: q.id, choiceId: req.body[`choice_${q.id}`] ? parseInt(req.body[`choice_${q.id}`], 10) : null };
+    return { questionId: q.id, answerText: req.body[`answer_${q.id}`] || '' };
+  });
+  await submitQuizAttempt({ contentItemId: contentItem.id, studentId: member.id, answers });
+  res.redirect(`/student/classes/${assignment.class_id}?tab=lessons&notice=` + encodeURIComponent('Quiz submitted.'));
 });
 
 router.get('/assignments', async (req, res) => {
