@@ -6991,7 +6991,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    not a wide one; 420px reads much closer to it than the original 560px
    while still comfortably fitting the Teacher/Assistant box and the
    Register row's name pill + button side by side. */
-.parent-class-dialog {
+.parent-class-dialog,
+.event-card-dialog {
   width: min(420px, 92vw);
   max-height: 90vh;
   overflow-y: auto;
@@ -7000,7 +7001,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   padding: 1.5rem;
   box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
-.parent-class-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
+.parent-class-dialog::backdrop,
+.event-card-dialog::backdrop { background: rgba(28, 37, 48, 0.45); }
 .parent-class-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
 .parent-class-description { margin: 0 0 0.75rem; }
 .parent-class-divider { border: none; border-top: 1px solid var(--border); margin: 1.1rem 0; }
@@ -8723,6 +8725,14 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .event-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
 .event-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform 0.15s ease; }
 .event-card:hover { transform: translateY(-2px); }
+/* A real request: "when they click on an event it shows a popup" - the
+   card is now a real <button> (opens the preview popup) instead of an <a>
+   straight to /events/:id - same button-chrome reset as .class-card-
+   clickable's own comment (the inline color/layout above already gives it
+   everything else it needs). */
+.event-card-clickable { width: 100%; border: 1px solid var(--border); font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.event-card-clickable:hover, .event-card-clickable:focus-visible { box-shadow: 0 0 0 2px var(--brand) inset; }
+.event-card-clickable:focus-visible { outline: 2px solid var(--brand-dark); outline-offset: 2px; }
 .event-card-image { aspect-ratio: 16 / 9; overflow: hidden; }
 .event-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .event-card-body { padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.35rem; }

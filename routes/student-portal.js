@@ -33,6 +33,7 @@ const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils
 const forums = require('../utils/forums');
 const { sectionIdsForMember, classSectionIdsForClasses, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
+const events = require('../utils/events');
 const notifications = require('../utils/notifications');
 const resourceLinks = require('../utils/resourceLinks');
 const babysitters = require('../utils/babysitters');
@@ -118,6 +119,22 @@ router.get('/', async (req, res) => {
   const words = wordOfWeek.wordsOfTheWeek();
   const wordOfWeekDateLabel = wordOfWeek.currentWeekDateLabel();
   res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words, wordOfWeekDateLabel });
+});
+
+// A real request: "Registration is added to event registration log on
+// parent and student portals" - a student's own event registrations, same
+// shape as Parent Portal's own /parent/events, just for a single member
+// instead of the whole family (utils/events.js's own
+// eventRegistrationsForMembers).
+router.get('/events', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const registrations = member ? await events.eventRegistrationsForMembers([member.id]) : [];
+  res.render('student-event-registrations', {
+    title: 'My Event Registrations',
+    registrations: registrations.map((r) => ({ ...r, startsLabel: formatFriendlyTimestamp(r.starts_at) })),
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 });
 
 router.get('/classes', async (req, res) => {

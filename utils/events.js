@@ -266,9 +266,11 @@ async function getEventWithDetails(id) {
 // request: "if charging per person there should be an option for adding
 // several types of tickets with a different price and title bar next to
 // it." Same has-many-rows-owned-by-one-event shape as Volunteer Roles/
-// Donation Items/Food Items above - admin-side only for now (a scoping
-// question confirmed this): registration still charges the event's own
-// flat price_cents, this is just for the admin to define/manage the list.
+// Donation Items/Food Items above - defined here by an admin, then chosen
+// by a registrant on the real registration form once any exist for an
+// event (see registerForEvent/chargeForConfirmedRegistration below, which
+// charge the picked ticket's own price instead of the event's own flat
+// price_cents).
 async function addTicketType(eventId, title, priceCents, pricePer) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_ticket_types WHERE event_id = ?').get(eventId)).p) + 1;
   await db
@@ -844,10 +846,27 @@ async function volunteerSignupsByMemberForEvent(eventId) {
 // for the same reason (a promotion owes money starting now too). Must be
 // called with the open transaction handle - see utils/payments.js's own
 // createCharge comment on why.
-async function chargeForConfirmedRegistration(tx, event, member, accountId) {
-  if (event.price_cents == null) return null;
+// ticketTypeId (optional): once a member picks a ticket (event_ticket_types
+// - "if charging per person there should be an option for adding several
+// types of tickets with a different price"), that ticket's own price_cents/
+// price_per is charged instead of the event's flat price - looked up fresh
+// here (inside the transaction) rather than trusted from the caller, same
+// as every other charge amount in this app.
+async function chargeForConfirmedRegistration(tx, event, member, accountId, ticketTypeId) {
+  let priceCents = event.price_cents;
+  let pricePer = event.price_per;
+  let ticketLabel = '';
+  if (ticketTypeId) {
+    const ticketType = await tx.prepare('SELECT * FROM event_ticket_types WHERE id = ? AND event_id = ?').get(ticketTypeId, event.id);
+    if (ticketType) {
+      priceCents = ticketType.price_cents;
+      pricePer = ticketType.price_per;
+      ticketLabel = ` (${ticketType.title})`;
+    }
+  }
+  if (priceCents == null) return null;
   let reuseCharge = null;
-  if (event.price_per === 'family' && member.family_id) {
+  if (pricePer === 'family' && member.family_id) {
     reuseCharge = await tx
       .prepare(
         `SELECT er.charge_id FROM event_registrations er
@@ -858,7 +877,7 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId) {
       .get(event.id, member.family_id);
   }
   if (reuseCharge) return reuseCharge.charge_id;
-  return createCharge(member.id, accountId, 'event_registration', event.id, `${event.title} - event registration`, event.price_cents, tx);
+  return createCharge(member.id, accountId, 'event_registration', event.id, `${event.title}${ticketLabel} - event registration`, priceCents, tx);
 }
 
 // Shared by registerForEvent (below, member self-service, full eligibility
@@ -871,7 +890,7 @@ async function chargeForConfirmedRegistration(tx, event, member, accountId) {
 // use). Assumes the caller already confirmed the event exists/is a real
 // target - only "already registered" is re-checked here since it's cheap
 // and both callers need it.
-async function createOrReactivateRegistration(event, member, accountId, answers = {}, { allowWaitlist = true } = {}) {
+async function createOrReactivateRegistration(event, member, accountId, answers = {}, { allowWaitlist = true, ticketTypeId = null } = {}) {
   const existing = await db.prepare("SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ? AND status != 'cancelled'").get(event.id, member.id);
   if (existing) return { ok: false, error: `${member.name} is already registered for that event.` };
 
@@ -915,7 +934,7 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
 
   await db.withTransaction(async (tx) => {
     if (status === 'confirmed') {
-      chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId);
+      chargeId = await chargeForConfirmedRegistration(tx, event, member, accountId, ticketTypeId);
     } else {
       const existingWaitlisted = Number((await tx.prepare("SELECT COUNT(*) AS c FROM event_registrations WHERE event_id = ? AND status = 'waitlisted'").get(event.id)).c);
       waitlistPosition = existingWaitlisted + 1;
@@ -927,14 +946,14 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
       await tx
         .prepare(
           `UPDATE event_registrations SET status = ?, registered_by_account_id = ?, created_at = now_text(), cancelled_at = NULL,
-             waitlist_position = ?, charge_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
+             waitlist_position = ?, charge_id = ?, ticket_type_id = ?, checked_in_at = NULL, checked_out_at = NULL WHERE id = ?`
         )
-        .run(status, accountId, waitlistPosition, chargeId, registrationId);
+        .run(status, accountId, waitlistPosition, chargeId, ticketTypeId, registrationId);
       await tx.prepare('DELETE FROM event_registration_answers WHERE registration_id = ?').run(registrationId);
     } else {
       const info = await tx
-        .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(event.id, member.id, accountId, status, waitlistPosition, chargeId);
+        .prepare('INSERT INTO event_registrations (event_id, member_id, registered_by_account_id, status, waitlist_position, charge_id, ticket_type_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(event.id, member.id, accountId, status, waitlistPosition, chargeId, ticketTypeId);
       registrationId = info.lastInsertRowid;
     }
 
@@ -954,7 +973,7 @@ async function createOrReactivateRegistration(event, member, accountId, answers 
 }
 
 // { ok: false, error } or { ok: true, notice, status, waitlistPosition }
-async function registerForEvent({ eventId, memberId, accountId, family, answers = {} }) {
+async function registerForEvent({ eventId, memberId, accountId, family, answers = {}, ticketTypeId = null }) {
   const event = await getEvent(eventId);
   if (!event) return { ok: false, error: 'That event no longer exists.' };
   if (event.status !== 'published') return { ok: false, error: 'That event is not open for registration.' };
@@ -992,7 +1011,19 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
     }
   }
 
-  return createOrReactivateRegistration(event, member, accountId, answers, { allowWaitlist: !!event.allow_waitlist_signups });
+  // A real request: "select tickets, click register" - once an event has
+  // any ticket types defined (Finance tab), registering requires picking
+  // one; an event with none defined keeps registering at its own flat
+  // price_cents, unchanged.
+  let resolvedTicketTypeId = null;
+  const ticketTypes = await db.prepare('SELECT id FROM event_ticket_types WHERE event_id = ?').all(eventId);
+  if (ticketTypes.length) {
+    const match = ticketTypes.find((t) => String(t.id) === String(ticketTypeId));
+    if (!match) return { ok: false, error: 'Please select a ticket type.' };
+    resolvedTicketTypeId = match.id;
+  }
+
+  return createOrReactivateRegistration(event, member, accountId, answers, { allowWaitlist: !!event.allow_waitlist_signups, ticketTypeId: resolvedTicketTypeId });
 }
 
 // A real request: "add a button that says add registration. Pop up with
@@ -1041,7 +1072,7 @@ async function promoteNextWaitlisted(tx, eventId) {
 
   const event = await tx.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
   const member = await tx.prepare('SELECT * FROM members WHERE id = ?').get(next.member_id);
-  const chargeId = await chargeForConfirmedRegistration(tx, event, member, next.registered_by_account_id);
+  const chargeId = await chargeForConfirmedRegistration(tx, event, member, next.registered_by_account_id, next.ticket_type_id);
 
   await tx.prepare("UPDATE event_registrations SET status = 'confirmed', waitlist_position = NULL, charge_id = ? WHERE id = ?").run(chargeId, next.id);
   await tx
@@ -1079,6 +1110,29 @@ async function cancelRegistration(eventId, memberId) {
       linkUrl: '/events/' + eventId,
     });
   }
+}
+
+// A real request: "Registration is added to event registration log on
+// parent and student portals" - every non-cancelled event registration for
+// the given member ids, across every event, soonest-upcoming-first, for a
+// family-wide (Parent Portal) or single-member (Student Portal) "my
+// registrations" log page - same shape as classSchedule.js's own
+// manageClassesEntriesForAccount.
+async function eventRegistrationsForMembers(memberIds) {
+  if (!memberIds.length) return [];
+  const placeholders = memberIds.map(() => '?').join(',');
+  return db
+    .prepare(
+      `SELECT er.*, m.name AS "memberName", e.title, e.starts_at, e.ends_at, e.image_key AS "imageKey",
+              e.allow_registration_cancellations AS "allowCancel", tt.title AS "ticketTitle"
+       FROM event_registrations er
+       JOIN members m ON m.id = er.member_id
+       JOIN events e ON e.id = er.event_id
+       LEFT JOIN event_ticket_types tt ON tt.id = er.ticket_type_id
+       WHERE er.member_id IN (${placeholders}) AND er.status != 'cancelled'
+       ORDER BY e.starts_at ASC`
+    )
+    .all(...memberIds);
 }
 
 // --- Guest registration (admin permission - no members row) ---
@@ -1456,6 +1510,7 @@ module.exports = {
   eligibleMembersForRegistration,
   cancelRegistration,
   registrationsForEvent,
+  eventRegistrationsForMembers,
   familyGroupedRegistrationsForEvent,
   buildRegistrationsExportCsvLines,
   importRegistrationsFromRows,

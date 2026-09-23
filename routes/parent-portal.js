@@ -51,6 +51,7 @@ const {
 const notifications = require('../utils/notifications');
 const { sectionIdsForMember, classSectionIds, memberSatisfiesRestriction } = require('../utils/sections');
 const { registerForClass, unregisterFromClass } = require('../utils/classRegistration');
+const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
@@ -416,6 +417,29 @@ router.get('/classes/manage', async (req, res) => {
 router.get('/classes/manage/print', async (req, res) => {
   const { children, entries } = await manageClassesEntriesForAccount(req.portalAccount);
   res.render('parent-manage-classes-print', { title: 'View/Cancel Classes', hasChildren: children.length > 0, entries });
+});
+
+// A real request: "Registration is added to event registration log on
+// parent and student portals" - the family-wide equivalent of View/Cancel
+// Classes above, but for event registrations (utils/events.js's own
+// eventRegistrationsForMembers), reachable as a subpage of the existing
+// Events nav link (views/partials/portal-nav.ejs's PARENT_NAV_LINKS).
+router.get('/events', async (req, res) => {
+  const family = await familyForAccount(req.portalAccount.id);
+  const registrations = await events.eventRegistrationsForMembers(family.map((m) => m.id));
+  const groups = family
+    .map((m) => ({
+      member: m,
+      items: registrations.filter((r) => r.member_id === m.id).map((r) => ({ ...r, startsLabel: formatFriendlyTimestamp(r.starts_at) })),
+    }))
+    .filter((g) => g.items.length > 0);
+  res.render('parent-event-registrations', {
+    title: 'My Event Registrations',
+    hasChildren: family.length > 0,
+    groups,
+    error: req.query.error || null,
+    notice: req.query.notice || null,
+  });
 });
 
 router.get('/classes/manage/export.csv', async (req, res) => {

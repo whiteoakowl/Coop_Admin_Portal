@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>My Event Registrations</h1>
+    <p class="hint">To register for a new event, use <a href="/events">Events</a>.</p>
+
+    <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (registrations.length === 0) { %>
+      <p class="roster-empty">You're not registered for an event yet.</p>
+    <% } else { %>
+      <div class="manage-classes-list">
+        <% registrations.forEach(function(r) { %>
+          <div class="manage-classes-row">
+            <div class="manage-classes-row-info">
+              <a class="manage-classes-row-title" href="/events/<%= r.event_id %>"><%= r.title %></a>
+              <span class="manage-classes-row-meta">
+                <%= r.startsLabel %><% if (r.ticketTitle) { %> &middot; <%= r.ticketTitle %><% } %>
+              </span>
+            </div>
+            <% if (r.status === 'waitlisted') { %>
+              <span class="badge-pill">Waitlisted (#<%= r.waitlist_position %>)</span>
+            <% } else { %>
+              <span class="badge-pill badge-pill-present">Registered</span>
+            <% } %>
+            <% if (r.allowCancel) { %>
+              <form method="POST" action="/events/<%= r.event_id %>/unregister" class="inline-block-form">
+                <input type="hidden" name="memberId" value="<%= r.member_id %>" />
+                <input type="hidden" name="redirectTo" value="/student/events" />
+                <button type="submit" class="icon-btn icon-btn-danger" aria-label="Cancel your registration in <%= r.title %>" title="Cancel"><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </form>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

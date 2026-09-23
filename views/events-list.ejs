@@ -83,7 +83,7 @@
         <% } else { %>
           <div class="event-card-grid">
             <% events.forEach(function(e) { %>
-              <a class="event-card" href="/events/<%= e.id %>">
+              <button type="button" class="event-card event-card-clickable" data-view-event="<%= e.id %>">
                 <% if (e.imageUrl) { %>
                   <div class="event-card-image"><img src="<%= e.imageUrl %>" alt="" /></div>
                 <% } %>
@@ -93,12 +93,16 @@
                   <% if (e.categoryName) { %><span class="badge-pill" style="background: <%= e.categoryColor %>; color: #fff;"><%= e.categoryName %></span><% } %>
                   <% if (e.location) { %><p class="event-card-location"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= e.location %></p><% } %>
                 </div>
-              </a>
+              </button>
             <% }); %>
           </div>
         <% } %>
       </div>
     </section>
   </main>
+
+  <dialog id="event-card-dialog" class="parent-class-dialog event-card-dialog"></dialog>
+  <script src="/js/fragment-dialog.js"></script>
+  <script src="/js/events-card-view.js"></script>
 </body>
 </html>

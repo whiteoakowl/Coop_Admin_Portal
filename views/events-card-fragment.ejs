@@ -1,0 +1,39 @@
+<%# Fragment (no <html>/<body>) - fetched by public/js/events-card-view.js
+    and injected into the shared #event-card-dialog on the Events list, so
+    clicking an event card previews it without leaving the grid. A real
+    request: "it shows a popup of the event card with photo, title, short
+    description, cost and register now button. When you click register now
+    button it goes to the event page." Register Now is a plain link to the
+    real /events/:id page (which has the full description/ticket
+    selection/who's-registered/register flow) - this popup never registers
+    anyone itself. %>
+<div class="class-view-header-v2">
+  <div class="class-view-icon-badge" style="background: var(--brand);">
+    <svg class="icon"><use href="#icon-calendar-check"/></svg>
+  </div>
+  <div class="class-view-header-text">
+    <h3><%= event.title %></h3>
+    <span class="class-view-eyebrow"><%= startsLabel %></span>
+  </div>
+  <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+</div>
+
+<div class="parent-class-body">
+  <% if (event.imageUrl) { %>
+    <img src="<%= event.imageUrl %>" alt="" style="max-width: 100%; border-radius: var(--radius); display: block; margin-bottom: 0.75rem;" />
+  <% } %>
+
+  <% if (event.location) { %>
+    <p class="hint"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p>
+  <% } %>
+
+  <% if (event.short_description) { %>
+    <p><%= event.short_description %></p>
+  <% } %>
+
+  <% if (priceLabel) { %>
+    <p class="hint"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p>
+  <% } %>
+
+  <a class="primary-btn primary-btn-dark" style="display: block; text-align: center; margin-top: 0.75rem;" href="/events/<%= event.id %>">Register Now</a>
+</div>

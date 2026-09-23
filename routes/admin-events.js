@@ -690,9 +690,10 @@ router.post('/:id/finance', async (req, res) => {
 });
 
 // Ticket types (Finance tab) - a real request: "add ticket types, price,
-// title and permissions person or family." Admin-side only for now (a
-// scoping question confirmed this) - registration doesn't yet let a
-// registrant pick one and be charged accordingly.
+// title and permissions person or family." Managed here, admin-side; a
+// registrant picks one of these on the real /events/:id registration form
+// (utils/events.js's own registerForEvent/chargeForConfirmedRegistration),
+// charged that ticket's own price instead of the event's flat price_cents.
 router.post('/:id/ticket-types', async (req, res) => {
   const title = (req.body.title || '').trim();
   const priceCents = req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : 0;

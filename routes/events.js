@@ -135,6 +135,13 @@ router.get('/:id', async (req, res) => {
   const attachedVolunteerLists = await signupLists.volunteerListsForEvent(event.id);
   for (const list of attachedVolunteerLists) list.shifts = await signupLists.shiftsForVolunteerList(list.id);
 
+  // "If it allows for showing who has registered that will be listed
+  // below the register button" - show_registrants_to_members is the
+  // existing builder checkbox (previously stored but never read).
+  const registrants = event.show_registrants_to_members
+    ? (await events.registrationsForEvent(event.id)).filter((r) => r.status !== 'cancelled')
+    : [];
+
   res.render('events-detail', {
     title: event.title,
     settings,
@@ -148,10 +155,35 @@ router.get('/:id', async (req, res) => {
     myGuestRegistrations,
     attachedSignUpLists,
     attachedVolunteerLists,
+    registrants,
     isRegistrationWindowOpen: await events.isRegistrationWindowOpen(event),
     priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: "when they click on an event it shows a popup of the
+// event card with photo, title, short description, cost and register now
+// button." Small preview fragment fetched into the shared dialog on the
+// Events list (public/js/events-card-view.js) - same "fetch -> swap
+// dialog.innerHTML -> show" shape Parent Portal's own class-card popup
+// uses (routes/parent-portal.js's own /classes/:id/fragment), just for
+// browsing here rather than registering (Register Now goes to the real
+// /events/:id page, which already has the full description/ticket/who's-
+// registered/register flow).
+router.get('/:id/fragment', async (req, res) => {
+  const event = await events.getEvent(req.params.id);
+  if (!event || event.status !== 'published') return res.status(404).send('Not found');
+  if (event.visibility === 'members' && !req.portalAccount) return res.status(404).send('Not found');
+  if (req.portalAccount) {
+    const family = await familyForAccount(req.portalAccount.id);
+    if (family.length && !(await events.eventVisibleToFamily(event.id, family))) return res.status(404).send('Not found');
+  }
+  res.render('events-card-fragment', {
+    event: withImageUrl(event),
+    startsLabel: formatFriendlyTimestamp(event.starts_at),
+    priceLabel: event.price_cents == null ? null : `$${(event.price_cents / 100).toFixed(2)} per ${event.price_per}`,
   });
 });
 
@@ -174,7 +206,8 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
     const match = /^f(\d+)$/.exec(key);
     if (match) answers[match[1]] = value;
   }
-  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers });
+  const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
+  const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers, ticketTypeId });
   if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
 
   const event = await events.getEvent(eventId);
@@ -182,10 +215,17 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
 });
 
+// A real request built a "my registrations" log page on both portals
+// (routes/parent-portal.js's own /events, routes/student-portal.js's own
+// /events) that also needs its own Cancel button - redirectTo lets it send
+// a member back there instead of this event's own page, restricted to a
+// fixed allowlist so this never becomes an open redirect.
+const UNREGISTER_REDIRECT_ALLOWLIST = ['/parent/events', '/student/events'];
+
 router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
   const eventId = req.params.id;
   const memberId = parseInt(req.body.memberId, 10);
-  const back = `/events/${eventId}`;
+  const back = UNREGISTER_REDIRECT_ALLOWLIST.includes(req.body.redirectTo) ? req.body.redirectTo : `/events/${eventId}`;
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
