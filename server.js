@@ -518,13 +518,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error(err);
   logError(`${req.method} ${req.originalUrl}`, err);
-  // TEMPORARY diagnostic aid: the site is down everywhere and there is no
-  // other way to see the real error (no log access). Shows the bare
-  // message (never the full stack) right on the error page so it can be
-  // read off-screen without digging through host logs. Revert this once
-  // the root cause is found - a production error message is still
-  // internal detail that shouldn't stay exposed to every visitor.
-  res.status(500).render('500', { title: 'Error', debugMessage: err instanceof Error ? err.message : String(err) });
+  res.status(500).render('500', { title: 'Error' });
 });
 
 function lanAddresses() {
