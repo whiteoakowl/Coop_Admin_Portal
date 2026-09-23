@@ -7,6 +7,9 @@
   <main id="main-content" tabindex="-1" class="form-wrap form-wrap-narrow">
     <h1>Something went wrong</h1>
     <p>An unexpected error occurred. Please try again.</p>
+    <% if (typeof debugMessage !== 'undefined' && debugMessage) { %>
+      <p style="font-family: monospace; background: #f4f4f4; padding: 0.75rem; border-radius: 6px; word-break: break-word;"><%= debugMessage %></p>
+    <% } %>
     <a href="/" class="primary-btn">Go Home</a>
   </main>
 </body>
