@@ -184,10 +184,14 @@ CREATE TABLE IF NOT EXISTS volunteer_sections (
 );
 
 -- Session dates for a volunteer list, admin-chosen and editable any time
--- (same pattern as roster_dates).
+-- (same pattern as roster_dates). archived_at NULL means the date still
+-- shows on the Floater Assignments manage page's Choose Date dropdown -
+-- see supabase/migrations/20261016010000_volunteer_date_archiving.sql for
+-- why this doesn't just derive from session_date vs. today anymore.
 CREATE TABLE IF NOT EXISTS volunteer_dates (
   volunteer_list_id INTEGER NOT NULL REFERENCES volunteer_lists(id) ON DELETE CASCADE,
   session_date TEXT NOT NULL,
+  archived_at TEXT,
   PRIMARY KEY (volunteer_list_id, session_date)
 );
 
@@ -468,12 +472,17 @@ CREATE TABLE IF NOT EXISTS documents (
 -- that need a person every single session at a given hour (e.g. "Front
 -- Desk"), separate from both class teaching and Setup/Cleanup teams - an
 -- admin-managed list, not reused from either.
+-- session_date NULL (every permanent job) means "recurs every session" -
+-- see supabase/migrations/20261015010000_temporary_permanent_jobs.sql for
+-- why a non-NULL date (a "Temporary Position," Floater Assignments' own
+-- Add/Edit Temporary Position button) scopes a row to just that one date.
 CREATE TABLE IF NOT EXISTS permanent_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   day TEXT NOT NULL CHECK(day IN ('monday','wednesday')),
   hour_position INTEGER NOT NULL CHECK(hour_position BETWEEN 1 AND 4),
   title TEXT NOT NULL,
   room TEXT,
+  session_date TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

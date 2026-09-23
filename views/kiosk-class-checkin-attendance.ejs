@@ -19,7 +19,6 @@
         </div>
       </div>
       <h1><%= cls.class_name %> Attendance</h1>
-      <p class="subtitle"><%= dateLabel %></p>
 
       <% if (rows.length === 0) { %>
         <p class="roster-empty">No students are enrolled in this class.</p>
@@ -30,60 +29,63 @@
           <span class="legend-item"><span class="cell-tag cell-absent">A</span> Absent</span>
           <span id="roster-save-status" class="volunteer-save-status"></span>
         </div>
+        <%# A real request: "roster grid should show attendance for all
+            days matching the Monday/Wednesday attendance" - one column
+            per session date (dateLabels/row.cells, from the same
+            buildRosterGridData the admin grid uses - see routes/kiosk-
+            class-checkin.js's own comment), not just today. %>
         <div class="roster-scroll">
           <table class="roster-table roster-table-detailed">
             <thead>
               <tr>
                 <th class="roster-name-col">Name</th>
-                <th>Status</th>
-                <th>Checked In</th>
-                <th>Checked Out</th>
+                <% dateLabels.forEach(function(label) { %>
+                  <th><%= label %></th>
+                <% }); %>
               </tr>
             </thead>
             <tbody>
               <% rows.forEach(function(row) { %>
-                <% var cell = row.cells[0]; %>
                 <tr>
                   <td class="roster-name-col"><%= row.member.name %></td>
-                  <td>
-                    <%# A real request: "class attendance should allow for
-                        manually changing P, L, A just like the Monday/
-                        Wednesday attendance. it should then save
-                        automatically." Same roster-cell-select markup/
-                        auto-save script (public/js/attendance-grid.js) as
-                        the admin day roster - data-endpoint points it at
-                        this surface's own PIN-gated POST route instead of
-                        an admin one; data-tab is unused here. %>
-                    <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-endpoint="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %>">
-                      <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
-                      <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
-                      <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>
-                      <option value="absent" <%= cell.status === 'absent' ? 'selected' : '' %>>A</option>
-                    </select>
-                  </td>
-                  <td><%= cell.checkInTime || '—' %></td>
-                  <td><%= cell.checkOutTime || '—' %></td>
+                  <% row.cells.forEach(function(cell) { %>
+                    <td>
+                      <div class="cell-detailed">
+                        <%# A real request: "class attendance should allow
+                            for manually changing P, L, A just like the
+                            Monday/Wednesday attendance. it should then
+                            save automatically." Same roster-cell-select
+                            markup/auto-save script (public/js/attendance-
+                            grid.js) as the admin day roster -
+                            data-endpoint points it at this surface's own
+                            PIN-gated POST route instead of an admin one;
+                            data-tab is unused here. %>
+                        <select class="roster-cell-select roster-cell-select-<%= cell.status || 'blank' %>" data-endpoint="/kiosk/class-checkin/classes/<%= cls.id %>/attendance" data-member="<%= row.member.id %>" data-date="<%= cell.date %>" data-original="<%= cell.status || '' %>" aria-label="Attendance status for <%= row.member.name %> on <%= cell.date %>">
+                          <option value="" <%= !cell.status ? 'selected' : '' %>>—</option>
+                          <option value="present" <%= cell.status === 'present' ? 'selected' : '' %>>P</option>
+                          <option value="late" <%= cell.status === 'late' ? 'selected' : '' %>>L</option>
+                          <option value="absent" <%= cell.status === 'absent' ? 'selected' : '' %>>A</option>
+                        </select>
+                        <% if (cell.checkInTime) { %><span class="cell-time">In <%= cell.checkInTime %></span><% } %>
+                        <% if (cell.checkOutTime) { %><span class="cell-time">Out <%= cell.checkOutTime %></span><% } %>
+                      </div>
+                    </td>
+                  <% }); %>
                 </tr>
               <% }); %>
             </tbody>
             <tfoot>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Present</td>
-                <td><span class="summary-badge summary-present"><%= summary.present %></span></td>
-                <td></td>
-                <td></td>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-present"><%= s.present %></span></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Late</td>
-                <td><span class="summary-badge summary-late"><%= summary.late %></span></td>
-                <td></td>
-                <td></td>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-late"><%= s.late %></span></td><% }); %>
               </tr>
               <tr class="roster-summary-row">
                 <td class="roster-summary-label">Absent</td>
-                <td><span class="summary-badge summary-absent"><%= summary.absent %></span></td>
-                <td></td>
-                <td></td>
+                <% summary.forEach(function(s) { %><td><span class="summary-badge summary-absent"><%= s.absent %></span></td><% }); %>
               </tr>
             </tfoot>
           </table>

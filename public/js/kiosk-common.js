@@ -1,4 +1,34 @@
-/* exported keepInputFocused, initKioskMethodChooser */
+/* exported keepInputFocused, initKioskMethodChooser, registerKioskPageCleanup */
+// A kiosk left in fullscreen never truly reloads between "pages" -
+// fullscreen-nav.js swaps <body>'s contents in place instead of
+// navigating, precisely so the top-level document (and fullscreen) never
+// unloads. But that also means anything a page's own script attaches to
+// `document` itself (not to an element inside <body>) - a setInterval, a
+// document-level event listener - normally OUTLIVES that page, since
+// nothing ever tears it down the way a real page unload would. A real bug
+// report after kiosk hardware ran for a full session: dozens of these
+// stale listeners/timers piled up (kiosk-checkin.js/kiosk-checkout.js's
+// own idle-timer listeners, and keepInputFocused below, both re-register
+// fresh copies on every single visit to those pages), each still holding
+// a *detached* previous page's own elements/closures, until enough of
+// them firing on every click/mousemove visibly bogged the page down and,
+// worse, let a stale page's own idle timer eventually fire and force-
+// navigate the CURRENT live page back to /kiosk out from under whatever
+// the person was doing - which can also explain fullscreen exiting
+// unexpectedly, if that stale navigation's own isFullscreen() check loses
+// a race.
+//
+// registerKioskPageCleanup(fn) is the fix: any kiosk script that attaches
+// something document-level registers how to undo it here, and fullscreen-
+// nav.js's swap() (the one place body content actually changes) drains
+// and runs every registered cleanup right before the swap - so each
+// "page" tears down its own document-level state the instant it's
+// replaced, the same as a real page unload would.
+function registerKioskPageCleanup(fn) {
+  if (!window.__kioskPageCleanups) window.__kioskPageCleanups = [];
+  window.__kioskPageCleanups.push(fn);
+}
+
 // Keeps the hidden barcode-scanner input focused so a USB/Bluetooth scanner
 // (which behaves like a keyboard) always has somewhere to type into.
 // No bundler here - this file is loaded via a plain <script> tag before
@@ -11,9 +41,14 @@ function keepInputFocused(inputEl) {
     if (document.activeElement !== inputEl && !inputEl.disabled) inputEl.focus();
   };
   focus();
-  setInterval(focus, 400);
+  const intervalId = setInterval(focus, 400);
   document.addEventListener('click', focus);
   document.addEventListener('touchstart', focus);
+  registerKioskPageCleanup(() => {
+    clearInterval(intervalId);
+    document.removeEventListener('click', focus);
+    document.removeEventListener('touchstart', focus);
+  });
 
   // A real bug report: a new Bluetooth barcode scanner typed the right
   // ID# into every other text field on the same Android tablet (Notes

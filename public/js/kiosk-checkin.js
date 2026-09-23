@@ -1,4 +1,4 @@
-/* global keepInputFocused, initIdKeypad, initKioskMethodChooser */
+/* global keepInputFocused, initIdKeypad, initKioskMethodChooser, registerKioskPageCleanup */
 (function () {
   const scanForm = document.getElementById('scan-form');
   if (!scanForm) return; // no session today
@@ -178,8 +178,24 @@
     clearIdleTimer();
     idleTimer = setTimeout(finishSession, 15000);
   }
+  // registerKioskPageCleanup - see kiosk-common.js's own comment on it.
+  // Without this, every visit to this page left these 5 listeners (and
+  // whatever idleTimer they'd go on to arm) permanently attached to
+  // `document`, since a kiosk in fullscreen never actually reloads
+  // between "pages" - a real bug report ("kiosk checkout freezes" /
+  // "checking out exits kiosk mode") traced to exactly this: a stale
+  // page's own leftover idle timer eventually firing and force-
+  // navigating whatever page is CURRENTLY showing back to /kiosk, out
+  // from under the person actually using it.
+  const idleListener = () => { if (isReadyToScan()) armIdleTimer(); };
   ['click', 'touchstart', 'scroll', 'mousemove', 'keydown'].forEach((evt) => {
-    document.addEventListener(evt, () => { if (isReadyToScan()) armIdleTimer(); }, { passive: true });
+    document.addEventListener(evt, idleListener, { passive: true });
+  });
+  registerKioskPageCleanup(() => {
+    clearIdleTimer();
+    ['click', 'touchstart', 'scroll', 'mousemove', 'keydown'].forEach((evt) => {
+      document.removeEventListener(evt, idleListener);
+    });
   });
 
   function finishSession() {

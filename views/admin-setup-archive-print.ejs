@@ -12,16 +12,13 @@
       <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
     </div>
 
+    <%# A real request: "make sure it prints one team per page" - see
+        admin-setup-assignments.ejs's own comment (and partials/setup-
+        assignment-cards.ejs's header comment) for the full explanation.
+        This page's own top-level .print-header is gone the same way -
+        each team now repeats its own copy instead. %>
     <div class="print-page volunteer-archive-print-page">
-      <div class="print-header">
-        <img src="/img/logo.png" alt="" />
-        <div>
-          <p class="print-header-title">Sanford Homeschoolers</p>
-          <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Assignments &mdash; <%= dateLabel %></p>
-        </div>
-      </div>
-
-      <%- include('partials/setup-assignment-cards', { cards, day, selectedDate: date, editable: false }) %>
+      <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate: date, dateLabel, editable: false }) %>
     </div>
   </main>
   <script src="/js/print-auto.js"></script>

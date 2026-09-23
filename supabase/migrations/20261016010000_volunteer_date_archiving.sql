@@ -1,0 +1,12 @@
+-- A real request: "Floater assignments, choose date drop down should show
+-- all of the dates so far until you click an archive button for each
+-- date." Before this, a date fell off the manage page's Choose Date
+-- dropdown (and into the read-only Archive tab) automatically the moment
+-- it was no longer today or later - an admin could never go back and fix
+-- an already-past date's assignments from the manage page again. Now that
+-- move only happens once an admin explicitly archives the date, whether
+-- it's already passed or not. NULL (every existing date) means "still
+-- active" - identical to today's behavior for every row that exists
+-- before this migration runs, since none of them have been explicitly
+-- archived yet.
+alter table volunteer_dates add column if not exists archived_at text;

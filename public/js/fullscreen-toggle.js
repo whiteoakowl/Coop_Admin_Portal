@@ -42,11 +42,21 @@
   const pinForm = pinDialog ? pinDialog.querySelector('form') : null;
   const pinInput = pinDialog ? pinDialog.querySelector('#fullscreen-exit-pin-input') : null;
   const pinError = pinDialog ? pinDialog.querySelector('#fullscreen-exit-pin-error') : null;
+  // A real request: "add a centered number keypad to type in the code" -
+  // initPinKeypad (public/js/kiosk-pin-keypad.js, loaded before this
+  // script on kiosk-home.ejs) builds the on-screen digit pad once here;
+  // typeof-guarded since this same script also runs on admin pages that
+  // don't load that file at all.
+  const pinKeypad =
+    pinDialog && typeof initPinKeypad === 'function'
+      ? initPinKeypad(pinDialog.querySelector('#fullscreen-exit-pin-keypad'), pinInput, pinForm)
+      : null;
 
   function requestExit() {
     if (!pinDialog) { document.exitFullscreen(); return; }
     if (pinError) pinError.hidden = true;
     if (pinInput) pinInput.value = '';
+    if (pinKeypad) pinKeypad.clear();
     pinDialog.showModal();
     if (pinInput) pinInput.focus();
   }
@@ -78,6 +88,7 @@
         pinError.textContent = result.error || 'Incorrect PIN.';
         pinError.hidden = false;
         if (pinInput) { pinInput.value = ''; pinInput.focus(); }
+        if (pinKeypad) pinKeypad.clear();
       }
     });
   }

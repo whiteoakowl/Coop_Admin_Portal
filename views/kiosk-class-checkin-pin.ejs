@@ -16,12 +16,24 @@
 
     <form method="POST" action="/kiosk/class-checkin/unlock" class="stack-form" data-preserve-fullscreen>
       <% if (next) { %><input type="hidden" name="next" value="<%= next %>" /><% } %>
-      <label for="pin">PIN</label>
-      <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required />
+      <%# A real request: "add a centered number keypad to type in the
+          code" - public/js/kiosk-pin-keypad.js's initPinKeypad builds the
+          display + digit grid below and writes into this input, same
+          pattern the exit-Kiosk-Mode PIN dialog uses (see that partial's
+          own comment). visually-kiosk-hidden, not `hidden` - still real
+          enough (typeable, still enforces pattern/required/maxlength) for
+          a physical keyboard, or plain HTML5 validation, to work as a
+          fallback if the keypad script somehow doesn't load. %>
+      <input id="pin" class="visually-kiosk-hidden" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" autofocus required />
+      <div id="class-checkin-pin-keypad" class="kiosk-scan-col"></div>
 
       <button type="submit" class="primary-btn">Unlock</button>
     </form>
   </main>
+  <script src="/js/kiosk-pin-keypad.js"></script>
+  <script>
+    initPinKeypad(document.getElementById('class-checkin-pin-keypad'), document.getElementById('pin'), document.querySelector('.stack-form'));
+  </script>
   <script src="/js/fullscreen-nav.js"></script>
 </body>
 </html>

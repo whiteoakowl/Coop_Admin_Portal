@@ -11,6 +11,8 @@ const {
   deletePermanentJob,
   savePositionGroup,
   deletePositionGroup,
+  saveTemporaryPositionGroup,
+  deleteTemporaryPositionGroup,
   setJobFloaters,
   setAssignment,
   approveAssignment,
@@ -90,6 +92,42 @@ router.post('/volunteers/:day/substitutes/permanent-jobs/group/:keyId/delete', r
   const keyId = parseInt(req.params.keyId, 10);
   const title = await deletePositionGroup(day, keyId);
   res.redirect(subUrl(day, { date: req.body.date, dialog: 'job', notice: title ? `Deleted "${title}".` : 'Position not found.' }));
+});
+
+// Add/Edit Temporary Position dialog's own Save button - same all-groups-
+// at-once shape as /permanent-jobs/save-groups above, except every group
+// here is scoped to one specific date (saveTemporaryPositionGroup's own
+// day+date+title lookup), since a temporary position - unlike a permanent
+// one - only ever exists for the single date it was created for. A
+// missing/invalid date can't be saved against (there'd be nothing to
+// scope the new rows to), so it's rejected up front instead of silently
+// creating a recurring job by accident.
+router.post('/volunteers/:day/substitutes/temporary-jobs/save-groups', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.body.date;
+  if (!isValidISODate(date)) {
+    return res.redirect(subUrl(day, { date, error: 'Choose a session date before adding a temporary position.' }));
+  }
+  const groups = req.body.groups && typeof req.body.groups === 'object' ? req.body.groups : {};
+  for (const [key, group] of Object.entries(groups)) {
+    const title = ((group && group.title) || '').trim();
+    const room = ((group && group.room) || '').trim();
+    const hours = [].concat((group && group.hours) || [])
+      .map((v) => parseInt(v, 10))
+      .filter((p) => HOUR_POSITIONS.includes(p));
+    const keyId = key === 'new' ? null : parseInt(key, 10);
+    if (keyId !== null && Number.isNaN(keyId)) continue;
+    await saveTemporaryPositionGroup(day, date, keyId, title, room, hours);
+  }
+  res.redirect(subUrl(day, { date, notice: 'Temporary positions saved.' }));
+});
+
+router.post('/volunteers/:day/substitutes/temporary-jobs/group/:keyId/delete', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const date = req.body.date;
+  const keyId = parseInt(req.params.keyId, 10);
+  const title = isValidISODate(date) ? await deleteTemporaryPositionGroup(day, date, keyId) : null;
+  res.redirect(subUrl(day, { date, dialog: 'temp-job', notice: title ? `Deleted "${title}".` : 'Position not found.' }));
 });
 
 router.post('/volunteers/:day/substitutes/permanent-jobs/:id/edit', requireAdmin, requireDay, async (req, res) => {

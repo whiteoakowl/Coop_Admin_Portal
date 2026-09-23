@@ -687,6 +687,21 @@ textarea:focus-visible,
   width: 1px;
 }
 
+/* Same "still real, still submits, just not shown" treatment as
+   #barcode-input/.task-barcode-input above, generalized into a reusable
+   class for the PIN inputs a centered on-screen keypad (public/js/kiosk-
+   pin-keypad.js) now drives instead - opacity/position (not `hidden`,
+   which is display:none and would also skip this input's own
+   required/pattern validation) so it stays a real, validatable, typeable
+   field for a physical keyboard or a no-JS fallback. */
+.visually-kiosk-hidden {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+  height: 1px;
+  width: 1px;
+}
+
 /* Class Check-In's own scan page (views/kiosk-class-checkin-scan.ejs) is
    the one kiosk scan screen where the barcode input must actually be
    visible and typeable - "typing in the name manually" is one of its
@@ -6030,10 +6045,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .team-print-preview-page .setup-team-card-grid .team-print-meta,
 .team-print-preview-page .setup-team-card-grid .team-members-card h4,
 .team-print-preview-page .setup-team-card-grid .team-member-name,
+.team-print-preview-page .setup-team-card-grid .team-member-phone,
 .team-print-preview-page .setup-team-card-grid .team-member-flag,
 .team-print-preview-page .setup-team-card-grid .team-tasks-card h4,
 .team-print-preview-page .setup-team-card-grid .team-tasks-list {
   font-size: 17pt;
+}
+/* A real request: "phone number should be next to name and match the
+   font size of the name" - .team-member-name-col's base rule (further
+   down) stacks name above phone in a column for the compact on-screen
+   team card, and .team-member-phone's own base font-size is deliberately
+   smaller/muted there. Print-only override: same row, same size (the
+   font-size bump above already covers the phone), separated by a plain
+   middle dot like every other inline meta pairing in this app already
+   uses (e.g. .roster-name-times, .kiosk-slot-reason). */
+.team-print-preview-page .setup-team-card-grid .team-member-name-col {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+}
+.team-print-preview-page .setup-team-card-grid .team-member-phone {
+  color: inherit;
+}
+.team-print-preview-page .setup-team-card-grid .team-member-phone::before {
+  content: "\00b7";
+  margin-right: 0.35em;
 }
 /* Mirrors the @media print .team-member-row-absent reset below, same
    reasoning as the rest of this block: this preview page should show
@@ -7989,6 +8026,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .setup-team-card-grid .team-print-meta,
   .setup-team-card-grid .team-members-card h4,
   .setup-team-card-grid .team-member-name,
+  .setup-team-card-grid .team-member-phone,
   .setup-team-card-grid .team-member-flag,
   .setup-team-card-grid .team-tasks-card h4,
   .setup-team-card-grid .team-tasks-list {
@@ -7999,6 +8037,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   }
   .team-print-page-inner .print-header-sub {
     font-size: 17pt;
+  }
+  /* A real request: "phone number should be next to name and match the
+     font size of the name" - see the .team-print-preview-page mirror of
+     this same override earlier in the file for the full explanation. */
+  .setup-team-card-grid .team-member-name-col {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35em;
+  }
+  .setup-team-card-grid .team-member-phone {
+    color: inherit;
+  }
+  .setup-team-card-grid .team-member-phone::before {
+    content: "\00b7";
+    margin-right: 0.35em;
   }
 
   /* Floater Teams: always a clean 2-per-row grid on paper (portrait, see

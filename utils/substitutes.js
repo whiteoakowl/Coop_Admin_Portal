@@ -3,18 +3,28 @@ const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate, floate
 const { getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
 const { todayISO, formatTimestamp } = require('./dates');
-const { parseClockMinutes, splitTimeRange } = require('./schedule');
+const { parseClockMinutes } = require('./schedule');
 
 // True once it's more than 5 minutes past an hour's start time on today's
 // date and the person assigned to cover it still hasn't checked in
 // anywhere - the board re-flags the slot as still needing a substitute
 // instead of quietly trusting a no-show assignment. Only meaningful for
 // today (there's no "current time" to compare a future/past date against).
-async function assignedIsOverdue(existing, date, hourLabel) {
+//
+// A real bug found while wiring isAutoLateForClass below (same 5-minute
+// rule, added for a real request): this used to take the HOUR'S OWN
+// LABEL (class_schedule_hours.label - free text an admin types, like
+// "Hour 1", not necessarily a time at all) and try to parse a clock time
+// out of it via splitTimeRange - which only works if that label happens
+// to literally BE a time range. hourStartTime is the hour's actual
+// start_time column instead (the same field the Start Time form field on
+// the class schedule's own Edit Dates dialog writes to, already a plain
+// parseable clock string) - a real time regardless of whatever text the
+// label carries.
+async function assignedIsOverdue(existing, date, hourStartTime) {
   if (!existing || existing.status !== 'approved') return false;
   if (date !== todayISO()) return false;
-  const { startRaw } = splitTimeRange(hourLabel);
-  const startMin = parseClockMinutes(startRaw);
+  const startMin = parseClockMinutes(hourStartTime);
   if (startMin === null) return false;
   const now = new Date();
   if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
@@ -24,8 +34,48 @@ async function assignedIsOverdue(existing, date, hourLabel) {
   return !checkedIn;
 }
 
+// A real request: "if a teacher or assistant doesn't check in by 5 minutes
+// after their class starts, the teaching or class assistant position
+// should show as a floater needed position." Same "more than 5 minutes
+// past the hour's start, still no check-in today" rule assignedIsOverdue
+// above already uses to re-flag a no-show FLOATER - this is that same
+// clock check applied to the teacher/assistant slot itself, before
+// anyone's explicitly marked them absent/late at all. Purely a computed,
+// read-time signal (like assignedIsOverdue - never written back to the
+// attendance table): an admin who does later mark them present or absent
+// simply changes what missingMemberIdsForDate already reports, no
+// separate auto-written row to reconcile. Today-only, same reasoning as
+// assignedIsOverdue - there's no "current time" to compare a future or
+// past date's own start time against. Takes the hour's own start_time
+// column (see assignedIsOverdue's own comment on why NOT its label).
+async function isAutoLateForClass(memberId, date, hourStartTime) {
+  if (date !== todayISO()) return false;
+  const startMin = parseClockMinutes(hourStartTime);
+  if (startMin === null) return false;
+  const now = new Date();
+  if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
+  const checkedIn = await db
+    .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
+    .get(memberId, date);
+  return !checkedIn;
+}
+
+// session_date IS NULL - the recurring jobs this function has always
+// returned. A Temporary Position (see temporaryJobsForDayDate below)
+// deliberately never shows up here, so it can't leak into the recurring
+// Add/Edit Position dialog's own group list.
 async function permanentJobsForDay(day) {
-  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? ORDER BY hour_position, LOWER(title)').all(day);
+  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date IS NULL ORDER BY hour_position, LOWER(title)').all(day);
+}
+
+// A real request: "add a button on floater assignment page ... called
+// add/edit temporary position ... the job is only available that day."
+// Same permanent_jobs row shape (and the exact same substitute_assignments
+// assign/unassign machinery permanentJobsForDay's own rows already use -
+// see the migration's own comment), just scoped to one specific date
+// instead of recurring every session.
+async function temporaryJobsForDayDate(day, date) {
+  return db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? ORDER BY hour_position, LOWER(title)').all(day, date);
 }
 
 async function getPermanentJob(id) {
@@ -40,6 +90,13 @@ async function createPermanentJob(fields) {
   const info = await db
     .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room) VALUES (?, ?, ?, ?)')
     .run(fields.day, fields.hourPosition, fields.title, fields.room || null);
+  return info.lastInsertRowid;
+}
+
+async function createTemporaryJob(fields) {
+  const info = await db
+    .prepare('INSERT INTO permanent_jobs (day, hour_position, title, room, session_date) VALUES (?, ?, ?, ?, ?)')
+    .run(fields.day, fields.hourPosition, fields.title, fields.room || null, fields.date);
   return info.lastInsertRowid;
 }
 
@@ -125,6 +182,52 @@ async function deletePositionGroup(day, keyId) {
   const anchor = await getPermanentJob(keyId);
   if (!anchor) return null;
   const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE day = ? AND title = ?').all(day, anchor.title);
+  for (const row of siblings) await deletePermanentJob(row.id);
+  return anchor.title;
+}
+
+// Temporary Position's own version of groupedPermanentJobsForDay/
+// savePositionGroup/deletePositionGroup above - identical shape, just
+// grouped (and its siblings looked back up) by day+date+title instead of
+// day+title, so a temporary position never gets confused with a
+// recurring one that happens to share the same title on the same day.
+async function groupedTemporaryJobsForDayDate(day, date) {
+  const jobs = await temporaryJobsForDayDate(day, date);
+  const groups = new Map();
+  for (const job of jobs) {
+    if (!groups.has(job.title)) groups.set(job.title, { keyId: job.id, title: job.title, room: job.room || '', hours: [] });
+    groups.get(job.title).hours.push(job.hour_position);
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+async function saveTemporaryPositionGroup(day, date, keyId, title, room, hours) {
+  if (keyId == null) {
+    if (!title || hours.length === 0) return;
+    for (const hourPosition of hours) await createTemporaryJob({ day, date, hourPosition, title, room });
+    return;
+  }
+  const anchor = await getPermanentJob(keyId);
+  if (!anchor) return;
+  const desiredHours = title ? hours : [];
+  const siblings = await db.prepare('SELECT * FROM permanent_jobs WHERE day = ? AND session_date = ? AND title = ?').all(day, date, anchor.title);
+  const existingHours = new Set(siblings.map((r) => r.hour_position));
+  for (const row of siblings) {
+    if (desiredHours.includes(row.hour_position)) {
+      await updatePermanentJob(row.id, { hourPosition: row.hour_position, title, room });
+    } else {
+      await deletePermanentJob(row.id);
+    }
+  }
+  for (const hourPosition of desiredHours) {
+    if (!existingHours.has(hourPosition)) await createTemporaryJob({ day, date, hourPosition, title, room });
+  }
+}
+
+async function deleteTemporaryPositionGroup(day, date, keyId) {
+  const anchor = await getPermanentJob(keyId);
+  if (!anchor) return null;
+  const siblings = await db.prepare('SELECT id FROM permanent_jobs WHERE day = ? AND session_date = ? AND title = ?').all(day, date, anchor.title);
   for (const row of siblings) await deletePermanentJob(row.id);
   return anchor.title;
 }
@@ -442,8 +545,9 @@ async function substituteBoard(day, date) {
   const classStaffByHourPosition = await classStaffByHour(grid);
   const classVacancySlotsByHourPosition = await classVacancySlotsByHour(grid);
   const jobs = await permanentJobsForDay(day);
+  const tempJobs = date ? await temporaryJobsForDayDate(day, date) : [];
   const jobsByHour = {};
-  jobs.forEach((j) => {
+  [...jobs, ...tempJobs].forEach((j) => {
     if (!jobsByHour[j.hour_position]) jobsByHour[j.hour_position] = [];
     jobsByHour[j.hour_position].push(j);
   });
@@ -473,10 +577,15 @@ async function substituteBoard(day, date) {
     // up on the chart twice, once per person, each with its own
     // assign/accept flow. A "late" status counts the same as "absent"
     // here (see missingMemberIdsForDate) - either way that staff member
-    // isn't going to be covering their spot.
+    // isn't going to be covering their spot. Falls back to
+    // isAutoLateForClass's own computed check (5+ minutes past this
+    // hour's own start, still no check-in) when no one's explicitly
+    // marked them absent/late yet - a real request: this shouldn't need
+    // an admin to notice and mark it by hand first.
     for (const { cls, person } of classStaffByHourPosition[hourPosition] || []) {
       if (person.role !== 'teacher' && person.role !== 'assistant') continue;
-      const status = missingById.get(person.id);
+      let status = missingById.get(person.id);
+      if (!status && date && (await isAutoLateForClass(person.id, date, hourGroup.start_time))) status = 'late';
       if (!status) continue;
 
       const slotId = classStaffSlotId(cls.id, person.id);
@@ -493,7 +602,7 @@ async function substituteBoard(day, date) {
         ageGroup: cls.age_group || '',
         reason: `${roleLabel} ${statusLabel}: ${person.name}`,
         assigned: await assignedInfo(existing, floaterPool),
-        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.start_time),
       });
     }
 
@@ -505,7 +614,7 @@ async function substituteBoard(day, date) {
       slots.push({
         ...vacancy,
         assigned: await assignedInfo(existing, floaterPool),
-        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.start_time),
       });
     }
 
@@ -513,13 +622,13 @@ async function substituteBoard(day, date) {
       const existing = await resolveSlot('job', job.id);
 
       slots.push({
-        overdue: await assignedIsOverdue(existing, date, hourGroup.label),
+        overdue: await assignedIsOverdue(existing, date, hourGroup.start_time),
         slotType: 'job',
         slotId: job.id,
         label: job.title,
         room: job.room || '',
-        detail: 'Permanent Job',
-        reason: 'Staffed every session',
+        detail: job.session_date ? 'Temporary Position' : 'Permanent Job',
+        reason: job.session_date ? 'Added for this date only' : 'Staffed every session',
         assigned: await assignedInfo(existing, floaterPool),
       });
     }
@@ -673,8 +782,9 @@ async function publicFloaterCardsForDate(day, date) {
   const classStaffByHourPosition = await classStaffByHour(grid);
   const classVacancySlotsByHourPosition = await classVacancySlotsByHour(grid);
   const jobs = await permanentJobsForDay(day);
+  const tempJobs = await temporaryJobsForDayDate(day, date);
   const jobsByHour = {};
-  jobs.forEach((j) => {
+  [...jobs, ...tempJobs].forEach((j) => {
     if (!jobsByHour[j.hour_position]) jobsByHour[j.hour_position] = [];
     jobsByHour[j.hour_position].push(j);
   });
@@ -758,9 +868,13 @@ module.exports = {
   classVacancySlotId,
   classVacancyEntriesForClass,
   permanentJobsForDay,
+  temporaryJobsForDayDate,
   groupedPermanentJobsForDay,
   savePositionGroup,
   deletePositionGroup,
+  groupedTemporaryJobsForDayDate,
+  saveTemporaryPositionGroup,
+  deleteTemporaryPositionGroup,
   getPermanentJob,
   floaterIdsForJob,
   createPermanentJob,

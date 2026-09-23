@@ -51,6 +51,17 @@
       window.location.href = finalUrl;
       return;
     }
+    // The outgoing page's own document-level state (keepInputFocused's
+    // interval/listeners, kiosk-checkin.js/kiosk-checkout.js's idle-timer
+    // listeners) - see registerKioskPageCleanup's own comment in kiosk-
+    // common.js for why this needs to happen, and why here specifically:
+    // this is the one place body content actually gets replaced.
+    if (window.__kioskPageCleanups) {
+      window.__kioskPageCleanups.forEach((fn) => {
+        try { fn(); } catch (err) { /* one page's bad cleanup shouldn't block the swap */ }
+      });
+      window.__kioskPageCleanups = [];
+    }
     document.title = doc.title;
     document.body.className = doc.body.className;
     Array.from(document.body.attributes).forEach((attr) => {

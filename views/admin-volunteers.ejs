@@ -38,6 +38,7 @@
         <div class="roster-btn-row no-print">
           <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Position</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-temp-job-dialog').showModal()">+ Add/Edit Temporary Position</button>
         </div>
       </div>
 
@@ -45,8 +46,8 @@
         <div class="category-filter" style="margin: 0;">
           <label for="chart-date-select">Choose Date</label>
           <select id="chart-date-select" onchange="window.fullscreenNavigate('/admin/volunteers/<%= day %>/manage' + (this.value ? '?date=' + this.value : ''))">
-            <% if (upcomingDates.length === 0) { %><option value="">No upcoming dates</option><% } %>
-            <% upcomingDates.forEach(function(d) { %>
+            <% if (activeDates.length === 0) { %><option value="">No dates</option><% } %>
+            <% activeDates.forEach(function(d) { %>
               <option value="<%= d.date %>" <%= selectedDate === d.date ? 'selected' : '' %>><%= d.label %></option>
             <% }); %>
           </select>
@@ -56,7 +57,7 @@
       <% if (dates.length === 0) { %>
         <p class="roster-empty">Add session dates above first.</p>
       <% } else if (!selectedDate) { %>
-        <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/volunteers/<%= day %>/archive">Archive</a> tab.</p>
+        <p class="roster-empty">Every date has been archived - add one above, or see them on the <a href="/admin/volunteers/<%= day %>/archive">Archive</a> tab.</p>
       <% } else { %>
         <div id="floater-assign-status" class="alert alert-error no-print" hidden></div>
         <div id="floater-cards-container" data-selected-date="<%= selectedDate %>">
@@ -75,8 +76,19 @@
             <% } %>
             <% dates.forEach(function(d) { %>
               <tr>
-                <td><%= d.label %></td>
+                <td><%= d.label %><% if (d.archived) { %> <span class="hint">(archived)</span><% } %></td>
                 <td class="actions-cell">
+                  <%# A real request: "choose date drop down should show
+                      all of the dates so far until you click an archive
+                      button for each date" - Archive just moves the date
+                      off the manage page's own Choose Date dropdown and
+                      onto the read-only Archive tab; Remove (still below)
+                      deletes it and its job assignments outright. %>
+                  <% if (!d.archived) { %>
+                    <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/archive?dialog=dates" class="inline-block-form">
+                      <button type="submit" class="link-btn">Archive</button>
+                    </form>
+                  <% } %>
                   <form method="POST" action="/admin/volunteers/<%= day %>/dates/<%= d.date %>/remove?dialog=dates" class="inline-block-form" data-confirm="Remove <%= d.label %>? Any position/room assignments for this date will be deleted too.">
                     <button type="submit" class="link-btn link-btn-danger">Remove</button>
                   </form>
@@ -168,6 +180,69 @@
       </form>
     </dialog>
 
+    <%# Temporary Position - a real request: "add a button on floater
+        assignment page that is just like the add/edit permanent position
+        button. except this will be called add/edit temporary position.
+        same popup and format. however, when a job is added using this
+        temporary button the job is only available that day." Same shape
+        as add-job-dialog above (one save-groups form for every group at
+        once), just scoped to the currently selected date - see
+        routes/admin-substitutes.js's /temporary-jobs/save-groups. %>
+    <dialog id="add-temp-job-dialog" class="volunteer-edit-dialog position-editor-dialog">
+      <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/save-groups?dialog=temp-job">
+        <div class="qr-filter-dialog-header">
+          <h3>Add/Edit Temporary Position</h3>
+          <div class="qr-filter-dialog-actions">
+            <button type="submit" class="primary-btn">Save</button>
+            <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
+          </div>
+        </div>
+        <input type="hidden" name="date" value="<%= selectedDate %>" />
+        <div class="roster-scroll position-group-list">
+          <% temporaryPositionGroups.forEach(function(g) { %>
+            <div class="position-group">
+              <div class="position-group-fields">
+                <input type="text" name="groups[<%= g.keyId %>][title]" value="<%= g.title %>" placeholder="Position title" />
+                <input type="text" name="groups[<%= g.keyId %>][room]" value="<%= g.room %>" placeholder="Room # (optional)" />
+                <button
+                  type="submit"
+                  formaction="/admin/volunteers/<%= day %>/substitutes/temporary-jobs/group/<%= g.keyId %>/delete?dialog=temp-job"
+                  formmethod="POST"
+                  formnovalidate
+                  class="icon-btn icon-btn-danger"
+                  aria-label="Delete <%= g.title %>"
+                  title="Delete Position"
+                ><svg class="icon"><use href="#icon-trash"/></svg></button>
+              </div>
+              <div class="checkbox-row">
+                <% hours.forEach(function(h) { %>
+                  <label class="checkbox-option">
+                    <input type="checkbox" name="groups[<%= g.keyId %>][hours][]" value="<%= h.position %>" <%= g.hours.includes(h.position) ? 'checked' : '' %> />
+                    <%= h.label %>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+          <div class="position-group">
+            <span class="class-card-pill-label">Add New Temporary Position</span>
+            <div class="position-group-fields">
+              <input type="text" name="groups[new][title]" placeholder="Position title (e.g. Front Desk)" />
+              <input type="text" name="groups[new][room]" placeholder="Room # (optional)" />
+            </div>
+            <div class="checkbox-row">
+              <% hours.forEach(function(h) { %>
+                <label class="checkbox-option">
+                  <input type="checkbox" name="groups[new][hours][]" value="<%= h.position %>" />
+                  <%= h.label %>
+                </label>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
     <%# Reopens the dialog a redirect (Save, or a position's own trash-icon
         delete below) just came back from, instead of leaving the admin at
         a closed manage page. Dialog ids aren't uniform ("dates" ->
@@ -178,7 +253,7 @@
         pattern) silently found nothing and .showModal() on null threw, so
         Save never actually reopened the position dialog either. %>
     <% if (openDialog) { %>
-      <% const dialogIds = { dates: 'edit-dates-dialog', job: 'add-job-dialog' }; %>
+      <% const dialogIds = { dates: 'edit-dates-dialog', job: 'add-job-dialog', 'temp-job': 'add-temp-job-dialog' }; %>
       <script>document.getElementById('<%= dialogIds[openDialog] %>').showModal();</script>
     <% } %>
   </main>

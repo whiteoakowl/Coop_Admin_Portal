@@ -22,4 +22,20 @@
     document.addEventListener(evt, reset, { passive: true });
   });
   reset();
+
+  // A page using this script never actually reloads while in fullscreen -
+  // fullscreen-nav.js swaps <body>'s contents in place instead of
+  // navigating, so anything attached to `document` itself (these 5
+  // listeners, this timer) would otherwise outlive this "page" forever,
+  // piling up fresh copies on every visit. window.__kioskPageCleanups is
+  // drained by fullscreen-nav.js's own swap() right before it replaces
+  // body content - self-initializing here (rather than calling a shared
+  // helper) since this script runs standalone on pages that don't load
+  // kiosk-common.js at all (setup-public.ejs, volunteers-public.ejs).
+  (window.__kioskPageCleanups = window.__kioskPageCleanups || []).push(() => {
+    clearTimeout(timer);
+    ['click', 'touchstart', 'scroll', 'mousemove', 'keydown'].forEach((evt) => {
+      document.removeEventListener(evt, reset);
+    });
+  });
 })();

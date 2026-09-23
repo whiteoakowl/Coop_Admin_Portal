@@ -7,14 +7,13 @@
 <body class="admin-page setup-assignments-print-page">
   <%- include('partials/admin-nav') %>
   <main id="main-content" tabindex="-1" class="admin-main" data-day="<%= day %>">
-    <div class="print-header">
-      <img src="/img/logo.png" alt="" />
-      <div>
-        <p class="print-header-title">Sanford Homeschoolers</p>
-        <p class="print-header-sub"><%= dayLabel %> Setup/Cleanup Assignments</p>
-      </div>
-    </div>
-
+    <%# A real request: "make sure it prints one team per page" - this
+        page's own top-level .print-header (display:none outside print,
+        so removing it changes nothing on screen) used to be the only
+        header in the whole print job and landed on whichever page
+        happened to hold it. partials/setup-assignment-cards.ejs now
+        repeats its own copy on every team's own page instead - see its
+        header comment. %>
     <h1>Setup/Cleanup</h1>
 
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
@@ -55,7 +54,7 @@
       <% } else if (!selectedDate) { %>
         <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive">Archive</a> tab.</p>
       <% } else { %>
-        <%- include('partials/setup-assignment-cards', { cards, day, selectedDate, editable: true }) %>
+        <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true }) %>
       <% } %>
     </div>
 

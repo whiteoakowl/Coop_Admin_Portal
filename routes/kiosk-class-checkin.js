@@ -24,7 +24,7 @@ const db = require('../db');
 const { todayISO, formatDateLong } = require('../utils/dates');
 const { isValidDay, DAY_LABELS } = require('../utils/days');
 const { allClassesList, ensureDayRoster, HOUR_POSITIONS } = require('../utils/classSchedule');
-const { buildRosterGridData } = require('../utils/rosterGrid');
+const { buildRosterGridData, rosterDates } = require('../utils/rosterGrid');
 const { verifyClassCheckinPin } = require('../utils/classCheckinPin');
 const { findMemberByBarcodeOrName } = require('../utils/memberLookup');
 const { ensurePlaygroundRoster, playgroundHourLabel, playgroundLogForDate } = require('../utils/playground');
@@ -130,10 +130,15 @@ router.get('/classes/:day', requireUnlocked, async (req, res) => {
 
 // Picking a class goes straight to its attendance sheet - Check In and
 // Check Out live here now (no separate class-detail page in between).
-// Today-only, not the full multi-week admin grid (routes/admin-
-// rosters.js) - this screen only ever shows the one day that matters for
-// "who's checked into this class right now" rather than a term's worth
-// of history.
+// A real request: "individual class check in/out screen, roster grid,
+// should show attendance for all days matching the Monday/Wednesday
+// attendance" - this used to hand buildRosterGridData a single-date
+// override ([today]) so the sheet only ever showed "who's checked in
+// right now," but that's exactly the shape the admin grid deliberately
+// avoids for a class roster (see admin-rosters.js's own GET handler) -
+// borrowing every date off the day's Student roster instead of just
+// today, same as here now, so a class's full attendance history shows up
+// identically on both surfaces.
 router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
   const cls = await findClassWithLabels(parseInt(req.params.id, 10));
   if (!cls) return res.status(404).render('404', { title: 'Not Found' });
@@ -142,14 +147,14 @@ router.get('/classes/:id/attendance', requireUnlocked, async (req, res) => {
   // ensureClassRoster's first call for this class - see resolveScan below,
   // which already guards the same gap.
   if (!roster) return res.status(404).render('404', { title: 'Not Found' });
-  const today = todayISO();
-  const grid = await buildRosterGridData(roster, [today]);
+  const dates = await rosterDates(await ensureDayRoster(cls.day, 'student'));
+  const grid = await buildRosterGridData(roster, dates);
   res.render('kiosk-class-checkin-attendance', {
     title: `Attendance - ${cls.class_name}`,
     cls,
-    dateLabel: formatDateLong(today),
     rows: grid.rows,
-    summary: grid.summary[0] || { present: 0, late: 0, absent: 0 },
+    dateLabels: grid.dateLabels,
+    summary: grid.summary,
   });
 });
 

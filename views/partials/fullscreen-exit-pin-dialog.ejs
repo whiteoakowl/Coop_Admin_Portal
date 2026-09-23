@@ -21,6 +21,16 @@
   <div class="confirm-dialog-icon"><svg class="icon"><use href="#icon-minimize"/></svg></div>
   <p class="confirm-dialog-message">Enter the Class Check-In PIN to exit Full Screen View.</p>
   <form method="POST" action="<%= typeof verifyPinUrl !== 'undefined' ? verifyPinUrl : '/admin/fullscreen/verify-pin' %>">
+    <%# A real request: "add a centered number keypad to type in the
+        code" - public/js/kiosk-pin-keypad.js's initPinKeypad builds the
+        display + digit grid below and writes into this input, same
+        pattern every other kiosk scan screen's own ID keypad already
+        uses (see kiosk-id-keypad.js). visually-kiosk-hidden (not the
+        `hidden` attribute - see that class's own comment) rather than
+        removed - it's still the one thing the form actually submits, and
+        still real enough (typeable, and required/pattern/maxlength still
+        enforced) for a physical keyboard, or plain HTML5 validation, to
+        work as a fallback if the keypad script somehow doesn't load. %>
     <input
       id="fullscreen-exit-pin-input"
       name="pin"
@@ -30,7 +40,9 @@
       maxlength="4"
       autocomplete="off"
       required
+      class="visually-kiosk-hidden"
     />
+    <div id="fullscreen-exit-pin-keypad" class="kiosk-scan-col"></div>
     <p class="hint" id="fullscreen-exit-pin-error" role="alert" hidden></p>
     <div class="notes-dialog-actions">
       <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>

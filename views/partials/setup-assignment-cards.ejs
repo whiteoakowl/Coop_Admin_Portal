@@ -20,7 +20,8 @@
 // small form that round-trips on submit.
 //
 // Locals: cards (routes/admin-setup.js's assignmentCardsForDate), day,
-// selectedDate, editable (defaults true).
+// selectedDate, editable (defaults true), dayLabel, dateLabel (optional -
+// see the print-header comment just below).
 var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
 var isEditable = typeof editable === 'undefined' ? true : editable;
 %>
@@ -30,6 +31,32 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
   <div class="floater-cards-grid setup-assignment-cards-grid">
     <% cards.forEach(function(team, idx) { %>
       <% var accent = FLOATER_ACCENTS[idx % FLOATER_ACCENTS.length]; %>
+      <%# A real request: "make sure it prints one team per page" - the
+          old markup had no per-team wrapper at all, just a bare
+          .floater-card sitting directly in the grid, so print had
+          nothing to force a page break on and no header to repeat -
+          every consuming page's OWN single top-level print-header
+          landed on whichever page happened to hold it, same root cause
+          floater-chart-cards.ejs's own print-header comment describes
+          for Floater Assignments (and the exact fix that already exists
+          for it): .floater-print-page + a repeated .print-header per
+          card, plus the SAME ":not(:first-child) { page-break-before }"
+          CSS rule that already exists for Floater Assignments (it's
+          generic - not scoped to Floater specifically - see styles.css) -
+          this reuses it instead of adding a near-duplicate Setup/Cleanup-
+          only rule. dayLabel/dateLabel are optional so this partial's
+          third caller (setup-assignment-cards-fragment.ejs, a live
+          dialog view that's never itself printed - it links out to
+          admin-setup-archive-print.ejs's OWN full print page instead)
+          doesn't need to pass them just to keep this markup valid. %>
+      <div class="floater-print-page">
+      <div class="print-header">
+        <img src="/img/logo.png" alt="" />
+        <div>
+          <p class="print-header-title">Sanford Homeschoolers</p>
+          <p class="print-header-sub"><%= typeof dayLabel !== 'undefined' ? dayLabel : '' %> Setup/Cleanup Assignments<% if (typeof dateLabel !== 'undefined' && dateLabel) { %> &mdash; <%= dateLabel %><% } %></p>
+        </div>
+      </div>
       <div class="floater-card floater-card-<%= accent %>">
         <div class="floater-card-header">
           <span class="floater-card-icon"><svg class="icon"><use href="#icon-broom"/></svg></span>
@@ -166,6 +193,7 @@ var isEditable = typeof editable === 'undefined' ? true : editable;
             </ul>
           </div>
         <% } %>
+      </div>
       </div>
     <% }); %>
   </div>

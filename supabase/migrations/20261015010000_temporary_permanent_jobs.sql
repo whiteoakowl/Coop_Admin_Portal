@@ -1,0 +1,13 @@
+-- A real request: "add a button on floater assignment page ... called
+-- add/edit temporary position. Same popup and format. However, when a
+-- job is added using this temporary button the job is only available
+-- that day. It [should not] appear as a job needing to be filled other
+-- days." Reuses permanent_jobs itself rather than a parallel table - a
+-- temporary position is staffed, assigned, and unassigned through the
+-- exact same substitute_assignments (slot_type='job', slot_id=this row's
+-- id) machinery a permanent job already uses, so nothing about that flow
+-- needs its own copy. NULL session_date (every existing row, and every
+-- permanent job going forward) means "recurs every session," matching
+-- today's behavior exactly; a non-NULL session_date scopes the row to
+-- that one date only.
+alter table permanent_jobs add column if not exists session_date text;

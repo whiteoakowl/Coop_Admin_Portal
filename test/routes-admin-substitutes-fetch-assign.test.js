@@ -42,14 +42,15 @@ async function loginAsAdmin() {
 
 // A real bug report: this file's own tests hardcoded a fixed calendar date
 // ('2026-09-07', "a Monday") that was in the future when written but is
-// now in the past - GET /fragment's own upcomingDates filter (routes/
-// admin-volunteers.js) excludes any date < today, so its test started
-// failing (rendering the empty "Add a position above first" state)
-// purely because real time caught up to the hardcoded literal, nothing to
-// do with the feature itself. Computed fresh each run instead, so this
-// can't go stale again - still lands on a real Monday (day: 'monday' is
-// used throughout this file) since some of the app's own date logic
-// (utils/substitutes.js's DAY_WEEKDAY) does care about the actual weekday.
+// now in the past - GET /fragment's own activeDates filter (routes/
+// admin-volunteers.js) used to exclude any date < today, so its test
+// started failing (rendering the empty "Add a position above first"
+// state) purely because real time caught up to the hardcoded literal,
+// nothing to do with the feature itself. Computed fresh each run
+// instead, so this can't go stale again - still lands on a real Monday
+// (day: 'monday' is used throughout this file) since some of the app's
+// own date logic (utils/substitutes.js's DAY_WEEKDAY) does care about the
+// actual weekday.
 function nextMonday() {
   const d = new Date();
   d.setDate(d.getDate() + (((1 - d.getDay() + 7) % 7) || 7));
