@@ -44,7 +44,7 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('the assign dropdown highlights a checked-in floater (CSS class + "checked in" text), not one who has not checked in', async () => {
+test('the assign dropdown highlights a checked-in floater with the CSS class only (no "checked in" text), not one who has not checked in', async () => {
   const cookie = await loginAsAdmin();
   const day = 'monday';
   const list = await getListByDay(day);
@@ -71,6 +71,7 @@ test('the assign dropdown highlights a checked-in floater (CSS class + "checked 
 
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<option value="\d+"\s*class="floater-option-checked-in">\s*Checked In Floater \([^)]*, checked in\)/);
-  assert.doesNotMatch(res.text, /Not Checked In Floater \([^)]*, checked in\)/);
+  assert.match(res.text, /<option value="\d+"\s*class="floater-option-checked-in">\s*Checked In Floater \([^)]*\)/);
+  assert.doesNotMatch(res.text, /Checked In Floater \([^)]*, checked in\)/);
+  assert.doesNotMatch(res.text, /class="floater-option-checked-in">\s*Not Checked In Floater/);
 });

@@ -5486,14 +5486,38 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    row's Floater column an assign dropdown + Accept/Unassign button
    instead of plain text (partials/floater-chart-cards.ejs). ---------- */
 
-.floater-chart-cards-grid { grid-template-columns: repeat(2, 1fr); }
-@media (max-width: 800px) {
-  .floater-chart-cards-grid { grid-template-columns: 1fr; }
+/* minmax(0, 1fr), not a bare 1fr - a bare 1fr track's minimum size
+   defaults to the item's own min-content width, which a table this wide
+   (long position names, a member-picker dropdown) easily exceeds at a
+   real phone width. That let the whole card (and the Assign/Unassign
+   button riding along inside it) render wider than the viewport instead
+   of actually shrinking to fit it - a real bug report: "on mobile assign/
+   unassigned button trails off the page and you can't click it." 0
+   overrides that automatic minimum so the track (and everything in it)
+   is free to shrink all the way down to the actual available width. */
+.floater-chart-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* 1050px, not 800px - below that, a 2-up card (minus the fixed 260px
+   sidebar and page padding) is too narrow for its own Position/Room/
+   Floater table: "Classroom Hallway Supervisor" and "Room 12" were
+   wrapping mid-word at ~900px viewports even after widening those
+   columns, because there just wasn't enough card width to give. One
+   column at that size gives each card the room the table actually needs. */
+@media (max-width: 1050px) {
+  .floater-chart-cards-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-.floater-chart-table th:nth-child(1) { width: 22%; }
-.floater-chart-table th:nth-child(2) { width: 12%; }
-.floater-chart-table th:nth-child(3) { width: 66%; }
+/* 36/16/48, not the base .floater-card-table's 40/24/36 - a real bug at
+   desktop widths: table-layout:fixed locks each column to its header's
+   width, and the old 22/12/66 split left "Room" so narrow that its own
+   header ("ROOM") had nowhere to go but overflow into "Floater" (the
+   inherited .floater-card-table th white-space: nowrap made it worse),
+   while "Position" was narrow enough to wrap long names like "Classroom
+   Hallway Supervisor" one character per line. white-space: normal lets a
+   header wrap instead of overflowing when a column is still tight. */
+.floater-chart-table th:nth-child(1) { width: 32%; }
+.floater-chart-table th:nth-child(2) { width: 20%; }
+.floater-chart-table th:nth-child(3) { width: 48%; }
+.floater-chart-table th { white-space: normal; }
 .floater-chart-table td:nth-child(1), .floater-chart-table td:nth-child(2), .floater-chart-table td:nth-child(3) { width: auto; }
 
 /* A class can now list more than once (one row per missing teacher/
@@ -5635,7 +5659,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .floater-chart-table td { display: block; width: auto; padding: 0; border: none; }
   .floater-chart-table td:nth-child(2) { color: var(--muted); }
   .floater-chart-table td:nth-child(2)::before { content: "\00b7\0020"; }
-  .floater-chart-table td:nth-child(3) { flex: 1 1 100%; }
+  /* min-width: 0 - a flex item's min-width defaults to auto, which lets
+     this cell's own min-content size (the select's widest-option width
+     plus the Assign/Unassign button) override flex:1 1 100% and force the
+     whole <tr> wider than the card. 0 lets it actually shrink to the row's
+     available width instead of pushing the button off the edge. */
+  .floater-chart-table td:nth-child(3) { flex: 1 1 100%; min-width: 0; }
 
   /* Position + Room moved to their own line above, so the Floater column
      now has the card's FULL width to itself instead of a cramped third of
@@ -5661,7 +5690,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
      text-overflow rule keeps the truncated closed-state value readable
      instead of letting the browser just clip mid-character. */
   .floater-chart-table .floater-assign-form select {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     min-width: 0;
     width: auto;
     max-width: 100%;
