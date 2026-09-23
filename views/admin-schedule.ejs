@@ -13,7 +13,7 @@
         <p class="print-header-sub">Schedule</p>
       </div>
     </div>
-    <h1>Schedules</h1>
+    <h1><%= tab === 'settings' ? 'Co-op Class Settings' : 'Schedules' %></h1>
 
     <%# Class Schedules/Member Schedules/Archive/Settings now live as
         subpages under the orange bar's own Schedules item (views/
@@ -141,61 +141,73 @@
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
 
-        <p class="hint">Registration and cancellation settings for every class, across both days - toggle a checkbox to save it immediately. Open a class's own card on its Monday/Wednesday Schedules tab to edit its name, room, time, roster, or pricing.</p>
+        <%# A real request rebuilt this whole tab: "Co-op admin portal.
+            Classes. Class settings subpage. The title should be Co-op
+            Class Settings at the top of the page. There should not be a
+            list of all of the classes. It should be a list of checkboxes
+            on the left in a clean column and questions/statements on the
+            right in a column." Registration/cancellation eligibility,
+            Parents Can Complete Lessons, Parents Can Use Class Chat, and
+            Semester are all per-class now - see each class's own Details
+            tab (views/admin-class-schedule-manage.ejs). Everything below
+            is genuinely co-op-wide. %>
+        <p class="hint">These settings apply to every class across the whole co-op. Open a class's own Details tab (from its Monday/Wednesday Schedules card) to edit that one class's own grade/age locks, registration, or semester.</p>
 
-        <% if (classes.length === 0) { %>
-          <p class="roster-empty">No classes yet - add one from the Monday or Wednesday Schedules tab.</p>
-        <% } else { %>
-          <div class="roster-scroll">
-            <table class="roster-table class-settings-table">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Class</th>
-                  <th>Open for Registration</th>
-                  <th>Parents Can Register</th>
-                  <th>Teachers/Assistants Can Self Sign-Up</th>
-                  <th>Students Can Self-Register</th>
-                  <th>Members Can Cancel</th>
-                  <th>Auto-Refund on Cancel</th>
-                  <th>Parents Can Complete Lessons</th>
-                  <th>Parents Can Use Class Chat</th>
-                  <th>Semester</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% classes.forEach(function(c) { %>
-                  <tr>
-                    <td><%= dayLabels[c.day] || c.day %></td>
-                    <td><%= c.class_name %></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="registrationOpen" <%= c.registration_open ? 'checked' : '' %> aria-label="Open for parent registration - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentRegister" <%= c.allow_parent_register ? 'checked' : '' %> aria-label="Parents can register - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowTeacherRegister" <%= c.allow_teacher_register ? 'checked' : '' %> aria-label="Teachers/assistants can self sign-up - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowStudentRegister" <%= c.allow_student_register ? 'checked' : '' %> aria-label="Students can self-register - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowCancel" <%= c.allow_cancel ? 'checked' : '' %> aria-label="Members can cancel their registration - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="autoRefundOnCancel" <%= c.auto_refund_on_cancel ? 'checked' : '' %> aria-label="Auto-refund a paid charge on cancel - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentCompleteLessons" <%= c.allow_parent_complete_lessons ? 'checked' : '' %> aria-label="Parents can complete lessons for their student - <%= c.class_name %>" /></td>
-                    <td><input type="checkbox" data-class-settings-toggle data-class-id="<%= c.id %>" data-field="allowParentChat" <%= c.allow_parent_chat ? 'checked' : '' %> aria-label="Parents can use this class's chat - <%= c.class_name %>" /></td>
-                    <td>
-                      <select data-class-settings-select data-class-id="<%= c.id %>" data-field="semesterId" aria-label="Semester - <%= c.class_name %>">
-                        <option value="">No Semester</option>
-                        <% semesters.forEach(function(s) { %>
-                          <option value="<%= s.id %>" <%= c.semester_id === s.id ? 'selected' : '' %>><%= s.title %></option>
-                        <% }); %>
-                      </select>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-          <p class="hint no-print" id="class-settings-save-status" role="status"></p>
-        <% } %>
+        <section class="portal-dashboard-card portal-dashboard-card-wide">
+          <form method="POST" action="/admin/schedule/class-settings" class="class-settings-form">
+            <div class="class-settings-question">
+              <div class="class-settings-question-label">When a class is restricted by age(s):</div>
+              <div class="class-settings-question-control">
+                <label class="checkbox-option"><input type="radio" name="ageRestrictionMode" value="start_date" <%= classSettings.ageRestrictionMode !== 'fixed_date' ? 'checked' : '' %> /> Consider the student's age on the class start date.</label>
+                <label class="checkbox-option">
+                  <input type="radio" name="ageRestrictionMode" value="fixed_date" <%= classSettings.ageRestrictionMode === 'fixed_date' ? 'checked' : '' %> />
+                  Consider the student's age on
+                  <select name="ageRestrictionMonth">
+                    <% ['1','2','3','4','5','6','7','8','9','10','11','12'].forEach(function(m, i) { %>
+                      <option value="<%= m %>" <%= String(classSettings.ageRestrictionMonth) === m ? 'selected' : '' %>><%= ['January','February','March','April','May','June','July','August','September','October','November','December'][i] %></option>
+                    <% }); %>
+                  </select>
+                  <select name="ageRestrictionDay">
+                    <% for (let d = 1; d <= 31; d++) { %>
+                      <option value="<%= d %>" <%= String(classSettings.ageRestrictionDay) === String(d) ? 'selected' : '' %>><%= d %></option>
+                    <% } %>
+                  </select>
+                  during the academic year to which the class is assigned.
+                </label>
+              </div>
+            </div>
+
+            <label class="checkbox-option class-settings-row"><input type="checkbox" name="defaultLockByAge" value="1" <%= classSettings.defaultLockByAge ? 'checked' : '' %> /> By default, restrict class registration to the age(s) selected per class.</label>
+            <label class="checkbox-option class-settings-row"><input type="checkbox" name="defaultLockByGrade" value="1" <%= classSettings.defaultLockByGrade ? 'checked' : '' %> /> By default, restrict class registration to the grade(s) selected per class.</label>
+            <label class="checkbox-option class-settings-row"><input type="checkbox" name="enableParentVolunteerRegistration" value="1" <%= classSettings.enableParentVolunteerRegistration ? 'checked' : '' %> /> Enable Parent/Volunteer Registration for classes.</label>
+
+            <div class="class-settings-question">
+              <div class="class-settings-question-label">Allow families to cancel class registrations:</div>
+              <div class="class-settings-question-control">
+                <label class="checkbox-option"><input type="radio" name="cancellationPolicy" value="through_end" <%= classSettings.cancellationPolicy === 'through_end' ? 'checked' : '' %> /> Through the End of the Class</label>
+                <label class="checkbox-option"><input type="radio" name="cancellationPolicy" value="before_start" <%= classSettings.cancellationPolicy === 'before_start' ? 'checked' : '' %> /> Only Prior to the Class Start Date</label>
+                <label class="checkbox-option"><input type="radio" name="cancellationPolicy" value="never" <%= classSettings.cancellationPolicy === 'never' ? 'checked' : '' %> /> Never</label>
+              </div>
+            </div>
+
+            <div class="class-settings-question">
+              <div class="class-settings-question-label">When are credit adjustments automatically given?</div>
+              <div class="class-settings-question-control">
+                <label class="checkbox-option"><input type="checkbox" name="autoCreditOnParentOrSystemRemoval" value="1" <%= classSettings.autoCreditOnParentOrSystemRemoval ? 'checked' : '' %> /> When a student is removed from a class by a parent, or a class is cancelled automatically for insufficient numbers.</label>
+                <label class="checkbox-option"><input type="checkbox" name="autoCreditOnAdminRemoval" value="1" <%= classSettings.autoCreditOnAdminRemoval ? 'checked' : '' %> /> When a student is removed from a class, or a class is cancelled or deleted, by an admin.</label>
+              </div>
+            </div>
+
+            <div class="class-settings-row">
+              <button type="submit" class="primary-btn">Save Class Settings</button>
+            </div>
+          </form>
+        </section>
 
         <%# A real request: "Overall class settings. Add a place to
             create and add new semester titles." Just a title list - each
-            class's own assignment is the Semester dropdown column added
-            to the table above. %>
+            class's own assignment is its own Semester dropdown, now on
+            that class's own Details tab. %>
         <h2>Semesters</h2>
         <section class="portal-dashboard-card portal-dashboard-card-wide">
           <h2>Add a Semester</h2>
@@ -245,10 +257,10 @@
         <h2>Registration Schedule</h2>
         <p class="hint">
           Stage class registration in rounds (e.g. teachers first, then everyone else), scoped to one day's
-          schedule grid and/or a Sections group if you like. A class only accepts registrations once it's
-          individually marked "Open for Registration" above <em>and</em>, if any windows exist below, the
-          registering member qualifies for one that's currently open. With no windows at all, a class's own Open
-          toggle is the only gate.
+          schedule grid and/or a Sections group if you like. A class only accepts registrations once its own
+          Close Registration checkbox (on that class's own Details tab) is unchecked <em>and</em>, if any windows
+          exist below, the registering member qualifies for one that's currently open. With no windows at all, a
+          class's own registration-open state is the only gate.
         </p>
 
         <section class="portal-dashboard-card portal-dashboard-card-wide">
@@ -501,6 +513,5 @@
   <script src="/js/schedule.js"></script>
   <script src="/js/archive-select-toggle.js"></script>
   <script src="/js/forum-editor.js"></script>
-  <script src="/js/class-settings-autosave.js"></script>
 </body>
 </html>

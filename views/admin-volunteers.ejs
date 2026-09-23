@@ -31,9 +31,13 @@
 
       <div class="grid-box-header">
         <h2><%= dayLabel %> Floater Assignments</h2>
+        <%# A real request: "edit dates and add/edit positions buttons
+            should be smaller size to match orange buttons on that page" -
+            same .roster-action-btn class/size the Export/Print/Archive
+            buttons above already use, instead of the larger .btn-secondary. %>
         <div class="roster-btn-row no-print">
-          <button type="button" class="btn-secondary" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-          <button type="button" class="btn-secondary" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Position</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Position</button>
         </div>
       </div>
 

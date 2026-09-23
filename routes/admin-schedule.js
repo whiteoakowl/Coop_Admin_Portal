@@ -35,10 +35,11 @@ const {
   addStaff,
   syncDayMemberRosters,
   listClassArchives,
-  allClassesList,
   listSemesters,
   createSemester,
   deleteSemester,
+  classGlobalSettings,
+  saveClassGlobalSettings,
 } = require('../utils/classSchedule');
 const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
 const { SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
@@ -145,27 +146,27 @@ router.get('/schedule', requireAdmin, async (req, res) => {
     });
   }
 
-  // Schedules > Settings tab - a real request: "settings like that should
-  // be under a tab labeled settings. this settings tab appears after the
-  // archive tab under schedules." Registration Open, Who Can Register
-  // (parent/teacher/student), and Cancellation policy moved off the Class
-  // Details form (they used to clutter the same popup as class name/room/
-  // time) onto this one table instead - every class across both days,
-  // each toggle auto-saving individually (routes/admin-class-schedule.js's
-  // own /settings route + public/js/class-settings-autosave.js) rather
-  // than needing the class's own Edit popup opened just to flip one flag.
+  // Schedules > Settings tab - a real request rebuilt this entirely into
+  // "Co-op Class Settings": genuinely co-op-wide settings only (age/grade
+  // restriction defaults, Enable Parent/Volunteer Registration,
+  // cancellation policy, credit adjustments), Semesters (a co-op-wide
+  // list of titles), and Registration Schedule (already co-op-wide).
+  // Registration Open, Parents Can Complete Lessons, Parents Can Use
+  // Class Chat, and Semester assignment are all per-class now and live on
+  // each class's own Details tab instead (views/admin-class-schedule-
+  // manage.ejs) - no more per-class table on this page at all.
   if (tab === 'settings') {
     const windowRows = await listWindows();
     return res.render('admin-schedule', {
-      title: 'Schedules',
+      title: 'Co-op Class Settings',
       tab,
       topTab: 'settings',
-      classes: await allClassesList(null),
       dayLabels: CLASS_DAY_LABELS,
       windows: windowRows.map((w) => ({ ...w, opensLabel: formatTimestamp(w.opens_at), closesLabel: formatTimestamp(w.closes_at) })),
       roles: await db.prepare('SELECT key, label FROM roles ORDER BY label').all(),
       sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
       semesters: await listSemesters(),
+      classSettings: await classGlobalSettings(),
       error: req.query.error || null,
       notice: req.query.notice || null,
     });
@@ -289,12 +290,9 @@ router.post('/schedule/registration-windows/:id/delete', requireFullAdmin, async
 });
 
 // --- Classes > Settings: Semesters - a real request: "Overall class
-// settings. Add a place to create and add new semester titles. On
-// individual class settings add dropdown for choosing semester." Just a
-// title list; each class's own semester assignment is a per-row dropdown
-// on this same page, saved via the existing auto-save route (routes/
-// admin-class-schedule.js's /class-schedule/classes/:id/settings, field
-// 'semesterId').
+// settings. Add a place to create and add new semester titles." Just a
+// title list; each class's own semester assignment is its own dropdown
+// on that class's own Details tab (views/admin-class-schedule-manage.ejs).
 router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
   const back = '/admin/schedule?tab=settings';
   try {
@@ -308,6 +306,28 @@ router.post('/schedule/semesters', requireFullAdmin, async (req, res) => {
 router.post('/schedule/semesters/:id/delete', requireFullAdmin, async (req, res) => {
   await deleteSemester(req.params.id);
   res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Semester removed.'));
+});
+
+// A real request rebuilt Co-op Class Settings entirely: "Remove [the
+// per-class registration/cancel settings]... Add the settings shown in
+// the images" (a similar co-op class-management product's own General
+// Settings page). Every field here is genuinely co-op-wide - see
+// utils/classSchedule.js's own classGlobalSettings/CLASS_SETTINGS_DEFAULTS
+// for what's stored and utils/classRegistration.js for how each one is
+// actually enforced.
+router.post('/schedule/class-settings', requireFullAdmin, async (req, res) => {
+  await saveClassGlobalSettings({
+    ageRestrictionMode: req.body.ageRestrictionMode === 'fixed_date' ? 'fixed_date' : 'start_date',
+    ageRestrictionMonth: req.body.ageRestrictionMonth,
+    ageRestrictionDay: req.body.ageRestrictionDay,
+    defaultLockByAge: req.body.defaultLockByAge === '1',
+    defaultLockByGrade: req.body.defaultLockByGrade === '1',
+    enableParentVolunteerRegistration: req.body.enableParentVolunteerRegistration === '1',
+    cancellationPolicy: ['through_end', 'before_start', 'never'].includes(req.body.cancellationPolicy) ? req.body.cancellationPolicy : 'through_end',
+    autoCreditOnParentOrSystemRemoval: req.body.autoCreditOnParentOrSystemRemoval === '1',
+    autoCreditOnAdminRemoval: req.body.autoCreditOnAdminRemoval === '1',
+  });
+  res.redirect('/admin/schedule?tab=settings&notice=' + encodeURIComponent('Class settings saved.'));
 });
 
 // --- Member Schedules: bulk import ---

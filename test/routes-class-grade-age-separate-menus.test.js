@@ -137,7 +137,7 @@ test('A class restricted by Age only blocks a child outside that age, independen
     .post(`/admin/class-schedule/classes/${cls.id}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ className: cls.class_name, hourPosition: '1', numericAges: ['7'], _csrf: csrf });
+    .send({ className: cls.class_name, hourPosition: '1', numericAges: ['7'], lockByAge: '1', _csrf: csrf });
 
   const tooOld = await createParentWithChild(birthdayForAge(10));
   const blocked = await request(app)

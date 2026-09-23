@@ -48,13 +48,25 @@ async function loginAsAdmin() {
   return { cookie, csrfToken: extractCsrf(page.text) };
 }
 
+// allowParentCompleteLessons/allowParentChat moved off the old global
+// Settings tab onto each class's own Details tab - flipping one now means
+// resubmitting that whole form, same as a real admin editing the Details
+// tab's checkboxes (preserving the class's other current values, same
+// shape as routes/admin-class-schedule.js's own Details POST route).
 async function setClassSetting(admin, classId, field, value) {
+  const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
   const res = await request(app)
-    .post(`/admin/class-schedule/classes/${classId}/settings`)
+    .post(`/admin/class-schedule/classes/${classId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ _csrf: admin.csrfToken, field, value });
-  assert.equal(res.status, 200);
+    .send({
+      _csrf: admin.csrfToken,
+      className: cls.class_name,
+      hourPosition: String(cls.hour_position),
+      allowParentCompleteLessons: field === 'allowParentCompleteLessons' ? value : (Number(cls.allow_parent_complete_lessons) ? '1' : '0'),
+      allowParentChat: field === 'allowParentChat' ? value : (Number(cls.allow_parent_chat) ? '1' : '0'),
+    });
+  assert.equal(res.status, 302);
 }
 
 let familyCounter = 0;
@@ -86,11 +98,11 @@ async function createParentWithChild(classId, childGradeLevel) {
   return { parentId, childId, cookie: loginRes.headers['set-cookie'] };
 }
 
-test('Class Settings tab: allowParentCompleteLessons and allowParentChat toggle independently and persist', async () => {
+test('Class Details tab: allowParentCompleteLessons and allowParentChat toggle independently and persist', async () => {
   const admin = await loginAsAdmin();
   const classId = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Perms Toggle Class', 'monday', 1) RETURNING id").get()).id;
 
-  const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
   assert.match(page.text, /allowParentCompleteLessons/);
   assert.match(page.text, /allowParentChat/);
 

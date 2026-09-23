@@ -6,7 +6,7 @@
 <body>
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
-  <main id="main-content" tabindex="-1" class="admin-main">
+  <main id="main-content" tabindex="-1" class="admin-main parent-home-main">
     <h1>Welcome, <%= member.name %></h1>
 
     <section class="portal-dashboard-section">
@@ -46,8 +46,18 @@
 
       <section class="portal-dashboard-card">
         <h2>Class Registrations</h2>
-        <p class="portal-dashboard-stat"><%= registrationCount %></p>
-        <p class="hint">active class registration<%= registrationCount === 1 ? '' : 's' %> across your family</p>
+        <%# A real request: "should show how many classes your family is
+            registered for by person in your family" - per-child counts
+            instead of one ambiguous family-wide total. %>
+        <% if (registrationCountsByChild.length === 0) { %>
+          <p class="hint">No students linked to your family yet.</p>
+        <% } else { %>
+          <ul class="portal-dashboard-list">
+            <% registrationCountsByChild.forEach(function(c) { %>
+              <li><%= c.name %>: <strong><%= c.count %></strong> class<%= c.count === 1 ? '' : 'es' %></li>
+            <% }); %>
+          </ul>
+        <% } %>
         <a class="roster-action-btn" href="/parent/classes">Browse Classes</a>
       </section>
 

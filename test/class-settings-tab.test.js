@@ -1,16 +1,14 @@
-// A real request bundle for the Class Edit form: "remove parent portal
-// checkbox. settings like that should be under a tab labeled settings.
-// this settings tab appears after the archive tab under schedules. who
-// can register for this class, three check boxes shouled also be under
-// settings for schedules... cancellation settings, two check boxes. this
-// should also be under schedules settings tab." Covers: the new Settings
-// tab renders every class with its current 6 toggle values; the new
-// per-checkbox /settings save route updates exactly the one field it's
-// asked to; and the regression this whole move could have caused - the
-// main Class Details save (routes/admin-class-schedule.js's POST
-// /class-schedule/classes/:id) no longer submits those 6 fields at all,
-// so it must preserve them rather than silently resetting them to
-// defaults just because they're absent from that particular save.
+// A real request rebuilt the old per-class Settings tab into a single
+// GLOBAL "Co-op Class Settings" page: "There should not be a list of all
+// of the classes. It should be a list of checkboxes on the left... and
+// questions/statements on the right." Covers: the new global settings
+// page renders with that title and persists its own fields via
+// classGlobalSettings/saveClassGlobalSettings; and the regression that
+// rebuild could have caused - the main Class Details save (routes/admin-
+// class-schedule.js's POST /class-schedule/classes/:id) still doesn't
+// submit the old per-class allow_parent_register/allow_teacher_register/
+// allow_student_register/allow_cancel/auto_refund_on_cancel fields, so it
+// must preserve them rather than silently resetting them to defaults.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -28,7 +26,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
-const { createClass, getClass } = require('../utils/classSchedule');
+const { createClass, getClass, classGlobalSettings } = require('../utils/classSchedule');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -43,63 +41,47 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Settings tab lists every class with its current registration/cancellation values, and no longer shows a Notes column', async () => {
+test('the global Co-op Class Settings page renders its title and no class list', async () => {
   const cookie = await loginAsAdmin();
-  await createClass({
-    day: 'monday', hourPosition: 1, className: 'Settings Tab Class', registrationOpen: true, allowStudentRegister: true, autoRefundOnCancel: true,
-  });
+  await createClass({ day: 'monday', hourPosition: 1, className: 'Should Not Appear On Settings' });
 
   const res = await request(app).get('/admin/schedule?tab=settings').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /Settings Tab Class/);
-  assert.match(res.text, /data-field="registrationOpen"[^>]*checked/);
-  assert.match(res.text, /data-field="allowStudentRegister"[^>]*checked/);
-  assert.match(res.text, /data-field="autoRefundOnCancel"[^>]*checked/);
+  assert.match(res.text, /Co-op Class Settings/);
+  assert.doesNotMatch(res.text, /Should Not Appear On Settings/);
 });
 
-test('the Settings tab per-checkbox save route flips exactly the one field it is told to, leaving the other 5 untouched', async () => {
+test('saving the global Co-op Class Settings form persists every field', async () => {
   const cookie = await loginAsAdmin();
-  const classId = await createClass({ day: 'monday', hourPosition: 2, className: 'Toggle Class' });
-  const before = await getClass(classId);
-  assert.equal(before.allow_parent_register, 1, 'sanity: defaults on');
-  assert.equal(before.registration_open, 0, 'sanity: defaults off');
-
   const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 
   const res = await request(app)
-    .post(`/admin/class-schedule/classes/${classId}/settings`)
+    .post('/admin/schedule/class-settings')
     .set('Cookie', cookie)
-    .set('X-CSRF-Token', csrfToken)
     .type('form')
-    .send({ field: 'registrationOpen', value: '1' });
-  assert.equal(res.status, 200);
+    .send({
+      ageRestrictionMode: 'fixed_date',
+      ageRestrictionMonth: '9',
+      ageRestrictionDay: '1',
+      defaultLockByAge: '1',
+      cancellationPolicy: 'before_start',
+      autoCreditOnAdminRemoval: '1',
+      _csrf: csrfToken,
+    });
+  assert.equal(res.status, 302);
 
-  const after = await getClass(classId);
-  assert.equal(after.registration_open, 1, 'the toggled field should flip');
-  assert.equal(after.allow_parent_register, 1, 'every other field should stay exactly as it was');
-  assert.equal(after.allow_teacher_register, 1);
-  assert.equal(after.allow_student_register, 0);
-  assert.equal(after.allow_cancel, 1);
-  assert.equal(after.auto_refund_on_cancel, 0);
+  const settings = await classGlobalSettings();
+  assert.equal(settings.ageRestrictionMode, 'fixed_date');
+  assert.equal(settings.ageRestrictionMonth, '9');
+  assert.equal(settings.ageRestrictionDay, '1');
+  assert.equal(settings.defaultLockByAge, true);
+  assert.equal(settings.defaultLockByGrade, false, 'a field left off the submitted form should be saved as unchecked, not preserved');
+  assert.equal(settings.cancellationPolicy, 'before_start');
+  assert.equal(settings.autoCreditOnAdminRemoval, true);
 });
 
-test('the settings save route rejects an unknown field name rather than ever building a column name from it', async () => {
-  const cookie = await loginAsAdmin();
-  const classId = await createClass({ day: 'monday', hourPosition: 3, className: 'Reject Class' });
-  const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', cookie);
-  const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
-
-  const res = await request(app)
-    .post(`/admin/class-schedule/classes/${classId}/settings`)
-    .set('Cookie', cookie)
-    .set('X-CSRF-Token', csrfToken)
-    .type('form')
-    .send({ field: 'id; DROP TABLE classes;--', value: '1' });
-  assert.equal(res.status, 400);
-});
-
-test('saving the main Class Details form (name/room/description) preserves whatever is already set on the Settings tab, instead of resetting it to defaults', async () => {
+test('saving the main Class Details form (name/room/description) preserves whatever the old per-class registration/cancellation columns already held, instead of resetting them to defaults', async () => {
   const cookie = await loginAsAdmin();
   const classId = await createClass({
     day: 'monday', hourPosition: 4, className: 'Preserve Class', registrationOpen: true, allowParentRegister: false, allowStudentRegister: true, allowCancel: false, autoRefundOnCancel: true,
@@ -111,9 +93,11 @@ test('saving the main Class Details form (name/room/description) preserves whate
   const page = await request(app).get('/admin/schedule?tab=monday').set('Cookie', cookie);
   const csrfToken = /name="csrf-token" content="([^"]*)"/.exec(page.text)[1];
 
-  // The real, current Class Details form - no registrationOpen/
+  // The real, current Class Details form - no
   // allowParentRegister/allowTeacherRegister/allowStudentRegister/
-  // allowCancel/autoRefundOnCancel fields at all anymore.
+  // allowCancel/autoRefundOnCancel fields at all anymore (registrationOpen
+  // itself is back on this form as the inverted "Close Registration"
+  // checkbox, so it's covered separately, not by this preservation path).
   const res = await request(app)
     .post(`/admin/class-schedule/classes/${classId}`)
     .set('Cookie', cookie)
@@ -123,6 +107,7 @@ test('saving the main Class Details form (name/room/description) preserves whate
       hourPosition: '4',
       room: 'New Room',
       description: 'Updated description',
+      closeRegistration: '',
       _csrf: csrfToken,
     });
   assert.equal(res.status, 302);
@@ -130,7 +115,7 @@ test('saving the main Class Details form (name/room/description) preserves whate
   const after = await getClass(classId);
   assert.equal(after.class_name, 'Preserve Class (renamed)', 'the actual edit should still apply');
   assert.equal(after.room, 'New Room');
-  assert.equal(after.registration_open, 1, 'registrationOpen must survive a save that never mentions it');
+  assert.equal(after.registration_open, 1, 'registrationOpen must survive a save that leaves Close Registration unchecked');
   assert.equal(after.allow_parent_register, 0, 'allowParentRegister must survive too, even though it defaults to 1');
   assert.equal(after.allow_student_register, 1);
   assert.equal(after.allow_cancel, 0);

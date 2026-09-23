@@ -74,7 +74,7 @@ test('Settings tab has an Add a Semester form, and added semesters are listed wi
   assert.equal(gone, undefined);
 });
 
-test('Each class on the Settings tab gets a Semester dropdown, pre-selected to its own semester, listing every semester as an option', async () => {
+test("Each class's own Details tab gets a Semester dropdown, pre-selected to its own semester, listing every semester as an option", async () => {
   const admin = await loginAsAdmin();
   await request(app)
     .post('/admin/schedule/semesters')
@@ -85,29 +85,29 @@ test('Each class on the Settings tab gets a Semester dropdown, pre-selected to i
 
   const classId = await createClass({ day: 'monday', hourPosition: 1, className: 'Semester Dropdown Class' });
 
-  const page = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
-  assert.match(page.text, /data-class-settings-select[^>]*data-field="semesterId"/);
+  const page = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
+  assert.match(page.text, /<select name="semesterId">/);
   assert.match(page.text, /<option value="">No Semester<\/option>/);
   assert.match(page.text, new RegExp(`<option value="${semester.id}" >Spring 2027</option>`));
 
   await request(app)
-    .post(`/admin/class-schedule/classes/${classId}/settings`)
+    .post(`/admin/class-schedule/classes/${classId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ field: 'semesterId', value: String(semester.id), _csrf: admin.csrfToken });
+    .send({ className: 'Semester Dropdown Class', hourPosition: '1', semesterId: String(semester.id), _csrf: admin.csrfToken });
 
   const cls = await getClass(classId);
   assert.equal(cls.semester_id, semester.id);
 
-  const afterAssign = await request(app).get('/admin/schedule?tab=settings').set('Cookie', admin.cookie);
+  const afterAssign = await request(app).get(`/admin/class-schedule/classes/${classId}/manage`).set('Cookie', admin.cookie);
   assert.match(afterAssign.text, new RegExp(`<option value="${semester.id}" selected>Spring 2027</option>`));
 
   // Clearing it back to "No Semester" (empty value) should null it out.
   await request(app)
-    .post(`/admin/class-schedule/classes/${classId}/settings`)
+    .post(`/admin/class-schedule/classes/${classId}`)
     .set('Cookie', admin.cookie)
     .type('form')
-    .send({ field: 'semesterId', value: '', _csrf: admin.csrfToken });
+    .send({ className: 'Semester Dropdown Class', hourPosition: '1', semesterId: '', _csrf: admin.csrfToken });
   const clsAfterClear = await getClass(classId);
   assert.equal(clsAfterClear.semester_id, null);
 });

@@ -182,7 +182,7 @@ router.post('/classes/:id/register', async (req, res) => {
     studentId: member.id,
     accountId: req.portalAccount.id,
     portalRoles: req.portalRoles,
-    allowField: 'allow_student_register',
+    registrantType: 'student',
   });
   if (!result.ok) return res.redirect(back + '?error=' + encodeURIComponent(result.error));
   res.redirect(back + '?notice=' + encodeURIComponent(result.notice));

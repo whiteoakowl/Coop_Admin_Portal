@@ -214,15 +214,27 @@ function formatDateAndTime(sqlTimestamp) {
   };
 }
 
+// Whole-years-old as of a given reference date (ISO), or null if either
+// date isn't valid - the general form ageFromBirthday below is built on.
+// A real request: "When a class is restricted by age(s): consider the
+// student's age on the class start date [or] on [Month] [Day] during the
+// academic year to which the class is assigned" - Co-op Class Settings'
+// own age-restriction-mode setting picks which referenceIso a class
+// registration eligibility check passes in here instead of always using
+// today (see utils/classRegistration.js's own ageForClassEligibility).
+function ageAsOfDate(iso, referenceIso) {
+  if (!isValidISODate(iso) || !isValidISODate(referenceIso)) return null;
+  const birth = parseISO(iso);
+  const reference = parseISO(referenceIso);
+  let age = reference.getFullYear() - birth.getFullYear();
+  const hadBirthdayByReference = reference.getMonth() > birth.getMonth() || (reference.getMonth() === birth.getMonth() && reference.getDate() >= birth.getDate());
+  if (!hadBirthdayByReference) age--;
+  return age >= 0 ? age : null;
+}
+
 // Whole-years-old as of today, or null if the birthday isn't a valid date.
 function ageFromBirthday(iso) {
-  if (!isValidISODate(iso)) return null;
-  const birth = parseISO(iso);
-  const today = parseISO(todayISO());
-  let age = today.getFullYear() - birth.getFullYear();
-  const hadBirthdayThisYear = today.getMonth() > birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
-  if (!hadBirthdayThisYear) age--;
-  return age >= 0 ? age : null;
+  return ageAsOfDate(iso, todayISO());
 }
 
 // Picks "today, or the closest date coming up" out of an unsorted list of
@@ -254,6 +266,7 @@ module.exports = {
   formatFriendlyTimestamp,
   formatDateAndTime,
   ageFromBirthday,
+  ageAsOfDate,
   closestUpcomingDate,
   easternInputToUtcText,
 };

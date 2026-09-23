@@ -11,7 +11,7 @@ const path = require('path');
 const db = require('../db');
 const { requirePortalAuth, requirePortal } = require('../middleware/portalAuth');
 const { memberForAccount } = require('../utils/portalAuth');
-const { allClassesList, removeStaff } = require('../utils/classSchedule');
+const { allClassesList, removeStaff, classGlobalSettings } = require('../utils/classSchedule');
 const { createCharge } = require('../utils/payments');
 const {
   assignmentsForClass,
@@ -93,13 +93,19 @@ router.get('/classes', async (req, res) => {
 
 // Self-signup as a teacher or assistant on a class - a real request:
 // "teachers and class assistants will be able to register" for a class
-// themselves (unlike students, this defaults ON - allow_teacher_register
-// is true unless a Main/Co-op Admin turns it off for a specific class),
-// capped by that class's own teacher_slots/assistant_slots (null means
-// unlimited). Writes directly to class_staff, the EXISTING teacher/
-// assistant model routes/admin-schedule.js already uses for admin-
-// assigned staff - self-signup and admin-assignment are the same table,
-// just two different ways a row gets added.
+// themselves, capped by that class's own teacher_slots/assistant_slots
+// (null means unlimited). Writes directly to class_staff, the EXISTING
+// teacher/assistant model routes/admin-schedule.js already uses for
+// admin-assigned staff - self-signup and admin-assignment are the same
+// table, just two different ways a row gets added.
+//
+// Gated by the class's own registration_open (Class Details' own Close
+// Registration checkbox) and Co-op Class Settings' global Enable Parent/
+// Volunteer Registration switch - the old per-class allow_teacher_register
+// column was removed outright (a real request: "we can schedule members
+// to register through the timed settings now - delete completely"),
+// Registration Schedule's own role-scoped windows (isRegistrationOpenForAccount
+// below) cover the "who/when" this used to gate ad hoc.
 async function staffCountsForClass(classId) {
   const rows = await db.prepare('SELECT role, COUNT(*) AS c FROM class_staff WHERE class_id = ? GROUP BY role').all(classId);
   const counts = { teacher: 0, assistant: 0 };
@@ -134,7 +140,10 @@ router.get('/browse-classes', async (req, res) => {
   const myClasses = await classesForTeacher(member);
   const myClassIds = new Set(myClasses.map((c) => c.id));
 
-  const openClasses = (await allClassesList(null)).filter((c) => c.allow_teacher_register && !myClassIds.has(c.id));
+  const settings = await classGlobalSettings();
+  const openClasses = settings.enableParentVolunteerRegistration
+    ? (await allClassesList(null)).filter((c) => c.registration_open && !myClassIds.has(c.id))
+    : [];
   const countsByClass = await staffCountsForClasses(openClasses.map((c) => c.id));
 
   res.render('teacher-browse-classes', {
@@ -155,7 +164,8 @@ router.post('/classes/:id/join', async (req, res) => {
   if (!member) return res.redirect(back + '?error=' + encodeURIComponent('No profile found for your account.'));
 
   const cls = await db.prepare('SELECT * FROM classes WHERE id = ?').get(classId);
-  if (!cls || !cls.allow_teacher_register) {
+  const settings = await classGlobalSettings();
+  if (!cls || !cls.registration_open || !settings.enableParentVolunteerRegistration) {
     return res.redirect(back + '?error=' + encodeURIComponent('Self-signup is not open for that class.'));
   }
   // No date/time enforcement existed here at all before Registration

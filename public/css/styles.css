@@ -8982,6 +8982,19 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .role-permissions-dialog { max-height: 85vh; overflow-y: auto; }
 .portal-dashboard-card-wide { max-width: 720px; margin-bottom: 1.5rem; }
 
+/* A real request: "Parent portal homepage, manage class registrations
+   button on desktop is huge. All buttons on the homepage should be same
+   size height, fit to text width." .portal-dashboard-card is a flex
+   column (see above) with no cross-axis alignment set, so its default
+   align-items: stretch was silently stretching every direct-child button
+   to the card's full width - .roster-action-btn's own flex:1 0 auto (a
+   toolbar-row sizing rule) does nothing to stop that here since the
+   button isn't inside a flex ROW. Scoped to this page only (views/
+   parent-home.ejs's own .parent-home-main) rather than a blanket
+   .portal-dashboard-card override, since that class is shared by every
+   portal's own home page. */
+.parent-home-main .roster-action-btn { align-self: flex-start; }
+
 /* Student Portal home: Announcements + Word of the Week side by side - a
    real request: "desktop it should be smaller width. announcements first,
    vocab word next to it on right." Announcements gets the wider column

@@ -99,6 +99,15 @@
                 selected: selectedGrades,
                 placeholder: 'All grades',
               }) %>
+              <%# A real request: "grade and age should have a checkbox
+                  that says lock class by grade or lock class by age" -
+                  grade and age selections used to always both gate
+                  registration together; this lets an admin turn either
+                  gate off independently (e.g. show an age range for
+                  information only, without it actually restricting who
+                  can register). Checked by default, matching that old
+                  always-on behavior. %>
+              <label class="checkbox-option"><input type="checkbox" name="lockByGrade" value="1" <%= cls.lock_by_grade == false || Number(cls.lock_by_grade) === 0 ? '' : 'checked' %> /> Lock class by grade</label>
             </div>
 
             <%# A real request: "grade selection and age selection should
@@ -111,7 +120,31 @@
                 selected: selectedAges,
                 placeholder: 'All ages',
               }) %>
+              <label class="checkbox-option"><input type="checkbox" name="lockByAge" value="1" <%= cls.lock_by_age == false || Number(cls.lock_by_age) === 0 ? '' : 'checked' %> /> Lock class by age</label>
             </div>
+
+            <%# A real request: "Add close registration check box on
+                detail page" - registration_open used to live on the old
+                per-class Class Settings table (now removed - see the
+                Co-op Class Settings rebuild), moved here instead. The
+                checkbox reads as "closed" while the underlying column is
+                "open", so the two are inverted in the POST handler. %>
+            <label class="member-form-full checkbox-option"><input type="checkbox" name="closeRegistration" value="1" <%= cls.registration_open ? '' : 'checked' %> /> Close Registration</label>
+
+            <label>Semester <span class="hint">(optional)</span>
+              <select name="semesterId">
+                <option value="">No Semester</option>
+                <% (typeof semesters !== 'undefined' ? semesters : []).forEach(function(s) { %>
+                  <option value="<%= s.id %>" <%= cls.semester_id === s.id ? 'selected' : '' %>><%= s.title %></option>
+                <% }); %>
+              </select>
+            </label>
+
+            <%# A real request moved these off the old global Co-op Class
+                Settings page onto each class's own Details form instead -
+                they stay per-class, just relocated here. %>
+            <label class="checkbox-option"><input type="checkbox" name="allowParentCompleteLessons" value="1" <%= cls.allow_parent_complete_lessons ? 'checked' : '' %> /> Parents Can Complete Lessons</label>
+            <label class="checkbox-option"><input type="checkbox" name="allowParentChat" value="1" <%= cls.allow_parent_chat ? 'checked' : '' %> /> Parents Can Use Class Chat</label>
 
             <div class="member-form-full" data-forum-editor>
               <label>Class Description <span class="hint">(shown to parents browsing classes)</span></label>
@@ -124,16 +157,13 @@
               <textarea name="supplyList" rows="3"><%= cls.supply_list || '' %></textarea>
             </label>
 
+            <%# A real request: "# of students, # of teachers, # of class
+                assistants options should move to the top of staff and
+                roster page" - moved to their own form there (see the
+                staffRoster tab below); Minimum Students Needed stays
+                here since it's a cancellation threshold, not a slot
+                count. %>
             <div class="member-form-full class-edit-slots-row">
-              <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
-                <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
-              </label>
-              <label># of Teachers Allowed <span class="hint">(optional)</span>
-                <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
-              </label>
-              <label># of Class Assistants Allowed <span class="hint">(optional)</span>
-                <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
-              </label>
               <label>Minimum Students Needed <span class="hint">(optional)</span>
                 <input type="number" name="minCapacity" min="0" value="<%= cls.min_capacity != null ? cls.min_capacity : '' %>" />
               </label>
@@ -165,6 +195,32 @@
         </div>
     <% } else if (activeTab === 'staffRoster') { %>
       <div class="class-manage-roster-col">
+        <%# A real request: "# of students, # of teachers, # of class
+            assistants options should move to the top of staff and
+            roster page" - moved off the Class Details tab, its own
+            small scoped save (utils/classSchedule.js's own
+            updateClassSlots) so it doesn't need to resupply every other
+            Class Details field just to change a slot count. %>
+        <div class="manage-section">
+          <div class="grid-box-header">
+            <h2>Slots</h2>
+          </div>
+          <form method="POST" action="/admin/class-schedule/classes/<%= cls.id %>/slots" class="member-form-grid">
+            <label># of Students Allowed <span class="hint">(blank = unlimited)</span>
+              <input type="number" name="capacity" min="0" value="<%= cls.capacity != null ? cls.capacity : '' %>" />
+            </label>
+            <label># of Teachers Allowed <span class="hint">(optional)</span>
+              <input type="number" name="teacherSlots" min="0" value="<%= cls.teacher_slots != null ? cls.teacher_slots : '' %>" />
+            </label>
+            <label># of Class Assistants Allowed <span class="hint">(optional)</span>
+              <input type="number" name="assistantSlots" min="0" value="<%= cls.assistant_slots != null ? cls.assistant_slots : '' %>" />
+            </label>
+            <div class="member-form-full">
+              <button type="submit" class="primary-btn">Save Slots</button>
+            </div>
+          </form>
+        </div>
+
         <div class="manage-section">
           <div class="grid-box-header">
             <h2>Teachers &amp; Assistants (<%= cls.staff.length %>)</h2>

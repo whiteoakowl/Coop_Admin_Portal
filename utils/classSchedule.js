@@ -489,8 +489,9 @@ async function createClass(fields) {
   const info = await db
     .prepare(
       `INSERT INTO classes (day, hour_position, class_name, room, age_group, numeric_ages, color, start_time, end_time, start_date, end_date, capacity, registration_open, description, supply_list,
-         allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         allow_parent_register, allow_teacher_register, allow_student_register, teacher_slots, assistant_slots, min_capacity, allow_cancel, auto_refund_on_cancel, price_cents, price_per, lock_by_grade, lock_by_age,
+         allow_parent_complete_lessons, allow_parent_chat)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.day,
@@ -517,7 +518,11 @@ async function createClass(fields) {
       fields.allowCancel === false ? 0 : 1,
       fields.autoRefundOnCancel ? 1 : 0,
       fields.priceCents || null,
-      fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students'
+      fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
+      fields.lockByGrade === false ? 0 : 1,
+      fields.lockByAge === false ? 0 : 1,
+      fields.allowParentCompleteLessons ? 1 : 0,
+      fields.allowParentChat ? 1 : 0
     );
   const id = info.lastInsertRowid;
   await ensureClassRoster(id);
@@ -528,7 +533,8 @@ async function updateClass(id, fields) {
   const before = await db.prepare('SELECT roster_id, day FROM classes WHERE id = ?').get(id);
   await db.prepare(
     `UPDATE classes SET day = ?, hour_position = ?, class_name = ?, room = ?, age_group = ?, numeric_ages = ?, color = ?, start_time = ?, end_time = ?, start_date = ?, end_date = ?, capacity = ?, registration_open = ?, description = ?, supply_list = ?,
-       allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?
+       allow_parent_register = ?, allow_teacher_register = ?, allow_student_register = ?, teacher_slots = ?, assistant_slots = ?, min_capacity = ?, allow_cancel = ?, auto_refund_on_cancel = ?, price_cents = ?, price_per = ?, lock_by_grade = ?, lock_by_age = ?,
+       allow_parent_complete_lessons = ?, allow_parent_chat = ?
      WHERE id = ?`
   ).run(
     fields.day,
@@ -556,6 +562,10 @@ async function updateClass(id, fields) {
     fields.autoRefundOnCancel ? 1 : 0,
     fields.priceCents || null,
     fields.pricePer === 'students_and_staff' ? 'students_and_staff' : 'students',
+    fields.lockByGrade === false ? 0 : 1,
+    fields.lockByAge === false ? 0 : 1,
+    fields.allowParentCompleteLessons ? 1 : 0,
+    fields.allowParentChat ? 1 : 0,
     id
   );
   // Keep the class's auto-roster's name/day in step with the class itself.
@@ -577,35 +587,57 @@ async function setClassImage(id, imageKey) {
   await db.prepare('UPDATE classes SET image_key = ? WHERE id = ?').run(imageKey, id);
 }
 
-// The 6 registration/cancellation toggles the Schedules > Settings tab
-// edits one class-row-at-a-time, auto-saving on each checkbox click (see
-// public/js/class-settings-autosave.js) rather than through the full
-// Class Details form's Save button - a real request moved them off that
-// form entirely: "settings like that should be under a tab labeled
-// settings." Keyed by the same field name the form/JS already uses, so
-// the route can validate against this exact allowlist instead of ever
-// interpolating a column name straight from the request body.
-const CLASS_SETTINGS_FIELDS = {
-  registrationOpen: 'registration_open',
-  allowParentRegister: 'allow_parent_register',
-  allowTeacherRegister: 'allow_teacher_register',
-  allowStudentRegister: 'allow_student_register',
-  allowCancel: 'allow_cancel',
-  autoRefundOnCancel: 'auto_refund_on_cancel',
-  // A real request: "allow parents to complete lessons for student and
-  // allow parent to interact in the class chat... turned on or off for
-  // different classes." Both default off (see the migration's own
-  // comment) - see utils/academics.js's lessonsForStudentView/
-  // submitQuizAttempt callers and routes/parent-portal.js's own Chat tab
-  // for where each is actually enforced.
-  allowParentCompleteLessons: 'allow_parent_complete_lessons',
-  allowParentChat: 'allow_parent_chat',
+// A real request rebuilt the old per-class Settings tab entirely: "Class
+// settings subpage... There should not be a list of all of the classes.
+// It should be a list of checkboxes on the left... Remove the following
+// settings: open, parents can register, teachers/assistants can self
+// sign up, students can self register, members can cancel their
+// registration, parents can complete lessons, parents can use class
+// chat." A follow-up confirmed: registration/cancel eligibility is now
+// handled entirely by Registration Schedule's own role-scoped windows
+// (utils/registrationWindows.js) - the old allow_parent_register/
+// allow_teacher_register/allow_student_register/allow_cancel columns and
+// their enforcement are removed outright, not replaced by anything
+// per-class or global. Parents Can Complete Lessons/Parents Can Use
+// Class Chat move to each class's own Details tab instead (still
+// per-class, just relocated - see admin-class-schedule-manage.ejs).
+// Auto-Refund on Cancel folds into two new GLOBAL credit-adjustment
+// settings below (classGlobalSettings/saveClassGlobalSettings), since the
+// reference design has no per-class equivalent at all.
+//
+// Every remaining setting from this rebuild is genuinely co-op-wide, not
+// per-class, so it lives in the generic app_settings key/value store
+// (appSetting/setAppSetting below) under a "class_settings." prefix
+// rather than its own bespoke table.
+const CLASS_SETTINGS_DEFAULTS = {
+  ageRestrictionMode: 'start_date', // 'start_date' | 'fixed_date'
+  ageRestrictionMonth: '8',
+  ageRestrictionDay: '31',
+  defaultLockByAge: false,
+  defaultLockByGrade: true,
+  enableParentVolunteerRegistration: true,
+  cancellationPolicy: 'through_end', // 'through_end' | 'before_start' | 'never'
+  autoCreditOnParentOrSystemRemoval: true,
+  autoCreditOnAdminRemoval: false,
 };
+const CLASS_SETTINGS_KEY_PREFIX = 'class_settings.';
 
-async function updateClassSettings(id, field, value) {
-  const column = CLASS_SETTINGS_FIELDS[field];
-  if (!column) throw new Error(`Unknown class setting field: ${field}`);
-  await db.prepare(`UPDATE classes SET ${column} = ? WHERE id = ?`).run(value ? 1 : 0, id);
+async function classGlobalSettings() {
+  const out = { ...CLASS_SETTINGS_DEFAULTS };
+  for (const key of Object.keys(CLASS_SETTINGS_DEFAULTS)) {
+    const raw = await appSetting(CLASS_SETTINGS_KEY_PREFIX + key, null);
+    if (raw == null) continue;
+    out[key] = typeof CLASS_SETTINGS_DEFAULTS[key] === 'boolean' ? raw === '1' : raw;
+  }
+  return out;
+}
+
+async function saveClassGlobalSettings(fields) {
+  for (const key of Object.keys(CLASS_SETTINGS_DEFAULTS)) {
+    if (!(key in fields)) continue;
+    const value = fields[key];
+    await setAppSetting(CLASS_SETTINGS_KEY_PREFIX + key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
+  }
 }
 
 // A real request: "Overall class settings. Add a place to create and add
@@ -635,6 +667,16 @@ async function deleteSemester(id) {
 // Semester" option means clear it.
 async function setClassSemester(id, semesterId) {
   await db.prepare('UPDATE classes SET semester_id = ? WHERE id = ?').run(semesterId || null, id);
+}
+
+// A real request: "# of students, # of teachers, # of class assistants
+// options should move to the top of staff and roster page" - out of the
+// Class Details form and onto the Staff & Roster tab's own form instead,
+// which needs its own scoped save (touching only these 3 columns) so it
+// doesn't have to resupply every other Class Details field just to
+// change a slot count.
+async function updateClassSlots(id, { capacity, teacherSlots, assistantSlots }) {
+  await db.prepare('UPDATE classes SET capacity = ?, teacher_slots = ?, assistant_slots = ? WHERE id = ?').run(capacity || null, teacherSlots || null, assistantSlots || null, id);
 }
 
 // Deactivates (never hard-deletes) the class's auto-roster before removing
@@ -2033,11 +2075,13 @@ module.exports = {
   setClassImage,
   classImageUrl,
   CLASS_IMAGES_BUCKET,
-  updateClassSettings,
+  classGlobalSettings,
+  saveClassGlobalSettings,
   listSemesters,
   createSemester,
   deleteSemester,
   setClassSemester,
+  updateClassSlots,
   deleteClass,
   archiveClasses,
   listClassArchives,

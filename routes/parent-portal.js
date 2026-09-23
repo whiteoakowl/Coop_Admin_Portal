@@ -129,22 +129,26 @@ router.get('/', async (req, res) => {
     .slice(0, 15);
 
   const childIds = children.map((c) => c.id);
-  const registrationCount = childIds.length
-    ? Number(
-        (
-          await db
-            .prepare(`SELECT COUNT(*) AS c FROM class_registrations WHERE status = 'confirmed' AND student_id IN (${childIds.map(() => '?').join(',')})`)
-            .get(...childIds)
-        ).c
-      )
-    : 0;
+  // A real request: "class registrations count should show how many
+  // classes your family is registered for by person in your family" -
+  // per-child counts instead of one family-wide total, so the homepage
+  // reads as "Jane: 2, Sam: 1" rather than an ambiguous "3".
+  const countsByStudent = childIds.length
+    ? await db
+        .prepare(
+          `SELECT student_id, COUNT(*) AS c FROM class_registrations WHERE status = 'confirmed' AND student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
+        )
+        .all(...childIds)
+    : [];
+  const countByStudentId = new Map(countsByStudent.map((r) => [r.student_id, Number(r.c)]));
+  const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(c.id) || 0 }));
 
   res.render('parent-home', {
     title: 'Parent Portal',
     member: await memberForAccount(req.portalAccount.id),
     children,
     announcements,
-    registrationCount,
+    registrationCountsByChild,
   });
 });
 
@@ -261,8 +265,8 @@ router.get('/classes/:id/fragment', async (req, res) => {
       eligibleChildren.push(child);
       continue;
     }
-    if (allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
-    if (allowedAges.length && !allowedAges.includes(String(ageFromBirthday(child.birthday)))) continue;
+    if (cls.lock_by_grade && allowedGrades.length && !allowedGrades.includes(child.grade_level)) continue;
+    if (cls.lock_by_age && allowedAges.length && !allowedAges.includes(String(ageFromBirthday(child.birthday)))) continue;
     if (restriction.length && !memberSatisfiesRestriction(await sectionIdsForMember(child.id), restriction)) continue;
     eligibleChildren.push(child);
   }
@@ -312,7 +316,7 @@ router.post('/classes/:id/register', async (req, res) => {
     studentId,
     accountId: req.portalAccount.id,
     portalRoles: req.portalRoles,
-    allowField: 'allow_parent_register',
+    registrantType: 'parent',
   });
   if (!result.ok) return res.redirect(back + 'error=' + encodeURIComponent(result.error));
   res.redirect(back + 'notice=' + encodeURIComponent(result.notice));

@@ -30,6 +30,7 @@ const {
   scoreAnswer,
 } = require('../utils/academics');
 const { primaryParentsFor } = require('../utils/scheduleCardData');
+const { adminRemoveStudentFromClass } = require('../utils/classRegistration');
 const { toCsvRow, sendCsv, buildTemplateWorkbook, readRowsFromFile } = require('../utils/spreadsheet');
 const { spreadsheetFileFilter, imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
@@ -57,8 +58,9 @@ const {
   setClassImage,
   classImageUrl,
   CLASS_IMAGES_BUCKET,
-  updateClassSettings,
   setClassSemester,
+  listSemesters,
+  updateClassSlots,
   deleteClass,
   archiveClasses,
   listClassArchives,
@@ -420,6 +422,7 @@ router.get('/class-schedule/classes/:id/manage', requireFullAdmin, async (req, r
     availableStudents: (await activeStudents()).filter((s) => !enrolledIds.includes(s.id)),
     enrolledStudents: await enrichRosterStudents(cls.students),
     availableStaff: (await activeMembersForStaff()).filter((p) => !staffIds.includes(p.id)),
+    semesters: await listSemesters(),
     sections: await db.prepare('SELECT * FROM sections ORDER BY name').all(),
     selectedSectionIds: await classSectionIds(id),
     classImageUrl: classImageUrl(cls.image_key),
@@ -717,7 +720,6 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       endTime: (req.body.endTime || '').trim(),
       startDate: (req.body.startDate || '').trim(),
       endDate: (req.body.endDate || '').trim(),
-      capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
       description: sanitizePostBody(req.body.description || ''),
       supplyList: (req.body.supplyList || '').trim(),
       ...registrationFieldsFromBody(req.body),
@@ -727,13 +729,33 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
       // fields at all, so preserve whatever's already on the class rather
       // than letting registrationFieldsFromBody's create-time defaults
       // silently reset them just because this save doesn't mention them.
-      registrationOpen: !!cls.registration_open,
+      // A real request: "Add close registration check box on detail
+      // page" moved registrationOpen itself back onto this form though -
+      // the checkbox reads as "closed" while the column is "open".
+      registrationOpen: req.body.closeRegistration !== '1',
       allowParentRegister: !!cls.allow_parent_register,
       allowTeacherRegister: !!cls.allow_teacher_register,
       allowStudentRegister: !!cls.allow_student_register,
       allowCancel: !!cls.allow_cancel,
       autoRefundOnCancel: !!cls.auto_refund_on_cancel,
+      // # of Students/Teachers/Class Assistants Allowed moved to their
+      // own form on the Staff & Roster tab (see the /slots route below) -
+      // preserve them here the same way, rather than resetting them to
+      // null just because this save doesn't mention them.
+      capacity: cls.capacity,
+      teacherSlots: cls.teacher_slots,
+      assistantSlots: cls.assistant_slots,
+      // A real request: "grade and age should have a checkbox that says
+      // lock class by grade or lock class by age."
+      lockByGrade: req.body.lockByGrade === '1',
+      lockByAge: req.body.lockByAge === '1',
+      // Parents Can Complete Lessons/Parents Can Use Class Chat moved off
+      // the old global Settings tab onto this Details form instead - a
+      // follow-up confirmed they stay per-class, just relocated.
+      allowParentCompleteLessons: req.body.allowParentCompleteLessons === '1',
+      allowParentChat: req.body.allowParentChat === '1',
     });
+    await setClassSemester(id, req.body.semesterId ? parseInt(req.body.semesterId, 10) : null);
     await saveClassSections(id, req.body);
     if (req.file) {
       await setClassImage(id, await saveClassImage(req.file, cls.image_key));
@@ -752,27 +774,21 @@ router.post('/class-schedule/classes/:id', requireFullAdmin, imageUpload.single(
   res.redirect(`/admin/class-schedule/${cls.day}?notice=` + encodeURIComponent(`"${className}" updated.`));
 });
 
-// Schedules > Settings tab (views/admin-schedule.ejs, tab==='settings') -
-// one checkbox per class per field, auto-saving on change (public/js/
-// class-settings-autosave.js, same fetch-on-change pattern attendance-
-// grid.js already uses), rather than a Save button per row. `field` is
-// checked against updateClassSettings' own CLASS_SETTINGS_FIELDS
-// allowlist there - this route never interpolates a column name itself.
-router.post('/class-schedule/classes/:id/settings', requireFullAdmin, async (req, res) => {
+// A real request: "# of students, # of teachers, # of class assistants
+// options should move to the top of staff and roster page" - its own
+// small form/route there instead of living on the Class Details save,
+// touching only these 3 columns (utils/classSchedule.js's own
+// updateClassSlots) rather than the whole-row updateClass.
+router.post('/class-schedule/classes/:id/slots', requireFullAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  try {
-    // The Semester dropdown saves through this same route/JS as the
-    // checkboxes above, but carries a nullable semester id rather than a
-    // boolean - see setClassSemester's own comment.
-    if (req.body.field === 'semesterId') {
-      await setClassSemester(id, req.body.value ? parseInt(req.body.value, 10) : null);
-    } else {
-      await updateClassSettings(id, req.body.field, req.body.value === '1');
-    }
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
-  res.json({ ok: true });
+  const cls = await getClass(id);
+  if (!cls) return res.status(404).send('Not found');
+  await updateClassSlots(id, {
+    capacity: req.body.capacity ? parseInt(req.body.capacity, 10) : null,
+    teacherSlots: req.body.teacherSlots ? parseInt(req.body.teacherSlots, 10) : null,
+    assistantSlots: req.body.assistantSlots ? parseInt(req.body.assistantSlots, 10) : null,
+  });
+  res.redirect(`/admin/class-schedule/classes/${id}/manage?tab=staffRoster&notice=` + encodeURIComponent('Slots updated.'));
 });
 
 router.post('/class-schedule/classes/:id/delete', requireFullAdmin, async (req, res) => {
@@ -862,6 +878,13 @@ router.post('/class-schedule/classes/:id/enrollment/:studentId/remove', requireF
   const studentId = parseInt(req.params.studentId, 10);
   try {
     await setEnrollment(id, cls.students.map((s) => s.id).filter((sid) => sid !== studentId));
+    // A real request folded the old per-class Auto-Refund on Cancel into
+    // a global credit-adjustment setting split by who removed the
+    // student - this is the ADMIN-initiated half (see
+    // adminRemoveStudentFromClass's own comment); it settles the
+    // student's own class_registrations/charge bookkeeping, which
+    // setEnrollment alone never touched.
+    await adminRemoveStudentFromClass(id, studentId, null);
   } catch (err) {
     return res.redirect(`/admin/class-schedule/${cls.day}?error=` + encodeURIComponent(`Could not update roster: ${err.message}`));
   }
