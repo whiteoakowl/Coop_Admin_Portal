@@ -42,10 +42,10 @@ async function loginAsAdmin() {
   return { cookie, csrfToken };
 }
 
-test('the manage page button reads "+ Add/Edit Position"', async () => {
+test('the manage page button reads "+ Add/Edit Permanent Positions"', async () => {
   const { cookie } = await loginAsAdmin();
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
-  assert.match(res.text, /\+ Add\/Edit Position/);
+  assert.match(res.text, /\+ Add\/Edit Permanent Positions/);
 });
 
 test('the dialog lists every existing position, stacked, with its own hours checked', async () => {

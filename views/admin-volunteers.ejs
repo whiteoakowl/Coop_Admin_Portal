@@ -36,8 +36,8 @@
             same .roster-action-btn class/size the Export/Print/Archive
             buttons above already use, instead of the larger .btn-secondary. %>
         <div class="roster-btn-row no-print">
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Edit Dates</button>
-          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Position</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('edit-dates-dialog').showModal()">Add/Edit Dates</button>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('add-job-dialog').showModal()">+ Add/Edit Permanent Positions</button>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('add-temp-job-dialog').showModal()">+ Add/Edit Temporary Position</button>
         </div>
       </div>
@@ -120,7 +120,7 @@
     <dialog id="add-job-dialog" class="volunteer-edit-dialog position-editor-dialog">
       <form method="POST" action="/admin/volunteers/<%= day %>/substitutes/permanent-jobs/save-groups?dialog=job">
         <div class="qr-filter-dialog-header">
-          <h3>Add/Edit Position</h3>
+          <h3>Add/Edit Permanent Positions</h3>
           <div class="qr-filter-dialog-actions">
             <button type="submit" class="primary-btn">Save</button>
             <button type="button" class="class-form-dialog-close" onclick="this.closest('dialog').close()" aria-label="Close"><svg class="icon"><use href="#icon-x-circle"/></svg></button>
@@ -247,7 +247,7 @@
         delete below) just came back from, instead of leaving the admin at
         a closed manage page. Dialog ids aren't uniform ("dates" ->
         edit-dates-dialog, but "job" -> add-job-dialog, matching the "+
-        Add/Edit Position" button's own onclick target above) - a real bug
+        Add/Edit Permanent Positions" button's own onclick target above) - a real bug
         this session found while wiring the delete button's own reopen: the
         old guessed id (interpolating "job" into an edit-<name>-dialog
         pattern) silently found nothing and .showModal() on null threw, so

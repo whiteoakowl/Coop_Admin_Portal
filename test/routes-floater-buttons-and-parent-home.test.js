@@ -45,12 +45,12 @@ async function loginAsAdmin() {
   return loginRes.headers['set-cookie'];
 }
 
-test('Floater Assignments: Edit Dates and Add/Edit Position use roster-action-btn, matching Export/Print/Archive', async () => {
+test('Floater Assignments: Add/Edit Dates and Add/Edit Permanent Positions use roster-action-btn, matching Export/Print/Archive', async () => {
   const cookie = await loginAsAdmin();
   const res = await request(app).get('/admin/volunteers/monday/manage').set('Cookie', cookie);
   assert.equal(res.status, 200);
-  assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('edit-dates-dialog'\)\.showModal\(\)">Edit Dates<\/button>/);
-  assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('add-job-dialog'\)\.showModal\(\)">\+ Add\/Edit Position<\/button>/);
+  assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('edit-dates-dialog'\)\.showModal\(\)">Add\/Edit Dates<\/button>/);
+  assert.match(res.text, /<button type="button" class="roster-action-btn" onclick="document\.getElementById\('add-job-dialog'\)\.showModal\(\)">\+ Add\/Edit Permanent Positions<\/button>/);
   assert.doesNotMatch(res.text, /class="btn-secondary" onclick="document\.getElementById\('edit-dates-dialog'\)/);
 });
 
