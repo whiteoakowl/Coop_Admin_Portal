@@ -2,7 +2,7 @@ const db = require('../db');
 const { HOUR_POSITIONS, hoursForDay, gridForDay, missingMemberIdsForDate, floaterPositionsCoveredByClass } = require('./classSchedule');
 const { getListByDay, sectionsForList, membersForSection, RANK_ORDER } = require('./volunteers');
 const { hasInfantChild } = require('./members');
-const { todayISO, formatTimestamp } = require('./dates');
+const { todayISO, nowEasternMinutes, formatTimestamp } = require('./dates');
 const { parseClockMinutes } = require('./schedule');
 
 // True once it's more than 5 minutes past an hour's start time on today's
@@ -21,13 +21,25 @@ const { parseClockMinutes } = require('./schedule');
 // the class schedule's own Edit Dates dialog writes to, already a plain
 // parseable clock string) - a real time regardless of whatever text the
 // label carries.
+//
+// A second real bug (this one live, reported as "a lot of running late
+// floater assignments appearing... nobody has submitted a late form"):
+// this compared hourStartTime (Eastern wall-clock, e.g. "9:00 AM")
+// against `new Date().getHours()/getMinutes()` - the SERVER's own local
+// clock, UTC on Netlify - the exact same class of mistake todayISO's own
+// comment (utils/dates.js) already documents for date rollover. UTC
+// reads several hours ahead of Eastern, so "5+ minutes past the hour's
+// start" was true almost the instant the calendar date matched, not 5
+// real minutes after the actual Eastern start time - every teacher/
+// assistant showed as running late all morning. nowEasternMinutes()
+// reads the current Eastern hour/minute the same Intl-formatter way
+// todayISO() reads the current Eastern date.
 async function assignedIsOverdue(existing, date, hourStartTime) {
   if (!existing || existing.status !== 'approved') return false;
   if (date !== todayISO()) return false;
   const startMin = parseClockMinutes(hourStartTime);
   if (startMin === null) return false;
-  const now = new Date();
-  if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
+  if (nowEasternMinutes() < startMin + 5) return false;
   const checkedIn = await db
     .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
     .get(existing.member_id, date);
@@ -52,8 +64,7 @@ async function isAutoLateForClass(memberId, date, hourStartTime) {
   if (date !== todayISO()) return false;
   const startMin = parseClockMinutes(hourStartTime);
   if (startMin === null) return false;
-  const now = new Date();
-  if (now.getHours() * 60 + now.getMinutes() < startMin + 5) return false;
+  if (nowEasternMinutes() < startMin + 5) return false;
   const checkedIn = await db
     .prepare(`SELECT 1 FROM attendance WHERE member_id = ? AND session_date = ? AND check_in_time IS NOT NULL LIMIT 1`)
     .get(memberId, date);

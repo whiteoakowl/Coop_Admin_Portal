@@ -34,6 +34,34 @@ function todayISO() {
   return EASTERN_DATE_FORMATTER.format(new Date());
 }
 
+// A real bug, the same underlying mistake todayISO's own comment above
+// already describes: utils/substitutes.js's assignedIsOverdue/
+// isAutoLateForClass compared a class hour's start_time (a plain "9:00
+// AM"-style Eastern wall-clock string) against `new Date().getHours() *
+// 60 + getMinutes()` - the SERVER's own local clock, UTC on Netlify. UTC
+// reads 4-5 hours ahead of Eastern, so "5+ minutes past the hour's start"
+// was true almost as soon as the calendar date matched, regardless of the
+// real Eastern time of day - every teacher/assistant showed as running
+// late the moment "today" began, not 5 minutes after their actual start
+// time. Reads the current Eastern hour/minute back out through the same
+// Intl formatter approach as EASTERN_DATE_FORMATTER above, instead of the
+// Date object's own UTC-local getHours()/getMinutes().
+const EASTERN_TIME_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour: 'numeric',
+  minute: 'numeric',
+  hourCycle: 'h23',
+});
+
+function nowEasternMinutes() {
+  const parts = {};
+  for (const p of EASTERN_TIME_PARTS_FORMATTER.formatToParts(new Date())) parts[p.type] = p.value;
+  // ICU's h23 cycle can still surface "24" for midnight in some runtimes -
+  // normalize it to 0 rather than let it silently overshoot into 1440+.
+  const hour = Number(parts.hour) % 24;
+  return hour * 60 + Number(parts.minute);
+}
+
 function addDays(iso, n) {
   const d = parseISO(iso);
   d.setDate(d.getDate() + n);
@@ -253,6 +281,7 @@ function closestUpcomingDate(dates, today) {
 
 module.exports = {
   todayISO,
+  nowEasternMinutes,
   addDays,
   weekdayOf,
   isValidISODate,

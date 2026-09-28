@@ -15,6 +15,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   todayISO,
+  nowEasternMinutes,
   addDays,
   weekdayOf,
   isValidISODate,
@@ -123,6 +124,37 @@ test('todayISO', async (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-06-16T02:00:00Z').getTime() });
     try {
       assert.equal(todayISO(), '2024-06-15');
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+});
+
+// A real bug: utils/substitutes.js's assignedIsOverdue/isAutoLateForClass
+// used to compare a class hour's Eastern wall-clock start time against
+// `new Date().getHours() * 60 + getMinutes()` - the SERVER's own local
+// clock, UTC on Netlify, the exact same class of mistake todayISO's own
+// test above guards against for calendar dates. Reported live as "a lot
+// of running late floater assignments appearing... nobody has submitted a
+// late form" - UTC reads hours ahead of Eastern, so every hour's start
+// time looked like it was already 5+ minutes in the past almost as soon
+// as the server's own UTC day began.
+test('nowEasternMinutes reads the current Eastern time of day, not the server process timezone', async (t) => {
+  await t.test('9:15 AM Eastern (EDT, UTC-4) is 555 minutes since midnight, from a UTC server clock reading early afternoon', () => {
+    // 1:15 PM UTC = 9:15 AM Eastern on this date (July, EDT in effect).
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-07-10T13:15:00Z').getTime() });
+    try {
+      assert.equal(nowEasternMinutes(), 9 * 60 + 15);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  await t.test('just after midnight Eastern normalizes to a small number of minutes, not 1440+', () => {
+    // 4:05 AM UTC = 12:05 AM Eastern (EDT, UTC-4).
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2024-07-10T04:05:00Z').getTime() });
+    try {
+      assert.equal(nowEasternMinutes(), 5);
     } finally {
       t.mock.timers.reset();
     }
