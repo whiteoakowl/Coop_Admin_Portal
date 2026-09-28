@@ -42,6 +42,7 @@ process.env.ADMIN_PASSWORD = 'testpassword123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { todayISO } = require('../utils/dates');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -289,6 +290,57 @@ test('once that same member checks out, the checkout\'s own record still wins (n
   const rowHtml = res.text.slice(rowStart, rowEnd);
   const matches = rowHtml.match(/Snack Table Team-#8/g) || [];
   assert.equal(matches.length, 1, 'the label should appear exactly once, not duplicated between the attendance and checkout sources');
+});
+
+// A follow-up double-check on the fix above, driving the REAL kiosk
+// check-in/checkout endpoints end to end (not direct SQL writes) - both
+// halves of the original request: "double check checkout also shows it
+// correctly. double check that scan on check in teams will still show a
+// check out time as well."
+test('end-to-end via the real kiosk endpoints: a "log on check in" member\'s task shows right after check-in, and checkout still shows BOTH a real checkout time and the same task', async (t) => {
+  const today = todayISO();
+  const teamId = (await db.prepare("INSERT INTO setup_teams (day, title, task_scan_timing) VALUES ('monday', 'Real Scan Team', 'checkin')").run()).lastInsertRowid;
+  const targetItemId = await createEighthTaskItem('monday', teamId);
+  await db.prepare('UPDATE task_list_items SET barcode = ? WHERE id = ?').run('999888', targetItemId);
+  const { lastInsertRowid: memberId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Real Scan Parent', 'real-scan-parent-1', 'parent')")
+    .run();
+  await db.prepare('INSERT INTO setup_team_members (team_id, member_id) VALUES (?, ?)').run(teamId, memberId);
+
+  const rosterId = (await db.prepare("SELECT id FROM rosters WHERE schedule_day = 'monday' AND name LIKE '%Parent%'").get()).id;
+  await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?) ON CONFLICT (roster_id, session_date) DO NOTHING').run(rosterId, today);
+  await db.prepare("INSERT INTO roster_members (roster_id, member_id, source) VALUES (?, ?, 'manual') ON CONFLICT (roster_id, member_id) DO NOTHING").run(rosterId, memberId);
+
+  await t.test('real check-in + real task-badge scan: the task shows on the roster right away, with no checkout time yet', async () => {
+    const checkinRes = await request(app).post('/kiosk/checkin/scan').type('form').send({ barcode: 'real-scan-parent-1' });
+    assert.equal(checkinRes.body.ok, true);
+    const taskScanRes = await request(app).post('/kiosk/checkin/task-scan').type('form').send({ memberId: String(memberId), barcode: '999888' });
+    assert.equal(taskScanRes.body.ok, true);
+
+    const { cookie } = await loginAsAdmin();
+    const res = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    const rowStart = res.text.indexOf('Real Scan Parent');
+    const rowEnd = res.text.indexOf('</tr>', rowStart);
+    const rowHtml = res.text.slice(rowStart, rowEnd);
+    assert.match(rowHtml, /Real Scan Team-#8/, 'the check-in-time scan should show on the roster right away');
+    assert.doesNotMatch(rowHtml, /Out /, 'no checkout has happened yet, so there should be no "Out ..." time');
+  });
+
+  await t.test('real checkout (single scan, already logged): the roster now shows a real checkout time AND the same task', async () => {
+    const checkoutRes = await request(app).post('/kiosk/checkout/scan').type('form').send({ barcode: 'real-scan-parent-1' });
+    assert.equal(checkoutRes.body.ok, true);
+    assert.equal(checkoutRes.body.memberType, 'parent-already-logged', 'checkout should not ask for a second badge scan - already logged at check-in');
+
+    const { cookie } = await loginAsAdmin();
+    const res = await request(app).get('/admin/rosters?tab=monday-parent').set('Cookie', cookie);
+    assert.equal(res.status, 200);
+    const rowStart = res.text.indexOf('Real Scan Parent');
+    const rowEnd = res.text.indexOf('</tr>', rowStart);
+    const rowHtml = res.text.slice(rowStart, rowEnd);
+    assert.match(rowHtml, /Real Scan Team-#8/, 'the same task should still show after checkout');
+    assert.match(rowHtml, /Out /, 'a real checkout time should now be shown too, unaffected by the cleanup-task fix');
+  });
 });
 
 test('an archived roster keeps the "<team>-#" line in its frozen snapshot', async () => {
