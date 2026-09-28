@@ -228,6 +228,69 @@ test('the roster CSV export includes a "Cleanup #" column with the scanned task\
   assert.equal(fields[cleanupColIndex], '8', 'the row should carry the scanned task\'s display Number (8) in that date\'s Cleanup # column');
 });
 
+// A real request: "when members check in that are on a setup/cleanup
+// team that says scan at check in, it should still record the setup
+// task badge number they completed on the Monday/Wednesday attendance
+// roster." Before this, the roster only ever read checkouts.task_item_id
+// - which doesn't exist at all until the member actually checks out - so
+// a "log on check in" member who scanned their real badge at check-in
+// (attendance.task_item_id, routes/kiosk.js's own /checkin/task-scan) and
+// was still present all day showed nothing. attendance.task_item_id is
+// inserted directly here, mirroring recordCheckoutScan's own "drive the
+// column, not the real kiosk endpoint" approach for this file.
+async function recordCheckinScan(memberId, rosterId, sessionDate, targetItemId) {
+  await db
+    .prepare('UPDATE attendance SET task_item_id = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?')
+    .run(targetItemId, memberId, rosterId, sessionDate);
+}
+
+test('a "log on check in" member\'s scanned task shows on the roster immediately, before they ever check out', async () => {
+  const { cookie } = await loginAsAdmin();
+
+  const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
+  const memberId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Checkin Scan Student', 'checkin-scan-student', 'student')").run()
+  ).lastInsertRowid;
+  await db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
+  const today = '2026-04-06';
+  await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
+  await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
+  const targetItemId = await createEighthTaskItem('monday');
+  await recordCheckinScan(memberId, rosterId, today, targetItemId);
+  // Deliberately no checkouts row at all - this member is still present.
+
+  const res = await request(app).get('/admin/rosters?tab=monday-student').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  const rowStart = res.text.indexOf('Checkin Scan Student');
+  const rowEnd = res.text.indexOf('</tr>', rowStart);
+  const rowHtml = res.text.slice(rowStart, rowEnd);
+  assert.match(rowHtml, /Snack Table Team-#8/, 'a check-in-time scan should show up on the roster right away, without waiting for a checkout');
+});
+
+test('once that same member checks out, the checkout\'s own record still wins (no duplicate/stale label)', async () => {
+  const { cookie } = await loginAsAdmin();
+
+  const rosterId = (await db.prepare("SELECT id FROM rosters WHERE category = 'Class Schedule' AND schedule_day = 'monday' AND name LIKE '%Student%'").get()).id;
+  const memberId = (
+    await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Checkin Then Checkout Student', 'checkin-then-checkout-student', 'student')").run()
+  ).lastInsertRowid;
+  await db.prepare('INSERT INTO roster_members (roster_id, member_id) VALUES (?, ?)').run(rosterId, memberId);
+  const today = '2026-04-13';
+  await db.prepare('INSERT INTO roster_dates (roster_id, session_date) VALUES (?, ?)').run(rosterId, today);
+  await db.prepare("INSERT INTO attendance (member_id, roster_id, session_date, status, check_in_time) VALUES (?, ?, ?, 'present', ?)").run(memberId, rosterId, today, Date.now());
+  const targetItemId = await createEighthTaskItem('monday');
+  await recordCheckinScan(memberId, rosterId, today, targetItemId);
+  await recordCheckoutScan(memberId, rosterId, today, targetItemId);
+
+  const res = await request(app).get('/admin/rosters?tab=monday-student').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  const rowStart = res.text.indexOf('Checkin Then Checkout Student');
+  const rowEnd = res.text.indexOf('</tr>', rowStart);
+  const rowHtml = res.text.slice(rowStart, rowEnd);
+  const matches = rowHtml.match(/Snack Table Team-#8/g) || [];
+  assert.equal(matches.length, 1, 'the label should appear exactly once, not duplicated between the attendance and checkout sources');
+});
+
 test('an archived roster keeps the "<team>-#" line in its frozen snapshot', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
 
