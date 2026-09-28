@@ -361,6 +361,11 @@
           var selectedFamily = selectedFamilyId ? families.find(function (f) { return f.id === selectedFamilyId; }) : null;
           var typeLabel = typeFilter === 'student' ? 'Student' : typeFilter === 'parent' ? 'Parent' : 'Member';
           var typeLabelPlural = typeFilter === 'student' ? 'students' : typeFilter === 'parent' ? 'parents' : 'members';
+          var selectedMemberName = selectedMemberId ? (allNames.find(function (n) { return n.id === selectedMemberId; }) || {}).name : null;
+          var filterLabelParts = [];
+          if (typeFilter) filterLabelParts.push(typeLabel + 's');
+          if (selectedFamily) filterLabelParts.push(selectedFamily.name + ' Family');
+          if (selectedMemberName) filterLabelParts.push(selectedMemberName);
         %>
         <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
         <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
@@ -369,17 +374,8 @@
           <div class="schedule-filters">
             <button type="button" class="roster-action-btn" onclick="document.getElementById('schedule-filter-dialog').showModal()">
               <svg class="icon"><use href="#icon-filter"/></svg>
-              Filter<% if (typeFilter) { %>: <%= typeLabel %>s<% } %><% if (selectedFamily) { %><% if (typeFilter) { %>,<% } else { %>:<% } %> <%= selectedFamily.name %> Family<% } %>
+              Filter<% if (filterLabelParts.length > 0) { %>: <%= filterLabelParts.join(', ') %><% } %>
             </button>
-            <div class="category-filter schedule-search">
-              <label for="schedule-name-select"><%= typeLabel %> Name</label>
-              <select id="schedule-name-select" onchange="window.fullscreenNavigate('/admin/schedule?tab=members<%= typeFilter ? '&type=' + typeFilter : '' %><%= selectedFamilyId ? '&familyId=' + selectedFamilyId : '' %>' + (this.value ? '&memberId=' + this.value : ''))">
-                <option value="">All <%= typeLabelPlural %></option>
-                <% allNames.forEach(function(n) { %>
-                  <option value="<%= n.id %>" <%= selectedMemberId === n.id ? 'selected' : '' %>><%= n.name %></option>
-                <% }); %>
-              </select>
-            </div>
             <div class="class-schedule-archive-controls" data-archive-controls="schedule-archive-form-<%= tab %>" hidden>
               <label class="checkbox-option class-schedule-select-all">
                 <input type="checkbox" data-select-all-for="schedule-archive-form-<%= tab %>" />
@@ -428,6 +424,20 @@
                 <option value="">All Families</option>
                 <% families.forEach(function(f) { %>
                   <option value="<%= f.id %>" <%= selectedFamilyId === f.id ? 'selected' : '' %>><%= f.name %> Family</option>
+                <% }); %>
+              </select>
+            </div>
+            <%# A real request: "remove the member name dropdown menu. The
+                filter button does the search now" - this used to be its
+                own always-visible dropdown in the toolbar, next to (not
+                inside) the Filter button; now it's just another field in
+                this same popup, submitted together with Type/Family. %>
+            <div class="category-filter">
+              <label for="schedule-name-select"><%= typeLabel %> Name</label>
+              <select id="schedule-name-select" name="memberId">
+                <option value="">All <%= typeLabelPlural %></option>
+                <% allNames.forEach(function(n) { %>
+                  <option value="<%= n.id %>" <%= selectedMemberId === n.id ? 'selected' : '' %>><%= n.name %></option>
                 <% }); %>
               </select>
             </div>
