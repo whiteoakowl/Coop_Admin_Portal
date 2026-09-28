@@ -1,0 +1,9 @@
+<%# Re-fetched by public/js/setup-assign.js after every Assign/Unassign
+    click and swapped into #setup-assignment-cards-container on
+    admin-setup-assignments.ejs, in place of the old full-page redirect -
+    mirrors floater-chart-cards-fragment.ejs's own role for Floater
+    Assignments (see routes/admin-setup.js's own /assignments/fragment
+    route for why this has to recompute every card rather than patch a
+    single row - one member's assignment can free up or take a task
+    another member's own dropdown was suggesting). %>
+<%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true }) %>

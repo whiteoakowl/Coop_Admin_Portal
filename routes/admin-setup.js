@@ -288,6 +288,15 @@ router.post('/setup/:day/dates/:date/remove', requireAdmin, requireDay, async (r
 // sense for a many-field form-at-once save, but per-slot assign/unassign
 // (like Floater's own per-row Accept/Unassign) is a closer match to how
 // an admin actually works the page: one member, one job, right now.
+//
+// A real request: "do not refresh the page every time you assign or
+// unassigned a setup/cleanup task. should be able to keep assigning all
+// at once" - same isFetch JSON-vs-redirect split routes/admin-substitutes.js
+// already established for the Floater Chart's own assign/unassign, so
+// public/js/setup-assign.js can submit via fetch and re-fetch just the
+// cards (see /assignments/fragment below) instead of a full page
+// navigation; a plain, non-fetch form submit still gets the original
+// redirect.
 router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, async (req, res) => {
   const day = req.params.day;
   const memberId = parseInt(req.params.memberId, 10);
@@ -299,10 +308,27 @@ router.post('/setup/:day/assignments/:memberId/task', requireAdmin, requireDay, 
     try {
       await setTaskAssignment(day, memberId, date, slot, taskItemId);
     } catch (e) {
+      if (isFetch(req)) return res.status(400).json({ ok: false, error: e.message });
       return res.redirect(back + (date ? '&' : '?') + 'error=' + encodeURIComponent(e.message));
     }
   }
+  if (isFetch(req)) return res.json({ ok: true });
   res.redirect(back);
+});
+
+// public/js/setup-assign.js's own re-fetch target after a successful
+// assign/unassign - recomputes every card for the current date rather
+// than patching a single row, since one member's assignment can free up
+// (or take) a task another member's own dropdown was suggesting - same
+// reasoning as routes/admin-volunteers.js's own /fragment route for the
+// Floater Chart.
+router.get('/setup/:day/assignments/fragment', requireAdmin, requireDay, async (req, res) => {
+  const day = req.params.day;
+  const dates = await datesForDay(day);
+  const { upcoming } = splitDatesByToday(dates);
+  const selectedDate = upcoming.includes(req.query.date) ? req.query.date : upcoming[0] || null;
+  const cards = selectedDate ? await assignmentCardsForDate(day, selectedDate) : [];
+  res.render('setup-assignment-live-fragment', { day, dayLabel: DAY_LABELS[day], selectedDate, cards });
 });
 
 router.get('/setup/:day/assignments/export.csv', requireAdmin, requireDay, async (req, res) => {

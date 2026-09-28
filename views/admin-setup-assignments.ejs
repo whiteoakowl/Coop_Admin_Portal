@@ -54,7 +54,10 @@
       <% } else if (!selectedDate) { %>
         <p class="roster-empty">No upcoming session dates - add one above, or see past dates on the <a href="/admin/setup/<%= day %>/archive">Archive</a> tab.</p>
       <% } else { %>
-        <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true }) %>
+        <div id="setup-assign-status" class="alert alert-error no-print" hidden></div>
+        <div id="setup-assignment-cards-container" data-selected-date="<%= selectedDate %>">
+          <%- include('partials/setup-assignment-cards', { cards, day, dayLabel, selectedDate, editable: true }) %>
+        </div>
       <% } %>
     </div>
 
@@ -74,5 +77,6 @@
     </dialog>
   </main>
   <script src="/js/setup-dates.js"></script>
+  <script src="/js/setup-assign.js"></script>
 </body>
 </html>
