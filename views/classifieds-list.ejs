@@ -23,7 +23,7 @@
     </a>
     <div class="site-header-actions">
       <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
-        <a class="btn-secondary" href="/classifieds/mine">My Listings</a>
+        <a class="btn-secondary" href="/classifieds/mine">Add/Edit My Listings</a>
         <a class="primary-btn" href="/portal">My Portals</a>
       <% } else { %>
         <a class="btn-secondary" href="/login">Log In</a>
@@ -36,8 +36,11 @@
   <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <h1>Classifieds</h1>
-        <% if (usesPortalNavShell) { %><p><a href="/classifieds/mine">My Listings</a></p><% } %>
+        <%# Same fix as directory-list.ejs's own comment. %>
+        <div class="grid-box-header">
+          <h1>Classifieds</h1>
+          <% if (usesPortalNavShell) { %><a class="roster-action-btn" href="/classifieds/mine">Add/Edit My Listings</a><% } %>
+        </div>
         <p>Buy, sell, and give away with other co-op families.</p>
 
         <% if (listings.length === 0) { %>

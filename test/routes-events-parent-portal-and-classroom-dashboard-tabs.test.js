@@ -99,13 +99,12 @@ test('the Events calendar always renders the grid, even with zero published even
   assert.doesNotMatch(res.text, /No upcoming events right now/);
 });
 
-test('the Events page description text is gone, and the Parent Portal Events subpage is titled Event Calendar', async () => {
+test('the Events page description text is gone, and the Parent Portal Events page is titled Event Calendar', async () => {
   const cookie = await createParentAndStudentDualRoleAccount();
   const res = await request(app).get('/events?view=calendar&portal=parent').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.doesNotMatch(res.text, /Upcoming co-op events, fundraisers/);
   assert.match(res.text, /<h1>Event Calendar<\/h1>/);
-  assert.match(res.text, /class="view-tab" href="\/events\?view=calendar&(?:amp;)?portal=parent">Event Calendar<\/a>/);
 });
 
 test('mobile: Print and + Submit an Event share one row, not split across two', async () => {

@@ -178,10 +178,12 @@ const MAIN_ADMIN_NAV_LINKS = [
 // /documents/<token> view rather than duplicating its file-serving code).
 const PARENT_NAV_LINKS = [
   { href: '/parent', icon: 'home', label: 'Home' },
-  { href: '/events?view=calendar&portal=parent', icon: 'calendar-check', label: 'Events', subpages: [
-    { href: '/events?view=calendar&portal=parent', label: 'Event Calendar' },
-    { href: '/parent/events', label: 'My Event Registrations' },
-  ] },
+  // A real request: "my event registrations should be a button on the
+  // event calendar page. No subpages" - dropped back out of this nav
+  // entry's own subpages array; events-list.ejs's own "My Event
+  // Registrations" button (its toolbar, Parent Portal only) is the only
+  // way there now.
+  { href: '/events?view=calendar&portal=parent', icon: 'calendar-check', label: 'Events' },
   { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
     { href: '/parent/classes', label: 'Class Registration' },
     { href: '/parent/classes/dashboard', label: 'Classroom Dashboard' },
@@ -203,10 +205,11 @@ const PARENT_NAV_LINKS = [
     { href: '/parent/name-tags', label: 'Name Tags' },
   ] },
   { href: '/parent/babysitters', icon: 'user', label: 'Babysitters' },
-  { href: '/parent/library', icon: 'book', label: 'Library', subpages: [
-    { href: '/parent/library', label: 'Browse Library' },
-    { href: '/parent/library/log', label: 'My Library Log' },
-  ] },
+  // A real request: "remove library log sub page. It is now a button on
+  // the library page" - My Library Log dropped back out of this nav
+  // entry's own subpages array; parent-library.ejs's own "My Library
+  // Log" button (right next to its <h1>) is the only way there now.
+  { href: '/parent/library', icon: 'book', label: 'Library' },
   { href: '/parent/reading', icon: 'book', label: 'Reading Challenge' },
   { href: '/accounting', icon: 'check-circle', label: 'Accounting' },
 ];

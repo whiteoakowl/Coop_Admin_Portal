@@ -30,7 +30,7 @@
     </a>
     <div class="site-header-actions">
       <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
-        <a class="btn-secondary" href="/directory/mine">My Listings</a>
+        <a class="btn-secondary" href="/directory/mine">Add/Edit My Listings</a>
         <a class="primary-btn" href="/portal">My Portals</a>
       <% } else { %>
         <a class="btn-secondary" href="/login">Log In</a>
@@ -43,8 +43,12 @@
   <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <h1>Business Directory</h1>
-        <% if (usesPortalNavShell) { %><p><a href="/directory/mine">My Listings</a></p><% } %>
+        <%# A real request: "my listing should be a button that says
+            add/edit my listings" - was a plain inline link. %>
+        <div class="grid-box-header">
+          <h1>Business Directory</h1>
+          <% if (usesPortalNavShell) { %><a class="roster-action-btn" href="/directory/mine">Add/Edit My Listings</a><% } %>
+        </div>
         <p>Businesses owned and run by co-op families.</p>
 
         <% if (listings.length === 0) { %>

@@ -81,6 +81,14 @@
               <a class="icon-btn<%= view === 'calendar' ? ' icon-btn-active' : '' %>" href="/events?view=calendar<%= portalQuerySuffix %>" aria-pressed="<%= view === 'calendar' %>" aria-label="Calendar view" title="Calendar view"><svg class="icon"><use href="#icon-calendar-check"/></svg></a>
             </div>
             <a class="roster-action-btn print-action-btn" href="/events/print" target="_blank">Print</a>
+            <%# A real request: "my event registrations should be a
+                button on the event calendar page. No subpages" - dropped
+                back out of portal-nav.ejs's own Events subpages array;
+                this button (Parent Portal only) is the only way there
+                now. %>
+            <% if (effectivePortal === 'parent') { %>
+              <a class="roster-action-btn" href="/parent/events">My Event Registrations</a>
+            <% } %>
             <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
               <a class="roster-action-btn" href="/events/submit">+ Submit an Event</a>
             <% } %>
