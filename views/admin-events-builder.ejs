@@ -178,38 +178,28 @@
 
         </form>
 
-        <%# A real request: "uploading image should have an upload button
-            to the right of choose file. it still says something went
-            wrong trying to upload a photo. after you hit upload photo
-            button it should show the image before saving." A separate
-            form from Details above (an HTML form can't nest inside
-            another), posting straight to the dedicated POST /:id/image
-            route - the image saves and shows immediately once Upload is
-            clicked, with no need to also click Save Event Details.
-            public/js/event-image-preview.js shows the chosen file
-            instantly (before that round trip even finishes) via a local
-            object URL; the img tag then also carries the real, already-
-            uploaded image on every later page load. The "something went
-            wrong" report was routes/admin-events.js's own uploadEventImage
-            wrapper missing - a too-large file made upload.single() throw
-            a MulterError that fell through to the generic error page
-            instead of a friendly "too large" redirect (same fix already
-            applied to routes/admin-documents.js and utils/memberIntake.js).
-            A later real request: "upload photo button should be smaller,
-            fit to text and sit clean next to choose file bar" -
-            .roster-action-btn's own flex: 1 0 auto (meant for a ROW of
-            SEVERAL buttons sharing space evenly) stretched this lone
-            button to fill the entire rest of the row next to the file
-            input; .roster-btn-row-fit-text doesn't help here since it's
-            a mobile-only (max-width: 640px) override, so the button gets
-            its own inline flex: 0 0 auto instead, sized to its own text
-            on every screen size. %>
+        <%# A real request: "when you upload a photo for an individual
+            event it automatically shows the photo so we don't need the
+            upload button, just choose file." The separate Upload button
+            is gone - public/js/event-image-preview.js now submits this
+            form itself the moment a file is chosen, straight to the
+            dedicated POST /:id/image route (still a separate form from
+            Details above - an HTML form can't nest inside another), the
+            same real upload/redirect round trip a manual Upload click
+            used to trigger. This also fixes the real bug that request
+            named: "when you click save the photo disappears" - clicking
+            the file input's own instant local-object-URL preview looked
+            like the photo was already saved, but nothing had actually
+            been posted to the server yet; clicking Save Event Details
+            only ever submitted the Details form, never this one, so the
+            image was never persisted and vanished on the next page load.
+            Auto-submitting removes that whole gap - there's no longer a
+            "chosen but not yet uploaded" state to get stuck in. %>
         <div class="member-form-full">
           <span class="roster-checkbox-label">Event Image</span>
           <img src="<%= imageUrl || '' %>" alt="" data-event-image-preview style="max-width: 240px; border-radius: var(--radius); display: <%= imageUrl ? 'block' : 'none' %>; margin-bottom: 0.5rem;" />
           <form method="POST" action="/main-admin/events/<%= event.id %>/image" enctype="multipart/form-data" class="roster-btn-row">
             <input type="file" name="image" accept="image/*" required data-event-image-input />
-            <button type="submit" class="roster-action-btn" style="flex: 0 0 auto; min-width: 0;">Upload</button>
           </form>
         </div>
 

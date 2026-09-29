@@ -1,8 +1,14 @@
-// Live preview for the Edit Event Image upload (views/admin-events-
-// builder.ejs) - a real request: "after you hit upload photo button it
-// should show the image before saving." Shows the just-chosen file
-// immediately via a local object URL, without waiting for the real
-// upload's own round trip to the server.
+// Live preview + auto-upload for the Edit Event Image field (views/admin-
+// events-builder.ejs) - a real request: "when you upload a photo for an
+// individual event it automatically shows the photo so we don't need the
+// upload button, just choose file." Shows the just-chosen file instantly
+// via a local object URL, then submits this form itself straight to the
+// real POST /:id/image route - no separate Upload button/click needed,
+// and no "chosen but not yet uploaded" state where the local preview
+// looks saved but nothing has actually reached the server yet (the real
+// bug the same request also reported: "when you click save the photo
+// disappears" - clicking the overall Save Event Details button only ever
+// submitted the Details form, never this one).
 (function () {
   document.querySelectorAll('[data-event-image-input]').forEach(function (input) {
     input.addEventListener('change', function () {
@@ -11,6 +17,7 @@
       var preview = input.closest('.member-form-full').querySelector('[data-event-image-preview]');
       preview.src = URL.createObjectURL(file);
       preview.style.display = 'block';
+      input.form.submit();
     });
   });
 })();

@@ -136,16 +136,21 @@ test('saving Event Details (no file attached) never touches the event image', as
   assert.equal(after.image_key, before.image_key, 'the image should be unaffected by a Details save');
 });
 
-// A real request: "upload photo button should be smaller, fit to text
-// and sit clean next to choose file bar" and "save event details button
-// should be the very last button on the page and dark blue, like we
-// used on other pages."
-test('Details tab: Upload button is fit-to-text, Save Event Details is the last button and dark blue', async () => {
+// A real request: "save event details button should be the very last
+// button on the page and dark blue, like we used on other pages." A
+// later real request ("we don't need the upload button, just choose
+// file") removed the separate Upload button entirely - choosing a file
+// now auto-submits the Image form itself (public/js/event-image-
+// preview.js), so there's no longer a manual upload step to size/place.
+test('Details tab: no separate Upload button, Save Event Details is the last button and dark blue', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);
   const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=details`).set('Cookie', admin.cookie);
 
-  assert.match(page.text, /<form method="POST" action="\/main-admin\/events\/\d+\/image" enctype="multipart\/form-data" class="roster-btn-row">[\s\S]*?<button type="submit" class="roster-action-btn" style="flex: 0 0 auto; min-width: 0;">Upload<\/button>/);
+  const imageFormMatch = /<form method="POST" action="\/main-admin\/events\/\d+\/image" enctype="multipart\/form-data" class="roster-btn-row">([\s\S]*?)<\/form>/.exec(page.text);
+  assert.ok(imageFormMatch, 'expected the Event Image form');
+  assert.doesNotMatch(imageFormMatch[1], /<button/, 'no Upload button - choosing a file auto-submits instead');
+  assert.match(imageFormMatch[1], /data-event-image-input/);
 
   // The Save button lives outside the Details <form> (an HTML form can't
   // nest inside another) but is still linked to it via form=, and it's
@@ -165,4 +170,26 @@ test('Details tab: Upload button is fit-to-text, Save Event Details is the last 
     .send({ title: 'Moved Save Button Event', startsAt: '2027-09-01T18:00', _csrf: admin.csrfToken });
   const event = await db.prepare('SELECT title FROM events WHERE id = ?').get(eventId);
   assert.equal(event.title, 'Moved Save Button Event');
+});
+
+// A real request: "when you save the event the photo should then appear
+// at the top of the detail page." Once actually uploaded (now the only
+// step, since choosing a file auto-submits), the image shows up on the
+// public /events/:id page exactly the way it already did for any event
+// whose image_key was set - confirming the earlier bug really was just
+// the image never reaching the server, not anything wrong with how the
+// detail page renders it.
+test('an uploaded event image shows at the top of the public event detail page', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/image?_csrf=${encodeURIComponent(admin.csrfToken)}`)
+    .set('Cookie', admin.cookie)
+    .attach('image', Buffer.from('fake jpeg bytes'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+
+  const event = await db.prepare('SELECT image_key FROM events WHERE id = ?').get(eventId);
+  const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', admin.cookie);
+  assert.equal(detailPage.status, 200);
+  assert.match(detailPage.text, new RegExp(`<img src="[^"]*${event.image_key}[^"]*"`));
 });
