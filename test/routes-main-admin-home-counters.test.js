@@ -130,3 +130,37 @@ test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', 
   // stays on whichever portal it's currently viewing.
   assert.match(res.text, /href="\/portal\/settings\?portal=parent"/);
 });
+
+// A real request: "the teacher count on main admin portal homepage should
+// show how many members are signed up for a teacher position on classes.
+// If a member is teaching more than one class they are only counted
+// once." Replaces the old count of distinct portal accounts holding the
+// 'teacher' role, which had nothing to do with whether a member is
+// actually assigned to teach a class at all.
+test('Teacher count: distinct members assigned as teacher on class_staff, teaching 2+ classes counted once, assistants and teacher-role-only accounts excluded', async () => {
+  const classId1 = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('monday', 1, 'Art') RETURNING id").get()).id;
+  const classId2 = (await db.prepare("INSERT INTO classes (day, hour_position, class_name) VALUES ('wednesday', 2, 'Science') RETURNING id").get()).id;
+
+  const twoClassTeacherId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Two Class Teacher', 'two-class-teacher-1', 'admin') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId1, twoClassTeacherId);
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'teacher')").run(classId2, twoClassTeacherId);
+
+  const assistantId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Just An Assistant', 'just-assistant-1', 'admin') RETURNING id").get()).id;
+  await db.prepare("INSERT INTO class_staff (class_id, member_id, role) VALUES (?, ?, 'assistant')").run(classId1, assistantId);
+
+  // Holds the Teacher Portal role but isn't assigned to teach any actual
+  // class - should NOT count, unlike the old member_account_roles query.
+  const portalOnlyId = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Portal Role Only', 'portal-role-only-1', 'admin') RETURNING id").get()).id;
+  const portalAccountId = (
+    await db
+      .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, 'portal-role-only@example.com', ?, 'active', now_text()) RETURNING id")
+      .get(portalOnlyId, hashPassword('testpassword123'))
+  ).id;
+  const teacherRole = await db.prepare("SELECT id FROM roles WHERE key = 'teacher'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(portalAccountId, teacherRole.id);
+
+  const cookie = await loginAsMainAdmin();
+  const res = await request(app).get('/main-admin').set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, /<span class="family-student-row-label">Teachers<\/span>\s*<span class="family-student-row-value">1<\/span>/);
+});

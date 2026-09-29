@@ -56,17 +56,16 @@ router.get('/', async (req, res) => {
   const familyCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c);
   const parentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c);
   const studentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c);
-  const teacherCount = Number(
-    (
-      await db
-        .prepare(
-          `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
-           JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
-           WHERE r.key = 'teacher' AND ma.status = 'active'`
-        )
-        .get()
-    ).c
-  );
+  // A real request: "the teacher count... should show how many members
+  // are signed up for a teacher position on classes. If a member is
+  // teaching more than one class they are only counted once." This used
+  // to count distinct portal accounts holding the 'teacher' role
+  // (member_account_roles) - a member's own class assignment
+  // (class_staff, the same table Class Manage's own Staff & Roster tab
+  // writes to) is the real source of "is this member actually teaching a
+  // class," independent of whether they've ever signed up for a Teacher
+  // Portal account at all.
+  const teacherCount = Number((await db.prepare("SELECT COUNT(DISTINCT member_id) AS c FROM class_staff WHERE role = 'teacher'").get()).c);
   const adminCount = Number(
     (
       await db
