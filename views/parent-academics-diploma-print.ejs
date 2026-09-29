@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Diploma</h1>
+    <p><a class="no-print" href="/parent/academics/diplomas">&larr; Diplomas</a></p>
+
+    <button type="button" class="roster-action-btn print-action-btn no-print" onclick="window.print()">Print</button>
+    <section class="portal-dashboard-card portal-dashboard-card-wide">
+      <h2><%= diploma.title %></h2>
+      <p>This certifies that</p>
+      <h3><%= member.name %></h3>
+      <% if (diploma.body_text) { %><p><%= diploma.body_text %></p><% } %>
+      <p class="hint">Issued <%= diploma.issued_date %></p>
+    </section>
+  </main>
+</body>
+</html>

@@ -30,16 +30,20 @@ const {
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
+const { CARD_WIDTH, CARD_HEIGHT } = require('../utils/scheduleCardBadge');
+const { buildDuplexPages, SCHEDULE_CARD_SAFE_INSET } = require('../utils/duplexPrint');
+const { buildCardPairs } = require('../utils/cardPairs');
 const NameTagRenderCore = require('../public/js/name-tag-render-core');
 const { formatFriendlyTimestamp, formatTimestamp, ageFromBirthday, todayISO } = require('../utils/dates');
 const { isRegistrationOpenForAccount, nextWindowForAccount } = require('../utils/registrationWindows');
 const { familyOf, byLastName } = require('../utils/members');
-const { libraryActivityForMemberIds } = require('../utils/library');
+const { libraryActivityForMemberIds, allItems: allLibraryItems, allLibraryTypes } = require('../utils/library');
 const resourceLinks = require('../utils/resourceLinks');
+const trainingModule = require('../utils/training');
 const {
-  assignmentsForStudent,
   assignmentsForStudentInClass,
   diplomaForStudent,
+  issueDiploma,
   transcriptForStudent,
   lessonsForStudentView,
   getContentItem,
@@ -53,6 +57,7 @@ const { registerForClass, unregisterFromClass } = require('../utils/classRegistr
 const events = require('../utils/events');
 const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
+const { jsonScriptSafe } = require('../utils/json');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const reading = require('../utils/reading');
 const businessDirectory = require('../utils/directory');
@@ -626,16 +631,61 @@ router.get('/handbook', async (req, res) => {
   res.render('parent-handbook', { title: 'Policy Handbook', handbookHtml: await getHandbookHtml() });
 });
 
-// Library - read-only. Reuses the EXISTING library_items/library_checkouts
-// tables the Co-op Admin Portal's own scan-based Library tools already
-// write to; a parent just gets a filtered view of their own family's
-// activity, not a second checkout system.
+// Library - a real request: "Page should show a list of all the library
+// items broken down into categories. Filter button to filter the
+// category. Button that says my library log... Library search bar."
+// Reuses the EXISTING library_items/library_checkouts tables the Co-op
+// Admin Portal's own scan-based Library tools already write to - this is
+// a read-only catalog browse (checkout itself stays a barcode-scan-only
+// action, same as everywhere else in the app), not a second checkout
+// system.
 router.get('/library', async (req, res) => {
+  const typeFilter = (req.query.type || '').trim();
+  const q = (req.query.q || '').trim().toLowerCase();
+  const types = await allLibraryTypes();
+  let items = await allLibraryItems(typeFilter || undefined);
+  if (q) items = items.filter((i) => i.title.toLowerCase().includes(q));
+
+  const itemsByType = {};
+  for (const item of items) {
+    const key = item.type || 'Uncategorized';
+    if (!itemsByType[key]) itemsByType[key] = [];
+    itemsByType[key].push(item);
+  }
+  const categories = Object.keys(itemsByType).sort((a, b) => a.localeCompare(b));
+
+  res.render('parent-library', { title: 'Library', types, typeFilter, q, categories, itemsByType });
+});
+
+// My Library Log - what this family currently has checked out (and when
+// it's due), plus their history of past checkouts/returns. This is the
+// exact page the bare /library route used to render before it became the
+// catalog browse above.
+router.get('/library/log', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   const family = member ? [member, ...(await familyOf(member.id))] : [];
   const memberIds = family.map((m) => m.id);
   const { active, recentReturns } = await libraryActivityForMemberIds(memberIds);
-  res.render('parent-library', { title: 'Library', active, recentReturns });
+  res.render('parent-library-log', { title: 'My Library Log', active, recentReturns });
+});
+
+// Training - a real request: "training should be a tab on their dashboard
+// panel after chat tab." The existing Training module (routes/training.js)
+// has its own, entirely separate "pick your name from a public link"
+// trust model (req.session.trainingMemberId) for members with no portal
+// account at all - not the portalAccount/portalRoles model this whole
+// file uses. Rather than duplicate its lesson player/quiz-taking/video-
+// progress code, this bridges the two: a signed-in parent's own member id
+// (already re-derived server-side, never trusted from the request, same
+// as everywhere else here) is written into that SAME session key, so the
+// existing /training/:id/play etc. routes work for them exactly as they
+// already do for anyone else - only this list page itself needed its own
+// portal-nav-shelled view instead of training-mine.ejs's public/kiosk one.
+router.get('/training', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  if (!member) return res.render('parent-training', { title: 'Training', assignments: [] });
+  req.session.trainingMemberId = member.id;
+  res.render('parent-training', { title: 'Training', assignments: await trainingModule.myAssignments(member.id) });
 });
 
 // Resources - a real request added this as a standing Parent Portal nav
@@ -684,22 +734,59 @@ router.get('/documents', async (req, res) => {
   res.render('parent-documents', { title: 'Documents', documents });
 });
 
-// Academics - assignments/grades, transcript, and diploma status for each
-// of the parent's own children in one place (utils/academics.js). Purely
-// read-only, same as everywhere else a parent views (rather than acts on)
-// their children's records.
+// Academics - a real request: "sub pages should be transcripts, diplomas,
+// name tags." Transcripts (this bare route - see the Classes/Class
+// Registration precedent above of the bare route being the first
+// subpage) is purely read-only, same as everywhere else a parent views
+// (rather than acts on) their children's records; grades/assignments
+// aren't part of this request and are already viewable per-class in
+// Classroom Dashboard's own Lessons tab, so they're left out here.
 router.get('/academics', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
-  const academics = [];
+  const transcripts = [];
   for (const child of children) {
-    const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(child.id);
-    const classIds = enrolledRows.map((r) => r.class_id);
-    const assignments = await assignmentsForStudent(child.id, classIds);
     const { current, history } = await transcriptForStudent(child.id);
-    const diploma = await diplomaForStudent(child.id);
-    academics.push({ child, assignments, current, history, diploma });
+    transcripts.push({ child, current, history });
   }
-  res.render('parent-academics', { title: 'Academics', academics });
+  res.render('parent-academics', { title: 'Academics', transcripts });
+});
+
+// Diplomas - a real request: "Diplomas allows parents to design and print
+// a diploma for their students." Reuses the exact same diplomas table/
+// issueDiploma upsert Main Admin's own /main-admin/academics uses (see
+// utils/academics.js), just scoped to the parent's own children instead
+// of gated behind manage_academics - a parent can create/edit (never
+// issue on someone else's behalf) their own child's diploma wording and
+// print it, the same one-diploma-per-student row either side writes to.
+router.get('/academics/diplomas', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const diplomas = [];
+  for (const child of children) {
+    const diploma = await diplomaForStudent(child.id);
+    diplomas.push({ child, diploma });
+  }
+  res.render('parent-academics-diplomas', { title: 'Diplomas', diplomas, todayISO: todayISO() });
+});
+
+router.post('/academics/diplomas', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const studentId = parseInt(req.body.studentId, 10);
+  if (!children.some((c) => c.id === studentId)) {
+    return res.redirect('/parent/academics/diplomas?error=' + encodeURIComponent('Select one of your own children.'));
+  }
+  const title = (req.body.title || '').trim() || 'Diploma of Completion';
+  const issuedDate = req.body.issuedDate || todayISO();
+  await issueDiploma({ studentId, title, issuedDate, bodyText: req.body.bodyText, issuedByAccountId: req.portalAccount.id });
+  res.redirect('/parent/academics/diplomas?notice=' + encodeURIComponent('Diploma saved.'));
+});
+
+router.get('/academics/diplomas/:studentId/print', async (req, res) => {
+  const children = await childrenForAccount(req.portalAccount);
+  const child = children.find((c) => c.id === parseInt(req.params.studentId, 10));
+  if (!child) return res.status(404).render('404', { title: 'Not Found' });
+  const diploma = await diplomaForStudent(child.id);
+  if (!diploma) return res.redirect('/parent/academics/diplomas?error=' + encodeURIComponent('Design a diploma for this child first.'));
+  res.render('parent-academics-diploma-print', { title: 'Diploma', member: child, diploma });
 });
 
 // Name Tags - a real request: parents should be able to print name tags
@@ -724,6 +811,28 @@ router.post('/name-tags/print', async (req, res) => {
   }
 
   const members = family.filter((m) => memberIds.includes(m.id));
+
+  // A real request: "Name tags allows them to print their name tag with
+  // or without their schedule on the back." Reuses Main Admin's own
+  // exact front/back duplex sheet (buildCardPairs/buildDuplexPages, same
+  // as its own /print-duplex route) rather than inventing a second,
+  // simpler schedule-back layout - it's already portal-agnostic (no nav)
+  // and this is the same badge+schedule-card data every print flow here
+  // already shares.
+  if (req.body.includeSchedule) {
+    const { frontPages, backPages } = buildDuplexPages(await buildCardPairs(members));
+    return res.render('main-admin-cards-duplex-print', {
+      title: 'Print Name Tags + Schedule Cards (Front & Back)',
+      frontPages,
+      backPages,
+      badgeWidth: BADGE_WIDTH,
+      badgeHeight: BADGE_HEIGHT,
+      cardWidth: CARD_WIDTH,
+      cardHeight: CARD_HEIGHT,
+      SCHEDULE_CARD_SAFE_INSET,
+    });
+  }
+
   const templates = { student: await getTemplate('student'), parent: await getTemplate('parent'), admin: await getTemplate('admin') };
   const dataByMember = await badgeDataForMembers(members);
   const badges = members.map((m) => {
@@ -747,13 +856,17 @@ router.post('/name-tags/print', async (req, res) => {
   });
 });
 
-// Babysitter Directory - a real request: "It should appear on parent
-// portal to view directory. Parents can view or create a profile for
-// their child as well to be a babysitter." One page: the approved
-// directory, plus a create/edit form per one of the parent's own
-// children (childrenForAccount - the same "never trust a member id from
-// the request" rule this whole file already follows for class
-// registration).
+// Babysitter Directory - a real request: "should not show list of
+// members students, just a directory of babysitters, button at the top
+// of the page that says add/edit babysitters. Button is clicked and form
+// pops up. Name selection is a drop down menu showing the parents
+// students names only." One combined dialog (not one accordion form per
+// child) whose Student dropdown is scoped to childrenForAccount - the
+// same "never trust a member id from the request" rule this whole file
+// already follows for class registration - with each child's own
+// existing profile fields embedded as JSON (profileDataJson) so
+// public/js/parent-babysitter-form.js can repopulate the form's fields
+// on selection change without a page reload.
 router.get('/babysitters', async (req, res) => {
   const children = await childrenForAccount(req.portalAccount);
   const profileByChildId = {};
@@ -763,6 +876,7 @@ router.get('/babysitters', async (req, res) => {
     title: 'Babysitter Directory',
     children,
     profileByChildId,
+    profileDataJson: jsonScriptSafe(profileByChildId),
     directory,
     error: req.query.error || null,
     notice: req.query.notice || null,
@@ -839,12 +953,19 @@ router.get('/leaderboard', async (req, res) => {
   });
 });
 
+// A real request: "log reading time should include minutes, not just
+// hours" (and the same for the goal below) - reading.addLog/setWeeklyGoal
+// both still just take one decimal hours number (shared with Student
+// Portal's identical reading challenge, unaffected by this Parent-Portal-
+// only request), so the two fields are combined into that one decimal
+// right here rather than changing either function's own signature.
 router.post('/reading/log', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/parent/reading?error=' + encodeURIComponent('No parent profile found for your account.'));
+  const hours = (Number(req.body.hours) || 0) + (Number(req.body.minutes) || 0) / 60;
   const result = await reading.addLog(member.id, {
     bookTitle: req.body.book_title,
-    hours: req.body.hours,
+    hours,
     notes: req.body.notes,
     logDate: req.body.log_date,
   });
@@ -855,7 +976,8 @@ router.post('/reading/log', async (req, res) => {
 router.post('/reading/goal', async (req, res) => {
   const member = await memberForAccount(req.portalAccount.id);
   if (!member) return res.redirect('/parent/reading?error=' + encodeURIComponent('No parent profile found for your account.'));
-  const result = await reading.setWeeklyGoal(member.id, req.body.weekly_goal_hours);
+  const hours = (Number(req.body.weekly_goal_hours) || 0) + (Number(req.body.weekly_goal_minutes) || 0) / 60;
+  const result = await reading.setWeeklyGoal(member.id, hours);
   if (!result.ok) return res.redirect('/parent/reading?error=' + encodeURIComponent(result.error));
   res.redirect('/parent/reading?notice=' + encodeURIComponent(`Weekly goal updated to ${result.hours} hours.`));
 });

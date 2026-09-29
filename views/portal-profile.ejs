@@ -4,8 +4,15 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // Same bug class as accounting-home.ejs's own comment - this is the
+    // literal "Account" bug from the report ("clicking on account it
+    // takes you somewhere else and the dashboard changes"). Kept navLinks
+    // as the fallback for non-parent/student accounts (teacher, main
+    // admin, ...) that also have their own profile.
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'My Profile',
+    portalTitle: sharedPortalTitle('My Profile'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
     ],

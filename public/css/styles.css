@@ -7088,13 +7088,25 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
 .parent-class-description { margin: 0 0 0.75rem; }
 .parent-class-divider { border: none; border-top: 1px solid var(--border); margin: 1.1rem 0; }
 .parent-class-children { display: flex; flex-direction: column; gap: 0.6rem; }
+/* A real bug report: "desktop, class registration, click on class that
+   your student is registered for - registered label should be closer to
+   students name, cancel should be on the same row as students name."
+   justify-content: space-between spread all 2-3 children (name, status
+   badge, Cancel form/hint) evenly across the row's full width - correct
+   for pairing a name against ONE trailing control, but with a status
+   badge in between too it reads as scattered rather than one grouped
+   row. flex-start keeps the name and badge adjacent; margin-left: auto
+   on the trailing Cancel form/Register button/hint (never the name
+   itself) is what still pins it to the row's right edge, on the SAME row
+   (flex-wrap stays as the mobile-width safety net, same as before). */
 .parent-class-child-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.6rem;
 }
+.parent-class-child-row > *:last-child:not(.parent-class-child-name) { margin-left: auto; }
 .parent-class-child-name {
   font-weight: 600;
   color: var(--ink);
@@ -9791,6 +9803,15 @@ input.forum-editor-color-input { position: absolute; width: 1px; height: 1px; pa
 .reading-stepper-btn { width: 2.25rem; height: 2.25rem; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .reading-stepper-btn .icon { width: 1rem; height: 1rem; }
 .reading-hours-stepper input[type="number"] { text-align: center; }
+
+/* Parent Portal's own Reading Challenge - a real request: "log reading
+   time should include minutes, not just hours" (Log Reading Time and Edit
+   Goal both). Plain hours+minutes number inputs rather than
+   .reading-hours-stepper's +/- buttons above (Student Portal's own,
+   unaffected by this Parent-Portal-only request) - two independent
+   fields don't fit that single-value increment/decrement interaction. */
+.reading-hours-minutes-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.reading-hours-minutes-row input[type="number"] { width: 5rem; text-align: center; }
 
 .reading-points-preview-card {
   display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; padding: 0.75rem;

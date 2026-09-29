@@ -12,14 +12,18 @@
   // instead of the empty COMMUNITY_LINKS_STUDENT that every native
   // /student/* page gets - stacking a second, redundant "Chat" entry
   // (from that generic list) underneath the one this page's own navLinks
-  // below already shows. portalTitle:'Student Portal' is the one value
-  // portal-nav.ejs special-cases straight to STUDENT_NAV_LINKS/
-  // COMMUNITY_LINKS_STUDENT (ignoring navLinks entirely for that case),
-  // restoring the student's own single normal tab bar here too.
-  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  // below already shows. portalTitle:'Student Portal'/'Parent Portal' are
+  // the values portal-nav.ejs special-cases straight to STUDENT_NAV_LINKS/
+  // PARENT_NAV_LINKS (ignoring navLinks entirely for those cases),
+  // restoring that portal's own single normal tab bar here too. A later
+  // real bug report ("Parent portal, clicking on chat goes to student
+  // portal. It should stay in parent portal") was this same fix never
+  // having covered a parent account at all - sharedPortalTitle
+  // (middleware/portalAuth.js) now centralizes checking both roles (and
+  // every other shared page's own version of this exact mistake).
   %>
   <%- include('partials/portal-nav', {
-    portalTitle: isStudentPortalAccount ? 'Student Portal' : 'Chat',
+    portalTitle: sharedPortalTitle('Chat'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/forums', icon: 'users', label: 'Chat' },

@@ -7,7 +7,7 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <div class="roster-toolbar">
+    <div class="grid-box-header">
       <h1>Resource Links</h1>
       <button type="button" class="roster-action-btn" onclick="document.getElementById('submit-resource-dialog').showModal()">+ Submit a Resource</button>
     </div>
@@ -35,10 +35,10 @@
     <% } %>
   </main>
 
-  <dialog id="submit-resource-dialog" class="member-picker-dialog">
+  <dialog id="submit-resource-dialog" class="member-picker-dialog dialog-label-stack">
     <form method="POST" action="/parent/resources/submit">
       <h3>Submit a Resource</h3>
-      <p class="hint">Found a great link for other parents? Submit it here - a Main Admin will review it before it appears on this list.</p>
+      <p class="hint">Found a great link for other parents? Submit it here and an admin will review it before it appears on this list.</p>
       <label for="submit-resource-title">Title
         <input id="submit-resource-title" type="text" name="title" required />
       </label>

@@ -24,6 +24,28 @@ async function loadPortalSession(req, res, next) {
   res.locals.portalAccount = null;
   res.locals.portalRoles = [];
 
+  // A whole family of real bug reports - "Parent portal, clicking on
+  // chat/store/account takes you somewhere else" - turned out to be the
+  // same mistake repeated across a dozen shared pages (Chat, Store,
+  // Business Directory, Classifieds, Photos, Accounting, My Profile,
+  // Settings, ...): each either hardcoded a generic portalTitle (losing a
+  // signed-in parent's or student's own nav shell entirely) or only ever
+  // checked for a student role (never parent). Centralizing the correct
+  // check here - parent takes priority since a parent account viewing a
+  // shared page always got there from their own Parent Portal nav - means
+  // every one of those views can now just call
+  // `sharedPortalTitle('<its own generic fallback>')` instead of
+  // reimplementing (and risking re-breaking) this same logic by hand.
+  // Only meaningful for a page that renders partials/portal-nav at all -
+  // a genuinely public page unconditionally shown to everyone (the
+  // homepage) has no reason to call this.
+  res.locals.sharedPortalTitle = function (fallback) {
+    const roles = res.locals.portalRoles || [];
+    if (roles.some((r) => r.key === 'parent')) return 'Parent Portal';
+    if (roles.some((r) => r.key === 'student')) return 'Student Portal';
+    return fallback;
+  };
+
   const accountId = req.session && req.session.portalAccountId;
   if (!accountId) return next();
   const account = await findAccountById(accountId);

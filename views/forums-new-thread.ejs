@@ -9,11 +9,12 @@
   // should only be one." - see forums-list.ejs's own comment on this
   // exact fix (portalTitle:'Chat' otherwise pulls in portal-nav.ejs's
   // generic default community list, duplicating this page's own Chat
-  // entry below).
-  const isStudentPortalAccount = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  // entry below). A later real bug report ("Parent portal, clicking on
+  // chat goes to student portal. It should stay in parent portal") added
+  // the parent-role check that fix never had.
   %>
   <%- include('partials/portal-nav', {
-    portalTitle: isStudentPortalAccount ? 'Student Portal' : 'Chat',
+    portalTitle: sharedPortalTitle('Chat'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/forums', icon: 'users', label: 'Chat' },

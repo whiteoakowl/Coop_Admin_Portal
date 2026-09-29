@@ -7,44 +7,15 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Academics</h1>
+    <h1>Transcripts</h1>
 
-    <% if (academics.length === 0) { %>
+    <% if (transcripts.length === 0) { %>
       <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
     <% } %>
 
-    <% academics.forEach(function(rec) { %>
+    <% transcripts.forEach(function(rec) { %>
       <section class="portal-dashboard-section">
         <h2><%= rec.child.name %></h2>
-
-        <h3>Assignments</h3>
-        <% if (rec.assignments.length === 0) { %>
-          <p class="roster-empty">No assignments yet.</p>
-        <% } else { %>
-          <div class="roster-scroll">
-            <table class="roster-table members-table condensed-table">
-              <thead><tr><th>Assignment</th><th>Class</th><th>Due</th><th>Grade</th></tr></thead>
-              <tbody>
-                <% rec.assignments.forEach(function(a) { %>
-                  <tr>
-                    <td class="roster-name-col"><%= a.title %></td>
-                    <td><%= a.class_name %></td>
-                    <td><%= a.dueDateLabel || '—' %></td>
-                    <td>
-                      <% if (!a.graded) { %>
-                        <span class="hint">Not graded yet</span>
-                      <% } else { %>
-                        <%= a.points_earned %><% if (a.points_possible != null) { %> / <%= a.points_possible %><% } %>
-                      <% } %>
-                    </td>
-                  </tr>
-                <% }); %>
-              </tbody>
-            </table>
-          </div>
-        <% } %>
-
-        <h3>Transcript</h3>
         <% if (rec.current.length === 0 && rec.history.length === 0) { %>
           <p class="roster-empty">No classes on record yet.</p>
         <% } else { %>
@@ -61,13 +32,6 @@
               </tbody>
             </table>
           </div>
-        <% } %>
-
-        <h3>Diploma</h3>
-        <% if (!rec.diploma) { %>
-          <p class="roster-empty">No diploma issued yet.</p>
-        <% } else { %>
-          <p><%= rec.diploma.title %> &middot; issued <%= rec.diploma.issued_date %></p>
         <% } %>
       </section>
     <% }); %>

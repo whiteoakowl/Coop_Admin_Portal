@@ -3,9 +3,14 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // A real bug report: "Parent portal, clicking on store changes the
+  // portal dashboard menu, it's going somewhere else." - see store-
+  // list.ejs's own comment on this fix.
+%>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Store',
+    portalTitle: sharedPortalTitle('Store'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/store', icon: 'tag', label: 'Store' },

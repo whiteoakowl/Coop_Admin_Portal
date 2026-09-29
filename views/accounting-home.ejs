@@ -4,8 +4,15 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // Same bug class as store-list.ejs's own comment. /accounting is open
+    // to ANY signed-in portal account (not just parent/student - a
+    // teacher or Main Admin can carry a charge too), so navLinks below
+    // still matters as the fallback for those other roles; only the
+    // portalTitle itself was the bug for a parent/student visitor.
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Accounting',
+    portalTitle: sharedPortalTitle('Accounting'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/accounting', icon: 'file-text', label: 'Accounting' },

@@ -3,7 +3,16 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // Same fix as directory-list.ejs's own comment.
+  const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+  const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  const usesPortalNavShell = hasParentRole || hasStudentRole;
+%>
 <body>
+  <% if (usesPortalNavShell) { %>
+    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -20,8 +29,9 @@
       <% } %>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
         <p><a href="/photos">&larr; All Albums</a></p>

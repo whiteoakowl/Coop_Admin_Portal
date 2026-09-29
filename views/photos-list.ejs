@@ -3,7 +3,16 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // Same fix as directory-list.ejs's own comment.
+  const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+  const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  const usesPortalNavShell = hasParentRole || hasStudentRole;
+%>
 <body>
+  <% if (usesPortalNavShell) { %>
+    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -20,11 +29,17 @@
       <% } %>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <h1>Photos</h1>
+        <div class="grid-box-header">
+          <h1>Photos</h1>
+          <% if (typeof portalAccount !== 'undefined' && portalAccount && albums.length > 0) { %>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('add-photo-dialog').showModal()">+ Add Photo</button>
+          <% } %>
+        </div>
 
         <% if (albums.length === 0) { %>
           <p class="roster-empty">No albums yet.</p>
@@ -46,5 +61,39 @@
       </div>
     </section>
   </main>
+
+  <% if (typeof portalAccount !== 'undefined' && portalAccount && albums.length > 0) { %>
+    <%
+      // A real request: "when you click the photos tab it goes to a
+      // completely different page than the whole dashboard. It should
+      // look like other pages with an add photo button." The list page
+      // has no album selected yet - unlike photos-detail.ejs's own
+      // upload form (one fixed album) - so this one also asks which
+      // album to add to, then posts to that exact same /photos/:id/upload
+      // route (members can add photos to an existing album, never create
+      // one - see routes/photos.js's own comment on why there's no
+      // create-album route here at all).
+    %>
+    <dialog id="add-photo-dialog" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/photos" enctype="multipart/form-data" onsubmit="this.action = '/photos/' + this.albumId.value + '/upload';">
+        <h3>Add Photo</h3>
+        <label>Album
+          <select name="albumId" required>
+            <% albums.forEach(function(a) { %><option value="<%= a.id %>"><%= a.title %></option><% }); %>
+          </select>
+        </label>
+        <label>Photo(s)
+          <input type="file" name="images" accept="image/*" multiple required />
+        </label>
+        <label>Caption <span class="hint">(optional, applies to all photos in this upload)</span>
+          <input type="text" name="caption" placeholder="e.g. Field trip day" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Upload</button>
+        </div>
+      </form>
+    </dialog>
+  <% } %>
 </body>
 </html>

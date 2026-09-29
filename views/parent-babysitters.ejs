@@ -7,61 +7,16 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Babysitter Directory</h1>
+    <div class="grid-box-header">
+      <h1>Babysitter Directory</h1>
+      <% if (children.length > 0) { %>
+        <button type="button" class="roster-action-btn" onclick="document.getElementById('babysitter-dialog').showModal()">Add/Edit Babysitters</button>
+      <% } %>
+    </div>
 
     <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
 
-    <% if (children.length > 0) { %>
-      <h2>My Children's Profiles</h2>
-      <p class="hint">Every new profile, and every edit to an existing one, needs Main Admin's approval before it appears in the directory below.</p>
-      <% children.forEach(function(child) { %>
-        <% var profile = profileByChildId[child.id]; %>
-        <details class="manage-section" <%= children.length === 1 ? 'open' : '' %>>
-          <summary>
-            <strong><%= child.name %></strong>
-            <% if (profile) { %>
-              <span class="badge-pill <%= profile.status === 'approved' ? 'badge-pill-present' : profile.status === 'pending' ? 'badge-pill-pending' : 'badge-pill-absent' %>">
-                <%= profile.status %>
-              </span>
-            <% } %>
-          </summary>
-          <form method="POST" action="/parent/babysitters/<%= child.id %>" enctype="multipart/form-data" class="stack-form member-form-page-panel">
-            <label class="member-form-full">Age/Grade
-              <input type="text" name="ageGrade" value="<%= profile ? profile.age_grade || '' : '' %>" placeholder="e.g. 15 / 9th grade" />
-            </label>
-            <label class="member-form-full">Availability
-              <textarea name="availability" rows="2" placeholder="e.g. Weekends, evenings after 5pm"><%= profile ? profile.availability || '' : '' %></textarea>
-            </label>
-            <label class="member-form-full">Experience
-              <textarea name="experience" rows="2" placeholder="Babysitting experience, ages watched, etc."><%= profile ? profile.experience || '' : '' %></textarea>
-            </label>
-            <label class="member-form-full">Certifications
-              <input type="text" name="certifications" value="<%= profile ? profile.certifications || '' : '' %>" placeholder="e.g. CPR certified, Red Cross Babysitting Course" />
-            </label>
-            <label class="member-form-full">Hourly Rate
-              <input type="text" name="hourlyRate" value="<%= profile ? profile.hourly_rate || '' : '' %>" placeholder="e.g. $12/hr" />
-            </label>
-            <label class="member-form-full">Contact Method
-              <input type="text" name="contactMethod" value="<%= profile ? profile.contact_method || '' : '' %>" placeholder="e.g. Text (555) 555-1234" />
-            </label>
-            <label class="member-form-full">Photo
-              <% if (profile && profile.photo_key) { %>
-                <img src="/babysitters/<%= profile.id %>/photo" alt="" class="babysitter-photo-preview" />
-              <% } %>
-              <input type="file" name="photo" accept="image/*" />
-            </label>
-            <div class="member-form-footer">
-              <div class="member-form-footer-edit">
-                <button type="submit" class="primary-btn"><%= profile ? 'Save Changes' : 'Submit Profile' %></button>
-              </div>
-            </div>
-          </form>
-        </details>
-      <% }); %>
-    <% } %>
-
-    <h2>Directory</h2>
     <% if (directory.length === 0) { %>
       <p class="roster-empty">No approved babysitter profiles yet.</p>
     <% } else { %>
@@ -81,5 +36,46 @@
       </div>
     <% } %>
   </main>
+
+  <% if (children.length > 0) { %>
+    <dialog id="babysitter-dialog" class="member-picker-dialog dialog-label-stack">
+      <form method="POST" action="/parent/babysitters" enctype="multipart/form-data" onsubmit="this.action = '/parent/babysitters/' + this.studentId.value;">
+        <h3>Add/Edit Babysitters</h3>
+        <p class="hint">Every new profile, and every edit to an existing one, needs Main Admin's approval before it appears in the directory above.</p>
+        <label>Student
+          <select name="studentId" id="babysitter-student-select" required>
+            <% children.forEach(function(child) { %><option value="<%= child.id %>"><%= child.name %></option><% }); %>
+          </select>
+        </label>
+        <label>Age/Grade
+          <input type="text" name="ageGrade" id="babysitter-field-ageGrade" placeholder="e.g. 15 / 9th grade" />
+        </label>
+        <label>Availability
+          <textarea name="availability" id="babysitter-field-availability" rows="2" placeholder="e.g. Weekends, evenings after 5pm"></textarea>
+        </label>
+        <label>Experience
+          <textarea name="experience" id="babysitter-field-experience" rows="2" placeholder="Babysitting experience, ages watched, etc."></textarea>
+        </label>
+        <label>Certifications
+          <input type="text" name="certifications" id="babysitter-field-certifications" placeholder="e.g. CPR certified, Red Cross Babysitting Course" />
+        </label>
+        <label>Hourly Rate
+          <input type="text" name="hourlyRate" id="babysitter-field-hourlyRate" placeholder="e.g. $12/hr" />
+        </label>
+        <label>Contact Method
+          <input type="text" name="contactMethod" id="babysitter-field-contactMethod" placeholder="e.g. Text (555) 555-1234" />
+        </label>
+        <label>Photo <span class="hint">(optional - replaces the current photo, if any)</span>
+          <input type="file" name="photo" accept="image/*" />
+        </label>
+        <div class="notes-dialog-actions">
+          <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+          <button type="submit" class="primary-btn">Submit for Review</button>
+        </div>
+      </form>
+    </dialog>
+    <script id="babysitter-profile-data" type="application/json"><%- profileDataJson %></script>
+    <script src="/js/parent-babysitter-form.js" defer></script>
+  <% } %>
 </body>
 </html>

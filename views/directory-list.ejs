@@ -3,7 +3,24 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // A real bug report class: "Parent portal, clicking on [a Community &
+  // Commerce page] changes the portal dashboard menu, it's going
+  // somewhere else." /directory is a genuinely public page (browsable
+  // signed out), so it can't assume every visitor belongs to one portal
+  // the way a native /parent/* page can - but it used to show this plain
+  // public header even to a signed-in parent/student, same class of bug
+  // /events had before its own fix (see views/events-list.ejs's own
+  // comment). A signed-in parent/student now gets their real portal nav
+  // shell instead, with this exact same listing grid inside it.
+  const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+  const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  const usesPortalNavShell = hasParentRole || hasStudentRole;
+%>
 <body>
+  <% if (usesPortalNavShell) { %>
+    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -21,11 +38,13 @@
       <% } %>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
         <h1>Business Directory</h1>
+        <% if (usesPortalNavShell) { %><p><a href="/directory/mine">My Listings</a></p><% } %>
         <p>Businesses owned and run by co-op families.</p>
 
         <% if (listings.length === 0) { %>

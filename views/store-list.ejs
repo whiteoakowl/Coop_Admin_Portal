@@ -3,9 +3,20 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // A real bug report: "Parent portal, clicking on store changes the
+  // portal dashboard menu, it's going somewhere else." /store is shared
+  // across every portal (any signed-in account, requirePortalAuth), but
+  // unconditionally hardcoded portalTitle:'Store' - losing a parent's
+  // (or student's) own portal nav shell every time, same class of bug
+  // /events and /forums both had before their own fixes. A signed-in
+  // parent/student now gets their real portal nav shell instead; anyone
+  // else (teacher/coop_admin/main_admin browsing the member store) still
+  // gets this page's own generic 3-link fallback below.
+%>
 <body>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Store',
+    portalTitle: sharedPortalTitle('Store'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
       { href: '/store', icon: 'tag', label: 'Store' },

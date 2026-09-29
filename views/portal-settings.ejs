@@ -4,8 +4,12 @@
   <%- include('partials/head', { title }) %>
 </head>
 <body>
+  <%
+    // Same bug class as accounting-home.ejs's own comment. Kept navLinks
+    // as the fallback for non-parent/student accounts.
+  %>
   <%- include('partials/portal-nav', {
-    portalTitle: 'Settings',
+    portalTitle: sharedPortalTitle('Settings'),
     navLinks: [
       { href: '/portal', icon: 'home', label: 'My Portals' },
     ],

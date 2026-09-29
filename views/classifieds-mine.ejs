@@ -3,7 +3,17 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
+<%
+  // Same fix as directory-mine.ejs's own comment (Classifieds mirrors
+  // Business Directory).
+  const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
+  const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
+  const usesPortalNavShell = hasParentRole || hasStudentRole;
+%>
 <body>
+  <% if (usesPortalNavShell) { %>
+    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+  <% } else { %>
   <%- include('partials/icon-sprite') %>
 
   <header class="site-header">
@@ -15,12 +25,14 @@
       <a class="primary-btn" href="/portal">My Portals</a>
     </div>
   </header>
+  <% } %>
 
-  <main id="main-content" tabindex="-1">
+  <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
         <div class="grid-box-header">
           <h1>My Classifieds</h1>
+          <% if (usesPortalNavShell) { %><a href="/classifieds">All Classifieds</a><% } %>
           <button type="button" class="roster-action-btn" onclick="document.getElementById('new-listing-dialog').showModal()">+ Post a Listing</button>
         </div>
 

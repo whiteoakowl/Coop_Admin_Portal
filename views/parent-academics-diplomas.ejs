@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Diplomas</h1>
+    <p class="hint">Design and print a diploma for your own student. Saving again replaces its wording - each student has one diploma.</p>
+
+    <% if (typeof notice !== 'undefined' && notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+    <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (diplomas.length === 0) { %>
+      <p class="roster-empty">No students are linked to your family yet. Contact an admin if this looks wrong.</p>
+    <% } %>
+
+    <% diplomas.forEach(function(rec) { %>
+      <section class="portal-dashboard-card portal-dashboard-card-wide">
+        <h2><%= rec.child.name %></h2>
+        <% if (rec.diploma) { %>
+          <p class="hint"><%= rec.diploma.title %> &middot; issued <%= rec.diploma.issued_date %></p>
+          <div class="roster-btn-row">
+            <a class="roster-action-btn print-action-btn" href="/parent/academics/diplomas/<%= rec.child.id %>/print" target="_blank">Print</a>
+            <button type="button" class="roster-action-btn" onclick="document.getElementById('diploma-dialog-<%= rec.child.id %>').showModal()">Edit Design</button>
+          </div>
+        <% } else { %>
+          <p class="roster-empty">No diploma designed yet.</p>
+          <button type="button" class="roster-action-btn" onclick="document.getElementById('diploma-dialog-<%= rec.child.id %>').showModal()">Design a Diploma</button>
+        <% } %>
+      </section>
+
+      <dialog id="diploma-dialog-<%= rec.child.id %>" class="member-picker-dialog dialog-label-stack">
+        <form method="POST" action="/parent/academics/diplomas">
+          <h3>Diploma for <%= rec.child.name %></h3>
+          <input type="hidden" name="studentId" value="<%= rec.child.id %>" />
+          <label>Title
+            <input type="text" name="title" value="<%= rec.diploma ? rec.diploma.title : 'Diploma of Completion' %>" required />
+          </label>
+          <label>Issue Date
+            <input type="date" name="issuedDate" value="<%= rec.diploma ? rec.diploma.issued_date : todayISO %>" required />
+          </label>
+          <label>Body Text <span class="hint">(optional wording shown on the printed diploma)</span>
+            <textarea name="bodyText" rows="3"><%= rec.diploma ? (rec.diploma.body_text || '') : '' %></textarea>
+          </label>
+          <div class="notes-dialog-actions">
+            <button type="button" class="btn-secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </dialog>
+    <% }); %>
+  </main>
+</body>
+</html>

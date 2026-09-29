@@ -7,74 +7,55 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Library</h1>
-    <p class="hint">What your family currently has checked out, and what's come back recently.</p>
+    <div class="grid-box-header">
+      <h1>Library</h1>
+      <a class="roster-action-btn" href="/parent/library/log">My Library Log</a>
+    </div>
 
-    <section class="portal-dashboard-section">
-      <h2>Currently Checked Out</h2>
-      <% if (active.length === 0) { %>
-        <p class="roster-empty">Nothing checked out right now.</p>
-      <% } else { %>
+    <div class="members-search-filter-row">
+      <form method="GET" action="/parent/library" class="members-search-bar">
+        <input type="hidden" name="type" value="<%= typeFilter %>" />
+        <svg class="icon"><use href="#icon-search"/></svg>
+        <input type="search" name="q" value="<%= q %>" placeholder="Search titles&hellip;" aria-label="Search library titles" />
+      </form>
+      <div class="category-filter">
+        <label for="library-type-select">Filter</label>
+        <select id="library-type-select" onchange="window.location = '/parent/library?type=' + encodeURIComponent(this.value) + '&q=<%= encodeURIComponent(q) %>'">
+          <option value="" <%= !typeFilter ? 'selected' : '' %>>All Categories</option>
+          <% types.forEach(function(t) { %>
+            <option value="<%= t %>" <%= typeFilter === t ? 'selected' : '' %>><%= t %></option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+
+    <% if (categories.length === 0) { %>
+      <p class="roster-empty">No library items match your search.</p>
+    <% } %>
+
+    <% categories.forEach(function(category) { %>
+      <section class="portal-dashboard-section">
+        <h2><%= category %></h2>
         <div class="roster-scroll">
           <table class="roster-table members-table condensed-table">
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Checked Out To</th>
-                <th>Checked Out</th>
-                <th>Due</th>
+                <th>Title</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <% active.forEach(function(c) { %>
+              <% itemsByType[category].forEach(function(item) { %>
                 <tr>
-                  <td class="roster-name-col"><%= c.title %></td>
-                  <td><%= c.memberName %></td>
-                  <td><%= c.checkedOutAt %></td>
-                  <td>
-                    <% if (!c.dueDateLabel) { %>
-                      &mdash;
-                    <% } else if (c.overdue) { %>
-                      <span class="badge-pill badge-pill-absent">Overdue &middot; <%= c.dueDateLabel %></span>
-                    <% } else { %>
-                      <%= c.dueDateLabel %>
-                    <% } %>
-                  </td>
+                  <td class="roster-name-col"><%= item.title %></td>
+                  <td><span class="badge-pill <%= item.checkedOut ? 'badge-pill-absent' : 'badge-pill-present' %>"><%= item.checkedOut ? 'Checked Out' : 'Available' %></span></td>
                 </tr>
               <% }); %>
             </tbody>
           </table>
         </div>
-      <% } %>
-    </section>
-
-    <section class="portal-dashboard-section">
-      <h2>Recently Returned</h2>
-      <% if (recentReturns.length === 0) { %>
-        <p class="roster-empty">No return history yet.</p>
-      <% } else { %>
-        <div class="roster-scroll">
-          <table class="roster-table members-table condensed-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Checked Out To</th>
-                <th>Returned</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% recentReturns.forEach(function(r) { %>
-                <tr>
-                  <td class="roster-name-col"><%= r.title %></td>
-                  <td><%= r.memberName %></td>
-                  <td><%= r.checkedInAt %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
-    </section>
+      </section>
+    <% }); %>
   </main>
 </body>
 </html>
