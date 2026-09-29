@@ -3,10 +3,32 @@
 <head>
   <%- include('partials/head', { title }) %>
 </head>
-<body class="public-page">
-  <%- include('partials/icon-sprite') %>
-  <main id="main-content" tabindex="-1" class="form-wrap">
-    <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+<%
+  // A real request: "Parent portal, name tag form and absence/late form
+  // should go to the kiosk form. It should just be a subpage on the
+  // parent portal, still have access to other portal pages. These forms
+  // are still the same forms with the same features." /absence is a
+  // genuinely public, no-login page (any kiosk walk-up can use it) that
+  // used to always render this plain kiosk-style shell, even for a
+  // signed-in parent browsing here from their own nav - losing their
+  // bottom tab bar and every other portal link exactly like /events used
+  // to for a signed-in parent/student before that same fix (see views/
+  // events-list.ejs's own comment). A signed-in parent now gets the real
+  // Parent Portal nav shell instead, with this exact same form inside it;
+  // a signed-out or non-parent visitor (the actual kiosk case) still gets
+  // the plain kiosk header and its own "Return to Home Screen" link.
+  const hasParentRole = portalRoles.some((r) => r.key === 'parent');
+%>
+<body<% if (!hasParentRole) { %> class="public-page"<% } %>>
+  <% if (hasParentRole) { %>
+    <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
+  <% } else { %>
+    <%- include('partials/icon-sprite') %>
+  <% } %>
+  <main id="main-content" tabindex="-1" class="form-wrap<% if (hasParentRole) { %> admin-main<% } %>">
+    <% if (!hasParentRole) { %>
+      <a href="/kiosk" class="kiosk-home"><svg class="icon"><use href="#icon-home"/></svg> Return to Home Screen</a>
+    <% } %>
     <div class="kiosk-header">
       <img class="form-logo" src="/img/logo.png" alt="Sanford Homeschoolers" />
       <h1>Absence/Late Form</h1>

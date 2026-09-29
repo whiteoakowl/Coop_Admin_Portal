@@ -8,14 +8,15 @@
 // on every real portal page - this pins that down as a permanent
 // regression test instead of a one-off manual check, covering all 69
 // Co-op Admin + Main Admin subpage links plus Parent Portal's own
-// Classes group. The two Classes subpages links that DON'T get a
-// dropdown on their own page (Name Tag Form -> /name-tag, Absence/Late
-// Form -> /absence) are a deliberate exception, same category page-
-// tabs.js's own comment already documents for a class/event/member
-// detail page: both are public, no-login, kiosk-shared self-service
-// forms (routes/absence.js's own comment: "public, no-login endpoint"),
-// never rendered inside any portal nav shell at all, kiosk touchscreen
-// or portal alike.
+// Classes group. Name Tag Form (/name-tag) and Absence/Late Form
+// (/absence) are public, no-login, kiosk-shared self-service forms
+// (routes/absence.js's own comment: "public, no-login endpoint") that
+// USED to be excluded here entirely - never rendered inside any portal
+// nav shell, kiosk touchscreen or portal alike. A later real request
+// ("should just be a subpage on the parent portal, still have access to
+// other portal pages") gave a signed-in parent the real Parent Portal
+// nav shell on these same two forms instead (see views/name-tag.ejs and
+// views/absence.ejs's own comments), so they're included below now too.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -140,10 +141,10 @@ test('Main Admin: every subpages-array link renders both an <h1> and a matching 
 
 test('Parent Portal Classes group: every real portal page in classLinks has a matching page-tabs-dialog', async () => {
   const cookie = await loginAsParent();
-  // /name-tag and /absence are deliberately excluded - see this file's own
-  // header comment (public, no-login, kiosk-shared forms outside any
-  // portal nav shell).
-  const hrefs = ['/parent/classes', '/parent/classes/dashboard', '/parent/handbook'];
+  // A real request gave /name-tag and /absence the Parent Portal nav
+  // shell too for a signed-in parent (see this file's own header
+  // comment) - no longer excluded.
+  const hrefs = ['/parent/classes', '/parent/classes/dashboard', '/parent/handbook', '/name-tag', '/absence'];
   for (const href of hrefs) {
     const res = await request(app).get(href).set('Cookie', cookie);
     assert.equal(res.status, 200, `${href} should render`);
