@@ -100,55 +100,15 @@ async function createParentWithChild() {
   return { cookie, csrfToken: extractCsrf(homePage.text), childId: childInfo.lastInsertRowid };
 }
 
-test('View/Cancel Classes: list view groups by family member, and toolbar has Print/Export/Print Name Tag', async () => {
-  const admin = await loginAsAdmin();
-  const cls = await createClass(admin, { className: 'Toolbar Class' });
-  const parent = await createParentWithChild();
-
-  await request(app)
-    .post(`/parent/classes/${cls.id}/register`)
-    .set('Cookie', parent.cookie)
-    .type('form')
-    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
-
-  const manage = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
-  assert.equal(manage.status, 200);
-  assert.match(manage.text, /manage-classes-group-header">Dashboard Child \d+</);
-  assert.match(manage.text, /href="\/parent\/classes\/manage\/print"/);
-  assert.match(manage.text, /href="\/parent\/classes\/manage\/export\.csv"/);
-  assert.match(manage.text, /href="\/parent\/name-tags">Print Name Tag/);
-});
-
-// A real request: "viewing class schedule for family or person student,
-// classes should be categorized as Monday or Wednesday and in time
-// order" - within one child's own block, entries used to sort
-// alphabetically by class name; now Monday sorts before Wednesday, and
-// within a day by hour_position (actual time slot).
-test('View/Cancel Classes: within one child\'s block, entries sort Monday-then-Wednesday and by time, not alphabetically', async () => {
-  const admin = await loginAsAdmin();
-  const wednesdayClass = await createClass(admin, { className: 'A Wednesday Entry', day: 'wednesday', hourPosition: '1' });
-  const mondayLater = await createClass(admin, { className: 'B Monday Later', day: 'monday', hourPosition: '2' });
-  const mondayEarlier = await createClass(admin, { className: 'C Monday Earlier', day: 'monday', hourPosition: '1' });
-  const parent = await createParentWithChild();
-
-  for (const cls of [wednesdayClass, mondayLater, mondayEarlier]) {
-    await request(app)
-      .post(`/parent/classes/${cls.id}/register`)
-      .set('Cookie', parent.cookie)
-      .type('form')
-      .send({ studentId: String(parent.childId), day: cls.day, _csrf: parent.csrfToken });
-  }
-
-  const manage = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
-  const iEarlier = manage.text.indexOf('C Monday Earlier');
-  const iLater = manage.text.indexOf('B Monday Later');
-  const iWed = manage.text.indexOf('A Wednesday Entry');
-  assert.ok(iEarlier > 0 && iLater > 0 && iWed > 0, 'all three classes should render');
-  assert.ok(iEarlier < iLater, 'the earlier Monday hour_position should render before the later one, despite its name sorting after alphabetically');
-  assert.ok(iLater < iWed, 'Monday entries should render before Wednesday entries, despite the Wednesday class name sorting first alphabetically');
-});
-
-test('View/Cancel Classes: fetch-style cancel (X-Requested-With) returns JSON instead of redirecting, and actually cancels', async () => {
+// A real request ("Remove view/cancel class page. You can now cancel the
+// class on the classroom dashboard with the new feature described
+// above") removed the whole "View/Cancel Classes" page and its own
+// Print/Export/sort-order/CSV coverage that used to live here -
+// /parent/classes/:id/unregister itself is still very much alive though
+// (the Classroom Dashboard's own Delete button, and the Class
+// Registration day grid's fragment popup Cancel form, both still call
+// it), so its fetch-vs-redirect JSON contract is still covered below.
+test('Classroom Dashboard Delete: fetch-style cancel (X-Requested-With) returns JSON instead of redirecting, and actually cancels', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Instant Delete Class' });
   const parent = await createParentWithChild();
@@ -159,8 +119,8 @@ test('View/Cancel Classes: fetch-style cancel (X-Requested-With) returns JSON in
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
 
-  const manage = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
-  const csrf = extractCsrf(manage.text);
+  const dashboard = await request(app).get(`/parent/classes/dashboard?studentId=${parent.childId}`).set('Cookie', parent.cookie);
+  const csrf = extractCsrf(dashboard.text);
 
   const res = await request(app)
     .post(`/parent/classes/${cls.id}/unregister`)
@@ -168,7 +128,7 @@ test('View/Cancel Classes: fetch-style cancel (X-Requested-With) returns JSON in
     .set('X-Requested-With', 'fetch')
     .set('X-CSRF-Token', csrf)
     .type('form')
-    .send({ studentId: String(parent.childId), day: 'monday' });
+    .send({ studentId: String(parent.childId) });
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { ok: true });
@@ -178,7 +138,7 @@ test('View/Cancel Classes: fetch-style cancel (X-Requested-With) returns JSON in
   assert.equal(enrollment, undefined);
 });
 
-test('View/Cancel Classes: fetch-style cancel for someone else\'s child is rejected with JSON, not a redirect', async () => {
+test('Classroom Dashboard Delete: fetch-style cancel for someone else\'s child is rejected with JSON, not a redirect', async () => {
   const admin = await loginAsAdmin();
   const cls = await createClass(admin, { className: 'Guard Rail Class' });
   const parentA = await createParentWithChild();
@@ -196,29 +156,12 @@ test('View/Cancel Classes: fetch-style cancel for someone else\'s child is rejec
     .set('X-Requested-With', 'fetch')
     .set('X-CSRF-Token', parentB.csrfToken)
     .type('form')
-    .send({ studentId: String(parentA.childId), day: 'monday' });
+    .send({ studentId: String(parentA.childId) });
 
   assert.equal(res.status, 403);
   assert.ok(res.body.error);
   const stillEnrolled = await db.prepare('SELECT * FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(cls.id, parentA.childId);
   assert.ok(stillEnrolled, 'parent A\'s child should still be enrolled');
-});
-
-test('View/Cancel Classes: export.csv lists each family member\'s class and status', async () => {
-  const admin = await loginAsAdmin();
-  const cls = await createClass(admin, { className: 'Export Class' });
-  const parent = await createParentWithChild();
-  await request(app)
-    .post(`/parent/classes/${cls.id}/register`)
-    .set('Cookie', parent.cookie)
-    .type('form')
-    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
-
-  const csv = await request(app).get('/parent/classes/manage/export.csv').set('Cookie', parent.cookie);
-  assert.equal(csv.status, 200);
-  assert.match(csv.headers['content-type'], /text\/csv/);
-  assert.match(csv.text, /Export Class/);
-  assert.match(csv.text, /Registered/);
 });
 
 test('Class Dashboard: family-member dropdown, and classes grouped Monday-first then Wednesday', async () => {

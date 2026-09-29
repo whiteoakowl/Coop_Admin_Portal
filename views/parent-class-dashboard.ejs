@@ -7,7 +7,8 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <h1>Class Dashboard</h1>
+    <h1>Classroom Dashboard</h1>
+    <div id="classroom-dashboard-status" class="alert alert-error no-print" hidden></div>
 
     <% if (children.length === 0 && parents.length === 0) { %>
       <p class="roster-empty">No family members are linked to your account yet. Contact an admin if this looks wrong.</p>
@@ -78,5 +79,6 @@
       <% } %>
     <% } %>
   </main>
+  <script src="/js/classroom-dashboard-withdraw.js"></script>
 </body>
 </html>

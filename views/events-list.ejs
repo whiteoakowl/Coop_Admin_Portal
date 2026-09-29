@@ -28,11 +28,27 @@
   // same as before.
   const hasStudentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'student');
   const hasParentRole = typeof portalRoles !== 'undefined' && portalRoles.some((r) => r.key === 'parent');
-  const usesPortalNavShell = hasStudentRole || hasParentRole;
+  // A real bug report: "on the parent portal when you click on browse
+  // events it switches to student portal. It should stay in parent
+  // portal." A dual-role account (student AND parent) used to always
+  // land here as Student Portal - portal-nav.ejs's own Parent/Student
+  // nav links now tag their /events links with ?portal=parent|student
+  // (routes/events.js's own portalParam) so this renders the nav shell
+  // the visitor actually clicked from; falls back to the old guess
+  // (Student, then Parent) only when that param is missing entirely -
+  // e.g. a bookmarked/typed-in-by-hand /events URL.
+  const requestedPortal = typeof portalParam !== 'undefined' ? portalParam : null;
+  let effectivePortal = null;
+  if (requestedPortal === 'parent' && hasParentRole) effectivePortal = 'parent';
+  else if (requestedPortal === 'student' && hasStudentRole) effectivePortal = 'student';
+  else if (hasStudentRole) effectivePortal = 'student';
+  else if (hasParentRole) effectivePortal = 'parent';
+  const usesPortalNavShell = effectivePortal !== null;
+  const portalQuerySuffix = effectivePortal ? `&portal=${effectivePortal}` : '';
   %>
-  <% if (hasStudentRole) { %>
+  <% if (effectivePortal === 'student') { %>
     <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
-  <% } else if (hasParentRole) { %>
+  <% } else if (effectivePortal === 'parent') { %>
     <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
@@ -56,14 +72,13 @@
   <main id="main-content" tabindex="-1"<% if (usesPortalNavShell) { %> class="admin-main"<% } %>>
     <section class="site-section">
       <div class="site-section-inner">
-        <h1>Events</h1>
-        <p>Upcoming co-op events, fundraisers, and get-togethers.</p>
+        <h1><%= effectivePortal === 'parent' ? 'Event Calendar' : 'Events' %></h1>
 
         <div class="roster-toolbar no-print">
           <div class="roster-btn-row">
             <div class="class-schedule-view-toggle" role="group" aria-label="List or calendar view">
-              <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/events?view=list" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
-              <a class="icon-btn<%= view === 'calendar' ? ' icon-btn-active' : '' %>" href="/events?view=calendar" aria-pressed="<%= view === 'calendar' %>" aria-label="Calendar view" title="Calendar view"><svg class="icon"><use href="#icon-calendar-check"/></svg></a>
+              <a class="icon-btn<%= view === 'list' ? ' icon-btn-active' : '' %>" href="/events?view=list<%= portalQuerySuffix %>" aria-pressed="<%= view === 'list' %>" aria-label="List view" title="List view"><svg class="icon"><use href="#icon-clipboard-list"/></svg></a>
+              <a class="icon-btn<%= view === 'calendar' ? ' icon-btn-active' : '' %>" href="/events?view=calendar<%= portalQuerySuffix %>" aria-pressed="<%= view === 'calendar' %>" aria-label="Calendar view" title="Calendar view"><svg class="icon"><use href="#icon-calendar-check"/></svg></a>
             </div>
             <a class="roster-action-btn print-action-btn" href="/events/print" target="_blank">Print</a>
             <% if (typeof portalAccount !== 'undefined' && portalAccount) { %>
@@ -72,14 +87,22 @@
           </div>
         </div>
 
-        <% if (events.length === 0) { %>
-          <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
-        <% } else if (view === 'calendar') { %>
+        <%# A real bug report: "the event calendar should show regardless
+            if there are events on the calendar or not" - calendar view
+            used to be skipped entirely (an empty-state message shown
+            instead) whenever there were zero upcoming events, same as
+            list view. Calendar view now always renders the grid (an
+            empty month reads the same way an empty list view does - see
+            partials/event-calendar-grid's own empty-day cells), and only
+            list view falls back to the empty-state message. %>
+        <% if (view === 'calendar') { %>
           <%- include('partials/event-calendar-grid', {
             calendar: calendar,
-            monthLinkBase: '/events?view=calendar',
+            monthLinkBase: `/events?view=calendar${portalQuerySuffix}`,
             eventHref: function (e) { return `/events/${e.id}`; },
           }) %>
+        <% } else if (events.length === 0) { %>
+          <p class="roster-empty">No upcoming events right now &mdash; check back soon.</p>
         <% } else { %>
           <div class="event-card-grid">
             <% events.forEach(function(e) { %>

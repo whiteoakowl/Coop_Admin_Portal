@@ -3,15 +3,19 @@
 // classImageUrl field), selectedChild (null when the dashboard is
 // showing a parent's own teaching/assisting classes instead of a
 // child's enrolled ones - see views/parent-class-dashboard.ejs). A real
-// request: "Class card should show Class image on left of card." A
-// child's card still links into the shared read-only class detail page
-// (routes/parent-portal.js's own /classes/dashboard/:id, which requires
-// a child's own enrollment); a parent's teaching card has nowhere to
-// click through to yet (that route is student-enrollment-only), so it
-// renders as a plain, non-linking card instead.
-var cardTag = selectedChild ? 'a' : 'div';
+// request: "Class card should show Class image on left of card."
+//
+// A later real request ("all classes should have a delete button and
+// view class button on each row to the right... you can now cancel the
+// class on the classroom dashboard") replaced the whole-card link with
+// explicit View Class / Delete buttons - the card body itself is no
+// longer clickable, since Delete needed its own separate click target
+// right next to View Class rather than living inside one. A parent's
+// teaching card has nowhere to click through to at all yet (that detail
+// route is student-enrollment-only) and isn't a registration to
+// withdraw from either, so it still renders with no action row.
 %>
-<<%= cardTag %> class="class-dash-card"<% if (selectedChild) { %> href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>"<% } %>>
+<div class="class-dash-card">
   <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
   <div class="class-dash-card-body">
     <% if (c.classImageUrl) { %>
@@ -26,4 +30,16 @@ var cardTag = selectedChild ? 'a' : 'div';
       <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
     </div>
   </div>
-</<%= cardTag %>>
+  <% if (selectedChild) { %>
+    <div class="class-dash-card-actions">
+      <a class="roster-action-btn" href="/parent/classes/dashboard/<%= c.id %>?studentId=<%= selectedChild.id %>">View Class</a>
+      <button
+        type="button"
+        class="roster-action-btn roster-action-btn-danger"
+        data-withdraw-class-btn
+        data-withdraw-class-url="/parent/classes/<%= c.id %>/unregister"
+        data-withdraw-student-id="<%= selectedChild.id %>"
+      >Delete</button>
+    </div>
+  <% } %>
+</div>

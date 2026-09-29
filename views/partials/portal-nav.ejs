@@ -167,14 +167,13 @@ const MAIN_ADMIN_NAV_LINKS = [
 // /documents/<token> view rather than duplicating its file-serving code).
 const PARENT_NAV_LINKS = [
   { href: '/parent', icon: 'home', label: 'Home' },
-  { href: '/events', icon: 'calendar-check', label: 'Events', subpages: [
-    { href: '/events', label: 'Browse Events' },
+  { href: '/events?portal=parent', icon: 'calendar-check', label: 'Events', subpages: [
+    { href: '/events?portal=parent', label: 'Event Calendar' },
     { href: '/parent/events', label: 'My Event Registrations' },
   ] },
   { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
     { href: '/parent/classes', label: 'Class Registration' },
-    { href: '/parent/classes/manage', label: 'View/Cancel Classes' },
-    { href: '/parent/classes/dashboard', label: 'Class Dashboard' },
+    { href: '/parent/classes/dashboard', label: 'Classroom Dashboard' },
     { href: '/name-tag', label: 'Name Tag Form' },
     { href: '/absence', label: 'Absence/Late Form' },
     { href: '/parent/handbook', label: 'Policy Handbook' },
@@ -207,8 +206,8 @@ const PARENT_NAV_LINKS = [
 // a standing tab - not in the requested list).
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
-  { href: '/events?view=calendar', icon: 'calendar-check', label: 'Calendar', subpages: [
-    { href: '/events?view=calendar', label: 'Calendar' },
+  { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Calendar', subpages: [
+    { href: '/events?view=calendar&portal=student', label: 'Calendar' },
     { href: '/student/events', label: 'My Event Registrations' },
   ] },
   { href: '/forums', icon: 'users', label: 'Chat' },

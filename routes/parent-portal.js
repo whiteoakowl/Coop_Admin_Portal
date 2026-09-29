@@ -27,7 +27,6 @@ const {
   attendanceHistoryForRoster,
   GRADE_LEVELS,
 } = require('../utils/classSchedule');
-const { sendCsv, toCsvRow } = require('../utils/spreadsheet');
 const { getHandbookHtml } = require('../utils/membershipHandbook');
 const { getTemplate, badgeDataForMembers } = require('../utils/nameTagData');
 const { BADGE_WIDTH, BADGE_HEIGHT } = require('../utils/nameTagBadge');
@@ -56,6 +55,8 @@ const babysitters = require('../utils/babysitters');
 const { imageFileFilter } = require('../utils/uploads');
 const { createStorageClient, uploadFile, generateKey } = require('../utils/storage');
 const reading = require('../utils/reading');
+const businessDirectory = require('../utils/directory');
+const classifieds = require('../utils/classifieds');
 
 router.use(requirePortalAuth, requirePortal('parent'));
 
@@ -141,8 +142,31 @@ router.get('/', async (req, res) => {
         )
         .all(...childIds)
     : [];
-  const countByStudentId = new Map(countsByStudent.map((r) => [r.student_id, Number(r.c)]));
-  const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(c.id) || 0 }));
+  const countByStudentId = new Map(countsByStudent.map((r) => [Number(r.student_id), Number(r.c)]));
+  const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(Number(c.id)) || 0 }));
+
+  // A real request: "Take off the my family card and replace it with
+  // upcoming events from the event calendar" - same visibility rules as
+  // the shared /events calendar itself (routes/events.js), just capped to
+  // a handful for the homepage card.
+  const family = await familyForAccount(req.portalAccount.id);
+  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
+  const visibilityFlags = await Promise.all(upcoming.map((e) => events.eventVisibleToFamily(e.id, family)));
+  const upcomingEvents = upcoming
+    .filter((e, i) => visibilityFlags[i])
+    .slice(0, 3)
+    .map((e) => ({ title: e.title, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+
+  // A real request: "card showing business directory listing. And a card
+  // showing classifieds listings" - a small preview of each, same
+  // 'active' status the /directory and /classifieds pages themselves use.
+  const businessDirectoryListings = (await businessDirectory.listListings({ status: 'active' })).slice(0, 4);
+  const classifiedsListings = (await classifieds.listListings({ status: 'active' })).slice(0, 4);
+
+  // A real request: "card showing the rankings for Parent reading
+  // challenge" - same leaderboard /parent/leaderboard already renders,
+  // scoped to memberType 'parent' (utils/reading.js).
+  const readingLeaders = await reading.leaderboard(5, 'parent');
 
   res.render('parent-home', {
     title: 'Parent Portal',
@@ -150,21 +174,20 @@ router.get('/', async (req, res) => {
     children,
     announcements,
     registrationCountsByChild,
+    upcomingEvents,
+    businessDirectoryListings,
+    classifiedsListings,
+    readingLeaders,
   });
 });
 
 // Redirect target for the register/unregister POSTs below - back to the
 // day grid the dialog was opened from, so registering/cancelling from
 // inside the popup lands the parent right back where they were instead
-// of resetting to Monday. A real request: "manage class button on the
-// parent portal homepage should go to the manage classes page" - Manage
-// Classes' own Cancel forms send returnTo=manage so an unregister from
-// THAT page comes back to it instead of the day grid. Returns a URL
-// already ending in `?` or `&` so a caller can always just tack
-// `error=`/`notice=` straight on, regardless of whether a `day` param
-// made it in.
-function classesBackUrl(day, returnTo) {
-  if (returnTo === 'manage') return '/parent/classes/manage?';
+// of resetting to Monday. Returns a URL already ending in `?` or `&` so a
+// caller can always just tack `error=`/`notice=` straight on, regardless
+// of whether a `day` param made it in.
+function classesBackUrl(day) {
   return isValidDay(day) ? `/parent/classes?day=${day}&` : '/parent/classes?';
 }
 
@@ -323,11 +346,12 @@ router.post('/classes/:id/register', async (req, res) => {
   res.redirect(back + 'notice=' + encodeURIComponent(result.notice));
 });
 
-// A fetch() caller (public/js/parent-manage-classes.js's instant-delete
-// trash button) gets JSON back instead of a redirect, so cancelling a
-// class from the list view never navigates the page - same isFetch
-// convention routes/main-admin-members.js and routes/admin-members.js
-// already use for their own no-reload row actions.
+// A fetch() caller (public/js/classroom-dashboard-withdraw.js's instant-
+// delete Delete button) gets JSON back instead of a redirect, so
+// withdrawing from a class on the Classroom Dashboard never navigates the
+// page - same isFetch convention routes/main-admin-members.js and
+// routes/admin-members.js already use for their own no-reload row
+// actions.
 function isFetch(req) {
   return req.get('X-Requested-With') === 'fetch';
 }
@@ -335,7 +359,7 @@ function isFetch(req) {
 router.post('/classes/:id/unregister', async (req, res) => {
   const classId = parseInt(req.params.id, 10);
   const studentId = parseInt(req.body.studentId, 10);
-  const back = classesBackUrl(req.body.day, req.body.returnTo);
+  const back = classesBackUrl(req.body.day);
 
   const children = await childrenForAccount(req.portalAccount);
   if (!children.some((c) => c.id === studentId)) {
@@ -353,77 +377,12 @@ router.post('/classes/:id/unregister', async (req, res) => {
   res.redirect(back + 'notice=' + encodeURIComponent('Registration cancelled.'));
 });
 
-const DAY_SORT_ORDER = { monday: 0, wednesday: 1 };
-
-// Every class a child in the family is enrolled in or waitlisted for -
-// shared by the list-view page below and its Print/Export toolbar buttons
-// so all three always agree on exactly the same rows.
-async function manageClassesEntriesForAccount(account) {
-  const children = await childrenForAccount(account);
-  const allClasses = await allClassesList(null);
-  const classById = new Map(allClasses.map((c) => [c.id, c]));
-
-  const entries = [];
-  for (const child of children) {
-    const enrolledRows = await db.prepare('SELECT class_id FROM class_enrollments WHERE student_id = ?').all(child.id);
-    for (const row of enrolledRows) {
-      const cls = classById.get(row.class_id);
-      if (cls) entries.push({ child, cls, waitlistPosition: null });
-    }
-    const waitlistRows = await db.prepare("SELECT class_id, waitlist_position FROM class_registrations WHERE student_id = ? AND status = 'waitlisted'").all(child.id);
-    for (const row of waitlistRows) {
-      const cls = classById.get(row.class_id);
-      if (cls) entries.push({ child, cls, waitlistPosition: row.waitlist_position });
-    }
-  }
-  // A real request: "viewing class schedule for family or person student,
-  // classes should be categorized as Monday or Wednesday and in time
-  // order" - grouped by family member first (unchanged), then by day
-  // (Monday before Wednesday), then by the class's own hour_position
-  // (its actual time slot) rather than alphabetically by class name.
-  entries.sort(
-    (a, b) =>
-      a.child.name.localeCompare(b.child.name) ||
-      DAY_SORT_ORDER[a.cls.day] - DAY_SORT_ORDER[b.cls.day] ||
-      a.cls.hour_position - b.cls.hour_position
-  );
-  return { children, entries };
-}
-
-// A real request: "when parents click on class tab it should have the
-// following subpages. Class registration, Manage Classes, name tag
-// request, absence/late form, Policy Handbook. That manage class button
-// on the parent portal homepage should go to the manage classes page."
-// Distinct from /classes above (browsing/registering for NEW classes,
-// "Class Registration") - this is a read-focused view of every class a
-// child is already enrolled in or waitlisted for, across the WHOLE
-// family (unlike Student Portal's own single-student "My Classes"), with
-// a Cancel action per row. A later real request relabeled the subpage
-// itself "View/Cancel Classes" and asked for a list view (grouped by
-// family member) instead of the original card grid, plus a Print/Export/
-// Print Name Tag toolbar and a click-through to each class's own read-
-// only Class Dashboard (see /classes/dashboard below).
-router.get('/classes/manage', async (req, res) => {
-  const { children, entries } = await manageClassesEntriesForAccount(req.portalAccount);
-  res.render('parent-manage-classes', {
-    title: 'View/Cancel Classes',
-    hasChildren: children.length > 0,
-    entries,
-    error: req.query.error || null,
-    notice: req.query.notice || null,
-  });
-});
-
-router.get('/classes/manage/print', async (req, res) => {
-  const { children, entries } = await manageClassesEntriesForAccount(req.portalAccount);
-  res.render('parent-manage-classes-print', { title: 'View/Cancel Classes', hasChildren: children.length > 0, entries });
-});
-
 // A real request: "Registration is added to event registration log on
-// parent and student portals" - the family-wide equivalent of View/Cancel
-// Classes above, but for event registrations (utils/events.js's own
-// eventRegistrationsForMembers), reachable as a subpage of the existing
-// Events nav link (views/partials/portal-nav.ejs's PARENT_NAV_LINKS).
+// parent and student portals" - the family-wide equivalent of the
+// Classroom Dashboard's own per-class enrollment view, but for event
+// registrations (utils/events.js's own eventRegistrationsForMembers),
+// reachable as a subpage of the existing Events nav link (views/
+// partials/portal-nav.ejs's PARENT_NAV_LINKS).
 router.get('/events', async (req, res) => {
   const family = await familyForAccount(req.portalAccount.id);
   const registrations = await events.eventRegistrationsForMembers(family.map((m) => m.id));
@@ -440,24 +399,6 @@ router.get('/events', async (req, res) => {
     error: req.query.error || null,
     notice: req.query.notice || null,
   });
-});
-
-router.get('/classes/manage/export.csv', async (req, res) => {
-  const { entries } = await manageClassesEntriesForAccount(req.portalAccount);
-  const lines = [toCsvRow(['Family Member', 'Class', 'Day', 'Time', 'Teacher', 'Status'])];
-  entries.forEach((e) => {
-    lines.push(
-      toCsvRow([
-        e.child.name,
-        e.cls.class_name,
-        e.cls.dayLabel,
-        e.cls.timeLabel,
-        e.cls.teacherNames.join(', '),
-        e.waitlistPosition != null ? `Waitlisted (#${e.waitlistPosition})` : 'Registered',
-      ])
-    );
-  });
-  sendCsv(res, 'my-classes.csv', lines);
 });
 
 // Every class one specific child is actually enrolled in (not waitlisted

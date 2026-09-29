@@ -100,7 +100,7 @@ test('Parent Portal homepage shows class registration counts broken down per chi
 
   const page = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(page.status, 200);
-  assert.match(page.text, /First Child: <strong>2<\/strong> classes/);
-  assert.match(page.text, /Second Child: <strong>1<\/strong> class</);
-  assert.match(page.text, /href="\/parent\/classes">Browse Classes<\/a>/);
+  assert.match(page.text, /First Child: <span class="badge-pill badge-pill-blue">2 classes<\/span>/);
+  assert.match(page.text, /Second Child: <span class="badge-pill badge-pill-blue">1 class<\/span>/);
+  assert.match(page.text, /href="\/parent\/classes\/dashboard">Classroom Dashboard<\/a>/);
 });

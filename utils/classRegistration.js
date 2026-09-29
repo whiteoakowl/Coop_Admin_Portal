@@ -247,6 +247,18 @@ async function unregisterFromClass({ classId, studentId, accountId }) {
   if (registration && registration.charge_id) {
     await settleChargeOnCancel(registration.charge_id, accountId, settings.autoCreditOnParentOrSystemRemoval);
   }
+  // A real request: "If they confirm Cancel class, this will automatically
+  // send a notification to request a name tag reprint" - dropping a class
+  // changes what schedule prints on that student's name tag, so it goes
+  // straight into the same name_tag_requests queue Main Admin already
+  // works from (routes/name-tag.js), same 'schedule_change' request type a
+  // member filing the Name Tag Form by hand for this exact reason would
+  // pick themselves.
+  if (registration && cls) {
+    await db
+      .prepare('INSERT INTO name_tag_requests (member_id, request_type, day, description) VALUES (?, ?, ?, ?)')
+      .run(studentId, 'schedule_change', cls.day, `Cancelled registration for "${cls.class_name}" - schedule may need to be reprinted.`);
+  }
   if (promoted) {
     await notifications.notify(promoted.accountId, 'class_waitlist_promoted', {
       title: `Off the waitlist: ${cls.class_name}`,

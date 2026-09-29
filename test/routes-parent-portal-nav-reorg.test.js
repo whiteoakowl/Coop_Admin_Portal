@@ -74,9 +74,13 @@ test('Parent Portal nav is one flat list in the exact requested order, no separa
   assert.doesNotMatch(res.text, /class="portal-nav-title">Co-op Classes</);
   assert.doesNotMatch(res.text, /class="portal-nav-title">Community</);
 
-  // Achievements/Leaderboard dropped as standing nav tabs.
-  assert.doesNotMatch(res.text, /href="\/parent\/achievements"/);
-  assert.doesNotMatch(res.text, /href="\/parent\/leaderboard"/);
+  // Achievements/Leaderboard dropped as standing nav tabs - scoped to the
+  // nav itself, not the whole page: a later real request ("should have a
+  // card showing the rankings for Parent reading challenge") added a
+  // legitimate /parent/leaderboard link to the homepage's own Parent
+  // Reading Challenge card, outside this nav entirely.
+  assert.doesNotMatch(navSection, /href="\/parent\/achievements"/);
+  assert.doesNotMatch(navSection, /href="\/parent\/leaderboard"/);
 });
 
 test('Achievements and Leaderboard are buttons on the Reading Challenge page', async () => {

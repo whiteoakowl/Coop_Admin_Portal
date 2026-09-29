@@ -7,35 +7,44 @@
   <%- include('partials/portal-nav', { portalTitle: 'Parent Portal' }) %>
 
   <main id="main-content" tabindex="-1" class="admin-main">
-    <p class="subtitle"><a href="/parent/classes/dashboard?studentId=<%= selectedChild.id %>">&larr; Class Dashboard</a></p>
+    <p class="subtitle"><a href="/parent/classes/dashboard?studentId=<%= selectedChild.id %>">&larr; Classroom Dashboard</a></p>
     <h1><%= cls.class_name %></h1>
     <p class="hint">
       Viewing for <strong><%= selectedChild.name %></strong> &middot;
       <%= cls.dayLabel %> &middot; <%= cls.timeLabel %>
       <% if (cls.room) { %> &middot; <%= cls.room %><% } %>
-      <% if (cls.teacherNames.length) { %> &middot; <%= cls.teacherNames.join(', ') %><% } %>
     </p>
-    <% if (cls.description) { %><div class="hint forum-editable-display"><%- cls.description %></div><% } %>
 
     <div class="view-tabs no-print">
       <a class="view-tab<%= tab === 'details' ? ' active' : '' %>" href="?tab=details&studentId=<%= selectedChild.id %>">Details</a>
       <a class="view-tab<%= tab === 'assignments' ? ' active' : '' %>" href="?tab=assignments&studentId=<%= selectedChild.id %>">Assignments</a>
-      <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades&studentId=<%= selectedChild.id %>">Grades</a>
       <a class="view-tab<%= tab === 'lessons' ? ' active' : '' %>" href="?tab=lessons&studentId=<%= selectedChild.id %>">Lessons</a>
       <a class="view-tab<%= tab === 'attendance' ? ' active' : '' %>" href="?tab=attendance&studentId=<%= selectedChild.id %>">Attendance</a>
       <% if (cls.allow_parent_chat) { %>
         <a class="view-tab<%= tab === 'chat' ? ' active' : '' %>" href="?tab=chat&studentId=<%= selectedChild.id %>">Chat</a>
       <% } %>
+      <a class="view-tab<%= tab === 'grades' ? ' active' : '' %>" href="?tab=grades&studentId=<%= selectedChild.id %>">Grades</a>
     </div>
 
     <div class="view-tab-panel">
       <% if (tab === 'details') { %>
         <%# A real request: "Details should have teachers, assistants,
             room number, start and end dates, start and end time, day of
-            the week, class description, supply list." Teacher(s), room,
-            day, time, and description already show in the page header
-            above these tabs - the rest lives here. %>
+            the week, class description, supply list." Room, day, and time
+            show in the page header above these tabs - the rest lives here.
+            A later real request moved the description down here too (it
+            used to sit in that same header) and added Teacher(s)/Cost per
+            Student, which weren't broken out as their own Details rows
+            before. %>
+        <p><strong>Teacher(s):</strong> <%= cls.teacherNames.length ? cls.teacherNames.join(', ') : 'None assigned' %></p>
         <p><strong>Assistant(s):</strong> <%= cls.assistantNames && cls.assistantNames.length ? cls.assistantNames.join(', ') : 'None assigned' %></p>
+        <% if (cls.price_cents != null) { %>
+          <p><strong>Cost per Student:</strong> $<%= (cls.price_cents / 100).toFixed(2) %></p>
+        <% } %>
+        <% if (cls.description) { %>
+          <p><strong>Description:</strong></p>
+          <div class="hint forum-editable-display"><%- cls.description %></div>
+        <% } %>
         <p><strong>Start Date:</strong> <%= cls.start_date || 'Not set' %></p>
         <p><strong>End Date:</strong> <%= cls.end_date || 'Not set' %></p>
         <p><strong>Grade/Age:</strong> <%= cls.gradeLabel || 'Not set' %></p>

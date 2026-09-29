@@ -30,18 +30,20 @@
     </section>
 
     <div class="portal-dashboard-grid">
+      <%# A real request: "Take off the my family card and replace it with
+          upcoming events from the event calendar." %>
       <section class="portal-dashboard-card">
-        <h2>My Family</h2>
-        <% if (children.length === 0) { %>
-          <p class="roster-empty">No students linked to your family yet. Contact an admin if this looks wrong.</p>
+        <h2>Upcoming Events</h2>
+        <% if (upcomingEvents.length === 0) { %>
+          <p class="roster-empty">No upcoming events right now.</p>
         <% } else { %>
           <ul class="portal-dashboard-list">
-            <% children.forEach(function(c) { %>
-              <li><%= c.name %><% if (c.grade_level) { %> <span class="hint">&middot; <%= c.grade_level %></span><% } %></li>
+            <% upcomingEvents.forEach(function(e) { %>
+              <li><%= e.title %> <span class="hint">&middot; <%= e.startsLabel %></span></li>
             <% }); %>
           </ul>
         <% } %>
-        <a class="roster-action-btn" href="/parent/classes/manage">Manage Class Registration</a>
+        <a class="roster-action-btn" href="/events">View Event Calendar</a>
       </section>
 
       <section class="portal-dashboard-card">
@@ -54,11 +56,11 @@
         <% } else { %>
           <ul class="portal-dashboard-list">
             <% registrationCountsByChild.forEach(function(c) { %>
-              <li><%= c.name %>: <strong><%= c.count %></strong> class<%= c.count === 1 ? '' : 'es' %></li>
+              <li><%= c.name %>: <span class="badge-pill badge-pill-blue"><%= c.count %> class<%= c.count === 1 ? '' : 'es' %></span></li>
             <% }); %>
           </ul>
         <% } %>
-        <a class="roster-action-btn" href="/parent/classes">Browse Classes</a>
+        <a class="roster-action-btn" href="/parent/classes/dashboard">Classroom Dashboard</a>
       </section>
 
       <section class="portal-dashboard-card">
@@ -75,8 +77,55 @@
           real signup action, not just a link to a form. %>
       <section class="portal-dashboard-card">
         <h2>Committees</h2>
-        <p class="hint">Volunteer for a committee position to help run the co-op.</p>
+        <p class="hint">Signup for a Committee and help us create fun events for the group!</p>
         <a class="roster-action-btn" href="/committees">Committee Sign Up</a>
+      </section>
+
+      <%# A real request: "should have a card showing the rankings for
+          Parent reading challenge" - same leaderboard /parent/leaderboard
+          already renders, scoped to parents. %>
+      <section class="portal-dashboard-card">
+        <h2>Parent Reading Challenge</h2>
+        <% if (readingLeaders.length === 0) { %>
+          <p class="roster-empty">No reading hours logged yet.</p>
+        <% } else { %>
+          <ul class="portal-dashboard-list">
+            <% readingLeaders.forEach(function(l) { %>
+              <li>#<%= l.rank %> <%= l.name %> <span class="hint">&middot; <%= l.hours %> hrs</span></li>
+            <% }); %>
+          </ul>
+        <% } %>
+        <a class="roster-action-btn" href="/parent/leaderboard">View Reading Challenge</a>
+      </section>
+
+      <%# A real request: "a card showing business directory listing." %>
+      <section class="portal-dashboard-card">
+        <h2>Business Directory</h2>
+        <% if (businessDirectoryListings.length === 0) { %>
+          <p class="roster-empty">No business listings yet.</p>
+        <% } else { %>
+          <ul class="portal-dashboard-list">
+            <% businessDirectoryListings.forEach(function(l) { %>
+              <li><%= l.business_name %></li>
+            <% }); %>
+          </ul>
+        <% } %>
+        <a class="roster-action-btn" href="/directory">View Business Directory</a>
+      </section>
+
+      <%# A real request: "a card showing classifieds listings." %>
+      <section class="portal-dashboard-card">
+        <h2>Classifieds</h2>
+        <% if (classifiedsListings.length === 0) { %>
+          <p class="roster-empty">No classifieds listings yet.</p>
+        <% } else { %>
+          <ul class="portal-dashboard-list">
+            <% classifiedsListings.forEach(function(l) { %>
+              <li><%= l.title %></li>
+            <% }); %>
+          </ul>
+        <% } %>
+        <a class="roster-action-btn" href="/classifieds">View Classifieds</a>
       </section>
     </div>
   </main>

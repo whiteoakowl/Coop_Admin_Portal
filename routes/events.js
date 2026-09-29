@@ -41,10 +41,20 @@ router.get('/', async (req, res) => {
   const eventSettings = await events.getEventSettings();
   const view = req.query.view ? (req.query.view === 'calendar' ? 'calendar' : 'list') : eventSettings.default_calendar_view;
   const mapped = visible.map((e) => ({ ...withImageUrl(e), startsLabel: formatFriendlyTimestamp(e.starts_at) }));
+  // A real bug report: "on the parent portal when you click on browse
+  // events it switches to student portal. It should stay in parent
+  // portal." This page is shared across every portal (see events-list.ejs's
+  // own comment), so for a dual-role account it used to always guess
+  // Student first with no way to say otherwise. portal-nav.ejs's own
+  // Parent/Student nav links now tag their /events links with ?portal=
+  // parent|student so the page renders the nav shell the visitor actually
+  // clicked from instead of guessing from their full role list.
+  const portalParam = req.query.portal === 'student' || req.query.portal === 'parent' ? req.query.portal : null;
   res.render('events-list', {
     title: 'Events',
     settings,
     view,
+    portalParam,
     events: mapped,
     calendar: view === 'calendar' ? events.monthGrid(req.query.month, mapped) : null,
   });

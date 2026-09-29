@@ -3,8 +3,12 @@
 //    to the class schedule/registration page. When parents click on
 //    class tab it should have the following subpages. Class
 //    registration, Manage Classes, name tag request, absence/late form,
-//    Policy Handbook. That manage class button on the parent portal
-//    homepage should go to the manage classes page."
+//    Policy Handbook." A later real request ("Remove view/cancel class
+//    page. You can now cancel the class on the classroom dashboard")
+//    removed the "Manage Classes"/"View/Cancel Classes" subpage entirely -
+//    see test/routes-events-parent-portal-and-classroom-dashboard-tabs.test.js
+//    and test/routes-parent-portal-classroom-dashboard-withdraw.test.js for
+//    the Classroom Dashboard's own replacement Delete button.
 // 2. "Parent portal, click on class to register, the class card should
 //    look like the image provided" - the class registration popup
 //    (views/parent-class-fragment.ejs) redesign.
@@ -97,38 +101,47 @@ async function createParentWithChild() {
   return { cookie, csrfToken: extractCsrf(homePage.text), childId: childInfo.lastInsertRowid };
 }
 
-test('Parent Portal homepage: "Manage Class Registration" links to /parent/classes/manage', async () => {
+test('Parent Portal homepage: "Classroom Dashboard" links to /parent/classes/dashboard', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
-  assert.match(home.text, /<a class="roster-action-btn" href="\/parent\/classes\/manage">Manage Class Registration<\/a>/);
+  assert.match(home.text, /<a class="roster-action-btn" href="\/parent\/classes\/dashboard">Classroom Dashboard<\/a>/);
 });
 
-test('Parent Portal: the Classes nav tab has all 6 subpages', async () => {
+// A real request removed the "View/Cancel Classes" subpage entirely
+// ("Remove view/cancel class page. You can now cancel the class on the
+// classroom dashboard"), dropping the Classes tab from 6 subpages to 5.
+test('Parent Portal: the Classes nav tab has all 5 remaining subpages', async () => {
   const parent = await createParentWithChild();
   const home = await request(app).get('/parent').set('Cookie', parent.cookie);
-  // A later real request ("Parent portal is not divided into sections.
-  // Tabs are in this order... co-op classes...") renamed the nav label
-  // from "Classes" to "Co-op Classes" (views/partials/portal-nav.ejs's
-  // own PARENT_NAV_LINKS), which changes this dialog's auto-derived id
-  // too (mobile-subpages-dialog.ejs slugifies the link's own label).
+  // A real request ("Parent portal is not divided into sections. Tabs
+  // are in this order... co-op classes...") renamed the nav label from
+  // "Classes" to "Co-op Classes" (views/partials/portal-nav.ejs's own
+  // PARENT_NAV_LINKS), which changes this dialog's auto-derived id too
+  // (mobile-subpages-dialog.ejs slugifies the link's own label).
   const dialogMatch = /<dialog class="view-tabs page-tabs-dialog no-print" id="mobile-subpages-co-op-classes">([\s\S]*?)<\/dialog>/.exec(home.text);
   assert.ok(dialogMatch, 'expected a Co-op Classes subpages dialog');
   const dialog = dialogMatch[1];
   [
     ['/parent/classes', 'Class Registration'],
-    ['/parent/classes/manage', 'View/Cancel Classes'],
-    ['/parent/classes/dashboard', 'Class Dashboard'],
+    ['/parent/classes/dashboard', 'Classroom Dashboard'],
     ['/name-tag', 'Name Tag Form'],
     ['/absence', 'Absence/Late Form'],
     ['/parent/handbook', 'Policy Handbook'],
   ].forEach(([href, label]) => {
     assert.match(dialog, new RegExp(`class="view-tab" href="${href.replace('/', '\\/')}">${label}<`));
   });
+  assert.doesNotMatch(dialog, /View\/Cancel Classes/);
 });
 
-test('View/Cancel Classes page: shows an enrolled child\'s class with a Cancel button, and cancelling (non-fetch) redirects back to it', async () => {
+// The Class Registration day-grid's own fragment popup (views/parent-
+// class-fragment.ejs) still has a plain (non-fetch) Cancel form for an
+// already-enrolled child - the one remaining real caller of /parent/
+// classes/:id/unregister outside the Classroom Dashboard's own fetch-
+// based Delete button. It now always redirects back to the day grid
+// (classesBackUrl no longer has a "manage" page to send it to instead).
+test('Class Registration day grid: cancelling (non-fetch) from the fragment popup redirects back to the day grid', async () => {
   const admin = await loginAsAdmin();
-  const cls = await createClass(admin, { className: 'Manage Page Class' });
+  const cls = await createClass(admin, { className: 'Fragment Cancel Class' });
   const parent = await createParentWithChild();
 
   await request(app)
@@ -137,22 +150,16 @@ test('View/Cancel Classes page: shows an enrolled child\'s class with a Cancel b
     .type('form')
     .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
 
-  const manage = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
-  assert.equal(manage.status, 200);
-  assert.match(manage.text, /Manage Page Class/);
-  assert.match(manage.text, /Registered/);
-  assert.match(manage.text, new RegExp(`data-cancel-class-url="/parent/classes/${cls.id}/unregister"`));
+  const fragment = await request(app).get(`/parent/classes/${cls.id}/fragment?day=monday`).set('Cookie', parent.cookie);
+  assert.match(fragment.text, new RegExp(`action="/parent/classes/${cls.id}/unregister"`));
 
-  const csrf2 = extractCsrf(manage.text);
   const cancelRes = await request(app)
     .post(`/parent/classes/${cls.id}/unregister`)
     .set('Cookie', parent.cookie)
     .type('form')
-    .send({ studentId: String(parent.childId), day: 'monday', returnTo: 'manage', _csrf: csrf2 });
-  assert.match(cancelRes.headers.location, /^\/parent\/classes\/manage\?/);
-
-  const afterCancel = await request(app).get('/parent/classes/manage').set('Cookie', parent.cookie);
-  assert.match(afterCancel.text, /No one in your family is registered for a class yet/);
+    .send({ studentId: String(parent.childId), day: 'monday', _csrf: parent.csrfToken });
+  assert.equal(cancelRes.status, 302);
+  assert.match(cancelRes.headers.location, /^\/parent\/classes\?day=monday&/);
 });
 
 test('Policy Handbook page renders the admin-edited handbook content', async () => {
