@@ -81,7 +81,12 @@ test('Parent Portal homepage: My Family card is gone, replaced by an Upcoming Ev
   assert.doesNotMatch(page.text, /<h2>My Family<\/h2>/);
   assert.match(page.text, /<h2>Upcoming Events<\/h2>/);
   assert.match(page.text, /Fall Fest/);
-  assert.match(page.text, /<a class="roster-action-btn" href="\/events">View Event Calendar<\/a>/);
+  // A real bug report: "event calendar should land on calendar view, not
+  // list view" - this button (and every other parent-facing Events link)
+  // now forces view=calendar&portal=parent instead of a bare /events,
+  // which otherwise falls back to whatever the org-wide default view
+  // setting happens to be (see routes/events.js's own comment).
+  assert.match(page.text, /<a class="roster-action-btn" href="\/events\?view=calendar&(?:amp;)?portal=parent">View Event Calendar<\/a>/);
 });
 
 test('Parent Portal homepage: Committees card has the new description', async () => {

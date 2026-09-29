@@ -176,7 +176,7 @@ router.get('/classes', async (req, res) => {
   const nextWindow = windowOpen ? null : await nextWindowForAccount(req.portalRoles);
 
   res.render('student-classes', {
-    title: 'My Classes',
+    title: 'Class Schedule',
     classes,
     openClasses,
     eligibleClassIds,
@@ -185,6 +185,31 @@ router.get('/classes', async (req, res) => {
     nextWindowLabel: nextWindow ? formatTimestamp(nextWindow.opens_at) : null,
     error: req.query.error || null,
     notice: req.query.notice || null,
+  });
+});
+
+// A real request: "Classes tab should have a few subpages: class
+// schedule, classroom dashboard..." - Class Schedule (above) is this
+// student's own class list plus the minor self-registration table;
+// Classroom Dashboard is the enrolled-classes-only view, Monday/Wednesday
+// grouped the same way Parent Portal's own /parent/classes/dashboard
+// groups a child's classes (routes/parent-portal.js's own byHourPosition
+// comment), each card linking into the exact same /student/classes/:id
+// detail page (Details/Assignments/Lessons/Forum/etc. tabs) - satisfies
+// the same request's "Assignments should not be a dashboard tab, it's
+// all under classroom dashboard page": there's no separate Assignments
+// nav tab any more (still reachable at its own /student/assignments URL,
+// same "dropped from the nav, not from the route table" precedent as
+// /student/name-tag), and a class's own Assignments tab already lives one
+// click away from every card here.
+router.get('/classes/dashboard', async (req, res) => {
+  const member = await memberForAccount(req.portalAccount.id);
+  const classes = await classesForStudent(member);
+  const byHourPosition = (a, b) => a.hour_position - b.hour_position;
+  res.render('student-class-dashboard', {
+    title: 'Classroom Dashboard',
+    mondayClasses: classes.filter((c) => c.day === 'monday').sort(byHourPosition),
+    wednesdayClasses: classes.filter((c) => c.day === 'wednesday').sort(byHourPosition),
   });
 });
 

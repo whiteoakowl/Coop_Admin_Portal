@@ -87,8 +87,11 @@ test('Parent Portal (portal-nav.ejs): no Full Screen View button/script, My Prof
   // every portal should be the member's full profile membership form so
   // that they can edit it" - My Profile now points at /portal/profile
   // (views/portal-profile.ejs), not the generic account-settings page
-  // settingsHref still resolves to for the gear icon.
-  assert.match(page.text, /<a class="admin-corner-link" href="\/portal\/profile">\s*<svg class="icon"><use href="#icon-user-circle"\/><\/svg>\s*My Profile/);
+  // settingsHref still resolves to for the gear icon. It also carries a
+  // ?portal=parent tag now (see portal-nav.ejs's own cornerPortalQuery
+  // comment) so a dual-role account's Profile/Settings links stay on
+  // whichever portal it's currently viewing.
+  assert.match(page.text, /<a class="admin-corner-link" href="\/portal\/profile\?portal=parent">\s*<svg class="icon"><use href="#icon-user-circle"\/><\/svg>\s*My Profile/);
   assert.match(page.text, /aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"\/>/);
 });
 

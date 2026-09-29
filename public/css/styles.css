@@ -2454,7 +2454,18 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 }
 .member-form-full { grid-column: 1 / -1; }
 .checkbox-group-label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--ink); margin-bottom: 0.35rem; }
-.select-all-btn { margin-bottom: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+/* A real bug report on the Name Tag/Absence forms: "when you choose a
+   parent name the select all button overlaps everything." This button
+   sits right after the name .stack-form (no bottom margin of its own)
+   and right before the per-member family checkbox group it reveals - with
+   no margin-top of its own, it used to render flush against the select
+   box above the instant it un-hides, then just as flush against the
+   checkbox rows right below it, reading as cramped/overlapping the
+   moment a name is picked and everything appears at once. display:
+   inline-flex (rather than a plain <button>'s own inline-block) is what
+   keeps its own icon-less label vertically centered consistently with
+   every other .btn-secondary use once it's given room to breathe. */
+.select-all-btn { display: inline-flex; align-items: center; margin-top: 0.75rem; margin-bottom: 0.75rem; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
 
 /* ---------- Edit / Save Changes toggle (public/js/edit-toggle.js) ---------- */
 

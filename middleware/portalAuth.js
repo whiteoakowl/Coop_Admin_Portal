@@ -39,10 +39,30 @@ async function loadPortalSession(req, res, next) {
   // Only meaningful for a page that renders partials/portal-nav at all -
   // a genuinely public page unconditionally shown to everyone (the
   // homepage) has no reason to call this.
+  //
+  // A later real bug report - "Student portal, when you click on chat it
+  // should stay on Student portal" - was this same "parent always wins"
+  // priority rule now working AGAINST a dual-role (parent AND student)
+  // account: clicking Chat from their own Student Portal nav still landed
+  // them in Parent Portal, since the guess never knew which portal they'd
+  // actually clicked from. ?portal=parent|student is the same fix
+  // routes/events.js's own portalParam already uses for this identical
+  // ambiguity - reading it straight off the request here (rather than
+  // every caller threading it through as its own render() local) is what
+  // lets every existing `sharedPortalTitle('Chat')`-style call keep
+  // working unchanged; only the handful of nav links that are reachable
+  // from BOTH portals' own nav (Chat, Photos - see portal-nav.ejs) needed
+  // to start tagging their own href with it, the exact same way Events'
+  // nav links already do.
   res.locals.sharedPortalTitle = function (fallback) {
     const roles = res.locals.portalRoles || [];
-    if (roles.some((r) => r.key === 'parent')) return 'Parent Portal';
-    if (roles.some((r) => r.key === 'student')) return 'Student Portal';
+    const hasParent = roles.some((r) => r.key === 'parent');
+    const hasStudent = roles.some((r) => r.key === 'student');
+    const requestedPortal = req.query.portal;
+    if (requestedPortal === 'parent' && hasParent) return 'Parent Portal';
+    if (requestedPortal === 'student' && hasStudent) return 'Student Portal';
+    if (hasParent) return 'Parent Portal';
+    if (hasStudent) return 'Student Portal';
     return fallback;
   };
 

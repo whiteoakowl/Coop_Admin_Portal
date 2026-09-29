@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <%- include('partials/portal-nav', { portalTitle: 'Student Portal' }) %>
+
+  <main id="main-content" tabindex="-1" class="admin-main">
+    <h1>Classroom Dashboard</h1>
+
+    <% if (mondayClasses.length === 0 && wednesdayClasses.length === 0) { %>
+      <p class="roster-empty">You're not enrolled in any classes yet.</p>
+    <% } else { %>
+      <h2>Monday</h2>
+      <% if (mondayClasses.length === 0) { %>
+        <p class="roster-empty">No Monday classes.</p>
+      <% } else { %>
+        <div class="class-dash-grid">
+          <% mondayClasses.forEach(function(c) { %>
+            <div class="class-dash-card">
+              <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+              <div class="class-dash-card-body">
+                <% if (c.classImageUrl) { %>
+                  <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
+                <% } else { %>
+                  <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+                <% } %>
+                <div class="class-dash-card-text">
+                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                </div>
+              </div>
+              <div class="class-dash-card-actions">
+                <a class="roster-action-btn" href="/student/classes/<%= c.id %>">View Class</a>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <h2>Wednesday</h2>
+      <% if (wednesdayClasses.length === 0) { %>
+        <p class="roster-empty">No Wednesday classes.</p>
+      <% } else { %>
+        <div class="class-dash-grid">
+          <% wednesdayClasses.forEach(function(c) { %>
+            <div class="class-dash-card">
+              <div class="class-dash-card-color-bar" style="background:<%= c.color %>"></div>
+              <div class="class-dash-card-body">
+                <% if (c.classImageUrl) { %>
+                  <img class="class-dash-card-image" src="<%= c.classImageUrl %>" alt="" />
+                <% } else { %>
+                  <span class="class-dash-card-image class-dash-card-image-placeholder"><svg class="icon"><use href="#icon-graduation-cap"/></svg></span>
+                <% } %>
+                <div class="class-dash-card-text">
+                  <h3 class="class-dash-card-title"><%= c.class_name %></h3>
+                  <p class="class-dash-card-meta"><%= c.timeLabel %></p>
+                  <p class="class-dash-card-meta"><%= c.room || 'No room set' %></p>
+                  <p class="class-dash-card-meta"><%= c.teacherNames.length ? c.teacherNames.join(', ') : 'No teacher assigned' %></p>
+                </div>
+              </div>
+              <div class="class-dash-card-actions">
+                <a class="roster-action-btn" href="/student/classes/<%= c.id %>">View Class</a>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    <% } %>
+  </main>
+</body>
+</html>

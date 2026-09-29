@@ -17,6 +17,17 @@ const showSwitcher = typeof portalRoles !== 'undefined' && portalRoles.length > 
 // settings redirects there) instead of the generic per-account Settings
 // page (My Privacy, etc.) every other portal's gear still opens.
 const settingsHref = portalTitle === 'Main Admin' ? '/main-admin/settings' : '/portal/settings';
+// A real bug report: "Student portal, when you click on chat it should
+// stay on Student portal" - the same "always guess Parent first" mistake
+// sharedPortalTitle now fixes for Chat/Photos (see middleware/portalAuth.js's
+// own comment) applies just as much here: My Profile/Settings are the
+// SAME /portal/profile, /portal/settings URL no matter which portal's own
+// corner renders this link, so a dual-role account clicking either from
+// Student Portal used to land back in Parent Portal too. This partial
+// already knows which portal it's rendering as (portalTitle, the param
+// every caller passes in) - tagging these two corner links with that
+// same ?portal=parent|student is enough, no guessing needed at all.
+const cornerPortalQuery = portalTitle === 'Parent Portal' ? '?portal=parent' : portalTitle === 'Student Portal' ? '?portal=student' : '';
 
 // Main Admin's own primary nav - a real request: "there are many
 // duplicate tabs, these should be the tabs and in this order." Every
@@ -167,8 +178,8 @@ const MAIN_ADMIN_NAV_LINKS = [
 // /documents/<token> view rather than duplicating its file-serving code).
 const PARENT_NAV_LINKS = [
   { href: '/parent', icon: 'home', label: 'Home' },
-  { href: '/events?portal=parent', icon: 'calendar-check', label: 'Events', subpages: [
-    { href: '/events?portal=parent', label: 'Event Calendar' },
+  { href: '/events?view=calendar&portal=parent', icon: 'calendar-check', label: 'Events', subpages: [
+    { href: '/events?view=calendar&portal=parent', label: 'Event Calendar' },
     { href: '/parent/events', label: 'My Event Registrations' },
   ] },
   { href: '/parent/classes', icon: 'graduation-cap', label: 'Co-op Classes', subpages: [
@@ -178,14 +189,14 @@ const PARENT_NAV_LINKS = [
     { href: '/absence', label: 'Absence/Late Form' },
     { href: '/parent/handbook', label: 'Policy Handbook' },
   ] },
-  { href: '/forums', icon: 'users', label: 'Chat' },
+  { href: '/forums?portal=parent', icon: 'users', label: 'Chat' },
   { href: '/parent/training', icon: 'graduation-cap', label: 'Training' },
   { href: '/directory', icon: 'map-pin', label: 'Business Directory' },
   { href: '/classifieds', icon: 'tag', label: 'Classifieds' },
   { href: '/parent/resources', icon: 'book', label: 'Resources' },
   { href: '/parent/documents', icon: 'file-text', label: 'Documents' },
   { href: '/store', icon: 'grid', label: 'Store' },
-  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/photos?portal=parent', icon: 'camera', label: 'Photos' },
   { href: '/parent/academics', icon: 'clipboard-list', label: 'Academics', subpages: [
     { href: '/parent/academics', label: 'Transcripts' },
     { href: '/parent/academics/diplomas', label: 'Diplomas' },
@@ -208,21 +219,37 @@ const PARENT_NAV_LINKS = [
 // other 11 didn't), centralized here the same way once a real
 // restructure request made that drift risk concrete. Photos moved in
 // from the old Community section (now empty for Student Portal, see
-// COMMUNITY_LINKS_STUDENT below) since it's now one of these 8 named
-// tabs rather than a Community extra; Name Tag dropped from the nav
-// entirely (still reachable at its own /student/name-tag URL, just not
-// a standing tab - not in the requested list).
+// COMMUNITY_LINKS_STUDENT below) since it's now one of these named tabs
+// rather than a Community extra.
+//
+// A later real request moved Classes to the 3rd tab and gave it
+// subpages ("a few subpages: class schedule, classroom dashboard,
+// absence/late form, name tag form"), same subpages-array pattern
+// PARENT_NAV_LINKS's own Co-op Classes entry already uses. Assignments
+// dropped as its own standing tab per that same request ("Assignments
+// should not be a dashboard tab. It's all under classroom dashboard
+// page") - a class's own Assignments tab is one click away from every
+// Classroom Dashboard card (routes/student-portal.js's own
+// /classes/dashboard), and the flat all-assignments view is still
+// reachable at its own /student/assignments URL, same "dropped from the
+// nav, not from the route table" precedent Name Tag already set (its
+// own /student/name-tag URL, now this Classes group's own Name Tag Form
+// subpage instead of a standing tab).
 const STUDENT_NAV_LINKS = [
   { href: '/student', icon: 'home', label: 'Home' },
   { href: '/events?view=calendar&portal=student', icon: 'calendar-check', label: 'Calendar', subpages: [
     { href: '/events?view=calendar&portal=student', label: 'Calendar' },
     { href: '/student/events', label: 'My Event Registrations' },
   ] },
-  { href: '/forums', icon: 'users', label: 'Chat' },
-  { href: '/student/classes', icon: 'graduation-cap', label: 'Classes' },
-  { href: '/student/assignments', icon: 'clipboard-list', label: 'Assignments' },
+  { href: '/student/classes', icon: 'graduation-cap', label: 'Classes', subpages: [
+    { href: '/student/classes', label: 'Class Schedule' },
+    { href: '/student/classes/dashboard', label: 'Classroom Dashboard' },
+    { href: '/absence', label: 'Absence/Late Form' },
+    { href: '/student/name-tag', label: 'Name Tag Form' },
+  ] },
+  { href: '/forums?portal=student', icon: 'users', label: 'Chat' },
   { href: '/student/resources', icon: 'book', label: 'Resources' },
-  { href: '/photos', icon: 'camera', label: 'Photos' },
+  { href: '/photos?portal=student', icon: 'camera', label: 'Photos' },
   { href: '/student/babysitter', icon: 'user', label: 'Babysitter Profile' },
 ];
 // Section 2, labeled "Activities" (classLinksTitle below) - Achievements
@@ -428,11 +455,11 @@ const communityLinks =
     own separate, untouched copy. No search form here (unlike
     admin-nav.ejs's own corner) - that's a Co-op-Admin-only feature. %>
 <header class="admin-page-corner-actions no-print">
-  <a class="admin-corner-link" href="/portal/profile">
+  <a class="admin-corner-link" href="/portal/profile<%= cornerPortalQuery %>">
     <svg class="icon"><use href="#icon-user-circle"/></svg>
     My Profile
   </a>
-  <a class="admin-corner-link" href="<%= settingsHref %>">
+  <a class="admin-corner-link" href="<%= settingsHref %><%= cornerPortalQuery %>">
     <svg class="icon"><use href="#icon-gear"/></svg>
     Settings
   </a>
@@ -453,8 +480,8 @@ const communityLinks =
       <%= portalTitle %>
     </a>
     <div class="admin-nav-right admin-nav-right-mobile">
-      <a class="admin-nav-right-link" href="/portal/profile" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
-      <a class="admin-nav-right-link" href="<%= settingsHref %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
+      <a class="admin-nav-right-link" href="/portal/profile<%= cornerPortalQuery %>" aria-label="My Profile"><svg class="icon"><use href="#icon-user-circle"/></svg></a>
+      <a class="admin-nav-right-link" href="<%= settingsHref %><%= cornerPortalQuery %>" aria-label="Settings"><svg class="icon"><use href="#icon-gear"/></svg></a>
       <% if (showSwitcher) { %>
         <a class="admin-nav-right-link" href="/portal" aria-label="Switch Portal"><svg class="icon"><use href="#icon-monitor"/></svg></a>
       <% } %>

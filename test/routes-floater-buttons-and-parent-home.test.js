@@ -80,7 +80,7 @@ async function loginAsPortalParent() {
 }
 
 test('Parent Portal homepage shows class registration counts broken down per child in the family', async () => {
-  const { cookie, familyId, acctId } = await loginAsPortalParent();
+  const { cookie, familyId } = await loginAsPortalParent();
   const child1 = (
     await db
       .prepare("INSERT INTO members (name, barcode, member_type, family_id, active) VALUES ('First Child', 'first-child', 'student', ?, 1) RETURNING id")
@@ -94,9 +94,18 @@ test('Parent Portal homepage shows class registration counts broken down per chi
   const classId1 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class One', 'monday', 1) RETURNING id").get()).id;
   const classId2 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class Two', 'monday', 2) RETURNING id").get()).id;
   const classId3 = (await db.prepare("INSERT INTO classes (class_name, day, hour_position) VALUES ('Count Class Three', 'wednesday', 1) RETURNING id").get()).id;
-  await db.prepare("INSERT INTO class_registrations (class_id, student_id, registered_by_account_id, status) VALUES (?, ?, ?, 'confirmed')").run(classId1, child1, acctId);
-  await db.prepare("INSERT INTO class_registrations (class_id, student_id, registered_by_account_id, status) VALUES (?, ?, ?, 'confirmed')").run(classId2, child1, acctId);
-  await db.prepare("INSERT INTO class_registrations (class_id, student_id, registered_by_account_id, status) VALUES (?, ?, ?, 'confirmed')").run(classId3, child2, acctId);
+  // A real bug report: "not showing counts... when I know they are signed
+  // up for classes" - the homepage used to count class_registrations
+  // (only a log of the parent's OWN self-service register/cancel
+  // actions), which stays empty for a student enrolled straight through
+  // Co-op Admin's own roster tool (utils/classSchedule.js's setEnrollment
+  // writes class_enrollments directly, never class_registrations). A
+  // confirmed self-service registration ALSO writes class_enrollments
+  // (see utils/classRegistration.js's registerForClass), so seeding just
+  // that one table here still covers both real paths.
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId1, child1);
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId2, child1);
+  await db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(classId3, child2);
 
   const page = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(page.status, 200);

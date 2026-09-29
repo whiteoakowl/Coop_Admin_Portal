@@ -67,8 +67,10 @@ test('a real request: "clicking the profile icon... should be the member\'s full
   assert.match(page.text, /value="Profile Test Parent 1"/);
 
   // The profile icon in the shared nav shell now points here, not at the
-  // generic account-settings page.
-  assert.match(page.text, /class="admin-corner-link" href="\/portal\/profile"/);
+  // generic account-settings page. It also carries a ?portal=parent tag
+  // (see portal-nav.ejs's own cornerPortalQuery comment) so a dual-role
+  // account's Profile link stays on whichever portal it's viewing.
+  assert.match(page.text, /class="admin-corner-link" href="\/portal\/profile\?portal=parent"/);
 });
 
 test('birthday and grade level are visible but locked - only an admin can change them', async () => {

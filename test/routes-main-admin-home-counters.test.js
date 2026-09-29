@@ -125,5 +125,8 @@ test('a non-Main-Admin portal keeps its plain Settings link, no gear dropdown', 
   const res = await request(app).get('/parent').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.doesNotMatch(res.text, /portal-switcher-details/);
-  assert.match(res.text, /href="\/portal\/settings"/);
+  // Carries a ?portal=parent tag now (see portal-nav.ejs's own
+  // cornerPortalQuery comment) so a dual-role account's Settings link
+  // stays on whichever portal it's currently viewing.
+  assert.match(res.text, /href="\/portal\/settings\?portal=parent"/);
 });

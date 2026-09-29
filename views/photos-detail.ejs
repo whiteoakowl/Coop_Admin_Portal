@@ -11,7 +11,10 @@
 %>
 <body>
   <% if (usesPortalNavShell) { %>
-    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+    <%
+      // Same fix as photos-list.ejs's own comment.
+    %>
+    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : 'Student Portal') }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 

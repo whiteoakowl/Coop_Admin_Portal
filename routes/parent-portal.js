@@ -139,11 +139,20 @@ router.get('/', async (req, res) => {
   // A real request: "class registrations count should show how many
   // classes your family is registered for by person in your family" -
   // per-child counts instead of one family-wide total, so the homepage
-  // reads as "Jane: 2, Sam: 1" rather than an ambiguous "3".
+  // reads as "Jane: 2, Sam: 1" rather than an ambiguous "3". A real bug
+  // report: "not showing counts... when I know they are signed up for
+  // classes" - this used to count class_registrations (only a log of the
+  // parent's OWN self-service register/cancel actions - see
+  // utils/classRegistration.js), which stays empty for any student whose
+  // class assignment came from Co-op Admin's own roster tool instead
+  // (utils/classSchedule.js's setEnrollment writes class_enrollments
+  // directly, never touching class_registrations at all). class_enrollments
+  // is the actual "is this student in this class" table used everywhere
+  // else (attendance, rosters, ...), so it's the right source here too.
   const countsByStudent = childIds.length
     ? await db
         .prepare(
-          `SELECT student_id, COUNT(*) AS c FROM class_registrations WHERE status = 'confirmed' AND student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
+          `SELECT student_id, COUNT(*) AS c FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
         )
         .all(...childIds)
     : [];

@@ -11,7 +11,16 @@
 %>
 <body>
   <% if (usesPortalNavShell) { %>
-    <%- include('partials/portal-nav', { portalTitle: hasParentRole ? 'Parent Portal' : 'Student Portal' }) %>
+    <%
+      // A real bug report: "Student portal, when you click on chat it
+      // should stay on Student portal" was this exact same "always
+      // guess Parent first" mistake, just for Photos instead of Chat -
+      // sharedPortalTitle (middleware/portalAuth.js) now also honors
+      // ?portal=parent|student when it's present (see portal-nav.ejs's
+      // own Photos href), so a dual-role account keeps whichever portal
+      // they actually clicked from instead of always landing in Parent.
+    %>
+    <%- include('partials/portal-nav', { portalTitle: sharedPortalTitle(hasParentRole ? 'Parent Portal' : 'Student Portal') }) %>
   <% } else { %>
   <%- include('partials/icon-sprite') %>
 
