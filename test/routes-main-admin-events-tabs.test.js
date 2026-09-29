@@ -140,17 +140,21 @@ test('Events builder (per-event edit page): renders its own .view-tabs strip wit
   // renamed to "Details", Finance added, Volunteers/Settings kept,
   // Attendance appended as its own link to the Registrations page. A
   // still later real request folded Donations/Food/Extra Fields into the
-  // Volunteers tab itself as a pill toggle rather than their own tabs,
-  // and renamed that top-level tab to "Resources/Fields".
+  // Volunteers tab itself, and renamed that top-level tab to
+  // "Resources/Fields". Originally a pill toggle for those four sections;
+  // a later real request ("the pill toggle... should be a drop down menu
+  // instead") replaced the pill strip with a plain <select>.
   ['Details', 'Finance', 'Resources/Fields', 'Settings', 'Attendance'].forEach((label) => {
     assert.match(page.text, new RegExp(`>${label}<`));
   });
   assert.doesNotMatch(page.text, />Event Details</);
   assert.match(page.text, /class="view-tab active" data-builder-nav-link>Resources\/Fields/);
   assert.match(page.text, new RegExp(`href="/main-admin/events/${eventId}/registrations" class="view-tab" data-builder-nav-link>Attendance`));
-  // The Resources/Fields tab's own pill toggle for its four sections.
+  // The Resources/Fields tab's own dropdown for its four sections.
+  const sectionSelectMatch = /<select id="event-section-select"[^>]*>([\s\S]*?)<\/select>/.exec(page.text);
+  assert.ok(sectionSelectMatch, 'expected the section dropdown');
   ['Volunteers', 'Food', 'Donations', 'Extra Fields'].forEach((label) => {
-    assert.match(page.text, new RegExp(`class="day-toggle-option[^"]*">${label}<`));
+    assert.match(sectionSelectMatch[1], new RegExp(`<option value="[^"]*"[^>]*>${label}<`));
   });
 });
 

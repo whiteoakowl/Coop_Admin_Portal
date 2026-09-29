@@ -165,6 +165,147 @@ test('Ticket Types: a ticket with no pricePer submitted defaults to person', asy
   assert.equal(ticket.price_per, 'person');
 });
 
+// A real request: "finance, add ticket type pop up, add a checkbox for
+// include physical ticket. Members will be able to print tickets with a
+// barcode for check in and out. Barcode is the same as their member ID
+// number barcode used for classes."
+test('Ticket Types: Add Ticket Type dialog has an Include physical ticket checkbox, and it persists', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(financePage.text, /name="includesPhysicalTicket" value="1"/);
+  assert.match(financePage.text, />\s*Include physical ticket\s*</);
+
+  const csrf = extractCsrf(financePage.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'General Admission', priceDollars: '5.00', pricePer: 'person', includesPhysicalTicket: '1', _csrf: csrf });
+
+  const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'General Admission'").get(eventId);
+  assert.equal(ticket.includes_physical_ticket, true);
+
+  const afterAdd = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  assert.match(afterAdd.text, /General Admission[\s\S]*?Physical ticket/);
+});
+
+test('Ticket Types: leaving Include physical ticket unchecked defaults to no physical ticket', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const page = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(page.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'RSVP Only', priceDollars: '0.00', _csrf: csrf });
+
+  const ticket = await db.prepare("SELECT * FROM event_ticket_types WHERE event_id = ? AND title = 'RSVP Only'").get(eventId);
+  assert.equal(ticket.includes_physical_ticket, false);
+});
+
+let ticketPrintFamilyCounter = 0;
+async function createParentWithChildForTicketPrint() {
+  ticketPrintFamilyCounter += 1;
+  const n = ticketPrintFamilyCounter;
+  const familyId = (await db.prepare('INSERT INTO families (name) VALUES (?)').run(`Ticket Print Family ${n}`)).lastInsertRowid;
+  const parentCode = await generateMemberCode();
+  const parentInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1)")
+    .run(`Ticket Print Parent ${n}`, parentCode, parentCode, familyId);
+  const childCode = await generateMemberCode();
+  const childInfo = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, active) VALUES (?, ?, ?, 'student', ?, 1)")
+    .run(`Ticket Print Child ${n}`, childCode, childCode, familyId);
+  const email = `ticket-print-parent-${n}@example.com`;
+  const accountInfo = await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(parentInfo.lastInsertRowid, email, hashPassword('testpassword123'));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(accountInfo.lastInsertRowid, parentRole.id);
+
+  const loginRes = await request(app).post('/login').type('form').send({ email, password: 'testpassword123' });
+  return { cookie: loginRes.headers['set-cookie'], childId: Number(childInfo.lastInsertRowid), childBarcode: childCode };
+}
+
+test('Print Ticket: shown and printable for a confirmed registration under a physical-ticket ticket type', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(financePage.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'General Admission', priceDollars: '0.00', includesPhysicalTicket: '1', _csrf: csrf });
+  const ticketType = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'General Admission'").get(eventId);
+
+  const parent = await createParentWithChildForTicketPrint();
+  const eventPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  const eventCsrf = extractCsrf(eventPage.text);
+  await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: parent.childId, ticketTypeId: ticketType.id, _csrf: eventCsrf });
+
+  const myEventsPage = await request(app).get('/parent/events').set('Cookie', parent.cookie);
+  assert.match(myEventsPage.text, new RegExp(`href="/events/${eventId}/ticket\\?memberId=${parent.childId}"[^>]*>Print Ticket<`));
+
+  const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${parent.childId}`).set('Cookie', parent.cookie);
+  assert.equal(ticketPage.status, 200);
+  assert.match(ticketPage.text, new RegExp(`data-barcode-value="${parent.childBarcode}"`));
+});
+
+test('Print Ticket: no button and 404 when the registration\'s ticket type has no physical ticket', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+
+  const parent = await createParentWithChildForTicketPrint();
+  const eventPage = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  const eventCsrf = extractCsrf(eventPage.text);
+  await request(app).post(`/events/${eventId}/register`).set('Cookie', parent.cookie).type('form').send({ memberId: parent.childId, _csrf: eventCsrf });
+
+  const myEventsPage = await request(app).get('/parent/events').set('Cookie', parent.cookie);
+  assert.doesNotMatch(myEventsPage.text, /Print Ticket/);
+
+  const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${parent.childId}`).set('Cookie', parent.cookie);
+  assert.equal(ticketPage.status, 404);
+});
+
+test('Print Ticket: a signed-in account can never print a ticket for a member outside its own family', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+
+  const financePage = await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie);
+  const csrf = extractCsrf(financePage.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'General Admission', priceDollars: '0.00', includesPhysicalTicket: '1', _csrf: csrf });
+  const ticketType = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'General Admission'").get(eventId);
+
+  const owner = await createParentWithChildForTicketPrint();
+  const eventPage = await request(app).get(`/events/${eventId}`).set('Cookie', owner.cookie);
+  const eventCsrf = extractCsrf(eventPage.text);
+  await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', owner.cookie)
+    .type('form')
+    .send({ memberId: owner.childId, ticketTypeId: ticketType.id, _csrf: eventCsrf });
+
+  const intruder = await createParentWithChildForTicketPrint();
+  const ticketPage = await request(app).get(`/events/${eventId}/ticket?memberId=${owner.childId}`).set('Cookie', intruder.cookie);
+  assert.equal(ticketPage.status, 404);
+});
+
 let paymentInstructionsFamilyCounter = 0;
 async function createParentAccountForPaymentInstructions() {
   paymentInstructionsFamilyCounter += 1;

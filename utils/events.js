@@ -271,11 +271,17 @@ async function getEventWithDetails(id) {
 // event (see registerForEvent/chargeForConfirmedRegistration below, which
 // charge the picked ticket's own price instead of the event's own flat
 // price_cents).
-async function addTicketType(eventId, title, priceCents, pricePer) {
+// includesPhysicalTicket (a real request: "add a checkbox for include
+// physical ticket. Members will be able to print tickets with a barcode
+// for check in and out") - a member holding a confirmed registration
+// under a ticket type with this on can print a ticket carrying their own
+// member barcode (routes/events.js's own /:id/ticket, same barcode value
+// class check-in already scans - see eventTicketDetailsForMember below).
+async function addTicketType(eventId, title, priceCents, pricePer, includesPhysicalTicket) {
   const position = Number((await db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM event_ticket_types WHERE event_id = ?').get(eventId)).p) + 1;
   await db
-    .prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, price_per, position) VALUES (?, ?, ?, ?, ?)')
-    .run(eventId, title, priceCents, pricePer === 'family' ? 'family' : 'person', position);
+    .prepare('INSERT INTO event_ticket_types (event_id, title, price_cents, price_per, position, includes_physical_ticket) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(eventId, title, priceCents, pricePer === 'family' ? 'family' : 'person', position, includesPhysicalTicket ? true : false);
 }
 
 async function deleteTicketType(id) {
@@ -1050,7 +1056,14 @@ async function registerForEvent({ eventId, memberId, accountId, family, answers 
 // at once." One result per requested member, in order, so the route can
 // report which (if any) failed (already registered) without losing the
 // ones that succeeded.
-async function adminAddRegistrations(eventId, memberIds, accountId) {
+// answers/ticketTypeId (optional) - a real request: "popup should show
+// all the same questions, volunteer signups and tickets questions as if
+// the member is signing up for the event themselves." The popup still
+// asks for one shared answer set/ticket for everyone selected (same
+// simplification its own volunteerShiftId/signupItemId already made -
+// see routes/admin-events.js's own comment), rather than a separate
+// per-member form the way self-service registration gets one.
+async function adminAddRegistrations(eventId, memberIds, accountId, answers = {}, ticketTypeId = null) {
   const event = await getEvent(eventId);
   if (!event) return memberIds.map(() => ({ ok: false, error: 'That event no longer exists.' }));
   const results = [];
@@ -1060,7 +1073,7 @@ async function adminAddRegistrations(eventId, memberIds, accountId) {
       results.push({ ok: false, error: 'That member no longer exists.' });
       continue;
     }
-    results.push(await createOrReactivateRegistration(event, member, accountId));
+    results.push(await createOrReactivateRegistration(event, member, accountId, answers, { ticketTypeId }));
   }
   return results;
 }
@@ -1143,7 +1156,8 @@ async function eventRegistrationsForMembers(memberIds) {
   return db
     .prepare(
       `SELECT er.*, m.name AS "memberName", e.title, e.starts_at, e.ends_at, e.image_key AS "imageKey",
-              e.allow_registration_cancellations AS "allowCancel", tt.title AS "ticketTitle"
+              e.allow_registration_cancellations AS "allowCancel", tt.title AS "ticketTitle",
+              tt.includes_physical_ticket AS "includesPhysicalTicket"
        FROM event_registrations er
        JOIN members m ON m.id = er.member_id
        JOIN events e ON e.id = er.event_id
@@ -1152,6 +1166,27 @@ async function eventRegistrationsForMembers(memberIds) {
        ORDER BY e.starts_at ASC`
     )
     .all(...memberIds);
+}
+
+// A member's own printable ticket for one event - the event's title/
+// starts_at, and the member's own name/barcode (the exact same barcode
+// class check-in scans - utils/memberLookup.js's findMemberByBarcodeOrName
+// is what routes/admin-events.js's own check-in scan route already uses,
+// unchanged here). Only returns something when there's a real, confirmed,
+// physical-ticket-eligible registration - the route calling this never
+// trusts the memberId it's given belongs to the requesting family, so it
+// also re-checks that itself before ever calling this.
+async function eventTicketDetailsForMember(eventId, memberId) {
+  return db
+    .prepare(
+      `SELECT e.title, e.starts_at, e.ends_at, m.name AS "memberName", m.barcode, tt.title AS "ticketTitle"
+       FROM event_registrations er
+       JOIN events e ON e.id = er.event_id
+       JOIN members m ON m.id = er.member_id
+       JOIN event_ticket_types tt ON tt.id = er.ticket_type_id
+       WHERE er.event_id = ? AND er.member_id = ? AND er.status = 'confirmed' AND tt.includes_physical_ticket = true`
+    )
+    .get(eventId, memberId);
 }
 
 // --- Guest registration (admin permission - no members row) ---
@@ -1530,6 +1565,7 @@ module.exports = {
   cancelRegistration,
   registrationsForEvent,
   eventRegistrationsForMembers,
+  eventTicketDetailsForMember,
   familyGroupedRegistrationsForEvent,
   buildRegistrationsExportCsvLines,
   importRegistrationsFromRows,

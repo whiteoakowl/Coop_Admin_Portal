@@ -30,6 +30,10 @@
             <% } else { %>
               <span class="badge-pill badge-pill-present">Registered</span>
             <% } %>
+            <%# Same fix as parent-event-registrations.ejs's own comment. %>
+            <% if (r.status === 'confirmed' && r.includesPhysicalTicket) { %>
+              <a class="roster-action-btn" href="/events/<%= r.event_id %>/ticket?memberId=<%= r.member_id %>" target="_blank">Print Ticket</a>
+            <% } %>
             <% if (r.allowCancel) { %>
               <form method="POST" action="/events/<%= r.event_id %>/unregister" class="inline-block-form">
                 <input type="hidden" name="memberId" value="<%= r.member_id %>" />

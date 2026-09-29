@@ -217,6 +217,43 @@
             <% }); %>
           </div>
 
+          <%# A real request: "popup should show all the same questions,
+              volunteer signups and tickets questions as if the member is
+              signing up for the event themselves." Same Ticket dropdown
+              and Extra Field inputs events-detail.ejs's own per-member
+              self-service form already asks - one shared answer set here
+              (applies to everyone selected above), same simplification
+              the volunteer/signup-list selects below already make. %>
+          <% if (event.ticketTypes && event.ticketTypes.length) { %>
+            <label>Ticket <span class="hint">(applies to everyone selected above)</span>
+              <select name="ticketTypeId" required>
+                <option value="">Select a ticket</option>
+                <% event.ticketTypes.forEach(function(t) { %>
+                  <option value="<%= t.id %>"><%= t.title %> &ndash; $<%= (t.price_cents / 100).toFixed(2) %> / <%= t.price_per %></option>
+                <% }); %>
+              </select>
+            </label>
+          <% } %>
+          <% if (event.extraFields && event.extraFields.length) { %>
+            <% event.extraFields.forEach(function(field) { %>
+              <label><%= field.label %><% if (field.required) { %> *<% } %> <span class="hint">(applies to everyone selected above)</span>
+                <% if (field.field_type === 'textarea') { %>
+                  <textarea name="answers[f<%= field.id %>]" rows="2" <%= field.required ? 'required' : '' %>></textarea>
+                <% } else if (field.field_type === 'select') { %>
+                  <select name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %>>
+                    <option value="">Select one</option>
+                    <% (field.options || '').split('\n').filter(Boolean).forEach(function(opt) { %>
+                      <option value="<%= opt %>"><%= opt %></option>
+                    <% }); %>
+                  </select>
+                <% } else if (field.field_type === 'checkbox') { %>
+                  <input type="checkbox" name="answers[f<%= field.id %>]" value="Yes" <%= field.required ? 'required' : '' %> />
+                <% } else { %>
+                  <input type="text" name="answers[f<%= field.id %>]" <%= field.required ? 'required' : '' %> />
+                <% } %>
+              </label>
+            <% }); %>
+          <% } %>
           <% if (attachedVolunteerLists.length) { %>
             <% attachedVolunteerLists.forEach(function(list) { %>
               <label><%= list.title %> Shift <span class="hint">(optional - applies to everyone selected above)</span>

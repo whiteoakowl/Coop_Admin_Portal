@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <%- include('partials/head', { title }) %>
+</head>
+<body>
+  <main id="main-content" tabindex="-1" class="badge-print-main">
+    <div class="print-preview-header no-print">
+      <h1>Print Ticket</h1>
+      <button type="button" class="roster-action-btn print-action-btn" onclick="window.print()">Print</button>
+    </div>
+
+    <%# Not the fixed-size, many-per-sheet .barcode-cell grid (admin-name-
+        tag-barcode-print.ejs's own layout) - this is one ticket with more
+        content (event title/date/ticket type) than that cell's own tight
+        1.75in height allows. Reuses .barcode-cell-svg (just the class
+        public/js/barcode-print-shrink-name.js's own renderAllBarcodes()
+        selects on) and the same member.barcode value class check-in
+        already scans - see routes/events.js's own comment on why. %>
+    <div class="event-ticket-card">
+      <h2><%= ticket.title %></h2>
+      <p><%= startsLabel %></p>
+      <p><%= ticket.memberName %><% if (ticket.ticketTitle) { %> &middot; <%= ticket.ticketTitle %><% } %></p>
+      <svg class="barcode-cell-svg event-ticket-barcode" data-barcode-value="<%= ticket.barcode %>"></svg>
+    </div>
+  </main>
+  <script src="/js/vendor/jsbarcode.min.js"></script>
+  <script src="/js/barcode-print-shrink-name.js"></script>
+</body>
+</html>

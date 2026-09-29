@@ -135,9 +135,9 @@ test('Settings tab renders the new yes/no question list, grade/age locks, and se
 
   // A real request: "under individual event settings, there should be a
   // button that says copy link with the public url address for the
-  // event."
+  // event." Later renamed "Copy Event Link" (another real request).
   assert.match(page.text, new RegExp(`data-copy-link="https?://[^"]*/events/${eventId}"`));
-  assert.match(page.text, />Copy Link</);
+  assert.match(page.text, />Copy Event Link</);
 
   assert.match(page.text, /> Lock registration to grade level</);
   assert.match(page.text, /> Lock registration to age level</);

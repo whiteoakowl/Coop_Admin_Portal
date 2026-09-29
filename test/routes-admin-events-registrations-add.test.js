@@ -212,3 +212,47 @@ test('Add Registration popup offers an attached Volunteer List shift and Sign-Up
   const signup = await db.prepare('SELECT * FROM volunteer_signup_list_signups WHERE shift_id = ? AND member_id = ?').get(shift.id, family.parentId);
   assert.ok(signup, 'the selected member should be signed up for the shift chosen in the popup');
 });
+
+// A real request: "popup should show all the same questions, volunteer
+// signups and tickets questions as if the member is signing up for the
+// event themselves."
+test('Add Registration popup offers the same Ticket and Extra Field questions self-service registration asks, applied to everyone selected', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  const family = await makeFamily('TicketFields');
+
+  let csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=finance`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/ticket-types`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ title: 'General Admission', priceDollars: '5.00', _csrf: csrf });
+  const ticketType = await db.prepare("SELECT id FROM event_ticket_types WHERE event_id = ? AND title = 'General Admission'").get(eventId);
+
+  csrf = extractCsrf((await request(app).get(`/main-admin/events/${eventId}/builder?tab=volunteers&section=extraFields`).set('Cookie', admin.cookie)).text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/extra-fields`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ label: 'T-Shirt Size', fieldType: 'text', _csrf: csrf });
+  const extraField = await db.prepare("SELECT id FROM event_extra_fields WHERE event_id = ? AND label = 'T-Shirt Size'").get(eventId);
+
+  const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
+  assert.match(page.text, /name="ticketTypeId"/);
+  assert.match(page.text, /General Admission/);
+  assert.match(page.text, /T-Shirt Size/);
+  assert.match(page.text, new RegExp(`name="answers\\[f${extraField.id}\\]"`));
+
+  csrf = extractCsrf(page.text);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/registrations/add`)
+    .set('Cookie', admin.cookie)
+    .type('form')
+    .send({ memberIds: [String(family.parentId)], ticketTypeId: String(ticketType.id), [`answers[f${extraField.id}]`]: 'Large', _csrf: csrf });
+
+  const registration = await db.prepare('SELECT * FROM event_registrations WHERE event_id = ? AND member_id = ?').get(eventId, family.parentId);
+  assert.ok(registration);
+  assert.equal(registration.ticket_type_id, ticketType.id);
+  const answer = await db.prepare('SELECT value FROM event_registration_answers WHERE registration_id = ? AND extra_field_id = ?').get(registration.id, extraField.id);
+  assert.equal(answer.value, 'Large');
+});

@@ -698,7 +698,7 @@ router.post('/:id/ticket-types', async (req, res) => {
   const title = (req.body.title || '').trim();
   const priceCents = req.body.priceDollars ? Math.round(parseFloat(req.body.priceDollars) * 100) : 0;
   if (!title) return res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&error=` + encodeURIComponent('Ticket title is required.'));
-  await events.addTicketType(req.params.id, title, priceCents, req.body.pricePer);
+  await events.addTicketType(req.params.id, title, priceCents, req.body.pricePer, req.body.includesPhysicalTicket === '1');
   res.redirect(`/main-admin/events/${req.params.id}/builder?tab=finance&notice=` + encodeURIComponent('Ticket type added.'));
 });
 
@@ -1015,7 +1015,12 @@ async function attachedListsForEvent(eventId) {
 }
 
 router.get('/:id/registrations', async (req, res) => {
-  const event = await events.getEvent(req.params.id);
+  // getEventWithDetails (not the plain getEvent) - the Add Registration
+  // popup below now needs its own ticketTypes/extraFields, the same real
+  // request that added them ("popup should show all the same questions,
+  // volunteer signups and tickets questions as if the member is signing
+  // up for the event themselves").
+  const event = await events.getEventWithDetails(req.params.id);
   if (!event) return res.status(404).render('404', { title: 'Not Found' });
   const familyGroups = await events.familyGroupedRegistrationsForEvent(req.params.id);
   const volunteerSignupsByMember = event.volunteers_enabled ? await events.volunteerSignupsByMemberForEvent(req.params.id) : new Map();
@@ -1039,14 +1044,27 @@ router.get('/:id/registrations', async (req, res) => {
 // "Add a button that says add registration. Pop up with menu of
 // members... Able to select multiple boxes and save all at once. If
 // there is a volunteer list or signup list attached to this particular
-// event it will also ask for those selections."
+// event it will also ask for those selections." A later real request:
+// "popup should show all the same questions, volunteer signups and
+// tickets questions as if the member is signing up for the event
+// themselves" - answers[] parsed the exact same way routes/events.js's
+// own /:id/register does (the "f" prefix keeps qs from reading a
+// purely-numeric bracket key as an array index), and ticketTypeId read
+// the same way too, both now threaded through adminAddRegistrations.
 router.post('/:id/registrations/add', async (req, res) => {
   const eventId = req.params.id;
   const memberIds = [].concat(req.body.memberIds || []).map((v) => parseInt(v, 10)).filter(Boolean);
   if (memberIds.length === 0) {
     return res.redirect(`/main-admin/events/${eventId}/registrations?error=` + encodeURIComponent('Choose at least one member.'));
   }
-  const results = await events.adminAddRegistrations(eventId, memberIds, req.portalAccount.id);
+  const rawAnswers = req.body.answers || {};
+  const answers = {};
+  for (const [key, value] of Object.entries(rawAnswers)) {
+    const match = /^f(\d+)$/.exec(key);
+    if (match) answers[match[1]] = value;
+  }
+  const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
+  const results = await events.adminAddRegistrations(eventId, memberIds, req.portalAccount.id, answers, ticketTypeId);
   const confirmed = results.filter((r) => r.ok).length;
   const failed = results.filter((r) => !r.ok);
 

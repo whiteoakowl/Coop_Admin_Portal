@@ -225,6 +225,32 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   res.redirect(back + '?notice=' + encodeURIComponent(result.notice));
 });
 
+// A real request: "add a checkbox for include physical ticket. Members
+// will be able to print tickets with a barcode for check in and out.
+// Barcode is the same as their member ID number barcode used for
+// classes." Only ever prints for a member this account's own family
+// actually has, and only when that member's own registration is
+// confirmed under a ticket type with includes_physical_ticket on -
+// utils/events.js's own eventTicketDetailsForMember already enforces the
+// latter two in its own WHERE clause; the family check here is this
+// route's own responsibility, same as every other member-scoped action in
+// this file never trusts an id from the request alone.
+router.get('/:id/ticket', requirePortalAuth, async (req, res) => {
+  const eventId = req.params.id;
+  const memberId = parseInt(req.query.memberId, 10);
+  const family = await familyForAccount(req.portalAccount.id);
+  if (!family.some((m) => m.id === memberId)) {
+    return res.status(404).render('404', { title: 'Not Found' });
+  }
+  const ticket = await events.eventTicketDetailsForMember(eventId, memberId);
+  if (!ticket) return res.status(404).render('404', { title: 'Not Found' });
+  res.render('events-ticket-print', {
+    title: `Ticket - ${ticket.title}`,
+    ticket,
+    startsLabel: formatFriendlyTimestamp(ticket.starts_at),
+  });
+});
+
 // A real request built a "my registrations" log page on both portals
 // (routes/parent-portal.js's own /events, routes/student-portal.js's own
 // /events) that also needs its own Cancel button - redirectTo lets it send

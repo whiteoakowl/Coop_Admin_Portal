@@ -34,6 +34,12 @@
               <% } else { %>
                 <span class="badge-pill badge-pill-present">Registered</span>
               <% } %>
+              <%# A real request: "members will be able to print tickets
+                  with a barcode for check in and out" - only when this
+                  registration's own ticket type has that turned on. %>
+              <% if (r.status === 'confirmed' && r.includesPhysicalTicket) { %>
+                <a class="roster-action-btn" href="/events/<%= r.event_id %>/ticket?memberId=<%= r.member_id %>" target="_blank">Print Ticket</a>
+              <% } %>
               <% if (r.allowCancel) { %>
                 <form method="POST" action="/events/<%= r.event_id %>/unregister" class="inline-block-form">
                   <input type="hidden" name="memberId" value="<%= r.member_id %>" />

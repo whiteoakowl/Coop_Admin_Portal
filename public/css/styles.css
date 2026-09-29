@@ -4647,6 +4647,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
    left to vary with content, same as any real-world barcode does, capped
    here so a very long name's barcode can't overflow its cell. */
 .barcode-cell-svg { max-width: 85%; height: 0.9in; }
+/* A member's own printable event ticket (views/events-ticket-print.ejs) -
+   a real request: "add a checkbox for include physical ticket. Members
+   will be able to print tickets with a barcode." One ticket, not a many-
+   per-sheet grid, so it gets its own simple centered card instead of
+   .barcode-only-sheet-page's fixed 1.75in cells. */
+.event-ticket-card {
+  border: 1px solid rgba(28, 37, 48, 0.35);
+  border-radius: var(--radius);
+  padding: 1.5rem 2rem;
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: center;
+}
+.event-ticket-card h2 { margin: 0 0 0.5rem; }
+.event-ticket-barcode { display: block; margin: 1rem auto 0; }
 /* Meant to be read at a glance across a table, not squinted at up close.
    Comfortably clears the cell's remaining vertical space: 1.75in row -
    0.9in barcode - 0.3in padding - 0.1in gap = ~0.45in left, and 1.6rem at
