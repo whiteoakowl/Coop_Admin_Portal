@@ -488,8 +488,27 @@ async function setEventSections(eventId, sectionIds) {
   }
 }
 
+// A real bug report: "events not appearing on parent portal" traced to a
+// member-submitted event a Main Admin clicked straight into from its own
+// Requests-tab title link (views/admin-events-list.ejs) and published
+// from the builder page (views/admin-events-builder.ejs's own Publish
+// button, which has no approval gate) without ever clicking the separate
+// Approve button first. Nothing here used to touch approval_status, so
+// the event sat with status='published' + approval_status='pending'
+// forever - "Published" in every admin view (which never filters on
+// approval_status - see routes/admin-events.js's own Calendar tab query),
+// yet invisible on every member-facing page (routes/events.js's own
+// listEvents call requires approval_status='approved' - see its own
+// comment, which already assumed this exact safety net existed).
+// Publishing is a stronger, more deliberate admin action than a bare
+// Approve click, so treating it as approval too - regardless of whatever
+// approval_status currently is - closes the gap without adding a second
+// required click to the normal Requests -> Approve -> Drafts -> Publish
+// flow (approval_status is already 'approved' by then, so this is a
+// no-op there).
 async function setEventStatus(id, status) {
-  await db.prepare('UPDATE events SET status = ?, updated_at = now_text() WHERE id = ?').run(status, id);
+  const approvalClause = status === 'published' ? `, approval_status = 'approved'` : '';
+  await db.prepare(`UPDATE events SET status = ?, updated_at = now_text()${approvalClause} WHERE id = ?`).run(status, id);
 }
 
 async function setEventImage(id, imageKey) {
