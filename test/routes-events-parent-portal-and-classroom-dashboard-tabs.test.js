@@ -70,12 +70,14 @@ async function createParentAndStudentDualRoleAccount() {
 test('a dual student+parent account clicking Events from the Parent Portal nav stays in Parent Portal, not Student', async () => {
   const cookie = await createParentAndStudentDualRoleAccount();
 
-  // Confirm the Parent Portal nav itself links with ?portal=parent.
+  // Confirm the Parent Portal nav itself links with ?portal=parent. A
+  // later real request ("event calendar should land on calendar view,
+  // not list view") added view=calendar to this same link.
   const home = await request(app).get('/parent').set('Cookie', cookie);
-  assert.match(home.text, /href="\/events\?portal=parent"/);
+  assert.match(home.text, /href="\/events\?view=calendar&(?:amp;)?portal=parent"/);
 
   // Following that exact link renders the Parent Portal shell, not Student.
-  const events = await request(app).get('/events?portal=parent').set('Cookie', cookie);
+  const events = await request(app).get('/events?view=calendar&portal=parent').set('Cookie', cookie);
   assert.equal(events.status, 200);
   assert.match(events.text, /Parent Portal/);
   assert.match(events.text, /href="\/parent\/events">My Event Registrations<\/a>/);
@@ -99,11 +101,11 @@ test('the Events calendar always renders the grid, even with zero published even
 
 test('the Events page description text is gone, and the Parent Portal Events subpage is titled Event Calendar', async () => {
   const cookie = await createParentAndStudentDualRoleAccount();
-  const res = await request(app).get('/events?portal=parent').set('Cookie', cookie);
+  const res = await request(app).get('/events?view=calendar&portal=parent').set('Cookie', cookie);
   assert.equal(res.status, 200);
   assert.doesNotMatch(res.text, /Upcoming co-op events, fundraisers/);
   assert.match(res.text, /<h1>Event Calendar<\/h1>/);
-  assert.match(res.text, /class="view-tab" href="\/events\?portal=parent">Event Calendar<\/a>/);
+  assert.match(res.text, /class="view-tab" href="\/events\?view=calendar&(?:amp;)?portal=parent">Event Calendar<\/a>/);
 });
 
 test('mobile: Print and + Submit an Event share one row, not split across two', async () => {
