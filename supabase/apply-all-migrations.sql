@@ -3292,7 +3292,22 @@ create table if not exists store_product_options (
   position integer not null default 0,
   created_at text not null default now_text()
 );
-create index if not exists idx_store_product_options_product on store_product_options(product_id);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261005010000_store_option_groups.sql later drops product_id from
+-- this table - dropping a column also drops any index built solely on
+-- it, so replaying this file after that migration has already run once
+-- would otherwise recreate the index against a column that's gone (a
+-- real bug report: running the whole consolidated SQL file a second time
+-- failed with "column product_id does not exist").
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'store_product_options' and column_name = 'product_id'
+  ) then
+    create index if not exists idx_store_product_options_product on store_product_options(product_id);
+  end if;
+end $$;
 
 -- No automatic backfill from the old sizes text - a size never carried
 -- its own price or stock, so there's nothing to carry over beyond the
@@ -3647,7 +3662,21 @@ alter table classes add column if not exists allow_parent_chat integer not null 
 -- rather than adding a second column: every existing row is still exactly
 -- "whoever posted this message's display name", just not exclusively an
 -- admin's anymore.
-alter table class_chat_messages rename column admin_username to author_name;
+--
+-- Guarded by an information_schema check, unlike a plain "rename column"
+-- (a real bug report: running this SQL a second time - this whole
+-- consolidated file is meant to be safe to replay in full - failed with
+-- "column admin_username does not exist", since the first run had already
+-- renamed it and Postgres has no "rename column if exists").
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'class_chat_messages' and column_name = 'admin_username'
+  ) then
+    alter table class_chat_messages rename column admin_username to author_name;
+  end if;
+end $$;
 
 -- ===== 20261003010000_orientation_progress.sql =====
 -- A real request: "Co-op admin portal. Add an orientation tab. List of
@@ -3716,15 +3745,29 @@ alter table store_product_options alter column price_cents drop not null;
 -- Backfill: every product that already had flat options gets one
 -- default group ("Options") so its existing values keep working as a
 -- single dropdown, unchanged from a buyer's point of view.
-insert into store_product_option_groups (product_id, name, position)
-select distinct product_id, 'Options', 0
-from store_product_options
-where group_id is null;
+--
+-- Guarded by an information_schema check (a real bug report: running
+-- this whole consolidated file a second time - it's meant to be safe to
+-- replay in full - failed with "column product_id does not exist", since
+-- the first run's own DROP COLUMN below already removed it by the time
+-- this backfill's queries were re-parsed).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'store_product_options' and column_name = 'product_id'
+  ) then
+    insert into store_product_option_groups (product_id, name, position)
+    select distinct product_id, 'Options', 0
+    from store_product_options
+    where group_id is null;
 
-update store_product_options o
-set group_id = g.id
-from store_product_option_groups g
-where o.group_id is null and g.product_id = o.product_id and g.name = 'Options';
+    update store_product_options o
+    set group_id = g.id
+    from store_product_option_groups g
+    where o.group_id is null and g.product_id = o.product_id and g.name = 'Options';
+  end if;
+end $$;
 
 -- Every value is now reached through its group (group_id, set not null
 -- above) rather than directly by product - product_id here is now
@@ -3989,3 +4032,25 @@ alter table volunteer_dates add column if not exists archived_at text;
 -- and others that don't (e.g. a free/RSVP-only tier), same as its own
 -- price_per already varies per ticket type rather than per event.
 alter table event_ticket_types add column if not exists includes_physical_ticket boolean not null default false;
+
+-- ===== 20261018010000_event_optional_info_sections.sql =====
+-- A real request: "event editing under details add another text box that
+-- says activity information, another text box below that saying meetup
+-- and parking information, another text box under that saying what to
+-- bring. Under that a text box that says extra notes. Next to each of
+-- these title is a check box and question that says include this
+-- section? If the box is checked then the information filled out and the
+-- section will appear on the event for members to see." Same "text field
+-- + its own include_* toggle" shape as the existing payment_instructions_
+-- title/text pair - each section only shows on the public event detail
+-- page (views/events-detail.ejs) when its own checkbox is on, regardless
+-- of whether text has been typed in.
+alter table events add column if not exists activity_info text;
+alter table events add column if not exists include_activity_info integer not null default 0;
+alter table events add column if not exists meetup_parking_info text;
+alter table events add column if not exists include_meetup_parking_info integer not null default 0;
+alter table events add column if not exists what_to_bring text;
+alter table events add column if not exists include_what_to_bring integer not null default 0;
+alter table events add column if not exists extra_notes text;
+alter table events add column if not exists include_extra_notes integer not null default 0;
+

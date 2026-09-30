@@ -29,15 +29,29 @@ alter table store_product_options alter column price_cents drop not null;
 -- Backfill: every product that already had flat options gets one
 -- default group ("Options") so its existing values keep working as a
 -- single dropdown, unchanged from a buyer's point of view.
-insert into store_product_option_groups (product_id, name, position)
-select distinct product_id, 'Options', 0
-from store_product_options
-where group_id is null;
+--
+-- Guarded by an information_schema check (a real bug report: running
+-- this whole consolidated file a second time - it's meant to be safe to
+-- replay in full - failed with "column product_id does not exist", since
+-- the first run's own DROP COLUMN below already removed it by the time
+-- this backfill's queries were re-parsed).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'store_product_options' and column_name = 'product_id'
+  ) then
+    insert into store_product_option_groups (product_id, name, position)
+    select distinct product_id, 'Options', 0
+    from store_product_options
+    where group_id is null;
 
-update store_product_options o
-set group_id = g.id
-from store_product_option_groups g
-where o.group_id is null and g.product_id = o.product_id and g.name = 'Options';
+    update store_product_options o
+    set group_id = g.id
+    from store_product_option_groups g
+    where o.group_id is null and g.product_id = o.product_id and g.name = 'Options';
+  end if;
+end $$;
 
 -- Every value is now reached through its group (group_id, set not null
 -- above) rather than directly by product - product_id here is now

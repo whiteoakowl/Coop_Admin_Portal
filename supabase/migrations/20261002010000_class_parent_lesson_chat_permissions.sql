@@ -16,4 +16,18 @@ alter table classes add column if not exists allow_parent_chat integer not null 
 -- rather than adding a second column: every existing row is still exactly
 -- "whoever posted this message's display name", just not exclusively an
 -- admin's anymore.
-alter table class_chat_messages rename column admin_username to author_name;
+--
+-- Guarded by an information_schema check, unlike a plain "rename column"
+-- (a real bug report: running this SQL a second time - this whole
+-- consolidated file is meant to be safe to replay in full - failed with
+-- "column admin_username does not exist", since the first run had already
+-- renamed it and Postgres has no "rename column if exists").
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'class_chat_messages' and column_name = 'admin_username'
+  ) then
+    alter table class_chat_messages rename column admin_username to author_name;
+  end if;
+end $$;

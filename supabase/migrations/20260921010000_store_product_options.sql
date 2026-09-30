@@ -20,7 +20,22 @@ create table if not exists store_product_options (
   position integer not null default 0,
   created_at text not null default now_text()
 );
-create index if not exists idx_store_product_options_product on store_product_options(product_id);
+-- Guarded (rather than a plain "create index if not exists") because
+-- 20261005010000_store_option_groups.sql later drops product_id from
+-- this table - dropping a column also drops any index built solely on
+-- it, so replaying this file after that migration has already run once
+-- would otherwise recreate the index against a column that's gone (a
+-- real bug report: running the whole consolidated SQL file a second time
+-- failed with "column product_id does not exist").
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'store_product_options' and column_name = 'product_id'
+  ) then
+    create index if not exists idx_store_product_options_product on store_product_options(product_id);
+  end if;
+end $$;
 
 -- No automatic backfill from the old sizes text - a size never carried
 -- its own price or stock, so there's nothing to carry over beyond the
