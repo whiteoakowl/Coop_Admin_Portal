@@ -25,6 +25,8 @@ process.env.MAIN_ADMIN_PASSWORD = 'changeme123';
 const request = require('supertest');
 const app = require('../server');
 const db = require('../db');
+const { hashPassword } = require('../utils/portalAuth');
+const { generateMemberCode } = require('../utils/members');
 
 test.before(() => app.ready);
 test.after(() => {
@@ -192,4 +194,41 @@ test('an uploaded event image shows at the top of the public event detail page',
   const detailPage = await request(app).get(`/events/${eventId}`).set('Cookie', admin.cookie);
   assert.equal(detailPage.status, 200);
   assert.match(detailPage.text, new RegExp(`<img src="[^"]*${event.image_key}[^"]*"`));
+});
+
+// A real bug report: "on parent portal you can't see the event photo when
+// you click on an individual event." Root cause: routes/events.js had its
+// own, separate image-URL-building logic (hardcoded to a local-disk path)
+// instead of sharing routes/admin-events.js's storage-backend-aware
+// imageUrl() - now both share one definition, utils/events.js's own
+// eventImageUrl(). This test hits the exact page a parent sees (?portal=
+// parent, the same page the calendar's own event cards link to) so this
+// class of divergence can't silently come back.
+test('an uploaded event image also shows on the Parent Portal event detail page', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await request(app)
+    .post(`/main-admin/events/${eventId}/image?_csrf=${encodeURIComponent(admin.csrfToken)}`)
+    .set('Cookie', admin.cookie)
+    .attach('image', Buffer.from('fake jpeg bytes'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+  await request(app).post(`/main-admin/events/${eventId}/status`).set('Cookie', admin.cookie).type('form').send({ status: 'published', _csrf: admin.csrfToken });
+  const event = await db.prepare('SELECT image_key FROM events WHERE id = ?').get(eventId);
+
+  const familyId = (await db.prepare("INSERT INTO families (name) VALUES (?)").run('Photo Parent Family')).lastInsertRowid;
+  const code = await generateMemberCode();
+  const memberRow = await db
+    .prepare("INSERT INTO members (name, barcode, member_code, member_type, family_id, is_primary_parent, active) VALUES (?, ?, ?, 'parent', ?, 1, 1) RETURNING id")
+    .get('Photo Test Parent', code, code, familyId);
+  await db
+    .prepare("INSERT INTO member_accounts (member_id, email, password_hash, status, approved_at) VALUES (?, ?, ?, 'active', now_text())")
+    .run(memberRow.id, 'photoparent@example.com', hashPassword('testpassword123'));
+  const parentRole = await db.prepare("SELECT id FROM roles WHERE key = 'parent'").get();
+  const acct = await db.prepare('SELECT id FROM member_accounts WHERE email = ?').get('photoparent@example.com');
+  await db.prepare('INSERT INTO member_account_roles (member_account_id, role_id) VALUES (?, ?)').run(acct.id, parentRole.id);
+  const parentLogin = await request(app).post('/login').type('form').send({ email: 'photoparent@example.com', password: 'testpassword123', next: '/parent' });
+  const parentCookie = parentLogin.headers['set-cookie'];
+
+  const parentDetailPage = await request(app).get(`/events/${eventId}?portal=parent`).set('Cookie', parentCookie);
+  assert.equal(parentDetailPage.status, 200);
+  assert.match(parentDetailPage.text, new RegExp(`<img src="[^"]*${event.image_key}[^"]*"`));
 });

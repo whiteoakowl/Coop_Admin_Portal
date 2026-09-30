@@ -51,38 +51,66 @@ router.use(requirePortalAuth, requirePortal('main_admin'));
 // member_type, since there's no 'teacher' member_type in the legacy
 // Co-op Admin member model this table also serves.
 router.get('/', async (req, res) => {
-  const pendingCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'pending'").get()).c);
-  const activeCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'active'").get()).c);
-  const familyCount = Number((await db.prepare('SELECT COUNT(*) AS c FROM families').get()).c);
-  const parentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get()).c);
-  const studentCount = Number((await db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get()).c);
-  // A real request: "the teacher count... should show how many members
-  // are signed up for a teacher position on classes. If a member is
-  // teaching more than one class they are only counted once." This used
-  // to count distinct portal accounts holding the 'teacher' role
-  // (member_account_roles) - a member's own class assignment
-  // (class_staff, the same table Class Manage's own Staff & Roster tab
-  // writes to) is the real source of "is this member actually teaching a
-  // class," independent of whether they've ever signed up for a Teacher
-  // Portal account at all.
-  const teacherCount = Number((await db.prepare("SELECT COUNT(DISTINCT member_id) AS c FROM class_staff WHERE role = 'teacher'").get()).c);
-  const adminCount = Number(
-    (
-      await db
-        .prepare(
-          `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
-           JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
-           WHERE r.key IN ('coop_admin', 'main_admin') AND ma.status = 'active'`
-        )
-        .get()
-    ).c
-  );
+  // All twelve of these are independent of one another (none reads a
+  // value another produced), so they run concurrently instead of as one
+  // long sequential await chain - see routes/admin.js's own dashboard for
+  // the same fix and the measured before/after on this pattern.
+  const [
+    pendingCountRow,
+    activeCountRow,
+    familyCountRow,
+    parentCountRow,
+    studentCountRow,
+    // A real request: "the teacher count... should show how many members
+    // are signed up for a teacher position on classes. If a member is
+    // teaching more than one class they are only counted once." This used
+    // to count distinct portal accounts holding the 'teacher' role
+    // (member_account_roles) - a member's own class assignment
+    // (class_staff, the same table Class Manage's own Staff & Roster tab
+    // writes to) is the real source of "is this member actually teaching a
+    // class," independent of whether they've ever signed up for a Teacher
+    // Portal account at all.
+    teacherCountRow,
+    adminCountRow,
+    eventRequests,
+    babysitterApprovals,
+    photoSubmissions,
+    directoryRequests,
+    classifiedsRequests,
+  ] = await Promise.all([
+    db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'pending'").get(),
+    db.prepare("SELECT COUNT(*) AS c FROM member_accounts WHERE status = 'active'").get(),
+    db.prepare('SELECT COUNT(*) AS c FROM families').get(),
+    db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'parent'").get(),
+    db.prepare("SELECT COUNT(*) AS c FROM members WHERE active = 1 AND member_type = 'student'").get(),
+    db.prepare("SELECT COUNT(DISTINCT member_id) AS c FROM class_staff WHERE role = 'teacher'").get(),
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT mar.member_account_id) AS c FROM member_account_roles mar
+         JOIN roles r ON r.id = mar.role_id JOIN member_accounts ma ON ma.id = mar.member_account_id
+         WHERE r.key IN ('coop_admin', 'main_admin') AND ma.status = 'active'`
+      )
+      .get(),
+    events.listEvents({ approvalStatus: 'pending' }),
+    babysitters.listPendingProfiles(),
+    photos.listPendingPhotos(),
+    directory.listListings({ status: 'pending' }),
+    classifieds.listListings({ status: 'pending' }),
+  ]);
 
-  const eventRequestsCount = (await events.listEvents({ approvalStatus: 'pending' })).length;
-  const babysitterApprovalsCount = (await babysitters.listPendingProfiles()).length;
-  const photoSubmissionsCount = (await photos.listPendingPhotos()).length;
-  const directoryRequestsCount = (await directory.listListings({ status: 'pending' })).length;
-  const classifiedsRequestsCount = (await classifieds.listListings({ status: 'pending' })).length;
+  const pendingCount = Number(pendingCountRow.c);
+  const activeCount = Number(activeCountRow.c);
+  const familyCount = Number(familyCountRow.c);
+  const parentCount = Number(parentCountRow.c);
+  const studentCount = Number(studentCountRow.c);
+  const teacherCount = Number(teacherCountRow.c);
+  const adminCount = Number(adminCountRow.c);
+
+  const eventRequestsCount = eventRequests.length;
+  const babysitterApprovalsCount = babysitterApprovals.length;
+  const photoSubmissionsCount = photoSubmissions.length;
+  const directoryRequestsCount = directoryRequests.length;
+  const classifiedsRequestsCount = classifiedsRequests.length;
 
   res.render('main-admin-home', {
     title: 'Main Admin',
@@ -151,11 +179,18 @@ router.get('/quick-links', (req, res) => {
 // routes/main-admin.js's own POST /roles/:id/permissions already uses
 // for role_permissions, just scoped to an admin_position instead.
 async function renderAdmins(req, res, error, notice) {
-  const adminPositions = await listAdminPositions();
-  const leadersByPosition = await membersByAdminPosition();
-  const permissions = await db.prepare('SELECT * FROM permissions ORDER BY label').all();
-  const positionPermissionIds = {};
-  for (const p of adminPositions) positionPermissionIds[p.id] = await permissionIdsForPosition(p.id);
+  const [adminPositions, leadersByPosition, permissions] = await Promise.all([
+    listAdminPositions(),
+    membersByAdminPosition(),
+    db.prepare('SELECT * FROM permissions ORDER BY label').all(),
+  ]);
+  // One permission-ids lookup per position, all independent of each
+  // other - run concurrently instead of one at a time (a real N+1 when
+  // there are more than a couple of admin positions).
+  const positionPermissionIdsEntries = await Promise.all(
+    adminPositions.map(async (p) => [p.id, await permissionIdsForPosition(p.id)])
+  );
+  const positionPermissionIds = Object.fromEntries(positionPermissionIdsEntries);
 
   const rows = [];
   for (const p of adminPositions) {

@@ -27,6 +27,25 @@ const notifications = require('./notifications');
 const { toCsvRow } = require('./spreadsheet');
 const { findMemberByBarcodeOrName } = require('./memberLookup');
 const { ageFromBirthday } = require('./emailComposer');
+const { createStorageClient, publicUrl } = require('./storage');
+
+// A real bug report: "on parent portal you can't see the event photo when
+// you click on an individual event." routes/events.js (the shared public/
+// member event detail page) had its OWN copy of this URL-building logic,
+// hardcoded to the pre-Supabase-Storage local-disk path
+// (`/uploads/events/${key}`) - it never checked createStorageClient() the
+// way routes/admin-events.js's own imageUrl() does, so once Storage was
+// actually configured (production), the file really did live at a
+// Supabase Storage URL but every visitor to the detail page - on any
+// portal, not just Parent - was still served the old local-disk path,
+// which 404s once file uploads move off local disk. Single shared
+// definition here now, imported by both route files, so they can't
+// diverge like this again.
+const EVENT_IMAGES_BUCKET = 'event-images';
+function eventImageUrl(key) {
+  if (!key) return null;
+  return createStorageClient() ? publicUrl(EVENT_IMAGES_BUCKET, key) : `/uploads/events/${key}`;
+}
 
 // A real request: "ages should have all ages listed, not just age
 // groups. 0-100." Deliberately its own list, not utils/emailComposer.js's
@@ -1588,6 +1607,8 @@ module.exports = {
   GRADE_OPTIONS,
   AGE_OPTIONS,
   EVENT_TYPES,
+  EVENT_IMAGES_BUCKET,
+  eventImageUrl,
   monthGrid,
   sortByLastNameField,
   ageGroupAllowsMember,

@@ -112,10 +112,16 @@ async function announcementsForAccount(accountId) {
 }
 
 router.get('/', async (req, res) => {
-  const member = await memberForAccount(req.portalAccount.id);
+  // announcementsForAccount/natureNews only need the account id, not
+  // `member` - independent of it and of each other, so they run
+  // alongside memberForAccount instead of after it. classesForStudent
+  // genuinely needs `member` first, so it stays a separate await.
+  const [member, announcements, natureNewsLatest] = await Promise.all([
+    memberForAccount(req.portalAccount.id),
+    announcementsForAccount(req.portalAccount.id),
+    natureNews.listApproved(3),
+  ]);
   const classes = await classesForStudent(member);
-  const announcements = await announcementsForAccount(req.portalAccount.id);
-  const natureNewsLatest = await natureNews.listApproved(3);
   const words = wordOfWeek.wordsOfTheWeek();
   const wordOfWeekDateLabel = wordOfWeek.currentWeekDateLabel();
   res.render('student-home', { title: 'Student Portal', member, classes, announcements, natureNewsLatest, words, wordOfWeekDateLabel });

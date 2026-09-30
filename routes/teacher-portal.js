@@ -75,9 +75,15 @@ async function announcementsForAccount(accountId) {
 }
 
 router.get('/', async (req, res) => {
-  const member = await memberForAccount(req.portalAccount.id);
+  // announcementsForAccount only needs the account id, not `member` -
+  // independent of it, so it runs alongside memberForAccount instead of
+  // after it. classesForTeacher genuinely needs `member` first, so it
+  // stays a separate await.
+  const [member, announcements] = await Promise.all([
+    memberForAccount(req.portalAccount.id),
+    announcementsForAccount(req.portalAccount.id),
+  ]);
   const classes = await classesForTeacher(member);
-  const announcements = await announcementsForAccount(req.portalAccount.id);
   res.render('teacher-home', { title: 'Teacher Portal', member, classes, announcements });
 });
 

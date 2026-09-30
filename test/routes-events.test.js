@@ -426,7 +426,7 @@ test('Public event detail page: Register list is a clean column (no name-on-butt
   // The ineligible row shows "Not eligible" instead of a Register button.
   const rowsSection = page.text.slice(page.text.indexOf('event-register-member-list'));
   assert.match(rowsSection, /Not eligible/);
-  assert.match(rowsSection, /roster-action-btn-small">Register</);
+  assert.match(rowsSection, /roster-action-btn-small js-event-register-btn">Register</);
 
   // The eligible child can still actually register (server-side gate
   // agrees with what the page showed as clickable).

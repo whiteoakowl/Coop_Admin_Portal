@@ -107,13 +107,13 @@ router.post('/checkin/scan', async (req, res) => {
   }
 
   const now = Date.now();
-  let alreadyPresent = true;
-  for (const r of rosters) {
-    const existing = await db
-      .prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?')
-      .get(member.id, r.id, today);
-    if (!existing || existing.status !== 'present') alreadyPresent = false;
-  }
+  // One lookup per roster this member is on today (almost always 1, at
+  // most a couple) - each is independent of the others, so run them
+  // concurrently instead of one at a time.
+  const existingStatuses = await Promise.all(
+    rosters.map((r) => db.prepare('SELECT status FROM attendance WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today))
+  );
+  const alreadyPresent = existingStatuses.every((existing) => existing && existing.status === 'present');
 
   if (alreadyPresent) {
     // A real bug: a "log on check-in" member who scanned their name tag
@@ -150,9 +150,9 @@ router.post('/checkin/scan', async (req, res) => {
      ON CONFLICT(member_id, roster_id, session_date)
      DO UPDATE SET status = 'present', check_in_time = excluded.check_in_time, source = 'kiosk', recorded_at = now_text()`
   );
-  for (const r of rosters) {
-    await upsert.run(member.id, r.id, today, now);
-  }
+  // Each roster gets its own row (member_id, roster_id, session_date) -
+  // writes are independent of one another, so run them concurrently.
+  await Promise.all(rosters.map((r) => upsert.run(member.id, r.id, today, now)));
 
   // A real request: "add a dropdown menu to each setup/cleanup team list
   // that asks, log on check in or log on check out ... if team 1 is, log
@@ -227,9 +227,9 @@ router.post('/checkin/task-scan', async (req, res) => {
   const now = Date.now();
   const taskItemId = task ? task.id : null;
   const update = db.prepare('UPDATE attendance SET task_item_id = ?, task_scanned_at = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
-  for (const r of rosters) {
-    await update.run(taskItemId, now, member.id, r.id, today);
-  }
+  // Independent per-roster writes (different roster_id each time) - run
+  // concurrently instead of one at a time.
+  await Promise.all(rosters.map((r) => update.run(taskItemId, now, member.id, r.id, today)));
 
   // A real request: "after parent scans their setup/cleanup badge it
   // should ask if they have a 2nd setup/cleanup badge to scan, with yes
@@ -282,9 +282,9 @@ router.post('/checkin/task-scan-2', async (req, res) => {
   const now = Date.now();
   const taskItemId = task ? task.id : null;
   const update = db.prepare('UPDATE attendance SET task_item_id_2 = ?, task_scanned_at_2 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
-  for (const r of rosters) {
-    await update.run(taskItemId, now, member.id, r.id, today);
-  }
+  // Independent per-roster writes (different roster_id each time) - run
+  // concurrently instead of one at a time.
+  await Promise.all(rosters.map((r) => update.run(taskItemId, now, member.id, r.id, today)));
 
   res.json({ ok: true, name: member.name, message: `Thank you for checking in, ${member.name}!` });
 });
@@ -333,14 +333,16 @@ router.post('/find-parent/scan', async (req, res) => {
   // card, not a separate hand-built view.
   const template = await getScheduleCardTemplate();
   const bgCss = NameTagRenderCore.backgroundCss(template.background, template.backgroundOpacity);
-  const parentData = [];
-  for (const p of parents) {
-    parentData.push({
+  // scheduleCardDataForMember(p) is its own independent set of DB reads
+  // per parent - run them concurrently instead of one parent at a time
+  // (Promise.all preserves `parents`' own order, same as the loop did).
+  const parentData = await Promise.all(
+    parents.map(async (p) => ({
       name: p.name,
       html: NameTagRenderCore.renderBadgeElements(template.elements, await scheduleCardDataForMember(p)),
       bgCss,
-    });
-  }
+    }))
+  );
 
   res.json({ ok: true, studentName: student.name, parents: parentData, cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT });
 });

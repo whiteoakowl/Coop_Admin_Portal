@@ -369,8 +369,11 @@ router.get('/playground', requireUnlocked, (req, res) => {
 router.get('/playground/:day', requireUnlocked, async (req, res) => {
   const day = req.params.day;
   if (!isValidDay(day)) return res.status(404).render('404', { title: 'Not Found' });
-  const hours = [];
-  for (const h of HOUR_POSITIONS) hours.push({ position: h, label: await playgroundHourLabel(day, h) });
+  // playgroundHourLabel(day, h) re-runs the SAME "hours for this day" query
+  // for every hour position (a real N+1 - only 4 positions today, but each
+  // one is a full round trip to Postgres in production) - each call is
+  // independent of the others, so run them concurrently instead.
+  const hours = await Promise.all(HOUR_POSITIONS.map(async (h) => ({ position: h, label: await playgroundHourLabel(day, h) })));
   res.render('kiosk-playground-hours', { title: 'Playground Check-In', day, dayLabel: DAY_LABELS[day], hours });
 });
 

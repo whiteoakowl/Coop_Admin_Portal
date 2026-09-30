@@ -36,9 +36,9 @@ async function recordCheckout(member, rosters, today, taskItemId, taskItemId2) {
      DO UPDATE SET task_item_id = excluded.task_item_id, task_item_id_2 = excluded.task_item_id_2, check_out_time = excluded.check_out_time, recorded_at = now_text()`
   );
   const now = Date.now();
-  for (const roster of rosters) {
-    await upsert.run(member.id, roster.id, today, taskItemId, taskItemId2 || null, now);
-  }
+  // Each roster gets its own row (member_id, roster_id, session_date) -
+  // writes are independent of one another, so run them concurrently.
+  await Promise.all(rosters.map((roster) => upsert.run(member.id, roster.id, today, taskItemId, taskItemId2 || null, now)));
 }
 
 // Step 1: scan the member's own name tag. Students are checked out
@@ -89,11 +89,12 @@ router.post('/checkout/scan', async (req, res) => {
   // has (its own `existing` check) - without this, a duplicate scan (a
   // scanner double-fire, or a sibling re-scanning the same badge) just
   // silently overwrote check_out_time with a later, spurious time.
-  let alreadyCheckedOut = true;
-  for (const r of rosters) {
-    const existing = await db.prepare('SELECT 1 FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today);
-    if (!existing) alreadyCheckedOut = false;
-  }
+  // One lookup per roster this member is on today - each is independent
+  // of the others, so run them concurrently instead of one at a time.
+  const existingCheckouts = await Promise.all(
+    rosters.map((r) => db.prepare('SELECT 1 FROM checkouts WHERE member_id = ? AND roster_id = ? AND session_date = ?').get(member.id, r.id, today))
+  );
+  const alreadyCheckedOut = existingCheckouts.every((existing) => existing);
   if (alreadyCheckedOut) {
     return res.json({
       ok: true,
@@ -246,9 +247,9 @@ router.post('/checkout/task-scan-2', async (req, res) => {
 
   const taskItemId2 = task ? task.id : null;
   const update = db.prepare('UPDATE checkouts SET task_item_id_2 = ? WHERE member_id = ? AND roster_id = ? AND session_date = ?');
-  for (const r of rosters) {
-    await update.run(taskItemId2, member.id, r.id, today);
-  }
+  // Independent per-roster writes (different roster_id each time) - run
+  // concurrently instead of one at a time.
+  await Promise.all(rosters.map((r) => update.run(taskItemId2, member.id, r.id, today)));
 
   res.json({ ok: true, name: member.name, message: `Thank you for checking out, ${member.name}! Have a great day!` });
 });

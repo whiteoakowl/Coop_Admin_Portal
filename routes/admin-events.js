@@ -15,7 +15,7 @@ const fs = require('fs');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 const { requirePortalPermission } = require('../middleware/portalAuth');
 const { imageFileFilter } = require('../utils/uploads');
-const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = require('../utils/storage');
+const { createStorageClient, uploadFile, deleteFile, generateKey } = require('../utils/storage');
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const db = require('../db');
 const events = require('../utils/events');
@@ -238,8 +238,11 @@ function eventDataFromRow(event) {
 // Public bucket (event images are meant to be visible on the public
 // homepage too, unlike admin-documents.js's private `documents` bucket)
 // - same publicUrl()-or-local-disk pattern admin-name-tag.js/admin-
-// schedule.js already use for their own public-facing images.
-const EVENT_IMAGES_BUCKET = 'event-images';
+// schedule.js already use for their own public-facing images. The bucket
+// name and the matching imageUrl()-equivalent (utils/events.js's own
+// eventImageUrl) are shared with routes/events.js so the two files can't
+// diverge on how a stored image_key becomes a servable URL - see that
+// function's own comment for the real bug this fixed.
 const EVENT_IMAGE_DIR = path.join(__dirname, '..', 'public', 'uploads', 'events');
 if (!createStorageClient() && !fs.existsSync(EVENT_IMAGE_DIR)) {
   try {
@@ -277,11 +280,6 @@ function uploadEventImage(back) {
   };
 }
 
-function imageUrl(key) {
-  if (!key) return null;
-  return createStorageClient() ? publicUrl(EVENT_IMAGES_BUCKET, key) : `/uploads/events/${key}`;
-}
-
 // Shared by the Create New Event wizard's own page-1 image upload (a real
 // request: "events creation, page one should also have... event image
 // upload") and the existing per-event Image upload on the builder's own
@@ -294,13 +292,13 @@ async function saveEventImage(file, existingKey) {
   const client = createStorageClient();
   let key;
   if (client) {
-    key = await uploadFile(client, EVENT_IMAGES_BUCKET, file.buffer, file.originalname, file.mimetype);
+    key = await uploadFile(client, events.EVENT_IMAGES_BUCKET, file.buffer, file.originalname, file.mimetype);
   } else {
     key = generateKey(file.originalname);
     fs.writeFileSync(path.join(EVENT_IMAGE_DIR, key), file.buffer);
   }
   if (existingKey) {
-    if (client) await deleteFile(client, EVENT_IMAGES_BUCKET, existingKey);
+    if (client) await deleteFile(client, events.EVENT_IMAGES_BUCKET, existingKey);
     else {
       const oldPath = path.join(EVENT_IMAGE_DIR, existingKey);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -643,7 +641,7 @@ async function loadBuilder(req, res) {
     activeTab,
     activeSection,
     extraFieldTypes: events.EXTRA_FIELD_TYPES,
-    imageUrl: imageUrl(event.image_key),
+    imageUrl: events.eventImageUrl(event.image_key),
     categories: await events.listCategories(),
     locations: await events.listLocations(),
     accountingCategories: await events.listAccountingCategories(),

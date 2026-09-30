@@ -111,23 +111,47 @@ async function parentsForAccount(account) {
 }
 
 router.get('/', async (req, res) => {
-  const children = await childrenForAccount(req.portalAccount);
+  // Everything in this first batch is independent of everything else in
+  // it (none reads a value another produced) - run concurrently instead
+  // of one at a time. Only childIds/countsByStudent (needs `children`)
+  // and visibilityFlags (needs `upcoming` + `family`) have a real
+  // dependency, so those stay in a second batch below.
+  const [children, siteRows, personalRows, family, upcoming, businessDirectoryListingsRaw, classifiedsListingsRaw, readingLeaders, member] =
+    await Promise.all([
+      childrenForAccount(req.portalAccount),
+      // Two real sources merged into one feed, newest first - a real
+      // request: "notifications should be announcements and show up on
+      // the parent portal homepage, showing current announcements and
+      // past ones. main admin can send these customized notifications."
+      // Site-wide announcements (the same content Main Admin > Website
+      // manages, also shown to signed-out visitors on the public
+      // homepage) are one source; the other is Main Admin >
+      // Announcements' own per-account notifications
+      // (utils/notifications.js's notify(), type_key 'announcement') -
+      // unread ones get a "New" badge (isNew below), read ones just sink
+      // down the list, which is what "current ones and past ones" means
+      // here rather than a hard time-based cutoff.
+      db.prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 10").all(),
+      notifications.listForAccount(req.portalAccount.id, { typeKey: 'announcement' }),
+      // A real request: "Take off the my family card and replace it with
+      // upcoming events from the event calendar" - same visibility rules
+      // as the shared /events calendar itself (routes/events.js), just
+      // capped to a handful for the homepage card.
+      familyForAccount(req.portalAccount.id),
+      events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' }),
+      // A real request: "card showing business directory listing. And a
+      // card showing classifieds listings" - a small preview of each,
+      // same 'active' status the /directory and /classifieds pages
+      // themselves use.
+      businessDirectory.listListings({ status: 'active' }),
+      classifieds.listListings({ status: 'active' }),
+      // A real request: "card showing the rankings for Parent reading
+      // challenge" - same leaderboard /parent/leaderboard already
+      // renders, scoped to memberType 'parent' (utils/reading.js).
+      reading.leaderboard(5, 'parent'),
+      memberForAccount(req.portalAccount.id),
+    ]);
 
-  // Two real sources merged into one feed, newest first - a real
-  // request: "notifications should be announcements and show up on the
-  // parent portal homepage, showing current announcements and past
-  // ones. main admin can send these customized notifications." Site-wide
-  // announcements (the same content Main Admin > Website manages, also
-  // shown to signed-out visitors on the public homepage) are one source;
-  // the other is Main Admin > Announcements' own per-account
-  // notifications (utils/notifications.js's notify(), type_key
-  // 'announcement') - unread ones get a "New" badge (isNew below), read
-  // ones just sink down the list, which is what "current ones and past
-  // ones" means here rather than a hard time-based cutoff.
-  const siteRows = await db
-    .prepare("SELECT * FROM announcements WHERE (expires_at IS NULL OR expires_at > now_text()) ORDER BY published_at DESC LIMIT 10")
-    .all();
-  const personalRows = await notifications.listForAccount(req.portalAccount.id, { typeKey: 'announcement' });
   const announcements = [
     ...siteRows.map((a) => ({ title: a.title, body: a.body, dateLabel: formatFriendlyTimestamp(a.published_at), sortKey: a.published_at, isNew: false })),
     ...personalRows.map((n) => ({ title: n.title, body: n.body, dateLabel: formatFriendlyTimestamp(n.created_at), sortKey: n.created_at, isNew: !n.read_at })),
@@ -149,42 +173,30 @@ router.get('/', async (req, res) => {
   // directly, never touching class_registrations at all). class_enrollments
   // is the actual "is this student in this class" table used everywhere
   // else (attendance, rosters, ...), so it's the right source here too.
-  const countsByStudent = childIds.length
-    ? await db
-        .prepare(
-          `SELECT student_id, COUNT(*) AS c FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
-        )
-        .all(...childIds)
-    : [];
+  const [countsByStudent, visibilityFlags] = await Promise.all([
+    childIds.length
+      ? db
+          .prepare(
+            `SELECT student_id, COUNT(*) AS c FROM class_enrollments WHERE student_id IN (${childIds.map(() => '?').join(',')}) GROUP BY student_id`
+          )
+          .all(...childIds)
+      : Promise.resolve([]),
+    Promise.all(upcoming.map((e) => events.eventVisibleToFamily(e.id, family))),
+  ]);
   const countByStudentId = new Map(countsByStudent.map((r) => [Number(r.student_id), Number(r.c)]));
   const registrationCountsByChild = children.map((c) => ({ name: c.name, count: countByStudentId.get(Number(c.id)) || 0 }));
 
-  // A real request: "Take off the my family card and replace it with
-  // upcoming events from the event calendar" - same visibility rules as
-  // the shared /events calendar itself (routes/events.js), just capped to
-  // a handful for the homepage card.
-  const family = await familyForAccount(req.portalAccount.id);
-  const upcoming = await events.listEvents({ status: 'published', upcomingOnly: true, approvalStatus: 'approved' });
-  const visibilityFlags = await Promise.all(upcoming.map((e) => events.eventVisibleToFamily(e.id, family)));
   const upcomingEvents = upcoming
     .filter((e, i) => visibilityFlags[i])
     .slice(0, 3)
     .map((e) => ({ title: e.title, startsLabel: formatFriendlyTimestamp(e.starts_at) }));
 
-  // A real request: "card showing business directory listing. And a card
-  // showing classifieds listings" - a small preview of each, same
-  // 'active' status the /directory and /classifieds pages themselves use.
-  const businessDirectoryListings = (await businessDirectory.listListings({ status: 'active' })).slice(0, 4);
-  const classifiedsListings = (await classifieds.listListings({ status: 'active' })).slice(0, 4);
-
-  // A real request: "card showing the rankings for Parent reading
-  // challenge" - same leaderboard /parent/leaderboard already renders,
-  // scoped to memberType 'parent' (utils/reading.js).
-  const readingLeaders = await reading.leaderboard(5, 'parent');
+  const businessDirectoryListings = businessDirectoryListingsRaw.slice(0, 4);
+  const classifiedsListings = classifiedsListingsRaw.slice(0, 4);
 
   res.render('parent-home', {
     title: 'Parent Portal',
-    member: await memberForAccount(req.portalAccount.id),
+    member,
     children,
     announcements,
     registrationCountsByChild,

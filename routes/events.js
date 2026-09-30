@@ -17,7 +17,7 @@ const notifications = require('../utils/notifications');
 const { sanitizePostBody } = require('../utils/sanitizeHtml');
 
 function withImageUrl(event) {
-  return { ...event, imageUrl: event.image_key ? `/uploads/events/${event.image_key}` : null };
+  return { ...event, imageUrl: events.eventImageUrl(event.image_key) };
 }
 
 // A real bug report: "parent portal, backing out of an event takes you to
@@ -32,6 +32,18 @@ function withImageUrl(event) {
 // before parent) and a dual-role account flips portals mid-visit.
 function portalPrefix(req) {
   return req.query.portal === 'parent' || req.query.portal === 'student' ? `?portal=${req.query.portal}&` : '?';
+}
+
+// A real request: "when you click register next to a member the page
+// will not refresh." /register and /unregister below still redirect for
+// a plain form submit (progressive enhancement - the page still works
+// with JS off), but public/js/events-detail-register.js's own fetch()
+// calls send this same Accept header middleware/csrfProtection.js
+// already checks for its own JSON error response, so both routes reuse
+// that exact convention instead of inventing a second way to ask for
+// JSON.
+function wantsJson(req) {
+  return !!(req.headers.accept && req.headers.accept.includes('application/json'));
 }
 
 // GET /events - public + member events, filtered to what THIS visitor is
@@ -271,10 +283,14 @@ router.post('/:id/register', requirePortalAuth, async (req, res) => {
   }
   const ticketTypeId = req.body.ticketTypeId ? parseInt(req.body.ticketTypeId, 10) : null;
   const result = await events.registerForEvent({ eventId, memberId, accountId: req.portalAccount.id, family, answers, ticketTypeId });
-  if (!result.ok) return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(result.error));
+  if (!result.ok) {
+    if (wantsJson(req)) return res.status(422).json({ ok: false, error: result.error });
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(result.error));
+  }
 
   const event = await events.getEvent(eventId);
   await notifications.notify(req.portalAccount.id, 'event_registration', { title: `Registered: ${event.title}`, body: result.notice, linkUrl: back });
+  if (wantsJson(req)) return res.json({ ok: true, notice: result.notice });
   res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent(result.notice));
 });
 
@@ -318,16 +334,21 @@ router.post('/:id/unregister', requirePortalAuth, async (req, res) => {
 
   const family = await familyForAccount(req.portalAccount.id);
   if (!family.some((m) => m.id === memberId)) {
-    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('You can only manage your own family\'s registrations.'));
+    const message = 'You can only manage your own family\'s registrations.';
+    if (wantsJson(req)) return res.status(403).json({ ok: false, error: message });
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(message));
   }
   // A real request: "allow registration cancelations" checkbox - gates a
   // member's own self-service cancel here only; a Main Admin can always
   // cancel a registration from the Registrations page regardless.
   const event = await events.getEvent(eventId);
   if (event && !event.allow_registration_cancellations) {
-    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent('Cancellations are not allowed for that event - contact an admin.'));
+    const message = 'Cancellations are not allowed for that event - contact an admin.';
+    if (wantsJson(req)) return res.status(422).json({ ok: false, error: message });
+    return res.redirect(back + portalPrefix(req) + 'error=' + encodeURIComponent(message));
   }
   await events.cancelRegistration(eventId, memberId);
+  if (wantsJson(req)) return res.json({ ok: true, notice: 'Registration cancelled.' });
   res.redirect(back + portalPrefix(req) + 'notice=' + encodeURIComponent('Registration cancelled.'));
 });
 

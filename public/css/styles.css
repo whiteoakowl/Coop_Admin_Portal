@@ -8953,8 +8953,31 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
    included optional info section now share one .manage-section (each
    its own <h3>, already bold site-wide) instead of a separate card
    each - this just spaces the stacked sections apart within it. */
-.event-details-card h3 { margin-top: 1.25rem; }
-.event-details-card h3:first-child { margin-top: 0; }
+/* A real request: "all of these information stay in one card but add
+   lines between each one to give it some division" - a top border on
+   every section title except the first turns the existing margin-top
+   spacing into a visible divider between Details/Activities/Parking/
+   Notes, without breaking back into separate cards. "Titles should be
+   shrunk to fit one line on mobile" - white-space: nowrap plus a smaller
+   mobile font-size keeps "Meetup and Parking Information" (the longest
+   one) from wrapping. */
+.event-details-card h3 { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border); white-space: nowrap; }
+.event-details-card h3:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+@media (max-width: 640px) {
+  .event-details-card h3 { font-size: 0.85rem; }
+}
+/* A real request: "the information under each section on the event
+   should be smaller font then their titles" - h3's own base size is
+   1rem, same as this body text's own inherited default, so the two read
+   as the same size today. 0.9rem here (0.8rem to keep the same ratio
+   once the mobile h3 shrinks to 0.85rem above) keeps the title visibly
+   the larger, bolder element or each section. */
+.event-details-card .forum-editable-display,
+.event-details-card p { font-size: 0.9rem; }
+@media (max-width: 640px) {
+  .event-details-card .forum-editable-display,
+  .event-details-card p { font-size: 0.8rem; }
+}
 
 /* "Name of each member should not be on each button. It should be a list
    of members with a small register button next to each name in a clean
@@ -8964,8 +8987,44 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 .event-register-member-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 .event-register-member-row:last-child { border-bottom: none; }
 .event-register-member-row-ineligible { opacity: 0.5; }
-.event-register-member-name { font-weight: 600; }
-.roster-action-btn-small { padding: 0.3rem 0.75rem; font-size: 0.85rem; }
+/* Wraps the optional checkbox ("add check boxes next to each member to
+   be able to register multiple family members at once") alongside the
+   name, as the row's own left-hand flex item - flex: 1/min-width: 0 here
+   (not just on the name) is what lets the name still shrink/ellipsis
+   correctly now that it's nested one level deeper than before. */
+.event-register-member-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+.event-register-member-checkbox { flex-shrink: 0; }
+/* min-width: 0 is what actually lets this shrink inside the flex row at
+   all - a flex item's default min-width is auto (its own content's
+   width), so without it the name would just push the row wider than the
+   card rather than ever wrapping or shrinking. white-space: nowrap keeps
+   "First Last" on one line (falling back to an ellipsis only if a name
+   is still too long for the row even at the mobile font-size below)
+   instead of wrapping first/last name onto separate lines. */
+.event-register-member-name { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.roster-action-btn-small { padding: 0.3rem 0.75rem; font-size: 0.85rem; flex-shrink: 0; }
+/* "The button will turn white and say registered" - a white background
+   with a green outline/text reads as a confirmed, non-urgent state
+   (green already means "success"/"present" everywhere else in this app),
+   distinct from the orange "Register" button it replaces. Doubles as the
+   Cancel trigger (clicking it unregisters) - events-detail-register.js's
+   own comment covers why that's the same button rather than a separate
+   one. */
+.roster-action-btn-registered { background: #fff; border-color: var(--green); color: var(--green); }
+.roster-action-btn-registered:hover { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+/* A real request: "shrink text of member names for the register card so
+   that first and last name fit on one row in mobile." */
+@media (max-width: 640px) {
+  .event-register-member-name { font-size: 0.85rem; }
+}
+
+/* The ticket/extra-field popup events-detail-register.js opens for a
+   member's Register click, when the event needs either. Sized like
+   .notes-dialog (reused for its shell/backdrop/actions-row) but a touch
+   wider since a ticket dropdown plus several extra-field questions is
+   more content than that dialog's usual single textarea. */
+.event-register-dialog { width: min(480px, 90vw); }
 
 /* Real bug, the same one .form-outer-panel exists to fix elsewhere in
    this app: html/body's own default background is the branded blue

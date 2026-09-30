@@ -281,7 +281,11 @@ test('Registering for an event keeps the visitor in Parent Portal on the redirec
 
   const detailPage = await request(app).get(`/events/${eventId}?portal=parent`).set('Cookie', cookie);
   const csrfToken = extractCsrf(detailPage.text);
-  const memberIdMatch = /name="memberId" value="(\d+)"/.exec(detailPage.text);
+  // The plain-list Register button is a JS-driven <button>, not a per-
+  // member <form> with its own hidden memberId field (see
+  // public/js/events-detail-register.js) - the member id it acts on
+  // lives on the row's own data-member-id attribute instead.
+  const memberIdMatch = /class="event-register-member-row[^"]*" data-member-id="(\d+)"/.exec(detailPage.text);
   assert.ok(memberIdMatch, 'expected at least one registerable family member on the page');
 
   // public/js/events-preserve-portal.js is what actually appends ?portal=

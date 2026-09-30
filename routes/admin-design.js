@@ -334,17 +334,22 @@ router.post('/design/print-classcheckin-qr', async (req, res) => {
 // against.
 router.get('/design/print-playground-qr', async (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
-  const pages = [];
-  for (const day of DAYS) {
-    const hours = [];
-    for (const hour of HOUR_POSITIONS) {
-      hours.push({
-        hourLabel: await playgroundHourLabel(day, hour),
-        checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
-      });
-    }
-    pages.push({ dayLabel: DAY_LABELS[day], hours });
-  }
+  // Every (day, hour) label lookup is independent of the others (and
+  // playgroundHourLabel re-queries the day's own hours every time it's
+  // called), so this used to be up to 8 sequential round trips for what's
+  // really only 2 distinct day-level queries worth of data - run them all
+  // concurrently instead.
+  const pages = await Promise.all(
+    DAYS.map(async (day) => {
+      const hours = await Promise.all(
+        HOUR_POSITIONS.map(async (hour) => ({
+          hourLabel: await playgroundHourLabel(day, hour),
+          checkInUrl: `${origin}/kiosk/class-checkin/playground/${day}/${hour}/attendance`,
+        }))
+      );
+      return { dayLabel: DAY_LABELS[day], hours };
+    })
+  );
 
   res.render('admin-playground-qr-print', {
     title: 'Print Playground Check-In QR Codes',

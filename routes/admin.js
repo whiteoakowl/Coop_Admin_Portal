@@ -95,9 +95,14 @@ async function todayStatsForType(memberType, today) {
   const placeholders = types.map(() => '?').join(',');
   const dow = weekdayOf(today);
   const day = dow === 1 ? 'monday' : dow === 3 ? 'wednesday' : null;
-  const total = day
-    ? (
-        await db
+  // All 5 queries below are independent of each other (none reads a
+  // result the others produce), so running them concurrently instead of
+  // one at a time cuts this function's own latency roughly 5x - real
+  // money on a remote/pooled Postgres connection, where each round trip
+  // carries its own network latency rather than being effectively free.
+  const [totalRow, checkedInRow, checkedOutRow, lateRow, absentRow] = await Promise.all([
+    day
+      ? db
           .prepare(
             `SELECT COUNT(DISTINCT m.id) AS c FROM members m
              JOIN roster_members rm ON rm.member_id = m.id
@@ -105,28 +110,41 @@ async function todayStatsForType(memberType, today) {
              WHERE m.active = 1 AND m.member_type IN (${placeholders}) AND r.category = 'Class Schedule' AND r.schedule_day = ?`
           )
           .get(...types, day)
-      ).c
-    : 0;
-  const checkedIn = (
-    await db
+      : { c: 0 },
+    db
       .prepare(
         `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
          JOIN members m ON m.id = a.member_id
          JOIN rosters r ON r.id = a.roster_id
          WHERE a.session_date = ? AND a.status = 'present' AND m.member_type IN (${placeholders}) AND r.category != 'Class Roster'`
       )
-      .get(today, ...types)
-  ).c;
-  const checkedOut = (
-    await db
+      .get(today, ...types),
+    db
       .prepare(
         `SELECT COUNT(DISTINCT c.member_id) AS c FROM checkouts c
          JOIN members m ON m.id = c.member_id
          JOIN rosters r ON r.id = c.roster_id
          WHERE c.session_date = ? AND m.member_type IN (${placeholders}) AND r.category != 'Class Roster'`
       )
-      .get(today, ...types)
-  ).c;
+      .get(today, ...types),
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+         JOIN members m ON m.id = a.member_id
+         WHERE a.session_date = ? AND a.status = 'late' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
+      )
+      .get(today, ...types),
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
+         JOIN members m ON m.id = a.member_id
+         WHERE a.session_date = ? AND a.status = 'absent' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
+      )
+      .get(today, ...types),
+  ]);
+  const total = totalRow.c;
+  const checkedIn = checkedInRow.c;
+  const checkedOut = checkedOutRow.c;
   // Unlike checkedIn/checkedOut above, late/absent deliberately do NOT
   // exclude rosters.category = 'Class Roster' - a real bug report:
   // "today's attendance ... should count absences and late that come
@@ -145,24 +163,8 @@ async function todayStatsForType(memberType, today) {
   // either, and kiosk/class-check-in scans never write status = 'late'/
   // 'absent' at all (only 'present'), so there was never really a "class
   // check-in" signal leaking in here in the first place.
-  const late = (
-    await db
-      .prepare(
-        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
-         JOIN members m ON m.id = a.member_id
-         WHERE a.session_date = ? AND a.status = 'late' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
-      )
-      .get(today, ...types)
-  ).c;
-  const absent = (
-    await db
-      .prepare(
-        `SELECT COUNT(DISTINCT a.member_id) AS c FROM attendance a
-         JOIN members m ON m.id = a.member_id
-         WHERE a.session_date = ? AND a.status = 'absent' AND a.source = 'absence_form' AND m.member_type IN (${placeholders})`
-      )
-      .get(today, ...types)
-  ).c;
+  const late = lateRow.c;
+  const absent = absentRow.c;
 
   return { total, checkedIn, checkedOut, late, absent };
 }
@@ -191,9 +193,14 @@ async function previousSessionDate(today) {
 // all) when there isn't a previous session yet, rather than a misleading
 // comparison against a session that never happened.
 async function statsWithTrends(memberType, today, previousDate) {
-  const current = await todayStatsForType(memberType, today);
-  if (!previousDate) return { ...current, trends: null, previousDateLabel: null };
-  const previous = await todayStatsForType(memberType, previousDate);
+  if (!previousDate) {
+    const current = await todayStatsForType(memberType, today);
+    return { ...current, trends: null, previousDateLabel: null };
+  }
+  // `today` and `previousDate` are two unrelated dates - fetching both
+  // concurrently instead of one after the other halves this function's
+  // own latency.
+  const [current, previous] = await Promise.all([todayStatsForType(memberType, today), todayStatsForType(memberType, previousDate)]);
   return {
     ...current,
     trends: {
@@ -258,15 +265,6 @@ router.get('/', requireAdmin, async (req, res) => {
   // not a per-day historical snapshot), so it stays the same regardless
   // of which date is selected - only Attendance/Alert Log move.
   const today = isValidISODate(req.query.date) ? req.query.date : todayISO();
-  const previousDate = await previousSessionDate(today);
-  const [mondayStudentCount, mondayParentCount, mondayFamilyCount, wednesdayStudentCount, wednesdayParentCount, wednesdayFamilyCount] = await Promise.all([
-    dayScheduleCount('student', 'monday'),
-    dayScheduleCount('parent', 'monday'),
-    dayFamilyCount('monday'),
-    dayScheduleCount('student', 'wednesday'),
-    dayScheduleCount('parent', 'wednesday'),
-    dayFamilyCount('wednesday'),
-  ]);
 
   // The Alert Log below reuses the exact same functions/format as the
   // Attendance page's own inline "Alerts" box (utils/alerts.js) - a real
@@ -277,17 +275,39 @@ router.get('/', requireAdmin, async (req, res) => {
   // there's at most one day's worth of sections here, same as visiting
   // that day's own Attendance tab today would show.
   const [alertDay] = todaysSessionDays(today);
-  let absenceAlerts = { absences: [], lates: [] };
-  let classesAtRisk = [];
-  let classesNeedingStaff = [];
-  if (alertDay) {
-    const parentRosterId = await ensureDayRoster(alertDay, 'parent');
-    [absenceAlerts, classesAtRisk, classesNeedingStaff] = await Promise.all([
-      absenceFormSubmissionsForRoster(parentRosterId, today),
-      classesAtRiskForDay(alertDay, today),
-      classesNeedingStaffForDay(alertDay, today),
-    ]);
-  }
+
+  // previousSessionDate, the 6 day-schedule counts, and the alert-log
+  // work below are 3 entirely independent branches - none reads a value
+  // another produces - so firing them together instead of one after the
+  // other overlaps their DB round trips instead of paying for each in
+  // turn. This matters most on a cold start against a remote/pooled
+  // Postgres connection (Netlify Function + Supabase), where each
+  // additional sequential round trip is real added latency, not
+  // effectively free the way it is against a local synchronous SQLite
+  // connection.
+  const [previousDate, dayCounts, alertResult] = await Promise.all([
+    previousSessionDate(today),
+    Promise.all([
+      dayScheduleCount('student', 'monday'),
+      dayScheduleCount('parent', 'monday'),
+      dayFamilyCount('monday'),
+      dayScheduleCount('student', 'wednesday'),
+      dayScheduleCount('parent', 'wednesday'),
+      dayFamilyCount('wednesday'),
+    ]),
+    alertDay
+      ? ensureDayRoster(alertDay, 'parent').then((parentRosterId) =>
+          Promise.all([absenceFormSubmissionsForRoster(parentRosterId, today), classesAtRiskForDay(alertDay, today), classesNeedingStaffForDay(alertDay, today)])
+        )
+      : Promise.resolve([{ absences: [], lates: [] }, [], []]),
+  ]);
+  const [mondayStudentCount, mondayParentCount, mondayFamilyCount, wednesdayStudentCount, wednesdayParentCount, wednesdayFamilyCount] = dayCounts;
+  const [absenceAlerts, classesAtRisk, classesNeedingStaff] = alertResult;
+
+  // student/parent stats both only depend on today/previousDate (already
+  // resolved above), so they run concurrently too rather than one after
+  // the other.
+  const [studentStats, parentStats] = await Promise.all([statsWithTrends('student', today, previousDate), statsWithTrends(['parent', 'admin'], today, previousDate)]);
 
   res.render('admin-dashboard', {
     title: 'Dashboard',
@@ -300,8 +320,8 @@ router.get('/', requireAdmin, async (req, res) => {
     wednesdayStudentCount,
     wednesdayParentCount,
     wednesdayFamilyCount,
-    studentStats: await statsWithTrends('student', today, previousDate),
-    parentStats: await statsWithTrends(['parent', 'admin'], today, previousDate),
+    studentStats,
+    parentStats,
     alertDayLabel: alertDay ? DAY_LABELS[alertDay] : null,
     absenceAlerts,
     classesAtRisk,
