@@ -8897,6 +8897,15 @@ tr[data-content-reorder-row].lesson-row-dragging { opacity: 0.55; background: va
 }
 .event-register-card h2 { color: var(--brand-darker); }
 
+/* A later real request: "instead of card for all those event viewing
+   sections make the details and activities, extra notes, parking etc
+   all on one card. Bold font for each section title." Details + every
+   included optional info section now share one .manage-section (each
+   its own <h3>, already bold site-wide) instead of a separate card
+   each - this just spaces the stacked sections apart within it. */
+.event-details-card h3 { margin-top: 1.25rem; }
+.event-details-card h3:first-child { margin-top: 0; }
+
 /* "Name of each member should not be on each button. It should be a list
    of members with a small register button next to each name in a clean
    column. It will gray out member who are not of the age or grade to

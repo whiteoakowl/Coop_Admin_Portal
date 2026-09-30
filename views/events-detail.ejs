@@ -112,38 +112,33 @@
         </div>
         <%
           // A real request: "Event details should also be card style like
-          // the other text information for events" - matches the
-          // .manage-section card each infoSection below already renders in.
-        %>
-        <% if (event.description) { %>
-          <div class="manage-section">
-            <h2>Details</h2>
-            <div class="forum-editable-display"><%- event.description %></div>
-          </div>
-        <% } %>
-
-        <%
-          // A real request: "event editing under details add another text
-          // box... include this section? If the box is checked then the
-          // information filled out and the section will appear on the
-          // event for members to see." Each only renders when its own
-          // checkbox is on AND it actually has text - an admin checking
-          // the box before typing anything shouldn't show an empty box.
+          // the other text information for events" - later refined to
+          // "instead of card for all those event viewing sections make
+          // the details and activities, extra notes, parking etc all on
+          // one card. Bold font for each section title. Registration card
+          // below it." One shared .manage-section card holds Details plus
+          // every included optional info section, each its own bold
+          // title instead of a separate card per section.
           var infoSections = [
             { label: 'Activity Information', text: event.activity_info, included: event.include_activity_info },
             { label: 'Meetup and Parking Information', text: event.meetup_parking_info, included: event.include_meetup_parking_info },
             { label: 'What to Bring', text: event.what_to_bring, included: event.include_what_to_bring },
             { label: 'Extra Notes', text: event.extra_notes, included: event.include_extra_notes },
           ];
+          var visibleInfoSections = infoSections.filter(function(section) { return section.included && section.text; });
         %>
-        <% infoSections.forEach(function(section) { %>
-          <% if (section.included && section.text) { %>
-            <div class="manage-section">
-              <h2><%= section.label %></h2>
+        <% if (event.description || visibleInfoSections.length) { %>
+          <div class="manage-section event-details-card">
+            <% if (event.description) { %>
+              <h3>Details</h3>
+              <div class="forum-editable-display"><%- event.description %></div>
+            <% } %>
+            <% visibleInfoSections.forEach(function(section) { %>
+              <h3><%= section.label %></h3>
               <p style="white-space: pre-wrap;"><%= section.text %></p>
-            </div>
-          <% } %>
-        <% }); %>
+            <% }); %>
+          </div>
+        <% } %>
 
         <% if (!portalAccount) { %>
           <p class="hint"><a href="/login?next=<%= encodeURIComponent('/events/' + event.id) %>">Log in</a> to register, volunteer, or claim a donation item.</p>
