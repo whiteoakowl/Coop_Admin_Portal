@@ -53,16 +53,50 @@
       </div>
     </div>
 
-    <%# A real request: "top of this page has total families, total
-        parents, total students registered, cancel, checked in and
-        checked out." %>
-    <div class="totals-card">
-      <span class="totals-item"><span class="stat-value"><%= totals.families %></span><span class="stat-label">Families</span></span>
-      <span class="totals-item"><span class="stat-value"><%= totals.parents %></span><span class="stat-label">Parents</span></span>
-      <span class="totals-item"><span class="stat-value"><%= totals.students %></span><span class="stat-label">Students</span></span>
-      <span class="totals-item"><span class="stat-value"><%= totals.cancelled %></span><span class="stat-label">Cancelled</span></span>
-      <span class="totals-item"><span class="stat-value"><%= totals.checkedIn %></span><span class="stat-label">Checked In</span></span>
-      <span class="totals-item"><span class="stat-value"><%= totals.checkedOut %></span><span class="stat-label">Checked Out</span></span>
+    <%
+      // A real request, with a reference screenshot: "counts for
+      // registered, canceled, checked in etc should look like this
+      // single card image. Use my pastel website colors. Orange. Blue,
+      // purple and green." All 4 statuses live on ONE card, each its own
+      // tinted column (icon+title header, then Family/Student/Parent
+      // rows below) - this app's own established soft-tint palette
+      // (green-bg/orange-bg/brand-soft/purple-soft - the same tokens
+      // .event-register-card and the team-accent-N cards already use)
+      // instead of the reference's own bold red/blue/green/purple - red
+      // isn't one of "my" 4 named colors, so Canceled is orange here.
+      var regSummaryCards = [
+        { key: 'registered', label: 'Registered', icon: 'icon-users', accent: 'green' },
+        { key: 'canceled', label: 'Canceled', icon: 'icon-x-circle', accent: 'orange' },
+        { key: 'checkedIn', label: 'Checked In', icon: 'icon-check-circle', accent: 'blue' },
+        { key: 'checkedOut', label: 'Checked Out', icon: 'icon-log-out', accent: 'purple' },
+      ];
+    %>
+    <div class="manage-section reg-summary-card">
+      <div class="reg-summary-cols">
+        <% regSummaryCards.forEach(function(card) { %>
+          <div class="reg-summary-col reg-summary-col-<%= card.accent %>">
+            <div class="reg-summary-col-header">
+              <svg class="icon"><use href="#<%= card.icon %>"/></svg>
+              <span><%= card.label %></span>
+            </div>
+            <div class="reg-summary-row">
+              <svg class="icon"><use href="#icon-users"/></svg>
+              <span class="reg-summary-row-label">Family</span>
+              <span class="reg-summary-row-value"><%= totals[card.key].family %></span>
+            </div>
+            <div class="reg-summary-row">
+              <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+              <span class="reg-summary-row-label">Student</span>
+              <span class="reg-summary-row-value"><%= totals[card.key].student %></span>
+            </div>
+            <div class="reg-summary-row">
+              <svg class="icon"><use href="#icon-user"/></svg>
+              <span class="reg-summary-row-label">Parent</span>
+              <span class="reg-summary-row-value"><%= totals[card.key].parent %></span>
+            </div>
+          </div>
+        <% }); %>
+      </div>
     </div>
 
     <% if (familyGroups.length === 0) { %>

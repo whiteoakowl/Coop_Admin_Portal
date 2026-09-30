@@ -121,20 +121,43 @@ test('Registrations totals header: families, parents, students, cancelled, check
     .send({ present: '1', _csrf: csrf });
 
   const page = await request(app).get(`/main-admin/events/${eventId}/registrations`).set('Cookie', admin.cookie);
-  const totalsMatch = /<div class="totals-card">([\s\S]*?)<\/div>/.exec(page.text);
-  assert.ok(totalsMatch, 'expected a totals-card on the page');
-  const totalsHtml = totalsMatch[1];
-  assert.match(totalsHtml, /Families/);
-  assert.match(totalsHtml, /Parents/);
-  assert.match(totalsHtml, /Students/);
-  assert.match(totalsHtml, /Cancelled/);
-  assert.match(totalsHtml, /Checked In/);
-  assert.match(totalsHtml, /Checked Out/);
-  // One family registered (parent + student), one checked in.
-  assert.match(totalsHtml, /<span class="stat-value">1<\/span><span class="stat-label">Families<\/span>/);
-  assert.match(totalsHtml, /<span class="stat-value">1<\/span><span class="stat-label">Parents<\/span>/);
-  assert.match(totalsHtml, /<span class="stat-value">1<\/span><span class="stat-label">Students<\/span>/);
-  assert.match(totalsHtml, /<span class="stat-value">1<\/span><span class="stat-label">Checked In<\/span>/);
+  assert.match(page.text, /<div class="manage-section reg-summary-card">/, 'expected the single reg-summary-card on the page');
+  assert.match(page.text, /<div class="reg-summary-cols">/, 'expected the 4-column layout inside that one card');
+  assert.match(page.text, /Registered/);
+  assert.match(page.text, /Canceled/);
+  assert.match(page.text, /Checked In/);
+  assert.match(page.text, /Checked Out/);
+
+  // Extracts one status column's own inner HTML by its accent class
+  // (each column is <div class="reg-summary-col reg-summary-col-
+  // <accent>">...</div>, itself containing exactly 4 further <div>s -
+  // a header + 3 rows).
+  function colHtml(accent) {
+    // Header/row <div>s are siblings, each opening and closing on its
+    // own - the only place two </div> tags land back to back inside one
+    // column is the last row's close immediately followed by the
+    // column's own close.
+    const re = new RegExp(`<div class="reg-summary-col reg-summary-col-${accent}">([\\s\\S]*?)</div>\\s*</div>`);
+    return re.exec(page.text)[1];
+  }
+  function rowValue(html, label) {
+    const re = new RegExp(`reg-summary-row-label">${label}</span>\\s*<span class="reg-summary-row-value">(\\d+)</span>`);
+    return Number(re.exec(html)[1]);
+  }
+
+  // One family registered (parent + student), one (the parent) checked in.
+  const registeredCol = colHtml('green');
+  assert.equal(rowValue(registeredCol, 'Family'), 1);
+  assert.equal(rowValue(registeredCol, 'Student'), 1);
+  assert.equal(rowValue(registeredCol, 'Parent'), 1);
+
+  const checkedInCol = colHtml('blue');
+  assert.equal(rowValue(checkedInCol, 'Family'), 1);
+  assert.equal(rowValue(checkedInCol, 'Student'), 0);
+  assert.equal(rowValue(checkedInCol, 'Parent'), 1);
+
+  const canceledCol = colHtml('orange');
+  assert.equal(rowValue(canceledCol, 'Family'), 0);
 });
 
 test('Print, Export, and Import buttons/routes exist and work', async () => {

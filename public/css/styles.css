@@ -1959,6 +1959,56 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
   .totals-item .stat-label { font-size: 0.62rem; }
 }
 
+/* Main Admin Events Attendance tab (views/admin-events-registrations.
+   ejs) - a real request, with a reference screenshot: "counts for
+   registered, canceled, checked in etc should look like this single
+   card image. Use my pastel website colors. Orange. Blue, purple and
+   green." All on ONE card (.reg-summary-card, the site's normal
+   .manage-section look), split into 4 tinted columns (a divider between
+   each, not separate boxes) - a header (icon+title) then three Family/
+   Student/Parent rows below, in this app's own soft-tint palette
+   (green-bg/orange-bg/brand-soft/purple-soft), not the reference
+   image's own bold red/blue/green/purple (red isn't one of "my" 4 named
+   colors, so Canceled is orange here instead). Columns stack on a
+   narrow screen, each keeping its own divider as a top border instead
+   of a left border. max-width keeps the card compact like the
+   reference image instead of stretching across the full page. */
+.reg-summary-card { margin: 1.5rem 0; padding: 0; overflow: hidden; max-width: 760px; }
+.reg-summary-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.reg-summary-col { border-left: 1px solid var(--border); }
+.reg-summary-col:first-child { border-left: none; }
+.reg-summary-col-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; font-weight: 700; }
+.reg-summary-col-header .icon { width: 1.15rem; height: 1.15rem; flex-shrink: 0; }
+.reg-summary-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem; border-top: 1px solid var(--border); }
+.reg-summary-row .icon { width: 1.1rem; height: 1.1rem; color: var(--muted); flex-shrink: 0; }
+.reg-summary-row-label { flex: 1; color: var(--muted); font-size: 0.88rem; }
+.reg-summary-row-value { font-weight: 700; font-size: 1.15rem; }
+
+.reg-summary-col-green .reg-summary-col-header { background: var(--green-bg); color: var(--green); }
+.reg-summary-col-green .reg-summary-row-value { color: var(--green); }
+.reg-summary-col-orange .reg-summary-col-header { background: var(--orange-bg); color: var(--orange); }
+.reg-summary-col-orange .reg-summary-row-value { color: var(--orange); }
+.reg-summary-col-blue .reg-summary-col-header { background: var(--brand-soft); color: var(--brand-darker); }
+.reg-summary-col-blue .reg-summary-row-value { color: var(--brand-darker); }
+.reg-summary-col-purple .reg-summary-col-header { background: var(--purple-soft); color: var(--purple); }
+.reg-summary-col-purple .reg-summary-row-value { color: var(--purple); }
+
+/* "It should be able to fit all on one row in mobile" - stays 4 columns
+   (never stacks to 1), each column just gets a compact stat-tile layout
+   instead of the desktop's icon+label+value row: the row icon is
+   dropped, and label/value swap order (via `order`) so the number reads
+   as a big number with a small caption under it, like a mobile stat
+   tile - the only way 4 columns of "Family 4" text fit on a phone
+   screen without wrapping or overflowing. */
+@media (max-width: 640px) {
+  .reg-summary-col-header { flex-direction: column; gap: 0.15rem; padding: 0.5rem 0.15rem; text-align: center; font-size: 0.52rem; line-height: 1.1; white-space: nowrap; }
+  .reg-summary-col-header .icon { width: 0.85rem; height: 0.85rem; }
+  .reg-summary-row { flex-direction: column; gap: 0; padding: 0.4rem 0.15rem; text-align: center; }
+  .reg-summary-row .icon { display: none; }
+  .reg-summary-row-label { order: 2; flex: none; font-size: 0.56rem; white-space: nowrap; }
+  .reg-summary-row-value { order: 1; font-size: 0.95rem; }
+}
+
 /* Co-op Admin homepage "Family & Student Counts" card - replaces the old
    7-card Monday/Wednesday/Total stat grid with the single two-column
    card a reference screenshot specified: one Monday column and one

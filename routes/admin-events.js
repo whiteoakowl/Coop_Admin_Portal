@@ -1045,21 +1045,46 @@ router.post('/:id/extra-fields/:fieldId/delete', async (req, res) => {
 // registered, cancel, checked in and checked out" - counted straight off
 // familyGroupedRegistrationsForEvent's own rows rather than a separate
 // query, since that's already every registration this page renders.
+// A real request, with a reference screenshot: "counts for registered,
+// canceled, checked in etc should look like this single card image."
+// Four categories (Registered/Canceled/Checked In/Checked Out), each its
+// own Family/Student/Parent breakdown - "family" for a category means
+// "this family has at least one member in that state," same convention
+// event.familyCount/family_capacity already use elsewhere for "families
+// registered." Guests aren't tied to a family or a parent/student type,
+// so (same as the old flat totals.parents/students, which only ever
+// counted group.members too) they don't factor into these breakdowns.
 function registrationTotals(familyGroups) {
-  const totals = { families: familyGroups.length, parents: 0, students: 0, cancelled: 0, checkedIn: 0, checkedOut: 0 };
+  const totals = {
+    registered: { family: 0, student: 0, parent: 0 },
+    canceled: { family: 0, student: 0, parent: 0 },
+    checkedIn: { family: 0, student: 0, parent: 0 },
+    checkedOut: { family: 0, student: 0, parent: 0 },
+  };
   familyGroups.forEach((group) => {
+    const familyIn = { registered: false, canceled: false, checkedIn: false, checkedOut: false };
     group.members.forEach((r) => {
-      if (r.status === 'cancelled') totals.cancelled += 1;
-      else if (r.memberType === 'parent' || r.memberType === 'admin') totals.parents += 1;
-      else totals.students += 1;
-      if (r.checked_in_at) totals.checkedIn += 1;
-      if (r.checked_out_at) totals.checkedOut += 1;
+      const bucket = r.memberType === 'parent' || r.memberType === 'admin' ? 'parent' : 'student';
+      if (r.status === 'cancelled') {
+        totals.canceled[bucket] += 1;
+        familyIn.canceled = true;
+      } else {
+        totals.registered[bucket] += 1;
+        familyIn.registered = true;
+      }
+      if (r.checked_in_at) {
+        totals.checkedIn[bucket] += 1;
+        familyIn.checkedIn = true;
+      }
+      if (r.checked_out_at) {
+        totals.checkedOut[bucket] += 1;
+        familyIn.checkedOut = true;
+      }
     });
-    group.guests.forEach((g) => {
-      if (g.status === 'cancelled') totals.cancelled += 1;
-      if (g.checked_in_at) totals.checkedIn += 1;
-      if (g.checked_out_at) totals.checkedOut += 1;
-    });
+    if (familyIn.registered) totals.registered.family += 1;
+    if (familyIn.canceled) totals.canceled.family += 1;
+    if (familyIn.checkedIn) totals.checkedIn.family += 1;
+    if (familyIn.checkedOut) totals.checkedOut.family += 1;
   });
   return totals;
 }
