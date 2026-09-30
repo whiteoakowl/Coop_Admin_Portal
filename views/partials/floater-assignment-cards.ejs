@@ -8,7 +8,19 @@
 // `label` merged in by the route), dayLabel and (optionally) dateLabel
 // for the per-page print header - only actually rendered under @media
 // print, so callers that never print, like the kiosk view, can simply
-// omit them.
+// omit them. kiosk (optional, default false) - true only for the public,
+// no-login kiosk view (routes/volunteers.js's own comment already says
+// "Plain names only" there, but the member-name link below used to render
+// regardless of caller). A real bug report: tapping an assigned floater's
+// name on that public board took an unauthenticated kiosk visitor to
+// /admin/members/:id - at best a dead end at the admin login page, at
+// worst (an admin device left signed in) a real navigation into the full
+// admin site, either way landing on a page that never loads fullscreen-
+// nav.js, so the very next link tap there broke kiosk fullscreen for
+// real. The Archive popup/print callers (both requireAdmin-gated) keep
+// the clickable link; the kiosk caller now gets a plain, unlinked name -
+// same "no admin escape hatch" treatment setup-public.ejs's own member
+// rows already use for the exact same reason.
 //
 // A real request: "floater printing. each page should have a header,
 // each page should be an hour that fits to page." Each hour is wrapped
@@ -19,6 +31,7 @@
 // single top-of-document header, which would otherwise only land on
 // whichever one page happens to hold it.
 var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
+var isKiosk = typeof kiosk !== 'undefined' && kiosk;
 %>
 <% if (cards.length === 0) { %>
   <p class="roster-empty">No positions configured for this day yet.</p>
@@ -49,7 +62,9 @@ var FLOATER_ACCENTS = ['blue', 'green', 'orange', 'purple'];
                 <td class="floater-card-position"><%= job.title %></td>
                 <td><%= job.room || '—' %></td>
                 <td>
-                  <% if (job.assigned) { %>
+                  <% if (job.assigned && isKiosk) { %>
+                    <%= job.assigned.name %>
+                  <% } else if (job.assigned) { %>
                     <a class="member-name-link" href="/admin/members/<%= job.assigned.id %>"><%= job.assigned.name %></a>
                   <% } else { %>
                     <span class="floater-card-unassigned">Unassigned</span>

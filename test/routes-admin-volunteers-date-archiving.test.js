@@ -149,6 +149,25 @@ test('the read-only Archive view/print/export routes only work for an explicitly
   assert.equal(afterArchive.status, 200, 'once explicitly archived, the same date should be readable');
 });
 
+test('the admin-only Archive view-fragment still links an assigned floater\'s name to their /admin/members profile (only the public kiosk board dropped that link)', async () => {
+  const { createPermanentJob, setAssignment } = require('../utils/substitutes');
+  const { cookie, csrfToken } = await loginAsAdmin();
+  const day = 'monday';
+  const date = '2020-05-04';
+  await addDate(cookie, csrfToken, day, date);
+
+  const jobId = await createPermanentJob({ day, hourPosition: 1, title: 'Archive Link Job', room: 'Room L' });
+  const { lastInsertRowid: floaterId } = await db
+    .prepare("INSERT INTO members (name, barcode, member_type) VALUES ('Archive Link Floater', 'archive-link-floater', 'parent')")
+    .run();
+  await setAssignment(date, 'job', jobId, floaterId, false);
+  await request(app).post(`/admin/volunteers/${day}/dates/${date}/archive`).set('Cookie', cookie).type('form').send({ _csrf: csrfToken });
+
+  const res = await request(app).get(`/admin/volunteers/${day}/archive/${date}/view-fragment`).set('Cookie', cookie);
+  assert.equal(res.status, 200);
+  assert.match(res.text, new RegExp(`<a class="member-name-link" href="/admin/members/${floaterId}">Archive Link Floater</a>`));
+});
+
 test('removing a date (not archiving it) deletes it outright, regardless of archived status', async () => {
   const { cookie, csrfToken } = await loginAsAdmin();
   const day = 'wednesday';

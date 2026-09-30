@@ -101,6 +101,25 @@ test('GET /volunteers/:day', async (t) => {
     assert.doesNotMatch(res.text, /Still Pending Job/, 'an unassigned/still-pending position must be invisible on the public kiosk, not shown as "Unassigned"');
   });
 
+  await t.test('a real bug report: an assigned floater\'s name is plain text, not a link into /admin/members - tapping it on the public kiosk used to land an unauthenticated visitor on the admin site and break kiosk fullscreen', async () => {
+    const { createPermanentJob, setAssignment } = require('../utils/substitutes');
+    // wednesday, not monday - monday already has an earlier "closest
+    // upcoming" date seeded by a prior test in this file, which would
+    // otherwise win over whatever date this test adds and hide this job.
+    const list = await db.prepare("SELECT id FROM volunteer_lists WHERE day = 'wednesday'").get();
+    const date = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db.prepare('INSERT INTO volunteer_dates (volunteer_list_id, session_date) VALUES (?, ?)').run(list.id, date);
+
+    const jobId = await createPermanentJob({ day: 'wednesday', hourPosition: 1, title: 'No-Link Job', room: 'Room N' });
+    const floater = (await db.prepare("INSERT INTO members (name, barcode, member_type) VALUES ('No Link Floater', 'kiosk-floater-nolink', 'parent')").run()).lastInsertRowid;
+    await setAssignment(date, 'job', jobId, floater, false);
+
+    const res = await request(app).get('/volunteers/wednesday');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /No Link Floater/);
+    assert.doesNotMatch(res.text, /href="\/admin\/members\//, 'the public kiosk board must never link out to the admin site');
+  });
+
   await t.test('a missing volunteer_lists row for an otherwise-valid day 404s instead of crashing', async () => {
     // Simulates the real startup-race bug this test file exists to lock
     // in: a request landing before db/bootstrapPg.js's first-boot seeding
