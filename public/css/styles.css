@@ -2449,7 +2449,18 @@ a.totals-item:hover, a.totals-item:focus-visible { background: var(--brand-soft)
 .member-edit-form { max-width: 720px; }
 .member-form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr), not a bare 1fr - a real bug report: "on mobile all
+     event edit options fall off the right side of the page." A plain
+     `1fr` track has an implicit min-width:auto, so Grid sizes the whole
+     column to whichever single field inside it (any tab's own multi-
+     select dropdown, rich-text toolbar row, etc.) has the widest
+     intrinsic content, then lets every OTHER field's grid item render at
+     that same too-wide size regardless of the grid container's own real
+     width - the classic "grid items don't shrink to fit" gotcha.
+     minmax(0, 1fr) gives the track an explicit 0 floor, so it shrinks to
+     the container's actual width and each item's own min-width: 0 (set
+     just below) takes over from there instead. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem 1.5rem;
 }
 .member-form-full { grid-column: 1 / -1; }
@@ -7661,7 +7672,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgr
   .notes-dialog,
   .member-picker-dialog,
   .member-profile-dialog { width: 92vw; padding: 1rem; }
-  .member-form-grid { grid-template-columns: 1fr; }
+  .member-form-grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* Event Details' Activity/Meetup-Parking/What to Bring/Extra Notes
+     checkboxes (views/admin-events-builder.ejs) - a real request: "all
+     those titles and questions should shrink font to fit nicely on one
+     row for mobile" (they were wrapping onto 2-3 lines at phone widths). */
+  .event-info-section-checkbox { font-size: 0.78rem; gap: 0.3rem; }
+  .event-info-section-checkbox .hint { font-size: 0.78rem; }
+  /* The title text and its hint now share one wrapping <span> (rather
+     than being two separate flex items, which used to squeeze each word
+     onto its own line) - min-width: 0 lets that span actually shrink
+     inside the flex row instead of forcing the row wider than it. */
+  .event-info-section-checkbox > span { min-width: 0; }
 }
 
 /* ---------- Schedule module ---------- */

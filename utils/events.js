@@ -1265,6 +1265,46 @@ async function setGuestAttendanceStatus(guestRegistrationId, status) {
   await db.prepare('UPDATE event_guest_registrations SET attendance_status = ? WHERE id = ?').run(status || null, guestRegistrationId);
 }
 
+// --- Organizers ---
+
+// A real request: "Organized by should be a drop down to choose Sanford
+// Homeschoolers or a parent name. Can select multiple. Will show on
+// parent portal who Organized the event and their email address." Each
+// row is either a specific parent (member_id set) or the fixed "Sanford
+// Homeschoolers" option (member_id null) - see the event_organizers
+// migration's own comment. LEFT JOIN so the org row still comes back
+// (with name/email null) alongside any real parent rows.
+async function organizersForEvent(eventId) {
+  return db
+    .prepare(
+      `SELECT eo.id, eo.member_id AS "memberId", m.name, m.email
+       FROM event_organizers eo
+       LEFT JOIN members m ON m.id = eo.member_id
+       WHERE eo.event_id = ?
+       ORDER BY eo.id`
+    )
+    .all(eventId);
+}
+
+// selections: array of strings, each either the literal 'org' (Sanford
+// Homeschoolers) or 'member:<id>' (a specific parent) - matching values
+// the admin-events-builder.ejs multi-select checkbox options above.
+// Replace-all rather than diff, same pattern the Grade/Age multi-selects'
+// own comma-joined columns use - a handful of rows per event, never worth
+// the extra bookkeeping a real diff would need.
+async function setEventOrganizers(eventId, selections) {
+  await db.prepare('DELETE FROM event_organizers WHERE event_id = ?').run(eventId);
+  const unique = [...new Set(selections)];
+  for (const sel of unique) {
+    if (sel === 'org') {
+      await db.prepare('INSERT INTO event_organizers (event_id, member_id) VALUES (?, NULL)').run(eventId);
+    } else if (sel.startsWith('member:')) {
+      const memberId = parseInt(sel.slice('member:'.length), 10);
+      if (memberId) await db.prepare('INSERT INTO event_organizers (event_id, member_id) VALUES (?, ?)').run(eventId, memberId);
+    }
+  }
+}
+
 // --- Volunteer roles (handoff item 2) ---
 
 async function addVolunteerRole(eventId, data) {
@@ -1599,6 +1639,8 @@ module.exports = {
   setGuestCheckedOut,
   setRegistrationAttendanceStatus,
   setGuestAttendanceStatus,
+  organizersForEvent,
+  setEventOrganizers,
   addVolunteerRole,
   updateVolunteerRole,
   deleteVolunteerRole,

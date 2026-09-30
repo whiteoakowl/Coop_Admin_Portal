@@ -183,10 +183,14 @@ router.get('/:id', async (req, res) => {
   );
 
   const portalParam = req.query.portal === 'student' || req.query.portal === 'parent' ? req.query.portal : null;
+  // A real request: "will show on parent portal who Organized the event
+  // and their email address" - see utils/events.js's own organizersForEvent.
+  const organizers = await events.organizersForEvent(event.id);
   res.render('events-detail', {
     title: event.title,
     settings,
     portalParam,
+    organizers,
     event: withImageUrl(event),
     startsLabel: formatFriendlyTimestamp(event.starts_at),
     endsLabel: event.ends_at ? formatFriendlyTimestamp(event.ends_at) : null,

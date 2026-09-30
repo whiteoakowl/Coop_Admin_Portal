@@ -80,6 +80,20 @@
           <p class="site-hero-meta"><svg class="icon"><use href="#icon-clock"/></svg> <%= timeLine %></p>
           <% if (event.location) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-map-pin"/></svg> <%= event.location %></p><% } %>
           <% if (priceLabel) { %><p class="site-hero-meta"><svg class="icon"><use href="#icon-tag"/></svg> <%= priceLabel %></p><% } %>
+          <%
+            // A real request: "Organized by should be a drop down to
+            // choose Sanford Homeschoolers or a parent name. Can select
+            // multiple. Will show on parent portal who Organized the
+            // event and their email address." A null memberId row is the
+            // fixed "Sanford Homeschoolers" option - see utils/events.js's
+            // own organizersForEvent/event_organizers migration.
+            var organizerLines = (typeof organizers !== 'undefined' ? organizers : []).map(function(o) {
+              return o.memberId ? (o.name + (o.email ? ' (' + o.email + ')' : '')) : 'Sanford Homeschoolers';
+            });
+          %>
+          <% if (organizerLines.length) { %>
+            <p class="site-hero-meta"><svg class="icon"><use href="#icon-user"/></svg> Organized by <%= organizerLines.join(', ') %></p>
+          <% } %>
         </div>
         <% if (event.description) { %><div class="forum-editable-display"><%- event.description %></div><% } %>
 

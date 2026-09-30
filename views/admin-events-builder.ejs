@@ -132,12 +132,6 @@
           <label class="member-form-full">Short Description <span class="hint">(50-150 characters, shown wherever the event is listed)</span>
             <textarea name="shortDescription" rows="2" maxlength="150"><%= event.short_description || '' %></textarea>
           </label>
-          <div class="member-form-full" data-forum-editor>
-            <label>Description</label>
-            <%- include('partials/forum-editor-toolbar') %>
-            <div class="forum-editable" data-forum-editable contenteditable="true"><%- event.description || '' %></div>
-            <input type="hidden" name="description" data-forum-body-input />
-          </div>
           <label>Category
             <select name="categoryId">
               <option value="">None</option>
@@ -178,9 +172,27 @@
             startFieldName: 'startsAt', endFieldName: 'endsAt',
             startRequired: true,
           }) %>
-          <label>Organized By
-            <input type="text" name="organizedBy" value="<%= event.organized_by || '' %>" placeholder="e.g., Sanford Homeschoolers" />
-          </label>
+          <%
+            // A real request: "Organized by should be a drop down to
+            // choose Sanford Homeschoolers or a parent name. Can select
+            // multiple. Will show on parent portal who Organized the
+            // event and their email address." Same multi-select-checkbox
+            // control the Grade/Age pickers already use (a real request
+            // of its own) - see utils/events.js's own organizersForEvent/
+            // setEventOrganizers for how these values round-trip.
+            var organizerOptions = [{ value: 'org', label: 'Sanford Homeschoolers' }].concat(
+              parentOrganizerOptions.map(function(p) { return { value: 'member:' + p.id, label: p.name }; })
+            );
+          %>
+          <div class="member-form-full">
+            <span class="roster-checkbox-label">Organized By</span>
+            <%- include('partials/multi-select-checkbox', {
+              name: 'organizers',
+              options: organizerOptions,
+              selected: selectedOrganizers,
+              placeholder: 'Select organizer(s)…',
+            }) %>
+          </div>
           <div class="member-form-full">
             <span class="roster-checkbox-label">Tags <span class="hint">(helps people find your event)</span></span>
             <div data-tag-input="tags" class="tag-input-wrap">
@@ -189,6 +201,12 @@
               <% }); %>
               <input type="text" class="tag-input-field" placeholder="Add tags and press Enter" />
             </div>
+          </div>
+          <div class="member-form-full" data-forum-editor>
+            <label>Description</label>
+            <%- include('partials/forum-editor-toolbar') %>
+            <div class="forum-editable" data-forum-editable contenteditable="true"><%- event.description || '' %></div>
+            <input type="hidden" name="description" data-forum-body-input />
           </div>
 
           <%
@@ -209,9 +227,9 @@
           %>
           <% infoSections.forEach(function(section) { %>
             <div class="member-form-full">
-              <label class="checkbox-option">
+              <label class="checkbox-option event-info-section-checkbox">
                 <input type="checkbox" name="include<%= section.key.charAt(0).toUpperCase() + section.key.slice(1) %>" value="1" <%= section.included ? 'checked' : '' %> />
-                <%= section.label %> <span class="hint">&mdash; Include this section?</span>
+                <span><%= section.label %> <span class="hint">&mdash; Include this section?</span></span>
               </label>
               <textarea name="<%= section.key %>" rows="3"><%= section.text || '' %></textarea>
             </div>

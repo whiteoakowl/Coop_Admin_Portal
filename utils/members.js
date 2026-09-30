@@ -88,6 +88,15 @@ async function activeParentAndAdminOptions() {
   return (await db.prepare("SELECT id, name FROM members WHERE active = 1 AND member_type IN ('parent', 'admin')").all()).sort(byLastName);
 }
 
+// Same as activeParentOptions above, plus each parent's own contact
+// email - the Main Admin Events "Organized By" picker (utils/events.js's
+// own organizersForEvent/setEventOrganizers) needs it to show on the
+// parent-facing event page: "will show on parent portal who organized
+// the event and their email address."
+async function activeParentOptionsWithEmail() {
+  return (await db.prepare("SELECT id, name, email FROM members WHERE active = 1 AND member_type = 'parent'").all()).sort(byLastName);
+}
+
 // Every active member, any type - a real request: "the drop down menu of
 // names should include all members admin, primary parent, parent and
 // student" for the Name Tag Request form specifically, since a student
@@ -385,6 +394,7 @@ module.exports = {
   findMemberByName,
   activeParentOptions,
   activeParentAndAdminOptions,
+  activeParentOptionsWithEmail,
   activeMemberOptions,
   familyGroupsByMember,
   loadFamilyMember,

@@ -17,6 +17,7 @@ const { createStorageClient, uploadFile, deleteFile, publicUrl, generateKey } = 
 const { formatFriendlyTimestamp } = require('../utils/dates');
 const db = require('../db');
 const events = require('../utils/events');
+const { activeParentOptionsWithEmail } = require('../utils/members');
 const {
   listSignUpLists,
   getSignUpList,
@@ -618,6 +619,11 @@ async function loadBuilder(req, res) {
     selectedAgeGroups: events.parseAgeGroupList(event.age_group_restriction),
     eventTypes: events.EVENT_TYPES,
     selectedTags: (event.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
+    // A real request: "Organized by should be a drop down to choose
+    // Sanford Homeschoolers or a parent name. Can select multiple." See
+    // utils/events.js's own organizersForEvent/setEventOrganizers.
+    parentOrganizerOptions: await activeParentOptionsWithEmail(),
+    selectedOrganizers: (await events.organizersForEvent(event.id)).map((o) => (o.memberId ? `member:${o.memberId}` : 'org')),
     // A real request: "under individual event settings, there should be
     // a button that says copy link with the public url address for the
     // event" - same data-copy-link pattern Signup/Volunteer Lists
@@ -666,7 +672,11 @@ router.post('/:id', async (req, res) => {
     slug: (req.body.slug || '').trim(),
     eventType: (req.body.eventType || '').trim(),
     shortDescription: (req.body.shortDescription || '').trim(),
-    organizedBy: (req.body.organizedBy || '').trim(),
+    // organizedBy (the old free-text field) is no longer edited from this
+    // form - eventDataFromRow(event)'s own value (spread above) just
+    // passes through unchanged, same "retired but not dropped column"
+    // pattern as e.g. event.language. See setEventOrganizers below for
+    // the real "Organized By" picker's own save.
     tags: [].concat(req.body.tags || []).map((t) => t.trim()).filter(Boolean).join(', '),
     activityInfo: (req.body.activityInfo || '').trim(),
     includeActivityInfo: req.body.includeActivityInfo === '1',
@@ -677,6 +687,7 @@ router.post('/:id', async (req, res) => {
     extraNotes: (req.body.extraNotes || '').trim(),
     includeExtraNotes: req.body.includeExtraNotes === '1',
   });
+  await events.setEventOrganizers(id, [].concat(req.body.organizers || []));
   res.redirect(`/main-admin/events/${id}/builder?notice=` + encodeURIComponent('Event details saved.'));
 });
 
