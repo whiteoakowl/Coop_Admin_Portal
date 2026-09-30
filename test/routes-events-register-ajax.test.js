@@ -258,6 +258,31 @@ test('an event with a ticket type opens a dialog instead of checkboxes - no bulk
   assert.match(page.text, /name="ticketTypeId"/);
 });
 
+test('plain event: a registered member\'s row says "Unregister" (not "Registered") and keeps its checkbox, marked data-registered="1"', async () => {
+  const admin = await loginAsMainAdmin();
+  const eventId = await createEvent(admin);
+  await publishEvent(admin, eventId);
+  const parent = await createParentAccount(1);
+
+  await request(app)
+    .post(`/events/${eventId}/register`)
+    .set('Cookie', parent.cookie)
+    .type('form')
+    .send({ memberId: String(parent.memberId), _csrf: parent.csrfToken });
+
+  const page = await request(app).get(`/events/${eventId}`).set('Cookie', parent.cookie);
+  assert.match(
+    page.text,
+    /class="event-register-member-row" data-member-id="\d+" data-member-name="[^"]*" data-registered="1">\s*<span class="event-register-member-info">\s*<input type="checkbox" class="event-register-member-checkbox"/,
+    'a registered member still gets a checkbox (for bulk unregister) and is flagged data-registered="1"'
+  );
+  assert.match(page.text, />Unregister</);
+  assert.doesNotMatch(page.text, />Registered</, 'the button must say "Unregister", not the old "Registered" label');
+
+  // The still-unregistered family member's own row is unaffected.
+  assert.match(page.text, /data-registered="0"/);
+});
+
 test('the events-detail-register.js script is included on the page', async () => {
   const admin = await loginAsMainAdmin();
   const eventId = await createEvent(admin);

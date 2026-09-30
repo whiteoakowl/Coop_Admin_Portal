@@ -24,9 +24,6 @@
   const dialog = document.getElementById('event-register-dialog');
   const selectedBtn = document.getElementById('event-register-selected-btn');
 
-  function rowInfo(row) {
-    return row.querySelector('.event-register-member-info');
-  }
   function rowActions(row) {
     return row.querySelector('.event-register-member-actions');
   }
@@ -57,22 +54,27 @@
     return postAction(`/events/${eventId}/unregister`, { memberId });
   }
 
-  // "The button will turn white and say registered" - roster-action-btn-
-  // registered is the white/green-outline variant (public/css/styles.css).
+  // "The button will turn white and say [unregister]" - roster-action-btn-
+  // registered is the white/green-outline variant (public/css/styles.css);
+  // the button itself always did double as the unregister action (its own
+  // js-event-unregister-btn class), this just makes the label say so. A
+  // registered row keeps its checkbox now (see events-detail.ejs's own
+  // comment) so it can still be picked up by the bulk button, this time to
+  // unregister rather than register.
   function markRegistered(row) {
+    row.dataset.registered = '1';
     const actions = rowActions(row);
     actions.innerHTML = '';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'roster-action-btn roster-action-btn-small roster-action-btn-registered js-event-unregister-btn';
-    btn.textContent = 'Registered';
+    btn.textContent = 'Unregister';
     actions.appendChild(btn);
-    const checkbox = rowInfo(row).querySelector('.event-register-member-checkbox');
-    if (checkbox) checkbox.remove();
     updateSelectedButtonState();
   }
 
   function markUnregistered(row) {
+    row.dataset.registered = '0';
     const actions = rowActions(row);
     actions.innerHTML = '';
     const btn = document.createElement('button');
@@ -80,26 +82,31 @@
     btn.className = 'roster-action-btn roster-action-btn-small js-event-register-btn';
     btn.textContent = 'Register';
     actions.appendChild(btn);
-    // A cancelled registration is eligible again (eligibility is a static
-    // grade/age check, not affected by registering/cancelling) - restore
-    // its checkbox in the plain (no-dialog) case so it can be picked back
-    // up by "Register Selected" without a reload.
-    if (!needsDialog) {
-      const info = rowInfo(row);
-      if (!info.querySelector('.event-register-member-checkbox')) {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'event-register-member-checkbox';
-        checkbox.value = row.dataset.memberId;
-        info.insertBefore(checkbox, info.firstChild);
-      }
-    }
     updateSelectedButtonState();
   }
 
+  // A real request: "register selected, [but] if all members from that
+  // family are selected [and already registered], will say unregister
+  // selected." The button now flips between the two actions based on what's
+  // currently checked - if every checked row is already registered, it
+  // switches to "Unregister Selected" (own click handler below unregisters
+  // just those); otherwise it stays "Register Selected" and only acts on
+  // whichever checked rows are NOT yet registered, so a stray registered
+  // row checked alongside unregistered ones is silently skipped rather than
+  // accidentally unregistered.
   function updateSelectedButtonState() {
     if (!selectedBtn) return;
-    selectedBtn.disabled = list.querySelectorAll('.event-register-member-checkbox:checked').length === 0;
+    const checked = [...list.querySelectorAll('.event-register-member-checkbox:checked')];
+    if (checked.length === 0) {
+      selectedBtn.disabled = true;
+      selectedBtn.textContent = 'Register Selected';
+      selectedBtn.dataset.mode = 'register';
+      return;
+    }
+    const allRegistered = checked.every((cb) => cb.closest('.event-register-member-row').dataset.registered === '1');
+    selectedBtn.disabled = false;
+    selectedBtn.dataset.mode = allRegistered ? 'unregister' : 'register';
+    selectedBtn.textContent = allRegistered ? 'Unregister Selected' : 'Register Selected';
   }
 
   list.addEventListener('click', async (e) => {
@@ -154,20 +161,25 @@
     selectedBtn.addEventListener('click', async () => {
       const checkboxes = [...list.querySelectorAll('.event-register-member-checkbox:checked')];
       if (!checkboxes.length) return;
+      const mode = selectedBtn.dataset.mode === 'unregister' ? 'unregister' : 'register';
       selectedBtn.disabled = true;
-      const originalLabel = selectedBtn.textContent;
-      selectedBtn.textContent = 'Registering…';
+      selectedBtn.textContent = mode === 'unregister' ? 'Unregistering…' : 'Registering…';
       // Sequential, not Promise.all - each call goes through the same
-      // capacity/waitlist checks a single Register click would, and
-      // firing them one at a time keeps that server-side accounting
+      // capacity/waitlist checks a single Register/Unregister click would,
+      // and firing them one at a time keeps that server-side accounting
       // (registrationCount, family_capacity) correct in request order
       // instead of racing several at once against the same event.
       for (const checkbox of checkboxes) {
         const row = checkbox.closest('.event-register-member-row');
-        const data = await registerMember(checkbox.value);
-        if (data.ok) markRegistered(row);
+        const rowIsRegistered = row.dataset.registered === '1';
+        if (mode === 'unregister' && rowIsRegistered) {
+          const data = await unregisterMember(checkbox.value);
+          if (data.ok) markUnregistered(row);
+        } else if (mode === 'register' && !rowIsRegistered) {
+          const data = await registerMember(checkbox.value);
+          if (data.ok) markRegistered(row);
+        }
       }
-      selectedBtn.textContent = originalLabel;
       updateSelectedButtonState();
     });
   }

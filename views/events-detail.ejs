@@ -178,9 +178,17 @@
               // there's nothing per-member to ask first, so they're
               // scoped to the no-ticket/no-extra-field case.
               var needsDialog = (event.ticketTypes && event.ticketTypes.length > 0) || (event.extraFields && event.extraFields.length > 0);
-              var eligibleUnregisteredCount = family.filter(function(m) { return eligibleForRegistration.has(m.id) && registeredMemberIds.indexOf(m.id) === -1; }).length;
+              // A real request: "register selected, [but] if all members
+              // from that family are selected [and already registered],
+              // will say unregister selected" - the bulk button now
+              // covers BOTH directions (public/js/events-detail-register.js
+              // flips its own label/action based on what's checked), so it
+              // needs to show whenever there's more than one member to act
+              // on at all, not just when there's more than one still
+              // unregistered.
+              var eligibleCount = family.filter(function(m) { return eligibleForRegistration.has(m.id); }).length;
             %>
-              <% if (!needsDialog && eligibleUnregisteredCount > 1) { %>
+              <% if (!needsDialog && eligibleCount > 1) { %>
                 <div class="roster-btn-row" style="margin-bottom: 0.75rem;">
                   <button type="button" id="event-register-selected-btn" class="roster-action-btn" disabled>Register Selected</button>
                 </div>
@@ -190,16 +198,20 @@
                   var isRegistered = registeredMemberIds.indexOf(m.id) !== -1;
                   var isEligible = eligibleForRegistration.has(m.id);
                 %>
-                  <div class="event-register-member-row<%= isEligible ? '' : ' event-register-member-row-ineligible' %>" data-member-id="<%= m.id %>" data-member-name="<%= m.name %>">
+                  <div class="event-register-member-row<%= isEligible ? '' : ' event-register-member-row-ineligible' %>" data-member-id="<%= m.id %>" data-member-name="<%= m.name %>" data-registered="<%= isRegistered ? '1' : '0' %>">
                     <span class="event-register-member-info">
-                      <% if (!needsDialog && isEligible && !isRegistered) { %>
+                      <%# A real request: a registered member also gets a
+                          checkbox now (not just an unregistered one), so
+                          they can be picked up by the same bulk button for
+                          a bulk "Unregister Selected". %>
+                      <% if (!needsDialog && isEligible) { %>
                         <input type="checkbox" class="event-register-member-checkbox" value="<%= m.id %>" />
                       <% } %>
                       <span class="event-register-member-name"><%= m.name %></span>
                     </span>
                     <span class="event-register-member-actions">
                       <% if (isRegistered) { %>
-                        <button type="button" class="roster-action-btn roster-action-btn-small roster-action-btn-registered js-event-unregister-btn">Registered</button>
+                        <button type="button" class="roster-action-btn roster-action-btn-small roster-action-btn-registered js-event-unregister-btn">Unregister</button>
                       <% } else if (isEligible) { %>
                         <button type="button" class="roster-action-btn roster-action-btn-small js-event-register-btn">Register</button>
                       <% } else { %>
